@@ -4,6 +4,7 @@
  */
 
 import type { TabLifecycle } from '../app';
+import type { AudioPlayback } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 
@@ -21,7 +22,7 @@ const SURPRISE_TEXTS = [
 ];
 
 let ttsIsSpeaking = false;
-let ttsPlayback: import('../../../../../sdk/runanywhere-web/packages/core/src/Infrastructure/AudioPlayback').AudioPlayback | null = null;
+let ttsPlayback: AudioPlayback | null = null;
 
 // ---------------------------------------------------------------------------
 // Init

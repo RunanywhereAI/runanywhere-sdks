@@ -42,6 +42,9 @@ ktlint {
     enableExperimentalRules.set(false)
     filter {
         exclude("**/generated/**")
+        // tests/streaming files are mounted as a srcDir but live outside the SDK
+        // source tree and follow repo-level naming conventions, not SDK conventions.
+        exclude { it.file.canonicalPath.contains("/tests/streaming/") }
         include("**/kotlin/**")
     }
 }

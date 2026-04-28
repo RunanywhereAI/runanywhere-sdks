@@ -16,6 +16,7 @@ import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.LLMEvent
+import ai.runanywhere.proto.v1.LLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.ToolValue
@@ -919,7 +920,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Get generation options from SharedPreferences
      */
-    private fun getGenerationOptions(): com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions {
+    private fun getGenerationOptions(): LLMGenerationOptions {
         val temperature = generationPrefs.getFloat("defaultTemperature", 0.7f)
         val maxTokens = generationPrefs.getInt("defaultMaxTokens", 1000)
         val systemPromptValue = generationPrefs.getString("defaultSystemPrompt", "")
@@ -928,10 +929,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         Timber.i("[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=$systemPromptInfo")
 
-        return com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions(
-            maxTokens = maxTokens,
+        return LLMGenerationOptions(
+            max_tokens = maxTokens,
             temperature = temperature,
-            systemPrompt = systemPrompt,
+            system_prompt = systemPrompt,
         )
     }
 

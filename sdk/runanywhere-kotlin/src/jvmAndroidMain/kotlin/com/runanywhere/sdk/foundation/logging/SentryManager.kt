@@ -8,9 +8,9 @@
 
 package com.runanywhere.sdk.foundation.logging
 
-import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.utils.SDKConstants
 import io.sentry.Breadcrumb
 import io.sentry.Sentry

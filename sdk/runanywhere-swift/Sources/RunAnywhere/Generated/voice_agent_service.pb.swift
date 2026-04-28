@@ -22,6 +22,11 @@
 // The service definition is the abstract contract; the per-language
 // adapter is the only hand-written piece (see GAP 09 Phases 16-19).
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -49,6 +54,336 @@ public struct RAVoiceAgentRequest: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+/// ---------------------------------------------------------------------------
+/// v3.2: One-shot voice-turn result.
+///
+/// Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
+/// `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
+/// `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
+/// Returned by the `processVoiceTurn` ergonomic API where a single audio
+/// blob produces transcription + assistant response + synthesized audio in
+/// one call (as opposed to the streaming path served by the Stream rpc).
+/// ---------------------------------------------------------------------------
+public struct RAVoiceAgentResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Whether the input audio passed VAD's speech-detected check.
+  public var speechDetected: Bool = false
+
+  /// Transcribed text from STT. Unset when speech_detected=false.
+  public var transcription: String {
+    get {_transcription ?? String()}
+    set {_transcription = newValue}
+  }
+  /// Returns true if `transcription` has been explicitly set.
+  public var hasTranscription: Bool {self._transcription != nil}
+  /// Clears the value of `transcription`. Subsequent reads from it will return its default value.
+  public mutating func clearTranscription() {self._transcription = nil}
+
+  /// Generated assistant response text from the LLM. Unset when STT
+  /// produced no transcription or LLM was skipped.
+  public var assistantResponse: String {
+    get {_assistantResponse ?? String()}
+    set {_assistantResponse = newValue}
+  }
+  /// Returns true if `assistantResponse` has been explicitly set.
+  public var hasAssistantResponse: Bool {self._assistantResponse != nil}
+  /// Clears the value of `assistantResponse`. Subsequent reads from it will return its default value.
+  public mutating func clearAssistantResponse() {self._assistantResponse = nil}
+
+  /// Thinking content extracted from `<think>...</think>` tags
+  /// (qwen3, deepseek-r1). Unset when the active LLM does not emit
+  /// a chain-of-thought trace.
+  public var thinkingContent: String {
+    get {_thinkingContent ?? String()}
+    set {_thinkingContent = newValue}
+  }
+  /// Returns true if `thinkingContent` has been explicitly set.
+  public var hasThinkingContent: Bool {self._thinkingContent != nil}
+  /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
+  public mutating func clearThinkingContent() {self._thinkingContent = nil}
+
+  /// Synthesized audio data from TTS. Encoding follows AudioFrameEvent
+  /// conventions (typically PCM-F32-LE, sample rate per voice). Unset
+  /// when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
+  public var synthesizedAudio: Data {
+    get {_synthesizedAudio ?? Data()}
+    set {_synthesizedAudio = newValue}
+  }
+  /// Returns true if `synthesizedAudio` has been explicitly set.
+  public var hasSynthesizedAudio: Bool {self._synthesizedAudio != nil}
+  /// Clears the value of `synthesizedAudio`. Subsequent reads from it will return its default value.
+  public mutating func clearSynthesizedAudio() {self._synthesizedAudio = nil}
+
+  /// Component states captured at the end of the turn — useful for UIs
+  /// surfacing readiness / partial-failure breakdowns alongside the
+  /// final result. Unset when the caller does not ask for it.
+  public var finalState: RAVoiceAgentComponentStates {
+    get {_finalState ?? RAVoiceAgentComponentStates()}
+    set {_finalState = newValue}
+  }
+  /// Returns true if `finalState` has been explicitly set.
+  public var hasFinalState: Bool {self._finalState != nil}
+  /// Clears the value of `finalState`. Subsequent reads from it will return its default value.
+  public mutating func clearFinalState() {self._finalState = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _transcription: String? = nil
+  fileprivate var _assistantResponse: String? = nil
+  fileprivate var _thinkingContent: String? = nil
+  fileprivate var _synthesizedAudio: Data? = nil
+  fileprivate var _finalState: RAVoiceAgentComponentStates? = nil
+}
+
+/// ---------------------------------------------------------------------------
+/// v3.2: Voice session behavior configuration.
+///
+/// Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
+/// Controls runtime behavior of the voice agent's session loop — silence
+/// timing, speech threshold, auto-TTS playback, continuous mode, and
+/// LLM thinking-mode toggle.
+/// ---------------------------------------------------------------------------
+public struct RAVoiceSessionConfig: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Silence duration (milliseconds) before processing the speech
+  /// buffer. Default per Swift/Kotlin: 1500 ms.
+  public var silenceDurationMs: Int32 = 0
+
+  /// Minimum audio level to detect speech (0.0 - 1.0). Default per
+  /// Swift/Kotlin: 0.1.
+  public var speechThreshold: Float = 0
+
+  /// Whether to auto-play TTS response after synthesis. Default true.
+  public var autoPlayTts: Bool = false
+
+  /// Whether to auto-resume listening after TTS playback. Default true.
+  public var continuousMode: Bool = false
+
+  /// Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
+  /// Default false.
+  public var thinkingModeEnabled: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// ---------------------------------------------------------------------------
+/// v3.2: Aggregated voice-agent compose configuration.
+///
+/// Mirrors the C ABI `rac_voice_agent_config_t` and Swift
+/// `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
+/// (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
+/// new message provides the fine-grained sub-component view consumed by the
+/// `rac_voice_agent_initialize()` C entry-point.
+///
+/// Each sub-config string field uses a "model_id" naming convention; the
+/// runtime resolves IDs against the model registry. An empty string means
+/// "use the currently loaded model/voice for that capability".
+/// ---------------------------------------------------------------------------
+public struct RAVoiceAgentComposeConfig: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// -------------------------------------------------------------------
+  /// STT sub-config (mirrors rac_voice_agent_stt_config_t).
+  /// -------------------------------------------------------------------
+  public var sttModelPath: String {
+    get {_storage._sttModelPath ?? String()}
+    set {_uniqueStorage()._sttModelPath = newValue}
+  }
+  /// Returns true if `sttModelPath` has been explicitly set.
+  public var hasSttModelPath: Bool {_storage._sttModelPath != nil}
+  /// Clears the value of `sttModelPath`. Subsequent reads from it will return its default value.
+  public mutating func clearSttModelPath() {_uniqueStorage()._sttModelPath = nil}
+
+  public var sttModelID: String {
+    get {_storage._sttModelID ?? String()}
+    set {_uniqueStorage()._sttModelID = newValue}
+  }
+  /// Returns true if `sttModelID` has been explicitly set.
+  public var hasSttModelID: Bool {_storage._sttModelID != nil}
+  /// Clears the value of `sttModelID`. Subsequent reads from it will return its default value.
+  public mutating func clearSttModelID() {_uniqueStorage()._sttModelID = nil}
+
+  public var sttModelName: String {
+    get {_storage._sttModelName ?? String()}
+    set {_uniqueStorage()._sttModelName = newValue}
+  }
+  /// Returns true if `sttModelName` has been explicitly set.
+  public var hasSttModelName: Bool {_storage._sttModelName != nil}
+  /// Clears the value of `sttModelName`. Subsequent reads from it will return its default value.
+  public mutating func clearSttModelName() {_uniqueStorage()._sttModelName = nil}
+
+  /// -------------------------------------------------------------------
+  /// LLM sub-config (mirrors rac_voice_agent_llm_config_t).
+  /// -------------------------------------------------------------------
+  public var llmModelPath: String {
+    get {_storage._llmModelPath ?? String()}
+    set {_uniqueStorage()._llmModelPath = newValue}
+  }
+  /// Returns true if `llmModelPath` has been explicitly set.
+  public var hasLlmModelPath: Bool {_storage._llmModelPath != nil}
+  /// Clears the value of `llmModelPath`. Subsequent reads from it will return its default value.
+  public mutating func clearLlmModelPath() {_uniqueStorage()._llmModelPath = nil}
+
+  public var llmModelID: String {
+    get {_storage._llmModelID ?? String()}
+    set {_uniqueStorage()._llmModelID = newValue}
+  }
+  /// Returns true if `llmModelID` has been explicitly set.
+  public var hasLlmModelID: Bool {_storage._llmModelID != nil}
+  /// Clears the value of `llmModelID`. Subsequent reads from it will return its default value.
+  public mutating func clearLlmModelID() {_uniqueStorage()._llmModelID = nil}
+
+  public var llmModelName: String {
+    get {_storage._llmModelName ?? String()}
+    set {_uniqueStorage()._llmModelName = newValue}
+  }
+  /// Returns true if `llmModelName` has been explicitly set.
+  public var hasLlmModelName: Bool {_storage._llmModelName != nil}
+  /// Clears the value of `llmModelName`. Subsequent reads from it will return its default value.
+  public mutating func clearLlmModelName() {_uniqueStorage()._llmModelName = nil}
+
+  /// -------------------------------------------------------------------
+  /// TTS sub-config (mirrors rac_voice_agent_tts_config_t).
+  /// -------------------------------------------------------------------
+  public var ttsVoicePath: String {
+    get {_storage._ttsVoicePath ?? String()}
+    set {_uniqueStorage()._ttsVoicePath = newValue}
+  }
+  /// Returns true if `ttsVoicePath` has been explicitly set.
+  public var hasTtsVoicePath: Bool {_storage._ttsVoicePath != nil}
+  /// Clears the value of `ttsVoicePath`. Subsequent reads from it will return its default value.
+  public mutating func clearTtsVoicePath() {_uniqueStorage()._ttsVoicePath = nil}
+
+  public var ttsVoiceID: String {
+    get {_storage._ttsVoiceID ?? String()}
+    set {_uniqueStorage()._ttsVoiceID = newValue}
+  }
+  /// Returns true if `ttsVoiceID` has been explicitly set.
+  public var hasTtsVoiceID: Bool {_storage._ttsVoiceID != nil}
+  /// Clears the value of `ttsVoiceID`. Subsequent reads from it will return its default value.
+  public mutating func clearTtsVoiceID() {_uniqueStorage()._ttsVoiceID = nil}
+
+  public var ttsVoiceName: String {
+    get {_storage._ttsVoiceName ?? String()}
+    set {_uniqueStorage()._ttsVoiceName = newValue}
+  }
+  /// Returns true if `ttsVoiceName` has been explicitly set.
+  public var hasTtsVoiceName: Bool {_storage._ttsVoiceName != nil}
+  /// Clears the value of `ttsVoiceName`. Subsequent reads from it will return its default value.
+  public mutating func clearTtsVoiceName() {_uniqueStorage()._ttsVoiceName = nil}
+
+  /// -------------------------------------------------------------------
+  /// VAD sub-config (mirrors rac_voice_agent_vad_config_t).
+  /// -------------------------------------------------------------------
+  public var vadSampleRate: Int32 {
+    get {_storage._vadSampleRate}
+    set {_uniqueStorage()._vadSampleRate = newValue}
+  }
+
+  /// default 0.1
+  public var vadFrameLength: Float {
+    get {_storage._vadFrameLength}
+    set {_uniqueStorage()._vadFrameLength = newValue}
+  }
+
+  /// default 0.005
+  public var vadEnergyThreshold: Float {
+    get {_storage._vadEnergyThreshold}
+    set {_uniqueStorage()._vadEnergyThreshold = newValue}
+  }
+
+  /// -------------------------------------------------------------------
+  /// Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
+  /// rac_wakeword_config_t).
+  /// -------------------------------------------------------------------
+  public var wakewordEnabled: Bool {
+    get {_storage._wakewordEnabled}
+    set {_uniqueStorage()._wakewordEnabled = newValue}
+  }
+
+  public var wakewordModelPath: String {
+    get {_storage._wakewordModelPath ?? String()}
+    set {_uniqueStorage()._wakewordModelPath = newValue}
+  }
+  /// Returns true if `wakewordModelPath` has been explicitly set.
+  public var hasWakewordModelPath: Bool {_storage._wakewordModelPath != nil}
+  /// Clears the value of `wakewordModelPath`. Subsequent reads from it will return its default value.
+  public mutating func clearWakewordModelPath() {_uniqueStorage()._wakewordModelPath = nil}
+
+  public var wakewordModelID: String {
+    get {_storage._wakewordModelID ?? String()}
+    set {_uniqueStorage()._wakewordModelID = newValue}
+  }
+  /// Returns true if `wakewordModelID` has been explicitly set.
+  public var hasWakewordModelID: Bool {_storage._wakewordModelID != nil}
+  /// Clears the value of `wakewordModelID`. Subsequent reads from it will return its default value.
+  public mutating func clearWakewordModelID() {_uniqueStorage()._wakewordModelID = nil}
+
+  public var wakewordPhrase: String {
+    get {_storage._wakewordPhrase ?? String()}
+    set {_uniqueStorage()._wakewordPhrase = newValue}
+  }
+  /// Returns true if `wakewordPhrase` has been explicitly set.
+  public var hasWakewordPhrase: Bool {_storage._wakewordPhrase != nil}
+  /// Clears the value of `wakewordPhrase`. Subsequent reads from it will return its default value.
+  public mutating func clearWakewordPhrase() {_uniqueStorage()._wakewordPhrase = nil}
+
+  /// default 0.5
+  public var wakewordThreshold: Float {
+    get {_storage._wakewordThreshold}
+    set {_uniqueStorage()._wakewordThreshold = newValue}
+  }
+
+  public var wakewordEmbeddingModelPath: String {
+    get {_storage._wakewordEmbeddingModelPath ?? String()}
+    set {_uniqueStorage()._wakewordEmbeddingModelPath = newValue}
+  }
+  /// Returns true if `wakewordEmbeddingModelPath` has been explicitly set.
+  public var hasWakewordEmbeddingModelPath: Bool {_storage._wakewordEmbeddingModelPath != nil}
+  /// Clears the value of `wakewordEmbeddingModelPath`. Subsequent reads from it will return its default value.
+  public mutating func clearWakewordEmbeddingModelPath() {_uniqueStorage()._wakewordEmbeddingModelPath = nil}
+
+  public var wakewordVadModelPath: String {
+    get {_storage._wakewordVadModelPath ?? String()}
+    set {_uniqueStorage()._wakewordVadModelPath = newValue}
+  }
+  /// Returns true if `wakewordVadModelPath` has been explicitly set.
+  public var hasWakewordVadModelPath: Bool {_storage._wakewordVadModelPath != nil}
+  /// Clears the value of `wakewordVadModelPath`. Subsequent reads from it will return its default value.
+  public mutating func clearWakewordVadModelPath() {_uniqueStorage()._wakewordVadModelPath = nil}
+
+  /// -------------------------------------------------------------------
+  /// Session-behavior sub-config. Optional so the C ABI can be invoked
+  /// without runtime-behavior overrides (engine defaults applied).
+  /// -------------------------------------------------------------------
+  public var sessionConfig: RAVoiceSessionConfig {
+    get {_storage._sessionConfig ?? RAVoiceSessionConfig()}
+    set {_uniqueStorage()._sessionConfig = newValue}
+  }
+  /// Returns true if `sessionConfig` has been explicitly set.
+  public var hasSessionConfig: Bool {_storage._sessionConfig != nil}
+  /// Clears the value of `sessionConfig`. Subsequent reads from it will return its default value.
+  public mutating func clearSessionConfig() {_uniqueStorage()._sessionConfig = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -80,6 +415,318 @@ extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
   public static func ==(lhs: RAVoiceAgentRequest, rhs: RAVoiceAgentRequest) -> Bool {
     if lhs.eventFilter != rhs.eventFilter {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.speechDetected) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._transcription) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._assistantResponse) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
+      case 5: try { try decoder.decodeSingularBytesField(value: &self._synthesizedAudio) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._finalState) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.speechDetected != false {
+      try visitor.visitSingularBoolField(value: self.speechDetected, fieldNumber: 1)
+    }
+    try { if let v = self._transcription {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._assistantResponse {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._thinkingContent {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._synthesizedAudio {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._finalState {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceAgentResult, rhs: RAVoiceAgentResult) -> Bool {
+    if lhs.speechDetected != rhs.speechDetected {return false}
+    if lhs._transcription != rhs._transcription {return false}
+    if lhs._assistantResponse != rhs._assistantResponse {return false}
+    if lhs._thinkingContent != rhs._thinkingContent {return false}
+    if lhs._synthesizedAudio != rhs._synthesizedAudio {return false}
+    if lhs._finalState != rhs._finalState {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceSessionConfig"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}silence_duration_ms\0\u{3}speech_threshold\0\u{3}auto_play_tts\0\u{3}continuous_mode\0\u{3}thinking_mode_enabled\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.silenceDurationMs) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.speechThreshold) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.autoPlayTts) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.continuousMode) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.thinkingModeEnabled) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.silenceDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.silenceDurationMs, fieldNumber: 1)
+    }
+    if self.speechThreshold.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.speechThreshold, fieldNumber: 2)
+    }
+    if self.autoPlayTts != false {
+      try visitor.visitSingularBoolField(value: self.autoPlayTts, fieldNumber: 3)
+    }
+    if self.continuousMode != false {
+      try visitor.visitSingularBoolField(value: self.continuousMode, fieldNumber: 4)
+    }
+    if self.thinkingModeEnabled != false {
+      try visitor.visitSingularBoolField(value: self.thinkingModeEnabled, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceSessionConfig, rhs: RAVoiceSessionConfig) -> Bool {
+    if lhs.silenceDurationMs != rhs.silenceDurationMs {return false}
+    if lhs.speechThreshold != rhs.speechThreshold {return false}
+    if lhs.autoPlayTts != rhs.autoPlayTts {return false}
+    if lhs.continuousMode != rhs.continuousMode {return false}
+    if lhs.thinkingModeEnabled != rhs.thinkingModeEnabled {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{3}wakeword_enabled\0\u{3}wakeword_model_path\0\u{3}wakeword_model_id\0\u{3}wakeword_phrase\0\u{3}wakeword_threshold\0\u{3}wakeword_embedding_model_path\0\u{3}wakeword_vad_model_path\0\u{3}session_config\0")
+
+  fileprivate class _StorageClass {
+    var _sttModelPath: String? = nil
+    var _sttModelID: String? = nil
+    var _sttModelName: String? = nil
+    var _llmModelPath: String? = nil
+    var _llmModelID: String? = nil
+    var _llmModelName: String? = nil
+    var _ttsVoicePath: String? = nil
+    var _ttsVoiceID: String? = nil
+    var _ttsVoiceName: String? = nil
+    var _vadSampleRate: Int32 = 0
+    var _vadFrameLength: Float = 0
+    var _vadEnergyThreshold: Float = 0
+    var _wakewordEnabled: Bool = false
+    var _wakewordModelPath: String? = nil
+    var _wakewordModelID: String? = nil
+    var _wakewordPhrase: String? = nil
+    var _wakewordThreshold: Float = 0
+    var _wakewordEmbeddingModelPath: String? = nil
+    var _wakewordVadModelPath: String? = nil
+    var _sessionConfig: RAVoiceSessionConfig? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _sttModelPath = source._sttModelPath
+      _sttModelID = source._sttModelID
+      _sttModelName = source._sttModelName
+      _llmModelPath = source._llmModelPath
+      _llmModelID = source._llmModelID
+      _llmModelName = source._llmModelName
+      _ttsVoicePath = source._ttsVoicePath
+      _ttsVoiceID = source._ttsVoiceID
+      _ttsVoiceName = source._ttsVoiceName
+      _vadSampleRate = source._vadSampleRate
+      _vadFrameLength = source._vadFrameLength
+      _vadEnergyThreshold = source._vadEnergyThreshold
+      _wakewordEnabled = source._wakewordEnabled
+      _wakewordModelPath = source._wakewordModelPath
+      _wakewordModelID = source._wakewordModelID
+      _wakewordPhrase = source._wakewordPhrase
+      _wakewordThreshold = source._wakewordThreshold
+      _wakewordEmbeddingModelPath = source._wakewordEmbeddingModelPath
+      _wakewordVadModelPath = source._wakewordVadModelPath
+      _sessionConfig = source._sessionConfig
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._sttModelPath) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._sttModelID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._sttModelName) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._llmModelPath) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._llmModelID) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._llmModelName) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoicePath) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceID) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceName) }()
+        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._vadSampleRate) }()
+        case 11: try { try decoder.decodeSingularFloatField(value: &_storage._vadFrameLength) }()
+        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._vadEnergyThreshold) }()
+        case 13: try { try decoder.decodeSingularBoolField(value: &_storage._wakewordEnabled) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._wakewordModelPath) }()
+        case 15: try { try decoder.decodeSingularStringField(value: &_storage._wakewordModelID) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._wakewordPhrase) }()
+        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._wakewordThreshold) }()
+        case 18: try { try decoder.decodeSingularStringField(value: &_storage._wakewordEmbeddingModelPath) }()
+        case 19: try { try decoder.decodeSingularStringField(value: &_storage._wakewordVadModelPath) }()
+        case 20: try { try decoder.decodeSingularMessageField(value: &_storage._sessionConfig) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._sttModelPath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._sttModelID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._sttModelName {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._llmModelPath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._llmModelID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._llmModelName {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._ttsVoicePath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._ttsVoiceID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._ttsVoiceName {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+      } }()
+      if _storage._vadSampleRate != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._vadSampleRate, fieldNumber: 10)
+      }
+      if _storage._vadFrameLength.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._vadFrameLength, fieldNumber: 11)
+      }
+      if _storage._vadEnergyThreshold.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._vadEnergyThreshold, fieldNumber: 12)
+      }
+      if _storage._wakewordEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._wakewordEnabled, fieldNumber: 13)
+      }
+      try { if let v = _storage._wakewordModelPath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._wakewordModelID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._wakewordPhrase {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
+      } }()
+      if _storage._wakewordThreshold.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._wakewordThreshold, fieldNumber: 17)
+      }
+      try { if let v = _storage._wakewordEmbeddingModelPath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 18)
+      } }()
+      try { if let v = _storage._wakewordVadModelPath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._sessionConfig {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceAgentComposeConfig, rhs: RAVoiceAgentComposeConfig) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._sttModelPath != rhs_storage._sttModelPath {return false}
+        if _storage._sttModelID != rhs_storage._sttModelID {return false}
+        if _storage._sttModelName != rhs_storage._sttModelName {return false}
+        if _storage._llmModelPath != rhs_storage._llmModelPath {return false}
+        if _storage._llmModelID != rhs_storage._llmModelID {return false}
+        if _storage._llmModelName != rhs_storage._llmModelName {return false}
+        if _storage._ttsVoicePath != rhs_storage._ttsVoicePath {return false}
+        if _storage._ttsVoiceID != rhs_storage._ttsVoiceID {return false}
+        if _storage._ttsVoiceName != rhs_storage._ttsVoiceName {return false}
+        if _storage._vadSampleRate != rhs_storage._vadSampleRate {return false}
+        if _storage._vadFrameLength != rhs_storage._vadFrameLength {return false}
+        if _storage._vadEnergyThreshold != rhs_storage._vadEnergyThreshold {return false}
+        if _storage._wakewordEnabled != rhs_storage._wakewordEnabled {return false}
+        if _storage._wakewordModelPath != rhs_storage._wakewordModelPath {return false}
+        if _storage._wakewordModelID != rhs_storage._wakewordModelID {return false}
+        if _storage._wakewordPhrase != rhs_storage._wakewordPhrase {return false}
+        if _storage._wakewordThreshold != rhs_storage._wakewordThreshold {return false}
+        if _storage._wakewordEmbeddingModelPath != rhs_storage._wakewordEmbeddingModelPath {return false}
+        if _storage._wakewordVadModelPath != rhs_storage._wakewordVadModelPath {return false}
+        if _storage._sessionConfig != rhs_storage._sessionConfig {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -402,7 +402,7 @@ class _ModelRowState extends State<ModelRow> {
       await for (final progress in progressStream) {
         if (!mounted) return;
 
-        final progressValue = progress.percentage;
+        final progressValue = progress.overallProgress;
 
         setState(() {
           _downloadProgress = progressValue;

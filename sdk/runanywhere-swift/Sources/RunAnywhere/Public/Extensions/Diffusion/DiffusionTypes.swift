@@ -608,9 +608,9 @@ public struct DiffusionResult: Sendable {
     }
 }
 
-// MARK: - SDKError Extension for Diffusion
+// MARK: - SDKException Extension for Diffusion
 
-public extension SDKError {
+public extension SDKException {
 
     /// Diffusion error codes
     enum DiffusionErrorCode: String, Sendable {
@@ -631,7 +631,165 @@ public extension SDKError {
     }
 
     /// Create a diffusion error
-    static func diffusion(_ code: DiffusionErrorCode, _ message: String) -> SDKError {
-        SDKError.general(.generationFailed, "[\(code.rawValue)] \(message)")
+    static func diffusion(_ code: DiffusionErrorCode, _ message: String) -> SDKException {
+        SDKException.general(.generationFailed, "[\(code.rawValue)] \(message)")
+    }
+}
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/diffusion_options.pb.swift`:
+//   • RADiffusionMode enum (.unspecified/.textToImage/.imageToImage/.inpainting)
+//   • RADiffusionScheduler enum (UNION superset, includes .ddpm, .lcm)
+//   • RADiffusionModelVariant enum (.unspecified/.sd15/.sd21/.sdxl/
+//                                    .sdxlTurbo/.sdxs/.lcm)
+//   • RADiffusionTokenizerSourceKind enum
+//                                    (.unspecified/.bundledSd15/.bundledSd2/
+//                                     .bundledSdxl/.custom)
+//   • RADiffusionTokenizerSource (kind, customPath)
+//   • RADiffusionConfiguration   (modelVariant, tokenizerSource,
+//                                  enableSafetyChecker, maxMemoryMb)
+//   • RADiffusionGenerationOptions (prompt, negativePrompt, width, height,
+//                                    numInferenceSteps, guidanceScale, seed,
+//                                    scheduler, mode)
+//   • RADiffusionProgress  (progressPercent, currentStep, totalSteps, stage,
+//                            intermediateImageData)
+//   • RADiffusionResult    (imageData, width, height, seedUsed, totalTimeMs,
+//                            safetyFlag, usedScheduler)
+//
+// Hand-rolled types are KEPT because they:
+//   1. ship Apple-StableDiffusion-specific scheduler conversion
+//      (toAppleScheduler), variant defaults (defaultResolution / defaultSteps /
+//      defaultGuidanceScale / requiresCFG / defaultTokenizerSource), and
+//      sd15 baseURL strings — none of which belong on the wire schema,
+//   2. expose `init(from cResult: rac_diffusion_result_t)` and `toCOptions`
+//      C bridge methods,
+//   3. retain pre-IDL fields the proto deliberately drops (input_image,
+//      mask_image, denoise_strength, report_intermediate_images,
+//      progress_stride, reduce_memory bool, dpm++_2m_sde scheduler).
+
+extension DiffusionTokenizerSource {
+    /// Convert to canonical generated proto `RADiffusionTokenizerSource`.
+    public func toRADiffusionTokenizerSource() -> RADiffusionTokenizerSource {
+        var proto = RADiffusionTokenizerSource()
+        switch self {
+        case .sd15:
+            proto.kind = .bundledSd15
+        case .sd2:
+            proto.kind = .bundledSd2
+        case .sdxl:
+            proto.kind = .bundledSdxl
+        case .custom(let url):
+            proto.kind = .custom
+            proto.customPath = url
+        }
+        return proto
+    }
+}
+
+extension DiffusionModelVariant {
+    /// Convert to canonical generated proto enum.
+    public var raVariant: RADiffusionModelVariant {
+        switch self {
+        case .sd15: return .sd15
+        case .sd21: return .sd21
+        case .sdxl: return .sdxl
+        case .sdxlTurbo: return .sdxlTurbo
+        case .sdxs: return .sdxs
+        case .lcm: return .lcm
+        }
+    }
+}
+
+extension DiffusionScheduler {
+    /// Convert to canonical generated proto enum. Notes: dpmPP2MSDE folds
+    /// onto dpmpp2M per the IDL drift note (SDE flag is a backend impl
+    /// detail).
+    public var raScheduler: RADiffusionScheduler {
+        switch self {
+        case .dpmPP2MKarras: return .dpmpp2MKarras
+        case .dpmPP2M: return .dpmpp2M
+        case .dpmPP2MSDE: return .dpmpp2M  // collapse SDE → DPM++ 2M per IDL
+        case .ddim: return .ddim
+        case .euler: return .euler
+        case .eulerAncestral: return .eulerA
+        case .pndm: return .pndm
+        case .lms: return .lms
+        }
+    }
+}
+
+extension DiffusionMode {
+    /// Convert to canonical generated proto enum.
+    public var raMode: RADiffusionMode {
+        switch self {
+        case .textToImage: return .textToImage
+        case .imageToImage: return .imageToImage
+        case .inpainting: return .inpainting
+        }
+    }
+}
+
+extension DiffusionConfiguration {
+    /// Convert to canonical generated proto `RADiffusionConfiguration`. Notes:
+    /// pre-IDL `reduceMemory: Bool` is dropped (proto uses `maxMemoryMb` cap
+    /// instead — set by the backend layer).
+    public func toRADiffusionConfiguration() -> RADiffusionConfiguration {
+        var proto = RADiffusionConfiguration()
+        proto.modelVariant = modelVariant.raVariant
+        proto.tokenizerSource = effectiveTokenizerSource.toRADiffusionTokenizerSource()
+        proto.enableSafetyChecker = enableSafetyChecker
+        return proto
+    }
+}
+
+extension DiffusionGenerationOptions {
+    /// Convert to canonical generated proto `RADiffusionGenerationOptions`.
+    /// Notes: `inputImage`, `maskImage`, `denoiseStrength`,
+    /// `reportIntermediateImages`, `progressStride` are dropped — see the
+    /// proto schema header for rationale.
+    public func toRADiffusionGenerationOptions() -> RADiffusionGenerationOptions {
+        var proto = RADiffusionGenerationOptions()
+        proto.prompt = prompt
+        proto.negativePrompt = negativePrompt
+        proto.width = Int32(width)
+        proto.height = Int32(height)
+        proto.numInferenceSteps = Int32(steps)
+        proto.guidanceScale = guidanceScale
+        proto.seed = seed
+        proto.scheduler = scheduler.raScheduler
+        proto.mode = mode.raMode
+        return proto
+    }
+}
+
+extension DiffusionProgress {
+    /// Convert to canonical generated proto `RADiffusionProgress`.
+    public func toRADiffusionProgress() -> RADiffusionProgress {
+        var proto = RADiffusionProgress()
+        proto.progressPercent = progress
+        proto.currentStep = Int32(currentStep)
+        proto.totalSteps = Int32(totalSteps)
+        proto.stage = stage
+        if let img = intermediateImage {
+            proto.intermediateImageData = img
+        }
+        return proto
+    }
+}
+
+extension DiffusionResult {
+    /// Convert to canonical generated proto `RADiffusionResult`. Notes:
+    /// pre-IDL `generation_time_ms` is renamed to proto `totalTimeMs`.
+    /// `usedScheduler` is left at .unspecified (Swift type doesn't carry it).
+    public func toRADiffusionResult() -> RADiffusionResult {
+        var proto = RADiffusionResult()
+        proto.imageData = imageData
+        proto.width = Int32(width)
+        proto.height = Int32(height)
+        proto.seedUsed = seedUsed
+        proto.totalTimeMs = generationTimeMs
+        proto.safetyFlag = safetyFlagged
+        return proto
     }
 }

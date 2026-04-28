@@ -11,7 +11,7 @@ package com.runanywhere.sdk.public.extensions
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.core.types.SDKComponent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 
@@ -43,7 +43,7 @@ private fun bridgeCategoryToPublic(value: Int): ModelCategory =
     }
 
 actual suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramework> {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val all = CppBridgeModelRegistry.getAll()
     return all
         .map { bridgeFrameworkToPublic(it.framework) }
@@ -52,7 +52,7 @@ actual suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramewor
 }
 
 actual suspend fun RunAnywhere.getFrameworks(capability: SDKComponent): List<InferenceFramework> {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
     val relevantCategories: Set<ModelCategory> =
         when (capability) {
@@ -61,11 +61,12 @@ actual suspend fun RunAnywhere.getFrameworks(capability: SDKComponent): List<Inf
             SDKComponent.STT -> setOf(ModelCategory.SPEECH_RECOGNITION)
             SDKComponent.TTS -> setOf(ModelCategory.SPEECH_SYNTHESIS)
             SDKComponent.VAD -> setOf(ModelCategory.AUDIO)
-            SDKComponent.VOICE -> setOf(
-                ModelCategory.LANGUAGE,
-                ModelCategory.SPEECH_RECOGNITION,
-                ModelCategory.SPEECH_SYNTHESIS,
-            )
+            SDKComponent.VOICE ->
+                setOf(
+                    ModelCategory.LANGUAGE,
+                    ModelCategory.SPEECH_RECOGNITION,
+                    ModelCategory.SPEECH_SYNTHESIS,
+                )
             SDKComponent.EMBEDDING -> setOf(ModelCategory.EMBEDDING)
             SDKComponent.RAG -> setOf(ModelCategory.LANGUAGE)
         }
@@ -81,10 +82,10 @@ actual suspend fun RunAnywhere.getFrameworks(capability: SDKComponent): List<Inf
 actual suspend fun RunAnywhere.flushPendingRegistrations() {
     // Kotlin's registerModel is synchronous (CppBridgeModelRegistry.save).
     // Nothing to flush; this exists for cross-platform parity.
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 }
 
 actual suspend fun RunAnywhere.discoverDownloadedModels() {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     CppBridgeModelRegistry.scanAndRestoreDownloadedModels()
 }

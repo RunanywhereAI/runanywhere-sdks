@@ -96,7 +96,7 @@ public actor HTTPClientAdapter: NetworkService {
 
     public func post(_ path: String, json: String, requiresAuth: Bool = false) async throws -> Data {
         guard let data = json.data(using: .utf8) else {
-            throw SDKError.general(.validationFailed, "Invalid JSON string")
+            throw SDKException.general(.validationFailed, "Invalid JSON string")
         }
         return try await postRaw(path, data, requiresAuth: requiresAuth)
     }
@@ -143,7 +143,7 @@ public actor HTTPClientAdapter: NetworkService {
         additionalHeaders: [String: String] = [:]
     ) async throws -> Data {
         guard let baseURL = baseURL else {
-            throw SDKError.network(.serviceNotAvailable, "HTTP adapter not configured")
+            throw SDKException.network(.serviceNotAvailable, "HTTP adapter not configured")
         }
 
         let url = buildURL(base: baseURL, path: path)
@@ -192,7 +192,7 @@ public actor HTTPClientAdapter: NetworkService {
             if let key = apiKey, !key.isEmpty {
                 return key
             }
-            throw SDKError.authentication(.authenticationFailed, "No valid authentication token")
+            throw SDKException.authentication(.authenticationFailed, "No valid authentication token")
         }
         return apiKey ?? ""
     }
@@ -275,7 +275,7 @@ public actor HTTPClientAdapter: NetworkService {
         var clientHandle: OpaquePointer?
         let createResult = rac_http_client_create(&clientHandle)
         guard createResult == RAC_SUCCESS, let client = clientHandle else {
-            throw SDKError.network(.networkError, "Failed to create HTTP client (rc=\(createResult))")
+            throw SDKException.network(.networkError, "Failed to create HTTP client (rc=\(createResult))")
         }
         defer { rac_http_client_destroy(client) }
 
@@ -289,7 +289,7 @@ public actor HTTPClientAdapter: NetworkService {
             free(urlCString)
         }
         guard let methodCString = methodCString, let urlCString = urlCString else {
-            throw SDKError.network(.networkError, "Out of memory building HTTP request")
+            throw SDKException.network(.networkError, "Out of memory building HTTP request")
         }
 
         let headerPairs: [(UnsafeMutablePointer<CChar>, UnsafeMutablePointer<CChar>)] =
@@ -413,18 +413,18 @@ public actor HTTPClientAdapter: NetworkService {
         }
     }
 
-    private static func networkError(forResult result: rac_result_t, message: String) -> SDKError {
+    private static func networkError(forResult result: rac_result_t, message: String) -> SDKException {
         switch result {
         case RAC_ERROR_TIMEOUT:
-            return SDKError.network(.timeout, message)
+            return SDKException.network(.timeout, message)
         case RAC_ERROR_CANCELLED:
-            return SDKError.network(.networkError, message)
+            return SDKException.network(.networkError, message)
         default:
-            return SDKError.network(.networkError, message)
+            return SDKException.network(.networkError, message)
         }
     }
 
-    private static func parseHTTPError(statusCode: Int, data: Data, url _: String) -> SDKError {
+    private static func parseHTTPError(statusCode: Int, data: Data, url _: String) -> SDKException {
         var errorMessage = "HTTP error \(statusCode)"
 
         // JSONSerialization returns heterogeneous dictionary for parsing unknown JSON error responses
@@ -441,19 +441,19 @@ public actor HTTPClientAdapter: NetworkService {
 
         switch statusCode {
         case 400:
-            return SDKError.network(.httpError, "Bad request: \(errorMessage)")
+            return SDKException.network(.httpError, "Bad request: \(errorMessage)")
         case 401:
-            return SDKError.authentication(.authenticationFailed, errorMessage)
+            return SDKException.authentication(.authenticationFailed, errorMessage)
         case 403:
-            return SDKError.authentication(.forbidden, errorMessage)
+            return SDKException.authentication(.forbidden, errorMessage)
         case 404:
-            return SDKError.network(.httpError, "Not found: \(errorMessage)")
+            return SDKException.network(.httpError, "Not found: \(errorMessage)")
         case 429:
-            return SDKError.network(.httpError, "Rate limited: \(errorMessage)")
+            return SDKException.network(.httpError, "Rate limited: \(errorMessage)")
         case 500...599:
-            return SDKError.network(.serverError, "Server error (\(statusCode)): \(errorMessage)")
+            return SDKException.network(.serverError, "Server error (\(statusCode)): \(errorMessage)")
         default:
-            return SDKError.network(.httpError, "HTTP \(statusCode): \(errorMessage)")
+            return SDKException.network(.httpError, "HTTP \(statusCode): \(errorMessage)")
         }
     }
 }

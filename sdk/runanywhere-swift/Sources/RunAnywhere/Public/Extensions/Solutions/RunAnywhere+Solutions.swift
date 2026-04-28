@@ -83,12 +83,12 @@ public final class SolutionHandle: @unchecked Sendable {
         lock.unlock()
 
         guard let h else {
-            throw SDKError.runtime(.invalidState, "Solution handle has already been destroyed")
+            throw SDKException.runtime(.invalidState, "Solution handle has already been destroyed")
         }
 
         let result = body(h)
         guard result == RAC_SUCCESS else {
-            throw SDKError.runtime(
+            throw SDKException.runtime(
                 .processingFailed,
                 "Solution call failed with rac_result_t \(result)"
             )
@@ -130,7 +130,7 @@ public extension RunAnywhere {
             }
 
             guard result == RAC_SUCCESS, let raw else {
-                throw SDKError.runtime(
+                throw SDKException.runtime(
                     .invalidConfiguration,
                     "rac_solution_create_from_proto failed with \(result)"
                 )
@@ -158,7 +158,7 @@ public extension RunAnywhere {
             let result = yaml.withCString { rac_solution_create_from_yaml($0, &raw) }
 
             guard result == RAC_SUCCESS, let raw else {
-                throw SDKError.runtime(
+                throw SDKException.runtime(
                     .invalidConfiguration,
                     "rac_solution_create_from_yaml failed with \(result)"
                 )
@@ -169,7 +169,7 @@ public extension RunAnywhere {
 
         private func ensureReady() async throws {
             guard RunAnywhere.isSDKInitialized else {
-                throw SDKError.general(.notInitialized, "SDK not initialized")
+                throw SDKException.general(.notInitialized, "SDK not initialized")
             }
             try await RunAnywhere.ensureServicesReady()
         }

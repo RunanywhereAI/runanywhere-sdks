@@ -17,6 +17,7 @@
 
 package com.runanywhere.sdk.public.extensions.LLM
 
+import ai.runanywhere.proto.v1.LLMGenerationOptions
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
 import com.runanywhere.sdk.public.RunAnywhere
@@ -351,7 +352,7 @@ object RunAnywhereToolCalling {
     ): String {
         val genOptions =
             LLMGenerationOptions(
-                maxTokens = maxTokens ?: 1024,
+                max_tokens = maxTokens ?: 1024,
                 temperature = temperature ?: 0.7f,
             )
 
@@ -369,7 +370,8 @@ object RunAnywhereToolCalling {
                         responseText.append(event.token)
                     }
                     if (event.is_final && event.error_message.isNotEmpty()) {
-                        throw com.runanywhere.sdk.foundation.errors.SDKError.llm(event.error_message)
+                        throw com.runanywhere.sdk.foundation.errors.SDKException
+                            .llm(event.error_message)
                     }
                 }
         }

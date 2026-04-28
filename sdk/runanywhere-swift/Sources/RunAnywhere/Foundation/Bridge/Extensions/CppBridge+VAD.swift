@@ -36,7 +36,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_vad_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKError.vad(.notInitialized, "Failed to create VAD component: \(result)")
+                throw SDKException.vad(.notInitialized, "Failed to create VAD component: \(result)")
             }
 
             self.handle = handle
@@ -91,7 +91,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKError.vad(.modelLoadFailed, "Failed to load VAD model: \(result)")
+                throw SDKException.vad(.modelLoadFailed, "Failed to load VAD model: \(result)")
             }
             loadedModelId = modelId
             logger.info("VAD model loaded: \(modelId)")
@@ -112,7 +112,7 @@ extension CppBridge {
             let handle = try getHandle()
             let result = rac_vad_component_initialize(handle)
             guard result == RAC_SUCCESS else {
-                throw SDKError.vad(.initializationFailed, "Failed to initialize VAD: \(result)")
+                throw SDKException.vad(.initializationFailed, "Failed to initialize VAD: \(result)")
             }
             logger.info("VAD initialized")
         }
@@ -122,7 +122,7 @@ extension CppBridge {
             let handle = try getHandle()
             let result = rac_vad_component_start(handle)
             guard result == RAC_SUCCESS else {
-                throw SDKError.vad(.processingFailed, "Failed to start VAD: \(result)")
+                throw SDKException.vad(.processingFailed, "Failed to start VAD: \(result)")
             }
         }
 
@@ -131,7 +131,7 @@ extension CppBridge {
             let handle = try getHandle()
             let result = rac_vad_component_stop(handle)
             guard result == RAC_SUCCESS else {
-                throw SDKError.vad(.processingFailed, "Failed to stop VAD: \(result)")
+                throw SDKException.vad(.processingFailed, "Failed to stop VAD: \(result)")
             }
         }
 

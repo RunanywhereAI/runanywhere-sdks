@@ -160,7 +160,7 @@ public extension RunAnywhere {
         options: ToolCallingOptions? = nil
     ) async throws -> ToolCallingResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
@@ -352,7 +352,7 @@ public extension RunAnywhere {
             }
             if event.isFinal {
                 if !event.errorMessage.isEmpty {
-                    throw SDKError.llm(.generationFailed, event.errorMessage)
+                    throw SDKException.llm(.generationFailed, event.errorMessage)
                 }
                 break
             }

@@ -14,7 +14,7 @@ import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.events.TTSEvent
-import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
+import ai.runanywhere.proto.v1.TTSOptions
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.isTTSVoiceLoadedSync
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
@@ -396,12 +396,12 @@ class TextToSpeechViewModel(
 
                 val startTime = System.currentTimeMillis()
 
-                // Create TTS options with current settings
+                // Create TTS options with current settings (proto-canonical)
                 val options =
                     TTSOptions(
-                        voice = _uiState.value.selectedModelId,
-                        language = "en-US",
-                        rate = _uiState.value.speed,
+                        voice = _uiState.value.selectedModelId ?: "",
+                        language_code = "en-US",
+                        speaking_rate = _uiState.value.speed,
                         pitch = _uiState.value.pitch,
                         volume = 1.0f,
                     )
@@ -428,13 +428,13 @@ class TextToSpeechViewModel(
 
                     val processingTime = System.currentTimeMillis() - startTime
 
-                    if (result.audioData.isEmpty()) {
+                    if (result.audio_data.toByteArray().isEmpty()) {
                         Timber.i("TTS synthesis returned empty audio")
                         _uiState.update {
                             it.copy(
                                 isGenerating = false,
                                 isSpeaking = false,
-                                audioDuration = result.duration,
+                                audioDuration = (result.duration_ms / 1000.0),
                                 audioSize = null,
                                 sampleRate = null,
                                 processingTimeMs = processingTime,
@@ -442,17 +442,17 @@ class TextToSpeechViewModel(
                         }
                     } else {
                         // ONNX/Piper TTS returns audio data for playback
-                        Timber.i("✅ Speech generation complete: ${result.audioData.size} bytes, duration: ${result.duration}s")
+                        Timber.i("✅ Speech generation complete: ${result.audio_data.toByteArray().size} bytes, duration: ${(result.duration_ms / 1000.0)}s")
 
-                        generatedAudioData = result.audioData
+                        generatedAudioData = result.audio_data.toByteArray()
 
                         _uiState.update {
                             it.copy(
                                 isGenerating = false,
                                 isSpeaking = false,
                                 hasGeneratedAudio = true,
-                                audioDuration = result.duration,
-                                audioSize = result.audioData.size,
+                                audioDuration = (result.duration_ms / 1000.0),
+                                audioSize = result.audio_data.toByteArray().size,
                                 sampleRate = null,
                                 processingTimeMs = processingTime,
                             )
@@ -671,9 +671,9 @@ class TextToSpeechViewModel(
 
         withContext(Dispatchers.Main) {
             val tts = systemTts ?: throw IllegalStateException("System TTS not initialized")
-            val locale = Locale.forLanguageTag(options.language.ifBlank { "en-US" })
+            val locale = Locale.forLanguageTag(options.language_code.ifBlank { "en-US" })
             tts.language = locale
-            tts.setSpeechRate(options.rate)
+            tts.setSpeechRate(options.speaking_rate)
             tts.setPitch(options.pitch)
         }
 

@@ -1,0 +1,191 @@
+// RunAnywhere IDL — storage / device-capacity / model-on-disk types.
+//
+// Every message and enum below is the *union* of cases currently declared by
+// hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
+// drift between the per-language storage definitions (see GAP_01_IDL_AND_CODEGEN.md
+// §"Why This Gap Matters") is what motivated this schema. Every SDK consumes
+// generated output; nothing is hand-written.
+//
+// Pre-IDL drift table (canonicalized by this file):
+//
+//   ── DeviceStorageInfo ──────────────────────────────────────────────────────
+//   Swift   StorageTypes.swift:14        (totalSpace, freeSpace, usedSpace,
+//                                          computed usagePercentage:Double)
+//   Kotlin  StorageTypes.kt:25            (totalSpace, freeSpace, usedSpace,
+//                                          computed usagePercentage)
+//   Dart    storage_types.dart:13         (totalSpace, freeSpace, usedSpace,
+//                                          computed usagePercentage)
+//   RN      RunAnywhere+Storage.ts:21     (totalSpace, freeSpace, usedSpace)
+//   Web     types/models.ts:156           (totalSpace, freeSpace, modelsPath)
+//                                          ← drift: flat StorageInfo, no breakdown
+//   C ABI   (no public type — only error codes -180..-219)
+//
+//   ── AppStorageInfo ─────────────────────────────────────────────────────────
+//   Swift   StorageTypes.swift:40         (documentsSize, cacheSize,
+//                                          appSupportSize, totalSize)
+//   Kotlin  StorageTypes.kt:45            (matches Swift)
+//   Dart    storage_types.dart:53         (matches Swift)
+//   RN      RunAnywhere+Storage.ts:31     (matches Swift)
+//   Web     (no equivalent — flat StorageInfo)
+//
+//   ── ModelStorageMetrics ────────────────────────────────────────────────────
+//   Swift   StorageTypes.swift:66         (model:ModelInfo + sizeOnDisk:Int64)
+//   Kotlin  StorageTypes.kt:66            (model:ModelInfo + sizeOnDisk:Long)
+//   Dart    storage_types.dart:95         (model:ModelInfo + sizeOnDisk:int)
+//   Older Kotlin models/storage/StorageInfo.kt:122 (StoredModel had a `lastUsed:Instant?`
+//                                          field — fold that into this canonical type)
+//   RN      RunAnywhere+Storage.ts        (no per-model breakdown — only modelCount)
+//   Web     types/models.ts:163 (StoredModel: id, name, sizeOnDisk, downloadedAt, lastUsed)
+//
+//   ── StorageAvailability ────────────────────────────────────────────────────
+//   Swift   StorageTypes.swift:175        (isAvailable, requiredSpace,
+//                                          availableSpace, hasWarning,
+//                                          recommendation:String?)
+//   Kotlin  StorageTypes.kt:178           (matches Swift)
+//   Dart    storage_types.dart:262        (matches Swift)
+//   Older Kotlin models/storage/StorageInfo.kt:140 (enum HEALTHY/LOW/CRITICAL/FULL)
+//                                          ← drift: same name, totally different shape;
+//                                          canonical struct shape wins.
+//   RN / Web (no equivalent type pre-IDL)
+//
+//   ── NPUChip ───────────────────────────────────────────────────────────────
+//   Dart    npu_chip.dart:14              (snapdragon8Elite, snapdragon8EliteGen5)
+//                                          ← only Dart defines this pre-IDL.
+//   Other SDKs: no equivalent enum. Canonical superset folds NPU detection
+//   across vendors (Apple Neural Engine, Qualcomm Hexagon, MediaTek APU,
+//   Google TPU, Intel NPU, plus NONE for "no NPU detected" and OTHER for
+//   unknown vendors).
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "StorageTypesProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// NPU chipset detected on the host device. Used to drive Genie / vendor-NPU
+// model-download URL selection and runtime backend wiring.
+// Sources pre-IDL:
+//   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
+// Canonical superset (this file): vendor-grouped, vendor-agnostic.
+// ---------------------------------------------------------------------------
+enum NPUChip {
+    NPU_CHIP_UNSPECIFIED         = 0;
+    NPU_CHIP_NONE                = 1;   // No NPU detected on this device
+    NPU_CHIP_APPLE_NEURAL_ENGINE = 2;   // Apple Neural Engine (A-series / M-series)
+    NPU_CHIP_QUALCOMM_HEXAGON    = 3;   // Snapdragon 8 Elite, 8 Elite Gen 5, etc.
+    NPU_CHIP_MEDIATEK_APU        = 4;   // MediaTek Dimensity APU
+    NPU_CHIP_GOOGLE_TPU          = 5;   // Pixel Tensor / TPU
+    NPU_CHIP_INTEL_NPU           = 6;   // Intel Core Ultra NPU
+    NPU_CHIP_OTHER               = 99;  // Detected NPU but vendor unmapped
+}
+
+// ---------------------------------------------------------------------------
+// Whole-device storage capacity. Reported by the platform OS (e.g. iOS
+// `URLResourceKey.volumeAvailableCapacity*`, Android `StatFs`, browser
+// `navigator.storage.estimate()`).
+//
+// `used_percent` is materialized rather than computed at the receiver so
+// every binding (Swift, Kotlin, Dart, RN, Web) reports the same number even
+// when total_bytes == 0 (in which case used_percent MUST be 0.0).
+//
+// Sources pre-IDL: see header drift table.
+// ---------------------------------------------------------------------------
+message DeviceStorageInfo {
+    int64 total_bytes  = 1;
+    int64 free_bytes   = 2;
+    int64 used_bytes   = 3;
+    float used_percent = 4;   // 0.0 — 100.0; 0.0 if total_bytes == 0
+}
+
+// ---------------------------------------------------------------------------
+// Per-app storage breakdown by directory type. Mirrors the iOS notion of
+// Documents / Caches / Application Support; on Android these map to
+// filesDir / cacheDir / a stable app-support sub-directory; on Web they map
+// to OPFS / FSAccess buckets (collapsed to documents_bytes by default).
+//
+// Sources pre-IDL: see header drift table.
+// ---------------------------------------------------------------------------
+message AppStorageInfo {
+    int64 documents_bytes   = 1;
+    int64 cache_bytes       = 2;
+    int64 app_support_bytes = 3;
+    int64 total_bytes       = 4;
+}
+
+// ---------------------------------------------------------------------------
+// On-disk metrics for a single downloaded model. The full ModelInfo is *not*
+// embedded here — callers cross-reference `model_id` against ModelInfo from
+// model_types.proto. This avoids circular embeds and keeps the wire payload
+// for storage queries small.
+//
+// `last_used_ms` (epoch ms, optional) preserves the field that lived on the
+// older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
+// other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
+// LRU eviction without another type round-trip.
+//
+// Sources pre-IDL: see header drift table.
+// ---------------------------------------------------------------------------
+message ModelStorageMetrics {
+    string         model_id            = 1;
+    int64          size_on_disk_bytes  = 2;
+    optional int64 last_used_ms        = 3;   // Unix epoch ms of last load
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate storage view: device capacity + app footprint + per-model rows.
+// `total_models` and `total_models_bytes` are denormalized for receivers that
+// would otherwise re-iterate `models` to compute them (Web binding, RN host).
+//
+// Sources pre-IDL: see header drift table.
+// ---------------------------------------------------------------------------
+message StorageInfo {
+    AppStorageInfo               app                 = 1;
+    DeviceStorageInfo            device              = 2;
+    repeated ModelStorageMetrics models              = 3;
+    int32                        total_models        = 4;
+    int64                        total_models_bytes  = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Result of a "do I have room to download X bytes?" probe. SDKs use this to
+// pre-flight `downloadModel(...)` and surface user-facing warnings (e.g.
+// "you only have 1.2 GB free; this model needs 4 GB").
+//
+// `warning_message` and `recommendation` are independently optional —
+// `warning_message` describes the current shortfall, `recommendation`
+// suggests an action (delete cache, free models, etc.).
+//
+// Sources pre-IDL: see header drift table.
+// ---------------------------------------------------------------------------
+message StorageAvailability {
+    bool            is_available     = 1;
+    int64           required_bytes   = 2;
+    int64           available_bytes  = 3;
+    optional string warning_message  = 4;
+    optional string recommendation   = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compatible "stored model" projection. Older Swift / Kotlin / Dart
+// surfaces (`StoredModel`) wrapped a full `ModelInfo`; this canonical form
+// flattens to the columns those SDKs actually exposed via computed
+// properties (id, name, size, local path, downloaded-at), so RN / Web can
+// emit the same shape without round-tripping through `ModelInfo`.
+//
+// Sources pre-IDL: see header drift table.
+// ---------------------------------------------------------------------------
+message StoredModel {
+    string         model_id        = 1;
+    string         name            = 2;
+    int64          size_bytes      = 3;
+    string         local_path      = 4;
+    optional int64 downloaded_at_ms = 5;   // Unix epoch ms of download completion
+}

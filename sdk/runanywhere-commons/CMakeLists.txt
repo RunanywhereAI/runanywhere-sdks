@@ -829,6 +829,20 @@ if(Protobuf_FOUND)
             # v2 close-out Phase G-2: LLMStreamEvent for the proto-byte
             # LLM stream ABI (rac_llm_stream.cpp).
             ${_RAC_PROTO_GEN_DIR}/llm_service.pb.cc
+            # Phase C6: per-modality option / event protos consumed by the
+            # foundation/rac_proto_adapters layer.
+            ${_RAC_PROTO_GEN_DIR}/stt_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/diffusion_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/embeddings_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/rag.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/storage_types.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/lora_options.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
+            # Phase C6: proto <-> C ABI adapter functions (foundation layer).
+            src/foundation/rac_proto_adapters.cpp
         )
         target_include_directories(rac_commons PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>

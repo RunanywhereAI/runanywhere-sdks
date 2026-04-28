@@ -5,6 +5,7 @@
 // source: voice_agent_service.proto
 /* eslint-disable */
 import _m0 from "protobufjs/minimal";
+import { VoiceAgentComponentStates } from "./voice_events";
 export const protobufPackage = "runanywhere.v1";
 function createBaseVoiceAgentRequest() {
     return { eventFilter: "" };
@@ -56,6 +57,611 @@ export const VoiceAgentRequest = {
         return message;
     },
 };
+function createBaseVoiceAgentResult() {
+    return {
+        speechDetected: false,
+        transcription: undefined,
+        assistantResponse: undefined,
+        thinkingContent: undefined,
+        synthesizedAudio: undefined,
+        finalState: undefined,
+    };
+}
+export const VoiceAgentResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.speechDetected !== false) {
+            writer.uint32(8).bool(message.speechDetected);
+        }
+        if (message.transcription !== undefined) {
+            writer.uint32(18).string(message.transcription);
+        }
+        if (message.assistantResponse !== undefined) {
+            writer.uint32(26).string(message.assistantResponse);
+        }
+        if (message.thinkingContent !== undefined) {
+            writer.uint32(34).string(message.thinkingContent);
+        }
+        if (message.synthesizedAudio !== undefined) {
+            writer.uint32(42).bytes(message.synthesizedAudio);
+        }
+        if (message.finalState !== undefined) {
+            VoiceAgentComponentStates.encode(message.finalState, writer.uint32(50).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceAgentResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.speechDetected = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.transcription = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.assistantResponse = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.thinkingContent = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.synthesizedAudio = reader.bytes();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.finalState = VoiceAgentComponentStates.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            speechDetected: isSet(object.speechDetected) ? globalThis.Boolean(object.speechDetected) : false,
+            transcription: isSet(object.transcription) ? globalThis.String(object.transcription) : undefined,
+            assistantResponse: isSet(object.assistantResponse) ? globalThis.String(object.assistantResponse) : undefined,
+            thinkingContent: isSet(object.thinkingContent) ? globalThis.String(object.thinkingContent) : undefined,
+            synthesizedAudio: isSet(object.synthesizedAudio) ? bytesFromBase64(object.synthesizedAudio) : undefined,
+            finalState: isSet(object.finalState) ? VoiceAgentComponentStates.fromJSON(object.finalState) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.speechDetected !== false) {
+            obj.speechDetected = message.speechDetected;
+        }
+        if (message.transcription !== undefined) {
+            obj.transcription = message.transcription;
+        }
+        if (message.assistantResponse !== undefined) {
+            obj.assistantResponse = message.assistantResponse;
+        }
+        if (message.thinkingContent !== undefined) {
+            obj.thinkingContent = message.thinkingContent;
+        }
+        if (message.synthesizedAudio !== undefined) {
+            obj.synthesizedAudio = base64FromBytes(message.synthesizedAudio);
+        }
+        if (message.finalState !== undefined) {
+            obj.finalState = VoiceAgentComponentStates.toJSON(message.finalState);
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceAgentResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceAgentResult();
+        message.speechDetected = object.speechDetected ?? false;
+        message.transcription = object.transcription ?? undefined;
+        message.assistantResponse = object.assistantResponse ?? undefined;
+        message.thinkingContent = object.thinkingContent ?? undefined;
+        message.synthesizedAudio = object.synthesizedAudio ?? undefined;
+        message.finalState = (object.finalState !== undefined && object.finalState !== null)
+            ? VoiceAgentComponentStates.fromPartial(object.finalState)
+            : undefined;
+        return message;
+    },
+};
+function createBaseVoiceSessionConfig() {
+    return {
+        silenceDurationMs: 0,
+        speechThreshold: 0,
+        autoPlayTts: false,
+        continuousMode: false,
+        thinkingModeEnabled: false,
+    };
+}
+export const VoiceSessionConfig = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.silenceDurationMs !== 0) {
+            writer.uint32(8).int32(message.silenceDurationMs);
+        }
+        if (message.speechThreshold !== 0) {
+            writer.uint32(21).float(message.speechThreshold);
+        }
+        if (message.autoPlayTts !== false) {
+            writer.uint32(24).bool(message.autoPlayTts);
+        }
+        if (message.continuousMode !== false) {
+            writer.uint32(32).bool(message.continuousMode);
+        }
+        if (message.thinkingModeEnabled !== false) {
+            writer.uint32(40).bool(message.thinkingModeEnabled);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceSessionConfig();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.silenceDurationMs = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 21) {
+                        break;
+                    }
+                    message.speechThreshold = reader.float();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.autoPlayTts = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.continuousMode = reader.bool();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.thinkingModeEnabled = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            silenceDurationMs: isSet(object.silenceDurationMs) ? globalThis.Number(object.silenceDurationMs) : 0,
+            speechThreshold: isSet(object.speechThreshold) ? globalThis.Number(object.speechThreshold) : 0,
+            autoPlayTts: isSet(object.autoPlayTts) ? globalThis.Boolean(object.autoPlayTts) : false,
+            continuousMode: isSet(object.continuousMode) ? globalThis.Boolean(object.continuousMode) : false,
+            thinkingModeEnabled: isSet(object.thinkingModeEnabled) ? globalThis.Boolean(object.thinkingModeEnabled) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.silenceDurationMs !== 0) {
+            obj.silenceDurationMs = Math.round(message.silenceDurationMs);
+        }
+        if (message.speechThreshold !== 0) {
+            obj.speechThreshold = message.speechThreshold;
+        }
+        if (message.autoPlayTts !== false) {
+            obj.autoPlayTts = message.autoPlayTts;
+        }
+        if (message.continuousMode !== false) {
+            obj.continuousMode = message.continuousMode;
+        }
+        if (message.thinkingModeEnabled !== false) {
+            obj.thinkingModeEnabled = message.thinkingModeEnabled;
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceSessionConfig.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceSessionConfig();
+        message.silenceDurationMs = object.silenceDurationMs ?? 0;
+        message.speechThreshold = object.speechThreshold ?? 0;
+        message.autoPlayTts = object.autoPlayTts ?? false;
+        message.continuousMode = object.continuousMode ?? false;
+        message.thinkingModeEnabled = object.thinkingModeEnabled ?? false;
+        return message;
+    },
+};
+function createBaseVoiceAgentComposeConfig() {
+    return {
+        sttModelPath: undefined,
+        sttModelId: undefined,
+        sttModelName: undefined,
+        llmModelPath: undefined,
+        llmModelId: undefined,
+        llmModelName: undefined,
+        ttsVoicePath: undefined,
+        ttsVoiceId: undefined,
+        ttsVoiceName: undefined,
+        vadSampleRate: 0,
+        vadFrameLength: 0,
+        vadEnergyThreshold: 0,
+        wakewordEnabled: false,
+        wakewordModelPath: undefined,
+        wakewordModelId: undefined,
+        wakewordPhrase: undefined,
+        wakewordThreshold: 0,
+        wakewordEmbeddingModelPath: undefined,
+        wakewordVadModelPath: undefined,
+        sessionConfig: undefined,
+    };
+}
+export const VoiceAgentComposeConfig = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.sttModelPath !== undefined) {
+            writer.uint32(10).string(message.sttModelPath);
+        }
+        if (message.sttModelId !== undefined) {
+            writer.uint32(18).string(message.sttModelId);
+        }
+        if (message.sttModelName !== undefined) {
+            writer.uint32(26).string(message.sttModelName);
+        }
+        if (message.llmModelPath !== undefined) {
+            writer.uint32(34).string(message.llmModelPath);
+        }
+        if (message.llmModelId !== undefined) {
+            writer.uint32(42).string(message.llmModelId);
+        }
+        if (message.llmModelName !== undefined) {
+            writer.uint32(50).string(message.llmModelName);
+        }
+        if (message.ttsVoicePath !== undefined) {
+            writer.uint32(58).string(message.ttsVoicePath);
+        }
+        if (message.ttsVoiceId !== undefined) {
+            writer.uint32(66).string(message.ttsVoiceId);
+        }
+        if (message.ttsVoiceName !== undefined) {
+            writer.uint32(74).string(message.ttsVoiceName);
+        }
+        if (message.vadSampleRate !== 0) {
+            writer.uint32(80).int32(message.vadSampleRate);
+        }
+        if (message.vadFrameLength !== 0) {
+            writer.uint32(93).float(message.vadFrameLength);
+        }
+        if (message.vadEnergyThreshold !== 0) {
+            writer.uint32(101).float(message.vadEnergyThreshold);
+        }
+        if (message.wakewordEnabled !== false) {
+            writer.uint32(104).bool(message.wakewordEnabled);
+        }
+        if (message.wakewordModelPath !== undefined) {
+            writer.uint32(114).string(message.wakewordModelPath);
+        }
+        if (message.wakewordModelId !== undefined) {
+            writer.uint32(122).string(message.wakewordModelId);
+        }
+        if (message.wakewordPhrase !== undefined) {
+            writer.uint32(130).string(message.wakewordPhrase);
+        }
+        if (message.wakewordThreshold !== 0) {
+            writer.uint32(141).float(message.wakewordThreshold);
+        }
+        if (message.wakewordEmbeddingModelPath !== undefined) {
+            writer.uint32(146).string(message.wakewordEmbeddingModelPath);
+        }
+        if (message.wakewordVadModelPath !== undefined) {
+            writer.uint32(154).string(message.wakewordVadModelPath);
+        }
+        if (message.sessionConfig !== undefined) {
+            VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceAgentComposeConfig();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.sttModelPath = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.sttModelId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.sttModelName = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.llmModelPath = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.llmModelId = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.llmModelName = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.ttsVoicePath = reader.string();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.ttsVoiceId = reader.string();
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.ttsVoiceName = reader.string();
+                    continue;
+                case 10:
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.vadSampleRate = reader.int32();
+                    continue;
+                case 11:
+                    if (tag !== 93) {
+                        break;
+                    }
+                    message.vadFrameLength = reader.float();
+                    continue;
+                case 12:
+                    if (tag !== 101) {
+                        break;
+                    }
+                    message.vadEnergyThreshold = reader.float();
+                    continue;
+                case 13:
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.wakewordEnabled = reader.bool();
+                    continue;
+                case 14:
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.wakewordModelPath = reader.string();
+                    continue;
+                case 15:
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.wakewordModelId = reader.string();
+                    continue;
+                case 16:
+                    if (tag !== 130) {
+                        break;
+                    }
+                    message.wakewordPhrase = reader.string();
+                    continue;
+                case 17:
+                    if (tag !== 141) {
+                        break;
+                    }
+                    message.wakewordThreshold = reader.float();
+                    continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.wakewordEmbeddingModelPath = reader.string();
+                    continue;
+                case 19:
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.wakewordVadModelPath = reader.string();
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.sessionConfig = VoiceSessionConfig.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            sttModelPath: isSet(object.sttModelPath) ? globalThis.String(object.sttModelPath) : undefined,
+            sttModelId: isSet(object.sttModelId) ? globalThis.String(object.sttModelId) : undefined,
+            sttModelName: isSet(object.sttModelName) ? globalThis.String(object.sttModelName) : undefined,
+            llmModelPath: isSet(object.llmModelPath) ? globalThis.String(object.llmModelPath) : undefined,
+            llmModelId: isSet(object.llmModelId) ? globalThis.String(object.llmModelId) : undefined,
+            llmModelName: isSet(object.llmModelName) ? globalThis.String(object.llmModelName) : undefined,
+            ttsVoicePath: isSet(object.ttsVoicePath) ? globalThis.String(object.ttsVoicePath) : undefined,
+            ttsVoiceId: isSet(object.ttsVoiceId) ? globalThis.String(object.ttsVoiceId) : undefined,
+            ttsVoiceName: isSet(object.ttsVoiceName) ? globalThis.String(object.ttsVoiceName) : undefined,
+            vadSampleRate: isSet(object.vadSampleRate) ? globalThis.Number(object.vadSampleRate) : 0,
+            vadFrameLength: isSet(object.vadFrameLength) ? globalThis.Number(object.vadFrameLength) : 0,
+            vadEnergyThreshold: isSet(object.vadEnergyThreshold) ? globalThis.Number(object.vadEnergyThreshold) : 0,
+            wakewordEnabled: isSet(object.wakewordEnabled) ? globalThis.Boolean(object.wakewordEnabled) : false,
+            wakewordModelPath: isSet(object.wakewordModelPath) ? globalThis.String(object.wakewordModelPath) : undefined,
+            wakewordModelId: isSet(object.wakewordModelId) ? globalThis.String(object.wakewordModelId) : undefined,
+            wakewordPhrase: isSet(object.wakewordPhrase) ? globalThis.String(object.wakewordPhrase) : undefined,
+            wakewordThreshold: isSet(object.wakewordThreshold) ? globalThis.Number(object.wakewordThreshold) : 0,
+            wakewordEmbeddingModelPath: isSet(object.wakewordEmbeddingModelPath)
+                ? globalThis.String(object.wakewordEmbeddingModelPath)
+                : undefined,
+            wakewordVadModelPath: isSet(object.wakewordVadModelPath)
+                ? globalThis.String(object.wakewordVadModelPath)
+                : undefined,
+            sessionConfig: isSet(object.sessionConfig) ? VoiceSessionConfig.fromJSON(object.sessionConfig) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.sttModelPath !== undefined) {
+            obj.sttModelPath = message.sttModelPath;
+        }
+        if (message.sttModelId !== undefined) {
+            obj.sttModelId = message.sttModelId;
+        }
+        if (message.sttModelName !== undefined) {
+            obj.sttModelName = message.sttModelName;
+        }
+        if (message.llmModelPath !== undefined) {
+            obj.llmModelPath = message.llmModelPath;
+        }
+        if (message.llmModelId !== undefined) {
+            obj.llmModelId = message.llmModelId;
+        }
+        if (message.llmModelName !== undefined) {
+            obj.llmModelName = message.llmModelName;
+        }
+        if (message.ttsVoicePath !== undefined) {
+            obj.ttsVoicePath = message.ttsVoicePath;
+        }
+        if (message.ttsVoiceId !== undefined) {
+            obj.ttsVoiceId = message.ttsVoiceId;
+        }
+        if (message.ttsVoiceName !== undefined) {
+            obj.ttsVoiceName = message.ttsVoiceName;
+        }
+        if (message.vadSampleRate !== 0) {
+            obj.vadSampleRate = Math.round(message.vadSampleRate);
+        }
+        if (message.vadFrameLength !== 0) {
+            obj.vadFrameLength = message.vadFrameLength;
+        }
+        if (message.vadEnergyThreshold !== 0) {
+            obj.vadEnergyThreshold = message.vadEnergyThreshold;
+        }
+        if (message.wakewordEnabled !== false) {
+            obj.wakewordEnabled = message.wakewordEnabled;
+        }
+        if (message.wakewordModelPath !== undefined) {
+            obj.wakewordModelPath = message.wakewordModelPath;
+        }
+        if (message.wakewordModelId !== undefined) {
+            obj.wakewordModelId = message.wakewordModelId;
+        }
+        if (message.wakewordPhrase !== undefined) {
+            obj.wakewordPhrase = message.wakewordPhrase;
+        }
+        if (message.wakewordThreshold !== 0) {
+            obj.wakewordThreshold = message.wakewordThreshold;
+        }
+        if (message.wakewordEmbeddingModelPath !== undefined) {
+            obj.wakewordEmbeddingModelPath = message.wakewordEmbeddingModelPath;
+        }
+        if (message.wakewordVadModelPath !== undefined) {
+            obj.wakewordVadModelPath = message.wakewordVadModelPath;
+        }
+        if (message.sessionConfig !== undefined) {
+            obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceAgentComposeConfig.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceAgentComposeConfig();
+        message.sttModelPath = object.sttModelPath ?? undefined;
+        message.sttModelId = object.sttModelId ?? undefined;
+        message.sttModelName = object.sttModelName ?? undefined;
+        message.llmModelPath = object.llmModelPath ?? undefined;
+        message.llmModelId = object.llmModelId ?? undefined;
+        message.llmModelName = object.llmModelName ?? undefined;
+        message.ttsVoicePath = object.ttsVoicePath ?? undefined;
+        message.ttsVoiceId = object.ttsVoiceId ?? undefined;
+        message.ttsVoiceName = object.ttsVoiceName ?? undefined;
+        message.vadSampleRate = object.vadSampleRate ?? 0;
+        message.vadFrameLength = object.vadFrameLength ?? 0;
+        message.vadEnergyThreshold = object.vadEnergyThreshold ?? 0;
+        message.wakewordEnabled = object.wakewordEnabled ?? false;
+        message.wakewordModelPath = object.wakewordModelPath ?? undefined;
+        message.wakewordModelId = object.wakewordModelId ?? undefined;
+        message.wakewordPhrase = object.wakewordPhrase ?? undefined;
+        message.wakewordThreshold = object.wakewordThreshold ?? 0;
+        message.wakewordEmbeddingModelPath = object.wakewordEmbeddingModelPath ?? undefined;
+        message.wakewordVadModelPath = object.wakewordVadModelPath ?? undefined;
+        message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
+            ? VoiceSessionConfig.fromPartial(object.sessionConfig)
+            : undefined;
+        return message;
+    },
+};
+function bytesFromBase64(b64) {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+        arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+}
+function base64FromBytes(arr) {
+    const bin = [];
+    arr.forEach((byte) => {
+        bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+}
 function isSet(value) {
     return value !== null && value !== undefined;
 }

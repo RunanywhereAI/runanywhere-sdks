@@ -1,15 +1,11 @@
-//
+///
 //  Generated code. Do not modify.
 //  source: llm_service.proto
 //
 // @dart = 2.12
+// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
 
-// ignore_for_file: always_use_package_imports
-// ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
-
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -20,6 +16,18 @@ import 'llm_service.pbenum.dart';
 export 'llm_service.pbenum.dart';
 
 class LLMGenerateRequest extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'LLMGenerateRequest', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'prompt')
+    ..a<$core.int>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'temperature', $pb.PbFieldType.OF)
+    ..a<$core.double>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'topP', $pb.PbFieldType.OF)
+    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'topK', $pb.PbFieldType.O3)
+    ..aOS(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'systemPrompt')
+    ..aOB(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'emitThoughts')
+    ..hasRequiredFields = false
+  ;
+
+  LLMGenerateRequest._() : super();
   factory LLMGenerateRequest({
     $core.String? prompt,
     $core.int? maxTokens,
@@ -29,45 +37,32 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
     $core.String? systemPrompt,
     $core.bool? emitThoughts,
   }) {
-    final $result = create();
+    final _result = create();
     if (prompt != null) {
-      $result.prompt = prompt;
+      _result.prompt = prompt;
     }
     if (maxTokens != null) {
-      $result.maxTokens = maxTokens;
+      _result.maxTokens = maxTokens;
     }
     if (temperature != null) {
-      $result.temperature = temperature;
+      _result.temperature = temperature;
     }
     if (topP != null) {
-      $result.topP = topP;
+      _result.topP = topP;
     }
     if (topK != null) {
-      $result.topK = topK;
+      _result.topK = topK;
     }
     if (systemPrompt != null) {
-      $result.systemPrompt = systemPrompt;
+      _result.systemPrompt = systemPrompt;
     }
     if (emitThoughts != null) {
-      $result.emitThoughts = emitThoughts;
+      _result.emitThoughts = emitThoughts;
     }
-    return $result;
+    return _result;
   }
-  LLMGenerateRequest._() : super();
   factory LLMGenerateRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory LLMGenerateRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LLMGenerateRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'prompt')
-    ..a<$core.int>(2, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
-    ..a<$core.double>(3, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
-    ..a<$core.double>(4, _omitFieldNames ? '' : 'topP', $pb.PbFieldType.OF)
-    ..a<$core.int>(5, _omitFieldNames ? '' : 'topK', $pb.PbFieldType.O3)
-    ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
-    ..aOB(7, _omitFieldNames ? '' : 'emitThoughts')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -77,10 +72,8 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LLMGenerateRequest copyWith(void Function(LLMGenerateRequest) updates) => super.copyWith((message) => updates(message as LLMGenerateRequest)) as LLMGenerateRequest;
-
+  LLMGenerateRequest copyWith(void Function(LLMGenerateRequest) updates) => super.copyWith((message) => updates(message as LLMGenerateRequest)) as LLMGenerateRequest; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static LLMGenerateRequest create() => LLMGenerateRequest._();
   LLMGenerateRequest createEmptyInstance() => create();
@@ -153,12 +146,21 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   void clearEmitThoughts() => clearField(7);
 }
 
-/// v2 close-out Phase G-2: unified per-token streaming event. Replaces
-/// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
-/// callbackFlow / StreamController / tokenQueue. One serialized event
-/// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
-/// from voice_events.proto so frontends can reuse gap-detection logic.
 class LLMStreamEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'LLMStreamEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'timestampUs')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'token')
+    ..aOB(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isFinal')
+    ..e<LLMTokenKind>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED, valueOf: LLMTokenKind.valueOf, enumValues: LLMTokenKind.values)
+    ..a<$core.int>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'tokenId', $pb.PbFieldType.OU3)
+    ..a<$core.double>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'logprob', $pb.PbFieldType.OF)
+    ..aOS(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'finishReason')
+    ..aOS(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  LLMStreamEvent._() : super();
   factory LLMStreamEvent({
     $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
@@ -170,53 +172,38 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $core.String? finishReason,
     $core.String? errorMessage,
   }) {
-    final $result = create();
+    final _result = create();
     if (seq != null) {
-      $result.seq = seq;
+      _result.seq = seq;
     }
     if (timestampUs != null) {
-      $result.timestampUs = timestampUs;
+      _result.timestampUs = timestampUs;
     }
     if (token != null) {
-      $result.token = token;
+      _result.token = token;
     }
     if (isFinal != null) {
-      $result.isFinal = isFinal;
+      _result.isFinal = isFinal;
     }
     if (kind != null) {
-      $result.kind = kind;
+      _result.kind = kind;
     }
     if (tokenId != null) {
-      $result.tokenId = tokenId;
+      _result.tokenId = tokenId;
     }
     if (logprob != null) {
-      $result.logprob = logprob;
+      _result.logprob = logprob;
     }
     if (finishReason != null) {
-      $result.finishReason = finishReason;
+      _result.finishReason = finishReason;
     }
     if (errorMessage != null) {
-      $result.errorMessage = errorMessage;
+      _result.errorMessage = errorMessage;
     }
-    return $result;
+    return _result;
   }
-  LLMStreamEvent._() : super();
   factory LLMStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory LLMStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LLMStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
-    ..aOS(3, _omitFieldNames ? '' : 'token')
-    ..aOB(4, _omitFieldNames ? '' : 'isFinal')
-    ..e<LLMTokenKind>(5, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED, valueOf: LLMTokenKind.valueOf, enumValues: LLMTokenKind.values)
-    ..a<$core.int>(6, _omitFieldNames ? '' : 'tokenId', $pb.PbFieldType.OU3)
-    ..a<$core.double>(7, _omitFieldNames ? '' : 'logprob', $pb.PbFieldType.OF)
-    ..aOS(8, _omitFieldNames ? '' : 'finishReason')
-    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -226,10 +213,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LLMStreamEvent copyWith(void Function(LLMStreamEvent) updates) => super.copyWith((message) => updates(message as LLMStreamEvent)) as LLMStreamEvent;
-
+  LLMStreamEvent copyWith(void Function(LLMStreamEvent) updates) => super.copyWith((message) => updates(message as LLMStreamEvent)) as LLMStreamEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static LLMStreamEvent create() => LLMStreamEvent._();
   LLMStreamEvent createEmptyInstance() => create();
@@ -238,8 +223,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   static LLMStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LLMStreamEvent>(create);
   static LLMStreamEvent? _defaultInstance;
 
-  /// Monotonic per-process sequence number. Useful for frontends that
-  /// need to detect gaps or out-of-order delivery.
   @$pb.TagNumber(1)
   $fixnum.Int64 get seq => $_getI64(0);
   @$pb.TagNumber(1)
@@ -249,8 +232,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSeq() => clearField(1);
 
-  /// Wall-clock timestamp captured at the C++ edge, in microseconds
-  /// since Unix epoch. Frontends may re-timestamp for UI display.
   @$pb.TagNumber(2)
   $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -260,8 +241,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTimestampUs() => clearField(2);
 
-  /// Generated token text. Empty on terminal events where only
-  /// finish_reason or error_message is populated.
   @$pb.TagNumber(3)
   $core.String get token => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -271,7 +250,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearToken() => clearField(3);
 
-  /// True on the last event of a generation.
   @$pb.TagNumber(4)
   $core.bool get isFinal => $_getBF(3);
   @$pb.TagNumber(4)
@@ -281,7 +259,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearIsFinal() => clearField(4);
 
-  /// Token semantic category (answer / thought / tool-call).
   @$pb.TagNumber(5)
   LLMTokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)
@@ -291,8 +268,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearKind() => clearField(5);
 
-  /// Backend-provided token id when the engine exposes it; 0 = unset
-  /// (proto3 scalar default).
   @$pb.TagNumber(6)
   $core.int get tokenId => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -302,7 +277,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearTokenId() => clearField(6);
 
-  /// Per-token log-probability when supported; 0.0 = unset.
   @$pb.TagNumber(7)
   $core.double get logprob => $_getN(6);
   @$pb.TagNumber(7)
@@ -312,8 +286,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearLogprob() => clearField(7);
 
-  /// Reason the stream stopped: "stop", "length", "cancelled", "error",
-  /// "" = unset (proto3 scalar default). Only populated when is_final.
   @$pb.TagNumber(8)
   $core.String get finishReason => $_getSZ(7);
   @$pb.TagNumber(8)
@@ -323,8 +295,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearFinishReason() => clearField(8);
 
-  /// Error message on failure events (kind may be unset, is_final true).
-  /// Empty on success.
   @$pb.TagNumber(9)
   $core.String get errorMessage => $_getSZ(8);
   @$pb.TagNumber(9)
@@ -335,6 +305,13 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   void clearErrorMessage() => clearField(9);
 }
 
+class LLMApi {
+  $pb.RpcClient _client;
+  LLMApi(this._client);
 
-const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
-const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');
+  $async.Future<LLMStreamEvent> generate($pb.ClientContext? ctx, LLMGenerateRequest request) {
+    var emptyResponse = LLMStreamEvent();
+    return _client.invoke<LLMStreamEvent>(ctx, 'LLM', 'Generate', request, emptyResponse);
+  }
+}
+

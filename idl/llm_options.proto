@@ -21,6 +21,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "model_types.proto";
+import "structured_output.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -72,6 +73,19 @@ message LLMGenerationOptions {
     // that conforms to this schema. Swift wraps this in a StructuredOutputConfig
     // struct with the Generatable.Type — proto carries just the schema string.
     optional string json_schema = 10;
+
+    // Optional thinking-tag pattern for extracting reasoning content from
+    // models like Qwen3 / LFM2 that emit <think>...</think> blocks.
+    optional ThinkingTagPattern thinking_pattern = 11;
+
+    // Routing hint: where this generation should run (on-device, cloud, or
+    // SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+    optional ExecutionTarget execution_target = 12;
+
+    // Optional structured-output configuration. Detailed message lives in
+    // structured_output.proto so the schema/format details aren't duplicated
+    // here. When set, supersedes the simpler `json_schema` string above.
+    optional StructuredOutputOptions structured_output = 13;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,4 +135,114 @@ message LLMGenerationResult {
     // Optional JSON output (when structured-output mode was requested).
     // Empty = no structured output.
     optional string json_output = 13;
+
+    // Optional aggregated performance metrics. Web SDK surfaces this as a
+    // separate object alongside the result; consumers may ignore it if they
+    // already use the per-field timings above.
+    optional PerformanceMetrics performance = 14;
+
+    // Where the generation actually ran (on-device, cloud, etc.). Useful
+    // when execution_target was AUTO and the SDK picked the route.
+    optional ExecutionTarget executed_on = 15;
+}
+
+// ---------------------------------------------------------------------------
+// Lightweight LLM configuration used at component-init time (Swift
+// LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
+// — this is the "load the model" knob set, not the per-call sampling knobs.
+// ---------------------------------------------------------------------------
+message LLMConfiguration {
+    // Model context window length in tokens. 0 = use model default.
+    int32  context_length      = 1;
+
+    // Default sampling temperature applied when a per-call value is unset.
+    float  temperature         = 2;
+
+    // Default max output tokens applied when a per-call value is unset.
+    int32  max_tokens          = 3;
+
+    // Default system prompt baked into the component. Empty = no default.
+    optional string system_prompt = 4;
+
+    // Whether streaming generation is enabled by default for this component.
+    bool   streaming           = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Per-prompt generation hints (Swift GenerationHints in LLMTypes.swift:550).
+// Carried alongside a prompt as a "soft" override of LLMConfiguration
+// defaults when the engine has no explicit LLMGenerationOptions to use.
+// ---------------------------------------------------------------------------
+message GenerationHints {
+    // Suggested sampling temperature.
+    float  temperature         = 1;
+
+    // Suggested max output tokens.
+    int32  max_tokens          = 2;
+
+    // Suggested role to use for the system prompt (e.g. "system", "developer").
+    // Empty = engine default ("system").
+    optional string system_role = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Pattern used to extract a model's "thinking" / reasoning block from its
+// raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
+// Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
+// ---------------------------------------------------------------------------
+message ThinkingTagPattern {
+    // Opening tag string. Default if empty: "<think>".
+    string opening_tag         = 1;
+
+    // Closing tag string. Default if empty: "</think>".
+    string closing_tag         = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
+// once per token in streaming mode.
+// ---------------------------------------------------------------------------
+message StreamToken {
+    // Decoded text fragment for this token.
+    string text                = 1;
+
+    // Wall-clock timestamp (ms since Unix epoch) the token was produced.
+    int64  timestamp_ms        = 2;
+
+    // Sequence index within the current generation (0-based).
+    int32  index               = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Aggregated performance metrics for a generation (Web SDK
+// PerformanceMetrics in types/models.ts:57). Higher-level summary that
+// rolls up the timing fields scattered across LLMGenerationResult.
+// ---------------------------------------------------------------------------
+message PerformanceMetrics {
+    // Total latency from request to last token, in milliseconds.
+    int64  latency_ms                  = 1;
+
+    // Peak memory used by the inference engine, in bytes.
+    int64  memory_bytes                = 2;
+
+    // Decode throughput in tokens/second.
+    float  throughput_tokens_per_sec   = 3;
+
+    // Prompt (input) token count.
+    int32  prompt_tokens               = 4;
+
+    // Completion (output) token count.
+    int32  completion_tokens           = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Routing destination for a generation (Web SDK ExecutionTarget in
+// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
+// ---------------------------------------------------------------------------
+enum ExecutionTarget {
+    EXECUTION_TARGET_UNSPECIFIED = 0;
+    EXECUTION_TARGET_ON_DEVICE   = 1;
+    EXECUTION_TARGET_CLOUD       = 2;
+    // Let the SDK decide based on policy (cost, latency, privacy, etc.).
+    EXECUTION_TARGET_AUTO        = 3;
 }

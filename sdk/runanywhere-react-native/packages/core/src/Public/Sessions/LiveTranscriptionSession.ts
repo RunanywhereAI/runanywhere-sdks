@@ -23,7 +23,23 @@ import {
   transcribeStream,
   stopStreamingTranscription,
 } from '../Extensions/RunAnywhere+STT';
-import type { STTOptions } from '../../types';
+import {
+  type STTOptions,
+  STTLanguage,
+} from '@runanywhere/proto-ts/stt_options';
+
+/** Default proto STTOptions for live transcription. */
+function defaultLiveSTTOptions(): STTOptions {
+  return {
+    language: STTLanguage.STT_LANGUAGE_AUTO,
+    enablePunctuation: true,
+    enableDiarization: false,
+    maxSpeakers: 0,
+    vocabularyList: [],
+    enableWordTimestamps: false,
+    beamSize: 0,
+  };
+}
 
 /**
  * Errors specific to live transcription.
@@ -111,10 +127,8 @@ export class LiveTranscriptionSession {
   private textResolver: ((value: IteratorResult<string>) => void) | null = null;
   private streamFinished = false;
 
-  constructor(options: STTOptions = {}) {
-    this.audioCapture = new AudioCaptureManager({
-      sampleRate: options.sampleRate ?? 16000,
-    });
+  constructor(options: STTOptions = defaultLiveSTTOptions()) {
+    this.audioCapture = new AudioCaptureManager({ sampleRate: 16000 });
     this.options = options;
   }
 
@@ -257,7 +271,7 @@ export class LiveTranscriptionSession {
       await transcribeStream(new ArrayBuffer(0), {
         ...this.options,
         onPartialResult: (partial) => {
-          this.pushText(partial.transcript);
+          this.pushText(partial.text);
         },
       });
     } catch (err) {
@@ -347,7 +361,7 @@ export async function startLiveTranscription(
   options?: STTOptions,
   onPartial?: (text: string) => void
 ): Promise<LiveTranscriptionSession> {
-  const session = new LiveTranscriptionSession(options ?? {});
+  const session = new LiveTranscriptionSession(options ?? defaultLiveSTTOptions());
   await session.start(onPartial);
   return session;
 }

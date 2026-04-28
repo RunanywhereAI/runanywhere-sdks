@@ -68,13 +68,13 @@ enum class AudioFormat(
     /** Convert to the IDL-generated Wire enum. Drift-preventing bijection. */
     fun toProto(): ai.runanywhere.proto.v1.AudioFormat =
         when (this) {
-            PCM       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM
-            WAV       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV
-            MP3       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3
-            OPUS      -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS
-            AAC       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC
-            FLAC      -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC
-            OGG       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG
+            PCM -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM
+            WAV -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV
+            MP3 -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3
+            OPUS -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS
+            AAC -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC
+            FLAC -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC
+            OGG -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG
             PCM_16BIT -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE
         }
 }
@@ -82,15 +82,15 @@ enum class AudioFormat(
 /** Decode from the IDL-generated Wire enum. Unknown proto cases → null. */
 fun audioFormatFromProto(proto: ai.runanywhere.proto.v1.AudioFormat): AudioFormat? =
     when (proto) {
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM        -> AudioFormat.PCM
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV        -> AudioFormat.WAV
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3        -> AudioFormat.MP3
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS       -> AudioFormat.OPUS
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC        -> AudioFormat.AAC
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC       -> AudioFormat.FLAC
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG        -> AudioFormat.OGG
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE  -> AudioFormat.PCM_16BIT
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_M4A        -> null // iOS/Dart container, not exposed in Kotlin yet
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM -> AudioFormat.PCM
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV -> AudioFormat.WAV
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3 -> AudioFormat.MP3
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS -> AudioFormat.OPUS
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC -> AudioFormat.AAC
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC -> AudioFormat.FLAC
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG -> AudioFormat.OGG
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE -> AudioFormat.PCM_16BIT
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_M4A -> null // iOS/Dart container, not exposed in Kotlin yet
         ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED -> null
     }
 
@@ -217,16 +217,16 @@ enum class InferenceFramework(
     /** Convert to the IDL-generated Wire enum. */
     fun toProto(): ai.runanywhere.proto.v1.InferenceFramework =
         when (this) {
-            ONNX               -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            SHERPA             -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
-            LLAMA_CPP          -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-            FOUNDATION_MODELS  -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
-            SYSTEM_TTS         -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
-            FLUID_AUDIO        -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
-            GENIE              -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE
-            BUILT_IN           -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN
-            NONE               -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE
-            UNKNOWN            -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+            ONNX -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+            SHERPA -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+            LLAMA_CPP -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+            FOUNDATION_MODELS -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
+            SYSTEM_TTS -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+            FLUID_AUDIO -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
+            GENIE -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE
+            BUILT_IN -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN
+            NONE -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE
+            UNKNOWN -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
         }
 
     companion object {
@@ -241,16 +241,16 @@ enum class InferenceFramework(
         /** Decode from the IDL-generated Wire enum; unsupported → UNKNOWN. */
         fun fromProto(proto: ai.runanywhere.proto.v1.InferenceFramework): InferenceFramework =
             when (proto) {
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX               -> ONNX
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA             -> SHERPA
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP          -> LLAMA_CPP
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS  -> FOUNDATION_MODELS
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS         -> SYSTEM_TTS
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO        -> FLUID_AUDIO
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE              -> GENIE
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN           -> BUILT_IN
-                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE               -> NONE
-                else                                                                              -> UNKNOWN
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> ONNX
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> SHERPA
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> LLAMA_CPP
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> FOUNDATION_MODELS
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> SYSTEM_TTS
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> FLUID_AUDIO
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> GENIE
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> BUILT_IN
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE -> NONE
+                else -> UNKNOWN
             }
     }
 }

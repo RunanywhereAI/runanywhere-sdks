@@ -71,6 +71,16 @@ public class AgentLoopConfig(
     schemaIndex = 4,
   )
   public val max_context_tokens: Int = 0,
+  /**
+   * Optional explicit solution-kind tag. See `SolutionType`.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
+    jsonName = "typeKind",
+    schemaIndex = 5,
+  )
+  public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<AgentLoopConfig, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -97,6 +107,7 @@ public class AgentLoopConfig(
     if (tools != other.tools) return false
     if (max_iterations != other.max_iterations) return false
     if (max_context_tokens != other.max_context_tokens) return false
+    if (type_kind != other.type_kind) return false
     return true
   }
 
@@ -109,6 +120,7 @@ public class AgentLoopConfig(
       result = result * 37 + tools.hashCode()
       result = result * 37 + max_iterations.hashCode()
       result = result * 37 + max_context_tokens.hashCode()
+      result = result * 37 + (type_kind?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -121,6 +133,7 @@ public class AgentLoopConfig(
     if (tools.isNotEmpty()) result += """tools=$tools"""
     result += """max_iterations=$max_iterations"""
     result += """max_context_tokens=$max_context_tokens"""
+    if (type_kind != null) result += """type_kind=$type_kind"""
     return result.joinToString(prefix = "AgentLoopConfig{", separator = ", ", postfix = "}")
   }
 
@@ -130,9 +143,10 @@ public class AgentLoopConfig(
     tools: List<ToolSpec> = this.tools,
     max_iterations: Int = this.max_iterations,
     max_context_tokens: Int = this.max_context_tokens,
+    type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
   ): AgentLoopConfig = AgentLoopConfig(llm_model_id, system_prompt, tools, max_iterations,
-      max_context_tokens, unknownFields)
+      max_context_tokens, type_kind, unknownFields)
 
   public companion object {
     @JvmField
@@ -155,6 +169,7 @@ public class AgentLoopConfig(
             value.max_iterations)
         if (value.max_context_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5,
             value.max_context_tokens)
+        size += SolutionType.ADAPTER.encodedSizeWithTag(6, value.type_kind)
         return size
       }
 
@@ -168,11 +183,13 @@ public class AgentLoopConfig(
             value.max_iterations)
         if (value.max_context_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
             value.max_context_tokens)
+        SolutionType.ADAPTER.encodeWithTag(writer, 6, value.type_kind)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: AgentLoopConfig) {
         writer.writeBytes(value.unknownFields)
+        SolutionType.ADAPTER.encodeWithTag(writer, 6, value.type_kind)
         if (value.max_context_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
             value.max_context_tokens)
         if (value.max_iterations != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
@@ -190,6 +207,7 @@ public class AgentLoopConfig(
         val tools = mutableListOf<ToolSpec>()
         var max_iterations: Int = 0
         var max_context_tokens: Int = 0
+        var type_kind: SolutionType? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> llm_model_id = ProtoAdapter.STRING.decode(reader)
@@ -197,6 +215,11 @@ public class AgentLoopConfig(
             3 -> tools.add(ToolSpec.ADAPTER.decode(reader))
             4 -> max_iterations = ProtoAdapter.INT32.decode(reader)
             5 -> max_context_tokens = ProtoAdapter.INT32.decode(reader)
+            6 -> try {
+              type_kind = SolutionType.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -206,6 +229,7 @@ public class AgentLoopConfig(
           tools = tools,
           max_iterations = max_iterations,
           max_context_tokens = max_context_tokens,
+          type_kind = type_kind,
           unknownFields = unknownFields
         )
       }

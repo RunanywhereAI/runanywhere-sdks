@@ -177,6 +177,59 @@ enum ArchiveStructure {
 }
 
 // ---------------------------------------------------------------------------
+// High-level artifact classification — what KIND of bundle a model ships as.
+// Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
+// compression flavor). Sources pre-IDL:
+//   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
+//   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
+//   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
+// ---------------------------------------------------------------------------
+enum ModelArtifactType {
+    MODEL_ARTIFACT_TYPE_UNSPECIFIED   = 0;
+    MODEL_ARTIFACT_TYPE_SINGLE_FILE   = 1;
+    MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE = 2;
+    MODEL_ARTIFACT_TYPE_DIRECTORY     = 3;
+    MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE   = 4;
+    MODEL_ARTIFACT_TYPE_CUSTOM        = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Hardware acceleration preference for inference. Sources pre-IDL:
+//   Web    enums.ts:165   (Auto / WebGPU / CPU)
+//   Swift  extensions     (CPU / GPU / NPU / Metal)
+//   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+// Canonicalized union below.
+// ---------------------------------------------------------------------------
+enum AccelerationPreference {
+    ACCELERATION_PREFERENCE_UNSPECIFIED = 0;
+    ACCELERATION_PREFERENCE_AUTO        = 1;
+    ACCELERATION_PREFERENCE_CPU         = 2;
+    ACCELERATION_PREFERENCE_GPU         = 3;
+    ACCELERATION_PREFERENCE_NPU         = 4;
+    ACCELERATION_PREFERENCE_WEBGPU      = 5;
+    ACCELERATION_PREFERENCE_METAL       = 6;
+    ACCELERATION_PREFERENCE_VULKAN      = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
+//   Web    enums.ts (RoutingPolicy)
+//          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
+//          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
+//   Swift  extensions (RoutingPolicy)
+// Canonical short-form below; specific PreferLocal/PreferCloud cover the
+// "preferred" cases, MANUAL covers explicit user override.
+// ---------------------------------------------------------------------------
+enum RoutingPolicy {
+    ROUTING_POLICY_UNSPECIFIED       = 0;
+    ROUTING_POLICY_PREFER_LOCAL      = 1;
+    ROUTING_POLICY_PREFER_CLOUD      = 2;
+    ROUTING_POLICY_COST_OPTIMIZED    = 3;
+    ROUTING_POLICY_LATENCY_OPTIMIZED = 4;
+    ROUTING_POLICY_MANUAL            = 5;
+}
+
+// ---------------------------------------------------------------------------
 // Core metadata for a model entry.
 // Sources pre-IDL:
 //   Swift  ModelTypes.swift:393       (16 fields)
@@ -211,6 +264,20 @@ message ModelInfo {
         string             custom_strategy_id = 23;
         bool               built_in           = 24;
     }
+
+    // High-level artifact classification, complementary to the `artifact`
+    // oneof above. Allows catalog entries to carry a coarse type tag without
+    // resolving the full strategy variant.
+    optional ModelArtifactType      artifact_type           = 25;
+
+    // Manifest of files that are expected on disk after fetch/extraction.
+    optional ExpectedModelFiles     expected_files          = 26;
+
+    // Preferred hardware acceleration backend for this model.
+    optional AccelerationPreference acceleration_preference = 27;
+
+    // Hybrid (on-device vs cloud) routing policy for this entry.
+    optional RoutingPolicy          routing_policy          = 28;
 }
 
 message SingleFileArtifact {
@@ -229,8 +296,27 @@ message ModelFileDescriptor {
     string url         = 1;
     string filename    = 2;
     bool   is_required = 3;
+
+    // Extended descriptor fields (Flutter model_types.dart:~350,
+    // Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
+    // canonical "required" flag — the documented `required` boolean from
+    // newer SDK sources maps onto it (default true, mirrored in Swift).
+    optional int64  size_bytes = 4;
+    optional string checksum   = 5;
 }
 
 message MultiFileArtifact {
     repeated ModelFileDescriptor files = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Declarative manifest of files a multi-file / directory model is expected
+// to contain on disk after download/extraction. Used for verification before
+// hand-off to the inference framework. Sources pre-IDL:
+//   Flutter core/types/model_types.dart:420
+//   Swift   ModelTypes.swift:~300
+// ---------------------------------------------------------------------------
+message ExpectedModelFiles {
+    repeated ModelFileDescriptor files          = 1;
+    optional string              root_directory = 2;
 }

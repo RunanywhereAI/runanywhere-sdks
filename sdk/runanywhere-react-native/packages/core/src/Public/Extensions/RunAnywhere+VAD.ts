@@ -1,29 +1,36 @@
 /**
  * RunAnywhere+VAD.ts
  *
- * Voice Activity Detection extension for RunAnywhere SDK.
- * Matches iOS: RunAnywhere+VAD.swift
+ * Voice Activity Detection extension. Wave 2: aligned to proto-canonical
+ * VAD shapes (`@runanywhere/proto-ts/vad_options`). Legacy ad-hoc local
+ * shapes have been deleted.
+ *
+ * Matches Swift: `Public/Extensions/VAD/RunAnywhere+VAD.swift`.
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { EventBus } from '../Events';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import type {
-  VADConfiguration,
-  VADResult,
-  SpeechActivityEvent,
-  VADSpeechActivityCallback,
-  VADAudioBufferCallback,
-  VADState,
-} from '../../types/VADTypes';
+import {
+  type VADConfiguration,
+  type VADOptions,
+  type VADResult,
+  SpeechActivityKind,
+} from '@runanywhere/proto-ts/vad_options';
 
 const logger = new SDKLogger('RunAnywhere.VAD');
 
-// ============================================================================
-// VAD State Management
-// ============================================================================
+/** RN-local runtime VAD state. (No proto counterpart — purely local UI/debug.) */
+export interface VADState {
+  isInitialized: boolean;
+  isRunning: boolean;
+  isSpeechActive: boolean;
+  currentProbability: number;
+}
 
-// Internal VAD state
+export type VADSpeechActivityCallback = (kind: SpeechActivityKind) => void;
+export type VADAudioBufferCallback = (samples: Float32Array) => void;
+
 let vadState: VADState = {
   isInitialized: false,
   isRunning: false,
@@ -31,7 +38,6 @@ let vadState: VADState = {
   currentProbability: 0,
 };
 
-// Callbacks
 let speechActivityCallback: VADSpeechActivityCallback | null = null;
 let audioBufferCallback: VADAudioBufferCallback | null = null;
 
@@ -40,28 +46,29 @@ let audioBufferCallback: VADAudioBufferCallback | null = null;
 // ============================================================================
 
 /**
- * Initialize VAD with default configuration
- * Matches Swift SDK: RunAnywhere.initializeVAD()
+ * Initialize VAD with optional configuration.
+ *
+ * Matches Swift SDK: `RunAnywhere.initializeVAD()`.
  */
 export async function initializeVAD(config?: VADConfiguration): Promise<void> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-
   logger.info('Initializing VAD...');
-
   const native = requireNativeModule();
 
-  // If a config is provided, configure VAD first
   if (config) {
     const configJson = JSON.stringify({
+      modelId: config.modelId,
       sampleRate: config.sampleRate ?? 16000,
-      frameLength: config.frameLength ?? 0.1,
-      energyThreshold: config.energyThreshold ?? 0.005,
+      frameLengthMs: config.frameLengthMs ?? 100,
+      threshold: config.threshold ?? 0.015,
+      enableAutoCalibration: config.enableAutoCalibration ?? false,
     });
-
-    // Load VAD model if path provided, otherwise use default
-    const loaded = await native.loadVADModel('default', configJson);
+    const loaded = await native.loadVADModel(
+      config.modelId || 'default',
+      configJson
+    );
     if (!loaded) {
       throw new Error('Failed to initialize VAD');
     }
@@ -69,26 +76,17 @@ export async function initializeVAD(config?: VADConfiguration): Promise<void> {
 
   vadState.isInitialized = true;
   logger.info('VAD initialized');
-
   EventBus.publish('Voice', { type: 'vadInitialized' });
 }
 
-/**
- * Check if VAD is ready
- * Matches Swift SDK: RunAnywhere.isVADReady
- */
+/** Whether VAD is ready. */
 export async function isVADReady(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-
+  if (!isNativeModuleAvailable()) return false;
   const native = requireNativeModule();
   return native.isVADModelLoaded();
 }
 
-/**
- * Get current VAD state
- */
+/** Get current VAD state. */
 export function getVADState(): VADState {
   return { ...vadState };
 }
@@ -97,60 +95,41 @@ export function getVADState(): VADState {
 // VAD Model Loading
 // ============================================================================
 
-/**
- * Load a VAD model
- */
+/** Load a VAD model. */
 export async function loadVADModel(
   modelPath: string,
   config?: VADConfiguration
 ): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-
+  if (!isNativeModuleAvailable()) return false;
   logger.info(`Loading VAD model: ${modelPath}`);
   const native = requireNativeModule();
-
   const configJson = config ? JSON.stringify(config) : undefined;
   const result = await native.loadVADModel(modelPath, configJson);
-
   if (result) {
     vadState.isInitialized = true;
     logger.info('VAD model loaded');
   }
-
   return result;
 }
 
-/**
- * Check if a VAD model is loaded
- */
+/** Check if a VAD model is loaded. */
 export async function isVADModelLoaded(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
+  if (!isNativeModuleAvailable()) return false;
   const native = requireNativeModule();
   return native.isVADModelLoaded();
 }
 
-/**
- * Unload the current VAD model
- */
+/** Unload the current VAD model. */
 export async function unloadVADModel(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-
+  if (!isNativeModuleAvailable()) return false;
   const native = requireNativeModule();
   const result = await native.unloadVADModel();
-
   if (result) {
     vadState.isInitialized = false;
     vadState.isRunning = false;
     vadState.isSpeechActive = false;
     logger.info('VAD model unloaded');
   }
-
   return result;
 }
 
@@ -158,98 +137,110 @@ export async function unloadVADModel(): Promise<boolean> {
 // Speech Detection
 // ============================================================================
 
-/**
- * Detect speech in audio samples
- * Matches Swift SDK: RunAnywhere.detectSpeech(in:)
- *
- * @param samples Float32Array of audio samples
- * @returns Whether speech was detected
- */
-export async function detectSpeech(samples: Float32Array): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-
-  // Convert Float32Array to base64
+/** Encode a `Float32Array` audio buffer to a base64 string. */
+function float32ToBase64(samples: Float32Array): string {
   const bytes = new Uint8Array(samples.buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
     const byte = bytes[i];
-    if (byte !== undefined) {
-      binary += String.fromCharCode(byte);
-    }
+    if (byte !== undefined) binary += String.fromCharCode(byte);
   }
-  const audioBase64 = btoa(binary);
+  return btoa(binary);
+}
 
-  const result = await processVAD(audioBase64);
+/**
+ * Detect voice activity in audio samples.
+ *
+ * Canonical cross-SDK signature: detectVoiceActivity(audio: Uint8Array, options: VADOptions)
+ * Also accepts Float32Array | string | ArrayBuffer for legacy callers.
+ *
+ * Matches Swift SDK: `RunAnywhere.detectVoiceActivity(_:options:)`.
+ */
+export async function detectVoiceActivity(
+  audio: Uint8Array | Float32Array | string | ArrayBuffer,
+  options?: Partial<VADOptions>
+): Promise<VADResult> {
+  if (!isNativeModuleAvailable()) {
+    return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
+  }
+  let audioForProcessing: string | ArrayBuffer;
+  if (audio instanceof Float32Array) {
+    audioForProcessing = audio.buffer as ArrayBuffer;
+  } else if (audio instanceof Uint8Array) {
+    audioForProcessing = audio.buffer as ArrayBuffer;
+  } else {
+    audioForProcessing = audio;
+  }
+  const result = await processVAD(audioForProcessing, 16000, options);
 
-  // Update state
   const wasSpeechActive = vadState.isSpeechActive;
   vadState.isSpeechActive = result.isSpeech;
-  vadState.currentProbability = result.probability;
+  vadState.currentProbability = result.confidence;
 
-  // Emit speech activity events
   if (result.isSpeech && !wasSpeechActive) {
     if (speechActivityCallback) {
-      speechActivityCallback('started');
+      speechActivityCallback(SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED);
     }
     EventBus.publish('Voice', { type: 'speechStarted' });
   } else if (!result.isSpeech && wasSpeechActive) {
     if (speechActivityCallback) {
-      speechActivityCallback('ended');
+      speechActivityCallback(SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED);
     }
     EventBus.publish('Voice', { type: 'speechEnded' });
   }
 
-  // Forward to audio buffer callback if set
-  if (audioBufferCallback) {
-    audioBufferCallback(samples);
+  if (audioBufferCallback && audio instanceof Float32Array) {
+    audioBufferCallback(audio);
   }
 
+  return result;
+}
+
+/**
+ * Detect speech in audio samples (boolean convenience).
+ *
+ * Matches Swift SDK: `RunAnywhere.detectSpeech(in:)`.
+ */
+export async function detectSpeech(samples: Float32Array): Promise<boolean> {
+  const result = await detectVoiceActivity(samples);
   return result.isSpeech;
 }
 
 /**
- * Process audio for voice activity detection
- * Returns detailed VAD result
+ * Process audio for voice activity detection — returns the full proto result.
  */
 export async function processVAD(
-  audioData: string | ArrayBuffer,
-  sampleRate: number = 16000
+  audio: string | ArrayBuffer,
+  sampleRate: number = 16000,
+  options?: Partial<VADOptions>
 ): Promise<VADResult> {
   if (!isNativeModuleAvailable()) {
-    return { isSpeech: false, probability: 0 };
+    return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
   }
   const native = requireNativeModule();
-
-  let audioBase64: string;
-  if (typeof audioData === 'string') {
-    audioBase64 = audioData;
-  } else {
-    const bytes = new Uint8Array(audioData);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      const byte = bytes[i];
-      if (byte !== undefined) {
-        binary += String.fromCharCode(byte);
-      }
-    }
-    audioBase64 = btoa(binary);
-  }
-
-  const optionsJson = JSON.stringify({ sampleRate });
+  const audioBase64 =
+    typeof audio === 'string' ? audio : float32ToBase64(new Float32Array(audio));
+  const optionsJson = JSON.stringify({
+    sampleRate,
+    threshold: options?.threshold,
+    minSpeechDurationMs: options?.minSpeechDurationMs,
+    minSilenceDurationMs: options?.minSilenceDurationMs,
+  });
   const resultJson = await native.processVAD(audioBase64, optionsJson);
-
   try {
     const result = JSON.parse(resultJson);
     return {
       isSpeech: result.isSpeech ?? false,
-      probability: result.speechProbability ?? result.probability ?? 0,
-      startTime: result.startTime,
-      endTime: result.endTime,
+      confidence:
+        result.speechProbability ??
+        result.probability ??
+        result.confidence ??
+        0,
+      energy: result.energy ?? result.energyLevel ?? 0,
+      durationMs: result.durationMs ?? 0,
     };
   } catch {
-    return { isSpeech: false, probability: 0 };
+    return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
   }
 }
 
@@ -257,48 +248,32 @@ export async function processVAD(
 // VAD Control
 // ============================================================================
 
-/**
- * Start VAD processing
- * Matches Swift SDK: RunAnywhere.startVAD()
- */
+/** Start VAD processing. */
 export async function startVAD(): Promise<void> {
   if (!vadState.isInitialized) {
     await initializeVAD();
   }
-
   vadState.isRunning = true;
   logger.info('VAD started');
-
   EventBus.publish('Voice', { type: 'vadStarted' });
 }
 
-/**
- * Stop VAD processing
- * Matches Swift SDK: RunAnywhere.stopVAD()
- */
+/** Stop VAD processing. */
 export async function stopVAD(): Promise<void> {
   vadState.isRunning = false;
   vadState.isSpeechActive = false;
   vadState.currentProbability = 0;
-
   logger.info('VAD stopped');
   EventBus.publish('Voice', { type: 'vadStopped' });
 }
 
-/**
- * Reset VAD state
- */
+/** Reset VAD state. */
 export async function resetVAD(): Promise<void> {
-  if (!isNativeModuleAvailable()) {
-    return;
-  }
-
+  if (!isNativeModuleAvailable()) return;
   const native = requireNativeModule();
   await native.resetVAD();
-
   vadState.isSpeechActive = false;
   vadState.currentProbability = 0;
-
   logger.debug('VAD state reset');
 }
 
@@ -306,12 +281,7 @@ export async function resetVAD(): Promise<void> {
 // Callbacks
 // ============================================================================
 
-/**
- * Set VAD speech activity callback
- * Matches Swift SDK: RunAnywhere.setVADSpeechActivityCallback(_:)
- *
- * @param callback Callback invoked when speech state changes
- */
+/** Set VAD speech activity callback. */
 export function setVADSpeechActivityCallback(
   callback: VADSpeechActivityCallback | null
 ): void {
@@ -319,12 +289,7 @@ export function setVADSpeechActivityCallback(
   logger.debug('VAD speech activity callback set');
 }
 
-/**
- * Set VAD audio buffer callback
- * Matches Swift SDK: RunAnywhere.setVADAudioBufferCallback(_:)
- *
- * @param callback Callback invoked with audio samples
- */
+/** Set VAD audio buffer callback. */
 export function setVADAudioBufferCallback(
   callback: VADAudioBufferCallback | null
 ): void {
@@ -336,24 +301,18 @@ export function setVADAudioBufferCallback(
 // Cleanup
 // ============================================================================
 
-/**
- * Cleanup VAD resources
- * Matches Swift SDK: RunAnywhere.cleanupVAD()
- */
+/** Cleanup VAD resources. */
 export async function cleanupVAD(): Promise<void> {
   await stopVAD();
   await unloadVADModel();
-
   speechActivityCallback = null;
   audioBufferCallback = null;
-
   vadState = {
     isInitialized: false,
     isRunning: false,
     isSpeechActive: false,
     currentProbability: 0,
   };
-
   logger.info('VAD cleaned up');
   EventBus.publish('Voice', { type: 'vadCleanedUp' });
 }

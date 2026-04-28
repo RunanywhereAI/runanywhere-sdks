@@ -166,7 +166,7 @@ extension ChatInterfaceView {
             }
             .navigationTitle(hasModelSelected ? "Chat" : "")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             .navigationBarHidden(!hasModelSelected)
             #endif
             .toolbar {
@@ -645,7 +645,7 @@ private struct LoRAScaleSheetView: View {
             }
             .padding()
             .navigationTitle("Load LoRA Adapter")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
         }
     }
 }
@@ -667,7 +667,7 @@ private struct LoRAManagementSheetView: View {
                 customAdapterSection
             }
             .navigationTitle("LoRA Adapters")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { onDismiss() }
@@ -818,7 +818,11 @@ private struct LoRAManagementSheetView: View {
                                     .foregroundColor(.secondary)
                                 ForEach(prompts, id: \.self) { prompt in
                                     Button {
+                                        #if os(iOS)
                                         UIPasteboard.general.string = prompt
+                                        #else
+                                        NSPasteboard.general.setString(prompt, forType: .string)
+                                        #endif
                                     } label: {
                                         HStack(spacing: 4) {
                                             Image(systemName: "doc.on.doc")

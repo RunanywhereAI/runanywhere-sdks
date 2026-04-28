@@ -701,7 +701,7 @@ private struct ApiConfigurationSheet: View {
             #endif
             .navigationTitle("API Configuration")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 #if os(iOS)

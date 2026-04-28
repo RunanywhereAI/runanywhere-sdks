@@ -78,7 +78,7 @@ public extension RunAnywhere {
     /// Events are emitted from C++ - no Swift event emissions needed
     static func initializeVoiceAgent(_ config: VoiceAgentConfiguration) async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -110,7 +110,7 @@ public extension RunAnywhere {
 
         let result = rac_voice_agent_initialize(handle, &cConfig)
         guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.initializationFailed, "Voice agent initialization failed: \(result)")
+            throw SDKException.voiceAgent(.initializationFailed, "Voice agent initialization failed: \(result)")
         }
     }
 
@@ -118,7 +118,7 @@ public extension RunAnywhere {
     /// Events are emitted from C++ - no Swift event emissions needed
     static func initializeVoiceAgentWithLoadedModels() async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -127,7 +127,7 @@ public extension RunAnywhere {
 
         let result = rac_voice_agent_initialize_with_loaded_models(handle)
         guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.initializationFailed, "Failed to initialize with loaded models: \(result)")
+            throw SDKException.voiceAgent(.initializationFailed, "Failed to initialize with loaded models: \(result)")
         }
     }
 
@@ -143,7 +143,7 @@ public extension RunAnywhere {
     /// Process a complete voice turn: audio -> transcription -> LLM response -> synthesized speech
     static func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
@@ -151,7 +151,7 @@ public extension RunAnywhere {
         var isReady: rac_bool_t = RAC_FALSE
         rac_voice_agent_is_ready(handle, &isReady)
         guard isReady == RAC_TRUE else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice agent not ready")
+            throw SDKException.voiceAgent(.notInitialized, "Voice agent not ready")
         }
 
         var cResult = rac_voice_agent_result_t()
@@ -165,7 +165,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.processingFailed, "Voice turn processing failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Voice turn processing failed: \(result)")
         }
 
         // Extract results
@@ -195,7 +195,7 @@ public extension RunAnywhere {
     /// Transcribe audio (voice agent must be initialized)
     static func voiceAgentTranscribe(_ audioData: Data) async throws -> String {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
@@ -211,7 +211,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = transcriptionPtr else {
-            throw SDKError.voiceAgent(.processingFailed, "Transcription failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Transcription failed: \(result)")
         }
 
         let transcription = String(cString: ptr)
@@ -223,7 +223,7 @@ public extension RunAnywhere {
     /// Generate LLM response (voice agent must be initialized)
     static func voiceAgentGenerateResponse(_ prompt: String) async throws -> String {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
@@ -234,7 +234,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = responsePtr else {
-            throw SDKError.voiceAgent(.processingFailed, "Response generation failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Response generation failed: \(result)")
         }
 
         let response = String(cString: ptr)
@@ -246,7 +246,7 @@ public extension RunAnywhere {
     /// Synthesize speech (voice agent must be initialized)
     static func voiceAgentSynthesizeSpeech(_ text: String) async throws -> Data {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
@@ -264,7 +264,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
         }
 
         guard let ptr = audioPtr, audioSize > 0 else {

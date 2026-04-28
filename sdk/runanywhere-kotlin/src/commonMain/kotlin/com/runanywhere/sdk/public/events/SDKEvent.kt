@@ -11,7 +11,7 @@
 
 package com.runanywhere.sdk.public.events
 
-import com.runanywhere.sdk.public.extensions.RAG.RAGResult
+import ai.runanywhere.proto.v1.RAGResult
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -380,10 +380,10 @@ data class RAGEvent(
             RAGEvent(
                 eventType = RAGEventType.QUERY_COMPLETE,
                 answerLength = result.answer.length,
-                chunksRetrieved = result.retrievedChunks.size,
-                retrievalTimeMs = result.retrievalTimeMs,
-                generationTimeMs = result.generationTimeMs,
-                totalTimeMs = result.totalTimeMs,
+                chunksRetrieved = result.retrieved_chunks.size,
+                retrievalTimeMs = result.retrieval_time_ms.toDouble(),
+                generationTimeMs = result.generation_time_ms.toDouble(),
+                totalTimeMs = result.total_time_ms.toDouble(),
             )
 
         fun pipelineCreated() = RAGEvent(eventType = RAGEventType.PIPELINE_CREATED)

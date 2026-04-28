@@ -12,7 +12,7 @@
  *                    RunAnywhere+StructuredOutput.swift
  */
 
-import { SDKError } from '../../Foundation/ErrorTypes';
+import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
 import { AudioPlayback } from '../../Infrastructure/AudioPlayback';
@@ -25,17 +25,15 @@ import type {
 import type {
   LLMGenerationOptions,
   LLMGenerationResult,
-  LLMStreamingResult,
-} from '../../types/LLMTypes';
+} from '@runanywhere/proto-ts/llm_options';
 import type {
+  LLMStreamingResult,
   STTTranscriptionResult,
   STTTranscribeOptions,
-} from '../../types/STTTypes';
-import type {
   TTSSynthesisResult,
   TTSSynthesizeOptions,
-} from '../../types/TTSTypes';
-import type { SpeechActivityCallback } from '../../types/VADTypes';
+  SpeechActivityCallback,
+} from '../../types/index';
 
 const logger = new SDKLogger('Convenience');
 
@@ -63,7 +61,7 @@ function requireLLM(): LLMProvider {
  */
 export async function chat(
   prompt: string,
-  options?: LLMGenerationOptions,
+  options?: Partial<LLMGenerationOptions>,
 ): Promise<string> {
   const result = await generate(prompt, options);
   return result.text;
@@ -74,7 +72,7 @@ export async function chat(
  */
 export async function generate(
   prompt: string,
-  options: LLMGenerationOptions = {},
+  options: Partial<LLMGenerationOptions> = {},
 ): Promise<LLMGenerationResult> {
   const llm = requireLLM();
   if (typeof llm.generate === 'function') {
@@ -95,7 +93,7 @@ export async function generate(
  */
 export async function generateStream(
   prompt: string,
-  options: LLMGenerationOptions = {},
+  options: Partial<LLMGenerationOptions> = {},
 ): Promise<LLMStreamingResult> {
   const llm = requireLLM();
   return llm.generateStream(prompt, {
@@ -134,7 +132,8 @@ export async function transcribe(
   if (typeof sttExt.transcribeFile === 'function') {
     return sttExt.transcribeFile(audio, options);
   }
-  throw SDKError.backendNotAvailable(
+  // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+  throw SDKException.backendNotAvailable(
     'transcribe(File)',
     'STT provider does not implement transcribeFile.',
   );
@@ -227,7 +226,8 @@ export function setVADCallback(callback: SpeechActivityCallback | null): void {
 export async function startVAD(): Promise<void> {
   // No-op: the Web VAD is sample-driven; the consumer pumps audio in.
   if (!getVAD()) {
-    throw SDKError.backendNotAvailable(
+    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+    throw SDKException.backendNotAvailable(
       'startVAD',
       'No VAD provider registered. Install and register @runanywhere/web-onnx.',
     );
@@ -274,7 +274,7 @@ export function isVADReady(): boolean {
 export async function generateStructured<T = unknown>(
   prompt: string,
   schema: { jsonSchema: string; parse?: (text: string) => T },
-  options?: LLMGenerationOptions,
+  options?: Partial<LLMGenerationOptions>,
 ): Promise<T> {
   const fullPrompt =
     `Respond ONLY with JSON matching this JSON Schema. ` +
@@ -291,7 +291,8 @@ export async function generateStructured<T = unknown>(
   try {
     return JSON.parse(cleaned) as T;
   } catch (err) {
-    throw SDKError.generationFailed(
+    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+    throw SDKException.generationFailed(
       `Structured output JSON parse failed: ${(err as Error).message}; raw: ${text.slice(0, 200)}`,
     );
   }

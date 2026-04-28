@@ -26,7 +26,7 @@ public extension RunAnywhere {
             logger.info("Found model \(candidate.id) with framework: \(candidate.framework.wireString) (\(candidate.framework.displayName))")
         }
         guard let model = models.first(where: { $0.id == modelId }) else {
-            throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
+            throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
         }
 
         let task = try await DownloadAdapter.shared.downloadModel(model)
@@ -104,7 +104,7 @@ public extension RunAnywhere {
     static func deleteModel(_ modelId: String) async throws {
         let models = try await availableModels()
         guard let model = models.first(where: { $0.id == modelId }) else {
-            throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
+            throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
         }
         try await deleteStoredModel(modelId, framework: model.framework)
     }

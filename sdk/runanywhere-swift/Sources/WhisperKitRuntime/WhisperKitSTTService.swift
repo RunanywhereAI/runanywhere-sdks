@@ -83,7 +83,7 @@ public actor WhisperKitSTTService {
 
     public func transcribe(_ audioData: Data, options: STTOptions) async throws -> STTOutput {
         guard let kit = whisperKit else {
-            throw SDKError.stt(.notInitialized, "WhisperKit model not loaded")
+            throw SDKException.stt(.notInitialized, "WhisperKit model not loaded")
         }
 
         let startTime = Date()

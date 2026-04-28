@@ -38,6 +38,19 @@ message VoiceEvent {
         StateChangeEvent  state            = 15;
         ErrorEvent        error            = 16;
         MetricsEvent      metrics          = 17;
+
+        // v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+        // VoiceAgentComponentStates and the AsyncSequence-style lifecycle
+        // signals consumed by the cross-platform VoiceAgent extensions
+        // (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
+        // VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
+        // voice_agent_types.dart).
+        VoiceAgentComponentStates component_state_changed = 18;
+        VoiceSessionError         session_error           = 19;
+        SessionStartedEvent       session_started         = 20;
+        SessionStoppedEvent       session_stopped         = 21;
+        AgentResponseStartedEvent agent_response_started  = 22;
+        AgentResponseCompletedEvent agent_response_completed = 23;
     }
 }
 
@@ -156,3 +169,82 @@ message MetricsEvent {
     // directly (2^63 ns ≈ 292 years of runtime headroom).
     int64  created_at_ns      = 8;
 }
+
+// ---------------------------------------------------------------------------
+// v3.2: VoiceAgent component-load lifecycle.
+//
+// Mirrors the per-SDK ComponentLoadState (Swift / Kotlin / RN / Web / Flutter)
+// describing whether each sub-component (STT, LLM, TTS, VAD) of the voice
+// agent has been loaded yet. Emitted on the `VoiceEvent.component_state_changed`
+// oneof arm whenever any component transitions.
+// ---------------------------------------------------------------------------
+
+// Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
+// UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
+// the same as NOT_LOADED for forward-compatibility.
+enum ComponentLoadState {
+    COMPONENT_LOAD_STATE_UNSPECIFIED = 0;
+    COMPONENT_LOAD_STATE_NOT_LOADED  = 1;
+    COMPONENT_LOAD_STATE_LOADING     = 2;
+    COMPONENT_LOAD_STATE_LOADED      = 3;
+    COMPONENT_LOAD_STATE_ERROR       = 4;
+}
+
+// Aggregate load state across all four voice-agent components. Mirrors Swift
+// `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
+// `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
+// `VoiceAgentComponentStates`.
+message VoiceAgentComponentStates {
+    ComponentLoadState stt_state = 1;
+    ComponentLoadState llm_state = 2;
+    ComponentLoadState tts_state = 3;
+    ComponentLoadState vad_state = 4;
+
+    // Computed: true when stt_state, llm_state, tts_state, vad_state are all
+    // COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+    // recompute.
+    bool ready       = 5;
+
+    // Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING.
+    bool any_loading = 6;
+}
+
+// ---------------------------------------------------------------------------
+// v3.2: Voice session error taxonomy.
+//
+// Mirrors Swift `VoiceSessionError`, Kotlin `VoiceSessionError`. The
+// `failed_component` field is populated only for COMPONENT_FAILURE — naming
+// the sub-component that produced the underlying error ("stt", "llm",
+// "tts", "vad", "wakeword").
+// ---------------------------------------------------------------------------
+
+enum VoiceSessionErrorCode {
+    VOICE_SESSION_ERROR_CODE_UNSPECIFIED            = 0;
+    VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED = 1;
+    VOICE_SESSION_ERROR_CODE_NOT_READY              = 2;
+    VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING        = 3;
+    VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE      = 4;
+}
+
+message VoiceSessionError {
+    VoiceSessionErrorCode code            = 1;
+    string                message         = 2;
+    optional string       failed_component = 3;
+}
+
+// ---------------------------------------------------------------------------
+// v3.2: Voice session lifecycle markers.
+//
+// Mirror the AsyncSequence / Flow lifecycle signals emitted by the per-SDK
+// VoiceAgent extensions. Carry no payload of their own — the surrounding
+// VoiceEvent already provides `seq`, `timestamp_us`, and (via MetricsEvent)
+// the latency breakdown.
+// ---------------------------------------------------------------------------
+
+message SessionStartedEvent {}
+
+message SessionStoppedEvent {}
+
+message AgentResponseStartedEvent {}
+
+message AgentResponseCompletedEvent {}

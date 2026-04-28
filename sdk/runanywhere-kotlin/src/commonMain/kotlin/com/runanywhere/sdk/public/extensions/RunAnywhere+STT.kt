@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.STTOptions
+import ai.runanywhere.proto.v1.STTOutput
+import ai.runanywhere.proto.v1.STTPartialResult
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.STT.STTOptions
-import com.runanywhere.sdk.public.extensions.STT.STTOutput
-import com.runanywhere.sdk.public.extensions.STT.STTTranscriptionResult
 
 // MARK: - Simple Transcription
 
@@ -67,6 +67,12 @@ expect suspend fun RunAnywhere.transcribeWithOptions(
     options: STTOptions,
 ): STTOutput
 
+/** Canonical cross-SDK signature: transcribe(audio, options) → STTOutput */
+suspend fun RunAnywhere.transcribe(
+    audio: ByteArray,
+    options: STTOptions,
+): STTOutput = transcribeWithOptions(audio, options)
+
 // MARK: - Streaming Transcription
 
 /**
@@ -80,7 +86,7 @@ expect suspend fun RunAnywhere.transcribeWithOptions(
 expect suspend fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions = STTOptions(),
-    onPartialResult: (STTTranscriptionResult) -> Unit,
+    onPartialResult: (STTPartialResult) -> Unit,
 ): STTOutput
 
 /**

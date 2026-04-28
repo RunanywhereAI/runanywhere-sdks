@@ -24,6 +24,31 @@
 export { RunAnywhere } from './Public/RunAnywhere';
 export type { StorageBackend } from './Public/RunAnywhere';
 
+// Namespace extensions — symmetric with Swift's 19-extension pattern.
+export { Storage } from './Public/Extensions/RunAnywhere+Storage';
+export type { StorageInfoExtended } from './Public/Extensions/RunAnywhere+Storage';
+export { PluginLoader } from './Public/Extensions/RunAnywhere+PluginLoader';
+export { TextGeneration } from './Public/Extensions/RunAnywhere+TextGeneration';
+export { StructuredOutput } from './Public/Extensions/RunAnywhere+StructuredOutput';
+export { ToolCalling } from './Public/Extensions/RunAnywhere+ToolCalling';
+export { LoRA } from './Public/Extensions/RunAnywhere+LoRA';
+export { STT } from './Public/Extensions/RunAnywhere+STT';
+export { TTS } from './Public/Extensions/RunAnywhere+TTS';
+export { VAD } from './Public/Extensions/RunAnywhere+VAD';
+export { VoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
+export { VisionLanguage } from './Public/Extensions/RunAnywhere+VisionLanguage';
+export type { VLMGenerationOptions, VLMResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
+export { VLMModels } from './Public/Extensions/RunAnywhere+VLMModels';
+export { Diffusion } from './Public/Extensions/RunAnywhere+Diffusion';
+export type { DiffusionGenerationOptions, DiffusionResult } from './Public/Extensions/RunAnywhere+Diffusion';
+export { RAG } from './Public/Extensions/RunAnywhere+RAG';
+export { ModelManagement } from './Public/Extensions/RunAnywhere+ModelManagement';
+export { ModelAssignments } from './Public/Extensions/RunAnywhere+ModelAssignments';
+export type { ModelAssignment } from './Public/Extensions/RunAnywhere+ModelAssignments';
+export { Frameworks } from './Public/Extensions/RunAnywhere+Frameworks';
+export { solutions as Solutions } from './Public/Extensions/RunAnywhere+Solutions';
+export { Logging } from './Public/Extensions/RunAnywhere+Logging';
+
 // Phase 4d: top-level convenience verbs (chat / generate / transcribe /
 // synthesize / speak / detectSpeech / setVADCallback / etc.) — also reachable
 // as static methods on `RunAnywhere`. Re-exported for tree-shakability.
@@ -111,9 +136,8 @@ export type {
 //   1. VoicePipeline      — TS-side composition (STT -> LLM -> TTS) via ExtensionPoint.
 //   2. VoiceAgentStreamAdapter — WASM proto-stream (VoiceEvent) parity with iOS/Android/Flutter/RN.
 //      Also accepts a custom VoiceAgentStreamTransport for TS-backed / test transports.
-export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
-export { PipelineState } from './Public/Extensions/VoiceAgentTypes';
-export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/VoicePipelineTypes';
+export { VoicePipeline, PipelineState } from './Public/Extensions/RunAnywhere+VoicePipeline';
+export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/RunAnywhere+VoicePipeline';
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
@@ -183,7 +207,11 @@ export type {
 export * from './types';
 
 // Foundation
-export { SDKError, SDKErrorCode, isSDKError } from './Foundation/ErrorTypes';
+export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
+export type { ProtoSDKError, ProtoErrorContext } from './Foundation/SDKException';
+export { ProtoErrorCategory, ProtoErrorCode } from './Foundation/SDKException';
+// Proto helpers — accessors that match Web event payload field names.
+export { tokensUsed, latencyMs } from './Foundation/ProtoHelpers';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12voice_events.proto\x12\x0erunanywhere.v1\"\xd3\x03\n\nVoiceEvent\x12\x0b\n\x03seq\x18\x01 \x01(\x04\x12\x14\n\x0ctimestamp_us\x18\x02 \x01(\x03\x12\x32\n\tuser_said\x18\n \x01(\x0b\x32\x1d.runanywhere.v1.UserSaidEventH\x00\x12>\n\x0f\x61ssistant_token\x18\x0b \x01(\x0b\x32#.runanywhere.v1.AssistantTokenEventH\x00\x12\x30\n\x05\x61udio\x18\x0c \x01(\x0b\x32\x1f.runanywhere.v1.AudioFrameEventH\x00\x12\'\n\x03vad\x18\r \x01(\x0b\x32\x18.runanywhere.v1.VADEventH\x00\x12\x37\n\x0binterrupted\x18\x0e \x01(\x0b\x32 .runanywhere.v1.InterruptedEventH\x00\x12\x31\n\x05state\x18\x0f \x01(\x0b\x32 .runanywhere.v1.StateChangeEventH\x00\x12+\n\x05\x65rror\x18\x10 \x01(\x0b\x32\x1a.runanywhere.v1.ErrorEventH\x00\x12/\n\x07metrics\x18\x11 \x01(\x0b\x32\x1c.runanywhere.v1.MetricsEventH\x00\x42\t\n\x07payload\"q\n\rUserSaidEvent\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08is_final\x18\x02 \x01(\x08\x12\x12\n\nconfidence\x18\x03 \x01(\x02\x12\x16\n\x0e\x61udio_start_us\x18\x04 \x01(\x03\x12\x14\n\x0c\x61udio_end_us\x18\x05 \x01(\x03\"^\n\x13\x41ssistantTokenEvent\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08is_final\x18\x02 \x01(\x08\x12\'\n\x04kind\x18\x03 \x01(\x0e\x32\x19.runanywhere.v1.TokenKind\"y\n\x0f\x41udioFrameEvent\x12\x0b\n\x03pcm\x18\x01 \x01(\x0c\x12\x16\n\x0esample_rate_hz\x18\x02 \x01(\x05\x12\x10\n\x08\x63hannels\x18\x03 \x01(\x05\x12/\n\x08\x65ncoding\x18\x04 \x01(\x0e\x32\x1d.runanywhere.v1.AudioEncoding\"O\n\x08VADEvent\x12*\n\x04type\x18\x01 \x01(\x0e\x32\x1c.runanywhere.v1.VADEventType\x12\x17\n\x0f\x66rame_offset_us\x18\x02 \x01(\x03\"S\n\x10InterruptedEvent\x12/\n\x06reason\x18\x01 \x01(\x0e\x32\x1f.runanywhere.v1.InterruptReason\x12\x0e\n\x06\x64\x65tail\x18\x02 \x01(\t\"s\n\x10StateChangeEvent\x12/\n\x08previous\x18\x01 \x01(\x0e\x32\x1d.runanywhere.v1.PipelineState\x12.\n\x07\x63urrent\x18\x02 \x01(\x0e\x32\x1d.runanywhere.v1.PipelineState\"V\n\nErrorEvent\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x11\n\tcomponent\x18\x03 \x01(\t\x12\x16\n\x0eis_recoverable\x18\x04 \x01(\x08\"\xda\x01\n\x0cMetricsEvent\x12\x14\n\x0cstt_final_ms\x18\x01 \x01(\x01\x12\x1a\n\x12llm_first_token_ms\x18\x02 \x01(\x01\x12\x1a\n\x12tts_first_audio_ms\x18\x03 \x01(\x01\x12\x15\n\rend_to_end_ms\x18\x04 \x01(\x01\x12\x18\n\x10tokens_generated\x18\x05 \x01(\x03\x12\x1c\n\x14\x61udio_samples_played\x18\x06 \x01(\x03\x12\x16\n\x0eis_over_budget\x18\x07 \x01(\x08\x12\x15\n\rcreated_at_ns\x18\x08 \x01(\x03*p\n\tTokenKind\x12\x1a\n\x16TOKEN_KIND_UNSPECIFIED\x10\x00\x12\x15\n\x11TOKEN_KIND_ANSWER\x10\x01\x12\x16\n\x12TOKEN_KIND_THOUGHT\x10\x02\x12\x18\n\x14TOKEN_KIND_TOOL_CALL\x10\x03*m\n\rAudioEncoding\x12\x1e\n\x1a\x41UDIO_ENCODING_UNSPECIFIED\x10\x00\x12\x1d\n\x19\x41UDIO_ENCODING_PCM_F32_LE\x10\x01\x12\x1d\n\x19\x41UDIO_ENCODING_PCM_S16_LE\x10\x02*\x99\x01\n\x0cVADEventType\x12\x19\n\x15VAD_EVENT_UNSPECIFIED\x10\x00\x12\x19\n\x15VAD_EVENT_VOICE_START\x10\x01\x12$\n VAD_EVENT_VOICE_END_OF_UTTERANCE\x10\x02\x12\x16\n\x12VAD_EVENT_BARGE_IN\x10\x03\x12\x15\n\x11VAD_EVENT_SILENCE\x10\x04*\xbd\x01\n\x0fInterruptReason\x12 \n\x1cINTERRUPT_REASON_UNSPECIFIED\x10\x00\x12\"\n\x1eINTERRUPT_REASON_USER_BARGE_IN\x10\x01\x12\x1d\n\x19INTERRUPT_REASON_APP_STOP\x10\x02\x12\'\n#INTERRUPT_REASON_AUDIO_ROUTE_CHANGE\x10\x03\x12\x1c\n\x18INTERRUPT_REASON_TIMEOUT\x10\x04*\xbc\x01\n\rPipelineState\x12\x1e\n\x1aPIPELINE_STATE_UNSPECIFIED\x10\x00\x12\x17\n\x13PIPELINE_STATE_IDLE\x10\x01\x12\x1c\n\x18PIPELINE_STATE_LISTENING\x10\x02\x12\x1b\n\x17PIPELINE_STATE_THINKING\x10\x03\x12\x1b\n\x17PIPELINE_STATE_SPEAKING\x10\x04\x12\x1a\n\x16PIPELINE_STATE_STOPPED\x10\x05\x42M\n\x17\x61i.runanywhere.proto.v1B\x10VoiceEventsProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12voice_events.proto\x12\x0erunanywhere.v1\"\xfb\x06\n\nVoiceEvent\x12\x0b\n\x03seq\x18\x01 \x01(\x04\x12\x14\n\x0ctimestamp_us\x18\x02 \x01(\x03\x12\x32\n\tuser_said\x18\n \x01(\x0b\x32\x1d.runanywhere.v1.UserSaidEventH\x00\x12>\n\x0f\x61ssistant_token\x18\x0b \x01(\x0b\x32#.runanywhere.v1.AssistantTokenEventH\x00\x12\x30\n\x05\x61udio\x18\x0c \x01(\x0b\x32\x1f.runanywhere.v1.AudioFrameEventH\x00\x12\'\n\x03vad\x18\r \x01(\x0b\x32\x18.runanywhere.v1.VADEventH\x00\x12\x37\n\x0binterrupted\x18\x0e \x01(\x0b\x32 .runanywhere.v1.InterruptedEventH\x00\x12\x31\n\x05state\x18\x0f \x01(\x0b\x32 .runanywhere.v1.StateChangeEventH\x00\x12+\n\x05\x65rror\x18\x10 \x01(\x0b\x32\x1a.runanywhere.v1.ErrorEventH\x00\x12/\n\x07metrics\x18\x11 \x01(\x0b\x32\x1c.runanywhere.v1.MetricsEventH\x00\x12L\n\x17\x63omponent_state_changed\x18\x12 \x01(\x0b\x32).runanywhere.v1.VoiceAgentComponentStatesH\x00\x12:\n\rsession_error\x18\x13 \x01(\x0b\x32!.runanywhere.v1.VoiceSessionErrorH\x00\x12>\n\x0fsession_started\x18\x14 \x01(\x0b\x32#.runanywhere.v1.SessionStartedEventH\x00\x12>\n\x0fsession_stopped\x18\x15 \x01(\x0b\x32#.runanywhere.v1.SessionStoppedEventH\x00\x12K\n\x16\x61gent_response_started\x18\x16 \x01(\x0b\x32).runanywhere.v1.AgentResponseStartedEventH\x00\x12O\n\x18\x61gent_response_completed\x18\x17 \x01(\x0b\x32+.runanywhere.v1.AgentResponseCompletedEventH\x00\x42\t\n\x07payload\"q\n\rUserSaidEvent\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08is_final\x18\x02 \x01(\x08\x12\x12\n\nconfidence\x18\x03 \x01(\x02\x12\x16\n\x0e\x61udio_start_us\x18\x04 \x01(\x03\x12\x14\n\x0c\x61udio_end_us\x18\x05 \x01(\x03\"^\n\x13\x41ssistantTokenEvent\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08is_final\x18\x02 \x01(\x08\x12\'\n\x04kind\x18\x03 \x01(\x0e\x32\x19.runanywhere.v1.TokenKind\"y\n\x0f\x41udioFrameEvent\x12\x0b\n\x03pcm\x18\x01 \x01(\x0c\x12\x16\n\x0esample_rate_hz\x18\x02 \x01(\x05\x12\x10\n\x08\x63hannels\x18\x03 \x01(\x05\x12/\n\x08\x65ncoding\x18\x04 \x01(\x0e\x32\x1d.runanywhere.v1.AudioEncoding\"O\n\x08VADEvent\x12*\n\x04type\x18\x01 \x01(\x0e\x32\x1c.runanywhere.v1.VADEventType\x12\x17\n\x0f\x66rame_offset_us\x18\x02 \x01(\x03\"S\n\x10InterruptedEvent\x12/\n\x06reason\x18\x01 \x01(\x0e\x32\x1f.runanywhere.v1.InterruptReason\x12\x0e\n\x06\x64\x65tail\x18\x02 \x01(\t\"s\n\x10StateChangeEvent\x12/\n\x08previous\x18\x01 \x01(\x0e\x32\x1d.runanywhere.v1.PipelineState\x12.\n\x07\x63urrent\x18\x02 \x01(\x0e\x32\x1d.runanywhere.v1.PipelineState\"V\n\nErrorEvent\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x11\n\tcomponent\x18\x03 \x01(\t\x12\x16\n\x0eis_recoverable\x18\x04 \x01(\x08\"\xda\x01\n\x0cMetricsEvent\x12\x14\n\x0cstt_final_ms\x18\x01 \x01(\x01\x12\x1a\n\x12llm_first_token_ms\x18\x02 \x01(\x01\x12\x1a\n\x12tts_first_audio_ms\x18\x03 \x01(\x01\x12\x15\n\rend_to_end_ms\x18\x04 \x01(\x01\x12\x18\n\x10tokens_generated\x18\x05 \x01(\x03\x12\x1c\n\x14\x61udio_samples_played\x18\x06 \x01(\x03\x12\x16\n\x0eis_over_budget\x18\x07 \x01(\x08\x12\x15\n\rcreated_at_ns\x18\x08 \x01(\x03\"\x9b\x02\n\x19VoiceAgentComponentStates\x12\x35\n\tstt_state\x18\x01 \x01(\x0e\x32\".runanywhere.v1.ComponentLoadState\x12\x35\n\tllm_state\x18\x02 \x01(\x0e\x32\".runanywhere.v1.ComponentLoadState\x12\x35\n\ttts_state\x18\x03 \x01(\x0e\x32\".runanywhere.v1.ComponentLoadState\x12\x35\n\tvad_state\x18\x04 \x01(\x0e\x32\".runanywhere.v1.ComponentLoadState\x12\r\n\x05ready\x18\x05 \x01(\x08\x12\x13\n\x0b\x61ny_loading\x18\x06 \x01(\x08\"\x8d\x01\n\x11VoiceSessionError\x12\x33\n\x04\x63ode\x18\x01 \x01(\x0e\x32%.runanywhere.v1.VoiceSessionErrorCode\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x1d\n\x10\x66\x61iled_component\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x13\n\x11_failed_component\"\x15\n\x13SessionStartedEvent\"\x15\n\x13SessionStoppedEvent\"\x1b\n\x19\x41gentResponseStartedEvent\"\x1d\n\x1b\x41gentResponseCompletedEvent*p\n\tTokenKind\x12\x1a\n\x16TOKEN_KIND_UNSPECIFIED\x10\x00\x12\x15\n\x11TOKEN_KIND_ANSWER\x10\x01\x12\x16\n\x12TOKEN_KIND_THOUGHT\x10\x02\x12\x18\n\x14TOKEN_KIND_TOOL_CALL\x10\x03*m\n\rAudioEncoding\x12\x1e\n\x1a\x41UDIO_ENCODING_UNSPECIFIED\x10\x00\x12\x1d\n\x19\x41UDIO_ENCODING_PCM_F32_LE\x10\x01\x12\x1d\n\x19\x41UDIO_ENCODING_PCM_S16_LE\x10\x02*\x99\x01\n\x0cVADEventType\x12\x19\n\x15VAD_EVENT_UNSPECIFIED\x10\x00\x12\x19\n\x15VAD_EVENT_VOICE_START\x10\x01\x12$\n VAD_EVENT_VOICE_END_OF_UTTERANCE\x10\x02\x12\x16\n\x12VAD_EVENT_BARGE_IN\x10\x03\x12\x15\n\x11VAD_EVENT_SILENCE\x10\x04*\xbd\x01\n\x0fInterruptReason\x12 \n\x1cINTERRUPT_REASON_UNSPECIFIED\x10\x00\x12\"\n\x1eINTERRUPT_REASON_USER_BARGE_IN\x10\x01\x12\x1d\n\x19INTERRUPT_REASON_APP_STOP\x10\x02\x12\'\n#INTERRUPT_REASON_AUDIO_ROUTE_CHANGE\x10\x03\x12\x1c\n\x18INTERRUPT_REASON_TIMEOUT\x10\x04*\xbc\x01\n\rPipelineState\x12\x1e\n\x1aPIPELINE_STATE_UNSPECIFIED\x10\x00\x12\x17\n\x13PIPELINE_STATE_IDLE\x10\x01\x12\x1c\n\x18PIPELINE_STATE_LISTENING\x10\x02\x12\x1b\n\x17PIPELINE_STATE_THINKING\x10\x03\x12\x1b\n\x17PIPELINE_STATE_SPEAKING\x10\x04\x12\x1a\n\x16PIPELINE_STATE_STOPPED\x10\x05*\xc2\x01\n\x12\x43omponentLoadState\x12$\n COMPONENT_LOAD_STATE_UNSPECIFIED\x10\x00\x12#\n\x1f\x43OMPONENT_LOAD_STATE_NOT_LOADED\x10\x01\x12 \n\x1c\x43OMPONENT_LOAD_STATE_LOADING\x10\x02\x12\x1f\n\x1b\x43OMPONENT_LOAD_STATE_LOADED\x10\x03\x12\x1e\n\x1a\x43OMPONENT_LOAD_STATE_ERROR\x10\x04*\x82\x02\n\x15VoiceSessionErrorCode\x12(\n$VOICE_SESSION_ERROR_CODE_UNSPECIFIED\x10\x00\x12\x39\n5VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED\x10\x01\x12&\n\"VOICE_SESSION_ERROR_CODE_NOT_READY\x10\x02\x12,\n(VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING\x10\x03\x12.\n*VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE\x10\x04\x42M\n\x17\x61i.runanywhere.proto.v1B\x10VoiceEventsProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,32 +32,48 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'voice_events_pb2', _globals
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\020VoiceEventsProtoP\001\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_TOKENKIND']._serialized_start=1434
-  _globals['_TOKENKIND']._serialized_end=1546
-  _globals['_AUDIOENCODING']._serialized_start=1548
-  _globals['_AUDIOENCODING']._serialized_end=1657
-  _globals['_VADEVENTTYPE']._serialized_start=1660
-  _globals['_VADEVENTTYPE']._serialized_end=1813
-  _globals['_INTERRUPTREASON']._serialized_start=1816
-  _globals['_INTERRUPTREASON']._serialized_end=2005
-  _globals['_PIPELINESTATE']._serialized_start=2008
-  _globals['_PIPELINESTATE']._serialized_end=2196
+  _globals['_TOKENKIND']._serialized_start=2394
+  _globals['_TOKENKIND']._serialized_end=2506
+  _globals['_AUDIOENCODING']._serialized_start=2508
+  _globals['_AUDIOENCODING']._serialized_end=2617
+  _globals['_VADEVENTTYPE']._serialized_start=2620
+  _globals['_VADEVENTTYPE']._serialized_end=2773
+  _globals['_INTERRUPTREASON']._serialized_start=2776
+  _globals['_INTERRUPTREASON']._serialized_end=2965
+  _globals['_PIPELINESTATE']._serialized_start=2968
+  _globals['_PIPELINESTATE']._serialized_end=3156
+  _globals['_COMPONENTLOADSTATE']._serialized_start=3159
+  _globals['_COMPONENTLOADSTATE']._serialized_end=3353
+  _globals['_VOICESESSIONERRORCODE']._serialized_start=3356
+  _globals['_VOICESESSIONERRORCODE']._serialized_end=3614
   _globals['_VOICEEVENT']._serialized_start=39
-  _globals['_VOICEEVENT']._serialized_end=506
-  _globals['_USERSAIDEVENT']._serialized_start=508
-  _globals['_USERSAIDEVENT']._serialized_end=621
-  _globals['_ASSISTANTTOKENEVENT']._serialized_start=623
-  _globals['_ASSISTANTTOKENEVENT']._serialized_end=717
-  _globals['_AUDIOFRAMEEVENT']._serialized_start=719
-  _globals['_AUDIOFRAMEEVENT']._serialized_end=840
-  _globals['_VADEVENT']._serialized_start=842
-  _globals['_VADEVENT']._serialized_end=921
-  _globals['_INTERRUPTEDEVENT']._serialized_start=923
-  _globals['_INTERRUPTEDEVENT']._serialized_end=1006
-  _globals['_STATECHANGEEVENT']._serialized_start=1008
-  _globals['_STATECHANGEEVENT']._serialized_end=1123
-  _globals['_ERROREVENT']._serialized_start=1125
-  _globals['_ERROREVENT']._serialized_end=1211
-  _globals['_METRICSEVENT']._serialized_start=1214
-  _globals['_METRICSEVENT']._serialized_end=1432
+  _globals['_VOICEEVENT']._serialized_end=930
+  _globals['_USERSAIDEVENT']._serialized_start=932
+  _globals['_USERSAIDEVENT']._serialized_end=1045
+  _globals['_ASSISTANTTOKENEVENT']._serialized_start=1047
+  _globals['_ASSISTANTTOKENEVENT']._serialized_end=1141
+  _globals['_AUDIOFRAMEEVENT']._serialized_start=1143
+  _globals['_AUDIOFRAMEEVENT']._serialized_end=1264
+  _globals['_VADEVENT']._serialized_start=1266
+  _globals['_VADEVENT']._serialized_end=1345
+  _globals['_INTERRUPTEDEVENT']._serialized_start=1347
+  _globals['_INTERRUPTEDEVENT']._serialized_end=1430
+  _globals['_STATECHANGEEVENT']._serialized_start=1432
+  _globals['_STATECHANGEEVENT']._serialized_end=1547
+  _globals['_ERROREVENT']._serialized_start=1549
+  _globals['_ERROREVENT']._serialized_end=1635
+  _globals['_METRICSEVENT']._serialized_start=1638
+  _globals['_METRICSEVENT']._serialized_end=1856
+  _globals['_VOICEAGENTCOMPONENTSTATES']._serialized_start=1859
+  _globals['_VOICEAGENTCOMPONENTSTATES']._serialized_end=2142
+  _globals['_VOICESESSIONERROR']._serialized_start=2145
+  _globals['_VOICESESSIONERROR']._serialized_end=2286
+  _globals['_SESSIONSTARTEDEVENT']._serialized_start=2288
+  _globals['_SESSIONSTARTEDEVENT']._serialized_end=2309
+  _globals['_SESSIONSTOPPEDEVENT']._serialized_start=2311
+  _globals['_SESSIONSTOPPEDEVENT']._serialized_end=2332
+  _globals['_AGENTRESPONSESTARTEDEVENT']._serialized_start=2334
+  _globals['_AGENTRESPONSESTARTEDEVENT']._serialized_end=2361
+  _globals['_AGENTRESPONSECOMPLETEDEVENT']._serialized_start=2363
+  _globals['_AGENTRESPONSECOMPLETEDEVENT']._serialized_end=2392
 # @@protoc_insertion_point(module_scope)

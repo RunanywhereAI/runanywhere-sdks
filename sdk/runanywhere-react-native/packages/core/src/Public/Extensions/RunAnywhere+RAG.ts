@@ -1,8 +1,8 @@
 /**
  * RunAnywhere+RAG.ts
  *
- * RAG (Retrieval-Augmented Generation) pipeline extension.
- * Delegates to native RAGBridge via the core HybridObject.
+ * RAG (Retrieval-Augmented Generation) pipeline extension. Wave 2:
+ * aligned to proto-canonical RAG shapes (`@runanywhere/proto-ts/rag`).
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RunAnywhere+RAG.swift
  */
@@ -13,8 +13,9 @@ import type {
   RAGConfiguration,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchResult,
   RAGStatistics,
-} from '../../types/RAGTypes';
+} from '@runanywhere/proto-ts/rag';
 
 const logger = new SDKLogger('RunAnywhere.RAG');
 
@@ -27,26 +28,25 @@ function ensureNative() {
 
 /**
  * Create a RAG pipeline with the given configuration.
- * Must be called before ingesting documents or querying.
+ *
+ * Matches Swift: `RunAnywhere.ragCreatePipeline(_:)`.
  */
-export async function ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+export async function ragCreatePipeline(
+  config: RAGConfiguration
+): Promise<void> {
   const native = ensureNative();
-
   const configWithDefaults = {
     embeddingModelPath: config.embeddingModelPath,
     llmModelPath: config.llmModelPath,
     embeddingDimension: config.embeddingDimension ?? 384,
     topK: config.topK ?? 3,
     similarityThreshold: config.similarityThreshold ?? 0.12,
-    maxContextTokens: config.maxContextTokens ?? 2048,
     chunkSize: config.chunkSize ?? 180,
     chunkOverlap: config.chunkOverlap ?? 30,
-    promptTemplate: config.promptTemplate ?? '',
-    embeddingConfigJSON: config.embeddingConfigJSON,
-    llmConfigJSON: config.llmConfigJSON,
   };
-
-  const success = await native.ragCreatePipeline(JSON.stringify(configWithDefaults));
+  const success = await native.ragCreatePipeline(
+    JSON.stringify(configWithDefaults)
+  );
   if (!success) {
     throw new Error('Failed to create RAG pipeline');
   }
@@ -60,10 +60,7 @@ export async function ragDestroyPipeline(): Promise<void> {
   logger.info('RAG pipeline destroyed');
 }
 
-/**
- * Ingest a document into the RAG pipeline.
- * The document is split into chunks, embedded, and indexed.
- */
+/** Ingest a document into the RAG pipeline. */
 export async function ragIngest(
   text: string,
   metadataJson?: string
@@ -75,9 +72,7 @@ export async function ragIngest(
   }
 }
 
-/**
- * Add multiple documents in batch.
- */
+/** Add multiple documents in batch. */
 export async function ragAddDocumentsBatch(
   documents: Array<{ text: string; metadataJson?: string }>
 ): Promise<void> {
@@ -90,21 +85,24 @@ export async function ragAddDocumentsBatch(
 
 /**
  * Query the RAG pipeline with a question.
- * Returns the generated answer and retrieved chunks.
+ *
+ * Matches Swift: `RunAnywhere.ragQuery(_:options:)`.
  */
 export async function ragQuery(
   question: string,
   options?: Omit<RAGQueryOptions, 'question'>
 ): Promise<RAGResult> {
   const native = ensureNative();
-
   const queryOptions: RAGQueryOptions = {
     question,
-    ...options,
+    systemPrompt: options?.systemPrompt,
+    maxTokens: options?.maxTokens ?? 0,
+    temperature: options?.temperature ?? 0,
+    topP: options?.topP ?? 1.0,
+    topK: options?.topK ?? 0,
   };
-
   const resultJson = await native.ragQuery(JSON.stringify(queryOptions));
-  return JSON.parse(resultJson) as RAGResult;
+  return parseRAGResult(resultJson);
 }
 
 /** Clear all documents from the pipeline. */
@@ -123,11 +121,80 @@ export async function ragGetDocumentCount(): Promise<number> {
 export async function ragGetStatistics(): Promise<RAGStatistics> {
   const native = ensureNative();
   const json = await native.ragGetStatistics();
-  const parsed = JSON.parse(json);
+  try {
+    const parsed = JSON.parse(json) as {
+      indexedDocuments?: number;
+      indexed_documents?: number;
+      documentCount?: number;
+      document_count?: number;
+      indexedChunks?: number;
+      indexed_chunks?: number;
+      chunkCount?: number;
+      chunk_count?: number;
+      totalTokensIndexed?: number;
+      total_tokens_indexed?: number;
+      lastUpdatedMs?: number;
+      last_updated_ms?: number;
+      indexPath?: string;
+      index_path?: string;
+    };
+    return {
+      indexedDocuments:
+        parsed.indexedDocuments ??
+        parsed.indexed_documents ??
+        parsed.documentCount ??
+        parsed.document_count ??
+        0,
+      indexedChunks:
+        parsed.indexedChunks ??
+        parsed.indexed_chunks ??
+        parsed.chunkCount ??
+        parsed.chunk_count ??
+        0,
+      totalTokensIndexed:
+        parsed.totalTokensIndexed ?? parsed.total_tokens_indexed ?? 0,
+      lastUpdatedMs: parsed.lastUpdatedMs ?? parsed.last_updated_ms ?? 0,
+      indexPath: parsed.indexPath ?? parsed.index_path,
+    };
+  } catch {
+    return {
+      indexedDocuments: 0,
+      indexedChunks: 0,
+      totalTokensIndexed: 0,
+      lastUpdatedMs: 0,
+    };
+  }
+}
+
+function parseRAGResult(json: string): RAGResult {
+  const parsed = JSON.parse(json) as {
+    answer?: string;
+    retrievedChunks?: Array<Partial<RAGSearchResult>>;
+    retrieved_chunks?: Array<Partial<RAGSearchResult>>;
+    contextUsed?: string;
+    context_used?: string;
+    retrievalTimeMs?: number;
+    retrieval_time_ms?: number;
+    generationTimeMs?: number;
+    generation_time_ms?: number;
+    totalTimeMs?: number;
+    total_time_ms?: number;
+  };
+  const chunks = (parsed.retrievedChunks ?? parsed.retrieved_chunks ?? []).map(
+    (chunk): RAGSearchResult => ({
+      chunkId: chunk.chunkId ?? '',
+      text: chunk.text ?? '',
+      similarityScore: chunk.similarityScore ?? 0,
+      sourceDocument: chunk.sourceDocument,
+      metadata: chunk.metadata ?? {},
+    })
+  );
   return {
-    documentCount: await ragGetDocumentCount(),
-    chunkCount: parsed.chunk_count ?? 0,
-    vectorStoreSize: parsed.vector_store_size_mb ?? 0,
-    statsJson: json,
+    answer: parsed.answer ?? '',
+    retrievedChunks: chunks,
+    contextUsed: parsed.contextUsed ?? parsed.context_used ?? '',
+    retrievalTimeMs: parsed.retrievalTimeMs ?? parsed.retrieval_time_ms ?? 0,
+    generationTimeMs: parsed.generationTimeMs ?? parsed.generation_time_ms ?? 0,
+    totalTimeMs: parsed.totalTimeMs ?? parsed.total_time_ms ?? 0,
   };
 }

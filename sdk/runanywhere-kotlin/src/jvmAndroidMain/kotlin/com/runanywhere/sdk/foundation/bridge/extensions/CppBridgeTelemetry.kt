@@ -139,7 +139,9 @@ object CppBridgeTelemetry {
 
             if (telemetryManagerHandle != 0L) {
                 RunAnywhereBridge.racTelemetryManagerSetDeviceInfo(
-                    telemetryManagerHandle, deviceModel, osVersion,
+                    telemetryManagerHandle,
+                    deviceModel,
+                    osVersion,
                 )
 
                 val httpCallback =
@@ -172,9 +174,13 @@ object CppBridgeTelemetry {
     @Volatile
     private var _apiKey: String? = null
 
-    fun setBaseUrl(url: String) { _baseUrl = url }
+    fun setBaseUrl(url: String) {
+        _baseUrl = url
+    }
 
-    fun setApiKey(key: String) { _apiKey = key }
+    fun setApiKey(key: String) {
+        _apiKey = key
+    }
 
     fun getBaseUrl(): String? = _baseUrl
 
@@ -234,7 +240,12 @@ object CppBridgeTelemetry {
 
     fun setEnvironment(environment: Int) {
         currentEnvironment = environment
-        val label = when (environment) { 0 -> "DEVELOPMENT"; 1 -> "STAGING"; else -> "PRODUCTION" }
+        val label =
+            when (environment) {
+                0 -> "DEVELOPMENT"
+                1 -> "STAGING"
+                else -> "PRODUCTION"
+            }
         log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Environment set to: $environment ($label)")
     }
 
@@ -250,7 +261,12 @@ object CppBridgeTelemetry {
         cachedApiKey?.let { return it }
         return try {
             val apiKey = RunAnywhereBridge.racDevConfigGetSupabaseKey()
-            if (!apiKey.isNullOrEmpty()) { cachedApiKey = apiKey; apiKey } else null
+            if (!apiKey.isNullOrEmpty()) {
+                cachedApiKey = apiKey
+                apiKey
+            } else {
+                null
+            }
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to get Supabase API key from dev config: ${e.message}")
             null
@@ -367,7 +383,9 @@ object CppBridgeTelemetry {
     ) {
         log(CppBridgePlatformAdapter.LogLevel.DEBUG, "HTTP ${HttpMethod.getName(method)} request to: $url")
 
-        try { telemetryListener?.onRequestStart(requestId, url, method) } catch (e: Exception) {
+        try {
+            telemetryListener?.onRequestStart(requestId, url, method)
+        } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Error in telemetry listener onRequestStart: ${e.message}")
         }
 
@@ -435,10 +453,11 @@ object CppBridgeTelemetry {
                     }
                     '{', '[' -> depth++
                     '}', ']' -> depth--
-                    ',' -> if (depth == 0) {
-                        pairs.add(content.substring(start, i).trim())
-                        start = i + 1
-                    }
+                    ',' ->
+                        if (depth == 0) {
+                            pairs.add(content.substring(start, i).trim())
+                            start = i + 1
+                        }
                 }
             }
             pairs.add(content.substring(start).trim())
@@ -502,15 +521,16 @@ object CppBridgeTelemetry {
         val bodyBytes: ByteArray? =
             if (body != null && method != HttpMethod.GET) body.encodeToByteArray() else null
 
-        val resp = RunAnywhereBridge.racHttpRequestExecute(
-            method = HttpMethod.getName(method),
-            url = url,
-            headerKeys = effectiveHeaders.keys.toTypedArray(),
-            headerValues = effectiveHeaders.values.toTypedArray(),
-            body = bodyBytes,
-            timeoutMs = DEFAULT_TIMEOUT_MS,
-            followRedirects = true,
-        )
+        val resp =
+            RunAnywhereBridge.racHttpRequestExecute(
+                method = HttpMethod.getName(method),
+                url = url,
+                headerKeys = effectiveHeaders.keys.toTypedArray(),
+                headerValues = effectiveHeaders.values.toTypedArray(),
+                body = bodyBytes,
+                timeoutMs = DEFAULT_TIMEOUT_MS,
+                followRedirects = true,
+            )
 
         if (resp == null || resp.errorMessage != null) {
             val err = resp?.errorMessage ?: "native HTTP call returned null"

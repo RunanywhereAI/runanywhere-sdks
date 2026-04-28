@@ -394,7 +394,7 @@ struct ConversationListView: View {
             .searchable(text: $searchQuery, prompt: "Search conversations")
             .navigationTitle("Conversations")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayModeCompat(.large)
             #endif
             .toolbar {
                 #if os(iOS)

@@ -107,6 +107,35 @@ class ArchiveStructure(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ARCHIVE_STRUCTURE_DIRECTORY_BASED: _ClassVar[ArchiveStructure]
     ARCHIVE_STRUCTURE_NESTED_DIRECTORY: _ClassVar[ArchiveStructure]
     ARCHIVE_STRUCTURE_UNKNOWN: _ClassVar[ArchiveStructure]
+
+class ModelArtifactType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    MODEL_ARTIFACT_TYPE_UNSPECIFIED: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_SINGLE_FILE: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_DIRECTORY: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_CUSTOM: _ClassVar[ModelArtifactType]
+
+class AccelerationPreference(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACCELERATION_PREFERENCE_UNSPECIFIED: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_AUTO: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_CPU: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_GPU: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_NPU: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_WEBGPU: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_METAL: _ClassVar[AccelerationPreference]
+    ACCELERATION_PREFERENCE_VULKAN: _ClassVar[AccelerationPreference]
+
+class RoutingPolicy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ROUTING_POLICY_UNSPECIFIED: _ClassVar[RoutingPolicy]
+    ROUTING_POLICY_PREFER_LOCAL: _ClassVar[RoutingPolicy]
+    ROUTING_POLICY_PREFER_CLOUD: _ClassVar[RoutingPolicy]
+    ROUTING_POLICY_COST_OPTIMIZED: _ClassVar[RoutingPolicy]
+    ROUTING_POLICY_LATENCY_OPTIMIZED: _ClassVar[RoutingPolicy]
+    ROUTING_POLICY_MANUAL: _ClassVar[RoutingPolicy]
 AUDIO_FORMAT_UNSPECIFIED: AudioFormat
 AUDIO_FORMAT_PCM: AudioFormat
 AUDIO_FORMAT_WAV: AudioFormat
@@ -184,9 +213,29 @@ ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED: ArchiveStructure
 ARCHIVE_STRUCTURE_DIRECTORY_BASED: ArchiveStructure
 ARCHIVE_STRUCTURE_NESTED_DIRECTORY: ArchiveStructure
 ARCHIVE_STRUCTURE_UNKNOWN: ArchiveStructure
+MODEL_ARTIFACT_TYPE_UNSPECIFIED: ModelArtifactType
+MODEL_ARTIFACT_TYPE_SINGLE_FILE: ModelArtifactType
+MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE: ModelArtifactType
+MODEL_ARTIFACT_TYPE_DIRECTORY: ModelArtifactType
+MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE: ModelArtifactType
+MODEL_ARTIFACT_TYPE_CUSTOM: ModelArtifactType
+ACCELERATION_PREFERENCE_UNSPECIFIED: AccelerationPreference
+ACCELERATION_PREFERENCE_AUTO: AccelerationPreference
+ACCELERATION_PREFERENCE_CPU: AccelerationPreference
+ACCELERATION_PREFERENCE_GPU: AccelerationPreference
+ACCELERATION_PREFERENCE_NPU: AccelerationPreference
+ACCELERATION_PREFERENCE_WEBGPU: AccelerationPreference
+ACCELERATION_PREFERENCE_METAL: AccelerationPreference
+ACCELERATION_PREFERENCE_VULKAN: AccelerationPreference
+ROUTING_POLICY_UNSPECIFIED: RoutingPolicy
+ROUTING_POLICY_PREFER_LOCAL: RoutingPolicy
+ROUTING_POLICY_PREFER_CLOUD: RoutingPolicy
+ROUTING_POLICY_COST_OPTIMIZED: RoutingPolicy
+ROUTING_POLICY_LATENCY_OPTIMIZED: RoutingPolicy
+ROUTING_POLICY_MANUAL: RoutingPolicy
 
 class ModelInfo(_message.Message):
-    __slots__ = ("id", "name", "category", "format", "framework", "download_url", "local_path", "download_size_bytes", "context_length", "supports_thinking", "supports_lora", "description", "source", "created_at_unix_ms", "updated_at_unix_ms", "single_file", "archive", "multi_file", "custom_strategy_id", "built_in")
+    __slots__ = ("id", "name", "category", "format", "framework", "download_url", "local_path", "download_size_bytes", "context_length", "supports_thinking", "supports_lora", "description", "source", "created_at_unix_ms", "updated_at_unix_ms", "single_file", "archive", "multi_file", "custom_strategy_id", "built_in", "artifact_type", "expected_files", "acceleration_preference", "routing_policy")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
@@ -207,6 +256,10 @@ class ModelInfo(_message.Message):
     MULTI_FILE_FIELD_NUMBER: _ClassVar[int]
     CUSTOM_STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
     BUILT_IN_FIELD_NUMBER: _ClassVar[int]
+    ARTIFACT_TYPE_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_FILES_FIELD_NUMBER: _ClassVar[int]
+    ACCELERATION_PREFERENCE_FIELD_NUMBER: _ClassVar[int]
+    ROUTING_POLICY_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     category: ModelCategory
@@ -227,7 +280,11 @@ class ModelInfo(_message.Message):
     multi_file: MultiFileArtifact
     custom_strategy_id: str
     built_in: bool
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., format: _Optional[_Union[ModelFormat, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., download_url: _Optional[str] = ..., local_path: _Optional[str] = ..., download_size_bytes: _Optional[int] = ..., context_length: _Optional[int] = ..., supports_thinking: _Optional[bool] = ..., supports_lora: _Optional[bool] = ..., description: _Optional[str] = ..., source: _Optional[_Union[ModelSource, str]] = ..., created_at_unix_ms: _Optional[int] = ..., updated_at_unix_ms: _Optional[int] = ..., single_file: _Optional[_Union[SingleFileArtifact, _Mapping]] = ..., archive: _Optional[_Union[ArchiveArtifact, _Mapping]] = ..., multi_file: _Optional[_Union[MultiFileArtifact, _Mapping]] = ..., custom_strategy_id: _Optional[str] = ..., built_in: _Optional[bool] = ...) -> None: ...
+    artifact_type: ModelArtifactType
+    expected_files: ExpectedModelFiles
+    acceleration_preference: AccelerationPreference
+    routing_policy: RoutingPolicy
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., format: _Optional[_Union[ModelFormat, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., download_url: _Optional[str] = ..., local_path: _Optional[str] = ..., download_size_bytes: _Optional[int] = ..., context_length: _Optional[int] = ..., supports_thinking: _Optional[bool] = ..., supports_lora: _Optional[bool] = ..., description: _Optional[str] = ..., source: _Optional[_Union[ModelSource, str]] = ..., created_at_unix_ms: _Optional[int] = ..., updated_at_unix_ms: _Optional[int] = ..., single_file: _Optional[_Union[SingleFileArtifact, _Mapping]] = ..., archive: _Optional[_Union[ArchiveArtifact, _Mapping]] = ..., multi_file: _Optional[_Union[MultiFileArtifact, _Mapping]] = ..., custom_strategy_id: _Optional[str] = ..., built_in: _Optional[bool] = ..., artifact_type: _Optional[_Union[ModelArtifactType, str]] = ..., expected_files: _Optional[_Union[ExpectedModelFiles, _Mapping]] = ..., acceleration_preference: _Optional[_Union[AccelerationPreference, str]] = ..., routing_policy: _Optional[_Union[RoutingPolicy, str]] = ...) -> None: ...
 
 class SingleFileArtifact(_message.Message):
     __slots__ = ("required_patterns", "optional_patterns")
@@ -250,17 +307,29 @@ class ArchiveArtifact(_message.Message):
     def __init__(self, type: _Optional[_Union[ArchiveType, str]] = ..., structure: _Optional[_Union[ArchiveStructure, str]] = ..., required_patterns: _Optional[_Iterable[str]] = ..., optional_patterns: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class ModelFileDescriptor(_message.Message):
-    __slots__ = ("url", "filename", "is_required")
+    __slots__ = ("url", "filename", "is_required", "size_bytes", "checksum")
     URL_FIELD_NUMBER: _ClassVar[int]
     FILENAME_FIELD_NUMBER: _ClassVar[int]
     IS_REQUIRED_FIELD_NUMBER: _ClassVar[int]
+    SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    CHECKSUM_FIELD_NUMBER: _ClassVar[int]
     url: str
     filename: str
     is_required: bool
-    def __init__(self, url: _Optional[str] = ..., filename: _Optional[str] = ..., is_required: _Optional[bool] = ...) -> None: ...
+    size_bytes: int
+    checksum: str
+    def __init__(self, url: _Optional[str] = ..., filename: _Optional[str] = ..., is_required: _Optional[bool] = ..., size_bytes: _Optional[int] = ..., checksum: _Optional[str] = ...) -> None: ...
 
 class MultiFileArtifact(_message.Message):
     __slots__ = ("files",)
     FILES_FIELD_NUMBER: _ClassVar[int]
     files: _containers.RepeatedCompositeFieldContainer[ModelFileDescriptor]
     def __init__(self, files: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ...) -> None: ...
+
+class ExpectedModelFiles(_message.Message):
+    __slots__ = ("files", "root_directory")
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    ROOT_DIRECTORY_FIELD_NUMBER: _ClassVar[int]
+    files: _containers.RepeatedCompositeFieldContainer[ModelFileDescriptor]
+    root_directory: str
+    def __init__(self, files: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ..., root_directory: _Optional[str] = ...) -> None: ...

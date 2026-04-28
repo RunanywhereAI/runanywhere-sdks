@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fsolutions.proto\x12\x0erunanywhere.v1\"\xa2\x02\n\x0eSolutionConfig\x12\x37\n\x0bvoice_agent\x18\x01 \x01(\x0b\x32 .runanywhere.v1.VoiceAgentConfigH\x00\x12(\n\x03rag\x18\x02 \x01(\x0b\x32\x19.runanywhere.v1.RAGConfigH\x00\x12\x33\n\twake_word\x18\x03 \x01(\x0b\x32\x1e.runanywhere.v1.WakeWordConfigH\x00\x12\x35\n\nagent_loop\x18\x04 \x01(\x0b\x32\x1f.runanywhere.v1.AgentLoopConfigH\x00\x12\x37\n\x0btime_series\x18\x05 \x01(\x0b\x32 .runanywhere.v1.TimeSeriesConfigH\x00\x42\x08\n\x06\x63onfig\"\x8e\x03\n\x10VoiceAgentConfig\x12\x14\n\x0cllm_model_id\x18\x01 \x01(\t\x12\x14\n\x0cstt_model_id\x18\x02 \x01(\t\x12\x14\n\x0ctts_model_id\x18\x03 \x01(\t\x12\x14\n\x0cvad_model_id\x18\x04 \x01(\t\x12\x16\n\x0esample_rate_hz\x18\x05 \x01(\x05\x12\x10\n\x08\x63hunk_ms\x18\x06 \x01(\x05\x12\x31\n\x0c\x61udio_source\x18\x07 \x01(\x0e\x32\x1b.runanywhere.v1.AudioSource\x12\x17\n\x0f\x61udio_file_path\x18\x0f \x01(\t\x12\x17\n\x0f\x65nable_barge_in\x18\x08 \x01(\x08\x12\x1d\n\x15\x62\x61rge_in_threshold_ms\x18\t \x01(\x05\x12\x15\n\rsystem_prompt\x18\n \x01(\t\x12\x1a\n\x12max_context_tokens\x18\x0b \x01(\x05\x12\x13\n\x0btemperature\x18\x0c \x01(\x02\x12\x15\n\remit_partials\x18\r \x01(\x08\x12\x15\n\remit_thoughts\x18\x0e \x01(\x08\"\x91\x02\n\tRAGConfig\x12\x16\n\x0e\x65mbed_model_id\x18\x01 \x01(\t\x12\x17\n\x0frerank_model_id\x18\x02 \x01(\t\x12\x14\n\x0cllm_model_id\x18\x03 \x01(\t\x12\x31\n\x0cvector_store\x18\x04 \x01(\x0e\x32\x1b.runanywhere.v1.VectorStore\x12\x19\n\x11vector_store_path\x18\x05 \x01(\t\x12\x12\n\nretrieve_k\x18\x06 \x01(\x05\x12\x12\n\nrerank_top\x18\x07 \x01(\x05\x12\x0f\n\x07\x62m25_k1\x18\x08 \x01(\x02\x12\x0e\n\x06\x62m25_b\x18\t \x01(\x02\x12\r\n\x05rrf_k\x18\n \x01(\x05\x12\x17\n\x0fprompt_template\x18\x0b \x01(\t\"s\n\x0eWakeWordConfig\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x0f\n\x07keyword\x18\x02 \x01(\t\x12\x11\n\tthreshold\x18\x03 \x01(\x02\x12\x13\n\x0bpre_roll_ms\x18\x04 \x01(\x05\x12\x16\n\x0esample_rate_hz\x18\x05 \x01(\x05\"\x9b\x01\n\x0f\x41gentLoopConfig\x12\x14\n\x0cllm_model_id\x18\x01 \x01(\t\x12\x15\n\rsystem_prompt\x18\x02 \x01(\t\x12\'\n\x05tools\x18\x03 \x03(\x0b\x32\x18.runanywhere.v1.ToolSpec\x12\x16\n\x0emax_iterations\x18\x04 \x01(\x05\x12\x1a\n\x12max_context_tokens\x18\x05 \x01(\x05\"B\n\x08ToolSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x13\n\x0bjson_schema\x18\x03 \x01(\t\"\x82\x01\n\x10TimeSeriesConfig\x12\x18\n\x10\x61nomaly_model_id\x18\x01 \x01(\t\x12\x14\n\x0cllm_model_id\x18\x02 \x01(\t\x12\x13\n\x0bwindow_size\x18\x03 \x01(\x05\x12\x0e\n\x06stride\x18\x04 \x01(\x05\x12\x19\n\x11\x61nomaly_threshold\x18\x05 \x01(\x02*z\n\x0b\x41udioSource\x12\x1c\n\x18\x41UDIO_SOURCE_UNSPECIFIED\x10\x00\x12\x1b\n\x17\x41UDIO_SOURCE_MICROPHONE\x10\x01\x12\x15\n\x11\x41UDIO_SOURCE_FILE\x10\x02\x12\x19\n\x15\x41UDIO_SOURCE_CALLBACK\x10\x03*`\n\x0bVectorStore\x12\x1c\n\x18VECTOR_STORE_UNSPECIFIED\x10\x00\x12\x18\n\x14VECTOR_STORE_USEARCH\x10\x01\x12\x19\n\x15VECTOR_STORE_PGVECTOR\x10\x02\x42:\n\x17\x61i.runanywhere.proto.v1B\x0eSolutionsProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fsolutions.proto\x12\x0erunanywhere.v1\"\xa2\x02\n\x0eSolutionConfig\x12\x37\n\x0bvoice_agent\x18\x01 \x01(\x0b\x32 .runanywhere.v1.VoiceAgentConfigH\x00\x12(\n\x03rag\x18\x02 \x01(\x0b\x32\x19.runanywhere.v1.RAGConfigH\x00\x12\x33\n\twake_word\x18\x03 \x01(\x0b\x32\x1e.runanywhere.v1.WakeWordConfigH\x00\x12\x35\n\nagent_loop\x18\x04 \x01(\x0b\x32\x1f.runanywhere.v1.AgentLoopConfigH\x00\x12\x37\n\x0btime_series\x18\x05 \x01(\x0b\x32 .runanywhere.v1.TimeSeriesConfigH\x00\x42\x08\n\x06\x63onfig\"o\n\x0eSolutionHandle\x12\x11\n\thandle_id\x18\x01 \x01(\t\x12\x15\n\rsolution_type\x18\x02 \x01(\t\x12\x15\n\rcreated_at_ms\x18\x03 \x01(\x03\x12\x12\n\x05state\x18\x04 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_state\"\xd2\x03\n\x10VoiceAgentConfig\x12\x14\n\x0cllm_model_id\x18\x01 \x01(\t\x12\x14\n\x0cstt_model_id\x18\x02 \x01(\t\x12\x14\n\x0ctts_model_id\x18\x03 \x01(\t\x12\x14\n\x0cvad_model_id\x18\x04 \x01(\t\x12\x16\n\x0esample_rate_hz\x18\x05 \x01(\x05\x12\x10\n\x08\x63hunk_ms\x18\x06 \x01(\x05\x12\x31\n\x0c\x61udio_source\x18\x07 \x01(\x0e\x32\x1b.runanywhere.v1.AudioSource\x12\x17\n\x0f\x61udio_file_path\x18\x0f \x01(\t\x12\x17\n\x0f\x65nable_barge_in\x18\x08 \x01(\x08\x12\x1d\n\x15\x62\x61rge_in_threshold_ms\x18\t \x01(\x05\x12\x15\n\rsystem_prompt\x18\n \x01(\t\x12\x1a\n\x12max_context_tokens\x18\x0b \x01(\x05\x12\x13\n\x0btemperature\x18\x0c \x01(\x02\x12\x15\n\remit_partials\x18\r \x01(\x08\x12\x15\n\remit_thoughts\x18\x0e \x01(\x08\x12\x34\n\ttype_kind\x18\x10 \x01(\x0e\x32\x1c.runanywhere.v1.SolutionTypeH\x00\x88\x01\x01\x42\x0c\n\n_type_kind\"\xd5\x02\n\tRAGConfig\x12\x16\n\x0e\x65mbed_model_id\x18\x01 \x01(\t\x12\x17\n\x0frerank_model_id\x18\x02 \x01(\t\x12\x14\n\x0cllm_model_id\x18\x03 \x01(\t\x12\x31\n\x0cvector_store\x18\x04 \x01(\x0e\x32\x1b.runanywhere.v1.VectorStore\x12\x19\n\x11vector_store_path\x18\x05 \x01(\t\x12\x12\n\nretrieve_k\x18\x06 \x01(\x05\x12\x12\n\nrerank_top\x18\x07 \x01(\x05\x12\x0f\n\x07\x62m25_k1\x18\x08 \x01(\x02\x12\x0e\n\x06\x62m25_b\x18\t \x01(\x02\x12\r\n\x05rrf_k\x18\n \x01(\x05\x12\x17\n\x0fprompt_template\x18\x0b \x01(\t\x12\x34\n\ttype_kind\x18\x0c \x01(\x0e\x32\x1c.runanywhere.v1.SolutionTypeH\x00\x88\x01\x01\x42\x0c\n\n_type_kind\"\xb7\x01\n\x0eWakeWordConfig\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x0f\n\x07keyword\x18\x02 \x01(\t\x12\x11\n\tthreshold\x18\x03 \x01(\x02\x12\x13\n\x0bpre_roll_ms\x18\x04 \x01(\x05\x12\x16\n\x0esample_rate_hz\x18\x05 \x01(\x05\x12\x34\n\ttype_kind\x18\x06 \x01(\x0e\x32\x1c.runanywhere.v1.SolutionTypeH\x00\x88\x01\x01\x42\x0c\n\n_type_kind\"\xdf\x01\n\x0f\x41gentLoopConfig\x12\x14\n\x0cllm_model_id\x18\x01 \x01(\t\x12\x15\n\rsystem_prompt\x18\x02 \x01(\t\x12\'\n\x05tools\x18\x03 \x03(\x0b\x32\x18.runanywhere.v1.ToolSpec\x12\x16\n\x0emax_iterations\x18\x04 \x01(\x05\x12\x1a\n\x12max_context_tokens\x18\x05 \x01(\x05\x12\x34\n\ttype_kind\x18\x06 \x01(\x0e\x32\x1c.runanywhere.v1.SolutionTypeH\x00\x88\x01\x01\x42\x0c\n\n_type_kind\"B\n\x08ToolSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x13\n\x0bjson_schema\x18\x03 \x01(\t\"\xc6\x01\n\x10TimeSeriesConfig\x12\x18\n\x10\x61nomaly_model_id\x18\x01 \x01(\t\x12\x14\n\x0cllm_model_id\x18\x02 \x01(\t\x12\x13\n\x0bwindow_size\x18\x03 \x01(\x05\x12\x0e\n\x06stride\x18\x04 \x01(\x05\x12\x19\n\x11\x61nomaly_threshold\x18\x05 \x01(\x02\x12\x34\n\ttype_kind\x18\x06 \x01(\x0e\x32\x1c.runanywhere.v1.SolutionTypeH\x00\x88\x01\x01\x42\x0c\n\n_type_kind*\xbc\x01\n\x0cSolutionType\x12\x1d\n\x19SOLUTION_TYPE_UNSPECIFIED\x10\x00\x12\x1d\n\x19SOLUTION_TYPE_VOICE_AGENT\x10\x01\x12\x15\n\x11SOLUTION_TYPE_RAG\x10\x02\x12\x1a\n\x16SOLUTION_TYPE_WAKEWORD\x10\x03\x12\x1d\n\x19SOLUTION_TYPE_TIME_SERIES\x10\x04\x12\x1c\n\x18SOLUTION_TYPE_AGENT_LOOP\x10\x05*z\n\x0b\x41udioSource\x12\x1c\n\x18\x41UDIO_SOURCE_UNSPECIFIED\x10\x00\x12\x1b\n\x17\x41UDIO_SOURCE_MICROPHONE\x10\x01\x12\x15\n\x11\x41UDIO_SOURCE_FILE\x10\x02\x12\x19\n\x15\x41UDIO_SOURCE_CALLBACK\x10\x03*`\n\x0bVectorStore\x12\x1c\n\x18VECTOR_STORE_UNSPECIFIED\x10\x00\x12\x18\n\x14VECTOR_STORE_USEARCH\x10\x01\x12\x19\n\x15VECTOR_STORE_PGVECTOR\x10\x02\x42:\n\x17\x61i.runanywhere.proto.v1B\x0eSolutionsProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,22 +32,26 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'solutions_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\016SolutionsProtoP\001\370\001\001\242\002\004RAV1\272\002\002RA'
-  _globals['_AUDIOSOURCE']._serialized_start=1481
-  _globals['_AUDIOSOURCE']._serialized_end=1603
-  _globals['_VECTORSTORE']._serialized_start=1605
-  _globals['_VECTORSTORE']._serialized_end=1701
+  _globals['_SOLUTIONTYPE']._serialized_start=1936
+  _globals['_SOLUTIONTYPE']._serialized_end=2124
+  _globals['_AUDIOSOURCE']._serialized_start=2126
+  _globals['_AUDIOSOURCE']._serialized_end=2248
+  _globals['_VECTORSTORE']._serialized_start=2250
+  _globals['_VECTORSTORE']._serialized_end=2346
   _globals['_SOLUTIONCONFIG']._serialized_start=36
   _globals['_SOLUTIONCONFIG']._serialized_end=326
-  _globals['_VOICEAGENTCONFIG']._serialized_start=329
-  _globals['_VOICEAGENTCONFIG']._serialized_end=727
-  _globals['_RAGCONFIG']._serialized_start=730
-  _globals['_RAGCONFIG']._serialized_end=1003
-  _globals['_WAKEWORDCONFIG']._serialized_start=1005
-  _globals['_WAKEWORDCONFIG']._serialized_end=1120
-  _globals['_AGENTLOOPCONFIG']._serialized_start=1123
-  _globals['_AGENTLOOPCONFIG']._serialized_end=1278
-  _globals['_TOOLSPEC']._serialized_start=1280
-  _globals['_TOOLSPEC']._serialized_end=1346
-  _globals['_TIMESERIESCONFIG']._serialized_start=1349
-  _globals['_TIMESERIESCONFIG']._serialized_end=1479
+  _globals['_SOLUTIONHANDLE']._serialized_start=328
+  _globals['_SOLUTIONHANDLE']._serialized_end=439
+  _globals['_VOICEAGENTCONFIG']._serialized_start=442
+  _globals['_VOICEAGENTCONFIG']._serialized_end=908
+  _globals['_RAGCONFIG']._serialized_start=911
+  _globals['_RAGCONFIG']._serialized_end=1252
+  _globals['_WAKEWORDCONFIG']._serialized_start=1255
+  _globals['_WAKEWORDCONFIG']._serialized_end=1438
+  _globals['_AGENTLOOPCONFIG']._serialized_start=1441
+  _globals['_AGENTLOOPCONFIG']._serialized_end=1664
+  _globals['_TOOLSPEC']._serialized_start=1666
+  _globals['_TOOLSPEC']._serialized_end=1732
+  _globals['_TIMESERIESCONFIG']._serialized_start=1735
+  _globals['_TIMESERIESCONFIG']._serialized_end=1933
 # @@protoc_insertion_point(module_scope)

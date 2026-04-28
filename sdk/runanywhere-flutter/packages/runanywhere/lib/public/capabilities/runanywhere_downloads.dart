@@ -7,9 +7,9 @@ import 'dart:io';
 
 import 'package:runanywhere/adapters/model_download_adapter.dart';
 import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/storage_types.dart';
+import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
@@ -19,7 +19,34 @@ import 'package:runanywhere/native/dart_bridge_model_registry.dart'
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/download_types.dart';
+import 'package:fixnum/fixnum.dart';
+// DownloadProgress + DownloadProgressState moved inline (Wave 3 deleted
+// the standalone download_types.dart since it only existed for this file).
+
+enum DownloadProgressState {
+  downloading,
+  completed,
+  failed,
+  cancelled;
+
+  bool get isCompleted => this == DownloadProgressState.completed;
+  bool get isFailed => this == DownloadProgressState.failed;
+}
+
+class DownloadProgress {
+  final int bytesDownloaded;
+  final int totalBytes;
+  final DownloadProgressState state;
+
+  const DownloadProgress({
+    required this.bytesDownloaded,
+    required this.totalBytes,
+    required this.state,
+  });
+
+  double get overallProgress =>
+      totalBytes > 0 ? bytesDownloaded / totalBytes : 0.0;
+}
 
 /// Downloads / storage-management capability surface.
 ///
@@ -33,7 +60,7 @@ class RunAnywhereDownloads {
   /// or FAILED; telemetry is recorded at each terminal state.
   Stream<DownloadProgress> start(String modelId) async* {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.Download');
@@ -83,7 +110,7 @@ class RunAnywhereDownloads {
   /// Cancel an active model download if the adapter still owns it.
   Future<void> cancelDownload(String modelId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     ModelDownloadService.shared.cancelDownload(modelId);
   }
@@ -91,7 +118,7 @@ class RunAnywhereDownloads {
   /// Delete a stored model from the C++ registry + disk.
   Future<void> delete(String modelId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.Download');
@@ -107,7 +134,7 @@ class RunAnywhereDownloads {
         _frameworkToCValue(model.framework),
       );
       if (!deleted && model.localPath != null) {
-        throw SDKError.storageError(
+        throw SDKException.storageError(
           'Failed to delete stored files for model: ${model.id}',
         );
       }
@@ -122,22 +149,22 @@ class RunAnywhereDownloads {
   /// Delete every downloaded model while keeping registry entries available.
   Future<void> deleteAllModels() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     final storedModels = await list();
     for (final storedModel in storedModels) {
-      await delete(storedModel.modelInfo.id);
+      await delete(storedModel.modelId);
     }
   }
 
   /// Clear cached files managed by the native file manager.
   Future<void> clearCache() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     if (!DartBridgeFileManager.clearCache()) {
-      throw SDKError.storageError('Failed to clear cache directory');
+      throw SDKException.storageError('Failed to clear cache directory');
     }
   }
 
@@ -145,7 +172,7 @@ class RunAnywhereDownloads {
   /// downloaded model with its on-disk size.
   Future<StorageInfo> getStorageInfo() async {
     if (!SdkState.shared.isInitialized) {
-      return StorageInfo.empty;
+      return StorageInfo();
     }
 
     try {
@@ -153,18 +180,21 @@ class RunAnywhereDownloads {
       final appStorage = await _getAppStorageInfo();
       final storedModels = await list();
       final modelMetrics = storedModels
-          .map((m) =>
-              ModelStorageMetrics(model: m.modelInfo, sizeOnDisk: m.size))
+          .map((m) => ModelStorageMetrics(
+                modelId: m.modelId,
+                sizeOnDiskBytes: m.sizeBytes,
+              ))
           .toList();
 
       return StorageInfo(
-        appStorage: appStorage,
-        deviceStorage: deviceStorage,
+        app: appStorage,
+        device: deviceStorage,
         models: modelMetrics,
+        totalModels: modelMetrics.length,
       );
     } catch (e) {
       SDKLogger('RunAnywhere.Storage').error('Failed to get storage info: $e');
-      return StorageInfo.empty;
+      return StorageInfo();
     }
   }
 
@@ -196,7 +226,12 @@ class RunAnywhereDownloads {
               .debug('Could not get size for ${model.id}: $e');
         }
 
-        storedModels.add(StoredModel(modelInfo: model, size: fileSize));
+        storedModels.add(StoredModel(
+          modelId: model.id,
+          name: model.name,
+          sizeBytes: Int64(fileSize),
+          localPath: localPath,
+        ));
       }
 
       return storedModels;
@@ -228,17 +263,24 @@ class RunAnywhereDownloads {
     try {
       final modelsDir = DartBridgeModelPaths.instance.getModelsDirectory();
       if (modelsDir == null) {
-        return const DeviceStorageInfo(
-            totalSpace: 0, freeSpace: 0, usedSpace: 0);
+        return DeviceStorageInfo(
+          totalBytes: Int64.ZERO,
+          freeBytes: Int64.ZERO,
+          usedBytes: Int64.ZERO,
+        );
       }
       final modelsDirSize = await _getDirectorySize(modelsDir);
       return DeviceStorageInfo(
-        totalSpace: modelsDirSize,
-        freeSpace: 0,
-        usedSpace: modelsDirSize,
+        totalBytes: Int64(modelsDirSize),
+        freeBytes: Int64.ZERO,
+        usedBytes: Int64(modelsDirSize),
       );
     } catch (e) {
-      return const DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0);
+      return DeviceStorageInfo(
+        totalBytes: Int64.ZERO,
+        freeBytes: Int64.ZERO,
+        usedBytes: Int64.ZERO,
+      );
     }
   }
 
@@ -248,17 +290,17 @@ class RunAnywhereDownloads {
       final modelsDirSize =
           modelsDir != null ? await _getDirectorySize(modelsDir) : 0;
       return AppStorageInfo(
-        documentsSize: modelsDirSize,
-        cacheSize: 0,
-        appSupportSize: 0,
-        totalSize: modelsDirSize,
+        documentsBytes: Int64(modelsDirSize),
+        cacheBytes: Int64.ZERO,
+        appSupportBytes: Int64.ZERO,
+        totalBytes: Int64(modelsDirSize),
       );
     } catch (e) {
-      return const AppStorageInfo(
-        documentsSize: 0,
-        cacheSize: 0,
-        appSupportSize: 0,
-        totalSize: 0,
+      return AppStorageInfo(
+        documentsBytes: Int64.ZERO,
+        cacheBytes: Int64.ZERO,
+        appSupportBytes: Int64.ZERO,
+        totalBytes: Int64.ZERO,
       );
     }
   }

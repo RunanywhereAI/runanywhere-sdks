@@ -26,11 +26,11 @@
  */
 
 import {
-  RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
+  RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
   LLMFramework, LLMStreamAdapter, applyLLMGenerationDefaults,
 } from '@runanywhere/web';
 import type {
-  ModelLoadContext, HardwareAcceleration, EmscriptenRunanywhereModule,
+  ModelLoadContext, EmscriptenRunanywhereModule,
 } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets, resetOffsets, loadOffsets } from '../Foundation/LlamaCppOffsets';
@@ -73,7 +73,7 @@ class TextGenerationImpl {
   /** Ensure the SDK is initialized and return the bridge. */
   private requireBridge(): LlamaCppBridge {
     if (!RunAnywhere.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     return LlamaCppBridge.shared;
   }
@@ -275,13 +275,13 @@ class TextGenerationImpl {
    * @param options - Generation options (temperature, maxTokens, etc.)
    * @returns Generation result with text and metrics
    */
-  async generate(prompt: string, options: LLMGenerationOptions = {}): Promise<LLMGenerationResult> {
+  async generate(prompt: string, options: Partial<LLMGenerationOptions> = {}): Promise<LLMGenerationResult> {
     const bridge = this.requireBridge();
     const m = bridge.module;
     const handle = await this.ensureLLMComponent();
 
     if (!this.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
     // Apply Swift-aligned defaults (maxTokens=100, temperature=0.8) so the
@@ -311,7 +311,7 @@ class TextGenerationImpl {
     const optionsPtr = m._rac_wasm_create_llm_options_default();
     if (optionsPtr === 0) {
       bridge.free(promptPtr);
-      throw new SDKError(SDKErrorCode.WASMMemoryError, 'Failed to allocate LLM options');
+      throw new SDKException(SDKErrorCode.WASMMemoryError, 'Failed to allocate LLM options');
     }
 
     // Override options if provided (offsets from compiler via StructOffsets)
@@ -366,7 +366,7 @@ class TextGenerationImpl {
         const detail = typeof wasmErr === 'number'
           ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
           : wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
-        throw new SDKError(
+        throw new SDKException(
           SDKErrorCode.GenerationFailed,
           `LLM generation crashed: ${detail}`,
         );
@@ -385,12 +385,12 @@ class TextGenerationImpl {
       const genResult: LLMGenerationResult = {
         text,
         inputTokens,
-        tokensUsed: outputTokens,
+        tokensGenerated: outputTokens,
         modelUsed: bridge.readString(m._rac_llm_component_get_model_id(handle)),
-        latencyMs,
+        generationTimeMs: latencyMs,
         framework: LLMFramework.LlamaCpp,
-        hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
         tokensPerSecond,
+        finishReason: '',
         thinkingTokens: 0,
         responseTokens: outputTokens,
       };
@@ -435,13 +435,13 @@ class TextGenerationImpl {
    * @param options - Generation options
    * @returns Streaming result with async token stream and final result promise
    */
-  async generateStream(prompt: string, options: LLMGenerationOptions = {}): Promise<LLMStreamingResult> {
+  async generateStream(prompt: string, options: Partial<LLMGenerationOptions> = {}): Promise<LLMStreamingResult> {
     const bridge = this.requireBridge();
     const m = bridge.module;
     const handle = await this.ensureLLMComponent();
 
     if (!this.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
     // Apply Swift-aligned defaults so streaming behavior matches across SDKs.
@@ -517,10 +517,10 @@ class TextGenerationImpl {
         const startResult = await callResult as number;
         logger.debug(`Stream generation returned result=${startResult}`);
         if (startResult !== 0) {
-          throw SDKError.fromRACResult(startResult, 'Failed to start streaming generation');
+          throw SDKException.fromRACResult(startResult, 'Failed to start streaming generation');
         }
       } catch (wasmErr: unknown) {
-        if (wasmErr instanceof SDKError) throw wasmErr;
+        if (wasmErr instanceof SDKException) throw wasmErr;
         if (wasmErr instanceof Error) {
           logger.error(`WASM stream generation error: ${wasmErr.message}\nStack: ${wasmErr.stack}`);
         } else {
@@ -529,7 +529,7 @@ class TextGenerationImpl {
         const detail = typeof wasmErr === 'number'
           ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
           : wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
-        throw new SDKError(SDKErrorCode.GenerationFailed, `LLM streaming generation crashed: ${detail}`);
+        throw new SDKException(SDKErrorCode.GenerationFailed, `LLM streaming generation crashed: ${detail}`);
       } finally {
         bridge.free(promptPtr);
         if (systemPromptPtr) bridge.free(systemPromptPtr);
@@ -560,7 +560,7 @@ class TextGenerationImpl {
 
           if (event.isFinal) {
             if (event.errorMessage) {
-              const err = new SDKError(SDKErrorCode.GenerationFailed, event.errorMessage);
+              const err = new SDKException(SDKErrorCode.GenerationFailed, event.errorMessage);
               rejectResult(err);
               throw err;
             }
@@ -573,13 +573,13 @@ class TextGenerationImpl {
         resolveResult({
           text: fullText,
           inputTokens: 0,
-          tokensUsed: tokenCount,
+          tokensGenerated: tokenCount,
           modelUsed: '',
-          latencyMs,
+          generationTimeMs: latencyMs,
           framework: LLMFramework.LlamaCpp,
-          hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
           tokensPerSecond,
-          timeToFirstTokenMs: timeToFirstToken,
+          ttftMs: timeToFirstToken,
+          finishReason: '',
           thinkingTokens: 0,
           responseTokens: tokenCount,
         });

@@ -28,7 +28,7 @@
  */
 
 import {
-  RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter,
+  RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter,
   AudioFileLoader,
 } from '@runanywhere/web';
 import type { STTTranscriptionResult, STTTranscribeOptions, STTStreamingSession } from '@runanywhere/web';
@@ -55,7 +55,7 @@ export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerF
 // ---------------------------------------------------------------------------
 
 function requireSherpa(): SherpaONNXBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return SherpaONNXBridge.shared;
 }
 
@@ -206,7 +206,7 @@ class STTImpl {
       config.type !== STTModelType.Zipformer &&
       config.type !== STTModelType.Paraformer
     ) {
-      throw SDKError.backendNotAvailable(
+      throw SDKException.backendNotAvailable(
         `STT.${config.type}`,
         `The bundled sherpa-onnx WASM only supports Whisper, Zipformer, and ` +
         `Paraformer. Received: ${config.type}.`,
@@ -238,7 +238,7 @@ class STTImpl {
         freeConfig(configStruct, m);
 
         if (this._onlineRecognizerHandle === 0) {
-          throw new SDKError(SDKErrorCode.ModelLoadFailed,
+          throw new SDKException(SDKErrorCode.ModelLoadFailed,
             `Failed to create online recognizer for ${config.modelId}`);
         }
       } else {
@@ -251,7 +251,7 @@ class STTImpl {
         freeConfig(configStruct, m);
 
         if (this._offlineRecognizerHandle === 0) {
-          throw new SDKError(SDKErrorCode.ModelLoadFailed,
+          throw new SDKException(SDKErrorCode.ModelLoadFailed,
             `Failed to create offline recognizer for ${config.modelId}`);
         }
       }
@@ -306,7 +306,7 @@ class STTImpl {
         // Streaming model: process all at once via online recognizer
         return this._transcribeViaOnline(audioSamples, options);
       }
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
     }
 
     const startMs = performance.now();
@@ -317,7 +317,7 @@ class STTImpl {
     // Create stream
     const stream = m._SherpaOnnxCreateOfflineStream(this._offlineRecognizerHandle);
     if (stream === 0) {
-      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create offline stream');
+      throw new SDKException(SDKErrorCode.GenerationFailed, 'Failed to create offline stream');
     }
 
     // Copy audio to WASM memory
@@ -377,7 +377,7 @@ class STTImpl {
 
     const stream = m._SherpaOnnxCreateOnlineStream(this._onlineRecognizerHandle);
     if (stream === 0) {
-      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create online stream');
+      throw new SDKException(SDKErrorCode.GenerationFailed, 'Failed to create online stream');
     }
 
     const audioPtr = m._malloc(audioSamples.length * 4);
@@ -426,7 +426,7 @@ class STTImpl {
    */
   createStreamingSession(options: STTTranscribeOptions = {}): STTStreamingSession {
     if (this._onlineRecognizerHandle === 0) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.ModelNotLoaded,
         'No streaming STT model loaded. Use a zipformer model.',
       );
@@ -494,7 +494,7 @@ class STTStreamingSessionImpl implements STTStreamingSession {
     const m = SherpaONNXBridge.shared.module;
     this._stream = m._SherpaOnnxCreateOnlineStream(recognizer);
     if (this._stream === 0) {
-      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create streaming session');
+      throw new SDKException(SDKErrorCode.GenerationFailed, 'Failed to create streaming session');
     }
   }
 

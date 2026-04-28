@@ -20,7 +20,7 @@ public extension RunAnywhere {
     /// and mmproj .gguf files automatically.
     ///
     /// - Parameter model: The model to load (must be registered in the global registry)
-    /// - Throws: SDKError if loading fails
+    /// - Throws: SDKException if loading fails
     static func loadVLMModel(_ model: ModelInfo) async throws {
         vlmLogger.info("Loading VLM model by ID: \(model.id)")
         try await CppBridge.VLM.shared.loadModelById(model.id)
@@ -30,7 +30,7 @@ public extension RunAnywhere {
     /// Load a VLM model by ID string using the C++ model registry.
     ///
     /// - Parameter modelId: Model identifier (must be registered in the global registry)
-    /// - Throws: SDKError if loading fails
+    /// - Throws: SDKException if loading fails
     static func loadVLMModelById(_ modelId: String) async throws {
         vlmLogger.info("Loading VLM model by ID: \(modelId)")
         try await CppBridge.VLM.shared.loadModelById(modelId)

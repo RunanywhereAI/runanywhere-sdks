@@ -65,7 +65,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
     public func validate() throws {
         // Validate threshold range
         guard energyThreshold >= 0 && energyThreshold <= 1.0 else {
-            throw SDKError.vad(
+            throw SDKException.vad(
                 .invalidConfiguration,
                 "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05"
             )
@@ -73,7 +73,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
         // Warn if threshold is too low
         if energyThreshold < 0.002 {
-            throw SDKError.vad(
+            throw SDKException.vad(
                 .invalidConfiguration,
                 "Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.002"
             )
@@ -81,7 +81,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
         // Warn if threshold is too high
         if energyThreshold > 0.1 {
-            throw SDKError.vad(
+            throw SDKException.vad(
                 .invalidConfiguration,
                 "Energy threshold \(energyThreshold) is very high and may miss speech. Recommended maximum: 0.1"
             )
@@ -89,7 +89,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
         // Validate sample rate
         guard sampleRate > 0 && sampleRate <= 48000 else {
-            throw SDKError.vad(
+            throw SDKException.vad(
                 .invalidConfiguration,
                 "Sample rate must be between 1 and 48000 Hz"
             )
@@ -97,7 +97,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
         // Validate frame length
         guard frameLength > 0 && frameLength <= 1.0 else {
-            throw SDKError.vad(
+            throw SDKException.vad(
                 .invalidConfiguration,
                 "Frame length must be between 0 and 1 second"
             )
@@ -105,7 +105,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
         // Validate calibration multiplier
         guard calibrationMultiplier >= 1.5 && calibrationMultiplier <= 5.0 else {
-            throw SDKError.vad(
+            throw SDKException.vad(
                 .invalidConfiguration,
                 "Calibration multiplier must be between 1.5 and 5.0"
             )
@@ -238,4 +238,67 @@ public enum SpeechActivityEvent: String, Sendable {
 
     /// Speech has ended
     case ended
+}
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types for cross-SDK serialization live in
+// `Sources/RunAnywhere/Generated/vad_options.pb.swift`:
+//   • RAVADConfiguration  (RA fields: modelID, sampleRate, frameLengthMs,
+//                           threshold, enableAutoCalibration)
+//   • RAVADOptions        (threshold, minSpeechDurationMs, minSilenceDurationMs)
+//   • RAVADResult         (isSpeech, confidence, energy, durationMs)
+//   • RAVADStatistics     (currentEnergy, currentThreshold, ambientLevel,
+//                           recentAvg, recentMax)
+//   • RASpeechActivityKind enum (unspecified, speechStarted, speechEnded, ongoing)
+//   • RASpeechActivityEvent struct (eventType, timestampMs, durationMs)
+//
+// The hand-rolled Swift types above are KEPT because they:
+//   1. carry Swift-specific fields not in the proto (calibrationMultiplier),
+//   2. use Swift idiomatic units (frameLength: Float seconds vs frameLengthMs Int32),
+//   3. expose ComponentConfiguration / Builder / validate() / CustomStringConvertible
+//      that the generated structs intentionally omit, and
+//   4. expose `init(from cStats: rac_energy_vad_stats_t)` C bridges.
+//
+// Use the bridges below to opt into the proto-canonical types when
+// serializing across SDK boundaries.
+
+extension VADConfiguration {
+    /// Convert to the canonical generated proto `RAVADConfiguration`. Notes:
+    /// frameLength (seconds, Float) is converted to frameLengthMs (Int32 ms).
+    /// `calibrationMultiplier` is dropped (not on the proto wire schema).
+    public func toRAVADConfiguration() -> RAVADConfiguration {
+        var proto = RAVADConfiguration()
+        proto.sampleRate = Int32(sampleRate)
+        proto.frameLengthMs = Int32(frameLength * 1000)
+        proto.threshold = energyThreshold
+        proto.enableAutoCalibration = enableAutoCalibration
+        return proto
+    }
+}
+
+extension VADStatistics {
+    /// Convert to the canonical generated proto `RAVADStatistics`.
+    /// Field-name mapping: current → currentEnergy, threshold → currentThreshold,
+    /// ambient → ambientLevel.
+    public func toRAVADStatistics() -> RAVADStatistics {
+        var proto = RAVADStatistics()
+        proto.currentEnergy = current
+        proto.currentThreshold = threshold
+        proto.ambientLevel = ambient
+        proto.recentAvg = recentAvg
+        proto.recentMax = recentMax
+        return proto
+    }
+}
+
+extension SpeechActivityEvent {
+    /// Convert to the canonical `RASpeechActivityKind` enum used inside the
+    /// generated `RASpeechActivityEvent` envelope.
+    public var raKind: RASpeechActivityKind {
+        switch self {
+        case .started: return .speechStarted
+        case .ended: return .speechEnded
+        }
+    }
 }

@@ -15,12 +15,29 @@ class ToolParameterType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TOOL_PARAMETER_TYPE_BOOLEAN: _ClassVar[ToolParameterType]
     TOOL_PARAMETER_TYPE_OBJECT: _ClassVar[ToolParameterType]
     TOOL_PARAMETER_TYPE_ARRAY: _ClassVar[ToolParameterType]
+
+class ToolCallFormatName(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    TOOL_CALL_FORMAT_NAME_UNSPECIFIED: _ClassVar[ToolCallFormatName]
+    TOOL_CALL_FORMAT_NAME_JSON: _ClassVar[ToolCallFormatName]
+    TOOL_CALL_FORMAT_NAME_XML: _ClassVar[ToolCallFormatName]
+    TOOL_CALL_FORMAT_NAME_NATIVE: _ClassVar[ToolCallFormatName]
+    TOOL_CALL_FORMAT_NAME_PYTHONIC: _ClassVar[ToolCallFormatName]
+    TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS: _ClassVar[ToolCallFormatName]
+    TOOL_CALL_FORMAT_NAME_HERMES: _ClassVar[ToolCallFormatName]
 TOOL_PARAMETER_TYPE_UNSPECIFIED: ToolParameterType
 TOOL_PARAMETER_TYPE_STRING: ToolParameterType
 TOOL_PARAMETER_TYPE_NUMBER: ToolParameterType
 TOOL_PARAMETER_TYPE_BOOLEAN: ToolParameterType
 TOOL_PARAMETER_TYPE_OBJECT: ToolParameterType
 TOOL_PARAMETER_TYPE_ARRAY: ToolParameterType
+TOOL_CALL_FORMAT_NAME_UNSPECIFIED: ToolCallFormatName
+TOOL_CALL_FORMAT_NAME_JSON: ToolCallFormatName
+TOOL_CALL_FORMAT_NAME_XML: ToolCallFormatName
+TOOL_CALL_FORMAT_NAME_NATIVE: ToolCallFormatName
+TOOL_CALL_FORMAT_NAME_PYTHONIC: ToolCallFormatName
+TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS: ToolCallFormatName
+TOOL_CALL_FORMAT_NAME_HERMES: ToolCallFormatName
 
 class ToolValue(_message.Message):
     __slots__ = ("string_value", "number_value", "bool_value", "array_value", "object_value")
@@ -106,7 +123,7 @@ class ToolResult(_message.Message):
     def __init__(self, tool_call_id: _Optional[str] = ..., name: _Optional[str] = ..., result_json: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
 
 class ToolCallingOptions(_message.Message):
-    __slots__ = ("tools", "max_iterations", "auto_execute", "temperature", "max_tokens", "system_prompt", "replace_system_prompt", "keep_tools_available", "format_hint")
+    __slots__ = ("tools", "max_iterations", "auto_execute", "temperature", "max_tokens", "system_prompt", "replace_system_prompt", "keep_tools_available", "format_hint", "format", "custom_system_prompt")
     TOOLS_FIELD_NUMBER: _ClassVar[int]
     MAX_ITERATIONS_FIELD_NUMBER: _ClassVar[int]
     AUTO_EXECUTE_FIELD_NUMBER: _ClassVar[int]
@@ -116,6 +133,8 @@ class ToolCallingOptions(_message.Message):
     REPLACE_SYSTEM_PROMPT_FIELD_NUMBER: _ClassVar[int]
     KEEP_TOOLS_AVAILABLE_FIELD_NUMBER: _ClassVar[int]
     FORMAT_HINT_FIELD_NUMBER: _ClassVar[int]
+    FORMAT_FIELD_NUMBER: _ClassVar[int]
+    CUSTOM_SYSTEM_PROMPT_FIELD_NUMBER: _ClassVar[int]
     tools: _containers.RepeatedCompositeFieldContainer[ToolDefinition]
     max_iterations: int
     auto_execute: bool
@@ -125,7 +144,9 @@ class ToolCallingOptions(_message.Message):
     replace_system_prompt: bool
     keep_tools_available: bool
     format_hint: str
-    def __init__(self, tools: _Optional[_Iterable[_Union[ToolDefinition, _Mapping]]] = ..., max_iterations: _Optional[int] = ..., auto_execute: _Optional[bool] = ..., temperature: _Optional[float] = ..., max_tokens: _Optional[int] = ..., system_prompt: _Optional[str] = ..., replace_system_prompt: _Optional[bool] = ..., keep_tools_available: _Optional[bool] = ..., format_hint: _Optional[str] = ...) -> None: ...
+    format: ToolCallFormatName
+    custom_system_prompt: str
+    def __init__(self, tools: _Optional[_Iterable[_Union[ToolDefinition, _Mapping]]] = ..., max_iterations: _Optional[int] = ..., auto_execute: _Optional[bool] = ..., temperature: _Optional[float] = ..., max_tokens: _Optional[int] = ..., system_prompt: _Optional[str] = ..., replace_system_prompt: _Optional[bool] = ..., keep_tools_available: _Optional[bool] = ..., format_hint: _Optional[str] = ..., format: _Optional[_Union[ToolCallFormatName, str]] = ..., custom_system_prompt: _Optional[str] = ...) -> None: ...
 
 class ToolCallingResult(_message.Message):
     __slots__ = ("text", "tool_calls", "tool_results", "is_complete", "conversation_id", "iterations_used")

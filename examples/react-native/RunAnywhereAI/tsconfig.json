@@ -24,7 +24,9 @@
       "@types/*": ["src/types/*"],
       "@services/*": ["src/services/*"],
       "@store/*": ["src/store/*"],
-      "@utils/*": ["src/utils/*"]
+      "@utils/*": ["src/utils/*"],
+      "@runanywhere/proto-ts": ["../../../sdk/runanywhere-proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../sdk/runanywhere-proto-ts/dist/*"]
     }
   },
   "include": ["src/**/*", "App.tsx", "index.js"],

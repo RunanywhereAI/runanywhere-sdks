@@ -16,7 +16,7 @@ public extension RunAnywhere {
     /// Multiple adapters can be stacked. Context is recreated internally.
     static func loadLoraAdapter(_ config: LoRAAdapterConfig) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await CppBridge.LLM.shared.loadLoraAdapter(config)
     }
@@ -24,7 +24,7 @@ public extension RunAnywhere {
     /// Remove a specific LoRA adapter by path.
     static func removeLoraAdapter(_ path: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await CppBridge.LLM.shared.removeLoraAdapter(path)
     }
@@ -32,7 +32,7 @@ public extension RunAnywhere {
     /// Remove all loaded LoRA adapters.
     static func clearLoraAdapters() async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await CppBridge.LLM.shared.clearLoraAdapters()
     }
@@ -40,7 +40,7 @@ public extension RunAnywhere {
     /// Get info about all currently loaded LoRA adapters.
     static func getLoadedLoraAdapters() async throws -> [LoRAAdapterInfo] {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         return try await CppBridge.LLM.shared.getLoadedLoraAdapters()
     }

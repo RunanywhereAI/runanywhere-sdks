@@ -639,6 +639,188 @@ public enum RAArchiveStructure: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
+/// High-level artifact classification — what KIND of bundle a model ships as.
+/// Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
+/// compression flavor). Sources pre-IDL:
+///   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
+///   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
+///   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
+/// ---------------------------------------------------------------------------
+public enum RAModelArtifactType: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case singleFile // = 1
+  case tarGzArchive // = 2
+  case directory // = 3
+  case zipArchive // = 4
+  case custom // = 5
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .singleFile
+    case 2: self = .tarGzArchive
+    case 3: self = .directory
+    case 4: self = .zipArchive
+    case 5: self = .custom
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .singleFile: return 1
+    case .tarGzArchive: return 2
+    case .directory: return 3
+    case .zipArchive: return 4
+    case .custom: return 5
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAModelArtifactType] = [
+    .unspecified,
+    .singleFile,
+    .tarGzArchive,
+    .directory,
+    .zipArchive,
+    .custom,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
+/// Hardware acceleration preference for inference. Sources pre-IDL:
+///   Web    enums.ts:165   (Auto / WebGPU / CPU)
+///   Swift  extensions     (CPU / GPU / NPU / Metal)
+///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+/// Canonicalized union below.
+/// ---------------------------------------------------------------------------
+public enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case auto // = 1
+  case cpu // = 2
+  case gpu // = 3
+  case npu // = 4
+  case webgpu // = 5
+  case metal // = 6
+  case vulkan // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .auto
+    case 2: self = .cpu
+    case 3: self = .gpu
+    case 4: self = .npu
+    case 5: self = .webgpu
+    case 6: self = .metal
+    case 7: self = .vulkan
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .auto: return 1
+    case .cpu: return 2
+    case .gpu: return 3
+    case .npu: return 4
+    case .webgpu: return 5
+    case .metal: return 6
+    case .vulkan: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAAccelerationPreference] = [
+    .unspecified,
+    .auto,
+    .cpu,
+    .gpu,
+    .npu,
+    .webgpu,
+    .metal,
+    .vulkan,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
+/// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
+///   Web    enums.ts (RoutingPolicy)
+///          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
+///          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
+///   Swift  extensions (RoutingPolicy)
+/// Canonical short-form below; specific PreferLocal/PreferCloud cover the
+/// "preferred" cases, MANUAL covers explicit user override.
+/// ---------------------------------------------------------------------------
+public enum RARoutingPolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case preferLocal // = 1
+  case preferCloud // = 2
+  case costOptimized // = 3
+  case latencyOptimized // = 4
+  case manual // = 5
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .preferLocal
+    case 2: self = .preferCloud
+    case 3: self = .costOptimized
+    case 4: self = .latencyOptimized
+    case 5: self = .manual
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .preferLocal: return 1
+    case .preferCloud: return 2
+    case .costOptimized: return 3
+    case .latencyOptimized: return 4
+    case .manual: return 5
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RARoutingPolicy] = [
+    .unspecified,
+    .preferLocal,
+    .preferCloud,
+    .costOptimized,
+    .latencyOptimized,
+    .manual,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
 /// Core metadata for a model entry.
 /// Sources pre-IDL:
 ///   Swift  ModelTypes.swift:393       (16 fields)
@@ -771,6 +953,48 @@ public struct RAModelInfo: @unchecked Sendable {
     set {_uniqueStorage()._artifact = .builtIn(newValue)}
   }
 
+  /// High-level artifact classification, complementary to the `artifact`
+  /// oneof above. Allows catalog entries to carry a coarse type tag without
+  /// resolving the full strategy variant.
+  public var artifactType: RAModelArtifactType {
+    get {_storage._artifactType ?? .unspecified}
+    set {_uniqueStorage()._artifactType = newValue}
+  }
+  /// Returns true if `artifactType` has been explicitly set.
+  public var hasArtifactType: Bool {_storage._artifactType != nil}
+  /// Clears the value of `artifactType`. Subsequent reads from it will return its default value.
+  public mutating func clearArtifactType() {_uniqueStorage()._artifactType = nil}
+
+  /// Manifest of files that are expected on disk after fetch/extraction.
+  public var expectedFiles: RAExpectedModelFiles {
+    get {_storage._expectedFiles ?? RAExpectedModelFiles()}
+    set {_uniqueStorage()._expectedFiles = newValue}
+  }
+  /// Returns true if `expectedFiles` has been explicitly set.
+  public var hasExpectedFiles: Bool {_storage._expectedFiles != nil}
+  /// Clears the value of `expectedFiles`. Subsequent reads from it will return its default value.
+  public mutating func clearExpectedFiles() {_uniqueStorage()._expectedFiles = nil}
+
+  /// Preferred hardware acceleration backend for this model.
+  public var accelerationPreference: RAAccelerationPreference {
+    get {_storage._accelerationPreference ?? .unspecified}
+    set {_uniqueStorage()._accelerationPreference = newValue}
+  }
+  /// Returns true if `accelerationPreference` has been explicitly set.
+  public var hasAccelerationPreference: Bool {_storage._accelerationPreference != nil}
+  /// Clears the value of `accelerationPreference`. Subsequent reads from it will return its default value.
+  public mutating func clearAccelerationPreference() {_uniqueStorage()._accelerationPreference = nil}
+
+  /// Hybrid (on-device vs cloud) routing policy for this entry.
+  public var routingPolicy: RARoutingPolicy {
+    get {_storage._routingPolicy ?? .unspecified}
+    set {_uniqueStorage()._routingPolicy = newValue}
+  }
+  /// Returns true if `routingPolicy` has been explicitly set.
+  public var hasRoutingPolicy: Bool {_storage._routingPolicy != nil}
+  /// Clears the value of `routingPolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearRoutingPolicy() {_uniqueStorage()._routingPolicy = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum OneOf_Artifact: Equatable, Sendable {
@@ -830,9 +1054,34 @@ public struct RAModelFileDescriptor: Sendable {
 
   public var isRequired: Bool = false
 
+  /// Extended descriptor fields (Flutter model_types.dart:~350,
+  /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
+  /// canonical "required" flag — the documented `required` boolean from
+  /// newer SDK sources maps onto it (default true, mirrored in Swift).
+  public var sizeBytes: Int64 {
+    get {_sizeBytes ?? 0}
+    set {_sizeBytes = newValue}
+  }
+  /// Returns true if `sizeBytes` has been explicitly set.
+  public var hasSizeBytes: Bool {self._sizeBytes != nil}
+  /// Clears the value of `sizeBytes`. Subsequent reads from it will return its default value.
+  public mutating func clearSizeBytes() {self._sizeBytes = nil}
+
+  public var checksum: String {
+    get {_checksum ?? String()}
+    set {_checksum = newValue}
+  }
+  /// Returns true if `checksum` has been explicitly set.
+  public var hasChecksum: Bool {self._checksum != nil}
+  /// Clears the value of `checksum`. Subsequent reads from it will return its default value.
+  public mutating func clearChecksum() {self._checksum = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _sizeBytes: Int64? = nil
+  fileprivate var _checksum: String? = nil
 }
 
 public struct RAMultiFileArtifact: Sendable {
@@ -845,6 +1094,36 @@ public struct RAMultiFileArtifact: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+/// ---------------------------------------------------------------------------
+/// Declarative manifest of files a multi-file / directory model is expected
+/// to contain on disk after download/extraction. Used for verification before
+/// hand-off to the inference framework. Sources pre-IDL:
+///   Flutter core/types/model_types.dart:420
+///   Swift   ModelTypes.swift:~300
+/// ---------------------------------------------------------------------------
+public struct RAExpectedModelFiles: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var files: [RAModelFileDescriptor] = []
+
+  public var rootDirectory: String {
+    get {_rootDirectory ?? String()}
+    set {_rootDirectory = newValue}
+  }
+  /// Returns true if `rootDirectory` has been explicitly set.
+  public var hasRootDirectory: Bool {self._rootDirectory != nil}
+  /// Clears the value of `rootDirectory`. Subsequent reads from it will return its default value.
+  public mutating func clearRootDirectory() {self._rootDirectory = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _rootDirectory: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -883,9 +1162,21 @@ extension RAArchiveStructure: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ARCHIVE_STRUCTURE_UNSPECIFIED\0\u{1}ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED\0\u{1}ARCHIVE_STRUCTURE_DIRECTORY_BASED\0\u{1}ARCHIVE_STRUCTURE_NESTED_DIRECTORY\0\u{1}ARCHIVE_STRUCTURE_UNKNOWN\0")
 }
 
+extension RAModelArtifactType: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_ARTIFACT_TYPE_UNSPECIFIED\0\u{1}MODEL_ARTIFACT_TYPE_SINGLE_FILE\0\u{1}MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE\0\u{1}MODEL_ARTIFACT_TYPE_DIRECTORY\0\u{1}MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE\0\u{1}MODEL_ARTIFACT_TYPE_CUSTOM\0")
+}
+
+extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0\u{1}ACCELERATION_PREFERENCE_WEBGPU\0\u{1}ACCELERATION_PREFERENCE_METAL\0\u{1}ACCELERATION_PREFERENCE_VULKAN\0")
+}
+
+extension RARoutingPolicy: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ROUTING_POLICY_UNSPECIFIED\0\u{1}ROUTING_POLICY_PREFER_LOCAL\0\u{1}ROUTING_POLICY_PREFER_CLOUD\0\u{1}ROUTING_POLICY_COST_OPTIMIZED\0\u{1}ROUTING_POLICY_LATENCY_OPTIMIZED\0\u{1}ROUTING_POLICY_MANUAL\0")
+}
+
 extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{1}description\0\u{1}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{4}\u{5}single_file\0\u{1}archive\0\u{3}multi_file\0\u{3}custom_strategy_id\0\u{3}built_in\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{1}description\0\u{1}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{4}\u{5}single_file\0\u{1}archive\0\u{3}multi_file\0\u{3}custom_strategy_id\0\u{3}built_in\0\u{3}artifact_type\0\u{3}expected_files\0\u{3}acceleration_preference\0\u{3}routing_policy\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -904,6 +1195,10 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     var _createdAtUnixMs: Int64 = 0
     var _updatedAtUnixMs: Int64 = 0
     var _artifact: RAModelInfo.OneOf_Artifact?
+    var _artifactType: RAModelArtifactType? = nil
+    var _expectedFiles: RAExpectedModelFiles? = nil
+    var _accelerationPreference: RAAccelerationPreference? = nil
+    var _routingPolicy: RARoutingPolicy? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -930,6 +1225,10 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       _createdAtUnixMs = source._createdAtUnixMs
       _updatedAtUnixMs = source._updatedAtUnixMs
       _artifact = source._artifact
+      _artifactType = source._artifactType
+      _expectedFiles = source._expectedFiles
+      _accelerationPreference = source._accelerationPreference
+      _routingPolicy = source._routingPolicy
     }
   }
 
@@ -1018,6 +1317,10 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
             _storage._artifact = .builtIn(v)
           }
         }()
+        case 25: try { try decoder.decodeSingularEnumField(value: &_storage._artifactType) }()
+        case 26: try { try decoder.decodeSingularMessageField(value: &_storage._expectedFiles) }()
+        case 27: try { try decoder.decodeSingularEnumField(value: &_storage._accelerationPreference) }()
+        case 28: try { try decoder.decodeSingularEnumField(value: &_storage._routingPolicy) }()
         default: break
         }
       }
@@ -1098,6 +1401,18 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       }()
       case nil: break
       }
+      try { if let v = _storage._artifactType {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 25)
+      } }()
+      try { if let v = _storage._expectedFiles {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
+      } }()
+      try { if let v = _storage._accelerationPreference {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 27)
+      } }()
+      try { if let v = _storage._routingPolicy {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 28)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1123,6 +1438,10 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
         if _storage._createdAtUnixMs != rhs_storage._createdAtUnixMs {return false}
         if _storage._updatedAtUnixMs != rhs_storage._updatedAtUnixMs {return false}
         if _storage._artifact != rhs_storage._artifact {return false}
+        if _storage._artifactType != rhs_storage._artifactType {return false}
+        if _storage._expectedFiles != rhs_storage._expectedFiles {return false}
+        if _storage._accelerationPreference != rhs_storage._accelerationPreference {return false}
+        if _storage._routingPolicy != rhs_storage._routingPolicy {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1214,7 +1533,7 @@ extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{1}checksum\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1225,12 +1544,18 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.filename) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.isRequired) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self._sizeBytes) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._checksum) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.url.isEmpty {
       try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
     }
@@ -1240,6 +1565,12 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if self.isRequired != false {
       try visitor.visitSingularBoolField(value: self.isRequired, fieldNumber: 3)
     }
+    try { if let v = self._sizeBytes {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._checksum {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1247,6 +1578,8 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs.url != rhs.url {return false}
     if lhs.filename != rhs.filename {return false}
     if lhs.isRequired != rhs.isRequired {return false}
+    if lhs._sizeBytes != rhs._sizeBytes {return false}
+    if lhs._checksum != rhs._checksum {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1277,6 +1610,45 @@ extension RAMultiFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
   public static func ==(lhs: RAMultiFileArtifact, rhs: RAMultiFileArtifact) -> Bool {
     if lhs.files != rhs.files {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAExpectedModelFiles: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ExpectedModelFiles"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}files\0\u{3}root_directory\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.files) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._rootDirectory) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.files.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.files, fieldNumber: 1)
+    }
+    try { if let v = self._rootDirectory {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAExpectedModelFiles, rhs: RAExpectedModelFiles) -> Bool {
+    if lhs.files != rhs.files {return false}
+    if lhs._rootDirectory != rhs._rootDirectory {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

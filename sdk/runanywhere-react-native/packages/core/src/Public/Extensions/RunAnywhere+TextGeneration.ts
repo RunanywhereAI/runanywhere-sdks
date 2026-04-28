@@ -14,13 +14,12 @@ import {
   requireNativeModule,
   isNativeModuleAvailable,
 } from '../../native';
-import type { GenerationOptions, GenerationResult } from '../../types';
-import { ExecutionTarget, HardwareAcceleration } from '../../types';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type {
-  LLMStreamingResult,
+  LLMGenerationOptions,
   LLMGenerationResult,
-} from '../../types/LLMTypes';
+  StreamToken,
+} from '@runanywhere/proto-ts/llm_options';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 
@@ -83,13 +82,13 @@ export async function chat(prompt: string): Promise<string> {
 }
 
 /**
- * Text generation with options and full metrics
+ * Text generation with options and full metrics.
  * Matches Swift SDK: RunAnywhere.generate(_:options:)
  */
 export async function generate(
   prompt: string,
-  options?: GenerationOptions
-): Promise<GenerationResult> {
+  options?: LLMGenerationOptions
+): Promise<LLMGenerationResult> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
@@ -108,22 +107,17 @@ export async function generate(
     return {
       text: result.text ?? '',
       thinkingContent: result.thinkingContent,
-      tokensUsed: result.tokensUsed ?? 0,
+      inputTokens: result.inputTokens ?? Math.ceil(prompt.length / 4),
+      tokensGenerated: result.tokensGenerated ?? result.tokensUsed ?? 0,
       modelUsed: result.modelUsed ?? 'unknown',
-      latencyMs: result.latencyMs ?? 0,
-      executionTarget: result.executionTarget ?? 0,
-      savedAmount: result.savedAmount ?? 0,
+      generationTimeMs: result.generationTimeMs ?? result.latencyMs ?? 0,
+      ttftMs: result.ttftMs ?? result.performanceMetrics?.timeToFirstTokenMs,
+      tokensPerSecond: result.tokensPerSecond ?? result.performanceMetrics?.tokensPerSecond ?? 0,
       framework: result.framework,
-      hardwareUsed: result.hardwareUsed ?? 0,
-      memoryUsed: result.memoryUsed ?? 0,
-      performanceMetrics: {
-        timeToFirstTokenMs: result.performanceMetrics?.timeToFirstTokenMs,
-        tokensPerSecond: result.performanceMetrics?.tokensPerSecond,
-        inferenceTimeMs:
-          result.performanceMetrics?.inferenceTimeMs ?? result.latencyMs ?? 0,
-      },
-      thinkingTokens: result.thinkingTokens,
+      finishReason: result.finishReason ?? 'stop',
+      thinkingTokens: result.thinkingTokens ?? 0,
       responseTokens: result.responseTokens ?? result.tokensUsed ?? 0,
+      jsonOutput: result.jsonOutput,
     };
   } catch {
     if (resultJson.includes('error')) {
@@ -131,70 +125,41 @@ export async function generate(
     }
     return {
       text: resultJson,
-      tokensUsed: 0,
+      inputTokens: 0,
+      tokensGenerated: 0,
       modelUsed: 'unknown',
-      latencyMs: 0,
-      executionTarget: ExecutionTarget.OnDevice,
-      savedAmount: 0,
-      hardwareUsed: HardwareAcceleration.CPU,
-      memoryUsed: 0,
-      performanceMetrics: {
-        inferenceTimeMs: 0,
-      },
+      generationTimeMs: 0,
+      tokensPerSecond: 0,
+      finishReason: 'stop',
+      thinkingTokens: 0,
       responseTokens: 0,
     };
   }
 }
 
 /**
- * Streaming text generation with async iterator
+ * Streaming text generation — canonical cross-SDK signature.
  *
- * Returns a LLMStreamingResult containing:
- * - stream: AsyncIterable<string> for consuming tokens
- * - result: Promise<LLMGenerationResult> for final metrics
- * - cancel: Function to cancel generation
+ * Returns an AsyncIterable<StreamToken> where each token carries `.text`,
+ * `.timestampMs`, and `.index` (proto StreamToken shape).
  *
  * Matches Swift SDK: RunAnywhere.generateStream(_:options:)
  *
  * Wire-up: tokens are pushed by C++ via the struct-callback
  * `(token: string, isComplete: boolean) => void` passed to
- * `native.generateStream(...)`. The callback batches at ~50 ms inside
- * `HybridRunAnywhereLlama.cpp` and emits a terminal call with
- * `isComplete = true`. We adopt the same single-channel pattern as the
- * VLM streaming path (`RunAnywhere+VLM.ts::processImageStream`) — no
- * separate proto-byte channel, no `LLMStreamAdapter`. This fixes
- * B-RN-4-001 where the LLM `LLMStreamAdapter`/`subscribeProtoEvents`
- * channel never delivered tokens, leaving awaiters hung even though
- * C++ generation completed.
- *
- * Example usage:
- * ```typescript
- * const streaming = await generateStream(prompt);
- *
- * // Display tokens in real-time
- * for await (const token of streaming.stream) {
- *   console.log(token);
- * }
- *
- * // Get complete analytics after streaming finishes
- * const metrics = await streaming.result;
- * console.log(`Speed: ${metrics.tokensPerSecond} tok/s`);
- * ```
+ * `native.generateStream(...)`.
  */
-export async function generateStream(
+export async function* generateStream(
   prompt: string,
-  options?: GenerationOptions
-): Promise<LLMStreamingResult> {
+  options?: LLMGenerationOptions
+): AsyncIterable<StreamToken> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
 
   const native = requireNativeModule();
-  const startTime = Date.now();
-  let firstTokenTime: number | null = null;
-  let fullText = '';
-  let tokenCount = 0;
   let cancelled = false;
+  let index = 0;
 
   const optionsJson = JSON.stringify({
     max_tokens: options?.maxTokens ?? 1000,
@@ -202,66 +167,30 @@ export async function generateStream(
     system_prompt: options?.systemPrompt ?? null,
   });
 
-  let resolveResult!: (result: LLMGenerationResult) => void;
-  let rejectResult!: (error: Error) => void;
-  const resultPromise = new Promise<LLMGenerationResult>((resolve, reject) => {
-    resolveResult = resolve;
-    rejectResult = reject;
-  });
-
-  // Producer/consumer queue fed by the C++ struct-callback. When a token
-  // arrives we either hand it directly to a pending awaiter or buffer it.
-  const tokenQueue: string[] = [];
-  let resolver: ((value: IteratorResult<string>) => void) | null = null;
+  const tokenQueue: StreamToken[] = [];
+  let resolver: ((value: IteratorResult<StreamToken>) => void) | null = null;
   let done = false;
   let error: Error | null = null;
 
-  const finalizeResult = (): void => {
-    const latencyMs = Date.now() - startTime;
-    const tokensPerSecond =
-      latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0;
-    resolveResult({
-      text: fullText,
-      thinkingContent: undefined,
-      inputTokens: Math.ceil(prompt.length / 4),
-      tokensUsed: tokenCount,
-      modelUsed: 'unknown',
-      latencyMs,
-      framework: 'unknown', // Backend-agnostic
-      tokensPerSecond,
-      timeToFirstTokenMs:
-        firstTokenTime !== null ? firstTokenTime - startTime : undefined,
-      thinkingTokens: 0,
-      responseTokens: tokenCount,
-    });
-    EventBus.publish('Generation', { type: 'completed' });
-  };
-
-  // Drive the C++ engine. Tokens flow through the struct-callback —
-  // this is the same pattern used by VLM streaming (RN-14 confirmed).
   native
     .generateStream(prompt, optionsJson, (token: string, isComplete: boolean) => {
       if (cancelled) return;
 
       if (token) {
-        if (firstTokenTime === null) firstTokenTime = Date.now();
-        fullText += token;
-        tokenCount++;
-
+        const st: StreamToken = { text: token, timestampMs: Date.now(), index: index++ };
         if (resolver) {
-          resolver({ value: token, done: false });
+          resolver({ value: st, done: false });
           resolver = null;
         } else {
-          tokenQueue.push(token);
+          tokenQueue.push(st);
         }
       }
 
       if (isComplete) {
         done = true;
-        finalizeResult();
-
+        EventBus.publish('Generation', { type: 'completed' });
         if (resolver) {
-          resolver({ value: undefined as unknown as string, done: true });
+          resolver({ value: undefined as unknown as StreamToken, done: true });
           resolver = null;
         }
       }
@@ -269,46 +198,27 @@ export async function generateStream(
     .catch((err: Error) => {
       error = err;
       done = true;
-      rejectResult(err);
       EventBus.publish('Generation', { type: 'failed', error: err.message });
       if (resolver) {
-        resolver({ value: undefined as unknown as string, done: true });
+        resolver({ value: undefined as unknown as StreamToken, done: true });
         resolver = null;
       }
     });
 
-  async function* tokenGenerator(): AsyncGenerator<string> {
-    while (!done || tokenQueue.length > 0) {
-      if (tokenQueue.length > 0) {
-        yield tokenQueue.shift()!;
-      } else if (!done) {
-        const next = await new Promise<IteratorResult<string>>((resolve) => {
-          resolver = resolve;
-        });
-        if (next.done) break;
-        yield next.value;
-      }
-    }
-    if (error) {
-      throw error;
+  while (!done || tokenQueue.length > 0) {
+    if (tokenQueue.length > 0) {
+      yield tokenQueue.shift()!;
+    } else if (!done) {
+      const next = await new Promise<IteratorResult<StreamToken>>((resolve) => {
+        resolver = resolve;
+      });
+      if (next.done) break;
+      yield next.value;
     }
   }
-
-  const cancel = (): void => {
-    cancelled = true;
-    cancelGeneration();
-    if (resolver) {
-      done = true;
-      resolver({ value: undefined as unknown as string, done: true });
-      resolver = null;
-    }
-  };
-
-  return {
-    stream: tokenGenerator(),
-    result: resultPromise,
-    cancel,
-  };
+  if (error) throw error;
+  // Allow callers to cancel via generator.return()
+  void cancelled;
 }
 
 /**

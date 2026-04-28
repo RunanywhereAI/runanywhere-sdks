@@ -21,6 +21,15 @@ import type {
 } from '@runanywhere/core';
 import { VLMImageFormat } from '@runanywhere/core';
 
+/** Encode a `Uint8Array` to a base64 string. */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binaryString = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binaryString += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binaryString);
+}
+
 const logger = new SDKLogger('RunAnywhere.VLM');
 
 // ============================================================================
@@ -197,7 +206,10 @@ export async function processImage(
       text: result.text ?? '',
       promptTokens: result.prompt_tokens ?? 0,
       completionTokens: result.completion_tokens ?? 0,
-      totalTimeMs: result.total_time_ms ?? 0,
+      totalTokens:
+        result.total_tokens ??
+        (result.prompt_tokens ?? 0) + (result.completion_tokens ?? 0),
+      processingTimeMs: result.total_time_ms ?? result.processing_time_ms ?? 0,
       tokensPerSecond: result.tokens_per_second ?? 0,
     };
   } catch {
@@ -208,7 +220,8 @@ export async function processImage(
       text: resultJson,
       promptTokens: 0,
       completionTokens: 0,
-      totalTimeMs: 0,
+      totalTokens: 0,
+      processingTimeMs: 0,
       tokensPerSecond: 0,
     };
   }
@@ -321,11 +334,13 @@ export async function processImageStream(
             const tokensPerSecond =
               latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0;
 
+            const promptTokens = Math.ceil(prompt.length / 4);
             const finalResult: VLMResult = {
               text: fullText,
-              promptTokens: Math.ceil(prompt.length / 4),
+              promptTokens,
               completionTokens: tokenCount,
-              totalTimeMs: latencyMs,
+              totalTokens: promptTokens + tokenCount,
+              processingTimeMs: latencyMs,
               tokensPerSecond,
             };
 
@@ -400,7 +415,11 @@ export function cancelVLMGeneration(): void {
 // ============================================================================
 
 /**
- * Convert VLMImage discriminated union to native parameters
+ * Convert proto `VLMImage` to native bridge parameters.
+ *
+ * The native side expects a numeric image format compatible with
+ * `rac_vlm_image_format_t` (FILE_PATH, RGB_PIXELS, BASE64). We map the
+ * proto enum values onto the C-ABI dispatch space.
  * @internal
  */
 function convertVLMImageToNative(image: VLMImage): {
@@ -410,46 +429,55 @@ function convertVLMImageToNative(image: VLMImage): {
   imageHeight: number;
 } {
   switch (image.format) {
-    case VLMImageFormat.FilePath:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH: {
+      const filePath = image.filePath ?? '';
+      if (!filePath) throw new Error('VLMImage.filePath is required for FILE_PATH format');
       return {
-        imageFormat: VLMImageFormat.FilePath,
-        imageData: image.filePath,
-        imageWidth: 0,
-        imageHeight: 0,
+        imageFormat: VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
+        imageData: filePath,
+        imageWidth: image.width ?? 0,
+        imageHeight: image.height ?? 0,
       };
+    }
 
-    case VLMImageFormat.RGBPixels:
-      // Convert Uint8Array to base64 string for bridge crossing
-      const base64Data = uint8ArrayToBase64(image.data);
+    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA: {
+      const rawBytes = image.rawRgb;
+      if (!rawBytes) throw new Error('VLMImage.rawRgb is required for RAW pixel format');
       return {
-        imageFormat: VLMImageFormat.RGBPixels,
-        imageData: base64Data,
+        imageFormat: image.format,
+        imageData: uint8ArrayToBase64(rawBytes),
         imageWidth: image.width,
         imageHeight: image.height,
       };
+    }
 
-    case VLMImageFormat.Base64:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_BASE64: {
+      const base64 = image.base64 ?? '';
+      if (!base64) throw new Error('VLMImage.base64 is required for BASE64 format');
       return {
-        imageFormat: VLMImageFormat.Base64,
-        imageData: image.base64,
-        imageWidth: 0,
-        imageHeight: 0,
+        imageFormat: VLMImageFormat.VLM_IMAGE_FORMAT_BASE64,
+        imageData: base64,
+        imageWidth: image.width ?? 0,
+        imageHeight: image.height ?? 0,
       };
+    }
+
+    case VLMImageFormat.VLM_IMAGE_FORMAT_JPEG:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_PNG:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_WEBP: {
+      const encoded = image.encoded;
+      if (!encoded)
+        throw new Error('VLMImage.encoded is required for encoded image formats');
+      return {
+        imageFormat: image.format,
+        imageData: uint8ArrayToBase64(encoded),
+        imageWidth: image.width ?? 0,
+        imageHeight: image.height ?? 0,
+      };
+    }
 
     default:
-      throw new Error(`Unknown VLM image format: ${(image as VLMImage).format}`);
+      throw new Error(`Unknown VLM image format: ${image.format}`);
   }
-}
-
-/**
- * Convert Uint8Array to base64 string
- * @internal
- */
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  // Use btoa with binary string conversion
-  let binaryString = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binaryString += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binaryString);
 }

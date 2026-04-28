@@ -20,10 +20,10 @@ public extension RunAnywhere {
     /// Must be called before ingesting documents or running queries.
     ///
     /// - Parameter config: RAG pipeline configuration (model paths, tuning parameters)
-    /// - Throws: `SDKError` if the SDK is not initialized or pipeline creation fails
+    /// - Throws: `SDKException` if the SDK is not initialized or pipeline creation fails
     static func ragCreatePipeline(config: RAGConfiguration) async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
@@ -47,10 +47,10 @@ public extension RunAnywhere {
     /// - Parameters:
     ///   - text: Plain text content of the document
     ///   - metadataJSON: Optional JSON string attached to all chunks from this document
-    /// - Throws: `SDKError` if the SDK or pipeline is not ready, or ingestion fails
+    /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails
     static func ragIngest(text: String, metadataJSON: String? = nil) async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
@@ -66,10 +66,10 @@ public extension RunAnywhere {
 
     /// Clear all previously ingested documents from the pipeline.
     ///
-    /// - Throws: `SDKError` if the SDK is not initialized or the pipeline is not ready
+    /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready
     static func ragClearDocuments() async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await CppBridge.RAG.shared.clearDocuments()
     }
@@ -93,10 +93,10 @@ public extension RunAnywhere {
     ///   - options: Optional query parameters (temperature, max tokens, etc.).
     ///              Pass `nil` to use defaults derived from the question.
     /// - Returns: A `RAGResult` containing the generated answer and retrieved chunks
-    /// - Throws: `SDKError` if the SDK or pipeline is not ready, or the query fails
+    /// - Throws: `SDKException` if the SDK or pipeline is not ready, or the query fails
     static func ragQuery(question: String, options: RAGQueryOptions? = nil) async throws -> RAGResult {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 

@@ -66,6 +66,85 @@ export function toolParameterTypeToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Tool-call wire formats various LLM families emit. Strongly-typed counterpart
+ * to `ToolCallingOptions.format_hint` (which remains a free-form string for
+ * back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
+ * 1:1 to this enum).
+ *
+ * Drift across SDKs:
+ *   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
+ *     today only exposes `default` and `lfm2` constants on a string-typed
+ *     field — it is not yet an enum.
+ *   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
+ * This enum is the union of formats LLM families actually emit; SDK frontends
+ * should map their existing strings onto these values when surfacing the
+ * strongly-typed field. Keep `format_hint` (string) populated for legacy
+ * consumers until all SDKs migrate.
+ * ---------------------------------------------------------------------------
+ */
+export var ToolCallFormatName;
+(function (ToolCallFormatName) {
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_UNSPECIFIED"] = 0] = "TOOL_CALL_FORMAT_NAME_UNSPECIFIED";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_JSON"] = 1] = "TOOL_CALL_FORMAT_NAME_JSON";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_XML"] = 2] = "TOOL_CALL_FORMAT_NAME_XML";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_NATIVE"] = 3] = "TOOL_CALL_FORMAT_NAME_NATIVE";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_PYTHONIC"] = 4] = "TOOL_CALL_FORMAT_NAME_PYTHONIC";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS"] = 5] = "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_HERMES"] = 6] = "TOOL_CALL_FORMAT_NAME_HERMES";
+    ToolCallFormatName[ToolCallFormatName["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ToolCallFormatName || (ToolCallFormatName = {}));
+export function toolCallFormatNameFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "TOOL_CALL_FORMAT_NAME_UNSPECIFIED":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED;
+        case 1:
+        case "TOOL_CALL_FORMAT_NAME_JSON":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
+        case 2:
+        case "TOOL_CALL_FORMAT_NAME_XML":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML;
+        case 3:
+        case "TOOL_CALL_FORMAT_NAME_NATIVE":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE;
+        case 4:
+        case "TOOL_CALL_FORMAT_NAME_PYTHONIC":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC;
+        case 5:
+        case "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS;
+        case 6:
+        case "TOOL_CALL_FORMAT_NAME_HERMES":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ToolCallFormatName.UNRECOGNIZED;
+    }
+}
+export function toolCallFormatNameToJSON(object) {
+    switch (object) {
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED:
+            return "TOOL_CALL_FORMAT_NAME_UNSPECIFIED";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON:
+            return "TOOL_CALL_FORMAT_NAME_JSON";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML:
+            return "TOOL_CALL_FORMAT_NAME_XML";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE:
+            return "TOOL_CALL_FORMAT_NAME_NATIVE";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC:
+            return "TOOL_CALL_FORMAT_NAME_PYTHONIC";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS:
+            return "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES:
+            return "TOOL_CALL_FORMAT_NAME_HERMES";
+        case ToolCallFormatName.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseToolValue() {
     return {
         stringValue: undefined,
@@ -780,6 +859,8 @@ function createBaseToolCallingOptions() {
         replaceSystemPrompt: false,
         keepToolsAvailable: false,
         formatHint: "",
+        format: undefined,
+        customSystemPrompt: undefined,
     };
 }
 export const ToolCallingOptions = {
@@ -810,6 +891,12 @@ export const ToolCallingOptions = {
         }
         if (message.formatHint !== "") {
             writer.uint32(74).string(message.formatHint);
+        }
+        if (message.format !== undefined) {
+            writer.uint32(80).int32(message.format);
+        }
+        if (message.customSystemPrompt !== undefined) {
+            writer.uint32(90).string(message.customSystemPrompt);
         }
         return writer;
     },
@@ -874,6 +961,18 @@ export const ToolCallingOptions = {
                     }
                     message.formatHint = reader.string();
                     continue;
+                case 10:
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.format = reader.int32();
+                    continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.customSystemPrompt = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -893,6 +992,8 @@ export const ToolCallingOptions = {
             replaceSystemPrompt: isSet(object.replaceSystemPrompt) ? globalThis.Boolean(object.replaceSystemPrompt) : false,
             keepToolsAvailable: isSet(object.keepToolsAvailable) ? globalThis.Boolean(object.keepToolsAvailable) : false,
             formatHint: isSet(object.formatHint) ? globalThis.String(object.formatHint) : "",
+            format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
+            customSystemPrompt: isSet(object.customSystemPrompt) ? globalThis.String(object.customSystemPrompt) : undefined,
         };
     },
     toJSON(message) {
@@ -924,6 +1025,12 @@ export const ToolCallingOptions = {
         if (message.formatHint !== "") {
             obj.formatHint = message.formatHint;
         }
+        if (message.format !== undefined) {
+            obj.format = toolCallFormatNameToJSON(message.format);
+        }
+        if (message.customSystemPrompt !== undefined) {
+            obj.customSystemPrompt = message.customSystemPrompt;
+        }
         return obj;
     },
     create(base) {
@@ -940,6 +1047,8 @@ export const ToolCallingOptions = {
         message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
         message.keepToolsAvailable = object.keepToolsAvailable ?? false;
         message.formatHint = object.formatHint ?? "";
+        message.format = object.format ?? undefined;
+        message.customSystemPrompt = object.customSystemPrompt ?? undefined;
         return message;
     },
 };

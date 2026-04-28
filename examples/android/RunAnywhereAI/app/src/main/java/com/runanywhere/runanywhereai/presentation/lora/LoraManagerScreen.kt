@@ -81,8 +81,8 @@ fun LoraManagerScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            items(state.loadedAdapters, key = { it.path }) { adapter ->
-                val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
+            items(state.loadedAdapters, key = { it.adapter_path }) { adapter ->
+                val examplePrompts = remember(adapter.adapter_path) { LoraExamplePrompts.forAdapterPath(adapter.adapter_path) }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -101,7 +101,7 @@ fun LoraManagerScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    adapter.path.substringAfterLast("/"),
+                                    adapter.adapter_path.substringAfterLast("/"),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                 )
@@ -112,7 +112,7 @@ fun LoraManagerScreen(
                                 )
                             }
                             Button(
-                                onClick = { loraViewModel.unloadAdapter(adapter.path) },
+                                onClick = { loraViewModel.unloadAdapter(adapter.adapter_path) },
                                 colors =
                                     ButtonDefaults.buttonColors(
                                         containerColor = AppColors.primaryRed.copy(alpha = 0.1f),

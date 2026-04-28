@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -429,13 +429,13 @@ object CppBridgeVAD {
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("VAD component not created")
+                throw SDKException.notInitialized("VAD component not created")
             }
             return handle
         }
@@ -495,7 +495,7 @@ object CppBridgeVAD {
                     TAG,
                     "Native library not loaded. VAD inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create VAD component via RunAnywhereBridge
@@ -508,7 +508,7 @@ object CppBridgeVAD {
                         TAG,
                         "VAD component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
+                    throw SDKException.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -629,13 +629,13 @@ object CppBridgeVAD {
      * @param audioData Raw audio data bytes
      * @param config Detection configuration (optional)
      * @return The detection result
-     * @throws SDKError if detection fails
+     * @throws SDKException if detection fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun process(audioData: ByteArray, config: DetectionConfig = DetectionConfig.DEFAULT): DetectionResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
-                throw SDKError.vad("VAD component not ready for detection")
+                throw SDKException.vad("VAD component not ready for detection")
             }
 
             isCancelled = false
@@ -658,7 +658,7 @@ object CppBridgeVAD {
             try {
                 val resultJson =
                     RunAnywhereBridge.racVadComponentProcess(handle, audioData, config.toJson())
-                        ?: throw SDKError.vad("Detection failed: null result")
+                        ?: throw SDKException.vad("Detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -679,7 +679,7 @@ object CppBridgeVAD {
                 return result
             } catch (e: Exception) {
                 setState(VADState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.vad("Detection failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.vad("Detection failed: ${e.message}")
             }
         }
     }
@@ -691,9 +691,9 @@ object CppBridgeVAD {
      * @param config Detection configuration (optional)
      * @param callback Callback for frame results
      * @return The final detection result
-     * @throws SDKError if detection fails
+     * @throws SDKException if detection fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun processStream(
         audioData: ByteArray,
         config: DetectionConfig = DetectionConfig.DEFAULT,
@@ -701,7 +701,7 @@ object CppBridgeVAD {
     ): DetectionResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
-                throw SDKError.vad("VAD component not ready for detection")
+                throw SDKException.vad("VAD component not ready for detection")
             }
 
             isCancelled = false
@@ -725,7 +725,7 @@ object CppBridgeVAD {
             try {
                 val resultJson =
                     RunAnywhereBridge.racVadComponentProcessStream(handle, audioData, config.toJson())
-                        ?: throw SDKError.vad("Streaming detection failed: null result")
+                        ?: throw SDKException.vad("Streaming detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -748,7 +748,7 @@ object CppBridgeVAD {
             } catch (e: Exception) {
                 setState(VADState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.vad("Streaming detection failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.vad("Streaming detection failed: ${e.message}")
             }
         }
     }
@@ -759,23 +759,23 @@ object CppBridgeVAD {
      * @param audioData Raw audio data bytes for the frame
      * @param config Detection configuration (optional)
      * @return The frame result
-     * @throws SDKError if processing fails
+     * @throws SDKException if processing fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun processFrame(audioData: ByteArray, config: DetectionConfig = DetectionConfig.DEFAULT): FrameResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
-                throw SDKError.vad("VAD component not ready for detection")
+                throw SDKException.vad("VAD component not ready for detection")
             }
 
             try {
                 val resultJson =
                     RunAnywhereBridge.racVadComponentProcessFrame(handle, audioData, config.toJson())
-                        ?: throw SDKError.vad("Frame processing failed: null result")
+                        ?: throw SDKException.vad("Frame processing failed: null result")
 
                 return parseFrameResult(resultJson)
             } catch (e: Exception) {
-                throw if (e is SDKError) e else SDKError.vad("Frame processing failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.vad("Frame processing failed: ${e.message}")
             }
         }
     }

@@ -18,7 +18,7 @@
  */
 
 import {
-  SDKError,
+  SDKException,
   SDKErrorCode,
   SDKLogger,
   EventBus,
@@ -215,7 +215,7 @@ export class LlamaCppBridge {
 
   get module(): LlamaCppModule {
     if (!this._module) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMNotLoaded,
         'LlamaCpp WASM not loaded. Call LlamaCPP.register() first.',
       );
@@ -407,7 +407,7 @@ export class LlamaCppBridge {
       this._loaded = false;
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load LlamaCpp WASM: ${message}`);
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMLoadFailed,
         `Failed to load LlamaCpp WASM module: ${message}`,
       );
@@ -676,7 +676,7 @@ export class LlamaCppBridge {
     if (result !== 0) {
       const errMsgPtr = this.module._rac_error_message(result);
       const errMsg = this.readString(errMsgPtr);
-      throw new SDKError(SDKErrorCode.BackendError, `${operation}: ${errMsg}`);
+      throw new SDKException(SDKErrorCode.BackendError, `${operation}: ${errMsg}`);
     }
   }
 
@@ -691,7 +691,7 @@ export class LlamaCppBridge {
     args: unknown[],
     opts?: { async?: boolean },
   ): T {
-    if (!this._module) throw new SDKError(SDKErrorCode.WASMNotLoaded, 'LlamaCpp WASM not loaded');
+    if (!this._module) throw new SDKException(SDKErrorCode.WASMNotLoaded, 'LlamaCpp WASM not loaded');
     return this._module.ccall(funcName, returnType, argTypes, args, opts) as T;
   }
 

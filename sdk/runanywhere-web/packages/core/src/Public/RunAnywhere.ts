@@ -27,13 +27,28 @@ import { ExtensionRegistry } from '../Infrastructure/ExtensionRegistry';
 import { ExtensionPoint } from '../Infrastructure/ExtensionPoint';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSStorage } from '../Infrastructure/OPFSStorage';
-import { SDKError, SDKErrorCode } from '../Foundation/ErrorTypes';
+import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import * as Convenience from './Extensions/RunAnywhere+Convenience';
 import * as LoRAExt from './Extensions/RunAnywhere+LoRA';
 import * as RAGExt from './Extensions/RunAnywhere+RAG';
 import * as VoiceAgentExt from './Extensions/RunAnywhere+VoiceAgent';
+import { Storage as StorageCapability } from './Extensions/RunAnywhere+Storage';
+import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
+import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
+import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
+import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
+import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
+import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
+import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
+import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+import { VLMModels as VLMModelsCapability } from './Extensions/RunAnywhere+VLMModels';
+import { Diffusion as DiffusionCapability } from './Extensions/RunAnywhere+Diffusion';
+import { ModelManagement as ModelManagementCapability } from './Extensions/RunAnywhere+ModelManagement';
+import { ModelAssignments as ModelAssignmentsCapability } from './Extensions/RunAnywhere+ModelAssignments';
+import { Frameworks as FrameworksCapability } from './Extensions/RunAnywhere+Frameworks';
+import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
 import { ModelRegistryAdapter, type RefreshOptions } from '../Adapters/ModelRegistryAdapter';
 
 /**
@@ -223,7 +238,8 @@ export const RunAnywhere = {
         // where it's missing (very old browsers, some SSR contexts) instead
         // of surfacing a confusing error deep inside a model download.
         if (typeof ReadableStream === 'undefined') {
-          throw new SDKError(
+          // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+          throw SDKException.fromCode(
             SDKErrorCode.InitializationFailed,
             'ReadableStream is not available in this environment. ' +
             'The RunAnywhere Web SDK requires the Fetch Streams API ' +
@@ -594,6 +610,55 @@ export const RunAnywhere = {
   // =========================================================================
 
   solutions: SolutionsCapability,
+
+  // =========================================================================
+  // Phase C-prime namespace extensions — symmetric with Swift / Kotlin / RN.
+  // =========================================================================
+
+  /** Storage info / persistence — `RunAnywhere.storage.info()` etc. */
+  storage: StorageCapability,
+
+  /** Plugin/extension management — `RunAnywhere.plugins.register(ext)` etc. */
+  plugins: PluginLoaderCapability,
+
+  /** VAD namespace — `RunAnywhere.vad.detect(audio)` etc. */
+  vad: VADCapability,
+
+  /** Text generation — `RunAnywhere.textGeneration.generate(options)` etc. */
+  textGeneration: TextGenerationCapability,
+
+  /** Structured output — `RunAnywhere.structuredOutput.generate(prompt, schema)` */
+  structuredOutput: StructuredOutputCapability,
+
+  /** Tool calling — `RunAnywhere.toolCalling.generate(prompt, tools)` */
+  toolCalling: ToolCallingCapability,
+
+  /** Speech-to-text — `RunAnywhere.stt.transcribe(audio)` */
+  stt: STTCapability,
+
+  /** Text-to-speech — `RunAnywhere.tts.synthesize(text)` */
+  tts: TTSCapability,
+
+  /** Vision-language models — `RunAnywhere.visionLanguage.generate(options)` */
+  visionLanguage: VisionLanguageCapability,
+
+  /** VLM model catalog — `RunAnywhere.vlmModels.list()` */
+  vlmModels: VLMModelsCapability,
+
+  /** Image diffusion — `RunAnywhere.diffusion.generate(options)` */
+  diffusion: DiffusionCapability,
+
+  /** Model lifecycle — `RunAnywhere.modelManagement.list()` / `.download()` etc. */
+  modelManagement: ModelManagementCapability,
+
+  /** Role→model mappings — `RunAnywhere.modelAssignments.set(role, modelId)` */
+  modelAssignments: ModelAssignmentsCapability,
+
+  /** Registered backend frameworks — `RunAnywhere.frameworks.list()` */
+  frameworks: FrameworksCapability,
+
+  /** Logging control — `RunAnywhere.logging.setLevel(LogLevel.Debug)` */
+  logging: LoggingCapability,
 
   // =========================================================================
   // Shutdown

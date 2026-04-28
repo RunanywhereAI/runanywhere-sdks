@@ -19,14 +19,14 @@
  *   - `allRegisteredLoraAdapters() -> LoraAdapterCatalogEntry[]`
  */
 
-import { SDKError } from '../../Foundation/ErrorTypes';
+import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import type {
   LoRAAdapterConfig,
   LoRAAdapterInfo,
   LoraAdapterCatalogEntry,
   LoraCompatibilityResult,
-} from '../../types/LoRATypes';
+} from '@runanywhere/proto-ts/lora_options';
 
 const logger = new SDKLogger('LoRA');
 
@@ -54,7 +54,8 @@ export function setLoRAProvider(provider: LoRAProvider | null): void {
 
 function require<TKey extends keyof LoRAProvider>(method: TKey): NonNullable<LoRAProvider[TKey]> {
   if (_provider == null || _provider[method] == null) {
-    throw SDKError.backendNotAvailable(
+    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+    throw SDKException.backendNotAvailable(
       `LoRA.${String(method)}`,
       'No LoRA backend registered. Install the @runanywhere/web-llamacpp ' +
       'package (with LoRA WASM exports) and register it via `LlamaCPP.register()`.',
@@ -69,7 +70,7 @@ function require<TKey extends keyof LoRAProvider>(method: TKey): NonNullable<LoR
 
 export async function loadLoraAdapter(config: LoRAAdapterConfig): Promise<void> {
   await require('loadLoraAdapter')(config);
-  logger.info(`LoRA adapter loaded: ${config.path}`);
+  logger.info(`LoRA adapter loaded: ${config.adapterPath}`);
 }
 
 export async function removeLoraAdapter(path: string): Promise<void> {
@@ -88,7 +89,7 @@ export async function getLoadedLoraAdapters(): Promise<LoRAAdapterInfo[]> {
 
 export async function checkLoraCompatibility(loraPath: string): Promise<LoraCompatibilityResult> {
   if (_provider?.checkLoraCompatibility == null) {
-    return { isCompatible: false, error: 'LoRA support not available' };
+    return { isCompatible: false, errorMessage: 'LoRA support not available' };
   }
   return _provider.checkLoraCompatibility(loraPath);
 }
@@ -107,3 +108,15 @@ export async function allRegisteredLoraAdapters(): Promise<LoraAdapterCatalogEnt
   if (_provider?.allRegisteredLoraAdapters == null) return [];
   return _provider.allRegisteredLoraAdapters();
 }
+
+export const LoRA = {
+  setProvider: setLoRAProvider,
+  load: loadLoraAdapter,
+  remove: removeLoraAdapter,
+  clear: clearLoraAdapters,
+  getLoaded: getLoadedLoraAdapters,
+  checkCompatibility: checkLoraCompatibility,
+  register: registerLoraAdapter,
+  adaptersForModel: loraAdaptersForModel,
+  allRegistered: allRegisteredLoraAdapters,
+};

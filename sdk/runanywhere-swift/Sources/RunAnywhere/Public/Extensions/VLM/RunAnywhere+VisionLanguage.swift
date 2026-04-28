@@ -40,17 +40,17 @@ public extension RunAnywhere {
         topP: Float = 0.9
     ) async throws -> VLMResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
         let handle = try await CppBridge.VLM.shared.getHandle()
         guard await CppBridge.VLM.shared.isLoaded else {
-            throw SDKError.vlm(.notInitialized, "VLM model not loaded")
+            throw SDKException.vlm(.notInitialized, "VLM model not loaded")
         }
 
         guard let imageData = image.toCImage() else {
-            throw SDKError.vlm(.invalidImage, "Failed to convert image")
+            throw SDKException.vlm(.invalidImage, "Failed to convert image")
         }
         var cImage = imageData.0
         let rgbData = imageData.1
@@ -71,7 +71,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.vlm(.processingFailed, "VLM processing failed: \(result)")
+            throw SDKException.vlm(.processingFailed, "VLM processing failed: \(result)")
         }
         defer { rac_vlm_result_free(&vlmResult) }
 
@@ -87,17 +87,17 @@ public extension RunAnywhere {
         topP: Float = 0.9
     ) async throws -> VLMStreamingResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
         let handle = try await CppBridge.VLM.shared.getHandle()
         guard await CppBridge.VLM.shared.isLoaded else {
-            throw SDKError.vlm(.notInitialized, "VLM model not loaded")
+            throw SDKException.vlm(.notInitialized, "VLM model not loaded")
         }
 
         guard let imageData = image.toCImage() else {
-            throw SDKError.vlm(.invalidImage, "Failed to convert image")
+            throw SDKException.vlm(.invalidImage, "Failed to convert image")
         }
         var cImage = imageData.0
         let rgbData = imageData.1
@@ -138,7 +138,7 @@ public extension RunAnywhere {
                 let errorCb: rac_vlm_component_error_callback_fn = { _, msg, userData in
                     guard let userData = userData else { return }
                     let ctx = Unmanaged<StreamContext>.fromOpaque(userData).takeRetainedValue()
-                    let error = SDKError.vlm(.processingFailed, msg.map { String(cString: $0) } ?? "Unknown")
+                    let error = SDKException.vlm(.processingFailed, msg.map { String(cString: $0) } ?? "Unknown")
                     ctx.continuation.finish(throwing: error)
                     Task { await ctx.collector.fail(error) }
                 }
@@ -152,7 +152,7 @@ public extension RunAnywhere {
 
                 if result != RAC_SUCCESS {
                     Unmanaged<StreamContext>.fromOpaque(contextPtr).release()
-                    let error = SDKError.vlm(.processingFailed, "Stream failed: \(result)")
+                    let error = SDKException.vlm(.processingFailed, "Stream failed: \(result)")
                     continuation.finish(throwing: error)
                     await collector.fail(error)
                 }

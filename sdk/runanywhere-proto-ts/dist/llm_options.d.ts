@@ -1,6 +1,23 @@
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework } from "./model_types";
+import { StructuredOutputOptions } from "./structured_output";
 export declare const protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * Routing destination for a generation (Web SDK ExecutionTarget in
+ * types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum ExecutionTarget {
+    EXECUTION_TARGET_UNSPECIFIED = 0,
+    EXECUTION_TARGET_ON_DEVICE = 1,
+    EXECUTION_TARGET_CLOUD = 2,
+    /** EXECUTION_TARGET_AUTO - Let the SDK decide based on policy (cost, latency, privacy, etc.). */
+    EXECUTION_TARGET_AUTO = 3,
+    UNRECOGNIZED = -1
+}
+export declare function executionTargetFromJSON(object: any): ExecutionTarget;
+export declare function executionTargetToJSON(object: ExecutionTarget): string;
 /**
  * ---------------------------------------------------------------------------
  * Options for a single text generation invocation.
@@ -41,6 +58,22 @@ export interface LLMGenerationOptions {
      * struct with the Generatable.Type — proto carries just the schema string.
      */
     jsonSchema?: string | undefined;
+    /**
+     * Optional thinking-tag pattern for extracting reasoning content from
+     * models like Qwen3 / LFM2 that emit <think>...</think> blocks.
+     */
+    thinkingPattern?: ThinkingTagPattern | undefined;
+    /**
+     * Routing hint: where this generation should run (on-device, cloud, or
+     * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+     */
+    executionTarget?: ExecutionTarget | undefined;
+    /**
+     * Optional structured-output configuration. Detailed message lives in
+     * structured_output.proto so the schema/format details aren't duplicated
+     * here. When set, supersedes the simpler `json_schema` string above.
+     */
+    structuredOutput?: StructuredOutputOptions | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -85,6 +118,100 @@ export interface LLMGenerationResult {
      * Empty = no structured output.
      */
     jsonOutput?: string | undefined;
+    /**
+     * Optional aggregated performance metrics. Web SDK surfaces this as a
+     * separate object alongside the result; consumers may ignore it if they
+     * already use the per-field timings above.
+     */
+    performance?: PerformanceMetrics | undefined;
+    /**
+     * Where the generation actually ran (on-device, cloud, etc.). Useful
+     * when execution_target was AUTO and the SDK picked the route.
+     */
+    executedOn?: ExecutionTarget | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Lightweight LLM configuration used at component-init time (Swift
+ * LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
+ * — this is the "load the model" knob set, not the per-call sampling knobs.
+ * ---------------------------------------------------------------------------
+ */
+export interface LLMConfiguration {
+    /** Model context window length in tokens. 0 = use model default. */
+    contextLength: number;
+    /** Default sampling temperature applied when a per-call value is unset. */
+    temperature: number;
+    /** Default max output tokens applied when a per-call value is unset. */
+    maxTokens: number;
+    /** Default system prompt baked into the component. Empty = no default. */
+    systemPrompt?: string | undefined;
+    /** Whether streaming generation is enabled by default for this component. */
+    streaming: boolean;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Per-prompt generation hints (Swift GenerationHints in LLMTypes.swift:550).
+ * Carried alongside a prompt as a "soft" override of LLMConfiguration
+ * defaults when the engine has no explicit LLMGenerationOptions to use.
+ * ---------------------------------------------------------------------------
+ */
+export interface GenerationHints {
+    /** Suggested sampling temperature. */
+    temperature: number;
+    /** Suggested max output tokens. */
+    maxTokens: number;
+    /**
+     * Suggested role to use for the system prompt (e.g. "system", "developer").
+     * Empty = engine default ("system").
+     */
+    systemRole?: string | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Pattern used to extract a model's "thinking" / reasoning block from its
+ * raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
+ * Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
+ * ---------------------------------------------------------------------------
+ */
+export interface ThinkingTagPattern {
+    /** Opening tag string. Default if empty: "<think>". */
+    openingTag: string;
+    /** Closing tag string. Default if empty: "</think>". */
+    closingTag: string;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
+ * once per token in streaming mode.
+ * ---------------------------------------------------------------------------
+ */
+export interface StreamToken {
+    /** Decoded text fragment for this token. */
+    text: string;
+    /** Wall-clock timestamp (ms since Unix epoch) the token was produced. */
+    timestampMs: number;
+    /** Sequence index within the current generation (0-based). */
+    index: number;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Aggregated performance metrics for a generation (Web SDK
+ * PerformanceMetrics in types/models.ts:57). Higher-level summary that
+ * rolls up the timing fields scattered across LLMGenerationResult.
+ * ---------------------------------------------------------------------------
+ */
+export interface PerformanceMetrics {
+    /** Total latency from request to last token, in milliseconds. */
+    latencyMs: number;
+    /** Peak memory used by the inference engine, in bytes. */
+    memoryBytes: number;
+    /** Decode throughput in tokens/second. */
+    throughputTokensPerSec: number;
+    /** Prompt (input) token count. */
+    promptTokens: number;
+    /** Completion (output) token count. */
+    completionTokens: number;
 }
 export declare const LLMGenerationOptions: {
     encode(message: LLMGenerationOptions, writer?: _m0.Writer): _m0.Writer;
@@ -101,6 +228,46 @@ export declare const LLMGenerationResult: {
     toJSON(message: LLMGenerationResult): unknown;
     create<I extends Exact<DeepPartial<LLMGenerationResult>, I>>(base?: I): LLMGenerationResult;
     fromPartial<I extends Exact<DeepPartial<LLMGenerationResult>, I>>(object: I): LLMGenerationResult;
+};
+export declare const LLMConfiguration: {
+    encode(message: LLMConfiguration, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): LLMConfiguration;
+    fromJSON(object: any): LLMConfiguration;
+    toJSON(message: LLMConfiguration): unknown;
+    create<I extends Exact<DeepPartial<LLMConfiguration>, I>>(base?: I): LLMConfiguration;
+    fromPartial<I extends Exact<DeepPartial<LLMConfiguration>, I>>(object: I): LLMConfiguration;
+};
+export declare const GenerationHints: {
+    encode(message: GenerationHints, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): GenerationHints;
+    fromJSON(object: any): GenerationHints;
+    toJSON(message: GenerationHints): unknown;
+    create<I extends Exact<DeepPartial<GenerationHints>, I>>(base?: I): GenerationHints;
+    fromPartial<I extends Exact<DeepPartial<GenerationHints>, I>>(object: I): GenerationHints;
+};
+export declare const ThinkingTagPattern: {
+    encode(message: ThinkingTagPattern, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ThinkingTagPattern;
+    fromJSON(object: any): ThinkingTagPattern;
+    toJSON(message: ThinkingTagPattern): unknown;
+    create<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(base?: I): ThinkingTagPattern;
+    fromPartial<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(object: I): ThinkingTagPattern;
+};
+export declare const StreamToken: {
+    encode(message: StreamToken, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StreamToken;
+    fromJSON(object: any): StreamToken;
+    toJSON(message: StreamToken): unknown;
+    create<I extends Exact<DeepPartial<StreamToken>, I>>(base?: I): StreamToken;
+    fromPartial<I extends Exact<DeepPartial<StreamToken>, I>>(object: I): StreamToken;
+};
+export declare const PerformanceMetrics: {
+    encode(message: PerformanceMetrics, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): PerformanceMetrics;
+    fromJSON(object: any): PerformanceMetrics;
+    toJSON(message: PerformanceMetrics): unknown;
+    create<I extends Exact<DeepPartial<PerformanceMetrics>, I>>(base?: I): PerformanceMetrics;
+    fromPartial<I extends Exact<DeepPartial<PerformanceMetrics>, I>>(object: I): PerformanceMetrics;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

@@ -5,10 +5,64 @@
 // source: llm_options.proto
 
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
+import { StructuredOutputOptions } from "./structured_output";
 
 export const protobufPackage = "runanywhere.v1";
+
+/**
+ * ---------------------------------------------------------------------------
+ * Routing destination for a generation (Web SDK ExecutionTarget in
+ * types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
+ * ---------------------------------------------------------------------------
+ */
+export enum ExecutionTarget {
+  EXECUTION_TARGET_UNSPECIFIED = 0,
+  EXECUTION_TARGET_ON_DEVICE = 1,
+  EXECUTION_TARGET_CLOUD = 2,
+  /** EXECUTION_TARGET_AUTO - Let the SDK decide based on policy (cost, latency, privacy, etc.). */
+  EXECUTION_TARGET_AUTO = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function executionTargetFromJSON(object: any): ExecutionTarget {
+  switch (object) {
+    case 0:
+    case "EXECUTION_TARGET_UNSPECIFIED":
+      return ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED;
+    case 1:
+    case "EXECUTION_TARGET_ON_DEVICE":
+      return ExecutionTarget.EXECUTION_TARGET_ON_DEVICE;
+    case 2:
+    case "EXECUTION_TARGET_CLOUD":
+      return ExecutionTarget.EXECUTION_TARGET_CLOUD;
+    case 3:
+    case "EXECUTION_TARGET_AUTO":
+      return ExecutionTarget.EXECUTION_TARGET_AUTO;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ExecutionTarget.UNRECOGNIZED;
+  }
+}
+
+export function executionTargetToJSON(object: ExecutionTarget): string {
+  switch (object) {
+    case ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED:
+      return "EXECUTION_TARGET_UNSPECIFIED";
+    case ExecutionTarget.EXECUTION_TARGET_ON_DEVICE:
+      return "EXECUTION_TARGET_ON_DEVICE";
+    case ExecutionTarget.EXECUTION_TARGET_CLOUD:
+      return "EXECUTION_TARGET_CLOUD";
+    case ExecutionTarget.EXECUTION_TARGET_AUTO:
+      return "EXECUTION_TARGET_AUTO";
+    case ExecutionTarget.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 /**
  * ---------------------------------------------------------------------------
@@ -51,7 +105,29 @@ export interface LLMGenerationOptions {
    * that conforms to this schema. Swift wraps this in a StructuredOutputConfig
    * struct with the Generatable.Type — proto carries just the schema string.
    */
-  jsonSchema?: string | undefined;
+  jsonSchema?:
+    | string
+    | undefined;
+  /**
+   * Optional thinking-tag pattern for extracting reasoning content from
+   * models like Qwen3 / LFM2 that emit <think>...</think> blocks.
+   */
+  thinkingPattern?:
+    | ThinkingTagPattern
+    | undefined;
+  /**
+   * Routing hint: where this generation should run (on-device, cloud, or
+   * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+   */
+  executionTarget?:
+    | ExecutionTarget
+    | undefined;
+  /**
+   * Optional structured-output configuration. Detailed message lives in
+   * structured_output.proto so the schema/format details aren't duplicated
+   * here. When set, supersedes the simpler `json_schema` string above.
+   */
+  structuredOutput?: StructuredOutputOptions | undefined;
 }
 
 /**
@@ -102,7 +178,112 @@ export interface LLMGenerationResult {
    * Optional JSON output (when structured-output mode was requested).
    * Empty = no structured output.
    */
-  jsonOutput?: string | undefined;
+  jsonOutput?:
+    | string
+    | undefined;
+  /**
+   * Optional aggregated performance metrics. Web SDK surfaces this as a
+   * separate object alongside the result; consumers may ignore it if they
+   * already use the per-field timings above.
+   */
+  performance?:
+    | PerformanceMetrics
+    | undefined;
+  /**
+   * Where the generation actually ran (on-device, cloud, etc.). Useful
+   * when execution_target was AUTO and the SDK picked the route.
+   */
+  executedOn?: ExecutionTarget | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Lightweight LLM configuration used at component-init time (Swift
+ * LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
+ * — this is the "load the model" knob set, not the per-call sampling knobs.
+ * ---------------------------------------------------------------------------
+ */
+export interface LLMConfiguration {
+  /** Model context window length in tokens. 0 = use model default. */
+  contextLength: number;
+  /** Default sampling temperature applied when a per-call value is unset. */
+  temperature: number;
+  /** Default max output tokens applied when a per-call value is unset. */
+  maxTokens: number;
+  /** Default system prompt baked into the component. Empty = no default. */
+  systemPrompt?:
+    | string
+    | undefined;
+  /** Whether streaming generation is enabled by default for this component. */
+  streaming: boolean;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Per-prompt generation hints (Swift GenerationHints in LLMTypes.swift:550).
+ * Carried alongside a prompt as a "soft" override of LLMConfiguration
+ * defaults when the engine has no explicit LLMGenerationOptions to use.
+ * ---------------------------------------------------------------------------
+ */
+export interface GenerationHints {
+  /** Suggested sampling temperature. */
+  temperature: number;
+  /** Suggested max output tokens. */
+  maxTokens: number;
+  /**
+   * Suggested role to use for the system prompt (e.g. "system", "developer").
+   * Empty = engine default ("system").
+   */
+  systemRole?: string | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Pattern used to extract a model's "thinking" / reasoning block from its
+ * raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
+ * Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
+ * ---------------------------------------------------------------------------
+ */
+export interface ThinkingTagPattern {
+  /** Opening tag string. Default if empty: "<think>". */
+  openingTag: string;
+  /** Closing tag string. Default if empty: "</think>". */
+  closingTag: string;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
+ * once per token in streaming mode.
+ * ---------------------------------------------------------------------------
+ */
+export interface StreamToken {
+  /** Decoded text fragment for this token. */
+  text: string;
+  /** Wall-clock timestamp (ms since Unix epoch) the token was produced. */
+  timestampMs: number;
+  /** Sequence index within the current generation (0-based). */
+  index: number;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Aggregated performance metrics for a generation (Web SDK
+ * PerformanceMetrics in types/models.ts:57). Higher-level summary that
+ * rolls up the timing fields scattered across LLMGenerationResult.
+ * ---------------------------------------------------------------------------
+ */
+export interface PerformanceMetrics {
+  /** Total latency from request to last token, in milliseconds. */
+  latencyMs: number;
+  /** Peak memory used by the inference engine, in bytes. */
+  memoryBytes: number;
+  /** Decode throughput in tokens/second. */
+  throughputTokensPerSec: number;
+  /** Prompt (input) token count. */
+  promptTokens: number;
+  /** Completion (output) token count. */
+  completionTokens: number;
 }
 
 function createBaseLLMGenerationOptions(): LLMGenerationOptions {
@@ -117,6 +298,9 @@ function createBaseLLMGenerationOptions(): LLMGenerationOptions {
     preferredFramework: 0,
     systemPrompt: undefined,
     jsonSchema: undefined,
+    thinkingPattern: undefined,
+    executionTarget: undefined,
+    structuredOutput: undefined,
   };
 }
 
@@ -151,6 +335,15 @@ export const LLMGenerationOptions = {
     }
     if (message.jsonSchema !== undefined) {
       writer.uint32(82).string(message.jsonSchema);
+    }
+    if (message.thinkingPattern !== undefined) {
+      ThinkingTagPattern.encode(message.thinkingPattern, writer.uint32(90).fork()).ldelim();
+    }
+    if (message.executionTarget !== undefined) {
+      writer.uint32(96).int32(message.executionTarget);
+    }
+    if (message.structuredOutput !== undefined) {
+      StructuredOutputOptions.encode(message.structuredOutput, writer.uint32(106).fork()).ldelim();
     }
     return writer;
   },
@@ -232,6 +425,27 @@ export const LLMGenerationOptions = {
 
           message.jsonSchema = reader.string();
           continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.thinkingPattern = ThinkingTagPattern.decode(reader, reader.uint32());
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.executionTarget = reader.int32() as any;
+          continue;
+        case 13:
+          if (tag !== 106) {
+            break;
+          }
+
+          message.structuredOutput = StructuredOutputOptions.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -255,6 +469,11 @@ export const LLMGenerationOptions = {
       preferredFramework: isSet(object.preferredFramework) ? inferenceFrameworkFromJSON(object.preferredFramework) : 0,
       systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
       jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : undefined,
+      thinkingPattern: isSet(object.thinkingPattern) ? ThinkingTagPattern.fromJSON(object.thinkingPattern) : undefined,
+      executionTarget: isSet(object.executionTarget) ? executionTargetFromJSON(object.executionTarget) : undefined,
+      structuredOutput: isSet(object.structuredOutput)
+        ? StructuredOutputOptions.fromJSON(object.structuredOutput)
+        : undefined,
     };
   },
 
@@ -290,6 +509,15 @@ export const LLMGenerationOptions = {
     if (message.jsonSchema !== undefined) {
       obj.jsonSchema = message.jsonSchema;
     }
+    if (message.thinkingPattern !== undefined) {
+      obj.thinkingPattern = ThinkingTagPattern.toJSON(message.thinkingPattern);
+    }
+    if (message.executionTarget !== undefined) {
+      obj.executionTarget = executionTargetToJSON(message.executionTarget);
+    }
+    if (message.structuredOutput !== undefined) {
+      obj.structuredOutput = StructuredOutputOptions.toJSON(message.structuredOutput);
+    }
     return obj;
   },
 
@@ -308,6 +536,13 @@ export const LLMGenerationOptions = {
     message.preferredFramework = object.preferredFramework ?? 0;
     message.systemPrompt = object.systemPrompt ?? undefined;
     message.jsonSchema = object.jsonSchema ?? undefined;
+    message.thinkingPattern = (object.thinkingPattern !== undefined && object.thinkingPattern !== null)
+      ? ThinkingTagPattern.fromPartial(object.thinkingPattern)
+      : undefined;
+    message.executionTarget = object.executionTarget ?? undefined;
+    message.structuredOutput = (object.structuredOutput !== undefined && object.structuredOutput !== null)
+      ? StructuredOutputOptions.fromPartial(object.structuredOutput)
+      : undefined;
     return message;
   },
 };
@@ -327,6 +562,8 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
     thinkingTokens: 0,
     responseTokens: 0,
     jsonOutput: undefined,
+    performance: undefined,
+    executedOn: undefined,
   };
 }
 
@@ -370,6 +607,12 @@ export const LLMGenerationResult = {
     }
     if (message.jsonOutput !== undefined) {
       writer.uint32(106).string(message.jsonOutput);
+    }
+    if (message.performance !== undefined) {
+      PerformanceMetrics.encode(message.performance, writer.uint32(114).fork()).ldelim();
+    }
+    if (message.executedOn !== undefined) {
+      writer.uint32(120).int32(message.executedOn);
     }
     return writer;
   },
@@ -472,6 +715,20 @@ export const LLMGenerationResult = {
 
           message.jsonOutput = reader.string();
           continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.performance = PerformanceMetrics.decode(reader, reader.uint32());
+          continue;
+        case 15:
+          if (tag !== 120) {
+            break;
+          }
+
+          message.executedOn = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -496,6 +753,8 @@ export const LLMGenerationResult = {
       thinkingTokens: isSet(object.thinkingTokens) ? globalThis.Number(object.thinkingTokens) : 0,
       responseTokens: isSet(object.responseTokens) ? globalThis.Number(object.responseTokens) : 0,
       jsonOutput: isSet(object.jsonOutput) ? globalThis.String(object.jsonOutput) : undefined,
+      performance: isSet(object.performance) ? PerformanceMetrics.fromJSON(object.performance) : undefined,
+      executedOn: isSet(object.executedOn) ? executionTargetFromJSON(object.executedOn) : undefined,
     };
   },
 
@@ -540,6 +799,12 @@ export const LLMGenerationResult = {
     if (message.jsonOutput !== undefined) {
       obj.jsonOutput = message.jsonOutput;
     }
+    if (message.performance !== undefined) {
+      obj.performance = PerformanceMetrics.toJSON(message.performance);
+    }
+    if (message.executedOn !== undefined) {
+      obj.executedOn = executionTargetToJSON(message.executedOn);
+    }
     return obj;
   },
 
@@ -561,6 +826,502 @@ export const LLMGenerationResult = {
     message.thinkingTokens = object.thinkingTokens ?? 0;
     message.responseTokens = object.responseTokens ?? 0;
     message.jsonOutput = object.jsonOutput ?? undefined;
+    message.performance = (object.performance !== undefined && object.performance !== null)
+      ? PerformanceMetrics.fromPartial(object.performance)
+      : undefined;
+    message.executedOn = object.executedOn ?? undefined;
+    return message;
+  },
+};
+
+function createBaseLLMConfiguration(): LLMConfiguration {
+  return { contextLength: 0, temperature: 0, maxTokens: 0, systemPrompt: undefined, streaming: false };
+}
+
+export const LLMConfiguration = {
+  encode(message: LLMConfiguration, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.contextLength !== 0) {
+      writer.uint32(8).int32(message.contextLength);
+    }
+    if (message.temperature !== 0) {
+      writer.uint32(21).float(message.temperature);
+    }
+    if (message.maxTokens !== 0) {
+      writer.uint32(24).int32(message.maxTokens);
+    }
+    if (message.systemPrompt !== undefined) {
+      writer.uint32(34).string(message.systemPrompt);
+    }
+    if (message.streaming !== false) {
+      writer.uint32(40).bool(message.streaming);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LLMConfiguration {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLLMConfiguration();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.contextLength = reader.int32();
+          continue;
+        case 2:
+          if (tag !== 21) {
+            break;
+          }
+
+          message.temperature = reader.float();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.maxTokens = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.systemPrompt = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.streaming = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LLMConfiguration {
+    return {
+      contextLength: isSet(object.contextLength) ? globalThis.Number(object.contextLength) : 0,
+      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+      maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+      systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
+      streaming: isSet(object.streaming) ? globalThis.Boolean(object.streaming) : false,
+    };
+  },
+
+  toJSON(message: LLMConfiguration): unknown {
+    const obj: any = {};
+    if (message.contextLength !== 0) {
+      obj.contextLength = Math.round(message.contextLength);
+    }
+    if (message.temperature !== 0) {
+      obj.temperature = message.temperature;
+    }
+    if (message.maxTokens !== 0) {
+      obj.maxTokens = Math.round(message.maxTokens);
+    }
+    if (message.systemPrompt !== undefined) {
+      obj.systemPrompt = message.systemPrompt;
+    }
+    if (message.streaming !== false) {
+      obj.streaming = message.streaming;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LLMConfiguration>, I>>(base?: I): LLMConfiguration {
+    return LLMConfiguration.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LLMConfiguration>, I>>(object: I): LLMConfiguration {
+    const message = createBaseLLMConfiguration();
+    message.contextLength = object.contextLength ?? 0;
+    message.temperature = object.temperature ?? 0;
+    message.maxTokens = object.maxTokens ?? 0;
+    message.systemPrompt = object.systemPrompt ?? undefined;
+    message.streaming = object.streaming ?? false;
+    return message;
+  },
+};
+
+function createBaseGenerationHints(): GenerationHints {
+  return { temperature: 0, maxTokens: 0, systemRole: undefined };
+}
+
+export const GenerationHints = {
+  encode(message: GenerationHints, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.temperature !== 0) {
+      writer.uint32(13).float(message.temperature);
+    }
+    if (message.maxTokens !== 0) {
+      writer.uint32(16).int32(message.maxTokens);
+    }
+    if (message.systemRole !== undefined) {
+      writer.uint32(26).string(message.systemRole);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): GenerationHints {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGenerationHints();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 13) {
+            break;
+          }
+
+          message.temperature = reader.float();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.maxTokens = reader.int32();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.systemRole = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GenerationHints {
+    return {
+      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+      maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+      systemRole: isSet(object.systemRole) ? globalThis.String(object.systemRole) : undefined,
+    };
+  },
+
+  toJSON(message: GenerationHints): unknown {
+    const obj: any = {};
+    if (message.temperature !== 0) {
+      obj.temperature = message.temperature;
+    }
+    if (message.maxTokens !== 0) {
+      obj.maxTokens = Math.round(message.maxTokens);
+    }
+    if (message.systemRole !== undefined) {
+      obj.systemRole = message.systemRole;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GenerationHints>, I>>(base?: I): GenerationHints {
+    return GenerationHints.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GenerationHints>, I>>(object: I): GenerationHints {
+    const message = createBaseGenerationHints();
+    message.temperature = object.temperature ?? 0;
+    message.maxTokens = object.maxTokens ?? 0;
+    message.systemRole = object.systemRole ?? undefined;
+    return message;
+  },
+};
+
+function createBaseThinkingTagPattern(): ThinkingTagPattern {
+  return { openingTag: "", closingTag: "" };
+}
+
+export const ThinkingTagPattern = {
+  encode(message: ThinkingTagPattern, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.openingTag !== "") {
+      writer.uint32(10).string(message.openingTag);
+    }
+    if (message.closingTag !== "") {
+      writer.uint32(18).string(message.closingTag);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ThinkingTagPattern {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseThinkingTagPattern();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.openingTag = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.closingTag = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ThinkingTagPattern {
+    return {
+      openingTag: isSet(object.openingTag) ? globalThis.String(object.openingTag) : "",
+      closingTag: isSet(object.closingTag) ? globalThis.String(object.closingTag) : "",
+    };
+  },
+
+  toJSON(message: ThinkingTagPattern): unknown {
+    const obj: any = {};
+    if (message.openingTag !== "") {
+      obj.openingTag = message.openingTag;
+    }
+    if (message.closingTag !== "") {
+      obj.closingTag = message.closingTag;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(base?: I): ThinkingTagPattern {
+    return ThinkingTagPattern.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(object: I): ThinkingTagPattern {
+    const message = createBaseThinkingTagPattern();
+    message.openingTag = object.openingTag ?? "";
+    message.closingTag = object.closingTag ?? "";
+    return message;
+  },
+};
+
+function createBaseStreamToken(): StreamToken {
+  return { text: "", timestampMs: 0, index: 0 };
+}
+
+export const StreamToken = {
+  encode(message: StreamToken, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.text !== "") {
+      writer.uint32(10).string(message.text);
+    }
+    if (message.timestampMs !== 0) {
+      writer.uint32(16).int64(message.timestampMs);
+    }
+    if (message.index !== 0) {
+      writer.uint32(24).int32(message.index);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamToken {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStreamToken();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.timestampMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.index = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StreamToken {
+    return {
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+      index: isSet(object.index) ? globalThis.Number(object.index) : 0,
+    };
+  },
+
+  toJSON(message: StreamToken): unknown {
+    const obj: any = {};
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.timestampMs !== 0) {
+      obj.timestampMs = Math.round(message.timestampMs);
+    }
+    if (message.index !== 0) {
+      obj.index = Math.round(message.index);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StreamToken>, I>>(base?: I): StreamToken {
+    return StreamToken.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StreamToken>, I>>(object: I): StreamToken {
+    const message = createBaseStreamToken();
+    message.text = object.text ?? "";
+    message.timestampMs = object.timestampMs ?? 0;
+    message.index = object.index ?? 0;
+    return message;
+  },
+};
+
+function createBasePerformanceMetrics(): PerformanceMetrics {
+  return { latencyMs: 0, memoryBytes: 0, throughputTokensPerSec: 0, promptTokens: 0, completionTokens: 0 };
+}
+
+export const PerformanceMetrics = {
+  encode(message: PerformanceMetrics, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.latencyMs !== 0) {
+      writer.uint32(8).int64(message.latencyMs);
+    }
+    if (message.memoryBytes !== 0) {
+      writer.uint32(16).int64(message.memoryBytes);
+    }
+    if (message.throughputTokensPerSec !== 0) {
+      writer.uint32(29).float(message.throughputTokensPerSec);
+    }
+    if (message.promptTokens !== 0) {
+      writer.uint32(32).int32(message.promptTokens);
+    }
+    if (message.completionTokens !== 0) {
+      writer.uint32(40).int32(message.completionTokens);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): PerformanceMetrics {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePerformanceMetrics();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.latencyMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.memoryBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 29) {
+            break;
+          }
+
+          message.throughputTokensPerSec = reader.float();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.promptTokens = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.completionTokens = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PerformanceMetrics {
+    return {
+      latencyMs: isSet(object.latencyMs) ? globalThis.Number(object.latencyMs) : 0,
+      memoryBytes: isSet(object.memoryBytes) ? globalThis.Number(object.memoryBytes) : 0,
+      throughputTokensPerSec: isSet(object.throughputTokensPerSec)
+        ? globalThis.Number(object.throughputTokensPerSec)
+        : 0,
+      promptTokens: isSet(object.promptTokens) ? globalThis.Number(object.promptTokens) : 0,
+      completionTokens: isSet(object.completionTokens) ? globalThis.Number(object.completionTokens) : 0,
+    };
+  },
+
+  toJSON(message: PerformanceMetrics): unknown {
+    const obj: any = {};
+    if (message.latencyMs !== 0) {
+      obj.latencyMs = Math.round(message.latencyMs);
+    }
+    if (message.memoryBytes !== 0) {
+      obj.memoryBytes = Math.round(message.memoryBytes);
+    }
+    if (message.throughputTokensPerSec !== 0) {
+      obj.throughputTokensPerSec = message.throughputTokensPerSec;
+    }
+    if (message.promptTokens !== 0) {
+      obj.promptTokens = Math.round(message.promptTokens);
+    }
+    if (message.completionTokens !== 0) {
+      obj.completionTokens = Math.round(message.completionTokens);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PerformanceMetrics>, I>>(base?: I): PerformanceMetrics {
+    return PerformanceMetrics.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PerformanceMetrics>, I>>(object: I): PerformanceMetrics {
+    const message = createBasePerformanceMetrics();
+    message.latencyMs = object.latencyMs ?? 0;
+    message.memoryBytes = object.memoryBytes ?? 0;
+    message.throughputTokensPerSec = object.throughputTokensPerSec ?? 0;
+    message.promptTokens = object.promptTokens ?? 0;
+    message.completionTokens = object.completionTokens ?? 0;
     return message;
   },
 };
@@ -576,6 +1337,21 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(long: Long): number {
+  if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return long.toNumber();
+}
+
+if (_m0.util.Long !== Long) {
+  _m0.util.Long = Long as any;
+  _m0.configure();
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

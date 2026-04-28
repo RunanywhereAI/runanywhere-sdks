@@ -42,41 +42,15 @@ export * from './types';
 // =============================================================================
 
 export {
-  // Error Codes
+  // Canonical proto error types (numeric codes + categories).
   ErrorCode,
-  getErrorCodeMessage,
-  // Error Category
   ErrorCategory,
-  allErrorCategories,
-  getCategoryFromCode,
-  inferCategoryFromError,
-  // Error Context
-  type ErrorContext,
-  createErrorContext,
-  formatStackTrace,
-  formatLocation,
-  formatContext,
-  ContextualError,
-  withContext,
-  getErrorContext,
-  getUnderlyingError,
-  // SDKError
-  SDKErrorCode,
-  type SDKErrorProtocol,
-  SDKError,
-  asSDKError,
-  isSDKError,
-  captureAndThrow,
-  notInitializedError,
-  alreadyInitializedError,
-  invalidInputError,
-  modelNotFoundError,
-  modelLoadError,
-  networkError,
-  authenticationError,
-  generationError,
-  storageError,
+  // Sole throwable surface — proto-backed `Error` subclass.
+  SDKException,
+  isSDKException,
+  asSDKException,
 } from './Foundation/ErrorTypes';
+export type { ErrorContext } from './Foundation/ErrorTypes';
 
 // =============================================================================
 // Foundation - Initialization
@@ -293,7 +267,7 @@ export {
   processImage,
   processImageStream,
   cancelVLMGeneration,
-} from './Public/Extensions/RunAnywhere+VLM';
+} from './Public/Extensions/RunAnywhere+VisionLanguage';
 
 // =============================================================================
 // LoRA Adapter Management
@@ -315,7 +289,7 @@ export type {
   LoRAAdapterInfo,
   LoraAdapterCatalogEntry,
   LoraCompatibilityResult,
-} from './types/LoRATypes';
+} from '@runanywhere/proto-ts/lora_options';
 
 // =============================================================================
 // Diffusion / Image Generation
@@ -337,7 +311,8 @@ export {
   DiffusionModelVariant,
   DiffusionScheduler,
   DiffusionMode,
-} from './types/DiffusionTypes';
+  DiffusionTokenizerSourceKind,
+} from '@runanywhere/proto-ts/diffusion_options';
 
 export type {
   DiffusionConfiguration,
@@ -345,9 +320,11 @@ export type {
   DiffusionProgress,
   DiffusionResult,
   DiffusionCapabilities,
-  DiffusionStreamingResult,
   DiffusionTokenizerSource,
-} from './types/DiffusionTypes';
+} from '@runanywhere/proto-ts/diffusion_options';
+
+// Streaming wrapper (RN-local, AsyncIterable shape — no proto counterpart).
+export type { DiffusionStreamingResult } from './Public/Extensions/RunAnywhere+Diffusion';
 
 // =============================================================================
 // Live Transcription Session
@@ -366,6 +343,48 @@ export type { LiveTranscriptionListener } from './Public/Sessions/LiveTranscript
 
 export type { STTStreamingResult } from './Public/Extensions/RunAnywhere+STT';
 export type { TTSStreamingResult } from './Public/Extensions/RunAnywhere+TTS';
+export type { VLMStreamingResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
+
+// =============================================================================
+// Phase D namespace extensions (new). Mirror Swift `+Frameworks`,
+// `+ModelAssignments`, `+ModelManagement`, `+PluginLoader`, `+VLMModels`.
+// =============================================================================
+
+export {
+  getRegisteredFrameworks,
+  getFrameworks,
+  getModelsForFramework as getModelsForFrameworkExt,
+} from './Public/Extensions/RunAnywhere+Frameworks';
+
+export {
+  fetchModelAssignments,
+  getModelsForFramework as getModelsForFrameworkAssignment,
+  getModelsForCategory,
+} from './Public/Extensions/RunAnywhere+ModelAssignments';
+
+export {
+  loadModelByCategory,
+  resolveModelFilePath,
+  ensureModelDownloaded,
+} from './Public/Extensions/RunAnywhere+ModelManagement';
+
+export {
+  pluginApiVersion,
+  loadPlugin,
+  unloadPlugin,
+  registeredPluginCount,
+  registeredPluginNames,
+} from './Public/Extensions/RunAnywhere+PluginLoader';
+
+export {
+  loadVLMModel as loadVLMModelByInfo,
+} from './Public/Extensions/RunAnywhere+VLMModels';
+
+// =============================================================================
+// Phase C-prime ergonomic helpers — proto factory defaults + predicates
+// =============================================================================
+
+export * as helpers from './helpers';
 
 export type {
   RAGConfiguration,
@@ -373,7 +392,7 @@ export type {
   RAGResult,
   RAGSearchResult,
   RAGStatistics,
-} from './types/RAGTypes';
+} from '@runanywhere/proto-ts/rag';
 
 // =============================================================================
 // Nitrogen Spec Types

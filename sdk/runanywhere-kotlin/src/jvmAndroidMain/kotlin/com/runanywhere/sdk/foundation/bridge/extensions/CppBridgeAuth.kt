@@ -28,12 +28,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AuthenticationResponse(
     @SerialName("access_token") val accessToken: String,
-    @SerialName("device_id")    val deviceId: String,
-    @SerialName("expires_in")   val expiresIn: Int,
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("expires_in") val expiresIn: Int,
     @SerialName("organization_id") val organizationId: String,
     @SerialName("refresh_token") val refreshToken: String,
-    @SerialName("token_type")   val tokenType: String,
-    @SerialName("user_id")      val userId: String? = null,
+    @SerialName("token_type") val tokenType: String,
+    @SerialName("user_id") val userId: String? = null,
 )
 
 /**
@@ -45,11 +45,13 @@ data class AuthenticationResponse(
 object CppBridgeAuth {
     private const val TAG = "CppBridge/Auth"
     private const val ENDPOINT_AUTHENTICATE = "/api/v1/auth/sdk/authenticate"
-    private const val ENDPOINT_REFRESH      = "/api/v1/auth/sdk/refresh"
-    private const val REQUEST_TIMEOUT_MS    = 30_000
+    private const val ENDPOINT_REFRESH = "/api/v1/auth/sdk/refresh"
+    private const val REQUEST_TIMEOUT_MS = 30_000
 
     /** Initialize native auth state. Idempotent. */
-    init { RunAnywhereBridge.racAuthInit() }
+    init {
+        RunAnywhereBridge.racAuthInit()
+    }
 
     val accessToken: String? get() = RunAnywhereBridge.racAuthGetAccessToken()
 
@@ -68,8 +70,12 @@ object CppBridgeAuth {
             val response = postJson(baseUrl + ENDPOINT_REFRESH, body)
             if (RunAnywhereBridge.racAuthHandleRefreshResponse(response) == 0) {
                 RunAnywhereBridge.racAuthGetAccessToken()
-            } else current
-        } catch (_: Exception) { current }
+            } else {
+                current
+            }
+        } catch (_: Exception) {
+            current
+        }
     }
 
     /**
@@ -83,12 +89,18 @@ object CppBridgeAuth {
         deviceId: String,
         platform: String = "android",
         sdkVersion: String = "0.1.0",
-        environment: Int = 0,  // 0 = DEVELOPMENT
+        environment: Int = 0, // 0 = DEVELOPMENT
     ): AuthenticationResponse {
         activeBaseUrl = baseUrl
-        val body = RunAnywhereBridge.racAuthBuildAuthenticateRequest(
-            apiKey, baseUrl, deviceId, platform, sdkVersion, environment,
-        ) ?: throw IllegalStateException("$TAG: rac_auth_build_authenticate_request returned null")
+        val body =
+            RunAnywhereBridge.racAuthBuildAuthenticateRequest(
+                apiKey,
+                baseUrl,
+                deviceId,
+                platform,
+                sdkVersion,
+                environment,
+            ) ?: throw IllegalStateException("$TAG: rac_auth_build_authenticate_request returned null")
         val response = postJson(baseUrl + ENDPOINT_AUTHENTICATE, body)
         if (RunAnywhereBridge.racAuthHandleAuthenticateResponse(response) != 0) {
             throw RuntimeException("$TAG: rac_auth_handle_authenticate_response rejected the body")
@@ -104,9 +116,11 @@ object CppBridgeAuth {
 
     @Volatile private var activeBaseUrl: String? = null
 
-    private val jsonParser = kotlinx.serialization.json.Json {
-        ignoreUnknownKeys = true; isLenient = true
-    }
+    private val jsonParser =
+        kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
     /**
      * JSON POST via the native curl-backed HTTP client. Throws on any
@@ -114,15 +128,16 @@ object CppBridgeAuth {
      * are always invoked with 2xx bodies only.
      */
     private fun postJson(url: String, body: String): String {
-        val resp = RunAnywhereBridge.racHttpRequestExecute(
-            method = "POST",
-            url = url,
-            headerKeys = arrayOf("Content-Type", "Accept"),
-            headerValues = arrayOf("application/json", "application/json"),
-            body = body.encodeToByteArray(),
-            timeoutMs = REQUEST_TIMEOUT_MS,
-            followRedirects = true,
-        ) ?: throw RuntimeException("$TAG: native HTTP call returned null")
+        val resp =
+            RunAnywhereBridge.racHttpRequestExecute(
+                method = "POST",
+                url = url,
+                headerKeys = arrayOf("Content-Type", "Accept"),
+                headerValues = arrayOf("application/json", "application/json"),
+                body = body.encodeToByteArray(),
+                timeoutMs = REQUEST_TIMEOUT_MS,
+                followRedirects = true,
+            ) ?: throw RuntimeException("$TAG: native HTTP call returned null")
 
         if (resp.errorMessage != null) {
             throw RuntimeException("$TAG: $url transport error: ${resp.errorMessage}")

@@ -47,11 +47,17 @@ import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
 import * as Device from './Extensions/RunAnywhere+Device';
-import * as VLM from './Extensions/RunAnywhere+VLM';
+import * as VLM from './Extensions/RunAnywhere+VisionLanguage';
 import * as LoRA from './Extensions/RunAnywhere+LoRA';
 import * as Diffusion from './Extensions/RunAnywhere+Diffusion';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
+// Phase D namespace extensions
+import * as Frameworks from './Extensions/RunAnywhere+Frameworks';
+import * as ModelAssignments from './Extensions/RunAnywhere+ModelAssignments';
+import * as ModelManagement from './Extensions/RunAnywhere+ModelManagement';
+import * as PluginLoader from './Extensions/RunAnywhere+PluginLoader';
+import * as VLMModels from './Extensions/RunAnywhere+VLMModels';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -604,7 +610,6 @@ export const RunAnywhere = {
   transcribeFile: STT.transcribeFile,
   // Streaming control (matches Swift: stopStreamingTranscription)
   stopStreamingTranscription: STT.stopStreamingTranscription,
-  stopStreamingSTT: STT.stopStreamingSTT,
   isStreamingSTT: STT.isStreamingSTT,
   // Introspection (matches Swift: currentSTTModel)
   currentSTTModel: STT.currentSTTModel,
@@ -870,6 +875,37 @@ export const RunAnywhere = {
     SAMPLE_RATE: Audio.AUDIO_SAMPLE_RATE,
     TTS_SAMPLE_RATE: Audio.TTS_SAMPLE_RATE,
   },
+
+  // ============================================================================
+  // Phase D Namespace Extensions (Frameworks / ModelAssignments / ModelManagement /
+  // PluginLoader / VLMModels)
+  // ============================================================================
+
+  // Framework discovery (mirrors Swift +Frameworks)
+  getRegisteredFrameworks: Frameworks.getRegisteredFrameworks,
+  getFrameworksForCapability: Frameworks.getFrameworks,
+  getModelsForFramework: Frameworks.getModelsForFramework,
+
+  // Model assignments (mirrors Swift +ModelAssignments)
+  fetchModelAssignments: ModelAssignments.fetchModelAssignments,
+  getModelsForCategory: ModelAssignments.getModelsForCategory,
+
+  // Model management (mirrors Swift +ModelManagement)
+  loadModelByCategory: ModelManagement.loadModelByCategory,
+  resolveModelFilePath: ModelManagement.resolveModelFilePath,
+  ensureModelDownloaded: ModelManagement.ensureModelDownloaded,
+
+  // Plugin loader (mirrors Swift +PluginLoader)
+  PluginLoader: {
+    apiVersion: PluginLoader.pluginApiVersion,
+    load: PluginLoader.loadPlugin,
+    unload: PluginLoader.unloadPlugin,
+    registeredCount: PluginLoader.registeredPluginCount,
+    registeredNames: PluginLoader.registeredPluginNames,
+  },
+
+  // VLM model overloads (mirrors Swift +VLMModels)
+  loadVLMModelByInfo: VLMModels.loadVLMModel,
 
   // ============================================================================
   // Factory Methods

@@ -536,6 +536,13 @@ final class VoiceAgentViewModel: ObservableObject {
         case .interrupted, .metrics, .none:
             // No UX-visible effect for these arms today.
             break
+
+        // Phase B regenerated RAVoiceEvent payload with new arms; we do not
+        // surface them in the UI yet, so they are intentionally folded into
+        // the same no-op bucket as .interrupted / .metrics.
+        case .componentStateChanged, .sessionError, .sessionStarted,
+             .sessionStopped, .agentResponseStarted, .agentResponseCompleted:
+            break
         }
     }
 

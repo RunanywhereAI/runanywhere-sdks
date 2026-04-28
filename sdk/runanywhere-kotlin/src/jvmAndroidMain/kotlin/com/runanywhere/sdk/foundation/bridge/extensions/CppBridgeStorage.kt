@@ -148,8 +148,6 @@ object CppBridgeStorage {
             }
     }
 
-    private val lock = Any()
-
     /**
      * Tag for logging.
      */

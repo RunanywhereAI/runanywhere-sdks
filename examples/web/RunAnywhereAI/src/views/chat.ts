@@ -10,7 +10,7 @@ import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ConversationsStore, type Conversation } from '../services/conversations-store';
-import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/Extensions/RunAnywhere+ToolCalling';
+import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -688,13 +688,13 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
 
   const finalResult = await resultPromise;
   console.log(
-    `[Chat] Generation complete: ${finalResult.tokensUsed} tokens in ` +
-    `${finalResult.latencyMs.toFixed(0)}ms (${finalResult.tokensPerSecond.toFixed(1)} tok/s)`,
+    `[Chat] Generation complete: ${finalResult.tokensGenerated} tokens in ` +
+    `${finalResult.generationTimeMs.toFixed(0)}ms (${finalResult.tokensPerSecond.toFixed(1)} tok/s)`,
   );
 
   appendMetrics(rowEl, {
-    tokens: finalResult.tokensUsed,
-    latencyMs: finalResult.latencyMs,
+    tokens: finalResult.tokensGenerated,
+    latencyMs: finalResult.generationTimeMs,
     tokensPerSecond: finalResult.tokensPerSecond,
   });
   scrollToBottom();

@@ -203,7 +203,7 @@ struct BenchmarkDashboardView: View {
         }
         .navigationTitle("Benchmarks")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayModeCompat(.inline)
         #endif
         .toolbar {
             if !viewModel.pastRuns.isEmpty {

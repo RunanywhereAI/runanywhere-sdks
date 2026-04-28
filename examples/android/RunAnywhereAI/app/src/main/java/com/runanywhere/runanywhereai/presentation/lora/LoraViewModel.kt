@@ -4,8 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoRAAdapterConfig
+import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.LoraCompatibilityResult
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
@@ -107,7 +107,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             try {
-                val config = LoRAAdapterConfig(path = path, scale = scale)
+                val config = LoRAAdapterConfig(adapter_path = path, scale = scale)
                 withContext(Dispatchers.IO) { RunAnywhere.loadLoraAdapter(config) }
                 val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
                 _uiState.update { it.copy(loadedAdapters = loaded, error = null) }
@@ -175,7 +175,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     /** Check if a specific adapter is currently loaded. */
     fun isLoaded(entry: LoraAdapterCatalogEntry): Boolean {
         val path = localPath(entry) ?: return false
-        return _uiState.value.loadedAdapters.any { it.path == path }
+        return _uiState.value.loadedAdapters.any { it.adapter_path == path }
     }
 
     /** Check which adapters are downloaded using the SDK. Must be called on IO dispatcher. */

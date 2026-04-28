@@ -20,7 +20,7 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/public/types/rag_types.dart';
+import 'package:runanywhere/generated/rag.pb.dart';
 
 // =============================================================================
 // FFI Function Typedefs for C++ bridge (flutter_rag_bridge.h)
@@ -159,7 +159,7 @@ class DartBridgeRAG {
     final fn = lib.lookupFunction<_CreatePipelineJsonNative,
         _CreatePipelineJsonDart>('flutter_rag_create_pipeline_json');
 
-    final jsonStr = jsonEncode(config.toJson());
+    final jsonStr = config.writeToJson();
     _logger.debug('createPipeline config: $jsonStr');
     final cStr = jsonStr.toNativeUtf8();
 
@@ -296,7 +296,7 @@ class DartBridgeRAG {
         lib.lookupFunction<_FreeStringNative, _FreeStringDart>(
             'flutter_rag_free_string');
 
-    final jsonStr = jsonEncode(options.toJson());
+    final jsonStr = options.writeToJson();
     final cStr = jsonStr.toNativeUtf8();
 
     try {
@@ -304,8 +304,7 @@ class DartBridgeRAG {
       final resultJson = resultPtr.toDartString();
       freeFn(resultPtr);
 
-      final decoded = jsonDecode(resultJson) as Map<String, dynamic>;
-      return RAGResult.fromJson(decoded);
+      return RAGResult.fromJson(resultJson);
     } finally {
       calloc.free(cStr);
     }
@@ -326,7 +325,7 @@ class DartBridgeRAG {
     final resultJson = resultPtr.toDartString();
     freeFn(resultPtr);
 
-    return RAGStatistics.fromJsonString(resultJson);
+    return RAGStatistics.fromJson(resultJson);
   }
 
   void _ensurePipeline() {
@@ -337,7 +336,7 @@ class DartBridgeRAG {
 
   /// Create pipeline on a background isolate.
   Future<void> createPipelineAsync(RAGConfiguration config) async {
-    final jsonStr = jsonEncode(config.toJson());
+    final jsonStr = config.writeToJson();
     _logger.debug('createPipelineAsync config: $jsonStr');
 
     final result = await Isolate.run(() => _isolateCreatePipeline(jsonStr));
@@ -384,13 +383,12 @@ class DartBridgeRAG {
   Future<RAGResult> queryAsync(RAGQueryOptions options) async {
     _ensurePipeline();
 
-    final jsonStr = jsonEncode(options.toJson());
+    final jsonStr = options.writeToJson();
     final resultJson = await Isolate.run(
       () => _isolateQuery(jsonStr),
     );
 
-    final decoded = jsonDecode(resultJson) as Map<String, dynamic>;
-    return RAGResult.fromJson(decoded);
+    return RAGResult.fromJson(resultJson);
   }
 }
 

@@ -9,9 +9,9 @@
 // Mirrors Swift `RunAnywhere+ToolCalling.swift`.
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart' show LLMGenerationOptions;
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
-import 'package:runanywhere/public/types/generation_types.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
 
 /// Tools (function calling) capability surface.
@@ -143,7 +143,7 @@ class RunAnywhereTools {
       // v2 close-out Phase G-2: generateStream now returns
       // Stream<LLMStreamEvent>; accumulate token text off each event.
       final eventStream = RunAnywhereLLM.shared
-          .generateStream(currentPrompt, options: genOptions);
+          .generateStream(currentPrompt, genOptions);
       final buffer = StringBuffer();
       await for (final event in eventStream) {
         if (event.isFinal) {

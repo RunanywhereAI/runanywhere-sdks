@@ -12,7 +12,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.data.transform.IncompleteBytesToStringBuffer
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -406,13 +406,13 @@ object CppBridgeLLM {
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("LLM component not created")
+                throw SDKException.notInitialized("LLM component not created")
             }
             return handle
         }
@@ -472,7 +472,7 @@ object CppBridgeLLM {
                     TAG,
                     "Native library not loaded. LLM inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create LLM component via RunAnywhereBridge
@@ -486,7 +486,7 @@ object CppBridgeLLM {
                         TAG,
                         "LLM component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
+                    throw SDKException.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -612,14 +612,14 @@ object CppBridgeLLM {
      * @param prompt The input prompt
      * @param config Generation configuration (optional)
      * @return The generation result
-     * @throws SDKError if generation fails
+     * @throws SDKException if generation fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun generate(prompt: String, config: GenerationConfig = GenerationConfig.DEFAULT): GenerationResult {
         val currentHandle: Long
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
-                throw SDKError.llm("LLM component not ready for generation")
+                throw SDKException.llm("LLM component not ready for generation")
             }
             currentHandle = handle
             isCancelled = false
@@ -644,7 +644,7 @@ object CppBridgeLLM {
             // JNI call outside lock so cancel() can acquire lock and set isCancelled
             val resultJson =
                 RunAnywhereBridge.racLlmComponentGenerate(currentHandle, prompt, config.toJson())
-                    ?: throw SDKError.llm("Generation failed: null result")
+                    ?: throw SDKException.llm("Generation failed: null result")
 
             val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -669,7 +669,7 @@ object CppBridgeLLM {
             synchronized(lock) {
                 setState(LLMState.READY) // Reset to ready, not error
             }
-            throw if (e is SDKError) e else SDKError.llm("Generation failed: ${e.message}")
+            throw if (e is SDKException) e else SDKException.llm("Generation failed: ${e.message}")
         }
     }
 
@@ -680,9 +680,9 @@ object CppBridgeLLM {
      * @param config Generation configuration (optional)
      * @param callback Callback for each generated token
      * @return The final generation result
-     * @throws SDKError if generation fails
+     * @throws SDKException if generation fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun generateStream(
         prompt: String,
         config: GenerationConfig = GenerationConfig.DEFAULT,
@@ -691,7 +691,7 @@ object CppBridgeLLM {
         val currentHandle: Long
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
-                throw SDKError.llm("LLM component not ready for generation")
+                throw SDKException.llm("LLM component not ready for generation")
             }
             currentHandle = handle
             isCancelled = false
@@ -741,7 +741,7 @@ object CppBridgeLLM {
                     prompt,
                     config.toJson(),
                     jniCallback,
-                ) ?: throw SDKError.llm("Streaming generation failed: null result")
+                ) ?: throw SDKException.llm("Streaming generation failed: null result")
 
             try {
                 // when stream ends:
@@ -776,7 +776,7 @@ object CppBridgeLLM {
                 setState(LLMState.READY) // Reset to ready, not error
                 streamCallback = null
             }
-            throw if (e is SDKError) e else SDKError.llm("Streaming generation failed: ${e.message}")
+            throw if (e is SDKException) e else SDKException.llm("Streaming generation failed: ${e.message}")
         }
     }
 

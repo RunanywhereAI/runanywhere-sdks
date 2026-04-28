@@ -17,7 +17,7 @@
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
@@ -25,6 +25,7 @@ import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
@@ -35,7 +36,10 @@ import 'package:runanywhere/public/capabilities/runanywhere_tools.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_vlm_models.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_voice_agent.dart';
+import 'package:runanywhere/public/extensions/runanywhere_plugin_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -98,7 +102,7 @@ class RunAnywhereSDK {
   Future<void> completeServicesInitialization() async {
     if (areServicesReady) return;
     if (!isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
   }
 
@@ -131,18 +135,18 @@ class RunAnywhereSDK {
       );
     } else {
       if (apiKey == null || apiKey.isEmpty) {
-        throw SDKError.validationFailed(
+        throw SDKException.validationFailed(
           'API key is required for ${environment.description} mode',
         );
       }
       if (baseURL == null || baseURL.isEmpty) {
-        throw SDKError.validationFailed(
+        throw SDKException.validationFailed(
           'Base URL is required for ${environment.description} mode',
         );
       }
       final uri = Uri.tryParse(baseURL);
       if (uri == null) {
-        throw SDKError.validationFailed('Invalid base URL: $baseURL');
+        throw SDKException.validationFailed('Invalid base URL: $baseURL');
       }
       params = SDKInitParams(
         apiKey: apiKey,
@@ -253,6 +257,12 @@ class RunAnywhereSDK {
   /// describe, askAbout.
   RunAnywhereVLM get vlm => RunAnywhereVLM.shared;
 
+  /// VisionLanguage namespace (Swift parity). Identical to [vlm].
+  RunAnywhereVLM get visionLanguage => RunAnywhereVLM.shared;
+
+  /// VLMModels — filtered catalog for vision/multimodal models.
+  RunAnywhereVLMModels get vlmModels => RunAnywhereVLMModels.shared;
+
   /// Voice Agent (full STT → LLM → TTS pipeline) — initialize,
   /// cleanup, isReady, eventStream. Symmetric with `llm.generateStream`:
   /// `voice.eventStream()` returns `Stream<VoiceEvent>` and wraps
@@ -278,4 +288,15 @@ class RunAnywhereSDK {
   /// proto bytes, or YAML sugar; returns a [SolutionHandle] with
   /// start / stop / cancel / feed / closeInput / destroy verbs.
   RunAnywhereSolutions get solutions => RunAnywhereSolutions.shared;
+
+  /// Voice Agent namespace (parity with Swift `RunAnywhere.VoiceAgent`).
+  /// Wraps `voice` with VoiceAgent-themed aliases.
+  RunAnywhereVoiceAgent get voiceAgent => RunAnywhereVoiceAgent.shared;
+
+  /// Diffusion (image generation). Currently throws
+  /// `featureNotAvailable` until the FFI bridge lands.
+  RunAnywhereDiffusion get diffusion => RunAnywhereDiffusion.shared;
+
+  /// Runtime plugin loader (parity with Swift `RunAnywhere.PluginLoader`).
+  RunAnywherePluginLoader get pluginLoader => RunAnywherePluginLoader.shared;
 }

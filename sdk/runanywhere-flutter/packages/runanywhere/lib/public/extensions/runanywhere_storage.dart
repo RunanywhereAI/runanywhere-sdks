@@ -3,9 +3,10 @@
 // runanywhere_storage.dart — storage + download helpers.
 // Mirrors Swift `RunAnywhere+Storage.swift`.
 
+import 'package:fixnum/fixnum.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/adapters/model_download_adapter.dart';
-import 'package:runanywhere/core/types/storage_types.dart';
+import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -32,36 +33,22 @@ class RunAnywhereStorage {
     if (native != null) {
       return StorageAvailability(
         isAvailable: native.isAvailable,
-        requiredSpace: native.requiredSpace,
-        availableSpace: native.availableSpace,
-        hasWarning: native.hasWarning,
-        recommendation: native.recommendation,
+        requiredBytes: Int64(native.requiredSpace),
+        availableBytes: Int64(native.availableSpace),
+        warningMessage: native.hasWarning ? 'Low storage' : '',
+        recommendation: native.recommendation ?? '',
       );
     }
 
     // Fail-open: assume available if the native call returns null.
     return StorageAvailability(
       isAvailable: true,
-      requiredSpace: requiredWithMargin,
-      availableSpace: 0,
-      hasWarning: false,
+      requiredBytes: Int64(requiredWithMargin),
+      availableBytes: Int64.ZERO,
     );
   }
 
-  /// Boolean-only convenience matching the legacy v3 surface. Prefer
-  /// [checkStorageAvailable] which returns the rich shape.
-  static Future<bool> isStorageAvailable({
-    required int modelSize,
-    double safetyMargin = 0.1,
-  }) async {
-    final result = await checkStorageAvailable(
-      modelSize: modelSize,
-      safetyMargin: safetyMargin,
-    );
-    return result.isAvailable;
-  }
-
-  /// Get a value from native storage.
+/// Get a value from native storage.
   static Future<String?> getStorageValue(String key) =>
       DartBridgeStorage.instance.get(key);
 

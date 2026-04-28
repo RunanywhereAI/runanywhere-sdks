@@ -162,12 +162,9 @@ extension SDKComponent {
         case .stt:       return RAC_PRIMITIVE_TRANSCRIBE
         case .tts:       return RAC_PRIMITIVE_SYNTHESIZE
         case .vad:       return RAC_PRIMITIVE_DETECT_VOICE
-        case .embedding: return RAC_PRIMITIVE_EMBED
+        case .embeddings: return RAC_PRIMITIVE_EMBED
         case .diffusion: return RAC_PRIMITIVE_DIFFUSION
-        case .voice, .rag:
-            // Aggregate components — no single primitive. Callers that need
-            // listProviders() for these should enumerate per-primitive
-            // themselves.
+        case .voiceAgent, .rag, .wakeword, .speakerDiarization, .unspecified, .UNRECOGNIZED:
             return nil
         }
     }
@@ -180,10 +177,12 @@ extension SDKComponent {
         case .stt:       return RAC_CAPABILITY_STT
         case .tts:       return RAC_CAPABILITY_TTS
         case .vad:       return RAC_CAPABILITY_VAD
-        case .voice:     return RAC_CAPABILITY_TEXT_GENERATION  // aggregate
-        case .embedding: return RAC_CAPABILITY_TEXT_GENERATION  // embeddings ride on TEXT_GENERATION
+        case .voiceAgent:     return RAC_CAPABILITY_TEXT_GENERATION
+        case .embeddings: return RAC_CAPABILITY_TEXT_GENERATION
         case .diffusion: return RAC_CAPABILITY_DIFFUSION
-        case .rag:       return RAC_CAPABILITY_TEXT_GENERATION  // aggregate
+        case .rag:       return RAC_CAPABILITY_TEXT_GENERATION
+        case .wakeword, .speakerDiarization, .unspecified, .UNRECOGNIZED:
+            return RAC_CAPABILITY_TEXT_GENERATION
         }
     }
 

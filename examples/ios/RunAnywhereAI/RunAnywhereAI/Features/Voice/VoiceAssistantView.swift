@@ -502,7 +502,7 @@ extension VoiceAssistantView {
             )
             .navigationTitle("Voice Models")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {

@@ -11,11 +11,12 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.VADConfiguration
+import ai.runanywhere.proto.v1.VADEventType
+import ai.runanywhere.proto.v1.VADOptions
+import ai.runanywhere.proto.v1.VADResult
+import ai.runanywhere.proto.v1.VADStatistics
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.VAD.SpeechActivityEvent
-import com.runanywhere.sdk.public.extensions.VAD.VADConfiguration
-import com.runanywhere.sdk.public.extensions.VAD.VADResult
-import com.runanywhere.sdk.public.extensions.VAD.VADStatistics
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - VAD Operations
@@ -28,12 +29,12 @@ import kotlinx.coroutines.flow.Flow
  */
 expect suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult
 
-/**
- * Configure VAD settings.
- *
- * @param configuration VAD configuration
- */
-expect suspend fun RunAnywhere.configureVAD(configuration: VADConfiguration)
+/** Canonical cross-SDK signature: detectVoiceActivity(audio, options) → VADResult */
+@Suppress("UnusedParameter")
+suspend fun RunAnywhere.detectVoiceActivity(
+    audio: ByteArray,
+    options: VADOptions,
+): VADResult = detectVoiceActivity(audio)
 
 /**
  * Get current VAD statistics for debugging.
@@ -83,8 +84,7 @@ expect suspend fun RunAnywhere.initializeVAD()
  * Initialize VAD with the given configuration.
  *
  * Mirrors Swift's `RunAnywhere.initializeVAD(_ config:)`. This is the
- * preferred name going forward — `configureVAD(...)` remains as an
- * alias for backwards compatibility.
+ * Preferred overload when a configuration is available.
  */
 expect suspend fun RunAnywhere.initializeVAD(configuration: VADConfiguration)
 
@@ -113,7 +113,7 @@ expect suspend fun RunAnywhere.stopVAD()
  *
  * Idiomatic Kotlin alternative: collect [streamVAD] for a Flow.
  */
-expect suspend fun RunAnywhere.setVADSpeechActivityCallback(callback: (SpeechActivityEvent) -> Unit)
+expect suspend fun RunAnywhere.setVADSpeechActivityCallback(callback: (VADEventType) -> Unit)
 
 /**
  * Set the audio-buffer callback that fires for each processed VAD frame.

@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions
-import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Text Generation

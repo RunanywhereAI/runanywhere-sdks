@@ -10,10 +10,14 @@
  * are defined in core so providers return properly typed results.
  */
 
-import type { LLMGenerationOptions, LLMGenerationResult } from '../types/LLMTypes';
-import type { STTTranscriptionResult, STTTranscribeOptions } from '../types/STTTypes';
-import type { TTSSynthesisResult, TTSSynthesizeOptions } from '../types/TTSTypes';
-import type { SpeechActivityCallback } from '../types/VADTypes';
+import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import type {
+  STTTranscriptionResult,
+  STTTranscribeOptions,
+  TTSSynthesisResult,
+  TTSSynthesizeOptions,
+  SpeechActivityCallback,
+} from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Provider Capability Keys
@@ -35,7 +39,7 @@ export type ProviderCapability = 'llm' | 'stt' | 'tts' | 'vad';
 export interface LLMProvider {
   generate?(
     prompt: string,
-    options?: LLMGenerationOptions,
+    options?: Partial<LLMGenerationOptions>,
   ): Promise<LLMGenerationResult>;
   generateStream(
     prompt: string,

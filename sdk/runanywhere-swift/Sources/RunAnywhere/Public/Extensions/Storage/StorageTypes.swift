@@ -202,3 +202,93 @@ public struct StorageAvailability: Sendable {
         self.recommendation = recommendation
     }
 }
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/storage_types.pb.swift`:
+//   • RADeviceStorageInfo  (totalBytes, freeBytes, usedBytes, usedPercent)
+//   • RAAppStorageInfo     (documentsBytes, cacheBytes, appSupportBytes, totalBytes)
+//   • RAModelStorageMetrics (modelID, sizeOnDiskBytes, lastUsedMs)
+//   • RAStorageInfo        (app, device, models, totalModels, totalModelsBytes)
+//   • RAStorageAvailability (isAvailable, requiredBytes, availableBytes,
+//                              hasWarning, recommendation)
+//   • RAStoredModel        (canonical proto-only stored-model record)
+//   • RANPUChip enum
+//
+// Hand-rolled types are KEPT because they:
+//   1. embed full `ModelInfo` references for backward-compat StoredModel views,
+//   2. expose Swift idiomatic property names (totalSpace vs totalBytes,
+//      sizeOnDisk vs sizeOnDiskBytes, usagePercentage Double computed vs
+//      usedPercent Float materialized),
+//   3. provide Identifiable / Sendable computed properties consumed by SwiftUI.
+
+extension DeviceStorageInfo {
+    /// Convert to canonical generated proto `RADeviceStorageInfo`. Notes:
+    /// totalSpace/freeSpace/usedSpace → totalBytes/freeBytes/usedBytes;
+    /// usagePercentage (Double, computed) → usedPercent (Float, materialized).
+    public func toRADeviceStorageInfo() -> RADeviceStorageInfo {
+        var proto = RADeviceStorageInfo()
+        proto.totalBytes = totalSpace
+        proto.freeBytes = freeSpace
+        proto.usedBytes = usedSpace
+        proto.usedPercent = Float(usagePercentage)
+        return proto
+    }
+}
+
+extension AppStorageInfo {
+    /// Convert to canonical generated proto `RAAppStorageInfo`. Field rename:
+    /// documentsSize → documentsBytes (etc.).
+    public func toRAAppStorageInfo() -> RAAppStorageInfo {
+        var proto = RAAppStorageInfo()
+        proto.documentsBytes = documentsSize
+        proto.cacheBytes = cacheSize
+        proto.appSupportBytes = appSupportSize
+        proto.totalBytes = totalSize
+        return proto
+    }
+}
+
+extension ModelStorageMetrics {
+    /// Convert to canonical generated proto `RAModelStorageMetrics`. Notes:
+    /// proto stores only `modelID` (id reference) plus size; the full ModelInfo
+    /// must be cross-referenced separately by the consumer. `lastUsedMs` is
+    /// not tracked on the Swift type and is left at proto default (unset).
+    public func toRAModelStorageMetrics() -> RAModelStorageMetrics {
+        var proto = RAModelStorageMetrics()
+        proto.modelID = model.id
+        proto.sizeOnDiskBytes = sizeOnDisk
+        return proto
+    }
+}
+
+extension StorageAvailability {
+    /// Convert to canonical generated proto `RAStorageAvailability`. Field
+    /// rename: requiredSpace → requiredBytes; availableSpace → availableBytes.
+    /// Notes: `hasWarning: Bool` has no proto counterpart; the proto encodes
+    /// "warning present" via a non-empty `warningMessage` string. We omit it
+    /// here (lossless when no message is present).
+    public func toRAStorageAvailability() -> RAStorageAvailability {
+        var proto = RAStorageAvailability()
+        proto.isAvailable = isAvailable
+        proto.requiredBytes = requiredSpace
+        proto.availableBytes = availableSpace
+        if let rec = recommendation { proto.recommendation = rec }
+        return proto
+    }
+}
+
+extension StorageInfo {
+    /// Convert to canonical generated proto `RAStorageInfo`. The denormalized
+    /// `totalModels` / `totalModelsBytes` fields are populated for receivers
+    /// that would otherwise re-iterate `models` (matches Web/RN behavior).
+    public func toRAStorageInfo() -> RAStorageInfo {
+        var proto = RAStorageInfo()
+        proto.app = appStorage.toRAAppStorageInfo()
+        proto.device = deviceStorage.toRADeviceStorageInfo()
+        proto.models = models.map { $0.toRAModelStorageMetrics() }
+        proto.totalModels = Int32(models.count)
+        proto.totalModelsBytes = totalModelsSize
+        return proto
+    }
+}

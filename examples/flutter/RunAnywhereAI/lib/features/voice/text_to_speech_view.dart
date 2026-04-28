@@ -192,28 +192,32 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
       final result = await sdk.RunAnywhereSDK.instance.tts.synthesize(
         _textController.text,
-        rate: _speechRate,
-        pitch: 1.0,
-        volume: 1.0,
+        sdk.TTSOptions(
+          speakingRate: _speechRate,
+          pitch: 1.0,
+          volume: 1.0,
+        ),
       );
 
+      // Wave 2: TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
+      final samples = Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
-          '✅ TTS synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+          '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = result.samples.isNotEmpty;
-        _duration = result.durationSeconds;
+        _hasAudio = samples.isNotEmpty;
+        _duration = result.durationMs.toInt() / 1000.0;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),
-          audioSize: result.samples.length * 4, // 4 bytes per float sample
+          audioSize: samples.length * 4, // 4 bytes per float sample
           sampleRate: result.sampleRate,
         );
       });
 
       // Auto-play if audio was generated
-      if (result.samples.isNotEmpty) {
-        await _playFloatAudio(result.samples, result.sampleRate);
+      if (samples.isNotEmpty) {
+        await _playFloatAudio(samples, result.sampleRate);
       }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');

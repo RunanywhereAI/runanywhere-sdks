@@ -140,6 +140,40 @@ public class LLMGenerationOptions(
     schemaIndex = 9,
   )
   public val json_schema: String? = null,
+  /**
+   * Optional thinking-tag pattern for extracting reasoning content from
+   * models like Qwen3 / LFM2 that emit <think>...</think> blocks.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.ThinkingTagPattern#ADAPTER",
+    jsonName = "thinkingPattern",
+    schemaIndex = 10,
+  )
+  public val thinking_pattern: ThinkingTagPattern? = null,
+  /**
+   * Routing hint: where this generation should run (on-device, cloud, or
+   * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.ExecutionTarget#ADAPTER",
+    jsonName = "executionTarget",
+    schemaIndex = 11,
+  )
+  public val execution_target: ExecutionTarget? = null,
+  /**
+   * Optional structured-output configuration. Detailed message lives in
+   * structured_output.proto so the schema/format details aren't duplicated
+   * here. When set, supersedes the simpler `json_schema` string above.
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.StructuredOutputOptions#ADAPTER",
+    jsonName = "structuredOutput",
+    schemaIndex = 12,
+  )
+  public val structured_output: StructuredOutputOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -176,6 +210,9 @@ public class LLMGenerationOptions(
     if (preferred_framework != other.preferred_framework) return false
     if (system_prompt != other.system_prompt) return false
     if (json_schema != other.json_schema) return false
+    if (thinking_pattern != other.thinking_pattern) return false
+    if (execution_target != other.execution_target) return false
+    if (structured_output != other.structured_output) return false
     return true
   }
 
@@ -193,6 +230,9 @@ public class LLMGenerationOptions(
       result = result * 37 + preferred_framework.hashCode()
       result = result * 37 + (system_prompt?.hashCode() ?: 0)
       result = result * 37 + (json_schema?.hashCode() ?: 0)
+      result = result * 37 + (thinking_pattern?.hashCode() ?: 0)
+      result = result * 37 + (execution_target?.hashCode() ?: 0)
+      result = result * 37 + (structured_output?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -210,6 +250,9 @@ public class LLMGenerationOptions(
     result += """preferred_framework=$preferred_framework"""
     if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
     if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
+    if (thinking_pattern != null) result += """thinking_pattern=$thinking_pattern"""
+    if (execution_target != null) result += """execution_target=$execution_target"""
+    if (structured_output != null) result += """structured_output=$structured_output"""
     return result.joinToString(prefix = "LLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
@@ -224,10 +267,13 @@ public class LLMGenerationOptions(
     preferred_framework: InferenceFramework = this.preferred_framework,
     system_prompt: String? = this.system_prompt,
     json_schema: String? = this.json_schema,
+    thinking_pattern: ThinkingTagPattern? = this.thinking_pattern,
+    execution_target: ExecutionTarget? = this.execution_target,
+    structured_output: StructuredOutputOptions? = this.structured_output,
     unknownFields: ByteString = this.unknownFields,
   ): LLMGenerationOptions = LLMGenerationOptions(max_tokens, temperature, top_p, top_k,
       repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, system_prompt,
-      json_schema, unknownFields)
+      json_schema, thinking_pattern, execution_target, structured_output, unknownFields)
 
   public companion object {
     @JvmField
@@ -257,6 +303,9 @@ public class LLMGenerationOptions(
             InferenceFramework.ADAPTER.encodedSizeWithTag(8, value.preferred_framework)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.system_prompt)
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.json_schema)
+        size += ThinkingTagPattern.ADAPTER.encodedSizeWithTag(11, value.thinking_pattern)
+        size += ExecutionTarget.ADAPTER.encodedSizeWithTag(12, value.execution_target)
+        size += StructuredOutputOptions.ADAPTER.encodedSizeWithTag(13, value.structured_output)
         return size
       }
 
@@ -275,11 +324,17 @@ public class LLMGenerationOptions(
             InferenceFramework.ADAPTER.encodeWithTag(writer, 8, value.preferred_framework)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.system_prompt)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.json_schema)
+        ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 11, value.thinking_pattern)
+        ExecutionTarget.ADAPTER.encodeWithTag(writer, 12, value.execution_target)
+        StructuredOutputOptions.ADAPTER.encodeWithTag(writer, 13, value.structured_output)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        StructuredOutputOptions.ADAPTER.encodeWithTag(writer, 13, value.structured_output)
+        ExecutionTarget.ADAPTER.encodeWithTag(writer, 12, value.execution_target)
+        ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 11, value.thinking_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.json_schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.system_prompt)
         if (value.preferred_framework != InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED)
@@ -308,6 +363,9 @@ public class LLMGenerationOptions(
             InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         var system_prompt: String? = null
         var json_schema: String? = null
+        var thinking_pattern: ThinkingTagPattern? = null
+        var execution_target: ExecutionTarget? = null
+        var structured_output: StructuredOutputOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> max_tokens = ProtoAdapter.INT32.decode(reader)
@@ -324,6 +382,13 @@ public class LLMGenerationOptions(
             }
             9 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             10 -> json_schema = ProtoAdapter.STRING.decode(reader)
+            11 -> thinking_pattern = ThinkingTagPattern.ADAPTER.decode(reader)
+            12 -> try {
+              execution_target = ExecutionTarget.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            13 -> structured_output = StructuredOutputOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -338,11 +403,16 @@ public class LLMGenerationOptions(
           preferred_framework = preferred_framework,
           system_prompt = system_prompt,
           json_schema = json_schema,
+          thinking_pattern = thinking_pattern,
+          execution_target = execution_target,
+          structured_output = structured_output,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerationOptions): LLMGenerationOptions = value.copy(
+        thinking_pattern = value.thinking_pattern?.let(ThinkingTagPattern.ADAPTER::redact),
+        structured_output = value.structured_output?.let(StructuredOutputOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

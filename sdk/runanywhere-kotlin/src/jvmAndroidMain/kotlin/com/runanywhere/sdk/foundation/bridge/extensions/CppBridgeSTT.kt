@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -423,13 +423,13 @@ object CppBridgeSTT {
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("STT component not created")
+                throw SDKException.notInitialized("STT component not created")
             }
             return handle
         }
@@ -489,7 +489,7 @@ object CppBridgeSTT {
                     TAG,
                     "Native library not loaded. STT inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create STT component via RunAnywhereBridge
@@ -502,7 +502,7 @@ object CppBridgeSTT {
                         TAG,
                         "STT component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
+                    throw SDKException.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -625,13 +625,13 @@ object CppBridgeSTT {
      * @param audioData Raw audio data bytes
      * @param config Transcription configuration (optional)
      * @return The transcription result
-     * @throws SDKError if transcription fails
+     * @throws SDKException if transcription fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun transcribe(audioData: ByteArray, config: TranscriptionConfig = TranscriptionConfig.DEFAULT): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
-                throw SDKError.stt("STT component not ready for transcription")
+                throw SDKException.stt("STT component not ready for transcription")
             }
 
             isCancelled = false
@@ -654,7 +654,7 @@ object CppBridgeSTT {
             try {
                 val resultJson =
                     RunAnywhereBridge.racSttComponentTranscribe(handle, audioData, config.toJson())
-                        ?: throw SDKError.stt("Transcription failed: null result")
+                        ?: throw SDKException.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -675,7 +675,7 @@ object CppBridgeSTT {
                 return result
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.stt("Transcription failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.stt("Transcription failed: ${e.message}")
             }
         }
     }
@@ -686,13 +686,13 @@ object CppBridgeSTT {
      * @param audioPath Path to the audio file
      * @param config Transcription configuration (optional)
      * @return The transcription result
-     * @throws SDKError if transcription fails
+     * @throws SDKException if transcription fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun transcribeFile(audioPath: String, config: TranscriptionConfig = TranscriptionConfig.DEFAULT): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
-                throw SDKError.stt("STT component not ready for transcription")
+                throw SDKException.stt("STT component not ready for transcription")
             }
 
             isCancelled = false
@@ -715,7 +715,7 @@ object CppBridgeSTT {
             try {
                 val resultJson =
                     RunAnywhereBridge.racSttComponentTranscribeFile(handle, audioPath, config.toJson())
-                        ?: throw SDKError.stt("Transcription failed: null result")
+                        ?: throw SDKException.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -736,7 +736,7 @@ object CppBridgeSTT {
                 return result
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.stt("File transcription failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.stt("File transcription failed: ${e.message}")
             }
         }
     }
@@ -748,9 +748,9 @@ object CppBridgeSTT {
      * @param config Transcription configuration (optional)
      * @param callback Callback for partial results
      * @return The final transcription result
-     * @throws SDKError if transcription fails
+     * @throws SDKException if transcription fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun transcribeStream(
         audioData: ByteArray,
         config: TranscriptionConfig = TranscriptionConfig.DEFAULT,
@@ -758,7 +758,7 @@ object CppBridgeSTT {
     ): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
-                throw SDKError.stt("STT component not ready for transcription")
+                throw SDKException.stt("STT component not ready for transcription")
             }
 
             isCancelled = false
@@ -782,7 +782,7 @@ object CppBridgeSTT {
             try {
                 val resultJson =
                     RunAnywhereBridge.racSttComponentTranscribeStream(handle, audioData, config.toJson())
-                        ?: throw SDKError.stt("Streaming transcription failed: null result")
+                        ?: throw SDKException.stt("Streaming transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -805,7 +805,7 @@ object CppBridgeSTT {
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.stt("Streaming transcription failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.stt("Streaming transcription failed: ${e.message}")
             }
         }
     }
@@ -1120,20 +1120,37 @@ object CppBridgeSTT {
         val results = mutableListOf<WordTimestamp>()
         for (match in objectRegex.findAll(arrayBody)) {
             val obj = match.value
-            val word = Regex("\"word\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(obj)
-                ?.groupValues?.get(1)?.let { unescapeJson(it) } ?: continue
-            val startSeconds = Regex("\"start_time\"\\s*:\\s*(-?[\\d.]+)").find(obj)
-                ?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-            val endSeconds = Regex("\"end_time\"\\s*:\\s*(-?[\\d.]+)").find(obj)
-                ?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-            val conf = Regex("\"confidence\"\\s*:\\s*(-?[\\d.]+)").find(obj)
-                ?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
-            results += WordTimestamp(
-                word = word,
-                startMs = (startSeconds * 1000.0).toLong(),
-                endMs = (endSeconds * 1000.0).toLong(),
-                confidence = conf,
-            )
+            val word =
+                Regex("\"word\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.let { unescapeJson(it) } ?: continue
+            val startSeconds =
+                Regex("\"start_time\"\\s*:\\s*(-?[\\d.]+)")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toDoubleOrNull() ?: 0.0
+            val endSeconds =
+                Regex("\"end_time\"\\s*:\\s*(-?[\\d.]+)")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toDoubleOrNull() ?: 0.0
+            val conf =
+                Regex("\"confidence\"\\s*:\\s*(-?[\\d.]+)")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toFloatOrNull() ?: 0f
+            results +=
+                WordTimestamp(
+                    word = word,
+                    startMs = (startSeconds * 1000.0).toLong(),
+                    endMs = (endSeconds * 1000.0).toLong(),
+                    confidence = conf,
+                )
         }
         return results
     }

@@ -23,7 +23,7 @@ public extension RunAnywhere {
     /// - Returns: Transcribed text
     static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
@@ -36,7 +36,7 @@ public extension RunAnywhere {
     /// Unload the currently loaded STT model
     static func unloadSTTModel() async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         await CppBridge.STT.shared.unload()
@@ -61,13 +61,13 @@ public extension RunAnywhere {
         options: STTOptions
     ) async throws -> STTOutput {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.STT.shared.getHandle()
 
         guard await CppBridge.STT.shared.isLoaded else {
-            throw SDKError.stt(.notInitialized, "STT model not loaded")
+            throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
         let modelId = await CppBridge.STT.shared.currentModelId ?? "unknown"
@@ -91,7 +91,7 @@ public extension RunAnywhere {
         }
 
         guard transcribeResult == RAC_SUCCESS else {
-            throw SDKError.stt(.processingFailed, "Transcription failed: \(transcribeResult)")
+            throw SDKException.stt(.processingFailed, "Transcription failed: \(transcribeResult)")
         }
 
         let endTime = Date()
@@ -137,11 +137,11 @@ public extension RunAnywhere {
         language: String? = nil
     ) async throws -> STTOutput {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         guard let channelData = buffer.floatChannelData else {
-            throw SDKError.stt(.emptyAudioBuffer, "Audio buffer has no channel data")
+            throw SDKException.stt(.emptyAudioBuffer, "Audio buffer has no channel data")
         }
 
         let frameLength = Int(buffer.frameLength)
@@ -167,17 +167,17 @@ public extension RunAnywhere {
         onPartialResult: @escaping (STTTranscriptionResult) -> Void
     ) async throws -> STTOutput {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.STT.shared.getHandle()
 
         guard await CppBridge.STT.shared.isLoaded else {
-            throw SDKError.stt(.notInitialized, "STT model not loaded")
+            throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
         guard await CppBridge.STT.shared.supportsStreaming else {
-            throw SDKError.stt(.streamingNotSupported, "Model does not support streaming")
+            throw SDKException.stt(.streamingNotSupported, "Model does not support streaming")
         }
 
         let modelId = await CppBridge.STT.shared.currentModelId ?? "unknown"
@@ -220,7 +220,7 @@ public extension RunAnywhere {
         let finalContext = Unmanaged<STTStreamingContext>.fromOpaque(contextPtr).takeRetainedValue()
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.stt(.processingFailed, "Streaming transcription failed: \(result)")
+            throw SDKException.stt(.processingFailed, "Streaming transcription failed: \(result)")
         }
 
         let endTime = Date()
@@ -246,13 +246,13 @@ public extension RunAnywhere {
     /// Process audio samples for streaming transcription
     static func processStreamingAudio(_ samples: [Float], options: STTOptions = STTOptions()) async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.STT.shared.getHandle()
 
         guard await CppBridge.STT.shared.isLoaded else {
-            throw SDKError.stt(.notInitialized, "STT model not loaded")
+            throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
@@ -272,7 +272,7 @@ public extension RunAnywhere {
         }
 
         if transcribeResult != RAC_SUCCESS {
-            throw SDKError.stt(.processingFailed, "Streaming process failed: \(transcribeResult)")
+            throw SDKException.stt(.processingFailed, "Streaming process failed: \(transcribeResult)")
         }
     }
 

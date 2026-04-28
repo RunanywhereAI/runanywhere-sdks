@@ -1,0 +1,746 @@
+// RunAnywhere IDL — canonical SDK event surface.
+//
+// This proto REPLACES React Native's hand-written `events.ts` (337 LOC,
+// 11 event union variants, ~70+ specific event variants) and unifies
+// eventing across Swift, Kotlin, Dart, RN, and Web SDKs.
+//
+// Pre-IDL drift table (sources consolidated here):
+//   RN     events.ts:1-337                 — 337 LOC, 11 union types, ~70 variants (PRIMARY SOURCE)
+//   RN     enums.ts:168-176 (SDKComponent) — 7 component cases (LLM/STT/TTS/VAD/Embedding/SpeakerDiarization/VoiceAgent)
+//   RN     enums.ts:270-283 (SDKEventType) — 11 category cases
+//   Swift  SDKEvent.swift:1-77             — 77 LOC, protocol-only (id/type/category/timestamp/sessionId/destination/properties)
+//   Swift  EventCategory                   — 11 category cases
+//   Kotlin SDKEvent.kt:1-400               — 400 LOC, sealed-style data classes
+//                                             (SDKLifecycleEvent, ModelEvent, LLMEvent, STTEvent, TTSEvent, ErrorEvent, RAGEvent)
+//   Dart   sdk_event.dart:1-871            — 871 LOC, abstract classes per category
+//                                             (Initialization, Configuration, Generation, Model, Voice, Device, Storage, RAG)
+//
+// Total: 1,685 LOC of platform-divergent event types collapsed to a single
+// envelope (`SDKEvent`) + 11 category messages with strongly-typed `oneof`
+// payloads. Every field below is the union of cases declared somewhere
+// pre-IDL, so adding a SDK consumer never requires re-running drift checks
+// against hand-written event hierarchies.
+//
+// Design choices:
+//   • Composition over deep enum hierarchies — every event-type message is
+//     a flat struct, and the discrimination is via `oneof event` on the
+//     top-level `SDKEvent` envelope.
+//   • Reuses voice_events.proto's `VoiceEvent` for streaming voice-pipeline
+//     events (UserSaid / AssistantToken / AudioFrame / VAD / Interrupted /
+//     StateChange / Error / Metrics). This file's `VoiceEvent` field
+//     covers higher-level lifecycle/session events that don't fit the
+//     pipeline streaming model (recording start/stop, playback, voice
+//     session orchestration).
+//   • Matches model_types.proto header/options exactly.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "voice_events.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "SdkEventsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Component identifier — every consumer / framework that the SDK orchestrates.
+// Sources pre-IDL:
+//   RN     enums.ts:168 (SDKComponent)             — 7 cases
+//   Swift  ComponentTypes.swift:SDKComponent       — 7 cases
+//   Kotlin ComponentTypes.kt:SDKComponent          — 7 cases
+//   Dart   sdk_component.dart                      — 7 cases
+// Canonical superset adds: VLM, DIFFUSION, RAG, WAKEWORD (referenced by
+// RN's ComponentInitializationEvent.components: SDKComponent[] but not yet
+// in any SDK's enum).
+// ---------------------------------------------------------------------------
+enum SDKComponent {
+    SDK_COMPONENT_UNSPECIFIED          = 0;
+    SDK_COMPONENT_STT                  = 1;
+    SDK_COMPONENT_TTS                  = 2;
+    SDK_COMPONENT_VAD                  = 3;
+    SDK_COMPONENT_LLM                  = 4;
+    SDK_COMPONENT_VLM                  = 5;
+    SDK_COMPONENT_DIFFUSION            = 6;
+    SDK_COMPONENT_RAG                  = 7;
+    SDK_COMPONENT_EMBEDDINGS           = 8;
+    SDK_COMPONENT_VOICE_AGENT          = 9;
+    SDK_COMPONENT_WAKEWORD             = 10;
+    SDK_COMPONENT_SPEAKER_DIARIZATION  = 11;
+}
+
+// ---------------------------------------------------------------------------
+// Event severity. New unification — pre-IDL each SDK either implied severity
+// from event type ("failed" → ERROR) or had no notion. Canonicalizing now
+// enables analytics to filter without parsing event names.
+// ---------------------------------------------------------------------------
+enum EventSeverity {
+    EVENT_SEVERITY_DEBUG    = 0;
+    EVENT_SEVERITY_INFO     = 1;
+    EVENT_SEVERITY_WARNING  = 2;
+    EVENT_SEVERITY_ERROR    = 3;
+    EVENT_SEVERITY_CRITICAL = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Where an event should be routed. Mirrors Swift `EventDestination` /
+// Kotlin `EventDestination` / Dart `EventDestination`.
+// Sources pre-IDL:
+//   Swift  SDKEvent.swift:15-22       — publicOnly / analyticsOnly / all
+//   Kotlin SDKEvent.kt:24-33          — PUBLIC_ONLY / ANALYTICS_ONLY / ALL
+//   Dart   sdk_event.dart:20-29       — all / publicOnly / analyticsOnly
+// ---------------------------------------------------------------------------
+enum EventDestination {
+    EVENT_DESTINATION_UNSPECIFIED      = 0;
+    EVENT_DESTINATION_ALL              = 1;   // EventBus + Analytics (default)
+    EVENT_DESTINATION_PUBLIC_ONLY      = 2;   // EventBus only
+    EVENT_DESTINATION_ANALYTICS_ONLY   = 3;   // Analytics/telemetry only
+}
+
+// ---------------------------------------------------------------------------
+// SDK lifecycle / initialization stage events. Mirrors
+//   RN  events.ts:38-43 (SDKInitializationEvent: 5 variants)
+// Plus integrated "configurationLoaded" source field. NOT to be confused
+// with `ComponentInitializationEvent` (per-component lifecycle).
+// ---------------------------------------------------------------------------
+message InitializationEvent {
+    InitializationStage stage     = 1;
+    string              source    = 2;   // for `CONFIGURATION_LOADED` (e.g. "remote", "local", "builtin")
+    string              error     = 3;   // populated when stage == FAILED
+    string              version   = 4;   // SDK version (Kotlin SDKLifecycleEvent.version)
+}
+
+enum InitializationStage {
+    INITIALIZATION_STAGE_UNSPECIFIED            = 0;
+    INITIALIZATION_STAGE_STARTED                = 1;
+    INITIALIZATION_STAGE_CONFIGURATION_LOADED   = 2;
+    INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED  = 3;
+    INITIALIZATION_STAGE_COMPLETED              = 4;
+    INITIALIZATION_STAGE_FAILED                 = 5;
+    INITIALIZATION_STAGE_SHUTDOWN               = 6;   // Kotlin SDKLifecycleEvent.SHUTDOWN
+}
+
+// ---------------------------------------------------------------------------
+// Configuration events — fetch / load / sync / settings retrieval / privacy /
+// routing-policy / analytics-status changes. Mirrors RN
+//   events.ts:49-66 (SDKConfigurationEvent: 17 variants).
+// ---------------------------------------------------------------------------
+message ConfigurationEvent {
+    ConfigurationEventKind kind             = 1;
+
+    // Source of configuration (`fetchCompleted.source`, `loaded.source`, …).
+    string                 source           = 2;
+
+    // Populated on FAILED variants (fetchFailed / syncFailed).
+    string                 error            = 3;
+
+    // List of changed top-level keys (configurationUpdated). Kept as
+    // strings since each SDK uses different KV value types; analytics
+    // only cares about which keys moved.
+    repeated string        changed_keys     = 4;
+
+    // For settings_retrieved — the resulting settings serialized as JSON.
+    // Avoids embedding DefaultGenerationSettings here (lives in llm_options
+    // / config protos).
+    string                 settings_json    = 5;
+
+    // For routing_policy_retrieved (RN events.ts:62 — `policy: string`).
+    string                 routing_policy   = 6;
+
+    // For privacy_mode_retrieved (RN events.ts:64).
+    string                 privacy_mode     = 7;
+
+    // For analytics_status_retrieved (RN events.ts:66 — `enabled: boolean`).
+    bool                   analytics_enabled = 8;
+
+    // Old / new value pairs for config_changed (canonical primitive
+    // representation). Both stored as JSON-encoded strings to avoid
+    // dragging a dynamic-typed `Value` into the schema.
+    string                 old_value_json   = 9;
+    string                 new_value_json   = 10;
+}
+
+enum ConfigurationEventKind {
+    CONFIGURATION_EVENT_KIND_UNSPECIFIED                 = 0;
+    CONFIGURATION_EVENT_KIND_FETCH_STARTED               = 1;
+    CONFIGURATION_EVENT_KIND_FETCH_COMPLETED             = 2;
+    CONFIGURATION_EVENT_KIND_FETCH_FAILED                = 3;
+    CONFIGURATION_EVENT_KIND_LOADED                      = 4;
+    CONFIGURATION_EVENT_KIND_UPDATED                     = 5;
+    CONFIGURATION_EVENT_KIND_SYNC_STARTED                = 6;
+    CONFIGURATION_EVENT_KIND_SYNC_COMPLETED              = 7;
+    CONFIGURATION_EVENT_KIND_SYNC_FAILED                 = 8;
+    CONFIGURATION_EVENT_KIND_SYNC_REQUESTED              = 9;
+    CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED          = 10;
+    CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED          = 11;
+    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED    = 12;
+    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED    = 13;
+    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED      = 14;
+    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED      = 15;
+    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED  = 16;
+    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED  = 17;
+    CONFIGURATION_EVENT_KIND_CHANGED                     = 18;   // generic config_changed (Kotlin/Dart)
+}
+
+// ---------------------------------------------------------------------------
+// LLM generation events. Mirrors RN
+//   events.ts:72-89 (SDKGenerationEvent: 12 variants).
+// Plus Kotlin LLMEvent (5 variants), Dart SDKGenerationEvent (4 factories).
+// ---------------------------------------------------------------------------
+message GenerationEvent {
+    GenerationEventKind kind             = 1;
+
+    // Optional session id (RN voiceSession_*, generationStarted.sessionId).
+    string              session_id       = 2;
+
+    // For STARTED — the prompt text (RN events.ts:75).
+    string              prompt           = 3;
+
+    // For TOKEN_GENERATED / FIRST_TOKEN_GENERATED — single token text.
+    string              token            = 4;
+
+    // For STREAMING_UPDATE — the running response text and token count.
+    string              streaming_text   = 5;
+    int32               tokens_count     = 6;
+
+    // For COMPLETED — full response, usage stats, latency.
+    string              response         = 7;
+    int32               tokens_used      = 8;
+    int64               latency_ms       = 9;
+
+    // For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76).
+    int64               first_token_latency_ms = 10;
+
+    // For FAILED.
+    string              error            = 11;
+
+    // For MODEL_LOADED / MODEL_UNLOADED — bound model.
+    string              model_id         = 12;
+
+    // For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated.
+    double              cost_amount      = 13;
+    double              cost_saved_amount = 14;
+
+    // For ROUTING_DECISION — RN events.ts:89.
+    string              routing_target   = 15;
+    string              routing_reason   = 16;
+}
+
+enum GenerationEventKind {
+    GENERATION_EVENT_KIND_UNSPECIFIED            = 0;
+    GENERATION_EVENT_KIND_SESSION_STARTED        = 1;
+    GENERATION_EVENT_KIND_SESSION_ENDED          = 2;
+    GENERATION_EVENT_KIND_STARTED                = 3;
+    GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED  = 4;
+    GENERATION_EVENT_KIND_TOKEN_GENERATED        = 5;
+    GENERATION_EVENT_KIND_STREAMING_UPDATE       = 6;
+    GENERATION_EVENT_KIND_COMPLETED              = 7;
+    GENERATION_EVENT_KIND_FAILED                 = 8;
+    GENERATION_EVENT_KIND_MODEL_LOADED           = 9;
+    GENERATION_EVENT_KIND_MODEL_UNLOADED         = 10;
+    GENERATION_EVENT_KIND_COST_CALCULATED        = 11;
+    GENERATION_EVENT_KIND_ROUTING_DECISION       = 12;
+    GENERATION_EVENT_KIND_STREAM_COMPLETED       = 13;   // Kotlin LLMEvent.STREAM_COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// Model lifecycle events: load / unload / download / list / catalog / delete /
+// custom-model / built-in-registration. Mirrors RN
+//   events.ts:95-130 (SDKModelEvent: 24 variants).
+// Plus Kotlin ModelEvent (7 ModelEventType) and Dart SDKModelEvent (10
+// concrete classes).
+// ---------------------------------------------------------------------------
+message ModelEvent {
+    ModelEventKind kind                = 1;
+
+    string         model_id            = 2;
+    string         task_id             = 3;   // present on RN download events
+
+    // For LOAD_PROGRESS / DOWNLOAD_PROGRESS — 0.0..1.0.
+    float          progress            = 4;
+
+    // For DOWNLOAD_PROGRESS — bytes counters.
+    int64          bytes_downloaded    = 5;
+    int64          total_bytes         = 6;
+
+    // For DOWNLOAD_PROGRESS — engine-level state string (RN events.ts:111).
+    string         download_state      = 7;
+
+    // For DOWNLOAD_COMPLETED — landed local path (RN events.ts:118).
+    string         local_path          = 8;
+
+    // For *_FAILED.
+    string         error               = 9;
+
+    // For LIST_COMPLETED / CATALOG_LOADED — count only; the full
+    // ModelInfo array travels via response RPCs, not via events.
+    int32          model_count         = 10;
+
+    // For CUSTOM_MODEL_ADDED — RN events.ts:129.
+    string         custom_model_name   = 11;
+    string         custom_model_url    = 12;
+}
+
+enum ModelEventKind {
+    MODEL_EVENT_KIND_UNSPECIFIED            = 0;
+    MODEL_EVENT_KIND_LOAD_STARTED           = 1;
+    MODEL_EVENT_KIND_LOAD_PROGRESS          = 2;
+    MODEL_EVENT_KIND_LOAD_COMPLETED         = 3;
+    MODEL_EVENT_KIND_LOAD_FAILED            = 4;
+    MODEL_EVENT_KIND_UNLOAD_STARTED         = 5;
+    MODEL_EVENT_KIND_UNLOAD_COMPLETED       = 6;
+    MODEL_EVENT_KIND_UNLOAD_FAILED          = 7;
+    MODEL_EVENT_KIND_DOWNLOAD_STARTED       = 8;
+    MODEL_EVENT_KIND_DOWNLOAD_PROGRESS      = 9;
+    MODEL_EVENT_KIND_DOWNLOAD_COMPLETED     = 10;
+    MODEL_EVENT_KIND_DOWNLOAD_FAILED        = 11;
+    MODEL_EVENT_KIND_DOWNLOAD_CANCELLED     = 12;
+    MODEL_EVENT_KIND_LIST_REQUESTED         = 13;
+    MODEL_EVENT_KIND_LIST_COMPLETED         = 14;
+    MODEL_EVENT_KIND_LIST_FAILED            = 15;
+    MODEL_EVENT_KIND_CATALOG_LOADED         = 16;
+    MODEL_EVENT_KIND_DELETE_STARTED         = 17;
+    MODEL_EVENT_KIND_DELETE_COMPLETED       = 18;
+    MODEL_EVENT_KIND_DELETE_FAILED          = 19;
+    MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED     = 20;
+    MODEL_EVENT_KIND_BUILT_IN_REGISTERED    = 21;
+}
+
+// ---------------------------------------------------------------------------
+// Voice / audio higher-level events. Mirrors RN
+//   events.ts:136-187 (SDKVoiceEvent: 41 variants).
+// Plus Dart SDKVoiceEvent (~15 concrete classes), Kotlin STTEvent + TTSEvent.
+//
+// Renamed from `VoiceEvent` to `VoiceLifecycleEvent` to avoid colliding with
+// `runanywhere.v1.VoiceEvent` from voice_events.proto, which carries the
+// low-level streaming pipeline payloads (UserSaid / AssistantToken /
+// AudioFrame / VAD / Interrupted / StateChange / Error / Metrics). The
+// pipeline events are exposed via SDKEvent.voice_pipeline; this message
+// is exposed via SDKEvent.voice.
+// ---------------------------------------------------------------------------
+message VoiceLifecycleEvent {
+    VoiceEventKind kind            = 1;
+
+    // For listeningStarted / voiceSession_* — optional session id.
+    string         session_id      = 2;
+
+    // For TRANSCRIPTION_PARTIAL / TRANSCRIPTION_FINAL / STT_PARTIAL_RESULT /
+    // STT_COMPLETED.
+    string         text            = 3;
+    float          confidence      = 4;
+
+    // For RESPONSE_GENERATED.
+    string         response_text   = 5;
+
+    // For AUDIO_GENERATED — base64-encoded PCM (RN events.ts:145).
+    string         audio_base64    = 6;
+
+    // For RECORDING_STOPPED / PLAYBACK_STARTED / PLAYBACK_COMPLETED —
+    // duration in milliseconds (RN events.ts:158, 160-161).
+    int64          duration_ms     = 7;
+
+    // For VOICE_SESSION_LISTENING — current audio level (RN events.ts:178).
+    float          audio_level     = 8;
+
+    // For VOICE_SESSION_TRANSCRIBED / VOICE_SESSION_RESPONDED /
+    // VOICE_SESSION_TURN_COMPLETED — RN events.ts:182-185.
+    string         transcription   = 9;
+    string         turn_response   = 10;
+    string         turn_audio_base64 = 11;
+
+    // For *_ERROR / *_FAILED.
+    string         error           = 12;
+}
+
+enum VoiceEventKind {
+    VOICE_EVENT_KIND_UNSPECIFIED                 = 0;
+
+    // Listening / detection.
+    VOICE_EVENT_KIND_LISTENING_STARTED           = 1;
+    VOICE_EVENT_KIND_LISTENING_ENDED             = 2;
+    VOICE_EVENT_KIND_SPEECH_DETECTED             = 3;
+
+    // Transcription.
+    VOICE_EVENT_KIND_TRANSCRIPTION_STARTED       = 4;
+    VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL       = 5;
+    VOICE_EVENT_KIND_TRANSCRIPTION_FINAL         = 6;
+
+    // Response generation / synthesis.
+    VOICE_EVENT_KIND_RESPONSE_GENERATED          = 7;
+    VOICE_EVENT_KIND_SYNTHESIS_STARTED           = 8;
+    VOICE_EVENT_KIND_AUDIO_GENERATED             = 9;
+    VOICE_EVENT_KIND_SYNTHESIS_COMPLETED         = 10;
+    VOICE_EVENT_KIND_SYNTHESIS_FAILED            = 11;   // Kotlin TTSEvent.SYNTHESIS_FAILED
+
+    // Pipeline lifecycle (high-level orchestration).
+    VOICE_EVENT_KIND_PIPELINE_STARTED            = 12;
+    VOICE_EVENT_KIND_PIPELINE_COMPLETED          = 13;
+    VOICE_EVENT_KIND_PIPELINE_ERROR              = 14;
+
+    // VAD.
+    VOICE_EVENT_KIND_VAD_STARTED                 = 15;
+    VOICE_EVENT_KIND_VAD_DETECTED                = 16;
+    VOICE_EVENT_KIND_VAD_ENDED                   = 17;
+    VOICE_EVENT_KIND_VAD_INITIALIZED             = 18;
+    VOICE_EVENT_KIND_VAD_STOPPED                 = 19;
+    VOICE_EVENT_KIND_VAD_CLEANED_UP              = 20;
+    VOICE_EVENT_KIND_SPEECH_STARTED              = 21;
+    VOICE_EVENT_KIND_SPEECH_ENDED                = 22;
+
+    // Per-stage processing markers.
+    VOICE_EVENT_KIND_STT_PROCESSING              = 23;
+    VOICE_EVENT_KIND_STT_PARTIAL_RESULT          = 24;
+    VOICE_EVENT_KIND_STT_COMPLETED               = 25;
+    VOICE_EVENT_KIND_STT_FAILED                  = 26;
+    VOICE_EVENT_KIND_LLM_PROCESSING              = 27;
+    VOICE_EVENT_KIND_TTS_PROCESSING              = 28;
+
+    // Recording.
+    VOICE_EVENT_KIND_RECORDING_STARTED           = 29;
+    VOICE_EVENT_KIND_RECORDING_STOPPED           = 30;
+
+    // Playback.
+    VOICE_EVENT_KIND_PLAYBACK_STARTED            = 31;
+    VOICE_EVENT_KIND_PLAYBACK_COMPLETED          = 32;
+    VOICE_EVENT_KIND_PLAYBACK_STOPPED            = 33;
+    VOICE_EVENT_KIND_PLAYBACK_PAUSED             = 34;
+    VOICE_EVENT_KIND_PLAYBACK_RESUMED            = 35;
+    VOICE_EVENT_KIND_PLAYBACK_FAILED             = 36;
+
+    // Voice session orchestration (RN events.ts:177-187).
+    VOICE_EVENT_KIND_VOICE_SESSION_STARTED       = 37;
+    VOICE_EVENT_KIND_VOICE_SESSION_LISTENING     = 38;
+    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED = 39;
+    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED  = 40;
+    VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING    = 41;
+    VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED   = 42;
+    VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED     = 43;
+    VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING      = 44;
+    VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED = 45;
+    VOICE_EVENT_KIND_VOICE_SESSION_STOPPED       = 46;
+    VOICE_EVENT_KIND_VOICE_SESSION_ERROR         = 47;
+}
+
+// ---------------------------------------------------------------------------
+// Performance metrics events. Mirrors RN
+//   events.ts:193-197 (SDKPerformanceEvent: 4 variants).
+// ---------------------------------------------------------------------------
+message PerformanceEvent {
+    PerformanceEventKind kind              = 1;
+
+    // For MEMORY_WARNING — usage in bytes (RN typed as number).
+    int64                memory_bytes      = 2;
+
+    // For THERMAL_STATE_CHANGED — engine-defined state string
+    // (e.g. "nominal", "fair", "serious", "critical"; Apple-specific
+    // names preserved as strings to avoid platform-coupled enums).
+    string               thermal_state     = 3;
+
+    // For LATENCY_MEASURED.
+    string               operation         = 4;
+    int64                milliseconds      = 5;
+
+    // For THROUGHPUT_MEASURED — RN events.ts:197.
+    double               tokens_per_second = 6;
+}
+
+enum PerformanceEventKind {
+    PERFORMANCE_EVENT_KIND_UNSPECIFIED          = 0;
+    PERFORMANCE_EVENT_KIND_MEMORY_WARNING       = 1;
+    PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED = 2;
+    PERFORMANCE_EVENT_KIND_LATENCY_MEASURED     = 3;
+    PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED  = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Network events. Mirrors RN
+//   events.ts:203-207 (SDKNetworkEvent: 4 variants).
+// ---------------------------------------------------------------------------
+message NetworkEvent {
+    NetworkEventKind kind         = 1;
+
+    string           url          = 2;
+
+    // For REQUEST_COMPLETED — HTTP status (RN events.ts:205).
+    int32            status_code  = 3;
+
+    // For CONNECTIVITY_CHANGED — RN events.ts:207.
+    bool             is_online    = 4;
+
+    // For REQUEST_FAILED / TIMEOUT.
+    string           error        = 5;
+
+    // For REQUEST_COMPLETED — response time in ms (canonical addition,
+    // implied by Kotlin/iOS request timing instrumentation).
+    int64            latency_ms   = 6;
+}
+
+enum NetworkEventKind {
+    NETWORK_EVENT_KIND_UNSPECIFIED         = 0;
+    NETWORK_EVENT_KIND_REQUEST_STARTED     = 1;
+    NETWORK_EVENT_KIND_REQUEST_COMPLETED   = 2;
+    NETWORK_EVENT_KIND_REQUEST_FAILED      = 3;
+    NETWORK_EVENT_KIND_REQUEST_TIMEOUT     = 4;
+    NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Storage events. Mirrors RN
+//   events.ts:213-226 (SDKStorageEvent: 13 variants).
+// Plus Dart SDKStorageEvent (cacheCleared, tempFilesCleaned).
+// ---------------------------------------------------------------------------
+message StorageEvent {
+    StorageEventKind kind              = 1;
+
+    // For DELETE_MODEL_* events.
+    string           model_id          = 2;
+
+    // For *_FAILED.
+    string           error             = 3;
+
+    // For INFO_RETRIEVED — total/available bytes (StorageInfo summary).
+    int64            total_bytes       = 4;
+    int64            available_bytes   = 5;
+    int64            used_bytes        = 6;
+
+    // For MODELS_RETRIEVED.
+    int32            stored_model_count = 7;
+
+    // For CACHE_HIT / CACHE_MISS / EVICTION (canonical superset additions
+    // not in RN's events.ts but called out in Step 3 spec).
+    string           cache_key         = 8;
+    int64            evicted_bytes     = 9;
+}
+
+enum StorageEventKind {
+    STORAGE_EVENT_KIND_UNSPECIFIED            = 0;
+    STORAGE_EVENT_KIND_INFO_REQUESTED         = 1;
+    STORAGE_EVENT_KIND_INFO_RETRIEVED         = 2;
+    STORAGE_EVENT_KIND_MODELS_REQUESTED       = 3;
+    STORAGE_EVENT_KIND_MODELS_RETRIEVED       = 4;
+    STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED    = 5;
+    STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED  = 6;
+    STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED     = 7;
+    STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED     = 8;
+    STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED   = 9;
+    STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED      = 10;
+    STORAGE_EVENT_KIND_DELETE_MODEL_STARTED   = 11;
+    STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED = 12;
+    STORAGE_EVENT_KIND_DELETE_MODEL_FAILED    = 13;
+    STORAGE_EVENT_KIND_CACHE_HIT              = 14;
+    STORAGE_EVENT_KIND_CACHE_MISS             = 15;
+    STORAGE_EVENT_KIND_EVICTION               = 16;
+    STORAGE_EVENT_KIND_DISK_FULL              = 17;
+}
+
+// ---------------------------------------------------------------------------
+// Framework registry events. Mirrors RN
+//   events.ts:232-251 (SDKFrameworkEvent: 11 variants).
+// ---------------------------------------------------------------------------
+message FrameworkEvent {
+    FrameworkEventKind  kind             = 1;
+
+    // For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. Uses
+    // canonical InferenceFramework from model_types.proto, but stored as
+    // its enum int32 here to avoid cross-file message dependency just for
+    // a single field. Frontends decode via the shared codegen.
+    int32               framework        = 2;   // InferenceFramework
+
+    // For ADAPTER_REGISTERED — adapter display name.
+    string              adapter_name     = 3;
+
+    // For ADAPTERS_RETRIEVED / *_RETRIEVED — counts.
+    int32               adapter_count    = 4;
+    int32               framework_count  = 5;
+
+    // For MODELS_FOR_FRAMEWORK_RETRIEVED — model count (full ModelInfo[]
+    // travels via RPCs, not events).
+    int32               model_count      = 6;
+
+    // For *_FOR_MODALITY_* — modality identifier (string-keyed; canonical
+    // FrameworkModality enum exists in model_types but we keep this loose
+    // so plugins can register custom modalities).
+    string              modality         = 7;
+
+    // For ERROR / UNREGISTERED failures (canonical superset additions).
+    string              error            = 8;
+}
+
+enum FrameworkEventKind {
+    FRAMEWORK_EVENT_KIND_UNSPECIFIED                    = 0;
+    FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED             = 1;
+    FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED           = 2;
+    FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED             = 3;
+    FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED             = 4;
+    FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED           = 5;
+    FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED           = 6;
+    FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED         = 7;
+    FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED         = 8;
+    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED = 9;
+    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED = 10;
+    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED = 11;
+    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED = 12;
+    FRAMEWORK_EVENT_KIND_ERROR                          = 13;
+}
+
+// ---------------------------------------------------------------------------
+// Device events: device-info collection / sync, plus battery / thermal /
+// connectivity changes (canonical superset; Kotlin's analytics layer
+// already emits these as raw `BaseSDKEvent`s with category=device).
+// Mirrors RN events.ts:257-264 (SDKDeviceEvent: 7 variants).
+// ---------------------------------------------------------------------------
+message DeviceEvent {
+    DeviceEventKind kind            = 1;
+
+    // For DEVICE_INFO_COLLECTED / REFRESHED — populated state-key/value
+    // pairs (avoid embedding full DeviceInfoData; that lives in its own
+    // proto). The summary fields below are the most-queried subset.
+    string          device_id       = 2;
+    string          os_name         = 3;
+    string          os_version      = 4;
+    string          model           = 5;
+
+    // For *_FAILED.
+    string          error           = 6;
+
+    // For DEVICE_STATE_CHANGED — RN events.ts:264.
+    string          property        = 7;
+    string          new_value       = 8;
+    string          old_value       = 9;
+
+    // For BATTERY_CHANGED / THERMAL_CHANGED / CONNECTIVITY_CHANGED.
+    float           battery_level   = 10;   // 0.0..1.0
+    bool            is_charging     = 11;
+    string          thermal_state   = 12;   // free-form (Apple-specific names)
+    bool            is_connected    = 13;
+    string          connection_type = 14;   // "wifi", "cellular", "ethernet", ...
+}
+
+enum DeviceEventKind {
+    DEVICE_EVENT_KIND_UNSPECIFIED                    = 0;
+    DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED          = 1;
+    DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED  = 2;
+    DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED          = 3;
+    DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED       = 4;
+    DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED     = 5;
+    DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED        = 6;
+    DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED           = 7;
+    DEVICE_EVENT_KIND_BATTERY_CHANGED                = 8;
+    DEVICE_EVENT_KIND_THERMAL_CHANGED                = 9;
+    DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED           = 10;
+    DEVICE_EVENT_KIND_DEVICE_REGISTERED              = 11;   // Dart DeviceRegistered
+    DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED     = 12;   // Dart DeviceRegistrationFailed
+}
+
+// ---------------------------------------------------------------------------
+// Per-component initialization lifecycle. Mirrors RN
+//   events.ts:270-312 (ComponentInitializationEvent: 16 variants).
+// Distinct from `InitializationEvent` (overall SDK lifecycle).
+// ---------------------------------------------------------------------------
+message ComponentInitializationEvent {
+    ComponentInitializationEventKind kind            = 1;
+
+    // Single-component events (componentChecking / componentReady / …).
+    SDKComponent                     component       = 2;
+
+    // For COMPONENT_CHECKING / COMPONENT_INITIALIZING / COMPONENT_READY /
+    // download events.
+    string                           model_id        = 3;
+
+    // For COMPONENT_DOWNLOAD_REQUIRED — RN events.ts:285.
+    int64                            size_bytes      = 4;
+
+    // For COMPONENT_DOWNLOAD_PROGRESS — 0.0..1.0.
+    float                            progress        = 5;
+
+    // For COMPONENT_FAILED / *_FAILED.
+    string                           error           = 6;
+
+    // For COMPONENT_STATE_CHANGED — RN events.ts:274-278.
+    string                           old_state       = 7;
+    string                           new_state       = 8;
+
+    // For multi-component events (initializationStarted / parallel/sequential /
+    // someComponentsReady).
+    repeated SDKComponent            components       = 9;
+    repeated SDKComponent            ready_components = 10;
+    repeated SDKComponent            pending_components = 11;
+
+    // For INITIALIZATION_COMPLETED — InitializationResult summary
+    // (success bool + count). Full result travels via dedicated RPC.
+    bool                             init_success     = 12;
+    int32                            ready_count      = 13;
+    int32                            failed_count     = 14;
+}
+
+enum ComponentInitializationEventKind {
+    COMPONENT_INIT_EVENT_KIND_UNSPECIFIED                = 0;
+    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED     = 1;
+    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED   = 2;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED    = 3;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING         = 4;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED = 5;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED = 6;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS = 7;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED = 8;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING     = 9;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_READY            = 10;
+    COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED           = 11;
+    COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED      = 12;
+    COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED    = 13;
+    COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY       = 14;
+    COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY      = 15;
+}
+
+// ---------------------------------------------------------------------------
+// Top-level event envelope. Every event published by every SDK is wrapped in
+// exactly one `SDKEvent` — analytics consumers, app developers, and
+// pipelines all decode the same bytes.
+//
+// `voice_pipeline` carries the streaming voice pipeline events from
+// `voice_events.proto` (UserSaid / AssistantToken / AudioFrame / VAD /
+// Interrupted / StateChange / Error / Metrics). Higher-level voice
+// lifecycle events live in this file's `voice` field.
+// ---------------------------------------------------------------------------
+message SDKEvent {
+    // Wall-clock time of event creation, milliseconds since Unix epoch.
+    int64            timestamp_ms = 1;
+
+    EventSeverity    severity     = 2;
+
+    // Event identifier (UUID). Required by Swift SDKEvent.id /
+    // Kotlin SDKEvent.id / Dart SDKEvent.id for de-duplication.
+    string           id           = 13;
+
+    // Optional session id for grouping related events
+    // (Swift sessionId / Kotlin sessionId / Dart sessionId).
+    string           session_id   = 14;
+
+    // Event routing destination (Swift EventDestination, Kotlin
+    // EventDestination, Dart EventDestination).
+    EventDestination destination  = 15;
+
+    // Free-form metadata for properties not modeled above
+    // (mirrors `properties: Map<String, String>` from each SDK).
+    map<string, string> properties = 16;
+
+    oneof event {
+        InitializationEvent           initialization     = 3;
+        ConfigurationEvent            configuration      = 4;
+        GenerationEvent               generation         = 5;
+        ModelEvent                    model              = 6;
+        PerformanceEvent              performance        = 7;
+        NetworkEvent                  network            = 8;
+        StorageEvent                  storage            = 9;
+        FrameworkEvent                framework          = 10;
+        DeviceEvent                   device             = 11;
+        ComponentInitializationEvent  component_init     = 12;
+        VoiceLifecycleEvent           voice              = 17;
+        VoiceEvent                    voice_pipeline     = 18;   // from voice_events.proto
+    }
+}

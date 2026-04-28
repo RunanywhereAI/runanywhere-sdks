@@ -449,13 +449,17 @@ export async function generateWithTools(
 
     // Generate response
     let responseText = '';
-    const streamResult = await generateStream(fullPrompt, {
-      maxTokens: options?.maxTokens,
-      temperature: options?.temperature,
-    });
-
-    for await (const token of streamResult.stream) {
-      responseText += token;
+    for await (const token of generateStream(fullPrompt, {
+      maxTokens: options?.maxTokens ?? 1000,
+      temperature: options?.temperature ?? 0.7,
+      topP: 1.0,
+      topK: 0,
+      repetitionPenalty: 1.0,
+      stopSequences: [],
+      streamingEnabled: true,
+      preferredFramework: 0,
+    })) {
+      responseText += token.text;
     }
 
     logger.debug(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);

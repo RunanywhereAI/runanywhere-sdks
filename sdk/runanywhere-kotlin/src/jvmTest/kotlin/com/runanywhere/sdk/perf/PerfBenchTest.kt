@@ -14,19 +14,18 @@
 
 package com.runanywhere.sdk.perf
 
-import org.junit.Test
 import org.junit.Assume
+import org.junit.Test
+import tests.streaming.perfbench.PerfBench
 import java.io.File
-import tests.streaming.perf_bench.PerfBench
 import kotlin.test.assertTrue
 
 class PerfBenchTest {
-
     @Test
     fun `perf bench decodes and emits deltas`() {
         Assume.assumeTrue(
             "perf_bench input missing at /tmp/perf_input.bin (run perf_producer first)",
-            File(PerfBench.DEFAULT_INPUT_PATH).exists()
+            File(PerfBench.DEFAULT_INPUT_PATH).exists(),
         )
 
         val result = PerfBench.run()
@@ -38,7 +37,7 @@ class PerfBenchTest {
     fun `perf bench p50 under 1ms`() {
         Assume.assumeTrue(
             "perf_bench input missing at /tmp/perf_input.bin",
-            File(PerfBench.DEFAULT_INPUT_PATH).exists()
+            File(PerfBench.DEFAULT_INPUT_PATH).exists(),
         )
 
         val result = PerfBench.run()
@@ -47,8 +46,8 @@ class PerfBenchTest {
             "no non-zero deltas — producer likely not emitting metrics arm"
         }
         assertTrue(
-            p50 < 1_000_000L,  // 1 ms
-            "p50 latency $p50 ns exceeds 1ms threshold (GAP 09 #8)"
+            p50 < 1_000_000L, // 1 ms
+            "p50 latency $p50 ns exceeds 1ms threshold (GAP 09 #8)",
         )
     }
 }

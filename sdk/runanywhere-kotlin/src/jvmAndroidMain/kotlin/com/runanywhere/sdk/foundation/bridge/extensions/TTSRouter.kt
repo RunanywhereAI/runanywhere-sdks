@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -90,7 +90,7 @@ object TTSRouter {
             } else {
                 val errorMsg = "Failed to load TTS model (error: $result)"
                 logger.error(errorMsg)
-                Result.failure(SDKError.tts(errorMsg))
+                Result.failure(SDKException.tts(errorMsg))
             }
         }
 
@@ -109,7 +109,7 @@ object TTSRouter {
     ): Result<CppBridgeTTS.SynthesisResult> {
         return when (_currentBackend) {
             is Backend.SherpaOnnx -> synthesizeWithSherpaOnnx(text, config)
-            null -> Result.failure(SDKError.tts("No TTS model loaded"))
+            null -> Result.failure(SDKException.tts("No TTS model loaded"))
         }
     }
 
@@ -140,7 +140,7 @@ object TTSRouter {
                     Result.failure(e)
                 }
             }
-            null -> Result.failure(SDKError.tts("No TTS model loaded"))
+            null -> Result.failure(SDKException.tts("No TTS model loaded"))
         }
     }
 

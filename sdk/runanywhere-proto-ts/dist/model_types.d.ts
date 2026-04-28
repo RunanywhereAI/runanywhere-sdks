@@ -209,6 +209,71 @@ export declare function archiveStructureFromJSON(object: any): ArchiveStructure;
 export declare function archiveStructureToJSON(object: ArchiveStructure): string;
 /**
  * ---------------------------------------------------------------------------
+ * High-level artifact classification — what KIND of bundle a model ships as.
+ * Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
+ * compression flavor). Sources pre-IDL:
+ *   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
+ *   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
+ *   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
+ * ---------------------------------------------------------------------------
+ */
+export declare enum ModelArtifactType {
+    MODEL_ARTIFACT_TYPE_UNSPECIFIED = 0,
+    MODEL_ARTIFACT_TYPE_SINGLE_FILE = 1,
+    MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE = 2,
+    MODEL_ARTIFACT_TYPE_DIRECTORY = 3,
+    MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE = 4,
+    MODEL_ARTIFACT_TYPE_CUSTOM = 5,
+    UNRECOGNIZED = -1
+}
+export declare function modelArtifactTypeFromJSON(object: any): ModelArtifactType;
+export declare function modelArtifactTypeToJSON(object: ModelArtifactType): string;
+/**
+ * ---------------------------------------------------------------------------
+ * Hardware acceleration preference for inference. Sources pre-IDL:
+ *   Web    enums.ts:165   (Auto / WebGPU / CPU)
+ *   Swift  extensions     (CPU / GPU / NPU / Metal)
+ *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+ * Canonicalized union below.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum AccelerationPreference {
+    ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
+    ACCELERATION_PREFERENCE_AUTO = 1,
+    ACCELERATION_PREFERENCE_CPU = 2,
+    ACCELERATION_PREFERENCE_GPU = 3,
+    ACCELERATION_PREFERENCE_NPU = 4,
+    ACCELERATION_PREFERENCE_WEBGPU = 5,
+    ACCELERATION_PREFERENCE_METAL = 6,
+    ACCELERATION_PREFERENCE_VULKAN = 7,
+    UNRECOGNIZED = -1
+}
+export declare function accelerationPreferenceFromJSON(object: any): AccelerationPreference;
+export declare function accelerationPreferenceToJSON(object: AccelerationPreference): string;
+/**
+ * ---------------------------------------------------------------------------
+ * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
+ *   Web    enums.ts (RoutingPolicy)
+ *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
+ *          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
+ *   Swift  extensions (RoutingPolicy)
+ * Canonical short-form below; specific PreferLocal/PreferCloud cover the
+ * "preferred" cases, MANUAL covers explicit user override.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum RoutingPolicy {
+    ROUTING_POLICY_UNSPECIFIED = 0,
+    ROUTING_POLICY_PREFER_LOCAL = 1,
+    ROUTING_POLICY_PREFER_CLOUD = 2,
+    ROUTING_POLICY_COST_OPTIMIZED = 3,
+    ROUTING_POLICY_LATENCY_OPTIMIZED = 4,
+    ROUTING_POLICY_MANUAL = 5,
+    UNRECOGNIZED = -1
+}
+export declare function routingPolicyFromJSON(object: any): RoutingPolicy;
+export declare function routingPolicyToJSON(object: RoutingPolicy): string;
+/**
+ * ---------------------------------------------------------------------------
  * Core metadata for a model entry.
  * Sources pre-IDL:
  *   Swift  ModelTypes.swift:393       (16 fields)
@@ -238,6 +303,18 @@ export interface ModelInfo {
     multiFile?: MultiFileArtifact | undefined;
     customStrategyId?: string | undefined;
     builtIn?: boolean | undefined;
+    /**
+     * High-level artifact classification, complementary to the `artifact`
+     * oneof above. Allows catalog entries to carry a coarse type tag without
+     * resolving the full strategy variant.
+     */
+    artifactType?: ModelArtifactType | undefined;
+    /** Manifest of files that are expected on disk after fetch/extraction. */
+    expectedFiles?: ExpectedModelFiles | undefined;
+    /** Preferred hardware acceleration backend for this model. */
+    accelerationPreference?: AccelerationPreference | undefined;
+    /** Hybrid (on-device vs cloud) routing policy for this entry. */
+    routingPolicy?: RoutingPolicy | undefined;
 }
 export interface SingleFileArtifact {
     requiredPatterns: string[];
@@ -253,9 +330,30 @@ export interface ModelFileDescriptor {
     url: string;
     filename: string;
     isRequired: boolean;
+    /**
+     * Extended descriptor fields (Flutter model_types.dart:~350,
+     * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
+     * canonical "required" flag — the documented `required` boolean from
+     * newer SDK sources maps onto it (default true, mirrored in Swift).
+     */
+    sizeBytes?: number | undefined;
+    checksum?: string | undefined;
 }
 export interface MultiFileArtifact {
     files: ModelFileDescriptor[];
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Declarative manifest of files a multi-file / directory model is expected
+ * to contain on disk after download/extraction. Used for verification before
+ * hand-off to the inference framework. Sources pre-IDL:
+ *   Flutter core/types/model_types.dart:420
+ *   Swift   ModelTypes.swift:~300
+ * ---------------------------------------------------------------------------
+ */
+export interface ExpectedModelFiles {
+    files: ModelFileDescriptor[];
+    rootDirectory?: string | undefined;
 }
 export declare const ModelInfo: {
     encode(message: ModelInfo, writer?: _m0.Writer): _m0.Writer;
@@ -296,6 +394,14 @@ export declare const MultiFileArtifact: {
     toJSON(message: MultiFileArtifact): unknown;
     create<I extends Exact<DeepPartial<MultiFileArtifact>, I>>(base?: I): MultiFileArtifact;
     fromPartial<I extends Exact<DeepPartial<MultiFileArtifact>, I>>(object: I): MultiFileArtifact;
+};
+export declare const ExpectedModelFiles: {
+    encode(message: ExpectedModelFiles, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ExpectedModelFiles;
+    fromJSON(object: any): ExpectedModelFiles;
+    toJSON(message: ExpectedModelFiles): unknown;
+    create<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(base?: I): ExpectedModelFiles;
+    fromPartial<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(object: I): ExpectedModelFiles;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

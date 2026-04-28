@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.security
 
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 
 /**
  * Platform-agnostic secure storage interface
@@ -15,7 +15,7 @@ interface SecureStorage {
      * Store a string value securely
      * @param key Unique identifier for the value
      * @param value String value to store
-     * @throws SDKError.SecurityError if storage fails
+     * @throws SDKException.SecurityError if storage fails
      */
     suspend fun setSecureString(
         key: String,
@@ -26,7 +26,7 @@ interface SecureStorage {
      * Retrieve a stored string value
      * @param key Unique identifier for the value
      * @return Stored string value or null if not found
-     * @throws SDKError.SecurityError if retrieval fails
+     * @throws SDKException.SecurityError if retrieval fails
      */
     suspend fun getSecureString(key: String): String?
 
@@ -34,7 +34,7 @@ interface SecureStorage {
      * Store binary data securely
      * @param key Unique identifier for the data
      * @param data Binary data to store
-     * @throws SDKError.SecurityError if storage fails
+     * @throws SDKException.SecurityError if storage fails
      */
     suspend fun setSecureData(
         key: String,
@@ -45,14 +45,14 @@ interface SecureStorage {
      * Retrieve stored binary data
      * @param key Unique identifier for the data
      * @return Stored binary data or null if not found
-     * @throws SDKError.SecurityError if retrieval fails
+     * @throws SDKException.SecurityError if retrieval fails
      */
     suspend fun getSecureData(key: String): ByteArray?
 
     /**
      * Remove a stored value
      * @param key Unique identifier for the value to remove
-     * @throws SDKError.SecurityError if removal fails
+     * @throws SDKException.SecurityError if removal fails
      */
     suspend fun removeSecure(key: String)
 
@@ -65,7 +65,7 @@ interface SecureStorage {
 
     /**
      * Clear all stored values (use with caution)
-     * @throws SDKError.SecurityError if clear operation fails
+     * @throws SDKException.SecurityError if clear operation fails
      */
     suspend fun clearAll()
 

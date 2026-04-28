@@ -373,7 +373,7 @@ class DartBridgeLLM {
     String? systemPrompt,
     bool streamingEnabled = false,
   }) {
-    LLMConfiguration(
+    LLMComponentConfig(
       contextLength: contextLength,
       maxTokens: maxTokens,
       temperature: temperature,

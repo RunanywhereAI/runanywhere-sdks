@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.TTSOptions
+import ai.runanywhere.proto.v1.TTSOutput
+import ai.runanywhere.proto.v1.TTSSpeakResult
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
-import com.runanywhere.sdk.public.extensions.TTS.TTSOutput
-import com.runanywhere.sdk.public.extensions.TTS.TTSSpeakResult
 
 // MARK: - Voice Loading
 

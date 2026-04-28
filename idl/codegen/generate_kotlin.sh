@@ -34,7 +34,11 @@ if command -v wire-compiler >/dev/null 2>&1; then
         --kotlin_out="${OUT_DIR}" \
         model_types.proto voice_events.proto pipeline.proto solutions.proto \
         voice_agent_service.proto llm_service.proto download_service.proto \
-        llm_options.proto chat.proto tool_calling.proto
+        llm_options.proto chat.proto tool_calling.proto \
+        diffusion_options.proto embeddings_options.proto errors.proto \
+        lora_options.proto rag.proto sdk_events.proto storage_types.proto \
+        structured_output.proto stt_options.proto tts_options.proto \
+        vad_options.proto vlm_options.proto
 
     # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
     # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both

@@ -47,7 +47,7 @@ object CppBridgeVoiceAgent {
         if (newHandle == INVALID_HANDLE) {
             throw IllegalStateException(
                 "rac_voice_agent_create_standalone returned 0 — " +
-                    "likely OOM or missing rac_commons linkage."
+                    "likely OOM or missing rac_commons linkage.",
             )
         }
 
@@ -56,7 +56,7 @@ object CppBridgeVoiceAgent {
             RunAnywhereBridge.racVoiceAgentDestroy(newHandle)
             throw IllegalStateException(
                 "rac_voice_agent_initialize_with_loaded_models failed with code $initResult. " +
-                    "Ensure STT/LLM/TTS models are loaded (loadSTT/loadLLM/loadTTS) first."
+                    "Ensure STT/LLM/TTS models are loaded (loadSTT/loadLLM/loadTTS) first.",
             )
         }
 

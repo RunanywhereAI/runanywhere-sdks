@@ -5,9 +5,75 @@
 // source: solutions.proto
 
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 
 export const protobufPackage = "runanywhere.v1";
+
+/**
+ * ---------------------------------------------------------------------------
+ * SolutionType — discriminator for the kind of solution backing a
+ * `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
+ * oneof arms so frontends can switch on a single enum value rather than
+ * inspecting the oneof shape.
+ * ---------------------------------------------------------------------------
+ */
+export enum SolutionType {
+  SOLUTION_TYPE_UNSPECIFIED = 0,
+  SOLUTION_TYPE_VOICE_AGENT = 1,
+  SOLUTION_TYPE_RAG = 2,
+  SOLUTION_TYPE_WAKEWORD = 3,
+  SOLUTION_TYPE_TIME_SERIES = 4,
+  SOLUTION_TYPE_AGENT_LOOP = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function solutionTypeFromJSON(object: any): SolutionType {
+  switch (object) {
+    case 0:
+    case "SOLUTION_TYPE_UNSPECIFIED":
+      return SolutionType.SOLUTION_TYPE_UNSPECIFIED;
+    case 1:
+    case "SOLUTION_TYPE_VOICE_AGENT":
+      return SolutionType.SOLUTION_TYPE_VOICE_AGENT;
+    case 2:
+    case "SOLUTION_TYPE_RAG":
+      return SolutionType.SOLUTION_TYPE_RAG;
+    case 3:
+    case "SOLUTION_TYPE_WAKEWORD":
+      return SolutionType.SOLUTION_TYPE_WAKEWORD;
+    case 4:
+    case "SOLUTION_TYPE_TIME_SERIES":
+      return SolutionType.SOLUTION_TYPE_TIME_SERIES;
+    case 5:
+    case "SOLUTION_TYPE_AGENT_LOOP":
+      return SolutionType.SOLUTION_TYPE_AGENT_LOOP;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return SolutionType.UNRECOGNIZED;
+  }
+}
+
+export function solutionTypeToJSON(object: SolutionType): string {
+  switch (object) {
+    case SolutionType.SOLUTION_TYPE_UNSPECIFIED:
+      return "SOLUTION_TYPE_UNSPECIFIED";
+    case SolutionType.SOLUTION_TYPE_VOICE_AGENT:
+      return "SOLUTION_TYPE_VOICE_AGENT";
+    case SolutionType.SOLUTION_TYPE_RAG:
+      return "SOLUTION_TYPE_RAG";
+    case SolutionType.SOLUTION_TYPE_WAKEWORD:
+      return "SOLUTION_TYPE_WAKEWORD";
+    case SolutionType.SOLUTION_TYPE_TIME_SERIES:
+      return "SOLUTION_TYPE_TIME_SERIES";
+    case SolutionType.SOLUTION_TYPE_AGENT_LOOP:
+      return "SOLUTION_TYPE_AGENT_LOOP";
+    case SolutionType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 export enum AudioSource {
   AUDIO_SOURCE_UNSPECIFIED = 0,
@@ -109,6 +175,39 @@ export interface SolutionConfig {
 
 /**
  * ---------------------------------------------------------------------------
+ * SolutionHandle — opaque, serialisable descriptor for a started solution.
+ *
+ * The native side owns a `rac_solution_handle_t`; this message is the
+ * language-agnostic shape that frontends (Swift `SolutionHandle` class,
+ * Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
+ * the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
+ * are issued against the C handle keyed by `handle_id`.
+ * ---------------------------------------------------------------------------
+ */
+export interface SolutionHandle {
+  /**
+   * Stable, opaque identifier minted by the core for this solution
+   * instance. Used as the lookup key for lifecycle calls.
+   */
+  handleId: string;
+  /**
+   * String discriminator for the solution kind, e.g. "voice_agent",
+   * "rag", "wakeword", "time_series", "agent_loop". Free-form for
+   * forward-compat with future solutions; canonical values match the
+   * `SolutionType` enum names lower-cased.
+   */
+  solutionType: string;
+  /** Wall-clock creation timestamp (ms since Unix epoch). */
+  createdAtMs: number;
+  /**
+   * Optional engine-specific state string (e.g. "created", "running",
+   * "stopped"). Empty when the host hasn't surfaced state.
+   */
+  state?: string | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * VoiceAgent — the canonical streaming voice AI loop.
  * ---------------------------------------------------------------------------
  */
@@ -143,6 +242,12 @@ export interface VoiceAgentConfig {
   emitPartials: boolean;
   /** Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens. */
   emitThoughts: boolean;
+  /**
+   * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
+   * oneof arm; provided so callers that pass this message standalone (or
+   * log it) can read a single discriminator. Defaults to UNSPECIFIED.
+   */
+  typeKind?: SolutionType | undefined;
 }
 
 /**
@@ -172,6 +277,8 @@ export interface RAGConfig {
   rrfK: number;
   /** Prompt template. Supports {{context}} and {{query}} placeholders. */
   promptTemplate: string;
+  /** Optional explicit solution-kind tag. See `SolutionType`. */
+  typeKind?: SolutionType | undefined;
 }
 
 /**
@@ -190,6 +297,8 @@ export interface WakeWordConfig {
   preRollMs: number;
   /** default 16000 */
   sampleRateHz: number;
+  /** Optional explicit solution-kind tag. See `SolutionType`. */
+  typeKind?: SolutionType | undefined;
 }
 
 /**
@@ -204,6 +313,8 @@ export interface AgentLoopConfig {
   /** default 10 */
   maxIterations: number;
   maxContextTokens: number;
+  /** Optional explicit solution-kind tag. See `SolutionType`. */
+  typeKind?: SolutionType | undefined;
 }
 
 export interface ToolSpec {
@@ -225,6 +336,8 @@ export interface TimeSeriesConfig {
   windowSize: number;
   stride: number;
   anomalyThreshold: number;
+  /** Optional explicit solution-kind tag. See `SolutionType`. */
+  typeKind?: SolutionType | undefined;
 }
 
 function createBaseSolutionConfig(): SolutionConfig {
@@ -354,6 +467,110 @@ export const SolutionConfig = {
   },
 };
 
+function createBaseSolutionHandle(): SolutionHandle {
+  return { handleId: "", solutionType: "", createdAtMs: 0, state: undefined };
+}
+
+export const SolutionHandle = {
+  encode(message: SolutionHandle, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.handleId !== "") {
+      writer.uint32(10).string(message.handleId);
+    }
+    if (message.solutionType !== "") {
+      writer.uint32(18).string(message.solutionType);
+    }
+    if (message.createdAtMs !== 0) {
+      writer.uint32(24).int64(message.createdAtMs);
+    }
+    if (message.state !== undefined) {
+      writer.uint32(34).string(message.state);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): SolutionHandle {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSolutionHandle();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.handleId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.solutionType = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.createdAtMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.state = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SolutionHandle {
+    return {
+      handleId: isSet(object.handleId) ? globalThis.String(object.handleId) : "",
+      solutionType: isSet(object.solutionType) ? globalThis.String(object.solutionType) : "",
+      createdAtMs: isSet(object.createdAtMs) ? globalThis.Number(object.createdAtMs) : 0,
+      state: isSet(object.state) ? globalThis.String(object.state) : undefined,
+    };
+  },
+
+  toJSON(message: SolutionHandle): unknown {
+    const obj: any = {};
+    if (message.handleId !== "") {
+      obj.handleId = message.handleId;
+    }
+    if (message.solutionType !== "") {
+      obj.solutionType = message.solutionType;
+    }
+    if (message.createdAtMs !== 0) {
+      obj.createdAtMs = Math.round(message.createdAtMs);
+    }
+    if (message.state !== undefined) {
+      obj.state = message.state;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SolutionHandle>, I>>(base?: I): SolutionHandle {
+    return SolutionHandle.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SolutionHandle>, I>>(object: I): SolutionHandle {
+    const message = createBaseSolutionHandle();
+    message.handleId = object.handleId ?? "";
+    message.solutionType = object.solutionType ?? "";
+    message.createdAtMs = object.createdAtMs ?? 0;
+    message.state = object.state ?? undefined;
+    return message;
+  },
+};
+
 function createBaseVoiceAgentConfig(): VoiceAgentConfig {
   return {
     llmModelId: "",
@@ -371,6 +588,7 @@ function createBaseVoiceAgentConfig(): VoiceAgentConfig {
     temperature: 0,
     emitPartials: false,
     emitThoughts: false,
+    typeKind: undefined,
   };
 }
 
@@ -420,6 +638,9 @@ export const VoiceAgentConfig = {
     }
     if (message.emitThoughts !== false) {
       writer.uint32(112).bool(message.emitThoughts);
+    }
+    if (message.typeKind !== undefined) {
+      writer.uint32(128).int32(message.typeKind);
     }
     return writer;
   },
@@ -536,6 +757,13 @@ export const VoiceAgentConfig = {
 
           message.emitThoughts = reader.bool();
           continue;
+        case 16:
+          if (tag !== 128) {
+            break;
+          }
+
+          message.typeKind = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -562,6 +790,7 @@ export const VoiceAgentConfig = {
       temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
       emitPartials: isSet(object.emitPartials) ? globalThis.Boolean(object.emitPartials) : false,
       emitThoughts: isSet(object.emitThoughts) ? globalThis.Boolean(object.emitThoughts) : false,
+      typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
     };
   },
 
@@ -612,6 +841,9 @@ export const VoiceAgentConfig = {
     if (message.emitThoughts !== false) {
       obj.emitThoughts = message.emitThoughts;
     }
+    if (message.typeKind !== undefined) {
+      obj.typeKind = solutionTypeToJSON(message.typeKind);
+    }
     return obj;
   },
 
@@ -635,6 +867,7 @@ export const VoiceAgentConfig = {
     message.temperature = object.temperature ?? 0;
     message.emitPartials = object.emitPartials ?? false;
     message.emitThoughts = object.emitThoughts ?? false;
+    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
@@ -652,6 +885,7 @@ function createBaseRAGConfig(): RAGConfig {
     bm25B: 0,
     rrfK: 0,
     promptTemplate: "",
+    typeKind: undefined,
   };
 }
 
@@ -689,6 +923,9 @@ export const RAGConfig = {
     }
     if (message.promptTemplate !== "") {
       writer.uint32(90).string(message.promptTemplate);
+    }
+    if (message.typeKind !== undefined) {
+      writer.uint32(96).int32(message.typeKind);
     }
     return writer;
   },
@@ -777,6 +1014,13 @@ export const RAGConfig = {
 
           message.promptTemplate = reader.string();
           continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.typeKind = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -799,6 +1043,7 @@ export const RAGConfig = {
       bm25B: isSet(object.bm25B) ? globalThis.Number(object.bm25B) : 0,
       rrfK: isSet(object.rrfK) ? globalThis.Number(object.rrfK) : 0,
       promptTemplate: isSet(object.promptTemplate) ? globalThis.String(object.promptTemplate) : "",
+      typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
     };
   },
 
@@ -837,6 +1082,9 @@ export const RAGConfig = {
     if (message.promptTemplate !== "") {
       obj.promptTemplate = message.promptTemplate;
     }
+    if (message.typeKind !== undefined) {
+      obj.typeKind = solutionTypeToJSON(message.typeKind);
+    }
     return obj;
   },
 
@@ -856,12 +1104,13 @@ export const RAGConfig = {
     message.bm25B = object.bm25B ?? 0;
     message.rrfK = object.rrfK ?? 0;
     message.promptTemplate = object.promptTemplate ?? "";
+    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
 
 function createBaseWakeWordConfig(): WakeWordConfig {
-  return { modelId: "", keyword: "", threshold: 0, preRollMs: 0, sampleRateHz: 0 };
+  return { modelId: "", keyword: "", threshold: 0, preRollMs: 0, sampleRateHz: 0, typeKind: undefined };
 }
 
 export const WakeWordConfig = {
@@ -880,6 +1129,9 @@ export const WakeWordConfig = {
     }
     if (message.sampleRateHz !== 0) {
       writer.uint32(40).int32(message.sampleRateHz);
+    }
+    if (message.typeKind !== undefined) {
+      writer.uint32(48).int32(message.typeKind);
     }
     return writer;
   },
@@ -926,6 +1178,13 @@ export const WakeWordConfig = {
 
           message.sampleRateHz = reader.int32();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.typeKind = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -942,6 +1201,7 @@ export const WakeWordConfig = {
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
       preRollMs: isSet(object.preRollMs) ? globalThis.Number(object.preRollMs) : 0,
       sampleRateHz: isSet(object.sampleRateHz) ? globalThis.Number(object.sampleRateHz) : 0,
+      typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
     };
   },
 
@@ -962,6 +1222,9 @@ export const WakeWordConfig = {
     if (message.sampleRateHz !== 0) {
       obj.sampleRateHz = Math.round(message.sampleRateHz);
     }
+    if (message.typeKind !== undefined) {
+      obj.typeKind = solutionTypeToJSON(message.typeKind);
+    }
     return obj;
   },
 
@@ -975,12 +1238,13 @@ export const WakeWordConfig = {
     message.threshold = object.threshold ?? 0;
     message.preRollMs = object.preRollMs ?? 0;
     message.sampleRateHz = object.sampleRateHz ?? 0;
+    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
 
 function createBaseAgentLoopConfig(): AgentLoopConfig {
-  return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0 };
+  return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0, typeKind: undefined };
 }
 
 export const AgentLoopConfig = {
@@ -999,6 +1263,9 @@ export const AgentLoopConfig = {
     }
     if (message.maxContextTokens !== 0) {
       writer.uint32(40).int32(message.maxContextTokens);
+    }
+    if (message.typeKind !== undefined) {
+      writer.uint32(48).int32(message.typeKind);
     }
     return writer;
   },
@@ -1045,6 +1312,13 @@ export const AgentLoopConfig = {
 
           message.maxContextTokens = reader.int32();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.typeKind = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1061,6 +1335,7 @@ export const AgentLoopConfig = {
       tools: globalThis.Array.isArray(object?.tools) ? object.tools.map((e: any) => ToolSpec.fromJSON(e)) : [],
       maxIterations: isSet(object.maxIterations) ? globalThis.Number(object.maxIterations) : 0,
       maxContextTokens: isSet(object.maxContextTokens) ? globalThis.Number(object.maxContextTokens) : 0,
+      typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
     };
   },
 
@@ -1081,6 +1356,9 @@ export const AgentLoopConfig = {
     if (message.maxContextTokens !== 0) {
       obj.maxContextTokens = Math.round(message.maxContextTokens);
     }
+    if (message.typeKind !== undefined) {
+      obj.typeKind = solutionTypeToJSON(message.typeKind);
+    }
     return obj;
   },
 
@@ -1094,6 +1372,7 @@ export const AgentLoopConfig = {
     message.tools = object.tools?.map((e) => ToolSpec.fromPartial(e)) || [];
     message.maxIterations = object.maxIterations ?? 0;
     message.maxContextTokens = object.maxContextTokens ?? 0;
+    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
@@ -1188,7 +1467,7 @@ export const ToolSpec = {
 };
 
 function createBaseTimeSeriesConfig(): TimeSeriesConfig {
-  return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0 };
+  return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0, typeKind: undefined };
 }
 
 export const TimeSeriesConfig = {
@@ -1207,6 +1486,9 @@ export const TimeSeriesConfig = {
     }
     if (message.anomalyThreshold !== 0) {
       writer.uint32(45).float(message.anomalyThreshold);
+    }
+    if (message.typeKind !== undefined) {
+      writer.uint32(48).int32(message.typeKind);
     }
     return writer;
   },
@@ -1253,6 +1535,13 @@ export const TimeSeriesConfig = {
 
           message.anomalyThreshold = reader.float();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.typeKind = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1269,6 +1558,7 @@ export const TimeSeriesConfig = {
       windowSize: isSet(object.windowSize) ? globalThis.Number(object.windowSize) : 0,
       stride: isSet(object.stride) ? globalThis.Number(object.stride) : 0,
       anomalyThreshold: isSet(object.anomalyThreshold) ? globalThis.Number(object.anomalyThreshold) : 0,
+      typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
     };
   },
 
@@ -1289,6 +1579,9 @@ export const TimeSeriesConfig = {
     if (message.anomalyThreshold !== 0) {
       obj.anomalyThreshold = message.anomalyThreshold;
     }
+    if (message.typeKind !== undefined) {
+      obj.typeKind = solutionTypeToJSON(message.typeKind);
+    }
     return obj;
   },
 
@@ -1302,6 +1595,7 @@ export const TimeSeriesConfig = {
     message.windowSize = object.windowSize ?? 0;
     message.stride = object.stride ?? 0;
     message.anomalyThreshold = object.anomalyThreshold ?? 0;
+    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
@@ -1317,6 +1611,21 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(long: Long): number {
+  if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return long.toNumber();
+}
+
+if (_m0.util.Long !== Long) {
+  _m0.util.Long = Long as any;
+  _m0.configure();
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

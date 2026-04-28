@@ -18,6 +18,36 @@ export declare function toolParameterTypeFromJSON(object: any): ToolParameterTyp
 export declare function toolParameterTypeToJSON(object: ToolParameterType): string;
 /**
  * ---------------------------------------------------------------------------
+ * Tool-call wire formats various LLM families emit. Strongly-typed counterpart
+ * to `ToolCallingOptions.format_hint` (which remains a free-form string for
+ * back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
+ * 1:1 to this enum).
+ *
+ * Drift across SDKs:
+ *   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
+ *     today only exposes `default` and `lfm2` constants on a string-typed
+ *     field — it is not yet an enum.
+ *   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
+ * This enum is the union of formats LLM families actually emit; SDK frontends
+ * should map their existing strings onto these values when surfacing the
+ * strongly-typed field. Keep `format_hint` (string) populated for legacy
+ * consumers until all SDKs migrate.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum ToolCallFormatName {
+    TOOL_CALL_FORMAT_NAME_UNSPECIFIED = 0,
+    TOOL_CALL_FORMAT_NAME_JSON = 1,
+    TOOL_CALL_FORMAT_NAME_XML = 2,
+    TOOL_CALL_FORMAT_NAME_NATIVE = 3,
+    TOOL_CALL_FORMAT_NAME_PYTHONIC = 4,
+    TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS = 5,
+    TOOL_CALL_FORMAT_NAME_HERMES = 6,
+    UNRECOGNIZED = -1
+}
+export declare function toolCallFormatNameFromJSON(object: any): ToolCallFormatName;
+export declare function toolCallFormatNameToJSON(object: ToolCallFormatName): string;
+/**
+ * ---------------------------------------------------------------------------
  * JSON-typed scalar / composite carrier for tool arguments and results.
  * Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
  * TypeScript discriminated union. Used inside ToolParameter.enum_values
@@ -140,6 +170,19 @@ export interface ToolCallingOptions {
      * Empty = SDK default.
      */
     formatHint: string;
+    /**
+     * Strongly-typed tool-call format. Preferred over `format_hint` when set;
+     * `format_hint` remains for legacy callers and per-SDK custom strings
+     * that don't round-trip through this enum.
+     */
+    format?: ToolCallFormatName | undefined;
+    /**
+     * Caller-supplied system prompt that fully replaces the SDK-injected
+     * tool-calling system prompt (rather than being merged with it).
+     * Distinct from `system_prompt` (field 6), which is merged unless
+     * `replace_system_prompt` is true.
+     */
+    customSystemPrompt?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

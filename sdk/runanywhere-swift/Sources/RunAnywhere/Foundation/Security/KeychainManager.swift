@@ -93,10 +93,10 @@ public final class KeychainManager {
     /// - Parameters:
     ///   - value: String value to store
     ///   - key: Unique key for the value
-    /// - Throws: SDKError if storage fails
+    /// - Throws: SDKException if storage fails
     public func store(_ value: String, for key: String) throws {
         guard let data = value.data(using: .utf8) else {
-            throw SDKError.security(.encodingError, "Failed to encode string data for keychain storage")
+            throw SDKException.security(.encodingError, "Failed to encode string data for keychain storage")
         }
 
         try store(data, for: key)
@@ -106,7 +106,7 @@ public final class KeychainManager {
     /// - Parameters:
     ///   - data: Data to store
     ///   - key: Unique key for the data
-    /// - Throws: SDKError if storage fails
+    /// - Throws: SDKException if storage fails
     public func store(_ data: Data, for key: String) throws {
         var query = baseQuery(for: key)
         query[kSecValueData as String] = data
@@ -120,19 +120,19 @@ public final class KeychainManager {
         }
 
         guard status == errSecSuccess else {
-            throw SDKError.security(.keychainError, "Failed to store item in keychain: OSStatus \(status)")
+            throw SDKException.security(.keychainError, "Failed to store item in keychain: OSStatus \(status)")
         }
     }
 
     /// Retrieve a string value from the keychain
     /// - Parameter key: Key for the value
     /// - Returns: Stored string value
-    /// - Throws: SDKError if retrieval fails
+    /// - Throws: SDKException if retrieval fails
     public func retrieve(for key: String) throws -> String {
         let data = try retrieveData(for: key)
 
         guard let string = String(data: data, encoding: .utf8) else {
-            throw SDKError.security(.decodingError, "Failed to decode string data from keychain")
+            throw SDKException.security(.decodingError, "Failed to decode string data from keychain")
         }
 
         return string
@@ -141,7 +141,7 @@ public final class KeychainManager {
     /// Retrieve data from the keychain
     /// - Parameter key: Key for the data
     /// - Returns: Stored data
-    /// - Throws: SDKError if retrieval fails (but not for missing items - use retrieveDataIfExists for that)
+    /// - Throws: SDKException if retrieval fails (but not for missing items - use retrieveDataIfExists for that)
     public func retrieveData(for key: String) throws -> Data {
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
@@ -154,9 +154,9 @@ public final class KeychainManager {
         guard status == errSecSuccess,
               let data = result as? Data else {
             if status == errSecItemNotFound {
-                throw SDKError.security(.keychainError, "Item not found in keychain")
+                throw SDKException.security(.keychainError, "Item not found in keychain")
             }
-            throw SDKError.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
+            throw SDKException.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
         }
 
         return data
@@ -165,7 +165,7 @@ public final class KeychainManager {
     /// Retrieve data from the keychain if it exists (returns nil for missing items, no error thrown)
     /// - Parameter key: Key for the data
     /// - Returns: Stored data if found, nil if not found
-    /// - Throws: SDKError only for actual keychain errors (not for missing items)
+    /// - Throws: SDKException only for actual keychain errors (not for missing items)
     public func retrieveDataIfExists(for key: String) throws -> Data? {
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
@@ -183,7 +183,7 @@ public final class KeychainManager {
         // Other errors are actual problems
         guard status == errSecSuccess,
               let data = result as? Data else {
-            throw SDKError.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
+            throw SDKException.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
         }
 
         return data
@@ -192,14 +192,14 @@ public final class KeychainManager {
     /// Retrieve a string value from the keychain if it exists (returns nil for missing items, no error thrown)
     /// - Parameter key: Key for the value
     /// - Returns: Stored string value if found, nil if not found
-    /// - Throws: SDKError only for actual keychain errors (not for missing items)
+    /// - Throws: SDKException only for actual keychain errors (not for missing items)
     public func retrieveIfExists(for key: String) throws -> String? {
         guard let data = try retrieveDataIfExists(for: key) else {
             return nil
         }
 
         guard let string = String(data: data, encoding: .utf8) else {
-            throw SDKError.security(.decodingError, "Failed to decode string data from keychain")
+            throw SDKException.security(.decodingError, "Failed to decode string data from keychain")
         }
 
         return string
@@ -207,13 +207,13 @@ public final class KeychainManager {
 
     /// Delete an item from the keychain
     /// - Parameter key: Key for the item to delete
-    /// - Throws: SDKError if deletion fails
+    /// - Throws: SDKException if deletion fails
     public func delete(for key: String) throws {
         let query = baseQuery(for: key)
         let status = SecItemDelete(query as CFDictionary)
 
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw SDKError.security(.keychainError, "Failed to delete item from keychain: OSStatus \(status)")
+            throw SDKException.security(.keychainError, "Failed to delete item from keychain: OSStatus \(status)")
         }
     }
 

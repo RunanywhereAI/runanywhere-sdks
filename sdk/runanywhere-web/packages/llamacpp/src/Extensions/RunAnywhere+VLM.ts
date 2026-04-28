@@ -15,7 +15,7 @@
  */
 
 import type { HardwareAcceleration } from '@runanywhere/web';
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
 import { VLMImageFormat, VLMModelFamily } from './VLMTypes';
@@ -35,7 +35,7 @@ class VLMImpl {
   private _vlmBackendRegistered = false;
 
   private requireBridge(): LlamaCppBridge {
-    if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+    if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
     return LlamaCppBridge.shared;
   }
 
@@ -53,7 +53,7 @@ class VLMImpl {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fn = (m as any)['_rac_backend_llamacpp_vlm_register'];
     if (!fn) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.BackendNotAvailable,
         'VLM backend not available. Rebuild WASM with --vlm flag.',
       );
@@ -172,7 +172,7 @@ class VLMImpl {
     const handle = this.ensureVLMComponent();
 
     if (!this.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No VLM model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No VLM model loaded. Call loadModel() first.');
     }
 
     logger.debug(`VLM process: "${prompt.substring(0, 50)}..."`);

@@ -1,0 +1,192 @@
+// RunAnywhere v2 IDL — RAG (Retrieval-Augmented Generation) runtime types.
+//
+// Companion to solutions.proto::RAGConfig (which is the *solution-spec* sugar
+// fed into PipelineSpec). This file holds the *runtime* types — the inputs
+// and outputs that flow through the RAG pipeline at query time:
+//   - RAGConfiguration   (low-level pipeline config, pre-IDL hand-rolled)
+//   - RAGQueryOptions    (per-query sampling options)
+//   - RAGSearchResult    (a single retrieved chunk)
+//   - RAGResult          (full query result: answer + chunks + timings)
+//   - RAGStatistics      (index-level counters)
+//
+// Pre-IDL drift table (motivation for this schema):
+//
+//   RAGConfiguration:
+//     Swift   RAGTypes.swift:15        (11 fields, similarityThreshold default 0.12,
+//                                        chunkSize 180, chunkOverlap 30, topK 3)
+//     Kotlin  RAGTypes.kt:19           (11 fields, similarityThreshold default 0.15f,
+//                                        chunkSize 512, chunkOverlap 50, topK 3)
+//     Dart    rag_types.dart:13        (11 fields, similarityThreshold default 0.15,
+//                                        chunkSize 180, chunkOverlap 30, topK 10)
+//     RN      RAGTypes.ts:9            (11 fields, all numerics optional)
+//     Web     RAGTypes.ts:6            (11 fields, copy of RN)
+//
+//   RAGQueryOptions:
+//     Swift / Kotlin / Dart / RN / Web all define the same 6-field shape with
+//     consistent defaults (maxTokens 512, temperature 0.7, topP 0.9, topK 40).
+//
+//   RAGSearchResult:
+//     Swift / Kotlin / Dart       — metadataJSON as a single optional string
+//     RN / Web                    — metadataJson (lowercase j) optional string
+//     Note: pre-IDL all SDKs encoded metadata as a JSON *string*. The proto
+//     canonicalizes to map<string,string> so consumers don't all re-parse JSON
+//     and source_document is hoisted to a first-class field.
+//
+//   RAGResult:
+//     Swift / Kotlin / Dart       — timing fields are double (ms, fractional)
+//     RN / Web                    — timing fields are number
+//     Note: proto canonicalizes timings to int64 millis (matches the C ABI
+//     rac_rag_result_t which already uses fixed millis at the boundary).
+//
+//   RAGStatistics:
+//     Dart    rag_types.dart:241      ({statsJson} only — JSON blob)
+//     RN      RAGTypes.ts:59          ({documentCount, chunkCount, vectorStoreSize, statsJson})
+//     Web     RAGTypes.ts:45          (copy of RN)
+//     Swift / Kotlin                  — not yet defined pre-IDL
+//     Note: proto canonicalizes to typed counters (indexed_documents,
+//     indexed_chunks, total_tokens_indexed, last_updated_ms, index_path) so
+//     the JSON-blob escape hatch isn't needed.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "RagProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
+//
+// This is the runtime configuration consumed by the RAG pipeline directly,
+// distinct from solutions.proto::RAGConfig (which is the high-level solution
+// spec resolved through the model registry). RAGConfiguration takes raw model
+// paths because the pipeline runs after model resolution has already happened.
+// ---------------------------------------------------------------------------
+message RAGConfiguration {
+    // Filesystem path to the embedding model (typically ONNX).
+    string embedding_model_path  = 1;
+
+    // Filesystem path to the LLM model (typically GGUF).
+    string llm_model_path        = 2;
+
+    // Embedding vector dimension — must match the embedding model.
+    // Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
+    int32  embedding_dimension   = 3;
+
+    // Number of top chunks to retrieve per query.
+    int32  top_k                 = 4;
+
+    // Minimum cosine similarity threshold (0.0–1.0). Chunks below this
+    // score are discarded before being passed to the LLM as context.
+    float  similarity_threshold  = 5;
+
+    // Tokens per chunk when splitting documents during ingestion.
+    int32  chunk_size            = 6;
+
+    // Overlap tokens between consecutive chunks. Must be < chunk_size.
+    int32  chunk_overlap         = 7;
+}
+
+// ---------------------------------------------------------------------------
+// RAGQueryOptions — per-query sampling and prompt overrides.
+// ---------------------------------------------------------------------------
+message RAGQueryOptions {
+    // The user question to answer. Required (empty = no-op).
+    string question              = 1;
+
+    // Optional system prompt override. Unset uses the pipeline default.
+    optional string system_prompt = 2;
+
+    // Maximum tokens to generate in the answer.
+    int32  max_tokens            = 3;
+
+    // Sampling temperature. 0.0 = greedy, higher = more random.
+    float  temperature           = 4;
+
+    // Nucleus (top-p) sampling parameter. 1.0 = disabled.
+    float  top_p                 = 5;
+
+    // Top-k sampling parameter. 0 = disabled.
+    int32  top_k                 = 6;
+}
+
+// ---------------------------------------------------------------------------
+// RAGSearchResult — a single retrieved document chunk with similarity score.
+// ---------------------------------------------------------------------------
+message RAGSearchResult {
+    // Unique identifier of the chunk (assigned at ingestion time).
+    string chunk_id              = 1;
+
+    // Text content of the chunk (the actual snippet shown to the LLM).
+    string text                  = 2;
+
+    // Cosine similarity score (0.0–1.0). Higher = more relevant.
+    float  similarity_score      = 3;
+
+    // Optional source document identifier (filename, URL, or document ID).
+    // Set when the chunk's origin is tracked at ingestion time.
+    optional string source_document = 4;
+
+    // Free-form metadata associated with the chunk (e.g. page number, section,
+    // ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
+    // canonicalized here as a typed map so consumers don't re-parse.
+    map<string, string> metadata = 5;
+}
+
+// ---------------------------------------------------------------------------
+// RAGResult — the full result of a RAG query.
+// ---------------------------------------------------------------------------
+message RAGResult {
+    // The LLM-generated answer grounded in the retrieved context.
+    string answer                = 1;
+
+    // Document chunks retrieved during vector search and used as context.
+    // Order matches retrieval rank (highest similarity first).
+    repeated RAGSearchResult retrieved_chunks = 2;
+
+    // Full context string passed to the LLM (chunks joined into a prompt).
+    // May be empty for queries with no matching chunks.
+    string context_used          = 3;
+
+    // Time spent in the retrieval phase (vector search), in milliseconds.
+    int64  retrieval_time_ms     = 4;
+
+    // Time spent in the LLM generation phase, in milliseconds.
+    int64  generation_time_ms    = 5;
+
+    // Total end-to-end query time (retrieval + generation + overhead),
+    // in milliseconds.
+    int64  total_time_ms         = 6;
+}
+
+// ---------------------------------------------------------------------------
+// RAGStatistics — index-level counters for the RAG pipeline.
+//
+// Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
+// ---------------------------------------------------------------------------
+message RAGStatistics {
+    // Total number of documents ever ingested into the index.
+    int64  indexed_documents     = 1;
+
+    // Total number of chunks across all indexed documents.
+    int64  indexed_chunks        = 2;
+
+    // Approximate total token count across all indexed chunks.
+    int64  total_tokens_indexed  = 3;
+
+    // Wall-clock timestamp of the most recent ingestion, in milliseconds
+    // since Unix epoch. 0 = no ingestion yet.
+    int64  last_updated_ms       = 4;
+
+    // Filesystem path to the on-disk index, when applicable. Unset for
+    // in-memory-only indexes.
+    optional string index_path   = 5;
+}

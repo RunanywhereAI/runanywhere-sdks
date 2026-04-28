@@ -68,13 +68,13 @@ public struct LLMConfiguration: ComponentConfiguration, Sendable {
 
     public func validate() throws {
         guard contextLength > 0 && contextLength <= 32768 else {
-            throw SDKError.general(.validationFailed, "Context length must be between 1 and 32768")
+            throw SDKException.general(.validationFailed, "Context length must be between 1 and 32768")
         }
         guard temperature >= 0 && temperature <= 2.0 else {
-            throw SDKError.general(.validationFailed, "Temperature must be between 0 and 2.0")
+            throw SDKException.general(.validationFailed, "Temperature must be between 0 and 2.0")
         }
         guard maxTokens > 0 && maxTokens <= contextLength else {
-            throw SDKError.general(.validationFailed, "Max tokens must be between 1 and context length")
+            throw SDKException.general(.validationFailed, "Max tokens must be between 1 and context length")
         }
     }
 }
@@ -629,5 +629,91 @@ public actor StreamAccumulator {
                 completionContinuation = continuation
             }
         }
+    }
+}
+
+// MARK: - Phase C1: Generated Proto Bridges (LoRA + Structured Output)
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/lora_options.pb.swift`
+// and `Sources/RunAnywhere/Generated/structured_output.pb.swift`:
+//   • RALoRAAdapterConfig         (adapterPath, scale, adapterID)
+//   • RALoRAAdapterInfo           (adapterID, adapterPath, scale, applied,
+//                                   errorMessage)
+//   • RALoraAdapterCatalogEntry   (id, name, description_p, url, filename,
+//                                   compatibleModels, sizeBytes, author)
+//   • RALoraCompatibilityResult   (isCompatible, errorMessage,
+//                                   baseModelRequired)
+//   • RAStructuredOutputValidation (isValid, containsJson, errorMessage)
+//
+// Hand-rolled types are KEPT because they:
+//   1. expose `init(from cEntry: rac_lora_entry_t)` C bridges,
+//   2. use Swift idiomatic field names (path vs adapterPath, error vs
+//      errorMessage, downloadURL: URL vs url: String, fileSize Int64 vs
+//      sizeBytes Int64, adapterDescription String vs description_p,
+//      compatibleModelIds vs compatibleModels),
+//   3. carry `defaultScale` (not on proto schema) and use `URL` types.
+
+extension LoRAAdapterConfig {
+    /// Convert to canonical generated proto `RALoRAAdapterConfig`.
+    /// Field rename: path → adapterPath.
+    public func toRALoRAAdapterConfig() -> RALoRAAdapterConfig {
+        var proto = RALoRAAdapterConfig()
+        proto.adapterPath = path
+        proto.scale = scale
+        return proto
+    }
+}
+
+extension LoRAAdapterInfo {
+    /// Convert to canonical generated proto `RALoRAAdapterInfo`.
+    /// Field rename: path → adapterPath.
+    public func toRALoRAAdapterInfo() -> RALoRAAdapterInfo {
+        var proto = RALoRAAdapterInfo()
+        proto.adapterPath = path
+        proto.scale = scale
+        proto.applied = applied
+        return proto
+    }
+}
+
+extension LoraAdapterCatalogEntry {
+    /// Convert to canonical generated proto `RALoraAdapterCatalogEntry`.
+    /// Field renames: adapterDescription → description_p; downloadURL.absoluteString → url;
+    /// compatibleModelIds → compatibleModels; fileSize → sizeBytes.
+    /// Pre-IDL `defaultScale` is dropped (proto schema has no equivalent field).
+    public func toRALoraAdapterCatalogEntry() -> RALoraAdapterCatalogEntry {
+        var proto = RALoraAdapterCatalogEntry()
+        proto.id = id
+        proto.name = name
+        proto.description_p = adapterDescription
+        proto.url = downloadURL.absoluteString
+        proto.filename = filename
+        proto.compatibleModels = compatibleModelIds
+        proto.sizeBytes = fileSize
+        return proto
+    }
+}
+
+extension LoraCompatibilityResult {
+    /// Convert to canonical generated proto `RALoraCompatibilityResult`.
+    /// Field rename: error → errorMessage.
+    public func toRALoraCompatibilityResult() -> RALoraCompatibilityResult {
+        var proto = RALoraCompatibilityResult()
+        proto.isCompatible = isCompatible
+        if let err = error { proto.errorMessage = err }
+        return proto
+    }
+}
+
+extension StructuredOutputValidation {
+    /// Convert to canonical generated proto `RAStructuredOutputValidation`.
+    /// Field renames: error (String?) → errorMessage (String, defaults "");
+    /// containsJSON → containsJson (proto3 camelCase).
+    public func toRAStructuredOutputValidation() -> RAStructuredOutputValidation {
+        var proto = RAStructuredOutputValidation()
+        proto.isValid = isValid
+        proto.containsJson = containsJSON
+        if let err = error { proto.errorMessage = err }
+        return proto
     }
 }

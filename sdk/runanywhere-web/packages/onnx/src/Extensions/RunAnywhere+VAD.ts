@@ -18,7 +18,7 @@
  *   if (hasVoice) console.log('Speech detected!');
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { SpeechActivity } from './VADTypes';
 import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
@@ -34,7 +34,7 @@ const logger = new SDKLogger('VAD');
 // ---------------------------------------------------------------------------
 
 function requireSherpa(): SherpaONNXBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return SherpaONNXBridge.shared;
 }
 
@@ -108,7 +108,7 @@ class VADImpl {
       freeConfig(configStruct, m);
 
       if (this._vadHandle === 0) {
-        throw new SDKError(SDKErrorCode.ModelLoadFailed, 'Failed to create VAD from Silero model');
+        throw new SDKException(SDKErrorCode.ModelLoadFailed, 'Failed to create VAD from Silero model');
       }
 
       const loadTimeMs = Math.round(performance.now() - startMs);

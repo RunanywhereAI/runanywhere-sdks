@@ -302,7 +302,7 @@ public extension RunAnywhere {
         onPartial: ((String) -> Void)? = nil
     ) async throws -> LiveTranscriptionSession {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let session = LiveTranscriptionSession(options: options)

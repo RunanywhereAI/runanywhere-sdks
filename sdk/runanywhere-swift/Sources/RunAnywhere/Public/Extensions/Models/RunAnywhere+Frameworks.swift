@@ -46,14 +46,16 @@ public extension RunAnywhere {
             relevantCategories = [.speechSynthesis]
         case .vad:
             relevantCategories = [.audio]
-        case .voice:
+        case .voiceAgent:
             relevantCategories = [.language, .speechRecognition, .speechSynthesis]
-        case .embedding:
+        case .embeddings:
             relevantCategories = [.embedding]
         case .diffusion:
             relevantCategories = [.imageGeneration]
         case .rag:
             relevantCategories = [.language]
+        case .wakeword, .speakerDiarization, .unspecified, .UNRECOGNIZED:
+            relevantCategories = []
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

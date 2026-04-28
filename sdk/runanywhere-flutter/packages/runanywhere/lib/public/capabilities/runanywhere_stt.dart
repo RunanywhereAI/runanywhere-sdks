@@ -1,46 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_stt.dart — v4 STT (speech-to-text) capability.
+// Wave 2 STT capability — aligned to Swift + proto. Returns proto STTOutput.
 
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/stt_options.pb.dart';
+import 'package:runanywhere/generated/stt_options_helpers.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_stt.dart' show racAudioFormatWav, racAudioFormatPcm, racAudioFormatMp3, racAudioFormatOpus, racAudioFormatAac, racAudioFormatFlac;
+import 'package:runanywhere/native/dart_bridge_stt.dart'
+    show racAudioFormatWav;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/generation_types.dart';
-
-/// Map a Dart [AudioFormat] to the C enum int used by the STT bridge.
-int _sttAudioFormatToC(AudioFormat fmt) {
-  switch (fmt) {
-    case AudioFormat.wav:
-      return racAudioFormatWav;
-    case AudioFormat.pcm:
-      return racAudioFormatPcm;
-    case AudioFormat.mp3:
-      return racAudioFormatMp3;
-    case AudioFormat.opus:
-      return racAudioFormatOpus;
-    case AudioFormat.flac:
-      return racAudioFormatFlac;
-    case AudioFormat.m4a:
-      return racAudioFormatAac;
-  }
-}
 
 /// STT (speech-to-text) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.stt`.
+/// Access via `RunAnywhereSDK.instance.stt`. Mirrors Swift's
+/// `RunAnywhere+STT.swift`. Returns proto [STTOutput].
 class RunAnywhereSTT {
   RunAnywhereSTT._();
   static final RunAnywhereSTT _instance = RunAnywhereSTT._();
@@ -66,7 +51,7 @@ class RunAnywhereSTT {
   /// Load an STT model by ID.
   Future<void> load(String modelId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.LoadSTTModel');
@@ -80,11 +65,11 @@ class RunAnywhereSTT {
       final model = models.where((m) => m.id == modelId).firstOrNull;
 
       if (model == null) {
-        throw SDKError.modelNotFound('STT model not found: $modelId');
+        throw SDKException.modelNotFound('STT model not found: $modelId');
       }
 
       if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
+        throw SDKException.modelNotDownloaded(
           'STT model is not downloaded. Call downloadModel() first.',
         );
       }
@@ -92,7 +77,7 @@ class RunAnywhereSTT {
       final resolvedPath =
           await DartBridge.modelPaths.resolveModelFilePath(model);
       if (resolvedPath == null) {
-        throw SDKError.modelNotFound(
+        throw SDKException.modelNotFound(
             'Could not resolve STT model file path for: $modelId');
       }
 
@@ -104,7 +89,7 @@ class RunAnywhereSTT {
       await DartBridge.stt.loadModel(resolvedPath, modelId, model.name);
 
       if (!DartBridge.stt.isLoaded) {
-        throw SDKError.sttNotAvailable(
+        throw SDKException.sttNotAvailable(
           'STT model failed to load - model may not be compatible',
         );
       }
@@ -143,71 +128,53 @@ class RunAnywhereSTT {
   /// Unload the currently-loaded STT model.
   Future<void> unload() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     DartBridge.stt.unload();
   }
 
-  /// Transcribe audio data to text. Expects PCM16 at 16kHz mono.
-  Future<String> transcribe(Uint8List audioData) async {
-    final result = await transcribeWithResult(audioData);
-    return result.text;
-  }
-
-  /// Transcribe audio data with detailed result (confidence, language, ...).
-  ///
-  /// [options] when supplied controls language detection, format,
-  /// timestamps, etc. Mirrors Swift's `transcribeWithOptions`.
-  Future<STTResult> transcribeWithResult(
-    Uint8List audioData, {
+  /// Transcribe audio data to a proto [STTOutput]. Mirrors Swift's
+  /// `transcribe(_ audio:options:)` (the rich variant).
+  Future<STTOutput> transcribe(
+    Uint8List audio, [
     STTOptions? options,
-  }) async {
-    return transcribeWithOptions(audioData, options ?? const STTOptions());
-  }
-
-  /// Transcribe with explicit [STTOptions]. Mirrors Swift's
-  /// `RunAnywhere.transcribeWithOptions(_:options:)`.
-  Future<STTResult> transcribeWithOptions(
-    Uint8List audioData,
-    STTOptions options,
-  ) async {
+  ]) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
-
     if (!DartBridge.stt.isLoaded) {
-      throw SDKError.sttNotAvailable(
+      throw SDKException.sttNotAvailable(
         'No STT model loaded. Call loadSTTModel() first.',
       );
     }
 
     final logger = SDKLogger('RunAnywhere.Transcribe');
-    logger.debug('Transcribing ${audioData.length} bytes with details...');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
+    final opts = options ?? STTOptions();
     final modelId = currentModelId ?? 'unknown';
-
     final modelInfo =
         await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
 
-    // Duration (PCM16 at 16kHz mono): bytes / 2 / sampleRate * 1000.
-    final estimatedDurationMs =
-        (audioData.length / 2 / options.sampleRate * 1000).round();
+    // Audio length estimate: PCM16 at 16kHz mono → bytes / 2 / sampleRate * 1000.
+    const sampleRate = 16000;
+    final estimatedDurationMs = (audio.length / 2 / sampleRate * 1000).round();
 
+    final startTime = DateTime.now().millisecondsSinceEpoch;
     try {
       final result = await DartBridge.stt.transcribe(
-        audioData,
-        sampleRate: options.sampleRate,
-        language: options.language ?? 'en',
-        audioFormat: _sttAudioFormatToC(options.audioFormat),
-        enablePunctuation: options.enablePunctuation,
-        enableDiarization: options.enableDiarization,
-        maxSpeakers: options.maxSpeakers,
-        enableTimestamps: options.enableTimestamps,
-        detectLanguage: options.detectLanguage,
+        audio,
+        sampleRate: sampleRate,
+        language: opts.language.bcp47 ?? 'en',
+        audioFormat: racAudioFormatWav,
+        enablePunctuation: opts.hasEnablePunctuation()
+            ? opts.enablePunctuation
+            : true,
+        enableDiarization: opts.enableDiarization,
+        maxSpeakers: opts.maxSpeakers,
+        enableTimestamps: opts.enableWordTimestamps,
+        detectLanguage: opts.language == STTLanguage.STT_LANGUAGE_AUTO,
       );
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
       final audioDurationMs =
           result.durationMs > 0 ? result.durationMs : estimatedDurationMs;
 
@@ -226,24 +193,24 @@ class RunAnywhereSTT {
         isStreaming: false,
       );
 
+      logger.info('Transcription complete: ${result.text.length} chars, '
+          'confidence: ${result.confidence}');
+
       final metadata = TranscriptionMetadata(
         modelId: modelId,
-        processingTime: latencyMs / 1000.0,
-        audioLength: audioDurationMs / 1000.0,
+        processingTimeMs: Int64(latencyMs),
+        audioLengthMs: Int64(audioDurationMs),
+        realTimeFactor: audioDurationMs > 0
+            ? latencyMs / audioDurationMs.toDouble()
+            : 0.0,
       );
 
-      logger.info(
-          'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
-      return STTResult(
+      return STTOutput(
         text: result.text,
+        language: STTLanguageBcp47.fromBcp47(result.language),
         confidence: result.confidence,
-        durationMs: audioDurationMs,
-        language: result.language,
         metadata: metadata,
-        timestamp: DateTime.now(),
       );
-    } on SDKError {
-      rethrow;
     } catch (e) {
       TelemetryService.shared.trackError(
         errorCode: 'transcription_failed',
@@ -255,73 +222,52 @@ class RunAnywhereSTT {
     }
   }
 
-  /// Streaming transcription with partial-result callbacks.
-  ///
-  /// Mirrors Swift's `transcribeStream(audioData:options:onPartialResult:)`.
-  /// Currently the underlying C bridge does not surface partial events
-  /// directly; this implementation wraps the synchronous transcription
-  /// and emits a single final partial before returning the [STTResult].
-  /// When the C bridge gains a streaming entry point this will switch
-  /// over without changing the Dart signature.
-  Future<STTResult> transcribeStream(
-    Uint8List audioData, {
-    STTOptions options = const STTOptions(),
+  /// Streaming transcription. Yields a single final partial then resolves
+  /// to the full [STTOutput]. The underlying C bridge currently surfaces
+  /// only synchronous results.
+  Future<STTOutput> transcribeStream(
+    Uint8List audio, {
+    STTOptions? options,
     void Function(STTPartialResult partial)? onPartialResult,
   }) async {
-    final result = await transcribeWithOptions(audioData, options);
-
-    // Emit a final partial mirroring Swift's callback shape.
+    final result = await transcribe(audio, options);
     onPartialResult?.call(STTPartialResult(
-      transcript: result.text,
-      confidence: result.confidence,
+      text: result.text,
       isFinal: true,
-      language: result.language,
-      timestamps: result.wordTimestamps,
-      alternatives: result.alternatives,
+      stability: result.confidence,
     ));
-
     return result;
   }
 
-  /// Process audio samples for streaming transcription. Symmetric with
-  /// Swift's `processStreamingAudio(_:options:)`.
-  ///
-  /// [samples] - Float32 PCM samples at the [STTOptions.sampleRate].
+  /// Symmetric with Swift's `processStreamingAudio`. Float32 PCM samples
+  /// at 16kHz are forwarded to the synchronous transcribe path.
   Future<void> processStreamingAudio(
     Float32List samples, {
-    STTOptions options = const STTOptions(),
+    STTOptions? options,
   }) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     if (!DartBridge.stt.isLoaded) {
-      throw SDKError.sttNotAvailable('No STT model loaded.');
+      throw SDKException.sttNotAvailable('No STT model loaded.');
     }
-    // Convert Float32List to Uint8List for the C bridge.
     final byteData = ByteData(samples.lengthInBytes);
     for (var i = 0; i < samples.length; i++) {
       byteData.setFloat32(i * 4, samples[i], Endian.little);
     }
-    await transcribeWithOptions(
-      byteData.buffer.asUint8List(),
-      options,
-    );
+    await transcribe(byteData.buffer.asUint8List(), options);
   }
 
-  /// Transcribe a Float32 PCM buffer directly. Symmetric with Swift's
-  /// `transcribeBuffer(_:language:)` overload.
-  Future<STTResult> transcribeBuffer(
+  /// Transcribe a Float32 PCM buffer directly. Mirrors Swift's
+  /// `transcribeBuffer`.
+  Future<STTOutput> transcribeBuffer(
     Float32List samples, {
-    String? language,
+    STTOptions? options,
   }) async {
     final byteData = ByteData(samples.lengthInBytes);
     for (var i = 0; i < samples.length; i++) {
       byteData.setFloat32(i * 4, samples[i], Endian.little);
     }
-    final options = STTOptions(
-      language: language ?? const STTOptions().language,
-      audioFormat: AudioFormat.pcm,
-    );
-    return transcribeWithOptions(byteData.buffer.asUint8List(), options);
+    return transcribe(byteData.buffer.asUint8List(), options);
   }
 }

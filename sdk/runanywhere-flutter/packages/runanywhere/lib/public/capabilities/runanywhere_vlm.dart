@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_vlm.dart — v4 VLM (vision-language model) capability.
+// Wave 2 VLM capability — uses proto VLMImage / VLMGenerationOptions / VLMResult.
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/vlm_options.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
@@ -16,7 +19,24 @@ import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/vlm_types.dart';
+
+/// Streaming wrapper returned by `processImageStream`.
+class VLMStreamingResult {
+  /// Stream of tokens as they are generated.
+  final Stream<String> stream;
+
+  /// Future that completes with final result metrics when streaming finishes.
+  final Future<VLMResult> metrics;
+
+  /// Function to cancel the ongoing generation.
+  final void Function() cancel;
+
+  const VLMStreamingResult({
+    required this.stream,
+    required this.metrics,
+    required this.cancel,
+  });
+}
 
 /// VLM (vision-language model) capability surface.
 ///
@@ -32,11 +52,10 @@ class RunAnywhereVLM {
   /// Currently-loaded VLM model ID, or null.
   String? get currentModelId => DartBridge.vlm.currentModelId;
 
-  /// Load a VLM model by ID. Resolves the main model `.gguf` plus
-  /// the paired `*mmproj*.gguf` from the model folder.
+  /// Load a VLM model by ID.
   Future<void> load(String modelId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.LoadVLMModel');
@@ -50,53 +69,40 @@ class RunAnywhereVLM {
       final model = models.where((m) => m.id == modelId).firstOrNull;
 
       if (model == null) {
-        throw SDKError.modelNotFound('VLM model not found: $modelId');
+        throw SDKException.modelNotFound('VLM model not found: $modelId');
       }
 
       if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
+        throw SDKException.modelNotDownloaded(
           'VLM model is not downloaded. Call downloadModel() first.',
         );
       }
 
       final modelFolder = model.localPath!.toFilePath();
-      logger.info('VLM model folder: $modelFolder');
-
       final modelPath = await _resolveVLMModelFilePath(modelFolder, model);
       if (modelPath == null) {
-        throw SDKError.modelNotFound(
+        throw SDKException.modelNotFound(
           'Could not find main VLM model file in: $modelFolder',
         );
       }
-      logger.info('Resolved VLM model path: $modelPath');
 
       final modelDir = Directory(modelPath).parent.path;
       final mmprojPath = await _findMmprojFile(modelDir);
-      logger.info('mmproj path: ${mmprojPath ?? "not found"}');
 
       if (DartBridge.vlm.isLoaded) {
-        logger.debug('Unloading previous VLM model');
         DartBridge.vlm.unload();
       }
 
-      logger.debug('Loading VLM model via C++ bridge');
-      await DartBridge.vlm.loadModel(
-        modelPath,
-        mmprojPath,
-        modelId,
-        model.name,
-      );
+      await DartBridge.vlm.loadModel(modelPath, mmprojPath, modelId, model.name);
 
       if (!DartBridge.vlm.isLoaded) {
-        throw SDKError.vlmModelLoadFailed(
+        throw SDKException.vlmModelLoadFailed(
           'VLM model failed to load - model may not be compatible',
         );
       }
 
       final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info(
-        'VLM model loaded successfully: ${model.name} (isLoaded=${DartBridge.vlm.isLoaded})',
-      );
+      logger.info('VLM model loaded successfully: ${model.name}');
 
       TelemetryService.shared.trackModelLoad(
         modelId: modelId,
@@ -126,114 +132,28 @@ class RunAnywhereVLM {
     }
   }
 
-  /// Load a VLM model via C++ path resolution (model must be
-  /// pre-registered in the C++ registry).
-  Future<void> loadById(String modelId) async {
-    if (!SdkState.shared.isInitialized) throw SDKError.notInitialized();
-
-    final logger = SDKLogger('RunAnywhere.LoadVLMModelById');
-    logger.info('Loading VLM model by ID: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
-    try {
-      if (DartBridge.vlm.isLoaded) {
-        logger.debug('Unloading previous VLM model');
-        DartBridge.vlm.unload();
-      }
-
-      await DartBridge.vlm.loadModelById(modelId);
-
-      if (!DartBridge.vlm.isLoaded) {
-        throw SDKError.vlmModelLoadFailed(
-          'VLM model failed to load - model may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info('VLM model loaded by ID: $modelId');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-    } catch (e) {
-      logger.error('Failed to load VLM model by ID: $e');
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-      rethrow;
-    }
-  }
-
-  /// Load a VLM model from explicit file paths (bypasses registry).
+  /// Load a VLM model from explicit file paths.
   Future<void> loadWithPath(
     String modelPath, {
     String? mmprojPath,
     required String modelId,
     required String modelName,
   }) async {
-    if (!SdkState.shared.isInitialized) throw SDKError.notInitialized();
-
-    final logger = SDKLogger('RunAnywhere.LoadVLMModelWithPath');
-    logger.info('Loading VLM model from path: $modelPath');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
+    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
 
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
     try {
       if (DartBridge.vlm.isLoaded) {
-        logger.debug('Unloading previous VLM model');
         DartBridge.vlm.unload();
       }
-
       await DartBridge.vlm.loadModel(modelPath, mmprojPath, modelId, modelName);
-
       if (!DartBridge.vlm.isLoaded) {
-        throw SDKError.vlmModelLoadFailed(
+        throw SDKException.vlmModelLoadFailed(
           'VLM model failed to load - model may not be compatible',
         );
       }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info('VLM model loaded from path: $modelPath');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
     } catch (e) {
-      logger.error('Failed to load VLM model from path: $e');
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId, 'model_path': modelPath},
-      );
       EventBus.shared.publish(SDKModelEvent.loadFailed(
         modelId: modelId,
         error: e.toString(),
@@ -244,11 +164,8 @@ class RunAnywhereVLM {
 
   /// Unload the currently-loaded VLM model.
   Future<void> unload() async {
-    if (!SdkState.shared.isInitialized) throw SDKError.notInitialized();
-    final logger = SDKLogger('RunAnywhere.UnloadVLMModel');
-    logger.debug('Unloading VLM model');
+    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
     DartBridge.vlm.unload();
-    logger.info('VLM model unloaded');
   }
 
   /// Cancel any in-flight VLM generation.
@@ -256,11 +173,11 @@ class RunAnywhereVLM {
     DartBridge.vlm.cancel();
   }
 
-  /// Describe an image with a default or custom prompt.
+  /// Describe an image. Returns the generated text.
   Future<String> describe(
     VLMImage image, {
     String prompt = "What's in this image?",
-    VLMGenerationOptions options = const VLMGenerationOptions(),
+    VLMGenerationOptions? options,
   }) async {
     final result = await processImage(image, prompt: prompt, options: options);
     return result.text;
@@ -270,7 +187,7 @@ class RunAnywhereVLM {
   Future<String> askAbout(
     String question, {
     required VLMImage image,
-    VLMGenerationOptions options = const VLMGenerationOptions(),
+    VLMGenerationOptions? options,
   }) async {
     final result =
         await processImage(image, prompt: question, options: options);
@@ -281,16 +198,17 @@ class RunAnywhereVLM {
   Future<VLMResult> processImage(
     VLMImage image, {
     required String prompt,
-    VLMGenerationOptions options = const VLMGenerationOptions(),
+    VLMGenerationOptions? options,
   }) async {
-    if (!SdkState.shared.isInitialized) throw SDKError.notInitialized();
-    if (!DartBridge.vlm.isLoaded) throw SDKError.vlmNotInitialized();
+    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
+    if (!DartBridge.vlm.isLoaded) throw SDKException.vlmNotInitialized();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImage');
     final modelId = DartBridge.vlm.currentModelId ?? 'unknown';
+    final opts = options ?? VLMGenerationOptions();
 
     try {
-      final bridgeResult = await _processImageViaBridge(image, prompt, options);
+      final bridgeResult = await _processImageViaBridge(image, prompt, opts);
 
       logger.info(
         'VLM processing complete: ${bridgeResult.completionTokens} tokens, '
@@ -302,9 +220,9 @@ class RunAnywhereVLM {
         modelName: DartBridge.vlm.currentModelId,
         promptTokens: bridgeResult.promptTokens,
         completionTokens: bridgeResult.completionTokens,
-        latencyMs: bridgeResult.totalTimeMs.round(),
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
+        latencyMs: bridgeResult.processingTimeMs.toInt(),
+        temperature: opts.hasTemperature() ? opts.temperature : 0.7,
+        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 2048,
         tokensPerSecond: bridgeResult.tokensPerSecond,
         isStreaming: false,
       );
@@ -325,26 +243,23 @@ class RunAnywhereVLM {
   Future<VLMStreamingResult> processImageStream(
     VLMImage image, {
     required String prompt,
-    VLMGenerationOptions options = const VLMGenerationOptions(),
+    VLMGenerationOptions? options,
   }) async {
-    if (!SdkState.shared.isInitialized) throw SDKError.notInitialized();
-    if (!DartBridge.vlm.isLoaded) throw SDKError.vlmNotInitialized();
+    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
+    if (!DartBridge.vlm.isLoaded) throw SDKException.vlmNotInitialized();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImageStream');
-    final modelId = DartBridge.vlm.currentModelId ?? 'unknown';
     final startTime = DateTime.now();
-    DateTime? firstTokenTime;
+    final opts = options ?? VLMGenerationOptions();
 
     final controller = StreamController<String>.broadcast();
     final allTokens = <String>[];
 
     try {
-      final tokenStream =
-          _processImageStreamViaBridge(image, prompt, options);
+      final tokenStream = _processImageStreamViaBridge(image, prompt, opts);
 
       final subscription = tokenStream.listen(
         (token) {
-          firstTokenTime ??= DateTime.now();
           allTokens.add(token);
           if (!controller.isClosed) {
             controller.add(token);
@@ -352,11 +267,6 @@ class RunAnywhereVLM {
         },
         onError: (Object error) {
           logger.error('VLM streaming error: $error');
-          TelemetryService.shared.trackError(
-            errorCode: 'vlm_streaming_failed',
-            errorMessage: error.toString(),
-            context: {'model_id': modelId},
-          );
           if (!controller.isClosed) {
             controller.addError(error);
           }
@@ -375,35 +285,11 @@ class RunAnywhereVLM {
         final tokensPerSecond =
             totalTimeMs > 0 ? allTokens.length / (totalTimeMs / 1000) : 0.0;
 
-        int? timeToFirstTokenMs;
-        if (firstTokenTime != null) {
-          timeToFirstTokenMs =
-              firstTokenTime!.difference(startTime).inMilliseconds;
-        }
-
-        logger.info(
-          'VLM streaming complete: ${allTokens.length} tokens, '
-          '${tokensPerSecond.toStringAsFixed(1)} tok/s',
-        );
-
-        TelemetryService.shared.trackGeneration(
-          modelId: modelId,
-          modelName: DartBridge.vlm.currentModelId,
-          promptTokens: 0,
-          completionTokens: allTokens.length,
-          latencyMs: totalTimeMs.round(),
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          tokensPerSecond: tokensPerSecond,
-          timeToFirstTokenMs: timeToFirstTokenMs,
-          isStreaming: true,
-        );
-
         return VLMResult(
           text: allTokens.join(),
           promptTokens: 0,
           completionTokens: allTokens.length,
-          totalTimeMs: totalTimeMs,
+          processingTimeMs: Int64(totalTimeMs.round()),
           tokensPerSecond: tokensPerSecond,
         );
       });
@@ -412,7 +298,6 @@ class RunAnywhereVLM {
         stream: controller.stream,
         metrics: metricsFuture,
         cancel: () {
-          logger.debug('Cancelling VLM streaming');
           DartBridge.vlm.cancel();
           unawaited(subscription.cancel());
           if (!controller.isClosed) {
@@ -422,11 +307,6 @@ class RunAnywhereVLM {
       );
     } catch (e) {
       logger.error('Failed to start VLM streaming: $e');
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_streaming_start_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
       rethrow;
     }
   }
@@ -438,59 +318,61 @@ class RunAnywhereVLM {
     String prompt,
     VLMGenerationOptions options,
   ) async {
-    final format = image.format;
     final VlmBridgeResult bridgeResult;
+    final maxTokens = options.hasMaxTokens() ? options.maxTokens : 2048;
+    final temperature = options.hasTemperature() ? options.temperature : 0.7;
+    final topP = options.hasTopP() ? options.topP : 0.9;
 
-    if (format is VLMImageFormatFilePath) {
+    if (image.hasFilePath()) {
       bridgeResult = await DartBridge.vlm.processImage(
         imageFormat: RacVlmImageFormat.filePath,
-        filePath: format.path,
+        filePath: image.filePath,
         prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        useGpu: true,
+        systemPrompt: null,
+        maxImageSize: 0,
+        nThreads: 0,
       );
-    } else if (format is VLMImageFormatRgbPixels) {
+    } else if (image.hasRawRgb()) {
       bridgeResult = await DartBridge.vlm.processImage(
         imageFormat: RacVlmImageFormat.rgbPixels,
-        pixelData: format.data,
-        width: format.width,
-        height: format.height,
+        pixelData: Uint8List.fromList(image.rawRgb),
+        width: image.width,
+        height: image.height,
         prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        useGpu: true,
+        systemPrompt: null,
+        maxImageSize: 0,
+        nThreads: 0,
       );
-    } else if (format is VLMImageFormatBase64) {
+    } else if (image.hasBase64()) {
       bridgeResult = await DartBridge.vlm.processImage(
         imageFormat: RacVlmImageFormat.base64,
-        base64Data: format.encoded,
+        base64Data: image.base64,
         prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        useGpu: true,
+        systemPrompt: null,
+        maxImageSize: 0,
+        nThreads: 0,
       );
     } else {
-      throw SDKError.vlmInvalidImage('Unsupported image format');
+      throw SDKException.vlmInvalidImage('Unsupported image format');
     }
 
     return VLMResult(
       text: bridgeResult.text,
       promptTokens: bridgeResult.promptTokens,
       completionTokens: bridgeResult.completionTokens,
-      totalTimeMs: bridgeResult.totalTimeMs.toDouble(),
+      processingTimeMs: Int64(bridgeResult.totalTimeMs.round()),
       tokensPerSecond: bridgeResult.tokensPerSecond,
     );
   }
@@ -500,51 +382,53 @@ class RunAnywhereVLM {
     String prompt,
     VLMGenerationOptions options,
   ) {
-    final format = image.format;
+    final maxTokens = options.hasMaxTokens() ? options.maxTokens : 2048;
+    final temperature = options.hasTemperature() ? options.temperature : 0.7;
+    final topP = options.hasTopP() ? options.topP : 0.9;
 
-    if (format is VLMImageFormatFilePath) {
+    if (image.hasFilePath()) {
       return DartBridge.vlm.processImageStream(
         imageFormat: RacVlmImageFormat.filePath,
-        filePath: format.path,
+        filePath: image.filePath,
         prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        useGpu: true,
+        systemPrompt: null,
+        maxImageSize: 0,
+        nThreads: 0,
       );
-    } else if (format is VLMImageFormatRgbPixels) {
+    } else if (image.hasRawRgb()) {
       return DartBridge.vlm.processImageStream(
         imageFormat: RacVlmImageFormat.rgbPixels,
-        pixelData: format.data,
-        width: format.width,
-        height: format.height,
+        pixelData: Uint8List.fromList(image.rawRgb),
+        width: image.width,
+        height: image.height,
         prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        useGpu: true,
+        systemPrompt: null,
+        maxImageSize: 0,
+        nThreads: 0,
       );
-    } else if (format is VLMImageFormatBase64) {
+    } else if (image.hasBase64()) {
       return DartBridge.vlm.processImageStream(
         imageFormat: RacVlmImageFormat.base64,
-        base64Data: format.encoded,
+        base64Data: image.base64,
         prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        useGpu: true,
+        systemPrompt: null,
+        maxImageSize: 0,
+        nThreads: 0,
       );
     } else {
-      throw SDKError.vlmInvalidImage('Unsupported image format');
+      throw SDKException.vlmInvalidImage('Unsupported image format');
     }
   }
 

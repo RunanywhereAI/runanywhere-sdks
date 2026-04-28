@@ -1,57 +1,28 @@
 /**
  * Foundation/ErrorTypes
  *
- * Unified error handling system for the SDK.
- * Matches iOS SDK: Foundation/ErrorTypes/
+ * Wave 2 cleanup: legacy `SDKError` / `ErrorCode` / `ErrorCategory` /
+ * `ErrorContext` modules have been deleted. The canonical proto-encoded
+ * error shape lives in `@runanywhere/proto-ts/errors` and the throwable
+ * wrapper is `SDKException` (this file's only export). Consumers MUST
+ * use `SDKException` for all SDK-throw sites and `ErrorCode` /
+ * `ErrorCategory` from `@runanywhere/proto-ts/errors` for code-level
+ * dispatch.
  */
 
-// Error codes
-export { ErrorCode, getErrorCodeMessage } from './ErrorCodes';
-
-// Error categories
+// Canonical proto error types (re-exported for ergonomic access).
+export type {
+  ErrorContext,
+  SDKError as SDKErrorProto,
+} from '@runanywhere/proto-ts/errors';
 export {
   ErrorCategory,
-  allErrorCategories,
-  getCategoryFromCode,
-  inferCategoryFromError,
-} from './ErrorCategory';
+  ErrorCode,
+} from '@runanywhere/proto-ts/errors';
 
-// Error context - Type exports
-export type { ErrorContext } from './ErrorContext';
-
-// Error context - Value exports
+// SDKException — the only RN throwable wrapper around the proto.
 export {
-  createErrorContext,
-  formatStackTrace,
-  formatLocation,
-  formatContext,
-  ContextualError,
-  withContext,
-  getErrorContext,
-  getUnderlyingError,
-} from './ErrorContext';
-
-// SDK Error - Type exports
-export type { SDKErrorProtocol } from './SDKError';
-
-// SDK Error - Value exports
-export {
-  // Legacy enum (backwards compatibility)
-  SDKErrorCode,
-  // Class
-  SDKError,
-  // Utility functions
-  asSDKError,
-  isSDKError,
-  captureAndThrow,
-  // Convenience factory functions
-  notInitializedError,
-  alreadyInitializedError,
-  invalidInputError,
-  modelNotFoundError,
-  modelLoadError,
-  networkError,
-  authenticationError,
-  generationError,
-  storageError,
-} from './SDKError';
+  SDKException,
+  isSDKException,
+  asSDKException,
+} from './SDKException';

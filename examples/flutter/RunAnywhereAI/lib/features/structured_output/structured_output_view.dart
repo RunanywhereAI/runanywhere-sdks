@@ -236,35 +236,30 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   Future<void> _generateNonStream(StructuredOutputExample example) async {
     final result = await sdk.RunAnywhereSDK.instance.llm.generate(
       _promptController.text,
-      options: sdk.LLMGenerationOptions(
+      sdk.LLMGenerationOptions(
         maxTokens: 1000,
         temperature: 0.7,
-        structuredOutput: sdk.StructuredOutputConfig(
-          typeName: example.typeName,
-          schema: example.schema,
-        ),
+        jsonSchema: example.schema,
       ),
     );
 
     setState(() {
       _rawResponse = result.text;
-      _structuredData = result.structuredData;
+      _structuredData = result.hasJsonOutput()
+          ? jsonDecode(result.jsonOutput) as Map<String, dynamic>?
+          : null;
     });
   }
 
   Future<void> _generateStream(StructuredOutputExample example) async {
-    // v2 close-out Phase G-2: streaming returns Stream<LLMStreamEvent>.
-    // Structured-output parsing happens on the full accumulated text
-    // after the terminal event — not derived from a `result` future.
+    // Wave 2: streaming returns Stream<LLMStreamEvent>; structured-output
+    // parsing happens on the accumulated text after the terminal event.
     final eventStream = sdk.RunAnywhereSDK.instance.llm.generateStream(
       _promptController.text,
-      options: sdk.LLMGenerationOptions(
+      sdk.LLMGenerationOptions(
         maxTokens: 1000,
         temperature: 0.7,
-        structuredOutput: sdk.StructuredOutputConfig(
-          typeName: example.typeName,
-          schema: example.schema,
-        ),
+        jsonSchema: example.schema,
       ),
     );
 

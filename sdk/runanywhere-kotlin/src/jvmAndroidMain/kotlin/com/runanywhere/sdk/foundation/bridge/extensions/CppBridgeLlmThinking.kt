@@ -58,10 +58,12 @@ object CppBridgeLlmThinking {
      *   always pass a non-null String here, but defensive).
      */
     fun extract(text: String): LlmThinkingExtraction {
-        val arr = RunAnywhereBridge.racLlmExtractThinking(text)
-            ?: throw IllegalStateException(
-                "rac_llm_extract_thinking returned null; check logs")
-        val response = arr[0] ?: ""   // never null on success per C ABI doc
+        val arr =
+            RunAnywhereBridge.racLlmExtractThinking(text)
+                ?: throw IllegalStateException(
+                    "rac_llm_extract_thinking returned null; check logs",
+                )
+        val response = arr[0] ?: "" // never null on success per C ABI doc
         val thinking = arr.getOrNull(1)
         return LlmThinkingExtraction(response, thinking)
     }
@@ -74,7 +76,8 @@ object CppBridgeLlmThinking {
     fun strip(text: String): String {
         return RunAnywhereBridge.racLlmStripThinking(text)
             ?: throw IllegalStateException(
-                "rac_llm_strip_thinking returned null; check logs")
+                "rac_llm_strip_thinking returned null; check logs",
+            )
     }
 
     /**
@@ -89,10 +92,14 @@ object CppBridgeLlmThinking {
         response: String?,
         thinking: String?,
     ): LlmThinkingTokenSplit {
-        val arr = RunAnywhereBridge.racLlmSplitThinkingTokens(
-            totalCompletionTokens, response, thinking,
-        ) ?: throw IllegalStateException(
-            "rac_llm_split_thinking_tokens returned null; check logs")
+        val arr =
+            RunAnywhereBridge.racLlmSplitThinkingTokens(
+                totalCompletionTokens,
+                response,
+                thinking,
+            ) ?: throw IllegalStateException(
+                "rac_llm_split_thinking_tokens returned null; check logs",
+            )
         return LlmThinkingTokenSplit(
             thinkingTokens = arr[0],
             responseTokens = arr[1],

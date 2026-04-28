@@ -50,10 +50,10 @@ public struct STTConfiguration: ComponentConfiguration, Sendable {
 
     public func validate() throws {
         guard sampleRate > 0 && sampleRate <= 48000 else {
-            throw SDKError.general(.validationFailed, "Sample rate must be between 1 and 48000 Hz")
+            throw SDKException.general(.validationFailed, "Sample rate must be between 1 and 48000 Hz")
         }
         guard maxAlternatives > 0 && maxAlternatives <= 10 else {
-            throw SDKError.general(.validationFailed, "Max alternatives must be between 1 and 10")
+            throw SDKException.general(.validationFailed, "Max alternatives must be between 1 and 10")
         }
     }
 }
@@ -330,5 +330,118 @@ public struct STTTranscriptionResult: Sendable {
             self.transcript = transcript
             self.confidence = confidence
         }
+    }
+}
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/stt_options.pb.swift`:
+//   • RASTTConfiguration     (modelID, language: RASTTLanguage, sampleRate,
+//                              enableVad, audioFormat: RAAudioFormat)
+//   • RASTTOptions           (language, enablePunctuation, enableDiarization,
+//                              maxSpeakers, vocabularyList, enableWordTimestamps,
+//                              beamSize)
+//   • RASTTOutput            (text, language, confidence, words, alternatives, metadata)
+//   • RAWordTimestamp        (word, startMs, endMs, confidence) — proto uses ms Int64
+//   • RATranscriptionAlternative (text, confidence, words)
+//   • RATranscriptionMetadata    (modelID, processingTimeMs, audioLengthMs, realTimeFactor)
+//   • RASTTPartialResult     (text, isFinal, stability)
+//   • RASTTLanguage enum     (.unspecified/.auto/.en/.es/.fr/.de/.zh/.ja/.ko/.it/.pt/.ar/.ru/.hi)
+//
+// The hand-rolled Swift types above are KEPT for source compatibility because
+// direct typealiasing breaks the API:
+//   1. STTOptions has free-form `language: String` while proto uses RASTTLanguage enum.
+//   2. WordTimestamp uses `startTime/endTime: TimeInterval` (seconds) vs proto's
+//      `startMs/endMs: Int64`.
+//   3. STTConfiguration / STTOptions expose C-bridge `withCOptions` and
+//      validate() that the generated structs intentionally omit.
+//   4. STTOutput conforms to ComponentOutput (with `timestamp: Date`) and
+//      provides `init(from cOutput: rac_stt_output_t)`.
+
+extension STTConfiguration {
+    /// Convert to canonical generated proto `RASTTConfiguration`. Notes:
+    /// `language` (free-form BCP-47 String like "en-US") is collapsed to
+    /// the closest RASTTLanguage enum case (.unspecified when unmapped).
+    public func toRASTTConfiguration() -> RASTTConfiguration {
+        var proto = RASTTConfiguration()
+        if let modelId = modelId { proto.modelID = modelId }
+        proto.language = STTConfiguration.toRASTTLanguage(language)
+        proto.sampleRate = Int32(sampleRate)
+        proto.enableVad = false
+        return proto
+    }
+
+    /// Map a free-form BCP-47 string to the canonical RASTTLanguage enum.
+    public static func toRASTTLanguage(_ raw: String) -> RASTTLanguage {
+        let base = raw.split(separator: "-").first.map(String.init)?.lowercased() ?? raw.lowercased()
+        switch base {
+        case "auto": return .auto
+        case "en": return .en
+        case "es": return .es
+        case "fr": return .fr
+        case "de": return .de
+        case "zh": return .zh
+        case "ja": return .ja
+        case "ko": return .ko
+        case "it": return .it
+        case "pt": return .pt
+        case "ar": return .ar
+        case "ru": return .ru
+        case "hi": return .hi
+        default: return .unspecified
+        }
+    }
+}
+
+extension STTOptions {
+    /// Convert to canonical generated proto `RASTTOptions`. Notes:
+    /// detectLanguage=true is encoded as language=.auto on the wire.
+    /// `audioFormat`, `sampleRate`, and `preferredFramework` are omitted —
+    /// they belong on RASTTConfiguration.
+    public func toRASTTOptions() -> RASTTOptions {
+        var proto = RASTTOptions()
+        proto.language = detectLanguage ? .auto : STTConfiguration.toRASTTLanguage(language)
+        proto.enablePunctuation = enablePunctuation
+        proto.enableDiarization = enableDiarization
+        proto.maxSpeakers = Int32(maxSpeakers ?? 0)
+        proto.vocabularyList = vocabularyFilter
+        proto.enableWordTimestamps = enableTimestamps
+        return proto
+    }
+}
+
+extension WordTimestamp {
+    /// Convert to canonical generated proto `RAWordTimestamp`. Notes:
+    /// startTime/endTime (TimeInterval seconds) → startMs/endMs (Int64 ms).
+    public func toRAWordTimestamp() -> RAWordTimestamp {
+        var proto = RAWordTimestamp()
+        proto.word = word
+        proto.startMs = Int64(startTime * 1000)
+        proto.endMs = Int64(endTime * 1000)
+        proto.confidence = confidence
+        return proto
+    }
+}
+
+extension TranscriptionAlternative {
+    /// Convert to canonical generated proto `RATranscriptionAlternative`.
+    public func toRATranscriptionAlternative() -> RATranscriptionAlternative {
+        var proto = RATranscriptionAlternative()
+        proto.text = text
+        proto.confidence = confidence
+        return proto
+    }
+}
+
+extension TranscriptionMetadata {
+    /// Convert to canonical generated proto `RATranscriptionMetadata`. Notes:
+    /// processingTime (TimeInterval seconds) → processingTimeMs (Int64 ms).
+    public func toRATranscriptionMetadata() -> RATranscriptionMetadata {
+        var proto = RATranscriptionMetadata()
+        proto.modelID = modelId
+        proto.processingTimeMs = Int64(processingTime * 1000)
+        proto.audioLengthMs = Int64(audioLength * 1000)
+        proto.realTimeFactor = Float(realTimeFactor)
+        return proto
     }
 }

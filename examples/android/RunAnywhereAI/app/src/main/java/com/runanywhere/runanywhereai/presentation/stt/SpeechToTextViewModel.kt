@@ -12,7 +12,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.ModelEvent
-import com.runanywhere.sdk.public.extensions.STT.STTOptions
+import ai.runanywhere.proto.v1.STTOptions
 import com.runanywhere.sdk.public.extensions.currentSTTModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.isSTTModelLoadedSync
@@ -453,15 +453,15 @@ class SpeechToTextViewModel : ViewModel() {
                             // Transcribe in background
                             withContext(Dispatchers.IO) {
                                 try {
-                                    val options = STTOptions(language = _uiState.value.language)
+                                    val options = STTOptions(language = com.runanywhere.sdk.foundation.protoext.sttLanguageFromBcp47(_uiState.value.language))
                                     val result =
                                         RunAnywhere.transcribeStream(
                                             audioData = chunkData,
                                             options = options,
                                         ) { partial ->
                                             // Update UI with partial result (non-suspend callback)
-                                            if (partial.transcript.isNotBlank()) {
-                                                val newText = lastTranscription + " " + partial.transcript
+                                            if (partial.text.isNotBlank()) {
+                                                val newText = lastTranscription + " " + partial.text
                                                 // Use launch since we're in a non-suspend callback
                                                 viewModelScope.launch(Dispatchers.Main) {
                                                     handleSTTStreamText(newText.trim())

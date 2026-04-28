@@ -1,41 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_tts.dart — v4 TTS (text-to-speech) capability.
+// Wave 2 TTS capability — aligned to Swift + proto. Returns proto TTSOutput.
 
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart' as pb_models;
+import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_tts.dart' show racAudioFormatPcm, racAudioFormatWav;
+import 'package:runanywhere/native/dart_bridge_tts.dart' show racAudioFormatPcm;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/generation_types.dart';
-
-/// Map a Dart [AudioFormat] to the C enum int used by the TTS bridge.
-int _ttsAudioFormatToC(AudioFormat fmt) {
-  switch (fmt) {
-    case AudioFormat.wav:
-      return racAudioFormatWav;
-    case AudioFormat.pcm:
-      return racAudioFormatPcm;
-    default:
-      // PCM is the default for unsupported encodings on the TTS path.
-      return racAudioFormatPcm;
-  }
-}
 
 /// TTS (text-to-speech) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.tts`.
+/// Access via `RunAnywhereSDK.instance.tts`. Mirrors Swift's
+/// `RunAnywhere+TTS.swift`. Returns proto [TTSOutput].
 class RunAnywhereTTS {
   RunAnywhereTTS._();
   static final RunAnywhereTTS _instance = RunAnywhereTTS._();
@@ -61,7 +50,7 @@ class RunAnywhereTTS {
   /// Load a TTS voice by ID.
   Future<void> loadVoice(String voiceId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
@@ -75,11 +64,11 @@ class RunAnywhereTTS {
       final model = models.where((m) => m.id == voiceId).firstOrNull;
 
       if (model == null) {
-        throw SDKError.modelNotFound('TTS voice not found: $voiceId');
+        throw SDKException.modelNotFound('TTS voice not found: $voiceId');
       }
 
       if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
+        throw SDKException.modelNotDownloaded(
           'TTS voice is not downloaded. Call downloadModel() first.',
         );
       }
@@ -87,7 +76,7 @@ class RunAnywhereTTS {
       final resolvedPath =
           await DartBridge.modelPaths.resolveModelFilePath(model);
       if (resolvedPath == null) {
-        throw SDKError.modelNotFound(
+        throw SDKException.modelNotFound(
             'Could not resolve TTS voice path for: $voiceId');
       }
 
@@ -99,7 +88,7 @@ class RunAnywhereTTS {
       await DartBridge.tts.loadVoice(resolvedPath, voiceId, model.name);
 
       if (!DartBridge.tts.isLoaded) {
-        throw SDKError.ttsNotAvailable(
+        throw SDKException.ttsNotAvailable(
           'TTS voice failed to load - voice may not be compatible',
         );
       }
@@ -138,39 +127,28 @@ class RunAnywhereTTS {
   /// Unload the currently-loaded TTS voice.
   Future<void> unloadVoice() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     DartBridge.tts.unload();
   }
 
-  /// Synthesize speech from text. Rate/pitch/volume default to 1.0/1.0/1.0.
-  ///
-  /// When [options] is supplied, all other rate/pitch/volume args are
-  /// ignored and the [TTSOptions] fields take precedence. Mirrors
-  /// Swift's `synthesize(_:options:)`.
-  Future<TTSResult> synthesize(
-    String text, {
-    double rate = 1.0,
-    double pitch = 1.0,
-    double volume = 1.0,
+  /// Synthesize speech from [text]. Returns proto [TTSOutput] with PCM
+  /// float samples encoded as bytes in `audioData`. Mirrors Swift's
+  /// `synthesize(_:options:)`.
+  Future<TTSOutput> synthesize(
+    String text, [
     TTSOptions? options,
-  }) async {
-    final effectiveOptions = options ??
-        TTSOptions(rate: rate, pitch: pitch, volume: volume);
-    return _synthesizeWith(text, effectiveOptions);
-  }
-
-  Future<TTSResult> _synthesizeWith(String text, TTSOptions options) async {
+  ]) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
-
     if (!DartBridge.tts.isLoaded) {
-      throw SDKError.ttsNotAvailable(
+      throw SDKException.ttsNotAvailable(
         'No TTS voice loaded. Call loadTTSVoice() first.',
       );
     }
 
+    final opts = options ?? TTSOptions();
     final logger = SDKLogger('RunAnywhere.Synthesize');
     logger.debug(
         'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
@@ -184,18 +162,17 @@ class RunAnywhereTTS {
     try {
       final result = await DartBridge.tts.synthesize(
         text,
-        rate: options.rate,
-        pitch: options.pitch,
-        volume: options.volume,
-        language: options.language,
-        audioFormat: _ttsAudioFormatToC(options.audioFormat),
-        sampleRate: options.sampleRate,
-        useSsml: options.useSSML,
-        voiceId: options.voice,
+        rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
+        pitch: opts.hasPitch() ? opts.pitch : 1.0,
+        volume: opts.hasVolume() ? opts.volume : 1.0,
+        language: opts.hasLanguageCode() ? opts.languageCode : 'en-US',
+        audioFormat: racAudioFormatPcm,
+        sampleRate: 22050,
+        useSsml: opts.enableSsml,
+        voiceId: opts.hasVoice() ? opts.voice : null,
       );
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      final audioSizeBytes = result.samples.length * 4;
+      final audioBytes = Uint8List.view(result.samples.buffer);
 
       TelemetryService.shared.trackSynthesis(
         voiceId: voiceId,
@@ -204,28 +181,26 @@ class RunAnywhereTTS {
         audioDurationMs: result.durationMs,
         latencyMs: latencyMs,
         sampleRate: result.sampleRate,
-        audioSizeBytes: audioSizeBytes,
+        audioSizeBytes: audioBytes.length,
       );
 
       final metadata = TTSSynthesisMetadata(
-        voice: voiceId,
-        language: options.language,
-        processingTime: latencyMs / 1000.0,
+        voiceId: voiceId,
+        processingTimeMs: Int64(latencyMs),
         characterCount: text.length,
+        audioDurationMs: Int64(result.durationMs),
       );
 
       logger.info(
           'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz');
-      return TTSResult(
-        samples: result.samples,
+      return TTSOutput(
+        audioData: audioBytes,
+        audioFormat: pb_models.AudioFormat.AUDIO_FORMAT_PCM,
         sampleRate: result.sampleRate,
-        durationMs: result.durationMs,
-        format: options.audioFormat,
+        durationMs: Int64(result.durationMs),
         metadata: metadata,
-        timestamp: DateTime.now(),
+        timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
       );
-    } on SDKError {
-      rethrow;
     } catch (e) {
       TelemetryService.shared.trackError(
         errorCode: 'synthesis_failed',
@@ -237,36 +212,32 @@ class RunAnywhereTTS {
     }
   }
 
-  /// Stream synthesis chunks as they are generated. Mirrors Swift's
-  /// `synthesizeStream(_:options:onAudioChunk:)`.
-  ///
-  /// Yields PCM Float32 chunks (~100 ms each) as `Uint8List` byte
-  /// buffers. Use [onAudioChunk] for callback-style consumption (the
-  /// callback fires once per chunk in addition to the stream).
+  /// Stream synthesis chunks as they are generated. Yields raw byte
+  /// buffers (PCM Float32 samples encoded as bytes).
   Stream<Uint8List> synthesizeStream(
     String text, {
-    TTSOptions options = const TTSOptions(),
+    TTSOptions? options,
     void Function(Uint8List chunk)? onAudioChunk,
   }) async* {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     if (!DartBridge.tts.isLoaded) {
-      throw SDKError.ttsNotAvailable('No TTS voice loaded.');
+      throw SDKException.ttsNotAvailable('No TTS voice loaded.');
     }
+    final opts = options ?? TTSOptions();
 
     await for (final chunk in DartBridge.tts.synthesizeStream(
       text,
-      rate: options.rate,
-      pitch: options.pitch,
-      volume: options.volume,
-      language: options.language,
-      audioFormat: _ttsAudioFormatToC(options.audioFormat),
-      sampleRate: options.sampleRate,
-      useSsml: options.useSSML,
-      voiceId: options.voice,
+      rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
+      pitch: opts.hasPitch() ? opts.pitch : 1.0,
+      volume: opts.hasVolume() ? opts.volume : 1.0,
+      language: opts.hasLanguageCode() ? opts.languageCode : 'en-US',
+      audioFormat: racAudioFormatPcm,
+      sampleRate: 22050,
+      useSsml: opts.enableSsml,
+      voiceId: opts.hasVoice() ? opts.voice : null,
     )) {
-      // Convert Float32 samples to bytes for transport.
       final bytes = chunk.samples.buffer.asUint8List(
         chunk.samples.offsetInBytes,
         chunk.samples.lengthInBytes,
@@ -276,31 +247,25 @@ class RunAnywhereTTS {
     }
   }
 
-  /// Stop in-flight synthesis (no-op if nothing is playing). Mirrors
-  /// Swift's `RunAnywhere.stopSynthesis()`.
+  /// Stop in-flight synthesis (no-op if nothing is playing).
   Future<void> stopSynthesis() async {
     DartBridge.tts.stop();
   }
 
-  /// Synthesize-and-play: synthesizes audio for [text] then plays it
-  /// through the platform audio output. Mirrors Swift's
-  /// `RunAnywhere.speak(_:options:)`.
-  ///
-  /// NOTE: Audio playback is delegated to the host application — Flutter
-  /// has no platform audio player baked into the SDK. The caller can
-  /// chain this onto their own `audioplayers` / `just_audio` instance
-  /// using the returned [TTSResult.samples]. The metadata-only
-  /// [TTSSpeakResult] is returned as a parity-shape with Swift.
-  Future<TTSSpeakResult> speak(
-    String text, {
-    TTSOptions options = const TTSOptions(),
-  }) async {
-    final output = await _synthesizeWith(text, options);
+  /// Synthesize-and-play. Mirrors Swift's `RunAnywhere.speak(_:options:)`.
+  /// Returns proto [TTSSpeakResult] (metadata-only view).
+  Future<TTSSpeakResult> speak(String text, [TTSOptions? options]) async {
+    final output = await synthesize(text, options);
     _isSpeaking = true;
     try {
-      // Host app is responsible for actual playback. We surface the
-      // samples in the returned result so the caller can route them.
-      return TTSSpeakResult.from(output);
+      return TTSSpeakResult(
+        audioFormat: output.audioFormat,
+        sampleRate: output.sampleRate,
+        durationMs: output.durationMs,
+        audioSizeBytes: Int64(output.audioData.length),
+        metadata: output.metadata,
+        timestampMs: output.timestampMs,
+      );
     } finally {
       _isSpeaking = false;
     }
@@ -308,20 +273,16 @@ class RunAnywhereTTS {
 
   bool _isSpeaking = false;
 
-  /// True while a `speak()` invocation is in flight. Mirrors Swift's
-  /// `isSpeaking` getter.
+  /// True while a `speak()` invocation is in flight.
   bool get isSpeaking => _isSpeaking;
 
-  /// Stop ongoing playback initiated by `speak()`. Mirrors Swift's
-  /// `stopSpeaking()`.
+  /// Stop ongoing playback.
   Future<void> stopSpeaking() async {
     _isSpeaking = false;
     await stopSynthesis();
   }
 
-  /// List available TTS voice ids. Mirrors Swift's `availableTTSVoices`
-  /// — convenience wrapper around `models.available()` filtered by the
-  /// speech-synthesis category.
+  /// List available TTS voice ids.
   Future<List<String>> availableVoices() async {
     final all = await RunAnywhereModels.shared.available();
     return all

@@ -7,17 +7,17 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LoRAAdapterConfig
+import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoraRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import kotlinx.coroutines.Dispatchers
@@ -41,42 +41,42 @@ private val loraJson = Json { ignoreUnknownKeys = true }
 
 actual suspend fun RunAnywhere.loadLoraAdapter(config: LoRAAdapterConfig) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
-    loraLogger.info("Loading LoRA adapter: ${config.path} (scale=${config.scale})")
+    loraLogger.info("Loading LoRA adapter: ${config.adapter_path} (scale=${config.scale})")
 
-    val result = CppBridgeLLM.loadLoraAdapter(config.path, config.scale)
+    val result = CppBridgeLLM.loadLoraAdapter(config.adapter_path, config.scale)
     if (result != 0) {
-        throw SDKError.llm("Failed to load LoRA adapter '${config.path}': error code $result")
+        throw SDKException.llm("Failed to load LoRA adapter '${config.adapter_path}': error code $result")
     }
 }
 
 actual suspend fun RunAnywhere.removeLoraAdapter(path: String) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     val result = CppBridgeLLM.removeLoraAdapter(path)
     if (result != 0) {
-        throw SDKError.llm("Failed to remove LoRA adapter: error $result")
+        throw SDKException.llm("Failed to remove LoRA adapter: error $result")
     }
 }
 
 actual suspend fun RunAnywhere.clearLoraAdapters() {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     val result = CppBridgeLLM.clearLoraAdapters()
     if (result != 0) {
-        throw SDKError.llm("Failed to clear LoRA adapters: error $result")
+        throw SDKException.llm("Failed to clear LoRA adapters: error $result")
     }
 }
 
 actual suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo> {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     val jsonStr = CppBridgeLLM.getLoraInfo() ?: return emptyList()
@@ -86,7 +86,8 @@ actual suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo> {
         jsonArray.map { element ->
             val obj = element.jsonObject
             LoRAAdapterInfo(
-                path = obj["path"]?.jsonPrimitive?.content ?: "",
+                adapter_path = obj["path"]?.jsonPrimitive?.content ?: "",
+                adapter_id = obj["id"]?.jsonPrimitive?.content ?: "",
                 scale = obj["scale"]?.jsonPrimitive?.float ?: 1.0f,
                 applied = obj["applied"]?.jsonPrimitive?.boolean ?: false,
             )
@@ -112,7 +113,7 @@ actual fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibili
 // MARK: - LoRA Adapter Catalog
 
 actual fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry) {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     CppBridgeLoraRegistry.register(
         CppBridgeLoraRegistry.LoraEntry(
             id = entry.id,
@@ -157,27 +158,27 @@ private fun getLoraDownloadDir(): File =
 
 actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress> =
     callbackFlow {
-        if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+        if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
         val entry =
             CppBridgeLoraRegistry
                 .getAll()
                 .find { it.id == adapterId }
-                ?: throw SDKError.download("LoRA adapter '$adapterId' not found in registry")
+                ?: throw SDKException.download("LoRA adapter '$adapterId' not found in registry")
 
         val uri =
             try {
                 URI(entry.downloadUrl)
             } catch (e: Exception) {
-                throw SDKError.download("Invalid download URL for adapter '$adapterId': ${e.message}")
+                throw SDKException.download("Invalid download URL for adapter '$adapterId': ${e.message}")
             }
         if (uri.scheme?.lowercase() != "https") {
-            throw SDKError.download("Only HTTPS download URLs are allowed")
+            throw SDKException.download("Only HTTPS download URLs are allowed")
         }
 
         val (isNetworkAvailable, _) = CppBridgeDownload.checkNetworkStatus()
         if (!isNetworkAvailable) {
-            throw SDKError.networkUnavailable(IllegalStateException("No internet connection"))
+            throw SDKException.networkUnavailable(IllegalStateException("No internet connection"))
         }
 
         val loraDir = getLoraDownloadDir()
@@ -185,7 +186,7 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
         val tmpFile = File(loraDir, "${entry.filename}.tmp")
 
         if (!destFile.canonicalPath.startsWith(loraDir.canonicalPath + File.separator)) {
-            throw SDKError.download("Invalid adapter filename (path traversal): ${entry.filename}")
+            throw SDKException.download("Invalid adapter filename (path traversal): ${entry.filename}")
         }
 
         // Already downloaded — emit COMPLETED and return.
@@ -258,7 +259,7 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
         if (rc != CppBridgeDownload.DownloadError.NONE) {
             runCatching { tmpFile.delete() }
             val errorName = CppBridgeDownload.DownloadError.getName(rc)
-            throw SDKError.download(
+            throw SDKException.download(
                 "LoRA download failed for '${entry.filename}': $errorName (http_status=${outStatus[0]})",
             )
         }
@@ -285,7 +286,7 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
             }
         if (!isValidGguf) {
             destFile.delete()
-            throw SDKError.download("Downloaded LoRA adapter is not a valid GGUF file: ${entry.filename}")
+            throw SDKException.download("Downloaded LoRA adapter is not a valid GGUF file: ${entry.filename}")
         }
 
         loraLogger.info("LoRA download completed: ${destFile.absolutePath}")

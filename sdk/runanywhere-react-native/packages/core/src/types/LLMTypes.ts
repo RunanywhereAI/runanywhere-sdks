@@ -1,85 +1,30 @@
 /**
  * LLMTypes.ts
  *
- * Type definitions for LLM streaming functionality.
+ * Re-exports proto-canonical LLM types and defines RN-only streaming
+ * primitives that have no proto counterpart.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift
  */
 
-/**
- * LLM generation options
- */
-export interface LLMGenerationOptions {
-  /** Maximum tokens to generate */
-  maxTokens?: number;
-
-  /** Temperature (0.0 - 2.0) */
-  temperature?: number;
-
-  /** Top-p sampling */
-  topP?: number;
-
-  /** Top-k sampling */
-  topK?: number;
-
-  /** Stop sequences */
-  stopSequences?: string[];
-
-  /** System prompt */
-  systemPrompt?: string;
-
-  /** Enable streaming */
-  streamingEnabled?: boolean;
-}
-
-/**
- * LLM generation result
- */
-export interface LLMGenerationResult {
-  /** Generated text */
-  text: string;
-
-  /** Thinking content (for models with reasoning) */
-  thinkingContent?: string;
-
-  /** Input tokens count */
-  inputTokens: number;
-
-  /** Output tokens count */
-  tokensUsed: number;
-
-  /** Model ID used */
-  modelUsed: string;
-
-  /** Total latency in ms */
-  latencyMs: number;
-
-  /** Framework used */
-  framework: string;
-
-  /** Tokens per second */
-  tokensPerSecond: number;
-
-  /** Time to first token in ms */
-  timeToFirstTokenMs?: number;
-
-  /** Thinking tokens count */
-  thinkingTokens: number;
-
-  /** Response tokens count */
-  responseTokens: number;
-}
+// Proto-canonical types — single source of truth.
+export type {
+  LLMGenerationOptions,
+  LLMGenerationResult,
+  LLMConfiguration,
+  StreamToken,
+} from '@runanywhere/proto-ts/llm_options';
 
 /**
  * LLM streaming result
- * Contains both a stream for real-time tokens and a promise for final metrics
+ * Contains both a stream for real-time tokens and a promise for final metrics.
  */
 export interface LLMStreamingResult {
   /** Async iterator for tokens */
   stream: AsyncIterable<string>;
 
   /** Promise that resolves to final result with metrics */
-  result: Promise<LLMGenerationResult>;
+  result: Promise<import('@runanywhere/proto-ts/llm_options').LLMGenerationResult>;
 
   /** Cancel the generation */
   cancel: () => void;
@@ -119,7 +64,7 @@ export type LLMTokenCallback = (token: string) => void;
 /**
  * Stream completion callback
  */
-export type LLMStreamCompleteCallback = (result: LLMGenerationResult) => void;
+export type LLMStreamCompleteCallback = (result: import('@runanywhere/proto-ts/llm_options').LLMGenerationResult) => void;
 
 /**
  * Stream error callback

@@ -30,7 +30,7 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
-import com.runanywhere.sdk.public.extensions.RAG.RAGConfiguration
+import ai.runanywhere.proto.v1.RAGConfiguration
 import java.io.File
 
 /**
@@ -770,8 +770,7 @@ private fun buildRAGConfiguration(
         }
 
     return RAGConfiguration(
-        embeddingModelPath = resolvedEmbeddingPath,
-        llmModelPath = resolvedLLMPath,
-        embeddingConfigJson = embeddingConfigJson,
+        embedding_model_path = resolvedEmbeddingPath,
+        llm_model_path = resolvedLLMPath,
     )
 }

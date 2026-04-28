@@ -229,13 +229,13 @@ extension RunAnywhere {
     /// This method fetches models assigned to this device based on device type and platform
     /// - Parameter forceRefresh: Force refresh even if cached models are available
     /// - Returns: Array of ModelInfo objects assigned to this device
-    /// - Throws: SDKError if fetching fails
+    /// - Throws: SDKException if fetching fails
     public static func fetchModelAssignments(forceRefresh: Bool = false) async throws -> [ModelInfo] {
         let logger = SDKLogger(category: "RunAnywhere.ModelAssignments")
 
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized
@@ -256,7 +256,7 @@ extension RunAnywhere {
     public static func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized
@@ -272,7 +272,7 @@ extension RunAnywhere {
     public static func getModelsForCategory(_ category: ModelCategory) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized

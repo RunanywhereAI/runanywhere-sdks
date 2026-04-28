@@ -23,9 +23,10 @@ _sym_db = _symbol_database.Default()
 
 
 import model_types_pb2 as model__types__pb2
+import structured_output_pb2 as structured__output__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11llm_options.proto\x12\x0erunanywhere.v1\x1a\x11model_types.proto\"\xc5\x02\n\x14LLMGenerationOptions\x12\x12\n\nmax_tokens\x18\x01 \x01(\x05\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\r\n\x05top_p\x18\x03 \x01(\x02\x12\r\n\x05top_k\x18\x04 \x01(\x05\x12\x1a\n\x12repetition_penalty\x18\x05 \x01(\x02\x12\x16\n\x0estop_sequences\x18\x06 \x03(\t\x12\x19\n\x11streaming_enabled\x18\x07 \x01(\x08\x12?\n\x13preferred_framework\x18\x08 \x01(\x0e\x32\".runanywhere.v1.InferenceFramework\x12\x1a\n\rsystem_prompt\x18\t \x01(\tH\x00\x88\x01\x01\x12\x18\n\x0bjson_schema\x18\n \x01(\tH\x01\x88\x01\x01\x42\x10\n\x0e_system_promptB\x0e\n\x0c_json_schema\"\x8d\x03\n\x13LLMGenerationResult\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x1d\n\x10thinking_content\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x14\n\x0cinput_tokens\x18\x03 \x01(\x05\x12\x18\n\x10tokens_generated\x18\x04 \x01(\x05\x12\x12\n\nmodel_used\x18\x05 \x01(\t\x12\x1a\n\x12generation_time_ms\x18\x06 \x01(\x01\x12\x14\n\x07ttft_ms\x18\x07 \x01(\x01H\x01\x88\x01\x01\x12\x19\n\x11tokens_per_second\x18\x08 \x01(\x01\x12\x16\n\tframework\x18\t \x01(\tH\x02\x88\x01\x01\x12\x15\n\rfinish_reason\x18\n \x01(\t\x12\x17\n\x0fthinking_tokens\x18\x0b \x01(\x05\x12\x17\n\x0fresponse_tokens\x18\x0c \x01(\x05\x12\x18\n\x0bjson_output\x18\r \x01(\tH\x03\x88\x01\x01\x42\x13\n\x11_thinking_contentB\n\n\x08_ttft_msB\x0c\n\n_frameworkB\x0e\n\x0c_json_outputB\x8a\x01\n\x17\x61i.runanywhere.proto.v1B\x0fLLMOptionsProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11llm_options.proto\x12\x0erunanywhere.v1\x1a\x11model_types.proto\x1a\x17structured_output.proto\"\xd1\x04\n\x14LLMGenerationOptions\x12\x12\n\nmax_tokens\x18\x01 \x01(\x05\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\r\n\x05top_p\x18\x03 \x01(\x02\x12\r\n\x05top_k\x18\x04 \x01(\x05\x12\x1a\n\x12repetition_penalty\x18\x05 \x01(\x02\x12\x16\n\x0estop_sequences\x18\x06 \x03(\t\x12\x19\n\x11streaming_enabled\x18\x07 \x01(\x08\x12?\n\x13preferred_framework\x18\x08 \x01(\x0e\x32\".runanywhere.v1.InferenceFramework\x12\x1a\n\rsystem_prompt\x18\t \x01(\tH\x00\x88\x01\x01\x12\x18\n\x0bjson_schema\x18\n \x01(\tH\x01\x88\x01\x01\x12\x41\n\x10thinking_pattern\x18\x0b \x01(\x0b\x32\".runanywhere.v1.ThinkingTagPatternH\x02\x88\x01\x01\x12>\n\x10\x65xecution_target\x18\x0c \x01(\x0e\x32\x1f.runanywhere.v1.ExecutionTargetH\x03\x88\x01\x01\x12G\n\x11structured_output\x18\r \x01(\x0b\x32\'.runanywhere.v1.StructuredOutputOptionsH\x04\x88\x01\x01\x42\x10\n\x0e_system_promptB\x0e\n\x0c_json_schemaB\x13\n\x11_thinking_patternB\x13\n\x11_execution_targetB\x14\n\x12_structured_output\"\xa6\x04\n\x13LLMGenerationResult\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x1d\n\x10thinking_content\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x14\n\x0cinput_tokens\x18\x03 \x01(\x05\x12\x18\n\x10tokens_generated\x18\x04 \x01(\x05\x12\x12\n\nmodel_used\x18\x05 \x01(\t\x12\x1a\n\x12generation_time_ms\x18\x06 \x01(\x01\x12\x14\n\x07ttft_ms\x18\x07 \x01(\x01H\x01\x88\x01\x01\x12\x19\n\x11tokens_per_second\x18\x08 \x01(\x01\x12\x16\n\tframework\x18\t \x01(\tH\x02\x88\x01\x01\x12\x15\n\rfinish_reason\x18\n \x01(\t\x12\x17\n\x0fthinking_tokens\x18\x0b \x01(\x05\x12\x17\n\x0fresponse_tokens\x18\x0c \x01(\x05\x12\x18\n\x0bjson_output\x18\r \x01(\tH\x03\x88\x01\x01\x12<\n\x0bperformance\x18\x0e \x01(\x0b\x32\".runanywhere.v1.PerformanceMetricsH\x04\x88\x01\x01\x12\x39\n\x0b\x65xecuted_on\x18\x0f \x01(\x0e\x32\x1f.runanywhere.v1.ExecutionTargetH\x05\x88\x01\x01\x42\x13\n\x11_thinking_contentB\n\n\x08_ttft_msB\x0c\n\n_frameworkB\x0e\n\x0c_json_outputB\x0e\n\x0c_performanceB\x0e\n\x0c_executed_on\"\x94\x01\n\x10LLMConfiguration\x12\x16\n\x0e\x63ontext_length\x18\x01 \x01(\x05\x12\x13\n\x0btemperature\x18\x02 \x01(\x02\x12\x12\n\nmax_tokens\x18\x03 \x01(\x05\x12\x1a\n\rsystem_prompt\x18\x04 \x01(\tH\x00\x88\x01\x01\x12\x11\n\tstreaming\x18\x05 \x01(\x08\x42\x10\n\x0e_system_prompt\"d\n\x0fGenerationHints\x12\x13\n\x0btemperature\x18\x01 \x01(\x02\x12\x12\n\nmax_tokens\x18\x02 \x01(\x05\x12\x18\n\x0bsystem_role\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x0e\n\x0c_system_role\">\n\x12ThinkingTagPattern\x12\x13\n\x0bopening_tag\x18\x01 \x01(\t\x12\x13\n\x0b\x63losing_tag\x18\x02 \x01(\t\"@\n\x0bStreamToken\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x14\n\x0ctimestamp_ms\x18\x02 \x01(\x03\x12\r\n\x05index\x18\x03 \x01(\x05\"\x93\x01\n\x12PerformanceMetrics\x12\x12\n\nlatency_ms\x18\x01 \x01(\x03\x12\x14\n\x0cmemory_bytes\x18\x02 \x01(\x03\x12!\n\x19throughput_tokens_per_sec\x18\x03 \x01(\x02\x12\x15\n\rprompt_tokens\x18\x04 \x01(\x05\x12\x19\n\x11\x63ompletion_tokens\x18\x05 \x01(\x05*\x8a\x01\n\x0f\x45xecutionTarget\x12 \n\x1c\x45XECUTION_TARGET_UNSPECIFIED\x10\x00\x12\x1e\n\x1a\x45XECUTION_TARGET_ON_DEVICE\x10\x01\x12\x1a\n\x16\x45XECUTION_TARGET_CLOUD\x10\x02\x12\x19\n\x15\x45XECUTION_TARGET_AUTO\x10\x03\x42\x8a\x01\n\x17\x61i.runanywhere.proto.v1B\x0fLLMOptionsProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,8 +34,20 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'llm_options_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\017LLMOptionsProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_LLMGENERATIONOPTIONS']._serialized_start=57
-  _globals['_LLMGENERATIONOPTIONS']._serialized_end=382
-  _globals['_LLMGENERATIONRESULT']._serialized_start=385
-  _globals['_LLMGENERATIONRESULT']._serialized_end=782
+  _globals['_EXECUTIONTARGET']._serialized_start=1764
+  _globals['_EXECUTIONTARGET']._serialized_end=1902
+  _globals['_LLMGENERATIONOPTIONS']._serialized_start=82
+  _globals['_LLMGENERATIONOPTIONS']._serialized_end=675
+  _globals['_LLMGENERATIONRESULT']._serialized_start=678
+  _globals['_LLMGENERATIONRESULT']._serialized_end=1228
+  _globals['_LLMCONFIGURATION']._serialized_start=1231
+  _globals['_LLMCONFIGURATION']._serialized_end=1379
+  _globals['_GENERATIONHINTS']._serialized_start=1381
+  _globals['_GENERATIONHINTS']._serialized_end=1481
+  _globals['_THINKINGTAGPATTERN']._serialized_start=1483
+  _globals['_THINKINGTAGPATTERN']._serialized_end=1545
+  _globals['_STREAMTOKEN']._serialized_start=1547
+  _globals['_STREAMTOKEN']._serialized_end=1611
+  _globals['_PERFORMANCEMETRICS']._serialized_start=1614
+  _globals['_PERFORMANCEMETRICS']._serialized_end=1761
 # @@protoc_insertion_point(module_scope)

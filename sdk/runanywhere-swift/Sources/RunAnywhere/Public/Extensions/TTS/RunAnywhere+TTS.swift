@@ -22,16 +22,16 @@ public extension RunAnywhere {
     /// - Throws: Error if loading fails
     static func loadTTSVoice(_ voiceId: String) async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Resolve voice ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
+            throw SDKException.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
         }
         guard let localPath = modelInfo.localPath else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
+            throw SDKException.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
         try await CppBridge.TTS.shared.loadVoice(localPath.path, voiceId: voiceId, voiceName: modelInfo.name)
@@ -40,7 +40,7 @@ public extension RunAnywhere {
     /// Unload the currently loaded TTS voice
     static func unloadTTSVoice() async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         await CppBridge.TTS.shared.unload()
@@ -74,13 +74,13 @@ public extension RunAnywhere {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.TTS.shared.getHandle()
 
         guard await CppBridge.TTS.shared.isLoaded else {
-            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
+            throw SDKException.tts(.notInitialized, "TTS voice not loaded")
         }
 
         let voiceId = await CppBridge.TTS.shared.currentVoiceId ?? "unknown"
@@ -101,7 +101,7 @@ public extension RunAnywhere {
         }
 
         guard synthesizeResult == RAC_SUCCESS else {
-            throw SDKError.tts(.processingFailed, "Synthesis failed: \(synthesizeResult)")
+            throw SDKException.tts(.processingFailed, "Synthesis failed: \(synthesizeResult)")
         }
 
         let endTime = Date()
@@ -147,13 +147,13 @@ public extension RunAnywhere {
         onAudioChunk: @escaping (Data) -> Void
     ) async throws -> TTSOutput {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.TTS.shared.getHandle()
 
         guard await CppBridge.TTS.shared.isLoaded else {
-            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
+            throw SDKException.tts(.notInitialized, "TTS voice not loaded")
         }
 
         let voiceId = await CppBridge.TTS.shared.currentVoiceId ?? "unknown"
@@ -190,7 +190,7 @@ public extension RunAnywhere {
         let totalAudioData = finalContext.totalData
 
         guard streamResult == RAC_SUCCESS else {
-            throw SDKError.tts(.processingFailed, "Streaming synthesis failed: \(streamResult)")
+            throw SDKException.tts(.processingFailed, "Streaming synthesis failed: \(streamResult)")
         }
 
         let endTime = Date()
@@ -246,7 +246,7 @@ public extension RunAnywhere {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSSpeakResult {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let output = try await synthesize(text, options: options)
@@ -296,7 +296,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = wavDataPtr, wavSize > 0 else {
-            throw SDKError.tts(.processingFailed, "Failed to convert PCM to WAV: \(result)")
+            throw SDKException.tts(.processingFailed, "Failed to convert PCM to WAV: \(result)")
         }
 
         let wavData = Data(bytes: ptr, count: wavSize)

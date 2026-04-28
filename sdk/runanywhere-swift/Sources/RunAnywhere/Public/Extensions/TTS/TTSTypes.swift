@@ -78,13 +78,13 @@ public struct TTSConfiguration: ComponentConfiguration, Sendable {
 
     public func validate() throws {
         guard speakingRate >= 0.5 && speakingRate <= 2.0 else {
-            throw SDKError.tts(.invalidSpeakingRate, "Invalid speaking rate: \(speakingRate). Must be between 0.5 and 2.0.")
+            throw SDKException.tts(.invalidSpeakingRate, "Invalid speaking rate: \(speakingRate). Must be between 0.5 and 2.0.")
         }
         guard pitch >= 0.5 && pitch <= 2.0 else {
-            throw SDKError.tts(.invalidPitch, "Invalid pitch: \(pitch). Must be between 0.5 and 2.0.")
+            throw SDKException.tts(.invalidPitch, "Invalid pitch: \(pitch). Must be between 0.5 and 2.0.")
         }
         guard volume >= 0.0 && volume <= 1.0 else {
-            throw SDKError.tts(.invalidVolume, "Invalid volume: \(volume). Must be between 0.0 and 1.0.")
+            throw SDKException.tts(.invalidVolume, "Invalid volume: \(volume). Must be between 0.0 and 1.0.")
         }
     }
 }
@@ -459,5 +459,92 @@ public struct TTSSpeakResult: Sendable {
         self.audioSizeBytes = output.audioSizeBytes
         self.metadata = output.metadata
         self.timestamp = output.timestamp
+    }
+}
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/tts_options.pb.swift`:
+//   • RATTSConfiguration   (modelID, voice, languageCode, speakingRate, pitch,
+//                            volume, audioFormat, sampleRate, enableNeuralVoice,
+//                            enableSsml)
+//   • RATTSOptions         (voice, languageCode, speakingRate, pitch, volume,
+//                            enableSsml, audioFormat)
+//   • RATTSOutput          (audioData, audioFormat, sampleRate, durationMs,
+//                            phonemeTimestamps, metadata, timestampMs)
+//   • RATTSPhonemeTimestamp (phoneme, startMs, endMs)
+//   • RATTSSynthesisMetadata(voiceID, languageCode, processingTimeMs,
+//                             characterCount, audioDurationMs)
+//   • RATTSSpeakResult     (audioFormat, sampleRate, durationMs, audioSizeBytes,
+//                            metadata, timestampMs)
+//   • RATTSVoiceInfo       (id, displayName, languageCode, gender, description_p)
+//   • RATTSVoiceGender enum (.unspecified/.male/.female/.neutral)
+//
+// Hand-rolled types are KEPT because they:
+//   1. expose ComponentConfiguration / Builder / validate() that the proto
+//      structs intentionally omit,
+//   2. expose `withCOptions` C bridges and `init(from cOutput: rac_tts_output_t)`,
+//   3. use Swift idiomatic units (TimeInterval seconds, Date timestamps) where
+//      the proto wire uses Int64 ms.
+
+extension TTSConfiguration {
+    /// Convert to canonical generated proto `RATTSConfiguration`. Notes:
+    /// `language` (BCP-47 String) → `languageCode` (proto field name).
+    /// `audioFormat` (Swift AudioFormat = RAAudioFormat typealias) flows directly.
+    public func toRATTSConfiguration() -> RATTSConfiguration {
+        var proto = RATTSConfiguration()
+        if let modelId = modelId { proto.modelID = modelId }
+        proto.voice = voice
+        proto.languageCode = language
+        proto.speakingRate = speakingRate
+        proto.pitch = pitch
+        proto.volume = volume
+        proto.audioFormat = audioFormat
+        proto.enableNeuralVoice = useNeuralVoice
+        proto.enableSsml = enableSSML
+        return proto
+    }
+}
+
+extension TTSOptions {
+    /// Convert to canonical generated proto `RATTSOptions`. Notes:
+    /// `rate` → `speakingRate`; `useSSML` → `enableSsml`. `sampleRate` is on
+    /// RATTSConfiguration in the proto schema, not here.
+    public func toRATTSOptions() -> RATTSOptions {
+        var proto = RATTSOptions()
+        if let v = voice { proto.voice = v }
+        proto.languageCode = language
+        proto.speakingRate = rate
+        proto.pitch = pitch
+        proto.volume = volume
+        proto.enableSsml = useSSML
+        proto.audioFormat = audioFormat
+        return proto
+    }
+}
+
+extension TTSPhonemeTimestamp {
+    /// Convert to canonical generated proto `RATTSPhonemeTimestamp`. Notes:
+    /// startTime/endTime (TimeInterval seconds) → startMs/endMs (Int64 ms).
+    public func toRATTSPhonemeTimestamp() -> RATTSPhonemeTimestamp {
+        var proto = RATTSPhonemeTimestamp()
+        proto.phoneme = phoneme
+        proto.startMs = Int64(startTime * 1000)
+        proto.endMs = Int64(endTime * 1000)
+        return proto
+    }
+}
+
+extension TTSSynthesisMetadata {
+    /// Convert to canonical generated proto `RATTSSynthesisMetadata`. Notes:
+    /// `voice` → `voiceID`; `language` → `languageCode`; processingTime
+    /// (TimeInterval seconds) → processingTimeMs (Int64 ms).
+    public func toRATTSSynthesisMetadata() -> RATTSSynthesisMetadata {
+        var proto = RATTSSynthesisMetadata()
+        proto.voiceID = voice
+        proto.languageCode = language
+        proto.processingTimeMs = Int64(processingTime * 1000)
+        proto.characterCount = Int32(characterCount)
+        return proto
     }
 }

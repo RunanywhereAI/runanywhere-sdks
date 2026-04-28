@@ -243,6 +243,109 @@ export function pipelineStateToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+/**
+ * Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
+ * UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
+ * the same as NOT_LOADED for forward-compatibility.
+ */
+export var ComponentLoadState;
+(function (ComponentLoadState) {
+    ComponentLoadState[ComponentLoadState["COMPONENT_LOAD_STATE_UNSPECIFIED"] = 0] = "COMPONENT_LOAD_STATE_UNSPECIFIED";
+    ComponentLoadState[ComponentLoadState["COMPONENT_LOAD_STATE_NOT_LOADED"] = 1] = "COMPONENT_LOAD_STATE_NOT_LOADED";
+    ComponentLoadState[ComponentLoadState["COMPONENT_LOAD_STATE_LOADING"] = 2] = "COMPONENT_LOAD_STATE_LOADING";
+    ComponentLoadState[ComponentLoadState["COMPONENT_LOAD_STATE_LOADED"] = 3] = "COMPONENT_LOAD_STATE_LOADED";
+    ComponentLoadState[ComponentLoadState["COMPONENT_LOAD_STATE_ERROR"] = 4] = "COMPONENT_LOAD_STATE_ERROR";
+    ComponentLoadState[ComponentLoadState["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ComponentLoadState || (ComponentLoadState = {}));
+export function componentLoadStateFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "COMPONENT_LOAD_STATE_UNSPECIFIED":
+            return ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED;
+        case 1:
+        case "COMPONENT_LOAD_STATE_NOT_LOADED":
+            return ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED;
+        case 2:
+        case "COMPONENT_LOAD_STATE_LOADING":
+            return ComponentLoadState.COMPONENT_LOAD_STATE_LOADING;
+        case 3:
+        case "COMPONENT_LOAD_STATE_LOADED":
+            return ComponentLoadState.COMPONENT_LOAD_STATE_LOADED;
+        case 4:
+        case "COMPONENT_LOAD_STATE_ERROR":
+            return ComponentLoadState.COMPONENT_LOAD_STATE_ERROR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ComponentLoadState.UNRECOGNIZED;
+    }
+}
+export function componentLoadStateToJSON(object) {
+    switch (object) {
+        case ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED:
+            return "COMPONENT_LOAD_STATE_UNSPECIFIED";
+        case ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED:
+            return "COMPONENT_LOAD_STATE_NOT_LOADED";
+        case ComponentLoadState.COMPONENT_LOAD_STATE_LOADING:
+            return "COMPONENT_LOAD_STATE_LOADING";
+        case ComponentLoadState.COMPONENT_LOAD_STATE_LOADED:
+            return "COMPONENT_LOAD_STATE_LOADED";
+        case ComponentLoadState.COMPONENT_LOAD_STATE_ERROR:
+            return "COMPONENT_LOAD_STATE_ERROR";
+        case ComponentLoadState.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var VoiceSessionErrorCode;
+(function (VoiceSessionErrorCode) {
+    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_UNSPECIFIED"] = 0] = "VOICE_SESSION_ERROR_CODE_UNSPECIFIED";
+    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED"] = 1] = "VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED";
+    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_NOT_READY"] = 2] = "VOICE_SESSION_ERROR_CODE_NOT_READY";
+    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING"] = 3] = "VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING";
+    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE"] = 4] = "VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE";
+    VoiceSessionErrorCode[VoiceSessionErrorCode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(VoiceSessionErrorCode || (VoiceSessionErrorCode = {}));
+export function voiceSessionErrorCodeFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "VOICE_SESSION_ERROR_CODE_UNSPECIFIED":
+            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED;
+        case 1:
+        case "VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED":
+            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED;
+        case 2:
+        case "VOICE_SESSION_ERROR_CODE_NOT_READY":
+            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY;
+        case 3:
+        case "VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING":
+            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING;
+        case 4:
+        case "VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE":
+            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return VoiceSessionErrorCode.UNRECOGNIZED;
+    }
+}
+export function voiceSessionErrorCodeToJSON(object) {
+    switch (object) {
+        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED:
+            return "VOICE_SESSION_ERROR_CODE_UNSPECIFIED";
+        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED:
+            return "VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED";
+        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY:
+            return "VOICE_SESSION_ERROR_CODE_NOT_READY";
+        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING:
+            return "VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING";
+        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE:
+            return "VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE";
+        case VoiceSessionErrorCode.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseVoiceEvent() {
     return {
         seq: 0,
@@ -255,6 +358,12 @@ function createBaseVoiceEvent() {
         state: undefined,
         error: undefined,
         metrics: undefined,
+        componentStateChanged: undefined,
+        sessionError: undefined,
+        sessionStarted: undefined,
+        sessionStopped: undefined,
+        agentResponseStarted: undefined,
+        agentResponseCompleted: undefined,
     };
 }
 export const VoiceEvent = {
@@ -288,6 +397,24 @@ export const VoiceEvent = {
         }
         if (message.metrics !== undefined) {
             MetricsEvent.encode(message.metrics, writer.uint32(138).fork()).ldelim();
+        }
+        if (message.componentStateChanged !== undefined) {
+            VoiceAgentComponentStates.encode(message.componentStateChanged, writer.uint32(146).fork()).ldelim();
+        }
+        if (message.sessionError !== undefined) {
+            VoiceSessionError.encode(message.sessionError, writer.uint32(154).fork()).ldelim();
+        }
+        if (message.sessionStarted !== undefined) {
+            SessionStartedEvent.encode(message.sessionStarted, writer.uint32(162).fork()).ldelim();
+        }
+        if (message.sessionStopped !== undefined) {
+            SessionStoppedEvent.encode(message.sessionStopped, writer.uint32(170).fork()).ldelim();
+        }
+        if (message.agentResponseStarted !== undefined) {
+            AgentResponseStartedEvent.encode(message.agentResponseStarted, writer.uint32(178).fork()).ldelim();
+        }
+        if (message.agentResponseCompleted !== undefined) {
+            AgentResponseCompletedEvent.encode(message.agentResponseCompleted, writer.uint32(186).fork()).ldelim();
         }
         return writer;
     },
@@ -358,6 +485,42 @@ export const VoiceEvent = {
                     }
                     message.metrics = MetricsEvent.decode(reader, reader.uint32());
                     continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.componentStateChanged = VoiceAgentComponentStates.decode(reader, reader.uint32());
+                    continue;
+                case 19:
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.sessionError = VoiceSessionError.decode(reader, reader.uint32());
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.sessionStarted = SessionStartedEvent.decode(reader, reader.uint32());
+                    continue;
+                case 21:
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.sessionStopped = SessionStoppedEvent.decode(reader, reader.uint32());
+                    continue;
+                case 22:
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.agentResponseStarted = AgentResponseStartedEvent.decode(reader, reader.uint32());
+                    continue;
+                case 23:
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.agentResponseCompleted = AgentResponseCompletedEvent.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -378,6 +541,18 @@ export const VoiceEvent = {
             state: isSet(object.state) ? StateChangeEvent.fromJSON(object.state) : undefined,
             error: isSet(object.error) ? ErrorEvent.fromJSON(object.error) : undefined,
             metrics: isSet(object.metrics) ? MetricsEvent.fromJSON(object.metrics) : undefined,
+            componentStateChanged: isSet(object.componentStateChanged)
+                ? VoiceAgentComponentStates.fromJSON(object.componentStateChanged)
+                : undefined,
+            sessionError: isSet(object.sessionError) ? VoiceSessionError.fromJSON(object.sessionError) : undefined,
+            sessionStarted: isSet(object.sessionStarted) ? SessionStartedEvent.fromJSON(object.sessionStarted) : undefined,
+            sessionStopped: isSet(object.sessionStopped) ? SessionStoppedEvent.fromJSON(object.sessionStopped) : undefined,
+            agentResponseStarted: isSet(object.agentResponseStarted)
+                ? AgentResponseStartedEvent.fromJSON(object.agentResponseStarted)
+                : undefined,
+            agentResponseCompleted: isSet(object.agentResponseCompleted)
+                ? AgentResponseCompletedEvent.fromJSON(object.agentResponseCompleted)
+                : undefined,
         };
     },
     toJSON(message) {
@@ -412,6 +587,24 @@ export const VoiceEvent = {
         if (message.metrics !== undefined) {
             obj.metrics = MetricsEvent.toJSON(message.metrics);
         }
+        if (message.componentStateChanged !== undefined) {
+            obj.componentStateChanged = VoiceAgentComponentStates.toJSON(message.componentStateChanged);
+        }
+        if (message.sessionError !== undefined) {
+            obj.sessionError = VoiceSessionError.toJSON(message.sessionError);
+        }
+        if (message.sessionStarted !== undefined) {
+            obj.sessionStarted = SessionStartedEvent.toJSON(message.sessionStarted);
+        }
+        if (message.sessionStopped !== undefined) {
+            obj.sessionStopped = SessionStoppedEvent.toJSON(message.sessionStopped);
+        }
+        if (message.agentResponseStarted !== undefined) {
+            obj.agentResponseStarted = AgentResponseStartedEvent.toJSON(message.agentResponseStarted);
+        }
+        if (message.agentResponseCompleted !== undefined) {
+            obj.agentResponseCompleted = AgentResponseCompletedEvent.toJSON(message.agentResponseCompleted);
+        }
         return obj;
     },
     create(base) {
@@ -443,6 +636,26 @@ export const VoiceEvent = {
         message.metrics = (object.metrics !== undefined && object.metrics !== null)
             ? MetricsEvent.fromPartial(object.metrics)
             : undefined;
+        message.componentStateChanged =
+            (object.componentStateChanged !== undefined && object.componentStateChanged !== null)
+                ? VoiceAgentComponentStates.fromPartial(object.componentStateChanged)
+                : undefined;
+        message.sessionError = (object.sessionError !== undefined && object.sessionError !== null)
+            ? VoiceSessionError.fromPartial(object.sessionError)
+            : undefined;
+        message.sessionStarted = (object.sessionStarted !== undefined && object.sessionStarted !== null)
+            ? SessionStartedEvent.fromPartial(object.sessionStarted)
+            : undefined;
+        message.sessionStopped = (object.sessionStopped !== undefined && object.sessionStopped !== null)
+            ? SessionStoppedEvent.fromPartial(object.sessionStopped)
+            : undefined;
+        message.agentResponseStarted = (object.agentResponseStarted !== undefined && object.agentResponseStarted !== null)
+            ? AgentResponseStartedEvent.fromPartial(object.agentResponseStarted)
+            : undefined;
+        message.agentResponseCompleted =
+            (object.agentResponseCompleted !== undefined && object.agentResponseCompleted !== null)
+                ? AgentResponseCompletedEvent.fromPartial(object.agentResponseCompleted)
+                : undefined;
         return message;
     },
 };
@@ -1176,6 +1389,356 @@ export const MetricsEvent = {
         message.audioSamplesPlayed = object.audioSamplesPlayed ?? 0;
         message.isOverBudget = object.isOverBudget ?? false;
         message.createdAtNs = object.createdAtNs ?? 0;
+        return message;
+    },
+};
+function createBaseVoiceAgentComponentStates() {
+    return { sttState: 0, llmState: 0, ttsState: 0, vadState: 0, ready: false, anyLoading: false };
+}
+export const VoiceAgentComponentStates = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.sttState !== 0) {
+            writer.uint32(8).int32(message.sttState);
+        }
+        if (message.llmState !== 0) {
+            writer.uint32(16).int32(message.llmState);
+        }
+        if (message.ttsState !== 0) {
+            writer.uint32(24).int32(message.ttsState);
+        }
+        if (message.vadState !== 0) {
+            writer.uint32(32).int32(message.vadState);
+        }
+        if (message.ready !== false) {
+            writer.uint32(40).bool(message.ready);
+        }
+        if (message.anyLoading !== false) {
+            writer.uint32(48).bool(message.anyLoading);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceAgentComponentStates();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.sttState = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.llmState = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.ttsState = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.vadState = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.ready = reader.bool();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.anyLoading = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            sttState: isSet(object.sttState) ? componentLoadStateFromJSON(object.sttState) : 0,
+            llmState: isSet(object.llmState) ? componentLoadStateFromJSON(object.llmState) : 0,
+            ttsState: isSet(object.ttsState) ? componentLoadStateFromJSON(object.ttsState) : 0,
+            vadState: isSet(object.vadState) ? componentLoadStateFromJSON(object.vadState) : 0,
+            ready: isSet(object.ready) ? globalThis.Boolean(object.ready) : false,
+            anyLoading: isSet(object.anyLoading) ? globalThis.Boolean(object.anyLoading) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.sttState !== 0) {
+            obj.sttState = componentLoadStateToJSON(message.sttState);
+        }
+        if (message.llmState !== 0) {
+            obj.llmState = componentLoadStateToJSON(message.llmState);
+        }
+        if (message.ttsState !== 0) {
+            obj.ttsState = componentLoadStateToJSON(message.ttsState);
+        }
+        if (message.vadState !== 0) {
+            obj.vadState = componentLoadStateToJSON(message.vadState);
+        }
+        if (message.ready !== false) {
+            obj.ready = message.ready;
+        }
+        if (message.anyLoading !== false) {
+            obj.anyLoading = message.anyLoading;
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceAgentComponentStates.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceAgentComponentStates();
+        message.sttState = object.sttState ?? 0;
+        message.llmState = object.llmState ?? 0;
+        message.ttsState = object.ttsState ?? 0;
+        message.vadState = object.vadState ?? 0;
+        message.ready = object.ready ?? false;
+        message.anyLoading = object.anyLoading ?? false;
+        return message;
+    },
+};
+function createBaseVoiceSessionError() {
+    return { code: 0, message: "", failedComponent: undefined };
+}
+export const VoiceSessionError = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.code !== 0) {
+            writer.uint32(8).int32(message.code);
+        }
+        if (message.message !== "") {
+            writer.uint32(18).string(message.message);
+        }
+        if (message.failedComponent !== undefined) {
+            writer.uint32(26).string(message.failedComponent);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceSessionError();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.code = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.message = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.failedComponent = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            code: isSet(object.code) ? voiceSessionErrorCodeFromJSON(object.code) : 0,
+            message: isSet(object.message) ? globalThis.String(object.message) : "",
+            failedComponent: isSet(object.failedComponent) ? globalThis.String(object.failedComponent) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.code !== 0) {
+            obj.code = voiceSessionErrorCodeToJSON(message.code);
+        }
+        if (message.message !== "") {
+            obj.message = message.message;
+        }
+        if (message.failedComponent !== undefined) {
+            obj.failedComponent = message.failedComponent;
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceSessionError.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceSessionError();
+        message.code = object.code ?? 0;
+        message.message = object.message ?? "";
+        message.failedComponent = object.failedComponent ?? undefined;
+        return message;
+    },
+};
+function createBaseSessionStartedEvent() {
+    return {};
+}
+export const SessionStartedEvent = {
+    encode(_, writer = _m0.Writer.create()) {
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSessionStartedEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(_) {
+        return {};
+    },
+    toJSON(_) {
+        const obj = {};
+        return obj;
+    },
+    create(base) {
+        return SessionStartedEvent.fromPartial(base ?? {});
+    },
+    fromPartial(_) {
+        const message = createBaseSessionStartedEvent();
+        return message;
+    },
+};
+function createBaseSessionStoppedEvent() {
+    return {};
+}
+export const SessionStoppedEvent = {
+    encode(_, writer = _m0.Writer.create()) {
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSessionStoppedEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(_) {
+        return {};
+    },
+    toJSON(_) {
+        const obj = {};
+        return obj;
+    },
+    create(base) {
+        return SessionStoppedEvent.fromPartial(base ?? {});
+    },
+    fromPartial(_) {
+        const message = createBaseSessionStoppedEvent();
+        return message;
+    },
+};
+function createBaseAgentResponseStartedEvent() {
+    return {};
+}
+export const AgentResponseStartedEvent = {
+    encode(_, writer = _m0.Writer.create()) {
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseAgentResponseStartedEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(_) {
+        return {};
+    },
+    toJSON(_) {
+        const obj = {};
+        return obj;
+    },
+    create(base) {
+        return AgentResponseStartedEvent.fromPartial(base ?? {});
+    },
+    fromPartial(_) {
+        const message = createBaseAgentResponseStartedEvent();
+        return message;
+    },
+};
+function createBaseAgentResponseCompletedEvent() {
+    return {};
+}
+export const AgentResponseCompletedEvent = {
+    encode(_, writer = _m0.Writer.create()) {
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseAgentResponseCompletedEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(_) {
+        return {};
+    },
+    toJSON(_) {
+        const obj = {};
+        return obj;
+    },
+    create(base) {
+        return AgentResponseCompletedEvent.fromPartial(base ?? {});
+    },
+    fromPartial(_) {
+        const message = createBaseAgentResponseCompletedEvent();
         return message;
     },
 };

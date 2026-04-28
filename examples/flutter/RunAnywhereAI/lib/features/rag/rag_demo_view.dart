@@ -11,7 +11,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/public/types/rag_types.dart';
+import 'package:runanywhere/generated/rag.pb.dart';
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -104,36 +104,15 @@ class _RagDemoViewState extends State<RagDemoView> {
     return ggufFile.path;
   }
 
-  /// Resolve the vocab.txt path for the embedding model.
-  ///
-  /// For multi-file models (directory) vocab.txt is inside the directory.
-  /// For single-file models vocab.txt is a sibling file.
-  String? _resolveVocabPath(ModelInfo embeddingModel) {
-    final localPath = embeddingModel.localPath;
-    if (localPath == null) return null;
-
-    if (Directory(localPath).existsSync()) {
-      return '$localPath/vocab.txt';
-    }
-    // Single-file: sibling vocab.txt
-    final parent = File(localPath).parent.path;
-    return '$parent/vocab.txt';
-  }
-
   /// Build a [RAGConfiguration] from selected models with resolved paths.
   RAGConfiguration? _buildRagConfig() {
     final embeddingPath = _selectedEmbeddingModel?.localPath;
     final llmPath = _selectedLLMModel?.localPath;
     if (embeddingPath == null || llmPath == null) return null;
 
-    final vocabPath = _resolveVocabPath(_selectedEmbeddingModel!);
-    final embeddingConfigJson =
-        vocabPath != null ? '{"vocab_path":"$vocabPath"}' : null;
-
     return RAGConfiguration(
       embeddingModelPath: _resolveEmbeddingFilePath(embeddingPath),
       llmModelPath: _resolveLLMFilePath(llmPath),
-      embeddingConfigJSON: embeddingConfigJson,
     );
   }
 
@@ -734,9 +713,10 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
   }
 
   Widget _buildTimingMetrics(BuildContext context, RAGResult result) {
-    final retrievalMs = result.retrievalTimeMs.round();
-    final generationS = (result.generationTimeMs / 1000).toStringAsFixed(1);
-    final totalS = (result.totalTimeMs / 1000).toStringAsFixed(1);
+    final retrievalMs = result.retrievalTimeMs.toInt();
+    final generationS =
+        (result.generationTimeMs.toInt() / 1000).toStringAsFixed(1);
+    final totalS = (result.totalTimeMs.toInt() / 1000).toStringAsFixed(1);
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xSmall),

@@ -1387,11 +1387,15 @@ object RunAnywhereBridge {
     @JvmStatic external fun racAuthSaveTokens(): Int
 
     @JvmStatic external fun racAuthIsAuthenticated(): Boolean
+
     @JvmStatic external fun racAuthNeedsRefresh(): Boolean
 
     @JvmStatic external fun racAuthGetAccessToken(): String?
+
     @JvmStatic external fun racAuthGetDeviceId(): String?
+
     @JvmStatic external fun racAuthGetUserId(): String?
+
     @JvmStatic external fun racAuthGetOrganizationId(): String?
 
     /** Build the JSON body for POST /api/v1/auth/sdk/authenticate.

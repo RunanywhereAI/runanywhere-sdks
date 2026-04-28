@@ -157,7 +157,7 @@ async function ingestFile(file: File): Promise<void> {
     const piece = pieces[i];
     try {
       const result = await Embeddings.embed(piece);
-      const vector = Array.from(result.embeddings[0]?.data ?? []);
+      const vector: number[] = Array.from(result.vectors[0]?.data ?? []);
       if (vector.length === 0) continue;
       chunks.push({
         id: crypto.randomUUID(),
@@ -259,7 +259,7 @@ async function retrieveTopK(query: string): Promise<DocChunk[]> {
   );
   if (!Embeddings.isModelLoaded) return [];
   const result = await Embeddings.embed(query);
-  const queryVec = Array.from(result.embeddings[0]?.data ?? []);
+  const queryVec: number[] = Array.from(result.vectors[0]?.data ?? []);
   if (queryVec.length === 0) return [];
 
   const scored = chunks

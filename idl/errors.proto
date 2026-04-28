@@ -1,0 +1,525 @@
+// RunAnywhere IDL — error types (codes, categories, structured errors).
+//
+// Errors are catastrophic to drift on. This file is the single source of truth
+// for the error surface every SDK exposes; codegen must produce identical
+// numeric values, names, and category mappings everywhere.
+//
+// Every enum below is the *union* of cases currently declared by hand across
+// the C ABI (`runanywhere-commons`), Swift, Kotlin, Dart, React Native, and
+// Web SDKs. The canonical numeric values come from the C ABI header
+// `sdk/runanywhere-commons/include/rac/core/rac_error.h` (the C ABI is the
+// system's only ABI-stable wire format — Swift, Kotlin, Dart, RN, Web all map
+// onto it via `CommonsErrorMapping`-style adapters).
+//
+// === Pre-IDL drift summary (why exhaustive enumeration matters) ===
+//
+//   C ABI     rac_error.h:50-415        ~120 RAC_ERROR_* codes in -100..-899
+//                                       organized in 16 contiguous ranges:
+//                                         init      -100..-109
+//                                         model     -110..-129
+//                                         gen       -130..-149
+//                                         net       -150..-179
+//                                         storage   -180..-219
+//                                         hardware  -220..-229
+//                                         component -230..-249
+//                                         validation -250..-279
+//                                         audio     -280..-299
+//                                         lang/voice -300..-319
+//                                         auth      -320..-329
+//                                         security  -330..-349
+//                                         extraction -350..-369
+//                                         calibration -370..-379
+//                                         cancel    -380..-389
+//                                         module/svc -400..-499
+//                                         platform  -500..-599
+//                                         backend   -600..-699
+//                                         events    -700..-799
+//                                         other     -800..-899
+//                                       Several codes are *value aliases*
+//                                       (e.g. RAC_ERROR_OUT_OF_MEMORY = -221 =
+//                                       RAC_ERROR_INSUFFICIENT_MEMORY;
+//                                       RAC_ERROR_FILE_DELETE_FAILED = -187 =
+//                                       RAC_ERROR_DELETE_FAILED). The proto
+//                                       picks one canonical name per numeric
+//                                       value; aliases are documented inline.
+//
+//   C ABI     rac_structured_error.h:46 15-case `rac_error_category_t`
+//                                       (general, stt, tts, llm, vad, vlm,
+//                                       speakerDiarization, wakeWord,
+//                                       voiceAgent, download, fileManagement,
+//                                       network, authentication, security,
+//                                       runtime). NOTE: NO `rag` category in
+//                                       C ABI; Swift and Dart add it.
+//
+//   Swift     ErrorCode.swift:12        `enum ErrorCode: String` — ~85 cases,
+//                                       string-valued. No numeric raw value;
+//                                       Swift loses the negative C codes when
+//                                       serialised. SDKs must round-trip the
+//                                       numeric `c_abi_code` separately
+//                                       (hence the `c_abi_code` field on
+//                                       SDKError below).
+//             ErrorCategory.swift:11    `enum ErrorCategory: String` —
+//                                       16 cases incl. `rag`.
+//
+//   Kotlin    ErrorCode.kt:19           `enum class ErrorCode(rawValue: Int)`
+//                                       — 27 cases mapped to *condensed*
+//                                       integer values 0,-1..-13,-100..-105,
+//                                       -200..-202, -300..-302. This is a
+//                                       smaller, lossy sub-set of the C ABI
+//                                       canonical -100..-899 numbering and
+//                                       MUST be regenerated against this
+//                                       proto. Note ErrorCode.MODEL_NOT_FOUND
+//                                       and ErrorCode.FILE_NOT_FOUND in
+//                                       current Kotlin both map to rawValue
+//                                       = -6 (a duplicate-value bug).
+//             ErrorCategory.kt:19       18 cases incl. CONFIGURATION,
+//                                       INITIALIZATION, FILE_RESOURCE,
+//                                       MEMORY, STORAGE, OPERATION,
+//                                       PLATFORM. NO STT/TTS/LLM/VAD/VLM
+//                                       overlap with Swift names; Kotlin also
+//                                       has VOICE_AGENT but no
+//                                       SPEAKER_DIARIZATION, WAKE_WORD or
+//                                       RAG.
+//             SDKError.kt:27            `data class SDKError(code, category,
+//                                       message, cause)`. No source location
+//                                       fields (uses Throwable.cause).
+//             CommonsErrorMapping.kt    Maps C ABI rawValue → ErrorCode
+//                                       (lossy because the Kotlin enum is
+//                                       smaller).
+//
+//   Dart      error_code.dart:3         `enum ErrorCode(rawValue: int)` —
+//                                       43 cases in ranges 1000..2103
+//                                       (POSITIVE!) — totally different
+//                                       numbering from Swift / Kotlin / C ABI.
+//                                       Dart codes are platform-internal only
+//                                       and DO NOT round-trip with the C ABI.
+//                                       SDKs using Dart must convert via the
+//                                       canonical (negative) `c_abi_code`.
+//             error_category.dart:3     27-case enum incl. STT/TTS/VAD/LLM/
+//                                       VLM/SPEAKER_DIARIZATION/WAKE_WORD/
+//                                       VOICE_AGENT/RAG/DOWNLOAD/
+//                                       FILE_MANAGEMENT/SECURITY/RUNTIME +
+//                                       INITIALIZATION/GENERAL/MODEL/
+//                                       GENERATION/NETWORK/STORAGE/MEMORY/
+//                                       HARDWARE/VALIDATION/AUTHENTICATION/
+//                                       COMPONENT/FRAMEWORK/UNKNOWN. The
+//                                       superset across all SDKs.
+//             error_context.dart:4      `class ErrorContext { stackTrace,
+//                                       file, line, function, timestamp,
+//                                       threadInfo }`.
+//             sdk_error.dart:13         `class SDKError { message, type,
+//                                       underlyingError, context }` plus
+//                                       57-case `enum SDKErrorType`. Maps
+//                                       SDKErrorType → ErrorCode (1000..2103)
+//                                       and → ErrorCategory.
+//
+//   RN        ErrorCodes.ts:17          `enum ErrorCode` — ~38 cases in
+//                                       1000..1799 (positive, like Dart).
+//             ErrorCategory.ts:10       12-case `enum ErrorCategory` (string
+//                                       values: 'initialization', 'model',
+//                                       'generation', 'network', 'storage',
+//                                       'memory', 'hardware', 'validation',
+//                                       'authentication', 'component',
+//                                       'framework', 'unknown'). Misses
+//                                       STT/TTS/VAD/LLM/VLM etc.
+//             SDKError.ts:31            Has a *legacy* `enum SDKErrorCode`
+//                                       (string-keyed, 27 cases) plus the new
+//                                       numeric `ErrorCode` for backward
+//                                       compat. SDKError.ts:64 maps legacy
+//                                       string → numeric ErrorCode.
+//             ErrorContext.ts:11        `interface ErrorContext { stackTrace,
+//                                       file, line, function, timestamp,
+//                                       threadInfo }`.
+//
+//   Web       ErrorTypes.ts:9           `enum SDKErrorCode` — ~30 cases with
+//                                       NEGATIVE values matching the C ABI
+//                                       (-100..-903). Closer to canonical
+//                                       than RN/Dart but still partial.
+//                                       NOTE: Web adds WASM-specific codes
+//                                       (-900..-903) that the C ABI does not
+//                                       reserve there (C ABI uses -900..-999
+//                                       as "Reserved"). These are kept under
+//                                       a Web-only block at the bottom.
+//             ErrorTypes.ts:68          `class SDKError extends Error
+//                                       { code, details? }`. No category
+//                                       enum on web. (An ErrorCategory enum
+//                                       must be introduced when codegen
+//                                       runs against this proto.)
+//
+// === Why this proto matters ===
+// SDKError travels across the WASM/JNI/SwiftPM boundary as the structured
+// payload of failed `ra_*` calls. The C ABI exposes the negative numeric
+// `rac_result_t` codes; everything above that is a name + category +
+// human-readable message + (optional) source location. Codegen MUST:
+//   1. emit identical positive-valued enum constants for `ErrorCode`
+//      (proto3 forbids negative enum values),
+//   2. preserve the negative `rac_result_t` value in the SDKError.c_abi_code
+//      field for round-tripping with the C ABI,
+//   3. emit identical category mappings,
+//   4. produce a non-lossy `c_abi_code` ↔ ErrorCode lookup table on every
+//      target so platforms that previously condensed codes (Kotlin) or
+//      remapped to positive ranges (Dart, RN) stop drifting.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "ErrorsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// ErrorCategory — coarse-grained logical grouping for filtering / analytics.
+//
+// This is the union of all categories declared across SDKs, condensed to the
+// minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
+// VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
+// covers every category currently in use except for the per-modality ones
+// (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
+// COMPONENT. Per-modality routing is recovered at runtime from the source
+// of the failure (the `c_abi_code` numeric value uniquely identifies the
+// component) and from `ErrorContext.operation` — there is no need to encode
+// modality twice.
+//
+// Sources pre-IDL:
+//   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
+//                                      stt/tts/llm/vad/vlm/etc.
+//   Swift   ErrorCategory.swift:11     16 cases incl. rag.
+//   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
+//                                      INITIALIZATION, FILE_RESOURCE,
+//                                      OPERATION, PLATFORM (no per-modality).
+//   Dart    error_category.dart:3      27 cases (superset).
+//   RN      ErrorCategory.ts:10        12 cases.
+//   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
+//
+// The drift here is severe — every SDK uses a different category vocabulary.
+// Codegen MUST collapse to the 9 canonical buckets below.
+// ---------------------------------------------------------------------------
+enum ErrorCategory {
+    ERROR_CATEGORY_UNSPECIFIED   = 0;
+    ERROR_CATEGORY_NETWORK       = 1;  // wire, HTTP, download, server, timeout
+    ERROR_CATEGORY_VALIDATION    = 2;  // invalid args, empty input, format
+    ERROR_CATEGORY_MODEL         = 3;  // not-found, load-failed, incompatible
+    ERROR_CATEGORY_COMPONENT     = 4;  // STT/TTS/LLM/VAD/VLM/etc. lifecycle
+    ERROR_CATEGORY_IO            = 5;  // file system, storage, audio buffers
+    ERROR_CATEGORY_AUTH          = 6;  // API key, unauthorized, forbidden
+    ERROR_CATEGORY_INTERNAL      = 7;  // unknown, not-implemented, internal
+    ERROR_CATEGORY_CONFIGURATION = 8;  // env mismatch, init not done, bad cfg
+}
+
+// ---------------------------------------------------------------------------
+// ErrorCode — exhaustive enumeration of every distinct numeric error code in
+// the C ABI (`rac_result_t`).
+//
+// proto3 forbids negative enum values, so the proto enum holds POSITIVE
+// values that mirror the *absolute* magnitude of each C ABI code. The signed
+// `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
+// platforms can round-trip the original C ABI integer. The naming scheme is:
+//
+//     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
+//
+// (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
+//
+// `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
+// C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
+// SDKError.code (an SDKError implies a failure; success is signalled by the
+// absence of an SDKError). The zero-value enum entry exists only because
+// proto3 mandates it.
+//
+// CRITICAL: Do not change the numeric values without coordinated
+// migrations across every SDK *and* the C ABI. Adding new values is safe;
+// removing or renumbering is a wire-format break.
+//
+// All values below are sourced from
+// `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
+// where the C ABI defines two distinct macro names for the same numeric
+// value) are documented inline; we pick one canonical name per numeric value
+// to keep proto enum values unique.
+// ---------------------------------------------------------------------------
+enum ErrorCode {
+    ERROR_CODE_UNSPECIFIED                = 0;
+
+    // -- Initialization (-100..-109) -----------------------------------------
+    ERROR_CODE_NOT_INITIALIZED            = 100;  // RAC_ERROR_NOT_INITIALIZED
+    ERROR_CODE_ALREADY_INITIALIZED        = 101;  // RAC_ERROR_ALREADY_INITIALIZED
+    ERROR_CODE_INITIALIZATION_FAILED      = 102;  // RAC_ERROR_INITIALIZATION_FAILED
+    ERROR_CODE_INVALID_CONFIGURATION      = 103;  // RAC_ERROR_INVALID_CONFIGURATION
+    ERROR_CODE_INVALID_API_KEY            = 104;  // RAC_ERROR_INVALID_API_KEY
+    ERROR_CODE_ENVIRONMENT_MISMATCH       = 105;  // RAC_ERROR_ENVIRONMENT_MISMATCH
+    ERROR_CODE_INVALID_PARAMETER          = 106;  // RAC_ERROR_INVALID_PARAMETER
+
+    // -- Model (-110..-129) --------------------------------------------------
+    ERROR_CODE_MODEL_NOT_FOUND            = 110;  // RAC_ERROR_MODEL_NOT_FOUND
+    ERROR_CODE_MODEL_LOAD_FAILED          = 111;  // RAC_ERROR_MODEL_LOAD_FAILED
+    ERROR_CODE_MODEL_VALIDATION_FAILED    = 112;  // RAC_ERROR_MODEL_VALIDATION_FAILED
+    ERROR_CODE_MODEL_INCOMPATIBLE         = 113;  // RAC_ERROR_MODEL_INCOMPATIBLE
+    ERROR_CODE_INVALID_MODEL_FORMAT       = 114;  // RAC_ERROR_INVALID_MODEL_FORMAT
+    ERROR_CODE_MODEL_STORAGE_CORRUPTED    = 115;  // RAC_ERROR_MODEL_STORAGE_CORRUPTED
+    ERROR_CODE_MODEL_NOT_LOADED           = 116;  // RAC_ERROR_MODEL_NOT_LOADED
+
+    // -- Generation (-130..-149) --------------------------------------------
+    ERROR_CODE_GENERATION_FAILED          = 130;  // RAC_ERROR_GENERATION_FAILED
+    ERROR_CODE_GENERATION_TIMEOUT         = 131;  // RAC_ERROR_GENERATION_TIMEOUT
+    ERROR_CODE_CONTEXT_TOO_LONG           = 132;  // RAC_ERROR_CONTEXT_TOO_LONG
+    ERROR_CODE_TOKEN_LIMIT_EXCEEDED       = 133;  // RAC_ERROR_TOKEN_LIMIT_EXCEEDED
+    ERROR_CODE_COST_LIMIT_EXCEEDED        = 134;  // RAC_ERROR_COST_LIMIT_EXCEEDED
+    ERROR_CODE_INFERENCE_FAILED           = 135;  // RAC_ERROR_INFERENCE_FAILED
+
+    // -- Network (-150..-179) ------------------------------------------------
+    ERROR_CODE_NETWORK_UNAVAILABLE        = 150;  // RAC_ERROR_NETWORK_UNAVAILABLE
+    ERROR_CODE_NETWORK_ERROR              = 151;  // RAC_ERROR_NETWORK_ERROR
+    ERROR_CODE_REQUEST_FAILED             = 152;  // RAC_ERROR_REQUEST_FAILED
+    ERROR_CODE_DOWNLOAD_FAILED            = 153;  // RAC_ERROR_DOWNLOAD_FAILED
+    ERROR_CODE_SERVER_ERROR               = 154;  // RAC_ERROR_SERVER_ERROR
+    ERROR_CODE_TIMEOUT                    = 155;  // RAC_ERROR_TIMEOUT
+    ERROR_CODE_INVALID_RESPONSE           = 156;  // RAC_ERROR_INVALID_RESPONSE
+    ERROR_CODE_HTTP_ERROR                 = 157;  // RAC_ERROR_HTTP_ERROR
+    ERROR_CODE_CONNECTION_LOST            = 158;  // RAC_ERROR_CONNECTION_LOST
+    ERROR_CODE_PARTIAL_DOWNLOAD           = 159;  // RAC_ERROR_PARTIAL_DOWNLOAD
+    ERROR_CODE_HTTP_REQUEST_FAILED        = 160;  // RAC_ERROR_HTTP_REQUEST_FAILED
+    ERROR_CODE_HTTP_NOT_SUPPORTED         = 161;  // RAC_ERROR_HTTP_NOT_SUPPORTED
+
+    // -- Storage (-180..-219) ------------------------------------------------
+    ERROR_CODE_INSUFFICIENT_STORAGE       = 180;  // RAC_ERROR_INSUFFICIENT_STORAGE
+    ERROR_CODE_STORAGE_FULL               = 181;  // RAC_ERROR_STORAGE_FULL
+    ERROR_CODE_STORAGE_ERROR              = 182;  // RAC_ERROR_STORAGE_ERROR
+    ERROR_CODE_FILE_NOT_FOUND             = 183;  // RAC_ERROR_FILE_NOT_FOUND
+    ERROR_CODE_FILE_READ_FAILED           = 184;  // RAC_ERROR_FILE_READ_FAILED
+    ERROR_CODE_FILE_WRITE_FAILED          = 185;  // RAC_ERROR_FILE_WRITE_FAILED
+    ERROR_CODE_PERMISSION_DENIED          = 186;  // RAC_ERROR_PERMISSION_DENIED
+    ERROR_CODE_DELETE_FAILED              = 187;  // RAC_ERROR_DELETE_FAILED (alias: RAC_ERROR_FILE_DELETE_FAILED)
+    ERROR_CODE_MOVE_FAILED                = 188;  // RAC_ERROR_MOVE_FAILED
+    ERROR_CODE_DIRECTORY_CREATION_FAILED  = 189;  // RAC_ERROR_DIRECTORY_CREATION_FAILED
+    ERROR_CODE_DIRECTORY_NOT_FOUND        = 190;  // RAC_ERROR_DIRECTORY_NOT_FOUND
+    ERROR_CODE_INVALID_PATH               = 191;  // RAC_ERROR_INVALID_PATH
+    ERROR_CODE_INVALID_FILE_NAME          = 192;  // RAC_ERROR_INVALID_FILE_NAME
+    ERROR_CODE_TEMP_FILE_CREATION_FAILED  = 193;  // RAC_ERROR_TEMP_FILE_CREATION_FAILED
+
+    // -- Hardware (-220..-229) -----------------------------------------------
+    ERROR_CODE_HARDWARE_UNSUPPORTED       = 220;  // RAC_ERROR_HARDWARE_UNSUPPORTED
+    ERROR_CODE_INSUFFICIENT_MEMORY        = 221;  // RAC_ERROR_INSUFFICIENT_MEMORY (alias: RAC_ERROR_OUT_OF_MEMORY)
+
+    // -- Component state (-230..-249) ---------------------------------------
+    ERROR_CODE_COMPONENT_NOT_READY        = 230;  // RAC_ERROR_COMPONENT_NOT_READY
+    ERROR_CODE_INVALID_STATE              = 231;  // RAC_ERROR_INVALID_STATE
+    ERROR_CODE_SERVICE_NOT_AVAILABLE      = 232;  // RAC_ERROR_SERVICE_NOT_AVAILABLE
+    ERROR_CODE_SERVICE_BUSY               = 233;  // RAC_ERROR_SERVICE_BUSY
+    ERROR_CODE_PROCESSING_FAILED          = 234;  // RAC_ERROR_PROCESSING_FAILED
+    ERROR_CODE_START_FAILED               = 235;  // RAC_ERROR_START_FAILED
+    ERROR_CODE_NOT_SUPPORTED              = 236;  // RAC_ERROR_NOT_SUPPORTED
+
+    // -- Validation (-250..-279) --------------------------------------------
+    ERROR_CODE_VALIDATION_FAILED          = 250;  // RAC_ERROR_VALIDATION_FAILED
+    ERROR_CODE_INVALID_INPUT              = 251;  // RAC_ERROR_INVALID_INPUT
+    ERROR_CODE_INVALID_FORMAT             = 252;  // RAC_ERROR_INVALID_FORMAT
+    ERROR_CODE_EMPTY_INPUT                = 253;  // RAC_ERROR_EMPTY_INPUT
+    ERROR_CODE_TEXT_TOO_LONG              = 254;  // RAC_ERROR_TEXT_TOO_LONG
+    ERROR_CODE_INVALID_SSML               = 255;  // RAC_ERROR_INVALID_SSML
+    ERROR_CODE_INVALID_SPEAKING_RATE      = 256;  // RAC_ERROR_INVALID_SPEAKING_RATE
+    ERROR_CODE_INVALID_PITCH              = 257;  // RAC_ERROR_INVALID_PITCH
+    ERROR_CODE_INVALID_VOLUME             = 258;  // RAC_ERROR_INVALID_VOLUME
+    ERROR_CODE_INVALID_ARGUMENT           = 259;  // RAC_ERROR_INVALID_ARGUMENT
+    ERROR_CODE_NULL_POINTER               = 260;  // RAC_ERROR_NULL_POINTER
+    ERROR_CODE_BUFFER_TOO_SMALL           = 261;  // RAC_ERROR_BUFFER_TOO_SMALL
+
+    // -- Audio (-280..-299) -------------------------------------------------
+    ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED       = 280;  // RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED
+    ERROR_CODE_AUDIO_SESSION_FAILED             = 281;  // RAC_ERROR_AUDIO_SESSION_FAILED
+    ERROR_CODE_MICROPHONE_PERMISSION_DENIED     = 282;  // RAC_ERROR_MICROPHONE_PERMISSION_DENIED
+    ERROR_CODE_INSUFFICIENT_AUDIO_DATA          = 283;  // RAC_ERROR_INSUFFICIENT_AUDIO_DATA
+    ERROR_CODE_EMPTY_AUDIO_BUFFER               = 284;  // RAC_ERROR_EMPTY_AUDIO_BUFFER
+    ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED  = 285;  // RAC_ERROR_AUDIO_SESSION_ACTIVATION_FAILED
+
+    // -- Language / voice (-300..-319) --------------------------------------
+    ERROR_CODE_LANGUAGE_NOT_SUPPORTED     = 300;  // RAC_ERROR_LANGUAGE_NOT_SUPPORTED
+    ERROR_CODE_VOICE_NOT_AVAILABLE        = 301;  // RAC_ERROR_VOICE_NOT_AVAILABLE
+    ERROR_CODE_STREAMING_NOT_SUPPORTED    = 302;  // RAC_ERROR_STREAMING_NOT_SUPPORTED
+    ERROR_CODE_STREAM_CANCELLED           = 303;  // RAC_ERROR_STREAM_CANCELLED
+
+    // -- Authentication (-320..-329) ----------------------------------------
+    ERROR_CODE_AUTHENTICATION_FAILED      = 320;  // RAC_ERROR_AUTHENTICATION_FAILED
+    ERROR_CODE_UNAUTHORIZED               = 321;  // RAC_ERROR_UNAUTHORIZED
+    ERROR_CODE_FORBIDDEN                  = 322;  // RAC_ERROR_FORBIDDEN
+
+    // -- Security (-330..-349) ----------------------------------------------
+    ERROR_CODE_KEYCHAIN_ERROR             = 330;  // RAC_ERROR_KEYCHAIN_ERROR
+    ERROR_CODE_ENCODING_ERROR             = 331;  // RAC_ERROR_ENCODING_ERROR
+    ERROR_CODE_DECODING_ERROR             = 332;  // RAC_ERROR_DECODING_ERROR
+    ERROR_CODE_SECURE_STORAGE_FAILED      = 333;  // RAC_ERROR_SECURE_STORAGE_FAILED
+
+    // -- Extraction (-350..-369) --------------------------------------------
+    ERROR_CODE_EXTRACTION_FAILED          = 350;  // RAC_ERROR_EXTRACTION_FAILED
+    ERROR_CODE_CHECKSUM_MISMATCH          = 351;  // RAC_ERROR_CHECKSUM_MISMATCH
+    ERROR_CODE_UNSUPPORTED_ARCHIVE        = 352;  // RAC_ERROR_UNSUPPORTED_ARCHIVE
+
+    // -- Calibration (-370..-379) -------------------------------------------
+    ERROR_CODE_CALIBRATION_FAILED         = 370;  // RAC_ERROR_CALIBRATION_FAILED
+    ERROR_CODE_CALIBRATION_TIMEOUT        = 371;  // RAC_ERROR_CALIBRATION_TIMEOUT
+
+    // -- Cancellation (-380..-389) ------------------------------------------
+    ERROR_CODE_CANCELLED                  = 380;  // RAC_ERROR_CANCELLED
+
+    // -- Module / service (-400..-499) --------------------------------------
+    ERROR_CODE_MODULE_NOT_FOUND           = 400;  // RAC_ERROR_MODULE_NOT_FOUND
+    ERROR_CODE_MODULE_ALREADY_REGISTERED  = 401;  // RAC_ERROR_MODULE_ALREADY_REGISTERED
+    ERROR_CODE_MODULE_LOAD_FAILED         = 402;  // RAC_ERROR_MODULE_LOAD_FAILED
+    ERROR_CODE_SERVICE_NOT_FOUND          = 410;  // RAC_ERROR_SERVICE_NOT_FOUND
+    ERROR_CODE_SERVICE_ALREADY_REGISTERED = 411;  // RAC_ERROR_SERVICE_ALREADY_REGISTERED
+    ERROR_CODE_SERVICE_CREATE_FAILED      = 412;  // RAC_ERROR_SERVICE_CREATE_FAILED
+    ERROR_CODE_CAPABILITY_NOT_FOUND       = 420;  // RAC_ERROR_CAPABILITY_NOT_FOUND
+    ERROR_CODE_PROVIDER_NOT_FOUND         = 421;  // RAC_ERROR_PROVIDER_NOT_FOUND
+    ERROR_CODE_NO_CAPABLE_PROVIDER        = 422;  // RAC_ERROR_NO_CAPABLE_PROVIDER
+    ERROR_CODE_NOT_FOUND                  = 423;  // RAC_ERROR_NOT_FOUND
+
+    // -- Platform adapter (-500..-599) --------------------------------------
+    ERROR_CODE_ADAPTER_NOT_SET            = 500;  // RAC_ERROR_ADAPTER_NOT_SET
+
+    // -- Backend (-600..-699) -----------------------------------------------
+    ERROR_CODE_BACKEND_NOT_FOUND          = 600;  // RAC_ERROR_BACKEND_NOT_FOUND
+    ERROR_CODE_BACKEND_NOT_READY          = 601;  // RAC_ERROR_BACKEND_NOT_READY
+    ERROR_CODE_BACKEND_INIT_FAILED        = 602;  // RAC_ERROR_BACKEND_INIT_FAILED
+    ERROR_CODE_BACKEND_BUSY               = 603;  // RAC_ERROR_BACKEND_BUSY
+    ERROR_CODE_BACKEND_UNAVAILABLE        = 604;  // RAC_ERROR_BACKEND_UNAVAILABLE
+    ERROR_CODE_INVALID_HANDLE             = 610;  // RAC_ERROR_INVALID_HANDLE
+
+    // -- Event (-700..-799) -------------------------------------------------
+    ERROR_CODE_EVENT_INVALID_CATEGORY     = 700;  // RAC_ERROR_EVENT_INVALID_CATEGORY
+    ERROR_CODE_EVENT_SUBSCRIPTION_FAILED  = 701;  // RAC_ERROR_EVENT_SUBSCRIPTION_FAILED
+    ERROR_CODE_EVENT_PUBLISH_FAILED       = 702;  // RAC_ERROR_EVENT_PUBLISH_FAILED
+
+    // -- Other (-800..-899) -------------------------------------------------
+    ERROR_CODE_NOT_IMPLEMENTED            = 800;  // RAC_ERROR_NOT_IMPLEMENTED
+    ERROR_CODE_FEATURE_NOT_AVAILABLE      = 801;  // RAC_ERROR_FEATURE_NOT_AVAILABLE
+    ERROR_CODE_FRAMEWORK_NOT_AVAILABLE    = 802;  // RAC_ERROR_FRAMEWORK_NOT_AVAILABLE
+    ERROR_CODE_UNSUPPORTED_MODALITY       = 803;  // RAC_ERROR_UNSUPPORTED_MODALITY
+    ERROR_CODE_UNKNOWN                    = 804;  // RAC_ERROR_UNKNOWN
+    ERROR_CODE_INTERNAL                   = 805;  // RAC_ERROR_INTERNAL
+
+    // -- Plugin (GAP 02 / GAP 03; -810..-829) -------------------------------
+    ERROR_CODE_ABI_VERSION_MISMATCH       = 810;  // RAC_ERROR_ABI_VERSION_MISMATCH
+    ERROR_CODE_CAPABILITY_UNSUPPORTED     = 811;  // RAC_ERROR_CAPABILITY_UNSUPPORTED
+    ERROR_CODE_PLUGIN_DUPLICATE           = 812;  // RAC_ERROR_PLUGIN_DUPLICATE
+    ERROR_CODE_PLUGIN_LOAD_FAILED         = 820;  // RAC_ERROR_PLUGIN_LOAD_FAILED
+    ERROR_CODE_PLUGIN_BUSY                = 821;  // RAC_ERROR_PLUGIN_BUSY
+
+    // -- Web-only WASM codes (-900..-903) -----------------------------------
+    // The C ABI reserves -900..-999 for future use. The Web SDK currently
+    // squats four codes here for WASM bridge failures; codegen tags these
+    // as platform=web only. They are preserved verbatim so existing Web
+    // consumers don't break, but new SDKs SHOULD NOT emit them.
+    // Source: sdk/runanywhere-web/packages/core/src/Foundation/ErrorTypes.ts:58
+    ERROR_CODE_WASM_LOAD_FAILED           = 900;
+    ERROR_CODE_WASM_NOT_LOADED            = 901;
+    ERROR_CODE_WASM_CALLBACK_ERROR        = 902;
+    ERROR_CODE_WASM_MEMORY_ERROR          = 903;
+}
+
+// ---------------------------------------------------------------------------
+// ErrorContext — debugging metadata captured at the throw site.
+//
+// Sources pre-IDL:
+//   C ABI   rac_structured_error.h:102  rac_error_t fields source_file,
+//                                       source_line, source_function plus a
+//                                       rac_stack_frame_t[32] fixed-size
+//                                       stack capture and 3 custom k/v slots
+//                                       (custom_key1..3 / custom_value1..3).
+//                                       The fixed-shape custom slots flatten
+//                                       to a `metadata` map<string,string> in
+//                                       proto.
+//   Swift   ErrorContext.swift          (matches Dart equivalent).
+//   Kotlin  SDKError.kt                 No ErrorContext — uses Throwable.cause
+//                                       only. Will pick up source location
+//                                       from this proto on regeneration.
+//   Dart    error_context.dart:4        StackTrace? stackTrace, String file,
+//                                       int line, String function, DateTime
+//                                       timestamp, String threadInfo.
+//   RN      ErrorContext.ts:11          stackTrace[], file, line, function,
+//                                       timestamp, threadInfo.
+//   Web     ErrorTypes.ts               (no context type).
+//
+// Stack traces are intentionally NOT modeled here — they are platform-shaped
+// (string lines on RN/Dart, rac_stack_frame_t[] on C, StackTrace on Dart) and
+// belong in a platform-local logging path, not in the wire IDL. If the C ABI
+// ever ships symbolicated frames, add a `repeated StackFrame frames` field
+// guarded by a feature flag.
+// ---------------------------------------------------------------------------
+message ErrorContext {
+    // Free-form key/value pairs for telemetry tagging. Maps onto the C ABI's
+    // three custom_key/custom_value slots and Dart's `Map<String, dynamic>`
+    // (after string-coercion).
+    map<string, string> metadata = 1;
+
+    // __FILE__ at the throw site. C ABI cap is RAC_MAX_METADATA_STRING (256).
+    optional string source_file = 2;
+
+    // __LINE__ at the throw site.
+    optional int32  source_line = 3;
+
+    // Logical operation name ("loadModel", "generate", "transcribeStream",
+    // ...). Lets clients route on operation without parsing free-text.
+    // Maps roughly onto Dart's `function` field and C ABI's source_function;
+    // we use the more generic "operation" name because some platforms (C++,
+    // Swift) symbolicate the function name from the stack frame instead.
+    optional string operation   = 4;
+}
+
+// ---------------------------------------------------------------------------
+// SDKError — the unified error payload every SDK throws / returns.
+//
+// Sources pre-IDL:
+//   C ABI   rac_structured_error.h:102  rac_error_t (code, category, message,
+//                                       source location, stack trace,
+//                                       underlying_code, underlying_message,
+//                                       model_id, framework, session_id,
+//                                       timestamp_ms, 3 custom k/v slots).
+//   Swift   (no concrete SDKError type was located; Swift code uses
+//           ErrorCode + ErrorCategory + a SDKErrorProtocol shape that
+//           matches this message; the migrated Swift SDK in sdk/swift/ will
+//           be regenerated from this proto).
+//   Kotlin  SDKError.kt:27              data class (code, category, message,
+//                                       cause).
+//   Dart    sdk_error.dart:13           class SDKError (message, type,
+//                                       underlyingError, context).
+//   RN      SDKError.ts:147             class SDKError (code, legacyCode?,
+//                                       category, underlyingError, context,
+//                                       details?).
+//   Web     ErrorTypes.ts:68            class SDKError (code, details?).
+//
+// Wire contract:
+//   * `code` — required. Always non-zero (zero indicates success and there
+//     should be no SDKError to begin with). Codegen MUST refuse to emit
+//     ERROR_CODE_UNSPECIFIED at runtime.
+//   * `category` — required. Coarse routing bucket. May be UNSPECIFIED only
+//     when `code` itself doesn't fit any bucket cleanly (rare).
+//   * `message` — required, human-readable, non-localized. Localization is a
+//     consumer concern.
+//   * `context` — optional. Source location + telemetry metadata.
+//   * `c_abi_code` — optional. Negative `rac_result_t` integer from the C ABI
+//     (e.g. -110 for MODEL_NOT_FOUND). Allows lossless round-trip with the
+//     C ABI even when intermediate platforms (Kotlin, Dart, RN) use a
+//     positive-numbered local enum. If `code` is set, `c_abi_code` MUST
+//     equal `-int32(code)` for codes ≤ 899; for the Web-only WASM codes
+//     (≥ 900) `c_abi_code` is unset because no canonical C ABI value exists.
+//   * `nested_message` — optional. Underlying-error message as captured at
+//     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
+//     and Kotlin's Throwable.cause.message.
+// ---------------------------------------------------------------------------
+message SDKError {
+    ErrorCode             code           = 1;
+    ErrorCategory         category       = 2;
+    string                message        = 3;
+    optional ErrorContext context        = 4;
+
+    // Negative rac_result_t value from the C ABI. May be negative; preserved
+    // via int32 (proto3 int32 is signed). Unset when the failure originated
+    // outside the C ABI (e.g. a pure-Web WASM failure).
+    optional int32        c_abi_code     = 5;
+
+    // Underlying error's message (the "caused by" chain), if any.
+    optional string       nested_message = 6;
+}

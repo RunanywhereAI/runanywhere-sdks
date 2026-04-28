@@ -90,7 +90,7 @@ struct ToolCallDetailSheet: View {
             .background(AppColors.backgroundPrimary)
             .navigationTitle("Tool Call")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

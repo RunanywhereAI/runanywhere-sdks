@@ -43,6 +43,19 @@ MESSAGE_PROTOS=(
     "${PROTO_DIR}/llm_options.proto"
     "${PROTO_DIR}/chat.proto"
     "${PROTO_DIR}/tool_calling.proto"
+    # Phase B — additional duplicated data shapes (per-modality options + shared types).
+    "${PROTO_DIR}/diffusion_options.proto"
+    "${PROTO_DIR}/embeddings_options.proto"
+    "${PROTO_DIR}/errors.proto"
+    "${PROTO_DIR}/lora_options.proto"
+    "${PROTO_DIR}/rag.proto"
+    "${PROTO_DIR}/sdk_events.proto"
+    "${PROTO_DIR}/storage_types.proto"
+    "${PROTO_DIR}/structured_output.proto"
+    "${PROTO_DIR}/stt_options.proto"
+    "${PROTO_DIR}/tts_options.proto"
+    "${PROTO_DIR}/vad_options.proto"
+    "${PROTO_DIR}/vlm_options.proto"
 )
 
 protoc \

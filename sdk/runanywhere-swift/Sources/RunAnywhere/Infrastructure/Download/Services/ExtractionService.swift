@@ -98,7 +98,7 @@ public final class DefaultExtractionService: ExtractionServiceProtocol, @uncheck
         let startTime = Date()
 
         guard case .archive(_, let structure, _) = artifactType else {
-            throw SDKError.download(.extractionFailed, "Artifact type does not require extraction")
+            throw SDKException.download(.extractionFailed, "Artifact type does not require extraction")
         }
 
         logger.info("Starting extraction", metadata: [
@@ -121,7 +121,7 @@ public final class DefaultExtractionService: ExtractionServiceProtocol, @uncheck
         )
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.download(.extractionFailed, "Native extraction failed with code: \(result)")
+            throw SDKException.download(.extractionFailed, "Native extraction failed with code: \(result)")
         }
 
         // Find the actual model path using C++ rac_find_model_path_after_extraction()

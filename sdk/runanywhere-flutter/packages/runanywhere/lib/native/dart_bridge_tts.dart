@@ -178,7 +178,7 @@ class DartBridgeTTS {
     bool useSsml = false,
     String? voiceId,
   }) async {
-    TTSConfiguration(
+    TTSComponentConfig(
       speakingRate: rate,
       pitch: pitch,
       volume: volume,

@@ -155,12 +155,12 @@ class VLMViewModel extends ChangeNotifier {
       final xFile = await _cameraController!.takePicture();
 
       // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(xFile.path);
+      final image = sdk.VLMImage(filePath: xFile.path);
 
       final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe what you see briefly.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 200),
+        options: sdk.VLMGenerationOptions(maxTokens: 200),
       );
 
       // Listen to stream and append tokens
@@ -194,12 +194,12 @@ class VLMViewModel extends ChangeNotifier {
 
     try {
       // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(imagePath);
+      final image = sdk.VLMImage(filePath: imagePath);
 
       final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe this image in detail.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 300),
+        options: sdk.VLMGenerationOptions(maxTokens: 300),
       );
 
       // Listen to stream and append tokens
@@ -277,12 +277,12 @@ class VLMViewModel extends ChangeNotifier {
       final xFile = await _cameraController!.takePicture();
 
       // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(xFile.path);
+      final image = sdk.VLMImage(filePath: xFile.path);
 
       final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe what you see in one sentence.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 100),
+        options: sdk.VLMGenerationOptions(maxTokens: 100),
       );
 
       // Listen to stream and build description

@@ -1,14 +1,9 @@
-//
+///
 //  Generated code. Do not modify.
 //  source: model_types.proto
 //
 // @dart = 2.12
-
-// ignore_for_file: always_use_package_imports
-// ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
 
 import 'dart:core' as $core;
 
@@ -28,15 +23,45 @@ enum ModelInfo_Artifact {
   notSet
 }
 
-/// ---------------------------------------------------------------------------
-/// Core metadata for a model entry.
-/// Sources pre-IDL:
-///   Swift  ModelTypes.swift:393       (16 fields)
-///   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
-///   Dart   model_types.dart:335       (similar shape, nullable divergences)
-///   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
-/// ---------------------------------------------------------------------------
 class ModelInfo extends $pb.GeneratedMessage {
+  static const $core.Map<$core.int, ModelInfo_Artifact> _ModelInfo_ArtifactByTag = {
+    20 : ModelInfo_Artifact.singleFile,
+    21 : ModelInfo_Artifact.archive,
+    22 : ModelInfo_Artifact.multiFile,
+    23 : ModelInfo_Artifact.customStrategyId,
+    24 : ModelInfo_Artifact.builtIn,
+    0 : ModelInfo_Artifact.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ModelInfo', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..oo(0, [20, 21, 22, 23, 24])
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'id')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
+    ..e<ModelCategory>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
+    ..e<ModelFormat>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: ModelFormat.MODEL_FORMAT_UNSPECIFIED, valueOf: ModelFormat.valueOf, enumValues: ModelFormat.values)
+    ..e<InferenceFramework>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
+    ..aOS(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'downloadUrl')
+    ..aOS(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'localPath')
+    ..aInt64(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'downloadSizeBytes')
+    ..a<$core.int>(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'contextLength', $pb.PbFieldType.O3)
+    ..aOB(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'supportsThinking')
+    ..aOB(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'supportsLora')
+    ..aOS(12, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'description')
+    ..e<ModelSource>(13, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'source', $pb.PbFieldType.OE, defaultOrMaker: ModelSource.MODEL_SOURCE_UNSPECIFIED, valueOf: ModelSource.valueOf, enumValues: ModelSource.values)
+    ..aInt64(14, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'createdAtUnixMs')
+    ..aInt64(15, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'updatedAtUnixMs')
+    ..aOM<SingleFileArtifact>(20, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'singleFile', subBuilder: SingleFileArtifact.create)
+    ..aOM<ArchiveArtifact>(21, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'archive', subBuilder: ArchiveArtifact.create)
+    ..aOM<MultiFileArtifact>(22, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'multiFile', subBuilder: MultiFileArtifact.create)
+    ..aOS(23, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'customStrategyId')
+    ..aOB(24, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'builtIn')
+    ..e<ModelArtifactType>(25, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'artifactType', $pb.PbFieldType.OE, defaultOrMaker: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED, valueOf: ModelArtifactType.valueOf, enumValues: ModelArtifactType.values)
+    ..aOM<ExpectedModelFiles>(26, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'expectedFiles', subBuilder: ExpectedModelFiles.create)
+    ..e<AccelerationPreference>(27, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'accelerationPreference', $pb.PbFieldType.OE, defaultOrMaker: AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED, valueOf: AccelerationPreference.valueOf, enumValues: AccelerationPreference.values)
+    ..e<RoutingPolicy>(28, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'routingPolicy', $pb.PbFieldType.OE, defaultOrMaker: RoutingPolicy.ROUTING_POLICY_UNSPECIFIED, valueOf: RoutingPolicy.valueOf, enumValues: RoutingPolicy.values)
+    ..hasRequiredFields = false
+  ;
+
+  ModelInfo._() : super();
   factory ModelInfo({
     $core.String? id,
     $core.String? name,
@@ -58,107 +83,88 @@ class ModelInfo extends $pb.GeneratedMessage {
     MultiFileArtifact? multiFile,
     $core.String? customStrategyId,
     $core.bool? builtIn,
+    ModelArtifactType? artifactType,
+    ExpectedModelFiles? expectedFiles,
+    AccelerationPreference? accelerationPreference,
+    RoutingPolicy? routingPolicy,
   }) {
-    final $result = create();
+    final _result = create();
     if (id != null) {
-      $result.id = id;
+      _result.id = id;
     }
     if (name != null) {
-      $result.name = name;
+      _result.name = name;
     }
     if (category != null) {
-      $result.category = category;
+      _result.category = category;
     }
     if (format != null) {
-      $result.format = format;
+      _result.format = format;
     }
     if (framework != null) {
-      $result.framework = framework;
+      _result.framework = framework;
     }
     if (downloadUrl != null) {
-      $result.downloadUrl = downloadUrl;
+      _result.downloadUrl = downloadUrl;
     }
     if (localPath != null) {
-      $result.localPath = localPath;
+      _result.localPath = localPath;
     }
     if (downloadSizeBytes != null) {
-      $result.downloadSizeBytes = downloadSizeBytes;
+      _result.downloadSizeBytes = downloadSizeBytes;
     }
     if (contextLength != null) {
-      $result.contextLength = contextLength;
+      _result.contextLength = contextLength;
     }
     if (supportsThinking != null) {
-      $result.supportsThinking = supportsThinking;
+      _result.supportsThinking = supportsThinking;
     }
     if (supportsLora != null) {
-      $result.supportsLora = supportsLora;
+      _result.supportsLora = supportsLora;
     }
     if (description != null) {
-      $result.description = description;
+      _result.description = description;
     }
     if (source != null) {
-      $result.source = source;
+      _result.source = source;
     }
     if (createdAtUnixMs != null) {
-      $result.createdAtUnixMs = createdAtUnixMs;
+      _result.createdAtUnixMs = createdAtUnixMs;
     }
     if (updatedAtUnixMs != null) {
-      $result.updatedAtUnixMs = updatedAtUnixMs;
+      _result.updatedAtUnixMs = updatedAtUnixMs;
     }
     if (singleFile != null) {
-      $result.singleFile = singleFile;
+      _result.singleFile = singleFile;
     }
     if (archive != null) {
-      $result.archive = archive;
+      _result.archive = archive;
     }
     if (multiFile != null) {
-      $result.multiFile = multiFile;
+      _result.multiFile = multiFile;
     }
     if (customStrategyId != null) {
-      $result.customStrategyId = customStrategyId;
+      _result.customStrategyId = customStrategyId;
     }
     if (builtIn != null) {
-      $result.builtIn = builtIn;
+      _result.builtIn = builtIn;
     }
-    return $result;
+    if (artifactType != null) {
+      _result.artifactType = artifactType;
+    }
+    if (expectedFiles != null) {
+      _result.expectedFiles = expectedFiles;
+    }
+    if (accelerationPreference != null) {
+      _result.accelerationPreference = accelerationPreference;
+    }
+    if (routingPolicy != null) {
+      _result.routingPolicy = routingPolicy;
+    }
+    return _result;
   }
-  ModelInfo._() : super();
   factory ModelInfo.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory ModelInfo.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static const $core.Map<$core.int, ModelInfo_Artifact> _ModelInfo_ArtifactByTag = {
-    20 : ModelInfo_Artifact.singleFile,
-    21 : ModelInfo_Artifact.archive,
-    22 : ModelInfo_Artifact.multiFile,
-    23 : ModelInfo_Artifact.customStrategyId,
-    24 : ModelInfo_Artifact.builtIn,
-    0 : ModelInfo_Artifact.notSet
-  };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelInfo', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..oo(0, [20, 21, 22, 23, 24])
-    ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOS(2, _omitFieldNames ? '' : 'name')
-    ..e<ModelCategory>(3, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
-    ..e<ModelFormat>(4, _omitFieldNames ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: ModelFormat.MODEL_FORMAT_UNSPECIFIED, valueOf: ModelFormat.valueOf, enumValues: ModelFormat.values)
-    ..e<InferenceFramework>(5, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
-    ..aOS(6, _omitFieldNames ? '' : 'downloadUrl')
-    ..aOS(7, _omitFieldNames ? '' : 'localPath')
-    ..aInt64(8, _omitFieldNames ? '' : 'downloadSizeBytes')
-    ..a<$core.int>(9, _omitFieldNames ? '' : 'contextLength', $pb.PbFieldType.O3)
-    ..aOB(10, _omitFieldNames ? '' : 'supportsThinking')
-    ..aOB(11, _omitFieldNames ? '' : 'supportsLora')
-    ..aOS(12, _omitFieldNames ? '' : 'description')
-    ..e<ModelSource>(13, _omitFieldNames ? '' : 'source', $pb.PbFieldType.OE, defaultOrMaker: ModelSource.MODEL_SOURCE_UNSPECIFIED, valueOf: ModelSource.valueOf, enumValues: ModelSource.values)
-    ..aInt64(14, _omitFieldNames ? '' : 'createdAtUnixMs')
-    ..aInt64(15, _omitFieldNames ? '' : 'updatedAtUnixMs')
-    ..aOM<SingleFileArtifact>(20, _omitFieldNames ? '' : 'singleFile', subBuilder: SingleFileArtifact.create)
-    ..aOM<ArchiveArtifact>(21, _omitFieldNames ? '' : 'archive', subBuilder: ArchiveArtifact.create)
-    ..aOM<MultiFileArtifact>(22, _omitFieldNames ? '' : 'multiFile', subBuilder: MultiFileArtifact.create)
-    ..aOS(23, _omitFieldNames ? '' : 'customStrategyId')
-    ..aOB(24, _omitFieldNames ? '' : 'builtIn')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -168,10 +174,8 @@ class ModelInfo extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  ModelInfo copyWith(void Function(ModelInfo) updates) => super.copyWith((message) => updates(message as ModelInfo)) as ModelInfo;
-
+  ModelInfo copyWith(void Function(ModelInfo) updates) => super.copyWith((message) => updates(message as ModelInfo)) as ModelInfo; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static ModelInfo create() => ModelInfo._();
   ModelInfo createEmptyInstance() => create();
@@ -368,32 +372,69 @@ class ModelInfo extends $pb.GeneratedMessage {
   $core.bool hasBuiltIn() => $_has(19);
   @$pb.TagNumber(24)
   void clearBuiltIn() => clearField(24);
+
+  @$pb.TagNumber(25)
+  ModelArtifactType get artifactType => $_getN(20);
+  @$pb.TagNumber(25)
+  set artifactType(ModelArtifactType v) { setField(25, v); }
+  @$pb.TagNumber(25)
+  $core.bool hasArtifactType() => $_has(20);
+  @$pb.TagNumber(25)
+  void clearArtifactType() => clearField(25);
+
+  @$pb.TagNumber(26)
+  ExpectedModelFiles get expectedFiles => $_getN(21);
+  @$pb.TagNumber(26)
+  set expectedFiles(ExpectedModelFiles v) { setField(26, v); }
+  @$pb.TagNumber(26)
+  $core.bool hasExpectedFiles() => $_has(21);
+  @$pb.TagNumber(26)
+  void clearExpectedFiles() => clearField(26);
+  @$pb.TagNumber(26)
+  ExpectedModelFiles ensureExpectedFiles() => $_ensure(21);
+
+  @$pb.TagNumber(27)
+  AccelerationPreference get accelerationPreference => $_getN(22);
+  @$pb.TagNumber(27)
+  set accelerationPreference(AccelerationPreference v) { setField(27, v); }
+  @$pb.TagNumber(27)
+  $core.bool hasAccelerationPreference() => $_has(22);
+  @$pb.TagNumber(27)
+  void clearAccelerationPreference() => clearField(27);
+
+  @$pb.TagNumber(28)
+  RoutingPolicy get routingPolicy => $_getN(23);
+  @$pb.TagNumber(28)
+  set routingPolicy(RoutingPolicy v) { setField(28, v); }
+  @$pb.TagNumber(28)
+  $core.bool hasRoutingPolicy() => $_has(23);
+  @$pb.TagNumber(28)
+  void clearRoutingPolicy() => clearField(28);
 }
 
 class SingleFileArtifact extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'SingleFileArtifact', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..pPS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'requiredPatterns')
+    ..pPS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'optionalPatterns')
+    ..hasRequiredFields = false
+  ;
+
+  SingleFileArtifact._() : super();
   factory SingleFileArtifact({
     $core.Iterable<$core.String>? requiredPatterns,
     $core.Iterable<$core.String>? optionalPatterns,
   }) {
-    final $result = create();
+    final _result = create();
     if (requiredPatterns != null) {
-      $result.requiredPatterns.addAll(requiredPatterns);
+      _result.requiredPatterns.addAll(requiredPatterns);
     }
     if (optionalPatterns != null) {
-      $result.optionalPatterns.addAll(optionalPatterns);
+      _result.optionalPatterns.addAll(optionalPatterns);
     }
-    return $result;
+    return _result;
   }
-  SingleFileArtifact._() : super();
   factory SingleFileArtifact.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory SingleFileArtifact.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SingleFileArtifact', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..pPS(1, _omitFieldNames ? '' : 'requiredPatterns')
-    ..pPS(2, _omitFieldNames ? '' : 'optionalPatterns')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -403,10 +444,8 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  SingleFileArtifact copyWith(void Function(SingleFileArtifact) updates) => super.copyWith((message) => updates(message as SingleFileArtifact)) as SingleFileArtifact;
-
+  SingleFileArtifact copyWith(void Function(SingleFileArtifact) updates) => super.copyWith((message) => updates(message as SingleFileArtifact)) as SingleFileArtifact; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static SingleFileArtifact create() => SingleFileArtifact._();
   SingleFileArtifact createEmptyInstance() => create();
@@ -423,39 +462,38 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
 }
 
 class ArchiveArtifact extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ArchiveArtifact', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<ArchiveType>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: ArchiveType.ARCHIVE_TYPE_UNSPECIFIED, valueOf: ArchiveType.valueOf, enumValues: ArchiveType.values)
+    ..e<ArchiveStructure>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'structure', $pb.PbFieldType.OE, defaultOrMaker: ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED, valueOf: ArchiveStructure.valueOf, enumValues: ArchiveStructure.values)
+    ..pPS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'requiredPatterns')
+    ..pPS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'optionalPatterns')
+    ..hasRequiredFields = false
+  ;
+
+  ArchiveArtifact._() : super();
   factory ArchiveArtifact({
     ArchiveType? type,
     ArchiveStructure? structure,
     $core.Iterable<$core.String>? requiredPatterns,
     $core.Iterable<$core.String>? optionalPatterns,
   }) {
-    final $result = create();
+    final _result = create();
     if (type != null) {
-      $result.type = type;
+      _result.type = type;
     }
     if (structure != null) {
-      $result.structure = structure;
+      _result.structure = structure;
     }
     if (requiredPatterns != null) {
-      $result.requiredPatterns.addAll(requiredPatterns);
+      _result.requiredPatterns.addAll(requiredPatterns);
     }
     if (optionalPatterns != null) {
-      $result.optionalPatterns.addAll(optionalPatterns);
+      _result.optionalPatterns.addAll(optionalPatterns);
     }
-    return $result;
+    return _result;
   }
-  ArchiveArtifact._() : super();
   factory ArchiveArtifact.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory ArchiveArtifact.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ArchiveArtifact', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<ArchiveType>(1, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: ArchiveType.ARCHIVE_TYPE_UNSPECIFIED, valueOf: ArchiveType.valueOf, enumValues: ArchiveType.values)
-    ..e<ArchiveStructure>(2, _omitFieldNames ? '' : 'structure', $pb.PbFieldType.OE, defaultOrMaker: ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED, valueOf: ArchiveStructure.valueOf, enumValues: ArchiveStructure.values)
-    ..pPS(3, _omitFieldNames ? '' : 'requiredPatterns')
-    ..pPS(4, _omitFieldNames ? '' : 'optionalPatterns')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -465,10 +503,8 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  ArchiveArtifact copyWith(void Function(ArchiveArtifact) updates) => super.copyWith((message) => updates(message as ArchiveArtifact)) as ArchiveArtifact;
-
+  ArchiveArtifact copyWith(void Function(ArchiveArtifact) updates) => super.copyWith((message) => updates(message as ArchiveArtifact)) as ArchiveArtifact; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static ArchiveArtifact create() => ArchiveArtifact._();
   ArchiveArtifact createEmptyInstance() => create();
@@ -503,34 +539,43 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
 }
 
 class ModelFileDescriptor extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ModelFileDescriptor', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'url')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'filename')
+    ..aOB(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isRequired')
+    ..aInt64(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sizeBytes')
+    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'checksum')
+    ..hasRequiredFields = false
+  ;
+
+  ModelFileDescriptor._() : super();
   factory ModelFileDescriptor({
     $core.String? url,
     $core.String? filename,
     $core.bool? isRequired,
+    $fixnum.Int64? sizeBytes,
+    $core.String? checksum,
   }) {
-    final $result = create();
+    final _result = create();
     if (url != null) {
-      $result.url = url;
+      _result.url = url;
     }
     if (filename != null) {
-      $result.filename = filename;
+      _result.filename = filename;
     }
     if (isRequired != null) {
-      $result.isRequired = isRequired;
+      _result.isRequired = isRequired;
     }
-    return $result;
+    if (sizeBytes != null) {
+      _result.sizeBytes = sizeBytes;
+    }
+    if (checksum != null) {
+      _result.checksum = checksum;
+    }
+    return _result;
   }
-  ModelFileDescriptor._() : super();
   factory ModelFileDescriptor.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory ModelFileDescriptor.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelFileDescriptor', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'url')
-    ..aOS(2, _omitFieldNames ? '' : 'filename')
-    ..aOB(3, _omitFieldNames ? '' : 'isRequired')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -540,10 +585,8 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  ModelFileDescriptor copyWith(void Function(ModelFileDescriptor) updates) => super.copyWith((message) => updates(message as ModelFileDescriptor)) as ModelFileDescriptor;
-
+  ModelFileDescriptor copyWith(void Function(ModelFileDescriptor) updates) => super.copyWith((message) => updates(message as ModelFileDescriptor)) as ModelFileDescriptor; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static ModelFileDescriptor create() => ModelFileDescriptor._();
   ModelFileDescriptor createEmptyInstance() => create();
@@ -578,27 +621,44 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   $core.bool hasIsRequired() => $_has(2);
   @$pb.TagNumber(3)
   void clearIsRequired() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get sizeBytes => $_getI64(3);
+  @$pb.TagNumber(4)
+  set sizeBytes($fixnum.Int64 v) { $_setInt64(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasSizeBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSizeBytes() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get checksum => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set checksum($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasChecksum() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearChecksum() => clearField(5);
 }
 
 class MultiFileArtifact extends $pb.GeneratedMessage {
-  factory MultiFileArtifact({
-    $core.Iterable<ModelFileDescriptor>? files,
-  }) {
-    final $result = create();
-    if (files != null) {
-      $result.files.addAll(files);
-    }
-    return $result;
-  }
-  MultiFileArtifact._() : super();
-  factory MultiFileArtifact.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory MultiFileArtifact.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'MultiFileArtifact', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..pc<ModelFileDescriptor>(1, _omitFieldNames ? '' : 'files', $pb.PbFieldType.PM, subBuilder: ModelFileDescriptor.create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'MultiFileArtifact', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..pc<ModelFileDescriptor>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'files', $pb.PbFieldType.PM, subBuilder: ModelFileDescriptor.create)
     ..hasRequiredFields = false
   ;
 
+  MultiFileArtifact._() : super();
+  factory MultiFileArtifact({
+    $core.Iterable<ModelFileDescriptor>? files,
+  }) {
+    final _result = create();
+    if (files != null) {
+      _result.files.addAll(files);
+    }
+    return _result;
+  }
+  factory MultiFileArtifact.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory MultiFileArtifact.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -608,10 +668,8 @@ class MultiFileArtifact extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  MultiFileArtifact copyWith(void Function(MultiFileArtifact) updates) => super.copyWith((message) => updates(message as MultiFileArtifact)) as MultiFileArtifact;
-
+  MultiFileArtifact copyWith(void Function(MultiFileArtifact) updates) => super.copyWith((message) => updates(message as MultiFileArtifact)) as MultiFileArtifact; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static MultiFileArtifact create() => MultiFileArtifact._();
   MultiFileArtifact createEmptyInstance() => create();
@@ -624,6 +682,58 @@ class MultiFileArtifact extends $pb.GeneratedMessage {
   $core.List<ModelFileDescriptor> get files => $_getList(0);
 }
 
+class ExpectedModelFiles extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ExpectedModelFiles', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..pc<ModelFileDescriptor>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'files', $pb.PbFieldType.PM, subBuilder: ModelFileDescriptor.create)
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rootDirectory')
+    ..hasRequiredFields = false
+  ;
 
-const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
-const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');
+  ExpectedModelFiles._() : super();
+  factory ExpectedModelFiles({
+    $core.Iterable<ModelFileDescriptor>? files,
+    $core.String? rootDirectory,
+  }) {
+    final _result = create();
+    if (files != null) {
+      _result.files.addAll(files);
+    }
+    if (rootDirectory != null) {
+      _result.rootDirectory = rootDirectory;
+    }
+    return _result;
+  }
+  factory ExpectedModelFiles.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ExpectedModelFiles.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ExpectedModelFiles clone() => ExpectedModelFiles()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ExpectedModelFiles copyWith(void Function(ExpectedModelFiles) updates) => super.copyWith((message) => updates(message as ExpectedModelFiles)) as ExpectedModelFiles; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static ExpectedModelFiles create() => ExpectedModelFiles._();
+  ExpectedModelFiles createEmptyInstance() => create();
+  static $pb.PbList<ExpectedModelFiles> createRepeated() => $pb.PbList<ExpectedModelFiles>();
+  @$core.pragma('dart2js:noInline')
+  static ExpectedModelFiles getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ExpectedModelFiles>(create);
+  static ExpectedModelFiles? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<ModelFileDescriptor> get files => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get rootDirectory => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set rootDirectory($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasRootDirectory() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRootDirectory() => clearField(2);
+}
+

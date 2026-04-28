@@ -49,6 +49,25 @@ public class ModelFileDescriptor(
     schemaIndex = 2,
   )
   public val is_required: Boolean = false,
+  /**
+   * Extended descriptor fields (Flutter model_types.dart:~350,
+   * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
+   * canonical "required" flag — the documented `required` boolean from
+   * newer SDK sources maps onto it (default true, mirrored in Swift).
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    jsonName = "sizeBytes",
+    schemaIndex = 3,
+  )
+  public val size_bytes: Long? = null,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 4,
+  )
+  public val checksum: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelFileDescriptor, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -65,6 +84,8 @@ public class ModelFileDescriptor(
     if (url != other.url) return false
     if (filename != other.filename) return false
     if (is_required != other.is_required) return false
+    if (size_bytes != other.size_bytes) return false
+    if (checksum != other.checksum) return false
     return true
   }
 
@@ -75,6 +96,8 @@ public class ModelFileDescriptor(
       result = result * 37 + url.hashCode()
       result = result * 37 + filename.hashCode()
       result = result * 37 + is_required.hashCode()
+      result = result * 37 + (size_bytes?.hashCode() ?: 0)
+      result = result * 37 + (checksum?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -85,6 +108,8 @@ public class ModelFileDescriptor(
     result += """url=${sanitize(url)}"""
     result += """filename=${sanitize(filename)}"""
     result += """is_required=$is_required"""
+    if (size_bytes != null) result += """size_bytes=$size_bytes"""
+    if (checksum != null) result += """checksum=${sanitize(checksum)}"""
     return result.joinToString(prefix = "ModelFileDescriptor{", separator = ", ", postfix = "}")
   }
 
@@ -92,8 +117,11 @@ public class ModelFileDescriptor(
     url: String = this.url,
     filename: String = this.filename,
     is_required: Boolean = this.is_required,
+    size_bytes: Long? = this.size_bytes,
+    checksum: String? = this.checksum,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, unknownFields)
+  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, checksum,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -112,6 +140,8 @@ public class ModelFileDescriptor(
         if (value.filename != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.filename)
         if (value.is_required != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
             value.is_required)
+        size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.size_bytes)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.checksum)
         return size
       }
 
@@ -120,11 +150,15 @@ public class ModelFileDescriptor(
         if (value.filename != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.filename)
         if (value.is_required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.is_required)
+        ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.checksum)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelFileDescriptor) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.checksum)
+        ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
         if (value.is_required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.is_required)
         if (value.filename != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.filename)
@@ -135,11 +169,15 @@ public class ModelFileDescriptor(
         var url: String = ""
         var filename: String = ""
         var is_required: Boolean = false
+        var size_bytes: Long? = null
+        var checksum: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
             2 -> filename = ProtoAdapter.STRING.decode(reader)
             3 -> is_required = ProtoAdapter.BOOL.decode(reader)
+            4 -> size_bytes = ProtoAdapter.INT64.decode(reader)
+            5 -> checksum = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -147,6 +185,8 @@ public class ModelFileDescriptor(
           url = url,
           filename = filename,
           is_required = is_required,
+          size_bytes = size_bytes,
+          checksum = checksum,
           unknownFields = unknownFields
         )
       }

@@ -57,7 +57,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_diffusion_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKError.diffusion(.notInitialized, "Failed to create Diffusion component: \(result)")
+                throw SDKException.diffusion(.notInitialized, "Failed to create Diffusion component: \(result)")
             }
 
             self.handle = handle
@@ -94,13 +94,13 @@ extension CppBridge {
                         return rac_diffusion_component_configure(handle, &cConfig)
                     }
                     guard result == RAC_SUCCESS else {
-                        throw SDKError.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
+                        throw SDKException.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
                     }
                 } else {
                     cConfig.tokenizer.custom_base_url = nil
                     let result = rac_diffusion_component_configure(handle, &cConfig)
                     guard result == RAC_SUCCESS else {
-                        throw SDKError.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
+                        throw SDKException.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
                     }
                 }
             }
@@ -146,7 +146,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKError.diffusion(.modelLoadFailed, "Failed to load diffusion model: \(result)")
+                throw SDKException.diffusion(.modelLoadFailed, "Failed to load diffusion model: \(result)")
             }
             loadedModelId = modelId
             logger.info("Diffusion model loaded: \(modelId)")
@@ -180,7 +180,7 @@ extension CppBridge {
             guard result == RAC_SUCCESS else {
                 let errorMsg = cResult.error_message.map { String(cString: $0) } ?? "Unknown error"
                 rac_diffusion_result_free(&cResult)
-                throw SDKError.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
+                throw SDKException.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
             }
 
             let swiftResult = DiffusionResult(from: cResult)
@@ -254,7 +254,7 @@ extension CppBridge {
 
             guard result == RAC_SUCCESS else {
                 let errorMsg = context.capturedErrorMessage ?? "Unknown error"
-                throw SDKError.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
+                throw SDKException.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
             }
 
             // Build result from captured callback data
@@ -305,7 +305,7 @@ extension CppBridge {
             var cInfo = rac_diffusion_info_t()
             let result = rac_diffusion_component_get_info(handle, &cInfo)
             guard result == RAC_SUCCESS else {
-                throw SDKError.diffusion(.notInitialized, "Failed to get diffusion info: \(result)")
+                throw SDKException.diffusion(.notInitialized, "Failed to get diffusion info: \(result)")
             }
             return DiffusionInfo(from: cInfo)
         }

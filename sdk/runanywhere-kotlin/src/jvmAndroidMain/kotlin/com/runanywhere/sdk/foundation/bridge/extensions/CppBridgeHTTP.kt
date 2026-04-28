@@ -105,8 +105,11 @@ object CppBridgeHTTP {
         // Ensure Content-Type for bodied methods when caller didn't set one —
         // mirrors the legacy HttpURLConnection behaviour.
         val resolved =
-            if (body != null && method != HttpMethod.GET && method != HttpMethod.HEAD &&
-                headers?.keys?.any { it.equals("Content-Type", ignoreCase = true) } != true) {
+            if (body != null &&
+                method != HttpMethod.GET &&
+                method != HttpMethod.HEAD &&
+                headers?.keys?.any { it.equals("Content-Type", ignoreCase = true) } != true
+            ) {
                 (headers ?: emptyMap()) + ("Content-Type" to "application/json")
             } else {
                 headers ?: emptyMap()
@@ -121,15 +124,16 @@ object CppBridgeHTTP {
                 null
             }
 
-        val resp = RunAnywhereBridge.racHttpRequestExecute(
-            method = methodName,
-            url = url,
-            headerKeys = keys,
-            headerValues = values,
-            body = bodyBytes,
-            timeoutMs = effectiveTimeout,
-            followRedirects = true,
-        )
+        val resp =
+            RunAnywhereBridge.racHttpRequestExecute(
+                method = methodName,
+                url = url,
+                headerKeys = keys,
+                headerValues = values,
+                body = bodyBytes,
+                timeoutMs = effectiveTimeout,
+                followRedirects = true,
+            )
 
         if (resp == null || resp.errorMessage != null) {
             val err = resp?.errorMessage ?: "native HTTP call returned null"

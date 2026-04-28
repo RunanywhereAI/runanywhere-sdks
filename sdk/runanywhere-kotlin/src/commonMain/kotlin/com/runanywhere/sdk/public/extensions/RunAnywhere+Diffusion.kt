@@ -12,18 +12,18 @@
  * export `rac_diffusion_*` thunks. The functions below are wired through
  * `expect`/`actual` so each platform can provide its own bridge — the
  * default JVM/Android actual currently throws
- * `SDKError.unsupportedOperation` until the C++ commons surface lands.
+ * `SDKException.unsupportedOperation` until the C++ commons surface lands.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.DiffusionCapabilities
+import ai.runanywhere.proto.v1.DiffusionConfiguration
+import ai.runanywhere.proto.v1.DiffusionGenerationOptions
+import ai.runanywhere.proto.v1.DiffusionProgress
+import ai.runanywhere.proto.v1.DiffusionResult
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Diffusion.DiffusionCapabilities
-import com.runanywhere.sdk.public.extensions.Diffusion.DiffusionConfiguration
-import com.runanywhere.sdk.public.extensions.Diffusion.DiffusionGenerationOptions
-import com.runanywhere.sdk.public.extensions.Diffusion.DiffusionProgress
-import com.runanywhere.sdk.public.extensions.Diffusion.DiffusionResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Image Generation

@@ -15,8 +15,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.VLM.VLMGenerationOptions
-import com.runanywhere.sdk.public.extensions.VLM.VLMImage
+import ai.runanywhere.proto.v1.VLMGenerationOptions
+import ai.runanywhere.proto.v1.VLMImage
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.processImageStream
@@ -249,8 +249,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         generationJob =
             viewModelScope.launch {
                 try {
-                    val image = VLMImage.fromRGBPixels(frameData, w, h)
-                    val options = VLMGenerationOptions(maxTokens = 200, temperature = 0.7f)
+                    val image = com.runanywhere.sdk.foundation.protoext.vlmImageFromRgbPixels(frameData, w, h)
+                    val options = VLMGenerationOptions(max_tokens = 200, temperature = 0.7f)
 
                     Timber.i("Describing current camera frame (${w}x$h)")
 
@@ -296,8 +296,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 var tempFile: File? = null
                 try {
                     tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
-                    val image = VLMImage.fromFilePath(tempFile.absolutePath)
-                    val options = VLMGenerationOptions(maxTokens = 300, temperature = 0.7f)
+                    val image = com.runanywhere.sdk.foundation.protoext.vlmImageFromFilePath(tempFile.absolutePath)
+                    val options = VLMGenerationOptions(max_tokens = 300, temperature = 0.7f)
 
                     Timber.i("Starting VLM streaming for image: ${tempFile.name}")
 
@@ -375,8 +375,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
         var newDescription = ""
         try {
-            val image = VLMImage.fromRGBPixels(frameData, w, h)
-            val options = VLMGenerationOptions(maxTokens = 100, temperature = 0.7f)
+            val image = com.runanywhere.sdk.foundation.protoext.vlmImageFromRgbPixels(frameData, w, h)
+            val options = VLMGenerationOptions(max_tokens = 100, temperature = 0.7f)
 
             RunAnywhere.processImageStream(
                 image,

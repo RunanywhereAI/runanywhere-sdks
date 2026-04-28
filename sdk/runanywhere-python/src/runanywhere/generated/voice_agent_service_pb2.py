@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import voice_events_pb2 as voice__events__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19voice_agent_service.proto\x12\x0erunanywhere.v1\x1a\x12voice_events.proto\")\n\x11VoiceAgentRequest\x12\x14\n\x0c\x65vent_filter\x18\x01 \x01(\t2W\n\nVoiceAgent\x12I\n\x06Stream\x12!.runanywhere.v1.VoiceAgentRequest\x1a\x1a.runanywhere.v1.VoiceEvent0\x01\x42\x42\n\x17\x61i.runanywhere.proto.v1B\x16VoiceAgentServiceProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19voice_agent_service.proto\x12\x0erunanywhere.v1\x1a\x12voice_events.proto\")\n\x11VoiceAgentRequest\x12\x14\n\x0c\x65vent_filter\x18\x01 \x01(\t\"\xd0\x02\n\x10VoiceAgentResult\x12\x17\n\x0fspeech_detected\x18\x01 \x01(\x08\x12\x1a\n\rtranscription\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x1f\n\x12\x61ssistant_response\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x1d\n\x10thinking_content\x18\x04 \x01(\tH\x02\x88\x01\x01\x12\x1e\n\x11synthesized_audio\x18\x05 \x01(\x0cH\x03\x88\x01\x01\x12\x43\n\x0b\x66inal_state\x18\x06 \x01(\x0b\x32).runanywhere.v1.VoiceAgentComponentStatesH\x04\x88\x01\x01\x42\x10\n\x0e_transcriptionB\x15\n\x13_assistant_responseB\x13\n\x11_thinking_contentB\x14\n\x12_synthesized_audioB\x0e\n\x0c_final_state\"\x9a\x01\n\x12VoiceSessionConfig\x12\x1b\n\x13silence_duration_ms\x18\x01 \x01(\x05\x12\x18\n\x10speech_threshold\x18\x02 \x01(\x02\x12\x15\n\rauto_play_tts\x18\x03 \x01(\x08\x12\x17\n\x0f\x63ontinuous_mode\x18\x04 \x01(\x08\x12\x1d\n\x15thinking_mode_enabled\x18\x05 \x01(\x08\"\xca\x07\n\x17VoiceAgentComposeConfig\x12\x1b\n\x0estt_model_path\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\x19\n\x0cstt_model_id\x18\x02 \x01(\tH\x01\x88\x01\x01\x12\x1b\n\x0estt_model_name\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x1b\n\x0ellm_model_path\x18\x04 \x01(\tH\x03\x88\x01\x01\x12\x19\n\x0cllm_model_id\x18\x05 \x01(\tH\x04\x88\x01\x01\x12\x1b\n\x0ellm_model_name\x18\x06 \x01(\tH\x05\x88\x01\x01\x12\x1b\n\x0etts_voice_path\x18\x07 \x01(\tH\x06\x88\x01\x01\x12\x19\n\x0ctts_voice_id\x18\x08 \x01(\tH\x07\x88\x01\x01\x12\x1b\n\x0etts_voice_name\x18\t \x01(\tH\x08\x88\x01\x01\x12\x17\n\x0fvad_sample_rate\x18\n \x01(\x05\x12\x18\n\x10vad_frame_length\x18\x0b \x01(\x02\x12\x1c\n\x14vad_energy_threshold\x18\x0c \x01(\x02\x12\x18\n\x10wakeword_enabled\x18\r \x01(\x08\x12 \n\x13wakeword_model_path\x18\x0e \x01(\tH\t\x88\x01\x01\x12\x1e\n\x11wakeword_model_id\x18\x0f \x01(\tH\n\x88\x01\x01\x12\x1c\n\x0fwakeword_phrase\x18\x10 \x01(\tH\x0b\x88\x01\x01\x12\x1a\n\x12wakeword_threshold\x18\x11 \x01(\x02\x12*\n\x1dwakeword_embedding_model_path\x18\x12 \x01(\tH\x0c\x88\x01\x01\x12$\n\x17wakeword_vad_model_path\x18\x13 \x01(\tH\r\x88\x01\x01\x12?\n\x0esession_config\x18\x14 \x01(\x0b\x32\".runanywhere.v1.VoiceSessionConfigH\x0e\x88\x01\x01\x42\x11\n\x0f_stt_model_pathB\x0f\n\r_stt_model_idB\x11\n\x0f_stt_model_nameB\x11\n\x0f_llm_model_pathB\x0f\n\r_llm_model_idB\x11\n\x0f_llm_model_nameB\x11\n\x0f_tts_voice_pathB\x0f\n\r_tts_voice_idB\x11\n\x0f_tts_voice_nameB\x16\n\x14_wakeword_model_pathB\x14\n\x12_wakeword_model_idB\x12\n\x10_wakeword_phraseB \n\x1e_wakeword_embedding_model_pathB\x1a\n\x18_wakeword_vad_model_pathB\x11\n\x0f_session_config2W\n\nVoiceAgent\x12I\n\x06Stream\x12!.runanywhere.v1.VoiceAgentRequest\x1a\x1a.runanywhere.v1.VoiceEvent0\x01\x42\x42\n\x17\x61i.runanywhere.proto.v1B\x16VoiceAgentServiceProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,6 +35,12 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\026VoiceAgentServiceProtoP\001\370\001\001\242\002\004RAV1\272\002\002RA'
   _globals['_VOICEAGENTREQUEST']._serialized_start=65
   _globals['_VOICEAGENTREQUEST']._serialized_end=106
-  _globals['_VOICEAGENT']._serialized_start=108
-  _globals['_VOICEAGENT']._serialized_end=195
+  _globals['_VOICEAGENTRESULT']._serialized_start=109
+  _globals['_VOICEAGENTRESULT']._serialized_end=445
+  _globals['_VOICESESSIONCONFIG']._serialized_start=448
+  _globals['_VOICESESSIONCONFIG']._serialized_end=602
+  _globals['_VOICEAGENTCOMPOSECONFIG']._serialized_start=605
+  _globals['_VOICEAGENTCOMPOSECONFIG']._serialized_end=1575
+  _globals['_VOICEAGENT']._serialized_start=1577
+  _globals['_VOICEAGENT']._serialized_end=1664
 # @@protoc_insertion_point(module_scope)

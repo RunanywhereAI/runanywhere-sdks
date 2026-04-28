@@ -7,8 +7,8 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkSce
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
-import com.runanywhere.sdk.public.extensions.VLM.VLMGenerationOptions
-import com.runanywhere.sdk.public.extensions.VLM.VLMImage
+import ai.runanywhere.proto.v1.VLMGenerationOptions
+import ai.runanywhere.proto.v1.VLMImage
 import com.runanywhere.sdk.public.extensions.loadVLMModel
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.unloadVLMModel
@@ -50,16 +50,16 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
                 } else {
                     SyntheticInputGenerator.gradientRgb(width, height)
                 }
-            val vlmImage = VLMImage.fromRGBPixels(rgbData, width, height)
+            val vlmImage = com.runanywhere.sdk.foundation.protoext.vlmImageFromRgbPixels(rgbData, width, height)
 
             // Warmup
             val warmupStart = System.nanoTime()
-            val warmupOptions = VLMGenerationOptions(maxTokens = 5, temperature = 0.0f)
+            val warmupOptions = VLMGenerationOptions(max_tokens = 5, temperature = 0.0f)
             RunAnywhere.processImage(vlmImage, "Hi", warmupOptions)
             val warmupTimeMs = (System.nanoTime() - warmupStart) / 1_000_000.0
 
             // Benchmark
-            val benchOptions = VLMGenerationOptions(maxTokens = 128, temperature = 0.0f)
+            val benchOptions = VLMGenerationOptions(max_tokens = 128, temperature = 0.0f)
             val result =
                 RunAnywhere.processImage(
                     vlmImage,
@@ -70,13 +70,13 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
             val memAfter = SyntheticInputGenerator.availableMemoryBytes()
 
             return BenchmarkMetrics(
-                endToEndLatencyMs = result.totalTimeMs.toDouble(),
+                endToEndLatencyMs = result.processing_time_ms.toDouble(),
                 loadTimeMs = loadTimeMs,
                 warmupTimeMs = warmupTimeMs,
                 memoryDeltaBytes = memBefore - memAfter,
-                tokensPerSecond = result.tokensPerSecond.toDouble(),
-                promptTokens = result.promptTokens,
-                completionTokens = result.completionTokens,
+                tokensPerSecond = result.tokens_per_second.toDouble(),
+                promptTokens = result.prompt_tokens,
+                completionTokens = result.completion_tokens,
             )
         } finally {
             withContext(NonCancellable) {

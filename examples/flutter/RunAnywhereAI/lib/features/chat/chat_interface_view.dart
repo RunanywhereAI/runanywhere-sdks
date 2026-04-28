@@ -8,6 +8,7 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
@@ -330,7 +331,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
       // collect token text off each non-terminal event.
       final eventStream = sdk.RunAnywhereSDK.instance.llm
-          .generateStream(prompt, options: options);
+          .generateStream(prompt, options);
 
       await for (final event in eventStream) {
         if (event.isFinal) {
@@ -405,7 +406,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
     try {
       final result = await sdk.RunAnywhereSDK.instance.llm
-          .generate(prompt, options: options);
+          .generate(prompt, options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -413,7 +414,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           : 0.0;
 
       // Extract token counts from SDK result
-      final outputTokens = result.tokensUsed;
+      final outputTokens = result.tokensGenerated;
       final tokensPerSecond = result.tokensPerSecond;
 
       final analytics = MessageAnalytics(
@@ -801,9 +802,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 }
-
-/// Message role enum
-enum MessageRole { system, user, assistant }
 
 /// Chat message model
 class ChatMessage {

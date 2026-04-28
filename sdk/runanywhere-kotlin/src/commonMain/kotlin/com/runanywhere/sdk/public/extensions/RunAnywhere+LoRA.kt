@@ -11,9 +11,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LoRAAdapterConfig
+import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import kotlinx.coroutines.flow.Flow
 
@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.Flow
  * Multiple adapters can be stacked. Context is recreated internally.
  *
  * @param config LoRA adapter configuration (path and scale)
- * @throws SDKError if no model is loaded or loading fails
+ * @throws SDKException if no model is loaded or loading fails
  */
 expect suspend fun RunAnywhere.loadLoraAdapter(config: LoRAAdapterConfig)
 
@@ -34,7 +34,7 @@ expect suspend fun RunAnywhere.loadLoraAdapter(config: LoRAAdapterConfig)
  * Remove a specific LoRA adapter by path.
  *
  * @param path Path that was used when loading the adapter
- * @throws SDKError if adapter not found or removal fails
+ * @throws SDKException if adapter not found or removal fails
  */
 expect suspend fun RunAnywhere.removeLoraAdapter(path: String)
 
@@ -116,7 +116,7 @@ expect fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry
  *
  * @param adapterId Adapter ID from the catalog registry
  * @return Flow of download progress events
- * @throws SDKError if adapter not found or download fails
+ * @throws SDKException if adapter not found or download fails
  */
 expect fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress>
 

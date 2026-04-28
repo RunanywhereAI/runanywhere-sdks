@@ -125,6 +125,30 @@ public class ToolCallingOptions(
     schemaIndex = 8,
   )
   public val format_hint: String = "",
+  /**
+   * Strongly-typed tool-call format. Preferred over `format_hint` when set;
+   * `format_hint` remains for legacy callers and per-SDK custom strings
+   * that don't round-trip through this enum.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.ToolCallFormatName#ADAPTER",
+    schemaIndex = 9,
+  )
+  public val format: ToolCallFormatName? = null,
+  /**
+   * Caller-supplied system prompt that fully replaces the SDK-injected
+   * tool-calling system prompt (rather than being merged with it).
+   * Distinct from `system_prompt` (field 6), which is merged unless
+   * `replace_system_prompt` is true.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "customSystemPrompt",
+    schemaIndex = 10,
+  )
+  public val custom_system_prompt: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -159,6 +183,8 @@ public class ToolCallingOptions(
     if (replace_system_prompt != other.replace_system_prompt) return false
     if (keep_tools_available != other.keep_tools_available) return false
     if (format_hint != other.format_hint) return false
+    if (format != other.format) return false
+    if (custom_system_prompt != other.custom_system_prompt) return false
     return true
   }
 
@@ -175,6 +201,8 @@ public class ToolCallingOptions(
       result = result * 37 + replace_system_prompt.hashCode()
       result = result * 37 + keep_tools_available.hashCode()
       result = result * 37 + format_hint.hashCode()
+      result = result * 37 + (format?.hashCode() ?: 0)
+      result = result * 37 + (custom_system_prompt?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -191,6 +219,9 @@ public class ToolCallingOptions(
     result += """replace_system_prompt=$replace_system_prompt"""
     result += """keep_tools_available=$keep_tools_available"""
     result += """format_hint=${sanitize(format_hint)}"""
+    if (format != null) result += """format=$format"""
+    if (custom_system_prompt != null) result +=
+        """custom_system_prompt=${sanitize(custom_system_prompt)}"""
     return result.joinToString(prefix = "ToolCallingOptions{", separator = ", ", postfix = "}")
   }
 
@@ -204,10 +235,12 @@ public class ToolCallingOptions(
     replace_system_prompt: Boolean = this.replace_system_prompt,
     keep_tools_available: Boolean = this.keep_tools_available,
     format_hint: String = this.format_hint,
+    format: ToolCallFormatName? = this.format,
+    custom_system_prompt: String? = this.custom_system_prompt,
     unknownFields: ByteString = this.unknownFields,
   ): ToolCallingOptions = ToolCallingOptions(tools, max_iterations, auto_execute, temperature,
-      max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format_hint,
-      unknownFields)
+      max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format_hint, format,
+      custom_system_prompt, unknownFields)
 
   public companion object {
     @JvmField
@@ -236,6 +269,8 @@ public class ToolCallingOptions(
             value.keep_tools_available)
         if (value.format_hint != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
             value.format_hint)
+        size += ToolCallFormatName.ADAPTER.encodedSizeWithTag(10, value.format)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.custom_system_prompt)
         return size
       }
 
@@ -253,11 +288,15 @@ public class ToolCallingOptions(
         if (value.keep_tools_available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
             value.keep_tools_available)
         if (value.format_hint != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.format_hint)
+        ToolCallFormatName.ADAPTER.encodeWithTag(writer, 10, value.format)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.custom_system_prompt)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.custom_system_prompt)
+        ToolCallFormatName.ADAPTER.encodeWithTag(writer, 10, value.format)
         if (value.format_hint != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.format_hint)
         if (value.keep_tools_available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
             value.keep_tools_available)
@@ -283,6 +322,8 @@ public class ToolCallingOptions(
         var replace_system_prompt: Boolean = false
         var keep_tools_available: Boolean = false
         var format_hint: String = ""
+        var format: ToolCallFormatName? = null
+        var custom_system_prompt: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tools.add(ToolDefinition.ADAPTER.decode(reader))
@@ -294,6 +335,12 @@ public class ToolCallingOptions(
             7 -> replace_system_prompt = ProtoAdapter.BOOL.decode(reader)
             8 -> keep_tools_available = ProtoAdapter.BOOL.decode(reader)
             9 -> format_hint = ProtoAdapter.STRING.decode(reader)
+            10 -> try {
+              format = ToolCallFormatName.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            11 -> custom_system_prompt = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -307,6 +354,8 @@ public class ToolCallingOptions(
           replace_system_prompt = replace_system_prompt,
           keep_tools_available = keep_tools_available,
           format_hint = format_hint,
+          format = format,
+          custom_system_prompt = custom_system_prompt,
           unknownFields = unknownFields
         )
       }

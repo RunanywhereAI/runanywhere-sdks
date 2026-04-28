@@ -8,7 +8,7 @@ extension RunAnywhere {
     /// - Parameter modelId: The model identifier
     public static func loadModel(_ modelId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -16,7 +16,7 @@ extension RunAnywhere {
         // Resolve model ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
-            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
+            throw SDKException.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
 
         // Handle built-in models (Foundation Models, System TTS) - no file path needed
@@ -30,7 +30,7 @@ extension RunAnywhere {
 
         // For downloaded models, verify they exist and resolve the file path
         guard modelInfo.localPath != nil else {
-            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
+            throw SDKException.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
         // Log model info for debugging
@@ -242,7 +242,7 @@ extension RunAnywhere {
     /// Unload the currently loaded LLM model
     public static func unloadModel() async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         await CppBridge.LLM.shared.unload()
@@ -273,7 +273,7 @@ extension RunAnywhere {
     /// - Parameter modelId: The model identifier (e.g., "whisper-base")
     public static func loadSTTModel(_ modelId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Early guard: skip if this exact model is already loaded
@@ -288,10 +288,10 @@ extension RunAnywhere {
         // Resolve model ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
-            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
+            throw SDKException.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
         guard modelInfo.localPath != nil else {
-            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
+            throw SDKException.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
         // Resolve actual model path
@@ -312,7 +312,7 @@ extension RunAnywhere {
     /// - Parameter voiceId: The voice identifier
     public static func loadTTSModel(_ voiceId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Early guard: skip if this exact voice is already loaded
@@ -327,7 +327,7 @@ extension RunAnywhere {
         // Resolve voice ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
+            throw SDKException.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
         }
 
         // Handle built-in voices (System TTS) - no file path needed
@@ -339,7 +339,7 @@ extension RunAnywhere {
         }
 
         guard modelInfo.localPath != nil else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
+            throw SDKException.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
         // Resolve actual model path
@@ -354,7 +354,7 @@ extension RunAnywhere {
     /// - Parameter modelId: The model identifier (e.g., "silero-vad")
     public static func loadVADModel(_ modelId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Early guard: skip if this exact model is already loaded
@@ -368,10 +368,10 @@ extension RunAnywhere {
 
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
-            throw SDKError.vad(.modelNotFound, "VAD model '\(modelId)' not found in registry")
+            throw SDKException.vad(.modelNotFound, "VAD model '\(modelId)' not found in registry")
         }
         guard modelInfo.localPath != nil else {
-            throw SDKError.vad(.modelNotFound, "VAD model '\(modelId)' is not downloaded")
+            throw SDKException.vad(.modelNotFound, "VAD model '\(modelId)' is not downloaded")
         }
 
         let modelPath = try resolveModelFilePath(for: modelInfo)
@@ -388,7 +388,7 @@ extension RunAnywhere {
     /// Get available models
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
-        guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
+        guard isInitialized else { throw SDKException.general(.notInitialized, "SDK not initialized") }
         // Ensure services are initialized (including Platform backend registration)
         try await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.getAll()

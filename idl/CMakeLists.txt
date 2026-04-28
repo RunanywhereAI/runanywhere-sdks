@@ -29,6 +29,19 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/llm_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/chat.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/tool_calling.proto
+    # Phase B — additional duplicated data shapes (per-modality options + shared types).
+    ${CMAKE_CURRENT_SOURCE_DIR}/diffusion_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/embeddings_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/errors.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/lora_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/rag.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdk_events.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/storage_types.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/structured_output.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/stt_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/tts_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/vad_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/vlm_options.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

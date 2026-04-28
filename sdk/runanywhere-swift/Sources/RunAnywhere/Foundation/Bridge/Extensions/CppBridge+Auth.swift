@@ -23,7 +23,7 @@ extension CppBridge {
         /// Authenticate with backend
         /// - Parameter apiKey: API key for authentication
         /// - Returns: Authentication response
-        /// - Throws: SDKError on failure
+        /// - Throws: SDKException on failure
         @discardableResult
         public static func authenticate(apiKey: String) async throws -> AuthenticationResponse {
             let deviceId = DeviceIdentity.persistentUUID
@@ -35,7 +35,7 @@ extension CppBridge {
                 platform: SDKConstants.platform,
                 sdkVersion: SDKConstants.version
             ) else {
-                throw SDKError.general(.validationFailed, "Failed to build auth request")
+                throw SDKException.general(.validationFailed, "Failed to build auth request")
             }
 
             logger.info("Starting authentication...")
@@ -74,20 +74,20 @@ extension CppBridge {
 
         /// Refresh access token
         /// - Returns: New access token
-        /// - Throws: SDKError on failure
+        /// - Throws: SDKException on failure
         @discardableResult
         public static func refreshToken() async throws -> String {
             guard let refreshToken = State.refreshToken else {
-                throw SDKError.authentication(.invalidAPIKey, "No refresh token")
+                throw SDKException.authentication(.invalidApiKey, "No refresh token")
             }
 
             guard let deviceId = State.deviceId else {
-                throw SDKError.authentication(.authenticationFailed, "No device ID")
+                throw SDKException.authentication(.authenticationFailed, "No device ID")
             }
 
             // 1. Build refresh request JSON via C++
             guard let json = buildRefreshRequestJSON(deviceId: deviceId, refreshToken: refreshToken) else {
-                throw SDKError.general(.validationFailed, "Failed to build refresh request")
+                throw SDKException.general(.validationFailed, "Failed to build refresh request")
             }
 
             logger.debug("Refreshing access token...")
@@ -126,7 +126,7 @@ extension CppBridge {
 
         /// Get valid access token (refresh if needed)
         /// - Returns: Valid access token
-        /// - Throws: SDKError if no valid token available
+        /// - Throws: SDKException if no valid token available
         public static func getAccessToken() async throws -> String {
             // Check if current token is valid
             if let token = State.accessToken, !State.tokenNeedsRefresh {
@@ -138,7 +138,7 @@ extension CppBridge {
                 return try await refreshToken()
             }
 
-            throw SDKError.authentication(.authenticationFailed, "No valid token")
+            throw SDKException.authentication(.authenticationFailed, "No valid token")
         }
 
         /// Clear authentication state
@@ -244,12 +244,12 @@ extension CppBridge {
         ///   - statusCode: HTTP status code
         ///   - body: Response body data
         ///   - url: Request URL
-        /// - Returns: SDKError with appropriate category and message
+        /// - Returns: SDKException with appropriate category and message
         public static func parseAPIError(
             statusCode: Int32,
             body: Data?,
             url: String?
-        ) -> SDKError {
+        ) -> SDKException {
             let bodyString = body.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             let urlString = url ?? ""
 
@@ -273,24 +273,24 @@ extension CppBridge {
                 message = "HTTP \(statusCode)"
             }
 
-            // Map status code to SDKError category
+            // Map status code to SDKException category
             switch statusCode {
             case 401:
-                return SDKError.network(.unauthorized, message)
+                return SDKException.network(.unauthorized, message)
             case 403:
-                return SDKError.network(.forbidden, message)
+                return SDKException.network(.forbidden, message)
             case 404:
-                return SDKError.network(.invalidResponse, message)
+                return SDKException.network(.invalidResponse, message)
             case 408, 504:
-                return SDKError.network(.timeout, message)
+                return SDKException.network(.timeout, message)
             case 422:
-                return SDKError.network(.validationFailed, message)
+                return SDKException.network(.validationFailed, message)
             case 400..<500:
-                return SDKError.network(.httpError, "Client error \(statusCode): \(message)")
+                return SDKException.network(.httpError, "Client error \(statusCode): \(message)")
             case 500..<600:
-                return SDKError.network(.serverError, "Server error \(statusCode): \(message)")
+                return SDKException.network(.serverError, "Server error \(statusCode): \(message)")
             default:
-                return SDKError.network(.unknown, "\(message) (status: \(statusCode))")
+                return SDKException.network(.unknown, "\(message) (status: \(statusCode))")
             }
         }
     }

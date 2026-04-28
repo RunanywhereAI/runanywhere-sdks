@@ -66,19 +66,22 @@ class VoiceAgentStreamAdapter internal constructor(
      * handle share a single C callback registration and each receives the
      * full decoded event sequence.
      */
-    fun stream(): Flow<VoiceEvent> = callbackFlow<VoiceEvent> {
-        val fanOut = fanOutFor(handle, bridge)
-        val channel: SendChannel<VoiceEvent> = channel
-        val added = fanOut.attach(channel)
-        if (!added) {
-            close(IllegalStateException(
-                "rac_voice_agent_set_proto_callback failed (Protobuf may not be linked)"
-            ))
-            return@callbackFlow
-        }
+    fun stream(): Flow<VoiceEvent> =
+        callbackFlow<VoiceEvent> {
+            val fanOut = fanOutFor(handle, bridge)
+            val channel: SendChannel<VoiceEvent> = channel
+            val added = fanOut.attach(channel)
+            if (!added) {
+                close(
+                    IllegalStateException(
+                        "rac_voice_agent_set_proto_callback failed (Protobuf may not be linked)",
+                    ),
+                )
+                return@callbackFlow
+            }
 
-        awaitClose { fanOut.detach(channel) }
-    }
+            awaitClose { fanOut.detach(channel) }
+        }
 
     /**
      * SPI seam that lets tests substitute a fake producer in place of the
@@ -149,14 +152,15 @@ class VoiceAgentStreamAdapter internal constructor(
         internal fun isRegistered(): Boolean = callbackId != INVALID_CALLBACK_ID
 
         private fun broadcast(bytes: ByteArray) {
-            val event = try {
-                VoiceEvent.ADAPTER.decode(bytes)
-            } catch (t: Throwable) {
-                // Malformed frame: close each collector with the decode error.
-                // Broadcasting garbage is worse than surfacing the failure.
-                for (c in collectors) c.close(t)
-                return
-            }
+            val event =
+                try {
+                    VoiceEvent.ADAPTER.decode(bytes)
+                } catch (t: Throwable) {
+                    // Malformed frame: close each collector with the decode error.
+                    // Broadcasting garbage is worse than surfacing the failure.
+                    for (c in collectors) c.close(t)
+                    return
+                }
             // Each channel enforces its own backpressure policy (DROP_OLDEST
             // with capacity 64); a slow collector never blocks the C++
             // dispatcher or starves its peers.

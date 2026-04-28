@@ -13,9 +13,10 @@ const workspaceRoot = path.resolve(__dir, '../../..');
 const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
 const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm/sherpa');
 
-// proto-ts package.json lacks an `exports` field, so Vite cannot resolve
-// subpath imports like `@runanywhere/proto-ts/llm_service` to dist/llm_service.js.
-// Map subpath imports to source files explicitly during dev.
+// proto-ts package.json has an `exports` field (./* → ./dist/*) so Node/Vite
+// can resolve subpath imports like `@runanywhere/proto-ts/llm_service` natively.
+// Phase C-prime: alias kept as a belt-and-suspenders fallback for the rare
+// edge cases where the workspace symlink isn't visible to the bundler.
 const protoTsDist = path.resolve(workspaceRoot, 'sdk/runanywhere-proto-ts/dist');
 
 /**

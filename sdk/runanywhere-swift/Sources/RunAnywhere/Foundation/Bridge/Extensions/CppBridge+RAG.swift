@@ -38,7 +38,7 @@ extension CppBridge {
             var newPipeline: OpaquePointer?
             let result = rac_rag_pipeline_create_standalone(&mutableConfig, &newPipeline)
             guard result == RAC_SUCCESS, let newPipeline else {
-                throw SDKError.rag(.notInitialized, "Failed to create RAG pipeline: \(result)")
+                throw SDKException.rag(.notInitialized, "Failed to create RAG pipeline: \(result)")
             }
             self.pipeline = newPipeline
             logger.debug("RAG pipeline created")
@@ -72,7 +72,7 @@ extension CppBridge {
         /// The document will be split into chunks, embedded, and indexed.
         public func addDocument(text: String, metadataJSON: String?) throws {
             guard let pipeline else {
-                throw SDKError.rag(.notInitialized, "RAG pipeline not created")
+                throw SDKException.rag(.notInitialized, "RAG pipeline not created")
             }
             let result: rac_result_t
             if let metadataJSON {
@@ -87,18 +87,18 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKError.rag(.invalidInput, "Failed to add document to RAG pipeline: \(result)")
+                throw SDKException.rag(.invalidInput, "Failed to add document to RAG pipeline: \(result)")
             }
         }
 
         /// Clear all documents from the pipeline
         public func clearDocuments() throws {
             guard let pipeline else {
-                throw SDKError.rag(.notInitialized, "RAG pipeline not created")
+                throw SDKException.rag(.notInitialized, "RAG pipeline not created")
             }
             let result = rac_rag_clear_documents(pipeline)
             guard result == RAC_SUCCESS else {
-                throw SDKError.rag(.invalidState, "Failed to clear RAG documents: \(result)")
+                throw SDKException.rag(.invalidState, "Failed to clear RAG documents: \(result)")
             }
         }
 
@@ -116,13 +116,13 @@ extension CppBridge {
         /// Caller is responsible for calling rac_rag_result_free on the returned result.
         public func query(_ ragQuery: rac_rag_query_t) throws -> rac_rag_result_t {
             guard let pipeline else {
-                throw SDKError.rag(.notInitialized, "RAG pipeline not created")
+                throw SDKException.rag(.notInitialized, "RAG pipeline not created")
             }
             var mutableQuery = ragQuery
             var result = rac_rag_result_t()
             let status = rac_rag_query(pipeline, &mutableQuery, &result)
             guard status == RAC_SUCCESS else {
-                throw SDKError.rag(.generationFailed, "RAG query failed: \(status)")
+                throw SDKException.rag(.generationFailed, "RAG query failed: \(status)")
             }
             return result
         }

@@ -49,9 +49,9 @@ expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
  * v3.1: Call before constructing a VoiceAgentStreamAdapter. In the
  * but can be called explicitly for more control.
  *
- * @throws SDKError if SDK is not initialized
- * @throws SDKError if any component models are not loaded
- * @throws SDKError if VoiceAgent initialization fails
+ * @throws SDKException if SDK is not initialized
+ * @throws SDKException if any component models are not loaded
+ * @throws SDKException if VoiceAgent initialization fails
  */
 expect suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
 

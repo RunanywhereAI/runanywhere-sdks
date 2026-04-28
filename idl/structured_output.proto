@@ -1,0 +1,286 @@
+// RunAnywhere IDL — structured output / JSON schema / NLP result types.
+//
+// Every message and enum below is the *union* of cases currently declared by
+// hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
+// drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is what
+// motivated this schema. Every SDK consumes generated output; nothing is
+// hand-written.
+//
+// Pre-IDL drift snapshot for structured output:
+//   Swift  LLMTypes.swift:533           StructuredOutputConfig (Generatable.Type +
+//                                       includeSchemaInPrompt)
+//   Swift  LLMTypes.swift:585           StructuredOutputValidation
+//                                       (isValid, containsJSON, error)
+//   Kotlin LLMTypes.kt:242              StructuredOutputConfig (typeName, schema,
+//                                       includeSchemaInPrompt) — string-typed
+//   Kotlin LLMTypes.kt:278              StructuredOutputValidation
+//                                       (isValid, containsJSON, error)
+//   Dart   structured_output_types.dart StructuredOutputConfig (typeName, schema,
+//                                       includeSchemaInPrompt, name, strict)
+//   Dart   structured_output_types.dart StructuredOutputResult<T>
+//                                       (result, rawText, metrics)
+//   RN     StructuredOutputTypes.ts     Most exhaustive — JSONSchema /
+//                                       JSONSchemaProperty / EntityExtraction /
+//                                       Classification / Sentiment / NER
+//   Web    LLMTypes.ts                  structuredOutput field reserved
+//                                       (delegates to llamacpp pkg)
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "StructuredOutputProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// JSON Schema primitive type — union across SDKs.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:12     ('string'|'number'|'integer'|
+//                                        'boolean'|'object'|'array'|'null')
+//   Web (delegates to llamacpp pkg; no own enum)
+//   Swift / Kotlin / Dart represent schema as a serialized JSON string today,
+//     so this enum canonicalizes the RN-defined union.
+// ---------------------------------------------------------------------------
+enum JSONSchemaType {
+    JSON_SCHEMA_TYPE_UNSPECIFIED = 0;
+    JSON_SCHEMA_TYPE_OBJECT      = 1;
+    JSON_SCHEMA_TYPE_ARRAY       = 2;
+    JSON_SCHEMA_TYPE_STRING      = 3;
+    JSON_SCHEMA_TYPE_NUMBER      = 4;
+    JSON_SCHEMA_TYPE_INTEGER     = 5;
+    JSON_SCHEMA_TYPE_BOOLEAN     = 6;
+    JSON_SCHEMA_TYPE_NULL        = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Sentiment label — union across SDKs.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:131    ('positive'|'negative'|'neutral')
+//   (Other SDKs do not yet define a Sentiment type; MIXED is added for
+//    completeness — common in industry sentiment APIs.)
+// ---------------------------------------------------------------------------
+enum Sentiment {
+    SENTIMENT_UNSPECIFIED = 0;
+    SENTIMENT_POSITIVE    = 1;
+    SENTIMENT_NEGATIVE    = 2;
+    SENTIMENT_NEUTRAL     = 3;
+    SENTIMENT_MIXED       = 4;
+}
+
+// ---------------------------------------------------------------------------
+// JSON Schema property — describes a single property within a schema.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:24     JSONSchemaProperty (type, description,
+//                                       enum, format, items, properties, …)
+//
+// proto3 does not allow direct self-referential message fields without
+// `optional` / explicit handle. Recursion is expressed via:
+//   - `items_schema`     — for array element types       (handle to JSONSchema)
+//   - `object_schema`    — for nested object types       (handle to JSONSchema)
+// Deeper recursion (a property whose items are themselves objects with
+// further nested properties) is represented by repeating the same indirection
+// inside the referenced JSONSchema. Very deep schemas are uncommon and
+// supported by chaining these handles.
+// ---------------------------------------------------------------------------
+message JSONSchemaProperty {
+    // Primitive / composite type for this property.
+    JSONSchemaType  type             = 1;
+
+    // Human-readable description (`description` in JSON Schema).
+    optional string description      = 2;
+
+    // Allowed enum values (`enum` in JSON Schema). Strings only; numeric and
+    // boolean enums are rare and serialized as strings here.
+    repeated string enum_values      = 3;
+
+    // String format hint (`format` in JSON Schema): "email", "uri",
+    // "date-time", etc.
+    optional string format           = 4;
+
+    // Element schema when `type == JSON_SCHEMA_TYPE_ARRAY`.
+    optional JSONSchema items_schema = 5;
+
+    // Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`.
+    optional JSONSchema object_schema = 6;
+}
+
+// ---------------------------------------------------------------------------
+// JSON Schema definition — top-level schema for structured output.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:59     JSONSchema (extends JSONSchemaProperty
+//                                       with $schema, $id, title, definitions,
+//                                       $ref, allOf/anyOf/oneOf/not)
+// ---------------------------------------------------------------------------
+message JSONSchema {
+    // Root type for this schema (commonly OBJECT or ARRAY).
+    JSONSchemaType                       type                  = 1;
+
+    // Map of property name -> property definition.
+    map<string, JSONSchemaProperty>      properties            = 2;
+
+    // Names of required properties (`required` in JSON Schema).
+    repeated string                      required              = 3;
+
+    // Element schema when the root `type == JSON_SCHEMA_TYPE_ARRAY`.
+    optional JSONSchemaProperty          items                 = 4;
+
+    // Whether properties not declared in `properties` are allowed.
+    optional bool                        additional_properties = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Structured output options — request-side configuration for a structured
+// generation call. Wraps a JSONSchema plus generation flags.
+// Sources pre-IDL:
+//   Swift  LLMTypes.swift:533           StructuredOutputConfig
+//   Kotlin LLMTypes.kt:242              StructuredOutputConfig
+//   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
+//   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
+// ---------------------------------------------------------------------------
+message StructuredOutputOptions {
+    // Schema describing the desired output shape.
+    JSONSchema     schema                   = 1;
+
+    // Whether to embed the schema text in the LLM prompt.
+    bool           include_schema_in_prompt = 2;
+
+    // Strict schema adherence — rejects outputs that don't fully validate.
+    optional bool  strict_mode              = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Structured output validation result — populated after the model returns.
+// Sources pre-IDL:
+//   Swift  LLMTypes.swift:585           StructuredOutputValidation
+//   Kotlin LLMTypes.kt:278              StructuredOutputValidation
+//   Dart   structured_output_types.dart StructuredOutputValidation
+// ---------------------------------------------------------------------------
+message StructuredOutputValidation {
+    // Whether the parsed output validates against the requested schema.
+    bool            is_valid       = 1;
+
+    // Whether the raw text contained any parseable JSON object.
+    bool            contains_json  = 2;
+
+    // Validation / parse error message when `is_valid == false`.
+    optional string error_message  = 3;
+
+    // Original raw model output (for debugging / fallback parsing).
+    optional string raw_output     = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Structured output result — generic envelope returned by structured calls.
+// `parsed_json` is a UTF-8 JSON-encoded byte payload to keep the result
+// language-agnostic; SDKs deserialize into their concrete typed value.
+// Sources pre-IDL:
+//   RN     StructuredOutputTypes.ts:93  StructuredOutputResult<T> (data, raw,
+//                                       success, error)
+//   Dart   structured_output_types.dart StructuredOutputResult<T> (result,
+//                                       rawText, metrics)
+// ---------------------------------------------------------------------------
+message StructuredOutputResult {
+    // JSON-encoded parsed value (UTF-8 bytes).
+    bytes                       parsed_json = 1;
+
+    // Validation / parse outcome.
+    StructuredOutputValidation  validation  = 2;
+
+    // Raw model text prior to parsing (optional, useful for retries).
+    optional string             raw_text    = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Named entity — single span identified within input text.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:143    NamedEntity (text, type, startOffset,
+//                                       endOffset, confidence)
+// ---------------------------------------------------------------------------
+message NamedEntity {
+    // Surface form of the entity exactly as it appeared in input.
+    string text         = 1;
+
+    // Entity class label, e.g. "PERSON", "ORG", "LOCATION".
+    string entity_type  = 2;
+
+    // UTF-16 / character start offset (inclusive) within input text.
+    int32  start_offset = 3;
+
+    // UTF-16 / character end offset (exclusive) within input text.
+    int32  end_offset   = 4;
+
+    // Model confidence in [0.0, 1.0].
+    float  confidence   = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Entity extraction result — list of entities pulled from a document.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:110    EntityExtractionResult<T>
+//                                       (entities, confidence)
+// Note: RN's per-result `confidence` is dropped in favor of per-entity
+// confidence on `NamedEntity`, which is the more granular and useful form.
+// ---------------------------------------------------------------------------
+message EntityExtractionResult {
+    repeated NamedEntity entities = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Classification candidate — alternative label considered.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:118    ClassificationResult.alternatives item
+// ---------------------------------------------------------------------------
+message ClassificationCandidate {
+    string label      = 1;
+    float  confidence = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Classification result — top label plus optional alternatives.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:118    ClassificationResult (category,
+//                                       confidence, alternatives)
+// Note: RN names the field `category`; canonicalized here to `label`, which
+// matches industry classifier APIs (HuggingFace, OpenAI, etc.).
+// ---------------------------------------------------------------------------
+message ClassificationResult {
+    string                            label        = 1;
+    float                             confidence   = 2;
+    repeated ClassificationCandidate  alternatives = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Sentiment analysis result — overall sentiment plus per-class scores.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:130    SentimentResult (sentiment, score,
+//                                       aspects)
+// ---------------------------------------------------------------------------
+message SentimentResult {
+    Sentiment        sentiment       = 1;
+
+    // Aggregate confidence in the chosen sentiment label, [0.0, 1.0].
+    float            confidence      = 2;
+
+    // Per-class soft scores (optional). Absent fields are unscored.
+    optional float   positive_score  = 3;
+    optional float   negative_score  = 4;
+    optional float   neutral_score   = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Named entity recognition result — alias-style wrapper carrying entities.
+// Equivalent in shape to `EntityExtractionResult`; both are kept so SDKs that
+// distinguish "extraction" (instruction-driven) from "NER" (model-native)
+// can route to the appropriate type without ambiguity.
+// Sources pre-IDL:
+//   RN  StructuredOutputTypes.ts:154    NERResult (entities)
+// ---------------------------------------------------------------------------
+message NERResult {
+    repeated NamedEntity entities = 1;
+}

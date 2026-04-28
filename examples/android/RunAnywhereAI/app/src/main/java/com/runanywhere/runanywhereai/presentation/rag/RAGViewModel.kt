@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.services.DocumentService
 import com.runanywhere.runanywhereai.domain.services.DocumentServiceError
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.RAG.RAGConfiguration
+import ai.runanywhere.proto.v1.RAGConfiguration
 import com.runanywhere.sdk.public.extensions.ragCreatePipeline
 import com.runanywhere.sdk.public.extensions.ragDestroyPipeline
 import com.runanywhere.sdk.public.extensions.ragIngest
@@ -183,7 +183,7 @@ class RAGViewModel : ViewModel() {
                 val result = RunAnywhere.ragQuery(question = question)
 
                 val answerWithTiming = "${result.answer}\n\nAnswer generated in ${
-                    String.format("%.1f", result.totalTimeMs / 1000.0)
+                    String.format("%.1f", result.total_time_ms / 1000.0)
                 }s"
 
                 _uiState.update {
@@ -196,7 +196,7 @@ class RAGViewModel : ViewModel() {
                                 ),
                     )
                 }
-                Timber.i("Query complete (${result.totalTimeMs}ms)")
+                Timber.i("Query complete (${result.total_time_ms}ms)")
             } catch (e: Exception) {
                 Timber.e(e, "Query failed: ${e.message}")
                 val errorText = "Error: ${e.message ?: "Query failed"}"

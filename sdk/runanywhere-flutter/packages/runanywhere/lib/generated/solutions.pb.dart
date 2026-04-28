@@ -1,17 +1,13 @@
-//
+///
 //  Generated code. Do not modify.
 //  source: solutions.proto
 //
 // @dart = 2.12
-
-// ignore_for_file: always_use_package_imports
-// ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
 
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'solutions.pbenum.dart';
@@ -27,37 +23,7 @@ enum SolutionConfig_Config {
   notSet
 }
 
-/// Top-level union dispatched to the matching solution loader.
 class SolutionConfig extends $pb.GeneratedMessage {
-  factory SolutionConfig({
-    VoiceAgentConfig? voiceAgent,
-    RAGConfig? rag,
-    WakeWordConfig? wakeWord,
-    AgentLoopConfig? agentLoop,
-    TimeSeriesConfig? timeSeries,
-  }) {
-    final $result = create();
-    if (voiceAgent != null) {
-      $result.voiceAgent = voiceAgent;
-    }
-    if (rag != null) {
-      $result.rag = rag;
-    }
-    if (wakeWord != null) {
-      $result.wakeWord = wakeWord;
-    }
-    if (agentLoop != null) {
-      $result.agentLoop = agentLoop;
-    }
-    if (timeSeries != null) {
-      $result.timeSeries = timeSeries;
-    }
-    return $result;
-  }
-  SolutionConfig._() : super();
-  factory SolutionConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory SolutionConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
   static const $core.Map<$core.int, SolutionConfig_Config> _SolutionConfig_ConfigByTag = {
     1 : SolutionConfig_Config.voiceAgent,
     2 : SolutionConfig_Config.rag,
@@ -66,16 +32,44 @@ class SolutionConfig extends $pb.GeneratedMessage {
     5 : SolutionConfig_Config.timeSeries,
     0 : SolutionConfig_Config.notSet
   };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SolutionConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'SolutionConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..oo(0, [1, 2, 3, 4, 5])
-    ..aOM<VoiceAgentConfig>(1, _omitFieldNames ? '' : 'voiceAgent', subBuilder: VoiceAgentConfig.create)
-    ..aOM<RAGConfig>(2, _omitFieldNames ? '' : 'rag', subBuilder: RAGConfig.create)
-    ..aOM<WakeWordConfig>(3, _omitFieldNames ? '' : 'wakeWord', subBuilder: WakeWordConfig.create)
-    ..aOM<AgentLoopConfig>(4, _omitFieldNames ? '' : 'agentLoop', subBuilder: AgentLoopConfig.create)
-    ..aOM<TimeSeriesConfig>(5, _omitFieldNames ? '' : 'timeSeries', subBuilder: TimeSeriesConfig.create)
+    ..aOM<VoiceAgentConfig>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'voiceAgent', subBuilder: VoiceAgentConfig.create)
+    ..aOM<RAGConfig>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rag', subBuilder: RAGConfig.create)
+    ..aOM<WakeWordConfig>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakeWord', subBuilder: WakeWordConfig.create)
+    ..aOM<AgentLoopConfig>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'agentLoop', subBuilder: AgentLoopConfig.create)
+    ..aOM<TimeSeriesConfig>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'timeSeries', subBuilder: TimeSeriesConfig.create)
     ..hasRequiredFields = false
   ;
 
+  SolutionConfig._() : super();
+  factory SolutionConfig({
+    VoiceAgentConfig? voiceAgent,
+    RAGConfig? rag,
+    WakeWordConfig? wakeWord,
+    AgentLoopConfig? agentLoop,
+    TimeSeriesConfig? timeSeries,
+  }) {
+    final _result = create();
+    if (voiceAgent != null) {
+      _result.voiceAgent = voiceAgent;
+    }
+    if (rag != null) {
+      _result.rag = rag;
+    }
+    if (wakeWord != null) {
+      _result.wakeWord = wakeWord;
+    }
+    if (agentLoop != null) {
+      _result.agentLoop = agentLoop;
+    }
+    if (timeSeries != null) {
+      _result.timeSeries = timeSeries;
+    }
+    return _result;
+  }
+  factory SolutionConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SolutionConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -85,10 +79,8 @@ class SolutionConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  SolutionConfig copyWith(void Function(SolutionConfig) updates) => super.copyWith((message) => updates(message as SolutionConfig)) as SolutionConfig;
-
+  SolutionConfig copyWith(void Function(SolutionConfig) updates) => super.copyWith((message) => updates(message as SolutionConfig)) as SolutionConfig; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static SolutionConfig create() => SolutionConfig._();
   SolutionConfig createEmptyInstance() => create();
@@ -156,10 +148,117 @@ class SolutionConfig extends $pb.GeneratedMessage {
   TimeSeriesConfig ensureTimeSeries() => $_ensure(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// VoiceAgent — the canonical streaming voice AI loop.
-/// ---------------------------------------------------------------------------
+class SolutionHandle extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'SolutionHandle', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'handleId')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'solutionType')
+    ..aInt64(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'createdAtMs')
+    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'state')
+    ..hasRequiredFields = false
+  ;
+
+  SolutionHandle._() : super();
+  factory SolutionHandle({
+    $core.String? handleId,
+    $core.String? solutionType,
+    $fixnum.Int64? createdAtMs,
+    $core.String? state,
+  }) {
+    final _result = create();
+    if (handleId != null) {
+      _result.handleId = handleId;
+    }
+    if (solutionType != null) {
+      _result.solutionType = solutionType;
+    }
+    if (createdAtMs != null) {
+      _result.createdAtMs = createdAtMs;
+    }
+    if (state != null) {
+      _result.state = state;
+    }
+    return _result;
+  }
+  factory SolutionHandle.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SolutionHandle.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SolutionHandle clone() => SolutionHandle()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SolutionHandle copyWith(void Function(SolutionHandle) updates) => super.copyWith((message) => updates(message as SolutionHandle)) as SolutionHandle; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static SolutionHandle create() => SolutionHandle._();
+  SolutionHandle createEmptyInstance() => create();
+  static $pb.PbList<SolutionHandle> createRepeated() => $pb.PbList<SolutionHandle>();
+  @$core.pragma('dart2js:noInline')
+  static SolutionHandle getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SolutionHandle>(create);
+  static SolutionHandle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get handleId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set handleId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandleId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandleId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get solutionType => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set solutionType($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasSolutionType() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSolutionType() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get createdAtMs => $_getI64(2);
+  @$pb.TagNumber(3)
+  set createdAtMs($fixnum.Int64 v) { $_setInt64(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasCreatedAtMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCreatedAtMs() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get state => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set state($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasState() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearState() => clearField(4);
+}
+
 class VoiceAgentConfig extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceAgentConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelId')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sttModelId')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ttsModelId')
+    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vadModelId')
+    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
+    ..a<$core.int>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'chunkMs', $pb.PbFieldType.O3)
+    ..e<AudioSource>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioSource', $pb.PbFieldType.OE, defaultOrMaker: AudioSource.AUDIO_SOURCE_UNSPECIFIED, valueOf: AudioSource.valueOf, enumValues: AudioSource.values)
+    ..aOB(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'enableBargeIn')
+    ..a<$core.int>(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'bargeInThresholdMs', $pb.PbFieldType.O3)
+    ..aOS(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'systemPrompt')
+    ..a<$core.int>(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxContextTokens', $pb.PbFieldType.O3)
+    ..a<$core.double>(12, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'temperature', $pb.PbFieldType.OF)
+    ..aOB(13, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'emitPartials')
+    ..aOB(14, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'emitThoughts')
+    ..aOS(15, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioFilePath')
+    ..e<SolutionType>(16, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'typeKind', $pb.PbFieldType.OE, defaultOrMaker: SolutionType.SOLUTION_TYPE_UNSPECIFIED, valueOf: SolutionType.valueOf, enumValues: SolutionType.values)
+    ..hasRequiredFields = false
+  ;
+
+  VoiceAgentConfig._() : super();
   factory VoiceAgentConfig({
     $core.String? llmModelId,
     $core.String? sttModelId,
@@ -176,78 +275,61 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     $core.bool? emitPartials,
     $core.bool? emitThoughts,
     $core.String? audioFilePath,
+    SolutionType? typeKind,
   }) {
-    final $result = create();
+    final _result = create();
     if (llmModelId != null) {
-      $result.llmModelId = llmModelId;
+      _result.llmModelId = llmModelId;
     }
     if (sttModelId != null) {
-      $result.sttModelId = sttModelId;
+      _result.sttModelId = sttModelId;
     }
     if (ttsModelId != null) {
-      $result.ttsModelId = ttsModelId;
+      _result.ttsModelId = ttsModelId;
     }
     if (vadModelId != null) {
-      $result.vadModelId = vadModelId;
+      _result.vadModelId = vadModelId;
     }
     if (sampleRateHz != null) {
-      $result.sampleRateHz = sampleRateHz;
+      _result.sampleRateHz = sampleRateHz;
     }
     if (chunkMs != null) {
-      $result.chunkMs = chunkMs;
+      _result.chunkMs = chunkMs;
     }
     if (audioSource != null) {
-      $result.audioSource = audioSource;
+      _result.audioSource = audioSource;
     }
     if (enableBargeIn != null) {
-      $result.enableBargeIn = enableBargeIn;
+      _result.enableBargeIn = enableBargeIn;
     }
     if (bargeInThresholdMs != null) {
-      $result.bargeInThresholdMs = bargeInThresholdMs;
+      _result.bargeInThresholdMs = bargeInThresholdMs;
     }
     if (systemPrompt != null) {
-      $result.systemPrompt = systemPrompt;
+      _result.systemPrompt = systemPrompt;
     }
     if (maxContextTokens != null) {
-      $result.maxContextTokens = maxContextTokens;
+      _result.maxContextTokens = maxContextTokens;
     }
     if (temperature != null) {
-      $result.temperature = temperature;
+      _result.temperature = temperature;
     }
     if (emitPartials != null) {
-      $result.emitPartials = emitPartials;
+      _result.emitPartials = emitPartials;
     }
     if (emitThoughts != null) {
-      $result.emitThoughts = emitThoughts;
+      _result.emitThoughts = emitThoughts;
     }
     if (audioFilePath != null) {
-      $result.audioFilePath = audioFilePath;
+      _result.audioFilePath = audioFilePath;
     }
-    return $result;
+    if (typeKind != null) {
+      _result.typeKind = typeKind;
+    }
+    return _result;
   }
-  VoiceAgentConfig._() : super();
   factory VoiceAgentConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VoiceAgentConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'llmModelId')
-    ..aOS(2, _omitFieldNames ? '' : 'sttModelId')
-    ..aOS(3, _omitFieldNames ? '' : 'ttsModelId')
-    ..aOS(4, _omitFieldNames ? '' : 'vadModelId')
-    ..a<$core.int>(5, _omitFieldNames ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
-    ..a<$core.int>(6, _omitFieldNames ? '' : 'chunkMs', $pb.PbFieldType.O3)
-    ..e<AudioSource>(7, _omitFieldNames ? '' : 'audioSource', $pb.PbFieldType.OE, defaultOrMaker: AudioSource.AUDIO_SOURCE_UNSPECIFIED, valueOf: AudioSource.valueOf, enumValues: AudioSource.values)
-    ..aOB(8, _omitFieldNames ? '' : 'enableBargeIn')
-    ..a<$core.int>(9, _omitFieldNames ? '' : 'bargeInThresholdMs', $pb.PbFieldType.O3)
-    ..aOS(10, _omitFieldNames ? '' : 'systemPrompt')
-    ..a<$core.int>(11, _omitFieldNames ? '' : 'maxContextTokens', $pb.PbFieldType.O3)
-    ..a<$core.double>(12, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
-    ..aOB(13, _omitFieldNames ? '' : 'emitPartials')
-    ..aOB(14, _omitFieldNames ? '' : 'emitThoughts')
-    ..aOS(15, _omitFieldNames ? '' : 'audioFilePath')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -257,10 +339,8 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VoiceAgentConfig copyWith(void Function(VoiceAgentConfig) updates) => super.copyWith((message) => updates(message as VoiceAgentConfig)) as VoiceAgentConfig;
-
+  VoiceAgentConfig copyWith(void Function(VoiceAgentConfig) updates) => super.copyWith((message) => updates(message as VoiceAgentConfig)) as VoiceAgentConfig; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static VoiceAgentConfig create() => VoiceAgentConfig._();
   VoiceAgentConfig createEmptyInstance() => create();
@@ -269,7 +349,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   static VoiceAgentConfig getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentConfig>(create);
   static VoiceAgentConfig? _defaultInstance;
 
-  /// Model identifiers — resolved against the model registry.
   @$pb.TagNumber(1)
   $core.String get llmModelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -306,7 +385,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearVadModelId() => clearField(4);
 
-  /// Audio configuration.
   @$pb.TagNumber(5)
   $core.int get sampleRateHz => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -334,7 +412,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearAudioSource() => clearField(7);
 
-  /// Barge-in behavior.
   @$pb.TagNumber(8)
   $core.bool get enableBargeIn => $_getBF(7);
   @$pb.TagNumber(8)
@@ -353,7 +430,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearBargeInThresholdMs() => clearField(9);
 
-  /// LLM behavior.
   @$pb.TagNumber(10)
   $core.String get systemPrompt => $_getSZ(9);
   @$pb.TagNumber(10)
@@ -381,7 +457,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearTemperature() => clearField(12);
 
-  /// Emit partial transcripts as UserSaidEvent{is_final=false}.
   @$pb.TagNumber(13)
   $core.bool get emitPartials => $_getBF(12);
   @$pb.TagNumber(13)
@@ -391,7 +466,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearEmitPartials() => clearField(13);
 
-  /// Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
   @$pb.TagNumber(14)
   $core.bool get emitThoughts => $_getBF(13);
   @$pb.TagNumber(14)
@@ -401,8 +475,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   void clearEmitThoughts() => clearField(14);
 
-  /// Absolute path to an audio file. Required when `audio_source` is
-  /// `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
   @$pb.TagNumber(15)
   $core.String get audioFilePath => $_getSZ(14);
   @$pb.TagNumber(15)
@@ -411,12 +483,35 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   $core.bool hasAudioFilePath() => $_has(14);
   @$pb.TagNumber(15)
   void clearAudioFilePath() => clearField(15);
+
+  @$pb.TagNumber(16)
+  SolutionType get typeKind => $_getN(15);
+  @$pb.TagNumber(16)
+  set typeKind(SolutionType v) { setField(16, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasTypeKind() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearTypeKind() => clearField(16);
 }
 
-/// ---------------------------------------------------------------------------
-/// RAG — retrieve → rerank → prompt → LLM.
-/// ---------------------------------------------------------------------------
 class RAGConfig extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'RAGConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'embedModelId')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rerankModelId')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelId')
+    ..e<VectorStore>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vectorStore', $pb.PbFieldType.OE, defaultOrMaker: VectorStore.VECTOR_STORE_UNSPECIFIED, valueOf: VectorStore.valueOf, enumValues: VectorStore.values)
+    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vectorStorePath')
+    ..a<$core.int>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'retrieveK', $pb.PbFieldType.O3)
+    ..a<$core.int>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rerankTop', $pb.PbFieldType.O3)
+    ..a<$core.double>(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'bm25K1', $pb.PbFieldType.OF)
+    ..a<$core.double>(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'bm25B', $pb.PbFieldType.OF)
+    ..a<$core.int>(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rrfK', $pb.PbFieldType.O3)
+    ..aOS(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'promptTemplate')
+    ..e<SolutionType>(12, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'typeKind', $pb.PbFieldType.OE, defaultOrMaker: SolutionType.SOLUTION_TYPE_UNSPECIFIED, valueOf: SolutionType.valueOf, enumValues: SolutionType.values)
+    ..hasRequiredFields = false
+  ;
+
+  RAGConfig._() : super();
   factory RAGConfig({
     $core.String? embedModelId,
     $core.String? rerankModelId,
@@ -429,62 +524,49 @@ class RAGConfig extends $pb.GeneratedMessage {
     $core.double? bm25B,
     $core.int? rrfK,
     $core.String? promptTemplate,
+    SolutionType? typeKind,
   }) {
-    final $result = create();
+    final _result = create();
     if (embedModelId != null) {
-      $result.embedModelId = embedModelId;
+      _result.embedModelId = embedModelId;
     }
     if (rerankModelId != null) {
-      $result.rerankModelId = rerankModelId;
+      _result.rerankModelId = rerankModelId;
     }
     if (llmModelId != null) {
-      $result.llmModelId = llmModelId;
+      _result.llmModelId = llmModelId;
     }
     if (vectorStore != null) {
-      $result.vectorStore = vectorStore;
+      _result.vectorStore = vectorStore;
     }
     if (vectorStorePath != null) {
-      $result.vectorStorePath = vectorStorePath;
+      _result.vectorStorePath = vectorStorePath;
     }
     if (retrieveK != null) {
-      $result.retrieveK = retrieveK;
+      _result.retrieveK = retrieveK;
     }
     if (rerankTop != null) {
-      $result.rerankTop = rerankTop;
+      _result.rerankTop = rerankTop;
     }
     if (bm25K1 != null) {
-      $result.bm25K1 = bm25K1;
+      _result.bm25K1 = bm25K1;
     }
     if (bm25B != null) {
-      $result.bm25B = bm25B;
+      _result.bm25B = bm25B;
     }
     if (rrfK != null) {
-      $result.rrfK = rrfK;
+      _result.rrfK = rrfK;
     }
     if (promptTemplate != null) {
-      $result.promptTemplate = promptTemplate;
+      _result.promptTemplate = promptTemplate;
     }
-    return $result;
+    if (typeKind != null) {
+      _result.typeKind = typeKind;
+    }
+    return _result;
   }
-  RAGConfig._() : super();
   factory RAGConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory RAGConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'embedModelId')
-    ..aOS(2, _omitFieldNames ? '' : 'rerankModelId')
-    ..aOS(3, _omitFieldNames ? '' : 'llmModelId')
-    ..e<VectorStore>(4, _omitFieldNames ? '' : 'vectorStore', $pb.PbFieldType.OE, defaultOrMaker: VectorStore.VECTOR_STORE_UNSPECIFIED, valueOf: VectorStore.valueOf, enumValues: VectorStore.values)
-    ..aOS(5, _omitFieldNames ? '' : 'vectorStorePath')
-    ..a<$core.int>(6, _omitFieldNames ? '' : 'retrieveK', $pb.PbFieldType.O3)
-    ..a<$core.int>(7, _omitFieldNames ? '' : 'rerankTop', $pb.PbFieldType.O3)
-    ..a<$core.double>(8, _omitFieldNames ? '' : 'bm25K1', $pb.PbFieldType.OF)
-    ..a<$core.double>(9, _omitFieldNames ? '' : 'bm25B', $pb.PbFieldType.OF)
-    ..a<$core.int>(10, _omitFieldNames ? '' : 'rrfK', $pb.PbFieldType.O3)
-    ..aOS(11, _omitFieldNames ? '' : 'promptTemplate')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -494,10 +576,8 @@ class RAGConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  RAGConfig copyWith(void Function(RAGConfig) updates) => super.copyWith((message) => updates(message as RAGConfig)) as RAGConfig;
-
+  RAGConfig copyWith(void Function(RAGConfig) updates) => super.copyWith((message) => updates(message as RAGConfig)) as RAGConfig; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static RAGConfig create() => RAGConfig._();
   RAGConfig createEmptyInstance() => create();
@@ -533,7 +613,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearLlmModelId() => clearField(3);
 
-  /// Vector store — USearch (in-process HNSW, default) or remote pgvector.
   @$pb.TagNumber(4)
   VectorStore get vectorStore => $_getN(3);
   @$pb.TagNumber(4)
@@ -570,7 +649,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearRerankTop() => clearField(7);
 
-  /// BM25 parameters.
   @$pb.TagNumber(8)
   $core.double get bm25K1 => $_getN(7);
   @$pb.TagNumber(8)
@@ -589,7 +667,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearBm25B() => clearField(9);
 
-  /// RRF fusion parameter.
   @$pb.TagNumber(10)
   $core.int get rrfK => $_getIZ(9);
   @$pb.TagNumber(10)
@@ -599,7 +676,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearRrfK() => clearField(10);
 
-  /// Prompt template. Supports {{context}} and {{query}} placeholders.
   @$pb.TagNumber(11)
   $core.String get promptTemplate => $_getSZ(10);
   @$pb.TagNumber(11)
@@ -608,50 +684,60 @@ class RAGConfig extends $pb.GeneratedMessage {
   $core.bool hasPromptTemplate() => $_has(10);
   @$pb.TagNumber(11)
   void clearPromptTemplate() => clearField(11);
+
+  @$pb.TagNumber(12)
+  SolutionType get typeKind => $_getN(11);
+  @$pb.TagNumber(12)
+  set typeKind(SolutionType v) { setField(12, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasTypeKind() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTypeKind() => clearField(12);
 }
 
-/// ---------------------------------------------------------------------------
-/// Wake word — always-on listener that emits a pulse on keyword detection.
-/// ---------------------------------------------------------------------------
 class WakeWordConfig extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'WakeWordConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'modelId')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'keyword')
+    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'threshold', $pb.PbFieldType.OF)
+    ..a<$core.int>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'preRollMs', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
+    ..e<SolutionType>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'typeKind', $pb.PbFieldType.OE, defaultOrMaker: SolutionType.SOLUTION_TYPE_UNSPECIFIED, valueOf: SolutionType.valueOf, enumValues: SolutionType.values)
+    ..hasRequiredFields = false
+  ;
+
+  WakeWordConfig._() : super();
   factory WakeWordConfig({
     $core.String? modelId,
     $core.String? keyword,
     $core.double? threshold,
     $core.int? preRollMs,
     $core.int? sampleRateHz,
+    SolutionType? typeKind,
   }) {
-    final $result = create();
+    final _result = create();
     if (modelId != null) {
-      $result.modelId = modelId;
+      _result.modelId = modelId;
     }
     if (keyword != null) {
-      $result.keyword = keyword;
+      _result.keyword = keyword;
     }
     if (threshold != null) {
-      $result.threshold = threshold;
+      _result.threshold = threshold;
     }
     if (preRollMs != null) {
-      $result.preRollMs = preRollMs;
+      _result.preRollMs = preRollMs;
     }
     if (sampleRateHz != null) {
-      $result.sampleRateHz = sampleRateHz;
+      _result.sampleRateHz = sampleRateHz;
     }
-    return $result;
+    if (typeKind != null) {
+      _result.typeKind = typeKind;
+    }
+    return _result;
   }
-  WakeWordConfig._() : super();
   factory WakeWordConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory WakeWordConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'WakeWordConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOS(2, _omitFieldNames ? '' : 'keyword')
-    ..a<$core.double>(3, _omitFieldNames ? '' : 'threshold', $pb.PbFieldType.OF)
-    ..a<$core.int>(4, _omitFieldNames ? '' : 'preRollMs', $pb.PbFieldType.O3)
-    ..a<$core.int>(5, _omitFieldNames ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -661,10 +747,8 @@ class WakeWordConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  WakeWordConfig copyWith(void Function(WakeWordConfig) updates) => super.copyWith((message) => updates(message as WakeWordConfig)) as WakeWordConfig;
-
+  WakeWordConfig copyWith(void Function(WakeWordConfig) updates) => super.copyWith((message) => updates(message as WakeWordConfig)) as WakeWordConfig; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static WakeWordConfig create() => WakeWordConfig._();
   WakeWordConfig createEmptyInstance() => create();
@@ -717,50 +801,60 @@ class WakeWordConfig extends $pb.GeneratedMessage {
   $core.bool hasSampleRateHz() => $_has(4);
   @$pb.TagNumber(5)
   void clearSampleRateHz() => clearField(5);
+
+  @$pb.TagNumber(6)
+  SolutionType get typeKind => $_getN(5);
+  @$pb.TagNumber(6)
+  set typeKind(SolutionType v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasTypeKind() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTypeKind() => clearField(6);
 }
 
-/// ---------------------------------------------------------------------------
-/// Agent loop — multi-turn LLM with tool calling.
-/// ---------------------------------------------------------------------------
 class AgentLoopConfig extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'AgentLoopConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelId')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'systemPrompt')
+    ..pc<ToolSpec>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'tools', $pb.PbFieldType.PM, subBuilder: ToolSpec.create)
+    ..a<$core.int>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxIterations', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxContextTokens', $pb.PbFieldType.O3)
+    ..e<SolutionType>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'typeKind', $pb.PbFieldType.OE, defaultOrMaker: SolutionType.SOLUTION_TYPE_UNSPECIFIED, valueOf: SolutionType.valueOf, enumValues: SolutionType.values)
+    ..hasRequiredFields = false
+  ;
+
+  AgentLoopConfig._() : super();
   factory AgentLoopConfig({
     $core.String? llmModelId,
     $core.String? systemPrompt,
     $core.Iterable<ToolSpec>? tools,
     $core.int? maxIterations,
     $core.int? maxContextTokens,
+    SolutionType? typeKind,
   }) {
-    final $result = create();
+    final _result = create();
     if (llmModelId != null) {
-      $result.llmModelId = llmModelId;
+      _result.llmModelId = llmModelId;
     }
     if (systemPrompt != null) {
-      $result.systemPrompt = systemPrompt;
+      _result.systemPrompt = systemPrompt;
     }
     if (tools != null) {
-      $result.tools.addAll(tools);
+      _result.tools.addAll(tools);
     }
     if (maxIterations != null) {
-      $result.maxIterations = maxIterations;
+      _result.maxIterations = maxIterations;
     }
     if (maxContextTokens != null) {
-      $result.maxContextTokens = maxContextTokens;
+      _result.maxContextTokens = maxContextTokens;
     }
-    return $result;
+    if (typeKind != null) {
+      _result.typeKind = typeKind;
+    }
+    return _result;
   }
-  AgentLoopConfig._() : super();
   factory AgentLoopConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory AgentLoopConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AgentLoopConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'llmModelId')
-    ..aOS(2, _omitFieldNames ? '' : 'systemPrompt')
-    ..pc<ToolSpec>(3, _omitFieldNames ? '' : 'tools', $pb.PbFieldType.PM, subBuilder: ToolSpec.create)
-    ..a<$core.int>(4, _omitFieldNames ? '' : 'maxIterations', $pb.PbFieldType.O3)
-    ..a<$core.int>(5, _omitFieldNames ? '' : 'maxContextTokens', $pb.PbFieldType.O3)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -770,10 +864,8 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  AgentLoopConfig copyWith(void Function(AgentLoopConfig) updates) => super.copyWith((message) => updates(message as AgentLoopConfig)) as AgentLoopConfig;
-
+  AgentLoopConfig copyWith(void Function(AgentLoopConfig) updates) => super.copyWith((message) => updates(message as AgentLoopConfig)) as AgentLoopConfig; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static AgentLoopConfig create() => AgentLoopConfig._();
   AgentLoopConfig createEmptyInstance() => create();
@@ -820,37 +912,45 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
   $core.bool hasMaxContextTokens() => $_has(4);
   @$pb.TagNumber(5)
   void clearMaxContextTokens() => clearField(5);
+
+  @$pb.TagNumber(6)
+  SolutionType get typeKind => $_getN(5);
+  @$pb.TagNumber(6)
+  set typeKind(SolutionType v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasTypeKind() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTypeKind() => clearField(6);
 }
 
 class ToolSpec extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ToolSpec', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'description')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'jsonSchema')
+    ..hasRequiredFields = false
+  ;
+
+  ToolSpec._() : super();
   factory ToolSpec({
     $core.String? name,
     $core.String? description,
     $core.String? jsonSchema,
   }) {
-    final $result = create();
+    final _result = create();
     if (name != null) {
-      $result.name = name;
+      _result.name = name;
     }
     if (description != null) {
-      $result.description = description;
+      _result.description = description;
     }
     if (jsonSchema != null) {
-      $result.jsonSchema = jsonSchema;
+      _result.jsonSchema = jsonSchema;
     }
-    return $result;
+    return _result;
   }
-  ToolSpec._() : super();
   factory ToolSpec.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory ToolSpec.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolSpec', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'name')
-    ..aOS(2, _omitFieldNames ? '' : 'description')
-    ..aOS(3, _omitFieldNames ? '' : 'jsonSchema')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -860,10 +960,8 @@ class ToolSpec extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  ToolSpec copyWith(void Function(ToolSpec) updates) => super.copyWith((message) => updates(message as ToolSpec)) as ToolSpec;
-
+  ToolSpec copyWith(void Function(ToolSpec) updates) => super.copyWith((message) => updates(message as ToolSpec)) as ToolSpec; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static ToolSpec create() => ToolSpec._();
   ToolSpec createEmptyInstance() => create();
@@ -900,48 +998,49 @@ class ToolSpec extends $pb.GeneratedMessage {
   void clearJsonSchema() => clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Time series — window + anomaly_detect + generate_text.
-/// ---------------------------------------------------------------------------
 class TimeSeriesConfig extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'TimeSeriesConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'anomalyModelId')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelId')
+    ..a<$core.int>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'windowSize', $pb.PbFieldType.O3)
+    ..a<$core.int>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'stride', $pb.PbFieldType.O3)
+    ..a<$core.double>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'anomalyThreshold', $pb.PbFieldType.OF)
+    ..e<SolutionType>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'typeKind', $pb.PbFieldType.OE, defaultOrMaker: SolutionType.SOLUTION_TYPE_UNSPECIFIED, valueOf: SolutionType.valueOf, enumValues: SolutionType.values)
+    ..hasRequiredFields = false
+  ;
+
+  TimeSeriesConfig._() : super();
   factory TimeSeriesConfig({
     $core.String? anomalyModelId,
     $core.String? llmModelId,
     $core.int? windowSize,
     $core.int? stride,
     $core.double? anomalyThreshold,
+    SolutionType? typeKind,
   }) {
-    final $result = create();
+    final _result = create();
     if (anomalyModelId != null) {
-      $result.anomalyModelId = anomalyModelId;
+      _result.anomalyModelId = anomalyModelId;
     }
     if (llmModelId != null) {
-      $result.llmModelId = llmModelId;
+      _result.llmModelId = llmModelId;
     }
     if (windowSize != null) {
-      $result.windowSize = windowSize;
+      _result.windowSize = windowSize;
     }
     if (stride != null) {
-      $result.stride = stride;
+      _result.stride = stride;
     }
     if (anomalyThreshold != null) {
-      $result.anomalyThreshold = anomalyThreshold;
+      _result.anomalyThreshold = anomalyThreshold;
     }
-    return $result;
+    if (typeKind != null) {
+      _result.typeKind = typeKind;
+    }
+    return _result;
   }
-  TimeSeriesConfig._() : super();
   factory TimeSeriesConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory TimeSeriesConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TimeSeriesConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'anomalyModelId')
-    ..aOS(2, _omitFieldNames ? '' : 'llmModelId')
-    ..a<$core.int>(3, _omitFieldNames ? '' : 'windowSize', $pb.PbFieldType.O3)
-    ..a<$core.int>(4, _omitFieldNames ? '' : 'stride', $pb.PbFieldType.O3)
-    ..a<$core.double>(5, _omitFieldNames ? '' : 'anomalyThreshold', $pb.PbFieldType.OF)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -951,10 +1050,8 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  TimeSeriesConfig copyWith(void Function(TimeSeriesConfig) updates) => super.copyWith((message) => updates(message as TimeSeriesConfig)) as TimeSeriesConfig;
-
+  TimeSeriesConfig copyWith(void Function(TimeSeriesConfig) updates) => super.copyWith((message) => updates(message as TimeSeriesConfig)) as TimeSeriesConfig; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static TimeSeriesConfig create() => TimeSeriesConfig._();
   TimeSeriesConfig createEmptyInstance() => create();
@@ -1007,8 +1104,14 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   $core.bool hasAnomalyThreshold() => $_has(4);
   @$pb.TagNumber(5)
   void clearAnomalyThreshold() => clearField(5);
+
+  @$pb.TagNumber(6)
+  SolutionType get typeKind => $_getN(5);
+  @$pb.TagNumber(6)
+  set typeKind(SolutionType v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasTypeKind() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTypeKind() => clearField(6);
 }
 
-
-const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
-const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');

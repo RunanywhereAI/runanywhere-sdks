@@ -108,7 +108,7 @@ public extension CppBridge {
             )
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.network(.httpError, "Failed to fetch model assignments: \(result)")
+                throw SDKException.network(.httpError, "Failed to fetch model assignments: \(result)")
             }
 
             defer {

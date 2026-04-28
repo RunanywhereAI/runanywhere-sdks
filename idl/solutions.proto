@@ -28,6 +28,46 @@ message SolutionConfig {
 }
 
 // ---------------------------------------------------------------------------
+// SolutionType — discriminator for the kind of solution backing a
+// `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
+// oneof arms so frontends can switch on a single enum value rather than
+// inspecting the oneof shape.
+// ---------------------------------------------------------------------------
+enum SolutionType {
+    SOLUTION_TYPE_UNSPECIFIED = 0;
+    SOLUTION_TYPE_VOICE_AGENT = 1;
+    SOLUTION_TYPE_RAG         = 2;
+    SOLUTION_TYPE_WAKEWORD    = 3;
+    SOLUTION_TYPE_TIME_SERIES = 4;
+    SOLUTION_TYPE_AGENT_LOOP  = 5;
+}
+
+// ---------------------------------------------------------------------------
+// SolutionHandle — opaque, serialisable descriptor for a started solution.
+//
+// The native side owns a `rac_solution_handle_t`; this message is the
+// language-agnostic shape that frontends (Swift `SolutionHandle` class,
+// Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
+// the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
+// are issued against the C handle keyed by `handle_id`.
+// ---------------------------------------------------------------------------
+message SolutionHandle {
+    // Stable, opaque identifier minted by the core for this solution
+    // instance. Used as the lookup key for lifecycle calls.
+    string handle_id        = 1;
+    // String discriminator for the solution kind, e.g. "voice_agent",
+    // "rag", "wakeword", "time_series", "agent_loop". Free-form for
+    // forward-compat with future solutions; canonical values match the
+    // `SolutionType` enum names lower-cased.
+    string solution_type    = 2;
+    // Wall-clock creation timestamp (ms since Unix epoch).
+    int64  created_at_ms    = 3;
+    // Optional engine-specific state string (e.g. "created", "running",
+    // "stopped"). Empty when the host hasn't surfaced state.
+    optional string state   = 4;
+}
+
+// ---------------------------------------------------------------------------
 // VoiceAgent — the canonical streaming voice AI loop.
 // ---------------------------------------------------------------------------
 message VoiceAgentConfig {
@@ -60,6 +100,11 @@ message VoiceAgentConfig {
 
     // Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
     bool   emit_thoughts = 14;
+
+    // Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
+    // oneof arm; provided so callers that pass this message standalone (or
+    // log it) can read a single discriminator. Defaults to UNSPECIFIED.
+    optional SolutionType type_kind = 16;
 }
 
 enum AudioSource {
@@ -93,6 +138,9 @@ message RAGConfig {
 
     // Prompt template. Supports {{context}} and {{query}} placeholders.
     string prompt_template = 11;
+
+    // Optional explicit solution-kind tag. See `SolutionType`.
+    optional SolutionType type_kind = 12;
 }
 
 enum VectorStore {
@@ -110,6 +158,9 @@ message WakeWordConfig {
     float  threshold = 3;          // 0.0..1.0, engine-dependent
     int32  pre_roll_ms = 4;        // How much audio to emit before the trigger
     int32  sample_rate_hz = 5;     // default 16000
+
+    // Optional explicit solution-kind tag. See `SolutionType`.
+    optional SolutionType type_kind = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +172,9 @@ message AgentLoopConfig {
     repeated ToolSpec tools = 3;
     int32  max_iterations = 4;     // default 10
     int32  max_context_tokens = 5;
+
+    // Optional explicit solution-kind tag. See `SolutionType`.
+    optional SolutionType type_kind = 6;
 }
 
 message ToolSpec {
@@ -138,4 +192,7 @@ message TimeSeriesConfig {
     int32  window_size      = 3;   // Samples per window
     int32  stride           = 4;
     float  anomaly_threshold = 5;
+
+    // Optional explicit solution-kind tag. See `SolutionType`.
+    optional SolutionType type_kind = 6;
 }

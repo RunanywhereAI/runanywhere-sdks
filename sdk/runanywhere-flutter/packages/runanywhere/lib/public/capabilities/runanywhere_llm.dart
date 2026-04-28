@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_llm.dart — v4 LLM capability. Owns text generation,
-// model loading, and streaming.
+// Wave 2 LLM capability — aligned to Swift + proto. Returns proto
+// LLMGenerationResult; streams Stream<LLMStreamEvent>.
 
 import 'dart:async';
 import 'dart:convert';
@@ -9,8 +9,10 @@ import 'dart:convert';
 import 'package:runanywhere/adapters/llm_stream_adapter.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
@@ -20,7 +22,6 @@ import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/generation_types.dart';
 
 /// LLM (text generation) capability surface.
 ///
@@ -51,7 +52,7 @@ class RunAnywhereLLM {
   /// previously-loaded model, then hands off to the native bridge.
   Future<void> load(String modelId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.LoadModel');
@@ -65,11 +66,11 @@ class RunAnywhereLLM {
       final model = models.where((m) => m.id == modelId).firstOrNull;
 
       if (model == null) {
-        throw SDKError.modelNotFound('Model not found: $modelId');
+        throw SDKException.modelNotFound('Model not found: $modelId');
       }
 
       if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
+        throw SDKException.modelNotDownloaded(
           'Model is not downloaded. Call downloadModel() first.',
         );
       }
@@ -77,7 +78,7 @@ class RunAnywhereLLM {
       final resolvedPath =
           await DartBridge.modelPaths.resolveModelFilePath(model);
       if (resolvedPath == null) {
-        throw SDKError.modelNotFound(
+        throw SDKException.modelNotFound(
             'Could not resolve model file path for: $modelId');
       }
       logger.info('Resolved model path: $resolvedPath');
@@ -96,7 +97,7 @@ class RunAnywhereLLM {
       );
 
       if (!DartBridge.llm.isLoaded) {
-        throw SDKError.modelLoadFailed(
+        throw SDKException.modelLoadFailed(
           modelId,
           'LLM model failed to load - model may not be compatible',
         );
@@ -155,20 +156,21 @@ class RunAnywhereLLM {
     return result.text;
   }
 
-  /// Full LLM generation with options + structured output + telemetry.
+  /// Full LLM generation — canonical cross-SDK positional signature.
+  /// Returns proto [LLMGenerationResult].
   Future<LLMGenerationResult> generate(
-    String prompt, {
+    String prompt, [
     LLMGenerationOptions? options,
-  }) async {
+  ]) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
-    final opts = options ?? const LLMGenerationOptions();
+    final opts = options ?? LLMGenerationOptions();
     final startTime = DateTime.now();
 
     if (!DartBridge.llm.isLoaded) {
-      throw SDKError.componentNotReady(
+      throw SDKException.componentNotReady(
         'LLM model not loaded. Call loadModel() first.',
       );
     }
@@ -178,10 +180,11 @@ class RunAnywhereLLM {
         await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
 
-    String? effectiveSystemPrompt = opts.systemPrompt;
-    if (opts.structuredOutput != null) {
+    String? effectiveSystemPrompt =
+        opts.hasSystemPrompt() ? opts.systemPrompt : null;
+    if (opts.hasJsonSchema()) {
       final jsonSystemPrompt = DartBridgeStructuredOutput.shared
-          .getSystemPrompt(opts.structuredOutput!.schema);
+          .getSystemPrompt(opts.jsonSchema);
       if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
         effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
       } else {
@@ -192,8 +195,8 @@ class RunAnywhereLLM {
     try {
       final result = await DartBridge.llm.generate(
         prompt,
-        maxTokens: opts.maxTokens,
-        temperature: opts.temperature,
+        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
+        temperature: opts.hasTemperature() ? opts.temperature : 0.8,
         systemPrompt: effectiveSystemPrompt,
       );
 
@@ -209,21 +212,21 @@ class RunAnywhereLLM {
         promptTokens: result.promptTokens,
         completionTokens: result.completionTokens,
         latencyMs: latencyMs.round(),
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
+        temperature: opts.hasTemperature() ? opts.temperature : 0.8,
+        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
         contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         isStreaming: false,
       );
 
-      Map<String, dynamic>? structuredData;
-      if (opts.structuredOutput != null) {
+      String? structuredJson;
+      if (opts.hasJsonSchema()) {
         try {
           final jsonString =
               DartBridgeStructuredOutput.shared.extractJson(result.text);
           if (jsonString != null) {
-            final parsed = jsonDecode(jsonString);
-            structuredData = _normalizeStructuredData(parsed);
+            jsonDecode(jsonString); // validate
+            structuredJson = jsonString;
           }
         } catch (e) {
           SDKLogger('StructuredOutputHandler')
@@ -234,52 +237,47 @@ class RunAnywhereLLM {
       return LLMGenerationResult(
         text: result.text,
         inputTokens: result.promptTokens,
-        tokensUsed: result.completionTokens,
+        tokensGenerated: result.completionTokens,
         modelUsed: modelId,
-        latencyMs: latencyMs,
+        generationTimeMs: latencyMs,
         framework: 'llamacpp',
         tokensPerSecond: tokensPerSecond,
-        structuredData: structuredData,
+        jsonOutput: structuredJson,
       );
-    } on SDKError {
-      rethrow;
     } catch (e) {
       TelemetryService.shared.trackError(
         errorCode: 'generation_failed',
         errorMessage: e.toString(),
         context: {'model_id': modelId},
       );
-      throw SDKError.generationFailed('$e');
+      throw SDKException.generationFailed('$e');
     }
   }
 
-  /// v2 close-out Phase G-2: streaming LLM generation returns
-  /// `Stream<LLMStreamEvent>` sourced from the Phase G-2
-  /// [`LLMStreamAdapter`]. One event per token plus a terminal event
-  /// (`isFinal == true`). Callers derive metrics from the event
-  /// sequence; the previous `LLMStreamingResult` (stream + result
-  /// future + cancel) wrapper was DELETED together with the hand-rolled
-  /// StreamController + telemetry-collector shim.
+  /// Streaming LLM generation — canonical cross-SDK positional signature.
+  /// Returns `Stream<LLMStreamEvent>` — one event per token plus a
+  /// terminal event (`isFinal == true`).
   Stream<LLMStreamEvent> generateStream(
-    String prompt, {
+    String prompt, [
     LLMGenerationOptions? options,
-  }) {
+  ]) {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
-    final opts = options ?? const LLMGenerationOptions();
+    final opts = options ?? LLMGenerationOptions();
 
     if (!DartBridge.llm.isLoaded) {
-      throw SDKError.componentNotReady(
+      throw SDKException.componentNotReady(
         'LLM model not loaded. Call loadModel() first.',
       );
     }
 
-    String? effectiveSystemPrompt = opts.systemPrompt;
-    if (opts.structuredOutput != null) {
+    String? effectiveSystemPrompt =
+        opts.hasSystemPrompt() ? opts.systemPrompt : null;
+    if (opts.hasJsonSchema()) {
       final jsonSystemPrompt = DartBridgeStructuredOutput.shared
-          .getSystemPrompt(opts.structuredOutput!.schema);
+          .getSystemPrompt(opts.jsonSchema);
       if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
         effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
       } else {
@@ -291,14 +289,10 @@ class RunAnywhereLLM {
     final adapter = LLMStreamAdapter(handle);
     final eventStream = adapter.stream();
 
-    // Kick off the C++ driver. Events are delivered via the proto-byte
-    // callback set by the adapter; the returned Stream<String> of token
-    // text from DartBridge.llm.generateStream is ignored here — we only
-    // need to drive the engine loop.
     final driver = DartBridge.llm.generateStream(
       prompt,
-      maxTokens: opts.maxTokens,
-      temperature: opts.temperature,
+      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
+      temperature: opts.hasTemperature() ? opts.temperature : 0.8,
       systemPrompt: effectiveSystemPrompt,
     );
     DartBridge.llm.setActiveStreamSubscription(
@@ -317,25 +311,5 @@ class RunAnywhereLLM {
   /// Cancel any in-flight LLM generation.
   Future<void> cancel() async {
     DartBridge.llm.cancelGeneration();
-  }
-
-  // -- private helpers ------------------------------------------------------
-
-  /// Normalize parsed JSON to `Map<String, dynamic>`. Lists are wrapped
-  /// in `{'items': ...}`; non-string keys coerce to String; everything
-  /// else returns null.
-  static Map<String, dynamic>? _normalizeStructuredData(dynamic parsed) {
-    if (parsed is Map<String, dynamic>) {
-      return parsed;
-    } else if (parsed is List) {
-      return {'items': parsed};
-    } else if (parsed is Map) {
-      try {
-        return parsed.map((k, v) => MapEntry(k.toString(), v));
-      } catch (_) {
-        return null;
-      }
-    }
-    return null;
   }
 }

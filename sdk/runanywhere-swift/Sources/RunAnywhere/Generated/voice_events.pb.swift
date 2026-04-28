@@ -259,6 +259,101 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+/// Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
+/// UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
+/// the same as NOT_LOADED for forward-compatibility.
+public enum RAComponentLoadState: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case notLoaded // = 1
+  case loading // = 2
+  case loaded // = 3
+  case error // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .notLoaded
+    case 2: self = .loading
+    case 3: self = .loaded
+    case 4: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .notLoaded: return 1
+    case .loading: return 2
+    case .loaded: return 3
+    case .error: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAComponentLoadState] = [
+    .unspecified,
+    .notLoaded,
+    .loading,
+    .loaded,
+    .error,
+  ]
+
+}
+
+public enum RAVoiceSessionErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case microphonePermissionDenied // = 1
+  case notReady // = 2
+  case alreadyRunning // = 3
+  case componentFailure // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .microphonePermissionDenied
+    case 2: self = .notReady
+    case 3: self = .alreadyRunning
+    case 4: self = .componentFailure
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .microphonePermissionDenied: return 1
+    case .notReady: return 2
+    case .alreadyRunning: return 3
+    case .componentFailure: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVoiceSessionErrorCode] = [
+    .unspecified,
+    .microphonePermissionDenied,
+    .notReady,
+    .alreadyRunning,
+    .componentFailure,
+  ]
+
+}
+
 /// ---------------------------------------------------------------------------
 /// Sum type emitted on the output edge of the VoiceAgent pipeline.
 /// ---------------------------------------------------------------------------
@@ -342,6 +437,60 @@ public struct RAVoiceEvent: Sendable {
     set {payload = .metrics(newValue)}
   }
 
+  /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+  /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
+  /// signals consumed by the cross-platform VoiceAgent extensions
+  /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
+  /// VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
+  /// voice_agent_types.dart).
+  public var componentStateChanged: RAVoiceAgentComponentStates {
+    get {
+      if case .componentStateChanged(let v)? = payload {return v}
+      return RAVoiceAgentComponentStates()
+    }
+    set {payload = .componentStateChanged(newValue)}
+  }
+
+  public var sessionError: RAVoiceSessionError {
+    get {
+      if case .sessionError(let v)? = payload {return v}
+      return RAVoiceSessionError()
+    }
+    set {payload = .sessionError(newValue)}
+  }
+
+  public var sessionStarted: RASessionStartedEvent {
+    get {
+      if case .sessionStarted(let v)? = payload {return v}
+      return RASessionStartedEvent()
+    }
+    set {payload = .sessionStarted(newValue)}
+  }
+
+  public var sessionStopped: RASessionStoppedEvent {
+    get {
+      if case .sessionStopped(let v)? = payload {return v}
+      return RASessionStoppedEvent()
+    }
+    set {payload = .sessionStopped(newValue)}
+  }
+
+  public var agentResponseStarted: RAAgentResponseStartedEvent {
+    get {
+      if case .agentResponseStarted(let v)? = payload {return v}
+      return RAAgentResponseStartedEvent()
+    }
+    set {payload = .agentResponseStarted(newValue)}
+  }
+
+  public var agentResponseCompleted: RAAgentResponseCompletedEvent {
+    get {
+      if case .agentResponseCompleted(let v)? = payload {return v}
+      return RAAgentResponseCompletedEvent()
+    }
+    set {payload = .agentResponseCompleted(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// Exactly one of the following is populated on every event.
@@ -354,6 +503,18 @@ public struct RAVoiceEvent: Sendable {
     case state(RAStateChangeEvent)
     case error(RAErrorEvent)
     case metrics(RAMetricsEvent)
+    /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+    /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
+    /// signals consumed by the cross-platform VoiceAgent extensions
+    /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
+    /// VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
+    /// voice_agent_types.dart).
+    case componentStateChanged(RAVoiceAgentComponentStates)
+    case sessionError(RAVoiceSessionError)
+    case sessionStarted(RASessionStartedEvent)
+    case sessionStopped(RASessionStoppedEvent)
+    case agentResponseStarted(RAAgentResponseStartedEvent)
+    case agentResponseCompleted(RAAgentResponseCompletedEvent)
 
   }
 
@@ -528,6 +689,101 @@ public struct RAMetricsEvent: Sendable {
   public init() {}
 }
 
+/// Aggregate load state across all four voice-agent components. Mirrors Swift
+/// `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
+/// `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
+/// `VoiceAgentComponentStates`.
+public struct RAVoiceAgentComponentStates: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sttState: RAComponentLoadState = .unspecified
+
+  public var llmState: RAComponentLoadState = .unspecified
+
+  public var ttsState: RAComponentLoadState = .unspecified
+
+  public var vadState: RAComponentLoadState = .unspecified
+
+  /// Computed: true when stt_state, llm_state, tts_state, vad_state are all
+  /// COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+  /// recompute.
+  public var ready: Bool = false
+
+  /// Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING.
+  public var anyLoading: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAVoiceSessionError: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var code: RAVoiceSessionErrorCode = .unspecified
+
+  public var message: String = String()
+
+  public var failedComponent: String {
+    get {_failedComponent ?? String()}
+    set {_failedComponent = newValue}
+  }
+  /// Returns true if `failedComponent` has been explicitly set.
+  public var hasFailedComponent: Bool {self._failedComponent != nil}
+  /// Clears the value of `failedComponent`. Subsequent reads from it will return its default value.
+  public mutating func clearFailedComponent() {self._failedComponent = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _failedComponent: String? = nil
+}
+
+public struct RASessionStartedEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RASessionStoppedEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAAgentResponseStartedEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAAgentResponseCompletedEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
@@ -552,9 +808,17 @@ extension RAPipelineState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATE_UNSPECIFIED\0\u{1}PIPELINE_STATE_IDLE\0\u{1}PIPELINE_STATE_LISTENING\0\u{1}PIPELINE_STATE_THINKING\0\u{1}PIPELINE_STATE_SPEAKING\0\u{1}PIPELINE_STATE_STOPPED\0")
 }
 
+extension RAComponentLoadState: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_LOAD_STATE_UNSPECIFIED\0\u{1}COMPONENT_LOAD_STATE_NOT_LOADED\0\u{1}COMPONENT_LOAD_STATE_LOADING\0\u{1}COMPONENT_LOAD_STATE_LOADED\0\u{1}COMPONENT_LOAD_STATE_ERROR\0")
+}
+
+extension RAVoiceSessionErrorCode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_SESSION_ERROR_CODE_UNSPECIFIED\0\u{1}VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}VOICE_SESSION_ERROR_CODE_NOT_READY\0\u{1}VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING\0\u{1}VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE\0")
+}
+
 extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{4}\u{8}user_said\0\u{3}assistant_token\0\u{1}audio\0\u{1}vad\0\u{1}interrupted\0\u{1}state\0\u{1}error\0\u{1}metrics\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{4}\u{8}user_said\0\u{3}assistant_token\0\u{1}audio\0\u{1}vad\0\u{1}interrupted\0\u{1}state\0\u{1}error\0\u{1}metrics\0\u{3}component_state_changed\0\u{3}session_error\0\u{3}session_started\0\u{3}session_stopped\0\u{3}agent_response_started\0\u{3}agent_response_completed\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -668,6 +932,84 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
           self.payload = .metrics(v)
         }
       }()
+      case 18: try {
+        var v: RAVoiceAgentComponentStates?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .componentStateChanged(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .componentStateChanged(v)
+        }
+      }()
+      case 19: try {
+        var v: RAVoiceSessionError?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .sessionError(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .sessionError(v)
+        }
+      }()
+      case 20: try {
+        var v: RASessionStartedEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .sessionStarted(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .sessionStarted(v)
+        }
+      }()
+      case 21: try {
+        var v: RASessionStoppedEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .sessionStopped(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .sessionStopped(v)
+        }
+      }()
+      case 22: try {
+        var v: RAAgentResponseStartedEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .agentResponseStarted(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .agentResponseStarted(v)
+        }
+      }()
+      case 23: try {
+        var v: RAAgentResponseCompletedEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .agentResponseCompleted(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .agentResponseCompleted(v)
+        }
+      }()
       default: break
       }
     }
@@ -716,6 +1058,30 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     case .metrics?: try {
       guard case .metrics(let v)? = self.payload else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
+    }()
+    case .componentStateChanged?: try {
+      guard case .componentStateChanged(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
+    }()
+    case .sessionError?: try {
+      guard case .sessionError(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
+    }()
+    case .sessionStarted?: try {
+      guard case .sessionStarted(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+    }()
+    case .sessionStopped?: try {
+      guard case .sessionStopped(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+    }()
+    case .agentResponseStarted?: try {
+      guard case .agentResponseStarted(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+    }()
+    case .agentResponseCompleted?: try {
+      guard case .agentResponseCompleted(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
     }()
     case nil: break
     }
@@ -1076,6 +1442,181 @@ extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if lhs.audioSamplesPlayed != rhs.audioSamplesPlayed {return false}
     if lhs.isOverBudget != rhs.isOverBudget {return false}
     if lhs.createdAtNs != rhs.createdAtNs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceAgentComponentStates: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComponentStates"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_state\0\u{3}llm_state\0\u{3}tts_state\0\u{3}vad_state\0\u{1}ready\0\u{3}any_loading\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.sttState) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.llmState) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.ttsState) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.vadState) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.ready) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.anyLoading) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.sttState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.sttState, fieldNumber: 1)
+    }
+    if self.llmState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.llmState, fieldNumber: 2)
+    }
+    if self.ttsState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.ttsState, fieldNumber: 3)
+    }
+    if self.vadState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.vadState, fieldNumber: 4)
+    }
+    if self.ready != false {
+      try visitor.visitSingularBoolField(value: self.ready, fieldNumber: 5)
+    }
+    if self.anyLoading != false {
+      try visitor.visitSingularBoolField(value: self.anyLoading, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceAgentComponentStates, rhs: RAVoiceAgentComponentStates) -> Bool {
+    if lhs.sttState != rhs.sttState {return false}
+    if lhs.llmState != rhs.llmState {return false}
+    if lhs.ttsState != rhs.ttsState {return false}
+    if lhs.vadState != rhs.vadState {return false}
+    if lhs.ready != rhs.ready {return false}
+    if lhs.anyLoading != rhs.anyLoading {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceSessionError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceSessionError"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}message\0\u{3}failed_component\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.code) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.message) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._failedComponent) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.code != .unspecified {
+      try visitor.visitSingularEnumField(value: self.code, fieldNumber: 1)
+    }
+    if !self.message.isEmpty {
+      try visitor.visitSingularStringField(value: self.message, fieldNumber: 2)
+    }
+    try { if let v = self._failedComponent {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceSessionError, rhs: RAVoiceSessionError) -> Bool {
+    if lhs.code != rhs.code {return false}
+    if lhs.message != rhs.message {return false}
+    if lhs._failedComponent != rhs._failedComponent {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASessionStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SessionStartedEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASessionStartedEvent, rhs: RASessionStartedEvent) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASessionStoppedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SessionStoppedEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASessionStoppedEvent, rhs: RASessionStoppedEvent) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAAgentResponseStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AgentResponseStartedEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAAgentResponseStartedEvent, rhs: RAAgentResponseStartedEvent) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAAgentResponseCompletedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AgentResponseCompletedEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAAgentResponseCompletedEvent, rhs: RAAgentResponseCompletedEvent) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -4,12 +4,12 @@
 // capability. Owns pipeline lifecycle, document management,
 // statistics, and querying. Mirrors Swift `RunAnywhere+RAG.swift`.
 
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/rag_types.dart';
+import 'package:runanywhere/generated/rag.pb.dart';
 
 /// RAG (Retrieval-Augmented Generation) capability surface.
 ///
@@ -25,7 +25,7 @@ class RunAnywhereRAG {
   /// creation fails. Publishes [SDKRAGEvent.pipelineCreated] on success.
   Future<void> createPipeline(RAGConfiguration config) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     try {
@@ -33,14 +33,14 @@ class RunAnywhereRAG {
       EventBus.shared.publish(SDKRAGEvent.pipelineCreated());
     } catch (e) {
       EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
-      throw SDKError.invalidState('RAG pipeline creation failed: $e');
+      throw SDKException.invalidState('RAG pipeline creation failed: $e');
     }
   }
 
   /// Destroy the RAG pipeline and release native resources.
   Future<void> destroyPipeline() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     DartBridgeRAG.shared.destroyPipeline();
     EventBus.shared.publish(SDKRAGEvent.pipelineDestroyed());
@@ -51,7 +51,7 @@ class RunAnywhereRAG {
   /// Ingest a single document into the pipeline (chunk → embed → index).
   Future<void> ingest(String text, {String? metadataJSON}) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     EventBus.shared.publish(
@@ -75,7 +75,7 @@ class RunAnywhereRAG {
     } catch (e) {
       stopwatch.stop();
       EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
-      throw SDKError.invalidState('RAG ingestion failed: $e');
+      throw SDKException.invalidState('RAG ingestion failed: $e');
     }
   }
 
@@ -83,7 +83,7 @@ class RunAnywhereRAG {
   /// and optionally a `metadataJson` key.
   Future<void> addDocumentsBatch(List<Map<String, String>> documents) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     final totalLength =
@@ -109,19 +109,19 @@ class RunAnywhereRAG {
     } catch (e) {
       stopwatch.stop();
       EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
-      throw SDKError.invalidState('RAG batch ingestion failed: $e');
+      throw SDKException.invalidState('RAG batch ingestion failed: $e');
     }
   }
 
   /// Clear every document from the pipeline.
   Future<void> clearDocuments() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     try {
       DartBridgeRAG.shared.clearDocuments();
     } catch (e) {
-      throw SDKError.invalidState('RAG clear documents failed: $e');
+      throw SDKException.invalidState('RAG clear documents failed: $e');
     }
   }
 
@@ -130,7 +130,7 @@ class RunAnywhereRAG {
   /// Number of indexed document chunks in the pipeline.
   Future<int> documentCount() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     return DartBridgeRAG.shared.documentCount;
   }
@@ -138,12 +138,12 @@ class RunAnywhereRAG {
   /// Pipeline statistics (raw JSON from the C pipeline).
   Future<RAGStatistics> getStatistics() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     try {
       return DartBridgeRAG.shared.getStatistics();
     } catch (e) {
-      throw SDKError.invalidState('RAG get statistics failed: $e');
+      throw SDKException.invalidState('RAG get statistics failed: $e');
     }
   }
 
@@ -156,7 +156,7 @@ class RunAnywhereRAG {
     RAGQueryOptions? options,
   }) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     EventBus.shared.publish(
@@ -183,16 +183,16 @@ class RunAnywhereRAG {
         SDKRAGEvent.queryComplete(
           answerLength: result.answer.length,
           chunksRetrieved: result.retrievedChunks.length,
-          retrievalTimeMs: result.retrievalTimeMs,
-          generationTimeMs: result.generationTimeMs,
-          totalTimeMs: result.totalTimeMs,
+          retrievalTimeMs: result.retrievalTimeMs.toDouble(),
+          generationTimeMs: result.generationTimeMs.toDouble(),
+          totalTimeMs: result.totalTimeMs.toDouble(),
         ),
       );
 
       return result;
     } catch (e) {
       EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
-      throw SDKError.generationFailed('RAG query failed: $e');
+      throw SDKException.generationFailed('RAG query failed: $e');
     }
   }
 }

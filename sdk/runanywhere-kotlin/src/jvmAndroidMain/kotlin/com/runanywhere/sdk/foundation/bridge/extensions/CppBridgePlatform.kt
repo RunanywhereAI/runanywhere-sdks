@@ -11,7 +11,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 
 /**
  * Platform bridge that provides platform services callbacks for C++ core.
@@ -1181,20 +1181,20 @@ object CppBridgePlatform {
      * @param request The LLM request
      * @param callback Optional streaming callback
      * @return The LLM response
-     * @throws SDKError if the request fails
+     * @throws SDKException if the request fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun executeLLM(request: LLMRequest, callback: StreamCallback? = null): LLMResponse {
         val provider =
             platformProvider
-                ?: throw SDKError.platform("Platform provider not set")
+                ?: throw SDKException.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.LLM)) {
-            throw SDKError.platform("Platform LLM service not available")
+            throw SDKException.platform("Platform LLM service not available")
         }
 
         return provider.executeLLMRequest(request, callback)
-            ?: throw SDKError.platform("Platform LLM request failed")
+            ?: throw SDKException.platform("Platform LLM request failed")
     }
 
     /**
@@ -1202,20 +1202,20 @@ object CppBridgePlatform {
      *
      * @param request The TTS request
      * @return The TTS response
-     * @throws SDKError if the request fails
+     * @throws SDKException if the request fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun executeTTS(request: TTSRequest): TTSResponse {
         val provider =
             platformProvider
-                ?: throw SDKError.platform("Platform provider not set")
+                ?: throw SDKException.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.TTS)) {
-            throw SDKError.platform("Platform TTS service not available")
+            throw SDKException.platform("Platform TTS service not available")
         }
 
         return provider.executeTTSRequest(request)
-            ?: throw SDKError.platform("Platform TTS request failed")
+            ?: throw SDKException.platform("Platform TTS request failed")
     }
 
     /**
@@ -1223,20 +1223,20 @@ object CppBridgePlatform {
      *
      * @param request The STT request
      * @return The STT response
-     * @throws SDKError if the request fails
+     * @throws SDKException if the request fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun executeSTT(request: STTRequest): STTResponse {
         val provider =
             platformProvider
-                ?: throw SDKError.platform("Platform provider not set")
+                ?: throw SDKException.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.STT)) {
-            throw SDKError.platform("Platform STT service not available")
+            throw SDKException.platform("Platform STT service not available")
         }
 
         return provider.executeSTTRequest(request)
-            ?: throw SDKError.platform("Platform STT request failed")
+            ?: throw SDKException.platform("Platform STT request failed")
     }
 
     /**

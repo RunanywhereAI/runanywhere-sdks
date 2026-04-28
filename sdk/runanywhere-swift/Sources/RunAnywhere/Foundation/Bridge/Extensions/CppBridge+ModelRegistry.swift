@@ -78,7 +78,7 @@ extension CppBridge {
         /// Save model metadata to registry
         public func save(_ model: ModelInfo) throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Registry not initialized")
+                throw SDKException.general(.initializationFailed, "Registry not initialized")
             }
 
             logger.info("Saving model: \(model.id), Swift framework: \(model.framework.wireString) (\(model.framework.displayName))")
@@ -88,7 +88,7 @@ extension CppBridge {
 
             let result = rac_model_registry_save(handle, &cModel)
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.processingFailed, "Failed to save model")
+                throw SDKException.general(.processingFailed, "Failed to save model")
             }
 
             logger.info("Model saved successfully: \(model.id)")
@@ -188,7 +188,7 @@ extension CppBridge {
         /// Update download status for a model
         public func updateDownloadStatus(modelId: String, localPath: URL?) throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Registry not initialized")
+                throw SDKException.general(.initializationFailed, "Registry not initialized")
             }
 
             let result: rac_result_t
@@ -205,7 +205,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
+                throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
             }
 
             logger.debug("Updated download status for: \(modelId)")
@@ -214,7 +214,7 @@ extension CppBridge {
         /// Update last used timestamp
         public func updateLastUsed(modelId: String) throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Registry not initialized")
+                throw SDKException.general(.initializationFailed, "Registry not initialized")
             }
 
             let result = modelId.withCString { mid in
@@ -222,7 +222,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
+                throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
             }
         }
 
@@ -231,7 +231,7 @@ extension CppBridge {
         /// Remove model from registry
         public func remove(modelId: String) throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Registry not initialized")
+                throw SDKException.general(.initializationFailed, "Registry not initialized")
             }
 
             let result = modelId.withCString { mid in
@@ -239,7 +239,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
+                throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
             }
 
             logger.debug("Model removed: \(modelId)")

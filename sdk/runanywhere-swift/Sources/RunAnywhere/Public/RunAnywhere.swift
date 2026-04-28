@@ -192,7 +192,7 @@ public enum RunAnywhere {
      *   - baseURL: Backend API base URL (optional for development, required for production/staging)
      *   - environment: SDK environment (default: .development)
      *
-     * - Throws: SDKError if validation fails
+     * - Throws: SDKException if validation fails
      */
     public static func initialize(
         apiKey: String? = nil,
@@ -207,10 +207,10 @@ public enum RunAnywhere {
         } else {
             // Production/Staging mode - require API key and URL
             guard let apiKey = apiKey, !apiKey.isEmpty else {
-                throw SDKError.general(.invalidConfiguration, "API key is required for \(environment.description) mode")
+                throw SDKException.general(.invalidConfiguration, "API key is required for \(environment.description) mode")
             }
             guard let baseURL = baseURL, !baseURL.isEmpty else {
-                throw SDKError.general(.invalidConfiguration, "Base URL is required for \(environment.description) mode")
+                throw SDKException.general(.invalidConfiguration, "Base URL is required for \(environment.description) mode")
             }
             params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
         }
@@ -291,7 +291,7 @@ public enum RunAnywhere {
             logger.error("❌ Initialization failed: \(error.localizedDescription)")
             initParams = nil
             isInitialized = false
-            CppBridge.Events.emitSDKInitFailed(error: SDKError.from(error))
+            CppBridge.Events.emitSDKInitFailed(error: SDKException.from(error))
             throw error
         }
     }
@@ -349,7 +349,7 @@ public enum RunAnywhere {
     /// can wrap it in a shared Task for serialization.
     private static func _performServicesInitialization() async throws {
         guard let params = initParams, let environment = currentEnvironment else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let logger = SDKLogger(category: "RunAnywhere.Services")

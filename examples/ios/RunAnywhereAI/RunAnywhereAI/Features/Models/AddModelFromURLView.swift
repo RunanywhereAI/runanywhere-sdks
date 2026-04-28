@@ -61,7 +61,7 @@ struct AddModelFromURLView: View {
             #endif
             .navigationTitle("Add Model from URL")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 #if os(iOS)

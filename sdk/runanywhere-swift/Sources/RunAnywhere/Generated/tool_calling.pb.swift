@@ -94,6 +94,76 @@ public enum RAToolParameterType: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
+/// Tool-call wire formats various LLM families emit. Strongly-typed counterpart
+/// to `ToolCallingOptions.format_hint` (which remains a free-form string for
+/// back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
+/// 1:1 to this enum).
+///
+/// Drift across SDKs:
+///   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
+///     today only exposes `default` and `lfm2` constants on a string-typed
+///     field — it is not yet an enum.
+///   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
+/// This enum is the union of formats LLM families actually emit; SDK frontends
+/// should map their existing strings onto these values when surfacing the
+/// strongly-typed field. Keep `format_hint` (string) populated for legacy
+/// consumers until all SDKs migrate.
+/// ---------------------------------------------------------------------------
+public enum RAToolCallFormatName: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case json // = 1
+  case xml // = 2
+  case native // = 3
+  case pythonic // = 4
+  case openaiFunctions // = 5
+  case hermes // = 6
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .json
+    case 2: self = .xml
+    case 3: self = .native
+    case 4: self = .pythonic
+    case 5: self = .openaiFunctions
+    case 6: self = .hermes
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .json: return 1
+    case .xml: return 2
+    case .native: return 3
+    case .pythonic: return 4
+    case .openaiFunctions: return 5
+    case .hermes: return 6
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAToolCallFormatName] = [
+    .unspecified,
+    .json,
+    .xml,
+    .native,
+    .pythonic,
+    .openaiFunctions,
+    .hermes,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
 /// JSON-typed scalar / composite carrier for tool arguments and results.
 /// Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
 /// TypeScript discriminated union. Used inside ToolParameter.enum_values
@@ -361,6 +431,31 @@ public struct RAToolCallingOptions: Sendable {
   /// Empty = SDK default.
   public var formatHint: String = String()
 
+  /// Strongly-typed tool-call format. Preferred over `format_hint` when set;
+  /// `format_hint` remains for legacy callers and per-SDK custom strings
+  /// that don't round-trip through this enum.
+  public var format: RAToolCallFormatName {
+    get {_format ?? .unspecified}
+    set {_format = newValue}
+  }
+  /// Returns true if `format` has been explicitly set.
+  public var hasFormat: Bool {self._format != nil}
+  /// Clears the value of `format`. Subsequent reads from it will return its default value.
+  public mutating func clearFormat() {self._format = nil}
+
+  /// Caller-supplied system prompt that fully replaces the SDK-injected
+  /// tool-calling system prompt (rather than being merged with it).
+  /// Distinct from `system_prompt` (field 6), which is merged unless
+  /// `replace_system_prompt` is true.
+  public var customSystemPrompt: String {
+    get {_customSystemPrompt ?? String()}
+    set {_customSystemPrompt = newValue}
+  }
+  /// Returns true if `customSystemPrompt` has been explicitly set.
+  public var hasCustomSystemPrompt: Bool {self._customSystemPrompt != nil}
+  /// Clears the value of `customSystemPrompt`. Subsequent reads from it will return its default value.
+  public mutating func clearCustomSystemPrompt() {self._customSystemPrompt = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -368,6 +463,8 @@ public struct RAToolCallingOptions: Sendable {
   fileprivate var _temperature: Float? = nil
   fileprivate var _maxTokens: Int32? = nil
   fileprivate var _systemPrompt: String? = nil
+  fileprivate var _format: RAToolCallFormatName? = nil
+  fileprivate var _customSystemPrompt: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -416,6 +513,10 @@ fileprivate let _protobuf_package = "runanywhere.v1"
 
 extension RAToolParameterType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_PARAMETER_TYPE_UNSPECIFIED\0\u{1}TOOL_PARAMETER_TYPE_STRING\0\u{1}TOOL_PARAMETER_TYPE_NUMBER\0\u{1}TOOL_PARAMETER_TYPE_BOOLEAN\0\u{1}TOOL_PARAMETER_TYPE_OBJECT\0\u{1}TOOL_PARAMETER_TYPE_ARRAY\0")
+}
+
+extension RAToolCallFormatName: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CALL_FORMAT_NAME_UNSPECIFIED\0\u{1}TOOL_CALL_FORMAT_NAME_JSON\0\u{1}TOOL_CALL_FORMAT_NAME_XML\0\u{1}TOOL_CALL_FORMAT_NAME_NATIVE\0\u{1}TOOL_CALL_FORMAT_NAME_PYTHONIC\0\u{1}TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS\0\u{1}TOOL_CALL_FORMAT_NAME_HERMES\0")
 }
 
 extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -776,7 +877,7 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
 
 extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}max_iterations\0\u{3}auto_execute\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{3}format_hint\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}max_iterations\0\u{3}auto_execute\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{3}format_hint\0\u{1}format\0\u{3}custom_system_prompt\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -793,6 +894,8 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 7: try { try decoder.decodeSingularBoolField(value: &self.replaceSystemPrompt) }()
       case 8: try { try decoder.decodeSingularBoolField(value: &self.keepToolsAvailable) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.formatHint) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self._format) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._customSystemPrompt) }()
       default: break
       }
     }
@@ -830,6 +933,12 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if !self.formatHint.isEmpty {
       try visitor.visitSingularStringField(value: self.formatHint, fieldNumber: 9)
     }
+    try { if let v = self._format {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._customSystemPrompt {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -843,6 +952,8 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.replaceSystemPrompt != rhs.replaceSystemPrompt {return false}
     if lhs.keepToolsAvailable != rhs.keepToolsAvailable {return false}
     if lhs.formatHint != rhs.formatHint {return false}
+    if lhs._format != rhs._format {return false}
+    if lhs._customSystemPrompt != rhs._customSystemPrompt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -61,8 +61,8 @@ enum class SDKEnvironment(
     fun toProto(): ai.runanywhere.proto.v1.SDKEnvironment =
         when (this) {
             DEVELOPMENT -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-            STAGING     -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_STAGING
-            PRODUCTION  -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+            STAGING -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_STAGING
+            PRODUCTION -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
         }
 
     companion object {
@@ -73,8 +73,8 @@ enum class SDKEnvironment(
         fun fromProto(proto: ai.runanywhere.proto.v1.SDKEnvironment): SDKEnvironment =
             when (proto) {
                 ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> DEVELOPMENT
-                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_STAGING     -> STAGING
-                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION  -> PRODUCTION
+                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_STAGING -> STAGING
+                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> PRODUCTION
                 ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> DEVELOPMENT
             }
     }

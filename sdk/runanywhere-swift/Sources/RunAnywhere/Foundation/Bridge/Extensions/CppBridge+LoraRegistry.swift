@@ -34,7 +34,7 @@ extension CppBridge {
         /// Register a LoRA adapter in the catalog
         public func register(_ entry: LoraAdapterCatalogEntry) throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "LoRA registry not initialized")
+                throw SDKException.general(.initializationFailed, "LoRA registry not initialized")
             }
 
             // Allocate C strings via strdup so lifetime is independent of Swift strings
@@ -65,7 +65,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.processingFailed, "Failed to register LoRA adapter '\(entry.id)': \(result)")
+                throw SDKException.general(.processingFailed, "Failed to register LoRA adapter '\(entry.id)': \(result)")
             }
             logger.info("LoRA adapter registered: \(entry.id)")
         }

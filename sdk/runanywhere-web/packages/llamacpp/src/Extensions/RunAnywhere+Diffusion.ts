@@ -17,7 +17,7 @@
  *   // result.imageData is Uint8ClampedArray RGBA
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
 import {
@@ -47,7 +47,7 @@ class DiffusionImpl {
   private _diffusionComponentHandle = 0;
 
   private requireBridge(): LlamaCppBridge {
-    if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+    if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
     return LlamaCppBridge.shared;
   }
 
@@ -131,7 +131,7 @@ class DiffusionImpl {
     const handle = this.ensureDiffusionComponent();
 
     if (!this.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No diffusion model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No diffusion model loaded. Call loadModel() first.');
     }
 
     logger.info(`Generating image: "${options.prompt.substring(0, 50)}..."`);

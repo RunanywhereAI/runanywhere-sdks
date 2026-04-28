@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -468,13 +468,13 @@ object CppBridgeTTS {
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("TTS component not created")
+                throw SDKException.notInitialized("TTS component not created")
             }
             return handle
         }
@@ -534,7 +534,7 @@ object CppBridgeTTS {
                     TAG,
                     "Native library not loaded. TTS inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create TTS component via RunAnywhereBridge
@@ -547,7 +547,7 @@ object CppBridgeTTS {
                         TAG,
                         "TTS component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
+                    throw SDKException.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -670,13 +670,13 @@ object CppBridgeTTS {
      * @param text The input text to synthesize
      * @param config Synthesis configuration (optional)
      * @return The synthesis result
-     * @throws SDKError if synthesis fails
+     * @throws SDKException if synthesis fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun synthesize(text: String, config: SynthesisConfig = SynthesisConfig.DEFAULT): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
-                throw SDKError.tts("TTS component not ready for synthesis")
+                throw SDKException.tts("TTS component not ready for synthesis")
             }
 
             isCancelled = false
@@ -699,12 +699,12 @@ object CppBridgeTTS {
             try {
                 val rawAudioData =
                     RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
-                        ?: throw SDKError.tts("Synthesis failed: null result")
+                        ?: throw SDKException.tts("Synthesis failed: null result")
 
                 // TTS backends output Float32 PCM - convert to WAV for playback compatibility
                 val audioData =
                     RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
-                        ?: throw SDKError.tts("Failed to convert audio to WAV format")
+                        ?: throw SDKException.tts("Failed to convert audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
@@ -746,7 +746,7 @@ object CppBridgeTTS {
                 return result
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.tts("Synthesis failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.tts("Synthesis failed: ${e.message}")
             }
         }
     }
@@ -758,9 +758,9 @@ object CppBridgeTTS {
      * @param config Synthesis configuration (optional)
      * @param callback Callback for audio chunks
      * @return The final synthesis result
-     * @throws SDKError if synthesis fails
+     * @throws SDKException if synthesis fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun synthesizeStream(
         text: String,
         config: SynthesisConfig = SynthesisConfig.DEFAULT,
@@ -768,7 +768,7 @@ object CppBridgeTTS {
     ): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
-                throw SDKError.tts("TTS component not ready for synthesis")
+                throw SDKException.tts("TTS component not ready for synthesis")
             }
 
             isCancelled = false
@@ -792,12 +792,12 @@ object CppBridgeTTS {
             try {
                 val rawAudioData =
                     RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
-                        ?: throw SDKError.tts("Streaming synthesis failed: null result")
+                        ?: throw SDKException.tts("Streaming synthesis failed: null result")
 
                 // TTS backends output Float32 PCM - convert to WAV for playback compatibility
                 val audioData =
                     RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
-                        ?: throw SDKError.tts("Failed to convert streaming audio to WAV format")
+                        ?: throw SDKException.tts("Failed to convert streaming audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
@@ -839,7 +839,7 @@ object CppBridgeTTS {
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.tts("Streaming synthesis failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.tts("Streaming synthesis failed: ${e.message}")
             }
         }
     }
@@ -851,9 +851,9 @@ object CppBridgeTTS {
      * @param outputPath Path to save the audio file
      * @param config Synthesis configuration (optional)
      * @return The synthesis result (with empty audioData, as it's saved to file)
-     * @throws SDKError if synthesis fails
+     * @throws SDKException if synthesis fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun synthesizeToFile(
         text: String,
         outputPath: String,
@@ -861,7 +861,7 @@ object CppBridgeTTS {
     ): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
-                throw SDKError.tts("TTS component not ready for synthesis")
+                throw SDKException.tts("TTS component not ready for synthesis")
             }
 
             isCancelled = false
@@ -884,7 +884,7 @@ object CppBridgeTTS {
             try {
                 val durationMs = RunAnywhereBridge.racTtsComponentSynthesizeToFile(handle, text, outputPath, config.toJson())
                 if (durationMs < 0) {
-                    throw SDKError.tts("Synthesis to file failed: error code $durationMs")
+                    throw SDKException.tts("Synthesis to file failed: error code $durationMs")
                 }
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
@@ -917,7 +917,7 @@ object CppBridgeTTS {
                 return result
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.tts("Synthesis to file failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.tts("Synthesis to file failed: ${e.message}")
             }
         }
     }

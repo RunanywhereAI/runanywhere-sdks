@@ -121,7 +121,7 @@ extension CppBridge {
             progressHandler: @escaping (DownloadProgress) -> Void
         ) throws -> String {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Download manager not initialized")
+                throw SDKException.general(.initializationFailed, "Download manager not initialized")
             }
 
             var taskIdPtr: UnsafeMutablePointer<CChar>?
@@ -145,7 +145,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS, let taskId = taskIdPtr else {
-                throw SDKError.download(.downloadFailed, "Failed to start download")
+                throw SDKException.download(.downloadFailed, "Failed to start download")
             }
 
             let taskIdString = String(cString: taskId)
@@ -161,7 +161,7 @@ extension CppBridge {
         /// Cancel a download task
         public func cancelDownload(taskId: String) throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Download manager not initialized")
+                throw SDKException.general(.initializationFailed, "Download manager not initialized")
             }
 
             let result = taskId.withCString { tid in
@@ -169,7 +169,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.download(.downloadFailed, "Failed to cancel download")
+                throw SDKException.download(.downloadFailed, "Failed to cancel download")
             }
 
             progressCallbacks.removeValue(forKey: taskId)
@@ -179,12 +179,12 @@ extension CppBridge {
         /// Pause all downloads
         public func pauseAll() throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Download manager not initialized")
+                throw SDKException.general(.initializationFailed, "Download manager not initialized")
             }
 
             let result = rac_download_manager_pause_all(handle)
             guard result == RAC_SUCCESS else {
-                throw SDKError.download(.downloadFailed, "Failed to pause downloads")
+                throw SDKException.download(.downloadFailed, "Failed to pause downloads")
             }
 
             logger.info("Paused all downloads")
@@ -193,12 +193,12 @@ extension CppBridge {
         /// Resume all downloads
         public func resumeAll() throws {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Download manager not initialized")
+                throw SDKException.general(.initializationFailed, "Download manager not initialized")
             }
 
             let result = rac_download_manager_resume_all(handle)
             guard result == RAC_SUCCESS else {
-                throw SDKError.download(.downloadFailed, "Failed to resume downloads")
+                throw SDKException.download(.downloadFailed, "Failed to resume downloads")
             }
 
             logger.info("Resumed all downloads")
@@ -288,7 +288,7 @@ extension CppBridge {
         }
 
         /// Mark download as failed (called by Alamofire/HTTP layer)
-        public func markFailed(taskId: String, error: SDKError) {
+        public func markFailed(taskId: String, error: SDKException) {
             guard let handle = handle else { return }
 
             let errorCode = RAC_ERROR_DOWNLOAD_FAILED  // Map to appropriate error

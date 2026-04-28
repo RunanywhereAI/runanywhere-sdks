@@ -9,10 +9,10 @@
 
 import { NativeEventEmitter, NativeModules } from 'react-native';
 import { SDKLogger } from '../../Foundation/Logging';
+import type { SDKComponent } from '../../types/enums';
 import type {
   AnySDKEvent,
   ComponentInitializationEvent,
-  SDKComponent,
   SDKConfigurationEvent,
   SDKDeviceEvent,
   SDKEventListener,
@@ -25,7 +25,7 @@ import type {
   SDKStorageEvent,
   SDKVoiceEvent,
   UnsubscribeFunction,
-} from '../../types';
+} from './SDKEventTypes';
 
 // Native module reference - accessed lazily in setup() to avoid
 // accessing NativeModules before React Native is fully initialized (bridgeless mode)

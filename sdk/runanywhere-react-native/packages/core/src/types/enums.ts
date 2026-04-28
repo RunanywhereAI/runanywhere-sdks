@@ -1,16 +1,33 @@
 /**
  * RunAnywhere React Native SDK — Enums.
  *
- * These enums match the iOS Swift SDK exactly for consistency.
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/
+ * These string enums describe the JS-runtime values emitted by the
+ * native bridge. The canonical proto-encoded counterparts live in
+ * `@runanywhere/proto-ts/*` and are re-exported under `*Proto` aliases.
  *
- * GAP 01 Phase 5: each IDL-backed enum below ships a `toProto<X>()` /
- * `fromProto<X>()` helper that bridges to the ts-proto-generated numeric
- * enum under `@runanywhere/proto-ts/dist/model_types`. Adding a case on either side
- * forces the mapping to cover it; the CI drift-check
- * (.github/workflows/idl-drift-check.yml) catches any gap.
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/
  */
-import * as proto from '@runanywhere/proto-ts/dist/model_types';
+
+// Canonical proto-encoded enums (generated; DO NOT redefine). Available
+// alongside the RN string enums under `*Proto` aliases. Use the proto
+// enums when serializing for analytics or transport — the RN string
+// enums describe the in-process JS values exchanged with native bridges.
+export {
+  SDKComponent as SDKComponentProto,
+  EventSeverity as EventSeverityProto,
+  EventDestination as EventDestinationProto,
+} from '@runanywhere/proto-ts/sdk_events';
+export { ExecutionTarget as ExecutionTargetProto } from '@runanywhere/proto-ts/llm_options';
+export {
+  AccelerationPreference as AccelerationPreferenceProto,
+  ModelCategory as ModelCategoryProto,
+  ModelFormat as ModelFormatProto,
+  AudioFormat as AudioFormatProto,
+  InferenceFramework as InferenceFrameworkProto,
+  RoutingPolicy as RoutingPolicyProto,
+  ModelArtifactType as ModelArtifactTypeProto,
+  SDKEnvironment as SDKEnvironmentProto,
+} from '@runanywhere/proto-ts/model_types';
 
 /**
  * SDK environment for configuration and behavior
@@ -281,153 +298,3 @@ export enum SDKEventType {
   Network = 'network',
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Proto ↔ TS bridges (GAP 01 Phase 5 — drift prevention)
-// ────────────────────────────────────────────────────────────────────────────
-
-export function sdkEnvironmentToProto(e: SDKEnvironment): proto.SDKEnvironment {
-  switch (e) {
-    case SDKEnvironment.Development: return proto.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-    case SDKEnvironment.Staging:     return proto.SDKEnvironment.SDK_ENVIRONMENT_STAGING;
-    case SDKEnvironment.Production:  return proto.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
-  }
-}
-
-export function sdkEnvironmentFromProto(p: proto.SDKEnvironment): SDKEnvironment {
-  switch (p) {
-    case proto.SDKEnvironment.SDK_ENVIRONMENT_STAGING:    return SDKEnvironment.Staging;
-    case proto.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION: return SDKEnvironment.Production;
-    default:                                              return SDKEnvironment.Development;
-  }
-}
-
-export function audioFormatToProto(a: AudioFormat): proto.AudioFormat {
-  switch (a) {
-    case AudioFormat.PCM:  return proto.AudioFormat.AUDIO_FORMAT_PCM;
-    case AudioFormat.WAV:  return proto.AudioFormat.AUDIO_FORMAT_WAV;
-    case AudioFormat.MP3:  return proto.AudioFormat.AUDIO_FORMAT_MP3;
-    case AudioFormat.M4A:  return proto.AudioFormat.AUDIO_FORMAT_M4A;
-    case AudioFormat.FLAC: return proto.AudioFormat.AUDIO_FORMAT_FLAC;
-    case AudioFormat.OPUS: return proto.AudioFormat.AUDIO_FORMAT_OPUS;
-    case AudioFormat.AAC:  return proto.AudioFormat.AUDIO_FORMAT_AAC;
-  }
-}
-
-export function audioFormatFromProto(p: proto.AudioFormat): AudioFormat | undefined {
-  switch (p) {
-    case proto.AudioFormat.AUDIO_FORMAT_PCM:  return AudioFormat.PCM;
-    case proto.AudioFormat.AUDIO_FORMAT_WAV:  return AudioFormat.WAV;
-    case proto.AudioFormat.AUDIO_FORMAT_MP3:  return AudioFormat.MP3;
-    case proto.AudioFormat.AUDIO_FORMAT_M4A:  return AudioFormat.M4A;
-    case proto.AudioFormat.AUDIO_FORMAT_FLAC: return AudioFormat.FLAC;
-    case proto.AudioFormat.AUDIO_FORMAT_OPUS: return AudioFormat.OPUS;
-    case proto.AudioFormat.AUDIO_FORMAT_AAC:  return AudioFormat.AAC;
-    default:                                   return undefined; // PCM_S16LE / OGG / UNSPEC / UNRECOGNIZED
-  }
-}
-
-export function modelFormatToProto(f: ModelFormat): proto.ModelFormat {
-  switch (f) {
-    case ModelFormat.GGUF:        return proto.ModelFormat.MODEL_FORMAT_GGUF;
-    case ModelFormat.GGML:        return proto.ModelFormat.MODEL_FORMAT_GGML;
-    case ModelFormat.ONNX:        return proto.ModelFormat.MODEL_FORMAT_ONNX;
-    case ModelFormat.MLModel:     return proto.ModelFormat.MODEL_FORMAT_MLMODEL;
-    case ModelFormat.MLPackage:   return proto.ModelFormat.MODEL_FORMAT_MLPACKAGE;
-    case ModelFormat.TFLite:      return proto.ModelFormat.MODEL_FORMAT_TFLITE;
-    case ModelFormat.SafeTensors: return proto.ModelFormat.MODEL_FORMAT_SAFETENSORS;
-    case ModelFormat.Bin:         return proto.ModelFormat.MODEL_FORMAT_BIN;
-    case ModelFormat.Zip:         return proto.ModelFormat.MODEL_FORMAT_ZIP;
-    case ModelFormat.Folder:      return proto.ModelFormat.MODEL_FORMAT_FOLDER;
-    case ModelFormat.Proprietary: return proto.ModelFormat.MODEL_FORMAT_PROPRIETARY;
-    case ModelFormat.Unknown:     return proto.ModelFormat.MODEL_FORMAT_UNKNOWN;
-  }
-}
-
-export function modelFormatFromProto(p: proto.ModelFormat): ModelFormat {
-  switch (p) {
-    case proto.ModelFormat.MODEL_FORMAT_GGUF:        return ModelFormat.GGUF;
-    case proto.ModelFormat.MODEL_FORMAT_GGML:        return ModelFormat.GGML;
-    case proto.ModelFormat.MODEL_FORMAT_ONNX:        return ModelFormat.ONNX;
-    case proto.ModelFormat.MODEL_FORMAT_MLMODEL:     return ModelFormat.MLModel;
-    case proto.ModelFormat.MODEL_FORMAT_MLPACKAGE:   return ModelFormat.MLPackage;
-    case proto.ModelFormat.MODEL_FORMAT_TFLITE:      return ModelFormat.TFLite;
-    case proto.ModelFormat.MODEL_FORMAT_SAFETENSORS: return ModelFormat.SafeTensors;
-    case proto.ModelFormat.MODEL_FORMAT_BIN:         return ModelFormat.Bin;
-    case proto.ModelFormat.MODEL_FORMAT_ZIP:         return ModelFormat.Zip;
-    case proto.ModelFormat.MODEL_FORMAT_FOLDER:      return ModelFormat.Folder;
-    case proto.ModelFormat.MODEL_FORMAT_PROPRIETARY: return ModelFormat.Proprietary;
-    default:                                         return ModelFormat.Unknown;
-  }
-}
-
-export function modelCategoryToProto(c: ModelCategory): proto.ModelCategory {
-  switch (c) {
-    case ModelCategory.Language:           return proto.ModelCategory.MODEL_CATEGORY_LANGUAGE;
-    case ModelCategory.SpeechRecognition:  return proto.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
-    case ModelCategory.SpeechSynthesis:    return proto.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
-    case ModelCategory.Vision:             return proto.ModelCategory.MODEL_CATEGORY_VISION;
-    case ModelCategory.ImageGeneration:    return proto.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION;
-    case ModelCategory.Multimodal:         return proto.ModelCategory.MODEL_CATEGORY_MULTIMODAL;
-    case ModelCategory.Audio:              return proto.ModelCategory.MODEL_CATEGORY_AUDIO;
-    case ModelCategory.Embedding:          return proto.ModelCategory.MODEL_CATEGORY_EMBEDDING;
-  }
-}
-
-export function modelCategoryFromProto(p: proto.ModelCategory): ModelCategory {
-  switch (p) {
-    case proto.ModelCategory.MODEL_CATEGORY_LANGUAGE:                 return ModelCategory.Language;
-    case proto.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:       return ModelCategory.SpeechRecognition;
-    case proto.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:         return ModelCategory.SpeechSynthesis;
-    case proto.ModelCategory.MODEL_CATEGORY_VISION:                   return ModelCategory.Vision;
-    case proto.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION:         return ModelCategory.ImageGeneration;
-    case proto.ModelCategory.MODEL_CATEGORY_MULTIMODAL:               return ModelCategory.Multimodal;
-    case proto.ModelCategory.MODEL_CATEGORY_EMBEDDING:                return ModelCategory.Embedding;
-    // AUDIO + VOICE_ACTIVITY_DETECTION both collapse to Audio (TS has no VAD category)
-    default:                                                          return ModelCategory.Audio;
-  }
-}
-
-export function llmFrameworkToProto(f: LLMFramework): proto.InferenceFramework {
-  switch (f) {
-    case LLMFramework.CoreML:             return proto.InferenceFramework.INFERENCE_FRAMEWORK_COREML;
-    case LLMFramework.TensorFlowLite:     return proto.InferenceFramework.INFERENCE_FRAMEWORK_TFLITE;
-    case LLMFramework.MLX:                return proto.InferenceFramework.INFERENCE_FRAMEWORK_MLX;
-    case LLMFramework.SwiftTransformers:  return proto.InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS;
-    case LLMFramework.ONNX:               return proto.InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
-    case LLMFramework.Sherpa:             return proto.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
-    case LLMFramework.ExecuTorch:         return proto.InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH;
-    case LLMFramework.LlamaCpp:           return proto.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
-    case LLMFramework.FoundationModels:   return proto.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS;
-    case LLMFramework.PicoLLM:            return proto.InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM;
-    case LLMFramework.MLC:                return proto.InferenceFramework.INFERENCE_FRAMEWORK_MLC;
-    case LLMFramework.MediaPipe:          return proto.InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE;
-    case LLMFramework.WhisperKit:         return proto.InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT;
-    case LLMFramework.OpenAIWhisper:      return proto.InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER;
-    case LLMFramework.SystemTTS:          return proto.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
-    case LLMFramework.PiperTTS:           return proto.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS;
-    case LLMFramework.Genie:              return proto.InferenceFramework.INFERENCE_FRAMEWORK_GENIE;
-  }
-}
-
-export function llmFrameworkFromProto(p: proto.InferenceFramework): LLMFramework | undefined {
-  switch (p) {
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_COREML:              return LLMFramework.CoreML;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:              return LLMFramework.TensorFlowLite;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_MLX:                 return LLMFramework.MLX;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:  return LLMFramework.SwiftTransformers;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:                return LLMFramework.ONNX;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:              return LLMFramework.Sherpa;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:          return LLMFramework.ExecuTorch;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:           return LLMFramework.LlamaCpp;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:   return LLMFramework.FoundationModels;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:            return LLMFramework.PicoLLM;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_MLC:                 return LLMFramework.MLC;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:           return LLMFramework.MediaPipe;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT:          return LLMFramework.WhisperKit;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER:      return LLMFramework.OpenAIWhisper;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:          return LLMFramework.SystemTTS;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:           return LLMFramework.PiperTTS;
-    case proto.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:               return LLMFramework.Genie;
-    default:                                                                return undefined;
-  }
-}

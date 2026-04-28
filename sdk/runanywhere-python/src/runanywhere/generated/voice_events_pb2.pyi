@@ -43,6 +43,22 @@ class PipelineState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PIPELINE_STATE_THINKING: _ClassVar[PipelineState]
     PIPELINE_STATE_SPEAKING: _ClassVar[PipelineState]
     PIPELINE_STATE_STOPPED: _ClassVar[PipelineState]
+
+class ComponentLoadState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    COMPONENT_LOAD_STATE_UNSPECIFIED: _ClassVar[ComponentLoadState]
+    COMPONENT_LOAD_STATE_NOT_LOADED: _ClassVar[ComponentLoadState]
+    COMPONENT_LOAD_STATE_LOADING: _ClassVar[ComponentLoadState]
+    COMPONENT_LOAD_STATE_LOADED: _ClassVar[ComponentLoadState]
+    COMPONENT_LOAD_STATE_ERROR: _ClassVar[ComponentLoadState]
+
+class VoiceSessionErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    VOICE_SESSION_ERROR_CODE_UNSPECIFIED: _ClassVar[VoiceSessionErrorCode]
+    VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED: _ClassVar[VoiceSessionErrorCode]
+    VOICE_SESSION_ERROR_CODE_NOT_READY: _ClassVar[VoiceSessionErrorCode]
+    VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING: _ClassVar[VoiceSessionErrorCode]
+    VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE: _ClassVar[VoiceSessionErrorCode]
 TOKEN_KIND_UNSPECIFIED: TokenKind
 TOKEN_KIND_ANSWER: TokenKind
 TOKEN_KIND_THOUGHT: TokenKind
@@ -66,9 +82,19 @@ PIPELINE_STATE_LISTENING: PipelineState
 PIPELINE_STATE_THINKING: PipelineState
 PIPELINE_STATE_SPEAKING: PipelineState
 PIPELINE_STATE_STOPPED: PipelineState
+COMPONENT_LOAD_STATE_UNSPECIFIED: ComponentLoadState
+COMPONENT_LOAD_STATE_NOT_LOADED: ComponentLoadState
+COMPONENT_LOAD_STATE_LOADING: ComponentLoadState
+COMPONENT_LOAD_STATE_LOADED: ComponentLoadState
+COMPONENT_LOAD_STATE_ERROR: ComponentLoadState
+VOICE_SESSION_ERROR_CODE_UNSPECIFIED: VoiceSessionErrorCode
+VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED: VoiceSessionErrorCode
+VOICE_SESSION_ERROR_CODE_NOT_READY: VoiceSessionErrorCode
+VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING: VoiceSessionErrorCode
+VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE: VoiceSessionErrorCode
 
 class VoiceEvent(_message.Message):
-    __slots__ = ("seq", "timestamp_us", "user_said", "assistant_token", "audio", "vad", "interrupted", "state", "error", "metrics")
+    __slots__ = ("seq", "timestamp_us", "user_said", "assistant_token", "audio", "vad", "interrupted", "state", "error", "metrics", "component_state_changed", "session_error", "session_started", "session_stopped", "agent_response_started", "agent_response_completed")
     SEQ_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_US_FIELD_NUMBER: _ClassVar[int]
     USER_SAID_FIELD_NUMBER: _ClassVar[int]
@@ -79,6 +105,12 @@ class VoiceEvent(_message.Message):
     STATE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     METRICS_FIELD_NUMBER: _ClassVar[int]
+    COMPONENT_STATE_CHANGED_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ERROR_FIELD_NUMBER: _ClassVar[int]
+    SESSION_STARTED_FIELD_NUMBER: _ClassVar[int]
+    SESSION_STOPPED_FIELD_NUMBER: _ClassVar[int]
+    AGENT_RESPONSE_STARTED_FIELD_NUMBER: _ClassVar[int]
+    AGENT_RESPONSE_COMPLETED_FIELD_NUMBER: _ClassVar[int]
     seq: int
     timestamp_us: int
     user_said: UserSaidEvent
@@ -89,7 +121,13 @@ class VoiceEvent(_message.Message):
     state: StateChangeEvent
     error: ErrorEvent
     metrics: MetricsEvent
-    def __init__(self, seq: _Optional[int] = ..., timestamp_us: _Optional[int] = ..., user_said: _Optional[_Union[UserSaidEvent, _Mapping]] = ..., assistant_token: _Optional[_Union[AssistantTokenEvent, _Mapping]] = ..., audio: _Optional[_Union[AudioFrameEvent, _Mapping]] = ..., vad: _Optional[_Union[VADEvent, _Mapping]] = ..., interrupted: _Optional[_Union[InterruptedEvent, _Mapping]] = ..., state: _Optional[_Union[StateChangeEvent, _Mapping]] = ..., error: _Optional[_Union[ErrorEvent, _Mapping]] = ..., metrics: _Optional[_Union[MetricsEvent, _Mapping]] = ...) -> None: ...
+    component_state_changed: VoiceAgentComponentStates
+    session_error: VoiceSessionError
+    session_started: SessionStartedEvent
+    session_stopped: SessionStoppedEvent
+    agent_response_started: AgentResponseStartedEvent
+    agent_response_completed: AgentResponseCompletedEvent
+    def __init__(self, seq: _Optional[int] = ..., timestamp_us: _Optional[int] = ..., user_said: _Optional[_Union[UserSaidEvent, _Mapping]] = ..., assistant_token: _Optional[_Union[AssistantTokenEvent, _Mapping]] = ..., audio: _Optional[_Union[AudioFrameEvent, _Mapping]] = ..., vad: _Optional[_Union[VADEvent, _Mapping]] = ..., interrupted: _Optional[_Union[InterruptedEvent, _Mapping]] = ..., state: _Optional[_Union[StateChangeEvent, _Mapping]] = ..., error: _Optional[_Union[ErrorEvent, _Mapping]] = ..., metrics: _Optional[_Union[MetricsEvent, _Mapping]] = ..., component_state_changed: _Optional[_Union[VoiceAgentComponentStates, _Mapping]] = ..., session_error: _Optional[_Union[VoiceSessionError, _Mapping]] = ..., session_started: _Optional[_Union[SessionStartedEvent, _Mapping]] = ..., session_stopped: _Optional[_Union[SessionStoppedEvent, _Mapping]] = ..., agent_response_started: _Optional[_Union[AgentResponseStartedEvent, _Mapping]] = ..., agent_response_completed: _Optional[_Union[AgentResponseCompletedEvent, _Mapping]] = ...) -> None: ...
 
 class UserSaidEvent(_message.Message):
     __slots__ = ("text", "is_final", "confidence", "audio_start_us", "audio_end_us")
@@ -182,3 +220,45 @@ class MetricsEvent(_message.Message):
     is_over_budget: bool
     created_at_ns: int
     def __init__(self, stt_final_ms: _Optional[float] = ..., llm_first_token_ms: _Optional[float] = ..., tts_first_audio_ms: _Optional[float] = ..., end_to_end_ms: _Optional[float] = ..., tokens_generated: _Optional[int] = ..., audio_samples_played: _Optional[int] = ..., is_over_budget: _Optional[bool] = ..., created_at_ns: _Optional[int] = ...) -> None: ...
+
+class VoiceAgentComponentStates(_message.Message):
+    __slots__ = ("stt_state", "llm_state", "tts_state", "vad_state", "ready", "any_loading")
+    STT_STATE_FIELD_NUMBER: _ClassVar[int]
+    LLM_STATE_FIELD_NUMBER: _ClassVar[int]
+    TTS_STATE_FIELD_NUMBER: _ClassVar[int]
+    VAD_STATE_FIELD_NUMBER: _ClassVar[int]
+    READY_FIELD_NUMBER: _ClassVar[int]
+    ANY_LOADING_FIELD_NUMBER: _ClassVar[int]
+    stt_state: ComponentLoadState
+    llm_state: ComponentLoadState
+    tts_state: ComponentLoadState
+    vad_state: ComponentLoadState
+    ready: bool
+    any_loading: bool
+    def __init__(self, stt_state: _Optional[_Union[ComponentLoadState, str]] = ..., llm_state: _Optional[_Union[ComponentLoadState, str]] = ..., tts_state: _Optional[_Union[ComponentLoadState, str]] = ..., vad_state: _Optional[_Union[ComponentLoadState, str]] = ..., ready: _Optional[bool] = ..., any_loading: _Optional[bool] = ...) -> None: ...
+
+class VoiceSessionError(_message.Message):
+    __slots__ = ("code", "message", "failed_component")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    FAILED_COMPONENT_FIELD_NUMBER: _ClassVar[int]
+    code: VoiceSessionErrorCode
+    message: str
+    failed_component: str
+    def __init__(self, code: _Optional[_Union[VoiceSessionErrorCode, str]] = ..., message: _Optional[str] = ..., failed_component: _Optional[str] = ...) -> None: ...
+
+class SessionStartedEvent(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class SessionStoppedEvent(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class AgentResponseStartedEvent(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class AgentResponseCompletedEvent(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

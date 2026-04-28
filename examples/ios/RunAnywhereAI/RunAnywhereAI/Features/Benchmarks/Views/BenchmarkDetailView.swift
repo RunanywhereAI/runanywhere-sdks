@@ -130,7 +130,7 @@ struct BenchmarkDetailView: View {
         }
         .navigationTitle("Benchmark Details")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayModeCompat(.inline)
         #endif
         .task {
             jsonURL = viewModel.shareJSON(run: run)

@@ -16,7 +16,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
@@ -187,7 +187,7 @@ private val scanLock = Any()
 
 actual suspend fun RunAnywhere.availableModels(): List<ModelInfo> {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     // Scan for downloaded models once on first call
@@ -241,7 +241,7 @@ private fun syncRegisteredModelsWithBridge() {
 
 actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     val type =
         when (category) {
@@ -259,14 +259,14 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
 
 actual suspend fun RunAnywhere.downloadedModels(): List<ModelInfo> {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     return CppBridgeModelRegistry.getDownloaded().map { bridgeModelToPublic(it) }
 }
 
 actual suspend fun RunAnywhere.model(modelId: String): ModelInfo? {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     // Get model from C++ registry
     val bridgeModel = CppBridgeModelRegistry.get(modelId) ?: return null
@@ -338,7 +338,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
     if (registeredModel?.category == ModelCategory.EMBEDDING) {
         val downloadUrl =
             registeredModel.downloadURL
-                ?: return flow { throw SDKError.model("Model '$modelId' has no download URL") }
+                ?: return flow { throw SDKException.model("Model '$modelId' has no download URL") }
         val companions = getCompanionFiles(modelId) ?: emptyList()
         return flow {
             SDKLogger.download.info("EMBEDDING download: $modelId (${companions.size} companion file(s))")
@@ -357,7 +357,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
         val (isNetworkAvailable, networkDescription) = CppBridgeDownload.checkNetworkStatus()
         if (!isNetworkAvailable) {
             downloadLogger.error("No internet connection: $networkDescription")
-            throw SDKError.networkUnavailable(
+            throw SDKException.networkUnavailable(
                 IllegalStateException("No internet connection. Please check your network settings and try again."),
             )
         }
@@ -368,11 +368,11 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
         val modelInfo =
             getRegisteredModels().find { it.id == modelId }
                 ?: getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
-                ?: throw SDKError.model("Model '$modelId' not found in registry")
+                ?: throw SDKException.model("Model '$modelId' not found in registry")
 
         val downloadUrl =
             modelInfo.downloadURL
-                ?: throw SDKError.model("Model '$modelId' has no download URL")
+                ?: throw SDKException.model("Model '$modelId' has no download URL")
 
         downloadLogger.info("Starting download for model: $modelId")
         downloadLogger.info("  URL: $downloadUrl")
@@ -646,7 +646,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     modelType = modelType,
                     priority = CppBridgeDownload.DownloadPriority.NORMAL,
                     expectedChecksum = null,
-                ) ?: throw SDKError.download("Failed to start download for model: $modelId")
+                ) ?: throw SDKException.download("Failed to start download for model: $modelId")
 
             activeDownloadIdsByModel[modelId] = downloadId
             downloadLogger.info("Download queued with ID: $downloadId, waiting for completion...")
@@ -668,7 +668,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                         error = errorMsg,
                     ),
                 )
-                throw SDKError.download("Download failed for model: $modelId - $errorMsg")
+                throw SDKException.download("Download failed for model: $modelId - $errorMsg")
             }
 
             // 11. Get the downloaded file path
@@ -770,7 +770,7 @@ private suspend fun extractArchive(
     withContext(Dispatchers.IO) {
         val parentDir = archiveFile.parentFile
         if (parentDir == null || !parentDir.exists()) {
-            throw SDKError.download("Cannot determine extraction directory for: ${archiveFile.absolutePath}")
+            throw SDKException.download("Cannot determine extraction directory for: ${archiveFile.absolutePath}")
         }
 
         logger.info("Extracting to parent: ${parentDir.absolutePath}")
@@ -789,7 +789,7 @@ private suspend fun extractArchive(
                 archiveFile.delete()
             }
         } catch (e: Exception) {
-            throw SDKError.download("Failed to prepare archive for extraction: ${e.message}")
+            throw SDKException.download("Failed to prepare archive for extraction: ${e.message}")
         }
 
         try {
@@ -800,7 +800,7 @@ private suspend fun extractArchive(
                     parentDir.absolutePath,
                 )
             if (result != 0) {
-                throw SDKError.download("Native extraction failed with code: $result")
+                throw SDKException.download("Native extraction failed with code: $result")
             }
             logger.info("Native extraction completed successfully")
         } finally {
@@ -1006,9 +1006,10 @@ private fun downloadFileWithNativeRunner(
     // model download (companion-file flow) used to skip the provider check; this
     // unifies it with the regular single-file flow in CppBridgeDownload.
     CppBridgeDownload.downloadProvider?.let { provider ->
-        val ok = provider.download(url, destFile.absolutePath) { bytes, total ->
-            if (total > 0) progressCallback(bytes.toFloat() / total.toFloat())
-        }
+        val ok =
+            provider.download(url, destFile.absolutePath) { bytes, total ->
+                if (total > 0) progressCallback(bytes.toFloat() / total.toFloat())
+            }
         if (!ok) {
             throw IOException("Download failed for $url (DownloadProvider returned false)")
         }
@@ -1043,7 +1044,7 @@ private fun downloadFileWithNativeRunner(
 
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     val activeDownloadId = activeDownloadIdsByModel.remove(modelId)
     if (activeDownloadId != null) {
@@ -1054,7 +1055,7 @@ actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
 
 actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     val model = CppBridgeModelRegistry.get(modelId) ?: return false
     return model.localPath != null && model.localPath.isNotEmpty()
@@ -1062,7 +1063,7 @@ actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
 
 actual suspend fun RunAnywhere.deleteModel(modelId: String) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId)
     CppBridgeModelRegistry.remove(modelId)
@@ -1070,7 +1071,7 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
 
 actual suspend fun RunAnywhere.deleteAllModels() {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     val downloaded = CppBridgeModelRegistry.getDownloaded()
     downloaded.forEach { model ->
@@ -1093,7 +1094,7 @@ actual suspend fun RunAnywhere.refreshModelRegistry(
     pruneOrphans: Boolean,
 ) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     modelsLogger.info("Refreshing model registry via rac_model_registry_refresh")
     val rc =
@@ -1109,27 +1110,27 @@ actual suspend fun RunAnywhere.refreshModelRegistry(
 
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     val model =
         CppBridgeModelRegistry.get(modelId)
-            ?: throw SDKError.model("Model '$modelId' not found in registry")
+            ?: throw SDKException.model("Model '$modelId' not found in registry")
 
     val localPath =
         model.localPath
-            ?: throw SDKError.model("Model '$modelId' is not downloaded")
+            ?: throw SDKException.model("Model '$modelId' is not downloaded")
 
     // Pass modelPath, modelId, and modelName separately for correct telemetry
     val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
     if (result != 0) {
-        throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
+        throw SDKException.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }
 }
 
 actual suspend fun RunAnywhere.unloadLLMModel() {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
     CppBridgeLLM.unload()
 }
@@ -1161,16 +1162,16 @@ actual suspend fun RunAnywhere.currentSTTModel(): ModelInfo? {
 
 actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     val model =
         CppBridgeModelRegistry.get(modelId)
-            ?: throw SDKError.model("Model '$modelId' not found in registry")
+            ?: throw SDKException.model("Model '$modelId' not found in registry")
 
     val localPath =
         model.localPath
-            ?: throw SDKError.model("Model '$modelId' is not downloaded")
+            ?: throw SDKException.model("Model '$modelId' is not downloaded")
 
     // Run native load on IO thread to avoid ANR and native crashes on main thread
     val result =
@@ -1208,7 +1209,7 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
             CppBridgeSTT.loadModel(localPath, modelId, model.name)
         }
     if (result != 0) {
-        throw SDKError.stt(
+        throw SDKException.stt(
             "Failed to load STT model '$modelId' (error code: $result). " +
                 "Ensure the model is extracted and contains either an *encoder*.onnx + *decoder*.onnx + *tokens*.txt " +
                 "set (Whisper / transducer) or a model.onnx + tokens.txt pair (NeMo CTC).",
@@ -1235,7 +1236,7 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
 actual suspend fun RunAnywhere.fetchModelAssignments(forceRefresh: Boolean): List<ModelInfo> =
     withContext(Dispatchers.IO) {
         if (!isInitialized) {
-            throw SDKError.notInitialized("SDK not initialized")
+            throw SDKException.notInitialized("SDK not initialized")
         }
 
         ensureServicesReady()

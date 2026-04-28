@@ -14,7 +14,7 @@
  * The sherpa-onnx module is lazy-loaded on first use of STT/TTS/VAD.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger, HTTPAdapter } from '@runanywhere/web';
+import { SDKException, SDKErrorCode, SDKLogger, HTTPAdapter } from '@runanywhere/web';
 
 const logger = new SDKLogger('SherpaONNX');
 
@@ -155,7 +155,7 @@ export class SherpaONNXBridge {
 
   get module(): SherpaONNXModule {
     if (!this._module) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMNotLoaded,
         'Sherpa-ONNX WASM not loaded. Call ensureLoaded() first.',
       );
@@ -292,7 +292,7 @@ export class SherpaONNXBridge {
       this._loaded = false;
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load Sherpa-ONNX WASM: ${message}`);
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMLoadFailed,
         `Failed to load Sherpa-ONNX WASM module: ${message}. ` +
         'Build with: ./wasm/scripts/build-sherpa-onnx.sh',
@@ -345,7 +345,7 @@ export class SherpaONNXBridge {
       };
     }
 
-    throw new SDKError(SDKErrorCode.WASMNotLoaded, 'Sherpa-ONNX FS not available');
+    throw new SDKException(SDKErrorCode.WASMNotLoaded, 'Sherpa-ONNX FS not available');
   }
 
   /**
@@ -458,7 +458,7 @@ export class SherpaONNXBridge {
     // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: ONNX-only consumers may not load a commons HTTP module.
     const response = await fetch(url); // fetch() carve-out: fallback when no WASM module registered.
     if (!response.ok) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.NetworkError,
         `Failed to download ${url}: ${response.status} ${response.statusText}`,
       );

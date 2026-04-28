@@ -232,7 +232,7 @@ extension CppBridge.Events {
     }
 
     /// Emit download failed event via C++
-    public static func emitDownloadFailed(modelId: String, error: SDKError) {
+    public static func emitDownloadFailed(modelId: String, error: SDKException) {
         modelId.withCString { modelIdPtr in
             error.message.withCString { errorMsgPtr in
                 var eventData = rac_analytics_event_data_t()
@@ -305,7 +305,7 @@ extension CppBridge.Events {
     }
 
     /// Emit extraction failed event via C++
-    public static func emitExtractionFailed(modelId: String, error: SDKError) {
+    public static func emitExtractionFailed(modelId: String, error: SDKException) {
         modelId.withCString { modelIdPtr in
             error.message.withCString { errorMsgPtr in
                 var eventData = rac_analytics_event_data_t()
@@ -357,7 +357,7 @@ extension CppBridge.Events {
     }
 
     /// Emit SDK init failed event via C++
-    public static func emitSDKInitFailed(error: SDKError) {
+    public static func emitSDKInitFailed(error: SDKException) {
         error.message.withCString { errorMsgPtr in
             var eventData = rac_analytics_event_data_t()
             eventData.type = RAC_EVENT_SDK_INIT_FAILED
@@ -393,7 +393,7 @@ extension CppBridge.Events {
     }
 
     /// Emit storage cache clear failed event via C++
-    public static func emitStorageCacheClearFailed(error: SDKError) {
+    public static func emitStorageCacheClearFailed(error: SDKException) {
         error.message.withCString { errorMsgPtr in
             var eventData = rac_analytics_event_data_t()
             eventData.type = RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED
@@ -434,7 +434,7 @@ extension CppBridge.Events {
     }
 
     /// Emit voice agent turn failed event via C++
-    public static func emitVoiceAgentTurnFailed(error: SDKError) {
+    public static func emitVoiceAgentTurnFailed(error: SDKException) {
         error.message.withCString { errorMsgPtr in
             var eventData = rac_analytics_event_data_t()
             eventData.type = RAC_EVENT_VOICE_AGENT_TURN_FAILED
@@ -461,7 +461,7 @@ extension CppBridge.Events {
     }
 
     /// Emit device registration failed event via C++
-    public static func emitDeviceRegistrationFailed(error: SDKError) {
+    public static func emitDeviceRegistrationFailed(error: SDKException) {
         error.message.withCString { errorMsgPtr in
             var eventData = rac_analytics_event_data_t()
             eventData.type = RAC_EVENT_DEVICE_REGISTRATION_FAILED
@@ -475,7 +475,7 @@ extension CppBridge.Events {
     // MARK: - SDK Error Events
 
     /// Emit SDK error event via C++
-    public static func emitSDKError(error: SDKError, operation: String, context: String? = nil) {
+    public static func emitSDKError(error: SDKException, operation: String, context: String? = nil) {
         error.message.withCString { errorMsgPtr in
             operation.withCString { operationPtr in
                 var eventData = rac_analytics_event_data_t()

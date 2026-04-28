@@ -218,11 +218,17 @@ object CppBridgeDownload {
     /** Observer hook for UI + orchestration layers. */
     interface DownloadListener {
         fun onDownloadStarted(downloadId: String, modelId: String, url: String)
+
         fun onDownloadProgress(downloadId: String, downloadedBytes: Long, totalBytes: Long, progress: Int)
+
         fun onDownloadCompleted(downloadId: String, modelId: String, filePath: String, fileSize: Long)
+
         fun onDownloadFailed(downloadId: String, modelId: String, error: Int, errorMessage: String)
+
         fun onDownloadPaused(downloadId: String)
+
         fun onDownloadResumed(downloadId: String)
+
         fun onDownloadCancelled(downloadId: String)
     }
 
@@ -364,15 +370,16 @@ object CppBridgeDownload {
             }
 
             val downloadId = UUID.randomUUID().toString()
-            val task = DownloadTask(
-                downloadId = downloadId,
-                url = url,
-                destinationPath = tempPath,
-                modelId = modelId,
-                modelType = modelType,
-                priority = priority,
-                expectedChecksum = expectedChecksum,
-            )
+            val task =
+                DownloadTask(
+                    downloadId = downloadId,
+                    url = url,
+                    destinationPath = tempPath,
+                    modelId = modelId,
+                    modelType = modelType,
+                    priority = priority,
+                    expectedChecksum = expectedChecksum,
+                )
             activeDownloads[downloadId] = task
 
             CppBridgePlatformAdapter.logCallback(
@@ -544,11 +551,12 @@ object CppBridgeDownload {
             // interceptors / proxies. The provider is responsible for
             // checksum verification on its side.
             downloadProvider?.let { provider ->
-                val success = provider.download(task.url, task.destinationPath) { bytes, total ->
-                    task.downloadedBytes = bytes
-                    task.totalBytes = total
-                    notifyProgress(task)
-                }
+                val success =
+                    provider.download(task.url, task.destinationPath) { bytes, total ->
+                        task.downloadedBytes = bytes
+                        task.totalBytes = total
+                        notifyProgress(task)
+                    }
                 if (success) {
                     completeDownload(task)
                 } else {
@@ -558,28 +566,30 @@ object CppBridgeDownload {
             }
 
             // Native libcurl runner via JNI.
-            val listener = NativeDownloadProgressListener { bytes, total ->
-                // Cancellation: pause or cancel → tell libcurl to stop.
-                val s = task.status
-                if (s == DownloadStatus.CANCELLED || s == DownloadStatus.PAUSED) {
-                    return@NativeDownloadProgressListener false
+            val listener =
+                NativeDownloadProgressListener { bytes, total ->
+                    // Cancellation: pause or cancel → tell libcurl to stop.
+                    val s = task.status
+                    if (s == DownloadStatus.CANCELLED || s == DownloadStatus.PAUSED) {
+                        return@NativeDownloadProgressListener false
+                    }
+                    task.downloadedBytes = bytes
+                    if (total > 0) task.totalBytes = total
+                    notifyProgress(task)
+                    true
                 }
-                task.downloadedBytes = bytes
-                if (total > 0) task.totalBytes = total
-                notifyProgress(task)
-                true
-            }
 
             val outStatus = IntArray(1)
-            val rc = RunAnywhereBridge.racHttpDownloadExecute(
-                url = task.url,
-                destPath = task.destinationPath,
-                expectedSha256Hex = task.expectedChecksum,
-                resumeFromByte = resumeFrom,
-                timeoutMs = DEFAULT_READ_TIMEOUT_MS,
-                listener = listener,
-                outHttpStatus = outStatus,
-            )
+            val rc =
+                RunAnywhereBridge.racHttpDownloadExecute(
+                    url = task.url,
+                    destPath = task.destinationPath,
+                    expectedSha256Hex = task.expectedChecksum,
+                    resumeFromByte = resumeFrom,
+                    timeoutMs = DEFAULT_READ_TIMEOUT_MS,
+                    listener = listener,
+                    outHttpStatus = outStatus,
+                )
 
             when (rc) {
                 DownloadError.NONE -> completeDownload(task)
@@ -713,13 +723,14 @@ internal object HttpURLConnectionDownloadProvider : CppBridgeDownload.DownloadPr
         var currentUrl = url
         return try {
             while (redirectCount < MAX_REDIRECTS) {
-                val conn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = CONNECT_TIMEOUT_MS
-                    readTimeout = READ_TIMEOUT_MS
-                    instanceFollowRedirects = false
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "RunAnywhere-SDK-Commons/1.0")
-                }
+                val conn =
+                    (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                        instanceFollowRedirects = false
+                        requestMethod = "GET"
+                        setRequestProperty("User-Agent", "RunAnywhere-SDK-Commons/1.0")
+                    }
                 val code = conn.responseCode
                 when (code) {
                     in 200..299 -> {
@@ -748,14 +759,19 @@ internal object HttpURLConnectionDownloadProvider : CppBridgeDownload.DownloadPr
                         return true
                     }
                     301, 302, 303, 307, 308 -> {
-                        val location = conn.getHeaderField("Location")
-                            ?: run { conn.disconnect(); return false }
+                        val location =
+                            conn.getHeaderField("Location")
+                                ?: run {
+                                    conn.disconnect()
+                                    return false
+                                }
                         conn.disconnect()
-                        currentUrl = if (location.startsWith("http")) {
-                            location
-                        } else {
-                            URL(URL(currentUrl), location).toString()
-                        }
+                        currentUrl =
+                            if (location.startsWith("http")) {
+                                location
+                            } else {
+                                URL(URL(currentUrl), location).toString()
+                            }
                         redirectCount++
                     }
                     else -> {

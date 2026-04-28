@@ -60,6 +60,8 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_tool
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
+enum ToolCallFormatName : int;
+extern const uint32_t ToolCallFormatName_internal_data_[];
 enum ToolParameterType : int;
 extern const uint32_t ToolParameterType_internal_data_[];
 class ToolCall;
@@ -106,6 +108,9 @@ extern const ::google::protobuf::internal::ClassDataFull ToolValueObject_FieldsE
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
+template <>
+internal::EnumTraitsT<::runanywhere::v1::ToolCallFormatName_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::ToolCallFormatName>;
 template <>
 internal::EnumTraitsT<::runanywhere::v1::ToolParameterType_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ToolParameterType>;
@@ -156,6 +161,51 @@ template <>
 [[nodiscard]] inline bool ToolParameterType_Parse(
     ::absl::string_view name, ToolParameterType* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<ToolParameterType>(ToolParameterType_descriptor(), name,
+                                           value);
+}
+enum ToolCallFormatName : int {
+  TOOL_CALL_FORMAT_NAME_UNSPECIFIED = 0,
+  TOOL_CALL_FORMAT_NAME_JSON = 1,
+  TOOL_CALL_FORMAT_NAME_XML = 2,
+  TOOL_CALL_FORMAT_NAME_NATIVE = 3,
+  TOOL_CALL_FORMAT_NAME_PYTHONIC = 4,
+  TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS = 5,
+  TOOL_CALL_FORMAT_NAME_HERMES = 6,
+  ToolCallFormatName_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  ToolCallFormatName_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t ToolCallFormatName_internal_data_[];
+inline constexpr ToolCallFormatName ToolCallFormatName_MIN =
+    static_cast<ToolCallFormatName>(0);
+inline constexpr ToolCallFormatName ToolCallFormatName_MAX =
+    static_cast<ToolCallFormatName>(6);
+[[nodiscard]] inline bool ToolCallFormatName_IsValid(int value) {
+  return 0 <= value && value <= 6;
+}
+inline constexpr int ToolCallFormatName_ARRAYSIZE = 6 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+ToolCallFormatName_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(ToolCallFormatName) {
+  return ToolCallFormatName_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& ToolCallFormatName_Name(T value) {
+  static_assert(::std::is_same<T, ToolCallFormatName>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to ToolCallFormatName_Name().");
+  return ToolCallFormatName_Name(static_cast<ToolCallFormatName>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& ToolCallFormatName_Name(ToolCallFormatName value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<ToolCallFormatName_descriptor, 0, 6>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool ToolCallFormatName_Parse(
+    ::absl::string_view name, ToolCallFormatName* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<ToolCallFormatName>(ToolCallFormatName_descriptor(), name,
                                            value);
 }
 
@@ -2378,12 +2428,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
     kToolsFieldNumber = 1,
     kSystemPromptFieldNumber = 6,
     kFormatHintFieldNumber = 9,
+    kCustomSystemPromptFieldNumber = 11,
     kMaxIterationsFieldNumber = 2,
     kTemperatureFieldNumber = 4,
     kMaxTokensFieldNumber = 5,
     kAutoExecuteFieldNumber = 3,
     kReplaceSystemPromptFieldNumber = 7,
     kKeepToolsAvailableFieldNumber = 8,
+    kFormatFieldNumber = 10,
   };
   // repeated .runanywhere.v1.ToolDefinition tools = 1;
   [[nodiscard]] int tools_size()
@@ -2435,6 +2487,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
   const ::std::string& _internal_format_hint() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_format_hint(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_format_hint();
+
+  public:
+  // optional string custom_system_prompt = 11;
+  [[nodiscard]] bool has_custom_system_prompt()
+      const;
+  void clear_custom_system_prompt() ;
+  [[nodiscard]] const ::std::string& custom_system_prompt() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_custom_system_prompt(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_custom_system_prompt();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_custom_system_prompt();
+  void set_allocated_custom_system_prompt(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_custom_system_prompt() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_custom_system_prompt(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_custom_system_prompt();
 
   public:
   // int32 max_iterations = 2;
@@ -2501,12 +2570,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
   void _internal_set_keep_tools_available(bool value);
 
   public:
+  // optional .runanywhere.v1.ToolCallFormatName format = 10;
+  [[nodiscard]] bool has_format()
+      const;
+  void clear_format() ;
+  [[nodiscard]] ::runanywhere::v1::ToolCallFormatName format() const;
+  void set_format(::runanywhere::v1::ToolCallFormatName value);
+
+  private:
+  ::runanywhere::v1::ToolCallFormatName _internal_format() const;
+  void _internal_set_format(::runanywhere::v1::ToolCallFormatName value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingOptions)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 9,
-                                   1, 74,
+  static const ::google::protobuf::internal::TcParseTable<4, 11,
+                                   1, 94,
                                    2>
       _table_;
 
@@ -2532,12 +2613,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolDefinition > tools_;
     ::google::protobuf::internal::ArenaStringPtr system_prompt_;
     ::google::protobuf::internal::ArenaStringPtr format_hint_;
+    ::google::protobuf::internal::ArenaStringPtr custom_system_prompt_;
     ::int32_t max_iterations_;
     float temperature_;
     ::int32_t max_tokens_;
     bool auto_execute_;
     bool replace_system_prompt_;
     bool keep_tools_available_;
+    int format_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -4090,7 +4173,7 @@ inline void ToolCallingOptions::clear_max_iterations() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_iterations_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000010U);
 }
 inline ::int32_t ToolCallingOptions::max_iterations() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.max_iterations)
@@ -4098,7 +4181,7 @@ inline ::int32_t ToolCallingOptions::max_iterations() const {
 }
 inline void ToolCallingOptions::set_max_iterations(::int32_t value) {
   _internal_set_max_iterations(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.max_iterations)
 }
 inline ::int32_t ToolCallingOptions::_internal_max_iterations() const {
@@ -4115,7 +4198,7 @@ inline void ToolCallingOptions::clear_auto_execute() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.auto_execute_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000080U);
 }
 inline bool ToolCallingOptions::auto_execute() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.auto_execute)
@@ -4123,7 +4206,7 @@ inline bool ToolCallingOptions::auto_execute() const {
 }
 inline void ToolCallingOptions::set_auto_execute(bool value) {
   _internal_set_auto_execute(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.auto_execute)
 }
 inline bool ToolCallingOptions::_internal_auto_execute() const {
@@ -4137,14 +4220,14 @@ inline void ToolCallingOptions::_internal_set_auto_execute(bool value) {
 
 // optional float temperature = 4;
 inline bool ToolCallingOptions::has_temperature() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void ToolCallingOptions::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000020U);
 }
 inline float ToolCallingOptions::temperature() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.temperature)
@@ -4152,7 +4235,7 @@ inline float ToolCallingOptions::temperature() const {
 }
 inline void ToolCallingOptions::set_temperature(float value) {
   _internal_set_temperature(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.temperature)
 }
 inline float ToolCallingOptions::_internal_temperature() const {
@@ -4166,14 +4249,14 @@ inline void ToolCallingOptions::_internal_set_temperature(float value) {
 
 // optional int32 max_tokens = 5;
 inline bool ToolCallingOptions::has_max_tokens() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   return value;
 }
 inline void ToolCallingOptions::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000040U);
 }
 inline ::int32_t ToolCallingOptions::max_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.max_tokens)
@@ -4181,7 +4264,7 @@ inline ::int32_t ToolCallingOptions::max_tokens() const {
 }
 inline void ToolCallingOptions::set_max_tokens(::int32_t value) {
   _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.max_tokens)
 }
 inline ::int32_t ToolCallingOptions::_internal_max_tokens() const {
@@ -4267,7 +4350,7 @@ inline void ToolCallingOptions::clear_replace_system_prompt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.replace_system_prompt_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000100U);
 }
 inline bool ToolCallingOptions::replace_system_prompt() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.replace_system_prompt)
@@ -4275,7 +4358,7 @@ inline bool ToolCallingOptions::replace_system_prompt() const {
 }
 inline void ToolCallingOptions::set_replace_system_prompt(bool value) {
   _internal_set_replace_system_prompt(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.replace_system_prompt)
 }
 inline bool ToolCallingOptions::_internal_replace_system_prompt() const {
@@ -4292,7 +4375,7 @@ inline void ToolCallingOptions::clear_keep_tools_available() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.keep_tools_available_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000200U);
 }
 inline bool ToolCallingOptions::keep_tools_available() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.keep_tools_available)
@@ -4300,7 +4383,7 @@ inline bool ToolCallingOptions::keep_tools_available() const {
 }
 inline void ToolCallingOptions::set_keep_tools_available(bool value) {
   _internal_set_keep_tools_available(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.keep_tools_available)
 }
 inline bool ToolCallingOptions::_internal_keep_tools_available() const {
@@ -4375,6 +4458,104 @@ inline void ToolCallingOptions::set_allocated_format_hint(::std::string* PROTOBU
     _impl_.format_hint_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCallingOptions.format_hint)
+}
+
+// optional .runanywhere.v1.ToolCallFormatName format = 10;
+inline bool ToolCallingOptions::has_format() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
+  return value;
+}
+inline void ToolCallingOptions::clear_format() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.format_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000400U);
+}
+inline ::runanywhere::v1::ToolCallFormatName ToolCallingOptions::format() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.format)
+  return _internal_format();
+}
+inline void ToolCallingOptions::set_format(::runanywhere::v1::ToolCallFormatName value) {
+  _internal_set_format(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.format)
+}
+inline ::runanywhere::v1::ToolCallFormatName ToolCallingOptions::_internal_format() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ToolCallFormatName>(_impl_.format_);
+}
+inline void ToolCallingOptions::_internal_set_format(::runanywhere::v1::ToolCallFormatName value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.format_ = value;
+}
+
+// optional string custom_system_prompt = 11;
+inline bool ToolCallingOptions::has_custom_system_prompt() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  return value;
+}
+inline void ToolCallingOptions::clear_custom_system_prompt() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.custom_system_prompt_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::std::string& ToolCallingOptions::custom_system_prompt() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.custom_system_prompt)
+  return _internal_custom_system_prompt();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ToolCallingOptions::set_custom_system_prompt(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.custom_system_prompt_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.custom_system_prompt)
+}
+inline ::std::string* PROTOBUF_NONNULL ToolCallingOptions::mutable_custom_system_prompt()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_custom_system_prompt();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ToolCallingOptions.custom_system_prompt)
+  return _s;
+}
+inline const ::std::string& ToolCallingOptions::_internal_custom_system_prompt() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.custom_system_prompt_.Get();
+}
+inline void ToolCallingOptions::_internal_set_custom_system_prompt(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.custom_system_prompt_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ToolCallingOptions::_internal_mutable_custom_system_prompt() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.custom_system_prompt_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ToolCallingOptions::release_custom_system_prompt() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ToolCallingOptions.custom_system_prompt)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.custom_system_prompt_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.custom_system_prompt_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ToolCallingOptions::set_allocated_custom_system_prompt(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.custom_system_prompt_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.custom_system_prompt_.IsDefault()) {
+    _impl_.custom_system_prompt_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCallingOptions.custom_system_prompt)
 }
 
 // -------------------------------------------------------------------
@@ -4694,6 +4875,12 @@ struct is_proto_enum<::runanywhere::v1::ToolParameterType> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ToolParameterType>() {
   return ::runanywhere::v1::ToolParameterType_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::ToolCallFormatName> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ToolCallFormatName>() {
+  return ::runanywhere::v1::ToolCallFormatName_descriptor();
 }
 
 }  // namespace protobuf

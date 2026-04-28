@@ -282,3 +282,91 @@ private func withOptionalCString<T>(
         return try body(nil)
     }
 }
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/rag.pb.swift`:
+//   • RARAGConfiguration   (embeddingModelPath, llmModelPath,
+//                            embeddingDimension, topK, similarityThreshold,
+//                            chunkSize, chunkOverlap)
+//   • RARAGQueryOptions    (question, systemPrompt, maxTokens, temperature,
+//                            topP, topK)
+//   • RARAGSearchResult    (chunkID, text, similarityScore, sourceDocument,
+//                            metadata: map<string,string>)
+//   • RARAGResult          (answer, retrievedChunks, contextUsed,
+//                            retrievalTimeMs, generationTimeMs, totalTimeMs)
+//   • RARAGStatistics      (indexedDocuments, indexedChunks,
+//                            totalTokensIndexed, lastUpdatedMs, indexPath)
+//
+// Hand-rolled types are KEPT because they:
+//   1. expose `withCConfig`, `withCQuery`, `init(from cResult: rac_rag_result_t)`
+//      C bridges that the generated structs intentionally omit,
+//   2. retain `maxContextTokens`, `promptTemplate`, `embeddingConfigJSON`,
+//      `llmConfigJSON` fields the proto schema deliberately does not surface
+//      (backend-private knobs).
+//
+// metadataJSON ↔ metadata-map: the proto canonicalizes metadata as
+// `map<string,string>`. Pre-IDL Swift used a JSON-string blob. The
+// conversion below keeps the JSON blob untouched (consumers must JSON-decode
+// after the fact); a future helper could parse the blob into the map when
+// shape is known.
+
+extension RAGConfiguration {
+    /// Convert to canonical generated proto `RARAGConfiguration`. Notes:
+    /// `maxContextTokens`, `promptTemplate`, `embeddingConfigJSON`,
+    /// `llmConfigJSON` are dropped (not in proto schema).
+    public func toRARAGConfiguration() -> RARAGConfiguration {
+        var proto = RARAGConfiguration()
+        proto.embeddingModelPath = embeddingModelPath
+        proto.llmModelPath = llmModelPath
+        proto.embeddingDimension = Int32(embeddingDimension)
+        proto.topK = Int32(topK)
+        proto.similarityThreshold = similarityThreshold
+        proto.chunkSize = Int32(chunkSize)
+        proto.chunkOverlap = Int32(chunkOverlap)
+        return proto
+    }
+}
+
+extension RAGQueryOptions {
+    /// Convert to canonical generated proto `RARAGQueryOptions`.
+    public func toRARAGQueryOptions() -> RARAGQueryOptions {
+        var proto = RARAGQueryOptions()
+        proto.question = question
+        if let sp = systemPrompt { proto.systemPrompt = sp }
+        proto.maxTokens = Int32(maxTokens)
+        proto.temperature = temperature
+        proto.topP = topP
+        proto.topK = Int32(topK)
+        return proto
+    }
+}
+
+extension RAGSearchResult {
+    /// Convert to canonical generated proto `RARAGSearchResult`. Notes:
+    /// `metadataJSON` (JSON blob string) is left empty on the proto; consumers
+    /// migrating to the map<string,string> form should JSON-decode and
+    /// populate the map at the call site.
+    public func toRARAGSearchResult() -> RARAGSearchResult {
+        var proto = RARAGSearchResult()
+        proto.chunkID = chunkId
+        proto.text = text
+        proto.similarityScore = similarityScore
+        return proto
+    }
+}
+
+extension RAGResult {
+    /// Convert to canonical generated proto `RARAGResult`. Notes: timing
+    /// fields are converted from Double ms to Int64 ms (rounded).
+    public func toRARAGResult() -> RARAGResult {
+        var proto = RARAGResult()
+        proto.answer = answer
+        proto.retrievedChunks = retrievedChunks.map { $0.toRARAGSearchResult() }
+        proto.contextUsed = contextUsed ?? ""
+        proto.retrievalTimeMs = Int64(retrievalTimeMs)
+        proto.generationTimeMs = Int64(generationTimeMs)
+        proto.totalTimeMs = Int64(totalTimeMs)
+        return proto
+    }
+}

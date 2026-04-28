@@ -104,7 +104,11 @@ import type { ModelInfo } from '../types/model';
 import { ModelModality, LLMFramework } from '../types/model';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  type ModelInfo as SDKModelInfo,
+} from '@runanywhere/core';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
 export const TTSScreen: React.FC = () => {
   // State
@@ -531,12 +535,15 @@ export const TTSScreen: React.FC = () => {
         return;
       }
 
-      // SDK uses simple TTSConfiguration with rate/pitch/volume
+      // Proto-canonical TTSOptions (Wave 2: aligned to @runanywhere/proto-ts/tts_options).
       const sdkConfig = {
         voice: 'default',
-        rate: speed,
+        languageCode: '',
+        speakingRate: speed,
         pitch: pitch,
         volume: volume,
+        enableSsml: false,
+        audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
       };
 
       console.warn(
@@ -544,27 +551,40 @@ export const TTSScreen: React.FC = () => {
         text.substring(0, 50) + '...'
       );
 
-      // SDK returns TTSResult with audio, sampleRate, numSamples, duration
+      // SDK returns proto TTSOutput with audioData (Uint8Array), sampleRate, durationMs.
       const result = await RunAnywhere.synthesize(text, sdkConfig);
+
+      // Convert audioData (Uint8Array of Float32 PCM bytes) to base64 for WAV write.
+      const audioBytes = result.audioData;
+      const numSamples = Math.floor(audioBytes.byteLength / 4);
+      let audioBase64 = '';
+      {
+        const u8 = new Uint8Array(
+          audioBytes.buffer,
+          audioBytes.byteOffset,
+          audioBytes.byteLength
+        );
+        let binary = '';
+        for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]!);
+        audioBase64 = btoa(binary);
+      }
 
       console.warn('[TTSScreen] Synthesis result:', {
         sampleRate: result.sampleRate,
-        numSamples: result.numSamples,
-        duration: result.duration,
-        audioLength: result.audio?.length || 0,
+        numSamples,
+        durationMs: result.durationMs,
+        audioBytes: audioBytes.byteLength,
       });
 
-      // Use actual duration from result, or estimate if not available
-      const audioDuration =
-        result.duration ||
-        result.numSamples / result.sampleRate ||
+      const audioDuration = (result.durationMs ?? 0) / 1000 ||
+        numSamples / (result.sampleRate || 22050) ||
         text.length * 0.05;
       setDuration(audioDuration);
       setSampleRate(result.sampleRate || 22050);
-      setLastGeneratedAudio(result.audio);
+      setLastGeneratedAudio(audioBase64);
 
       // Convert to WAV and save to file for playback
-      if (result.audio && result.audio.length > 0) {
+      if (audioBase64.length > 0) {
         try {
           // Clean up previous file
           if (audioFilePath) {
@@ -572,7 +592,7 @@ export const TTSScreen: React.FC = () => {
           }
 
           const wavPath = await RunAnywhere.Audio.createWavFromPCMFloat32(
-            result.audio,
+            audioBase64,
             result.sampleRate || 22050
           );
           setAudioFilePath(wavPath);
@@ -588,7 +608,7 @@ export const TTSScreen: React.FC = () => {
             'Audio Generated',
             `Duration: ${audioDuration.toFixed(2)}s\n` +
               `Sample Rate: ${result.sampleRate} Hz\n` +
-              `Samples: ${result.numSamples.toLocaleString()}\n\n` +
+              `Samples: ${numSamples.toLocaleString()}\n\n` +
               'Audio file creation failed. Tap play to try again.',
             [{ text: 'OK' }]
           );

@@ -13,21 +13,21 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import com.runanywhere.sdk.adapters.LLMStreamAdapter
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions
-import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationResult
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 
 private val llmLogger = SDKLogger.llm
 
@@ -41,23 +41,23 @@ actual suspend fun RunAnywhere.generate(
     options: LLMGenerationOptions?,
 ): LLMGenerationResult {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
     ensureServicesReady()
 
-    val opts = options ?: LLMGenerationOptions.DEFAULT
+    val opts = options ?: LLMGenerationOptions()
     val startTime = System.currentTimeMillis()
 
     val config =
         CppBridgeLLM.GenerationConfig(
-            maxTokens = opts.maxTokens,
+            maxTokens = opts.max_tokens,
             temperature = opts.temperature,
-            topP = opts.topP,
-            systemPrompt = opts.systemPrompt,
+            topP = opts.top_p,
+            systemPrompt = opts.system_prompt,
         )
 
-    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}")
+    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
 
     val cppResult = CppBridgeLLM.generate(prompt, config)
 
@@ -66,16 +66,16 @@ actual suspend fun RunAnywhere.generate(
 
     return LLMGenerationResult(
         text = cppResult.text,
-        thinkingContent = null,
-        inputTokens = cppResult.tokensEvaluated - cppResult.tokensGenerated,
-        tokensUsed = cppResult.tokensGenerated,
-        modelUsed = CppBridgeLLM.getLoadedModelId() ?: "unknown",
-        latencyMs = latencyMs,
+        thinking_content = null,
+        input_tokens = cppResult.tokensEvaluated - cppResult.tokensGenerated,
+        tokens_generated = cppResult.tokensGenerated,
+        model_used = CppBridgeLLM.getLoadedModelId() ?: "unknown",
+        generation_time_ms = latencyMs,
         framework = "llamacpp",
-        tokensPerSecond = cppResult.tokensPerSecond.toDouble(),
-        timeToFirstTokenMs = null,
-        thinkingTokens = null,
-        responseTokens = cppResult.tokensGenerated,
+        tokens_per_second = cppResult.tokensPerSecond.toDouble(),
+        ttft_ms = null,
+        thinking_tokens = 0,
+        response_tokens = cppResult.tokensGenerated,
     )
 }
 
@@ -90,19 +90,19 @@ actual fun RunAnywhere.generateStream(
     options: LLMGenerationOptions?,
 ): Flow<LLMStreamEvent> {
     if (!isInitialized) {
-        throw SDKError.notInitialized("SDK not initialized")
+        throw SDKException.notInitialized("SDK not initialized")
     }
 
-    val opts = options ?: LLMGenerationOptions.DEFAULT
+    val opts = options ?: LLMGenerationOptions()
     val config =
         CppBridgeLLM.GenerationConfig(
-            maxTokens = opts.maxTokens,
+            maxTokens = opts.max_tokens,
             temperature = opts.temperature,
-            topP = opts.topP,
-            systemPrompt = opts.systemPrompt,
+            topP = opts.top_p,
+            systemPrompt = opts.system_prompt,
         )
 
-    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}")
+    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
 
     val handle = CppBridgeLLM.getHandle()
     val adapter = LLMStreamAdapter(handle)
@@ -112,7 +112,8 @@ actual fun RunAnywhere.generateStream(
     // coroutine re-emits via the C++ dispatcher's proto fan-out; the
     // struct-callback arg is null because we consume events via the
     // adapter, not the per-token struct callback.
-    return adapter.stream()
+    return adapter
+        .stream()
         .onStart {
             llmStreamDriverScope.launch {
                 try {
@@ -126,8 +127,7 @@ actual fun RunAnywhere.generateStream(
                     llmLogger.warn("generateStream driver failed: ${e.message}")
                 }
             }
-        }
-        .onCompletion { cause ->
+        }.onCompletion { cause ->
             if (cause != null) {
                 CppBridgeLLM.cancel()
             }

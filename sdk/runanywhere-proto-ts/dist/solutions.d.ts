@@ -1,5 +1,24 @@
 import _m0 from "protobufjs/minimal";
 export declare const protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * SolutionType — discriminator for the kind of solution backing a
+ * `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
+ * oneof arms so frontends can switch on a single enum value rather than
+ * inspecting the oneof shape.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum SolutionType {
+    SOLUTION_TYPE_UNSPECIFIED = 0,
+    SOLUTION_TYPE_VOICE_AGENT = 1,
+    SOLUTION_TYPE_RAG = 2,
+    SOLUTION_TYPE_WAKEWORD = 3,
+    SOLUTION_TYPE_TIME_SERIES = 4,
+    SOLUTION_TYPE_AGENT_LOOP = 5,
+    UNRECOGNIZED = -1
+}
+export declare function solutionTypeFromJSON(object: any): SolutionType;
+export declare function solutionTypeToJSON(object: SolutionType): string;
 export declare enum AudioSource {
     AUDIO_SOURCE_UNSPECIFIED = 0,
     /** AUDIO_SOURCE_MICROPHONE - Platform mic (default) */
@@ -29,6 +48,38 @@ export interface SolutionConfig {
     wakeWord?: WakeWordConfig | undefined;
     agentLoop?: AgentLoopConfig | undefined;
     timeSeries?: TimeSeriesConfig | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * SolutionHandle — opaque, serialisable descriptor for a started solution.
+ *
+ * The native side owns a `rac_solution_handle_t`; this message is the
+ * language-agnostic shape that frontends (Swift `SolutionHandle` class,
+ * Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
+ * the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
+ * are issued against the C handle keyed by `handle_id`.
+ * ---------------------------------------------------------------------------
+ */
+export interface SolutionHandle {
+    /**
+     * Stable, opaque identifier minted by the core for this solution
+     * instance. Used as the lookup key for lifecycle calls.
+     */
+    handleId: string;
+    /**
+     * String discriminator for the solution kind, e.g. "voice_agent",
+     * "rag", "wakeword", "time_series", "agent_loop". Free-form for
+     * forward-compat with future solutions; canonical values match the
+     * `SolutionType` enum names lower-cased.
+     */
+    solutionType: string;
+    /** Wall-clock creation timestamp (ms since Unix epoch). */
+    createdAtMs: number;
+    /**
+     * Optional engine-specific state string (e.g. "created", "running",
+     * "stopped"). Empty when the host hasn't surfaced state.
+     */
+    state?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -66,6 +117,12 @@ export interface VoiceAgentConfig {
     emitPartials: boolean;
     /** Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens. */
     emitThoughts: boolean;
+    /**
+     * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
+     * oneof arm; provided so callers that pass this message standalone (or
+     * log it) can read a single discriminator. Defaults to UNSPECIFIED.
+     */
+    typeKind?: SolutionType | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -94,6 +151,8 @@ export interface RAGConfig {
     rrfK: number;
     /** Prompt template. Supports {{context}} and {{query}} placeholders. */
     promptTemplate: string;
+    /** Optional explicit solution-kind tag. See `SolutionType`. */
+    typeKind?: SolutionType | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -111,6 +170,8 @@ export interface WakeWordConfig {
     preRollMs: number;
     /** default 16000 */
     sampleRateHz: number;
+    /** Optional explicit solution-kind tag. See `SolutionType`. */
+    typeKind?: SolutionType | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -124,6 +185,8 @@ export interface AgentLoopConfig {
     /** default 10 */
     maxIterations: number;
     maxContextTokens: number;
+    /** Optional explicit solution-kind tag. See `SolutionType`. */
+    typeKind?: SolutionType | undefined;
 }
 export interface ToolSpec {
     name: string;
@@ -143,6 +206,8 @@ export interface TimeSeriesConfig {
     windowSize: number;
     stride: number;
     anomalyThreshold: number;
+    /** Optional explicit solution-kind tag. See `SolutionType`. */
+    typeKind?: SolutionType | undefined;
 }
 export declare const SolutionConfig: {
     encode(message: SolutionConfig, writer?: _m0.Writer): _m0.Writer;
@@ -151,6 +216,14 @@ export declare const SolutionConfig: {
     toJSON(message: SolutionConfig): unknown;
     create<I extends Exact<DeepPartial<SolutionConfig>, I>>(base?: I): SolutionConfig;
     fromPartial<I extends Exact<DeepPartial<SolutionConfig>, I>>(object: I): SolutionConfig;
+};
+export declare const SolutionHandle: {
+    encode(message: SolutionHandle, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): SolutionHandle;
+    fromJSON(object: any): SolutionHandle;
+    toJSON(message: SolutionHandle): unknown;
+    create<I extends Exact<DeepPartial<SolutionHandle>, I>>(base?: I): SolutionHandle;
+    fromPartial<I extends Exact<DeepPartial<SolutionHandle>, I>>(object: I): SolutionHandle;
 };
 export declare const VoiceAgentConfig: {
     encode(message: VoiceAgentConfig, writer?: _m0.Writer): _m0.Writer;

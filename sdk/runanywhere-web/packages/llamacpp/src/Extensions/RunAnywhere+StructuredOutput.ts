@@ -17,14 +17,14 @@
  *   console.log(validated.extractedJson); // parsed JSON
  */
 
-import { RunAnywhere, SDKError, SDKLogger } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKLogger } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
 
 const logger = new SDKLogger('StructuredOutput');
 
 function requireBridge(): LlamaCppBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return LlamaCppBridge.shared;
 }
 

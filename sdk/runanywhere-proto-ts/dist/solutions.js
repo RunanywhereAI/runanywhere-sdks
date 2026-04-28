@@ -4,8 +4,72 @@
 //   protoc               v7.34.1
 // source: solutions.proto
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 export const protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * SolutionType — discriminator for the kind of solution backing a
+ * `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
+ * oneof arms so frontends can switch on a single enum value rather than
+ * inspecting the oneof shape.
+ * ---------------------------------------------------------------------------
+ */
+export var SolutionType;
+(function (SolutionType) {
+    SolutionType[SolutionType["SOLUTION_TYPE_UNSPECIFIED"] = 0] = "SOLUTION_TYPE_UNSPECIFIED";
+    SolutionType[SolutionType["SOLUTION_TYPE_VOICE_AGENT"] = 1] = "SOLUTION_TYPE_VOICE_AGENT";
+    SolutionType[SolutionType["SOLUTION_TYPE_RAG"] = 2] = "SOLUTION_TYPE_RAG";
+    SolutionType[SolutionType["SOLUTION_TYPE_WAKEWORD"] = 3] = "SOLUTION_TYPE_WAKEWORD";
+    SolutionType[SolutionType["SOLUTION_TYPE_TIME_SERIES"] = 4] = "SOLUTION_TYPE_TIME_SERIES";
+    SolutionType[SolutionType["SOLUTION_TYPE_AGENT_LOOP"] = 5] = "SOLUTION_TYPE_AGENT_LOOP";
+    SolutionType[SolutionType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(SolutionType || (SolutionType = {}));
+export function solutionTypeFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "SOLUTION_TYPE_UNSPECIFIED":
+            return SolutionType.SOLUTION_TYPE_UNSPECIFIED;
+        case 1:
+        case "SOLUTION_TYPE_VOICE_AGENT":
+            return SolutionType.SOLUTION_TYPE_VOICE_AGENT;
+        case 2:
+        case "SOLUTION_TYPE_RAG":
+            return SolutionType.SOLUTION_TYPE_RAG;
+        case 3:
+        case "SOLUTION_TYPE_WAKEWORD":
+            return SolutionType.SOLUTION_TYPE_WAKEWORD;
+        case 4:
+        case "SOLUTION_TYPE_TIME_SERIES":
+            return SolutionType.SOLUTION_TYPE_TIME_SERIES;
+        case 5:
+        case "SOLUTION_TYPE_AGENT_LOOP":
+            return SolutionType.SOLUTION_TYPE_AGENT_LOOP;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return SolutionType.UNRECOGNIZED;
+    }
+}
+export function solutionTypeToJSON(object) {
+    switch (object) {
+        case SolutionType.SOLUTION_TYPE_UNSPECIFIED:
+            return "SOLUTION_TYPE_UNSPECIFIED";
+        case SolutionType.SOLUTION_TYPE_VOICE_AGENT:
+            return "SOLUTION_TYPE_VOICE_AGENT";
+        case SolutionType.SOLUTION_TYPE_RAG:
+            return "SOLUTION_TYPE_RAG";
+        case SolutionType.SOLUTION_TYPE_WAKEWORD:
+            return "SOLUTION_TYPE_WAKEWORD";
+        case SolutionType.SOLUTION_TYPE_TIME_SERIES:
+            return "SOLUTION_TYPE_TIME_SERIES";
+        case SolutionType.SOLUTION_TYPE_AGENT_LOOP:
+            return "SOLUTION_TYPE_AGENT_LOOP";
+        case SolutionType.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 export var AudioSource;
 (function (AudioSource) {
     AudioSource[AudioSource["AUDIO_SOURCE_UNSPECIFIED"] = 0] = "AUDIO_SOURCE_UNSPECIFIED";
@@ -207,6 +271,100 @@ export const SolutionConfig = {
         return message;
     },
 };
+function createBaseSolutionHandle() {
+    return { handleId: "", solutionType: "", createdAtMs: 0, state: undefined };
+}
+export const SolutionHandle = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.handleId !== "") {
+            writer.uint32(10).string(message.handleId);
+        }
+        if (message.solutionType !== "") {
+            writer.uint32(18).string(message.solutionType);
+        }
+        if (message.createdAtMs !== 0) {
+            writer.uint32(24).int64(message.createdAtMs);
+        }
+        if (message.state !== undefined) {
+            writer.uint32(34).string(message.state);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSolutionHandle();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.handleId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.solutionType = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.createdAtMs = longToNumber(reader.int64());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.state = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            handleId: isSet(object.handleId) ? globalThis.String(object.handleId) : "",
+            solutionType: isSet(object.solutionType) ? globalThis.String(object.solutionType) : "",
+            createdAtMs: isSet(object.createdAtMs) ? globalThis.Number(object.createdAtMs) : 0,
+            state: isSet(object.state) ? globalThis.String(object.state) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.handleId !== "") {
+            obj.handleId = message.handleId;
+        }
+        if (message.solutionType !== "") {
+            obj.solutionType = message.solutionType;
+        }
+        if (message.createdAtMs !== 0) {
+            obj.createdAtMs = Math.round(message.createdAtMs);
+        }
+        if (message.state !== undefined) {
+            obj.state = message.state;
+        }
+        return obj;
+    },
+    create(base) {
+        return SolutionHandle.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSolutionHandle();
+        message.handleId = object.handleId ?? "";
+        message.solutionType = object.solutionType ?? "";
+        message.createdAtMs = object.createdAtMs ?? 0;
+        message.state = object.state ?? undefined;
+        return message;
+    },
+};
 function createBaseVoiceAgentConfig() {
     return {
         llmModelId: "",
@@ -224,6 +382,7 @@ function createBaseVoiceAgentConfig() {
         temperature: 0,
         emitPartials: false,
         emitThoughts: false,
+        typeKind: undefined,
     };
 }
 export const VoiceAgentConfig = {
@@ -272,6 +431,9 @@ export const VoiceAgentConfig = {
         }
         if (message.emitThoughts !== false) {
             writer.uint32(112).bool(message.emitThoughts);
+        }
+        if (message.typeKind !== undefined) {
+            writer.uint32(128).int32(message.typeKind);
         }
         return writer;
     },
@@ -372,6 +534,12 @@ export const VoiceAgentConfig = {
                     }
                     message.emitThoughts = reader.bool();
                     continue;
+                case 16:
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.typeKind = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -397,6 +565,7 @@ export const VoiceAgentConfig = {
             temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
             emitPartials: isSet(object.emitPartials) ? globalThis.Boolean(object.emitPartials) : false,
             emitThoughts: isSet(object.emitThoughts) ? globalThis.Boolean(object.emitThoughts) : false,
+            typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
         };
     },
     toJSON(message) {
@@ -446,6 +615,9 @@ export const VoiceAgentConfig = {
         if (message.emitThoughts !== false) {
             obj.emitThoughts = message.emitThoughts;
         }
+        if (message.typeKind !== undefined) {
+            obj.typeKind = solutionTypeToJSON(message.typeKind);
+        }
         return obj;
     },
     create(base) {
@@ -468,6 +640,7 @@ export const VoiceAgentConfig = {
         message.temperature = object.temperature ?? 0;
         message.emitPartials = object.emitPartials ?? false;
         message.emitThoughts = object.emitThoughts ?? false;
+        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
@@ -484,6 +657,7 @@ function createBaseRAGConfig() {
         bm25B: 0,
         rrfK: 0,
         promptTemplate: "",
+        typeKind: undefined,
     };
 }
 export const RAGConfig = {
@@ -520,6 +694,9 @@ export const RAGConfig = {
         }
         if (message.promptTemplate !== "") {
             writer.uint32(90).string(message.promptTemplate);
+        }
+        if (message.typeKind !== undefined) {
+            writer.uint32(96).int32(message.typeKind);
         }
         return writer;
     },
@@ -596,6 +773,12 @@ export const RAGConfig = {
                     }
                     message.promptTemplate = reader.string();
                     continue;
+                case 12:
+                    if (tag !== 96) {
+                        break;
+                    }
+                    message.typeKind = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -617,6 +800,7 @@ export const RAGConfig = {
             bm25B: isSet(object.bm25B) ? globalThis.Number(object.bm25B) : 0,
             rrfK: isSet(object.rrfK) ? globalThis.Number(object.rrfK) : 0,
             promptTemplate: isSet(object.promptTemplate) ? globalThis.String(object.promptTemplate) : "",
+            typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
         };
     },
     toJSON(message) {
@@ -654,6 +838,9 @@ export const RAGConfig = {
         if (message.promptTemplate !== "") {
             obj.promptTemplate = message.promptTemplate;
         }
+        if (message.typeKind !== undefined) {
+            obj.typeKind = solutionTypeToJSON(message.typeKind);
+        }
         return obj;
     },
     create(base) {
@@ -672,11 +859,12 @@ export const RAGConfig = {
         message.bm25B = object.bm25B ?? 0;
         message.rrfK = object.rrfK ?? 0;
         message.promptTemplate = object.promptTemplate ?? "";
+        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
 function createBaseWakeWordConfig() {
-    return { modelId: "", keyword: "", threshold: 0, preRollMs: 0, sampleRateHz: 0 };
+    return { modelId: "", keyword: "", threshold: 0, preRollMs: 0, sampleRateHz: 0, typeKind: undefined };
 }
 export const WakeWordConfig = {
     encode(message, writer = _m0.Writer.create()) {
@@ -694,6 +882,9 @@ export const WakeWordConfig = {
         }
         if (message.sampleRateHz !== 0) {
             writer.uint32(40).int32(message.sampleRateHz);
+        }
+        if (message.typeKind !== undefined) {
+            writer.uint32(48).int32(message.typeKind);
         }
         return writer;
     },
@@ -734,6 +925,12 @@ export const WakeWordConfig = {
                     }
                     message.sampleRateHz = reader.int32();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.typeKind = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -749,6 +946,7 @@ export const WakeWordConfig = {
             threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
             preRollMs: isSet(object.preRollMs) ? globalThis.Number(object.preRollMs) : 0,
             sampleRateHz: isSet(object.sampleRateHz) ? globalThis.Number(object.sampleRateHz) : 0,
+            typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
         };
     },
     toJSON(message) {
@@ -768,6 +966,9 @@ export const WakeWordConfig = {
         if (message.sampleRateHz !== 0) {
             obj.sampleRateHz = Math.round(message.sampleRateHz);
         }
+        if (message.typeKind !== undefined) {
+            obj.typeKind = solutionTypeToJSON(message.typeKind);
+        }
         return obj;
     },
     create(base) {
@@ -780,11 +981,12 @@ export const WakeWordConfig = {
         message.threshold = object.threshold ?? 0;
         message.preRollMs = object.preRollMs ?? 0;
         message.sampleRateHz = object.sampleRateHz ?? 0;
+        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
 function createBaseAgentLoopConfig() {
-    return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0 };
+    return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0, typeKind: undefined };
 }
 export const AgentLoopConfig = {
     encode(message, writer = _m0.Writer.create()) {
@@ -802,6 +1004,9 @@ export const AgentLoopConfig = {
         }
         if (message.maxContextTokens !== 0) {
             writer.uint32(40).int32(message.maxContextTokens);
+        }
+        if (message.typeKind !== undefined) {
+            writer.uint32(48).int32(message.typeKind);
         }
         return writer;
     },
@@ -842,6 +1047,12 @@ export const AgentLoopConfig = {
                     }
                     message.maxContextTokens = reader.int32();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.typeKind = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -857,6 +1068,7 @@ export const AgentLoopConfig = {
             tools: globalThis.Array.isArray(object?.tools) ? object.tools.map((e) => ToolSpec.fromJSON(e)) : [],
             maxIterations: isSet(object.maxIterations) ? globalThis.Number(object.maxIterations) : 0,
             maxContextTokens: isSet(object.maxContextTokens) ? globalThis.Number(object.maxContextTokens) : 0,
+            typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
         };
     },
     toJSON(message) {
@@ -876,6 +1088,9 @@ export const AgentLoopConfig = {
         if (message.maxContextTokens !== 0) {
             obj.maxContextTokens = Math.round(message.maxContextTokens);
         }
+        if (message.typeKind !== undefined) {
+            obj.typeKind = solutionTypeToJSON(message.typeKind);
+        }
         return obj;
     },
     create(base) {
@@ -888,6 +1103,7 @@ export const AgentLoopConfig = {
         message.tools = object.tools?.map((e) => ToolSpec.fromPartial(e)) || [];
         message.maxIterations = object.maxIterations ?? 0;
         message.maxContextTokens = object.maxContextTokens ?? 0;
+        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
@@ -972,7 +1188,7 @@ export const ToolSpec = {
     },
 };
 function createBaseTimeSeriesConfig() {
-    return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0 };
+    return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0, typeKind: undefined };
 }
 export const TimeSeriesConfig = {
     encode(message, writer = _m0.Writer.create()) {
@@ -990,6 +1206,9 @@ export const TimeSeriesConfig = {
         }
         if (message.anomalyThreshold !== 0) {
             writer.uint32(45).float(message.anomalyThreshold);
+        }
+        if (message.typeKind !== undefined) {
+            writer.uint32(48).int32(message.typeKind);
         }
         return writer;
     },
@@ -1030,6 +1249,12 @@ export const TimeSeriesConfig = {
                     }
                     message.anomalyThreshold = reader.float();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.typeKind = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1045,6 +1270,7 @@ export const TimeSeriesConfig = {
             windowSize: isSet(object.windowSize) ? globalThis.Number(object.windowSize) : 0,
             stride: isSet(object.stride) ? globalThis.Number(object.stride) : 0,
             anomalyThreshold: isSet(object.anomalyThreshold) ? globalThis.Number(object.anomalyThreshold) : 0,
+            typeKind: isSet(object.typeKind) ? solutionTypeFromJSON(object.typeKind) : undefined,
         };
     },
     toJSON(message) {
@@ -1064,6 +1290,9 @@ export const TimeSeriesConfig = {
         if (message.anomalyThreshold !== 0) {
             obj.anomalyThreshold = message.anomalyThreshold;
         }
+        if (message.typeKind !== undefined) {
+            obj.typeKind = solutionTypeToJSON(message.typeKind);
+        }
         return obj;
     },
     create(base) {
@@ -1076,9 +1305,23 @@ export const TimeSeriesConfig = {
         message.windowSize = object.windowSize ?? 0;
         message.stride = object.stride ?? 0;
         message.anomalyThreshold = object.anomalyThreshold ?? 0;
+        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
+function longToNumber(long) {
+    if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    }
+    if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+    }
+    return long.toNumber();
+}
+if (_m0.util.Long !== Long) {
+    _m0.util.Long = Long;
+    _m0.configure();
+}
 function isSet(value) {
     return value !== null && value !== undefined;
 }

@@ -17,7 +17,11 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.extensions.LLM.*
+import com.runanywhere.sdk.public.extensions.LLM.ToolCall
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
+import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
+import com.runanywhere.sdk.public.extensions.LLM.ToolValue
 import kotlinx.serialization.json.*
 
 /**

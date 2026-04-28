@@ -50,7 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 
 /**
@@ -101,10 +101,10 @@ fun LoraAdapterPickerSheet(
                     item {
                         SectionHeader("Active Adapters")
                     }
-                    items(state.loadedAdapters, key = { it.path }) { adapter ->
+                    items(state.loadedAdapters, key = { it.adapter_path }) { adapter ->
                         LoadedAdapterRow(
                             adapter = adapter,
-                            onRemove = { loraViewModel.unloadAdapter(adapter.path) },
+                            onRemove = { loraViewModel.unloadAdapter(adapter.adapter_path) },
                         )
                     }
                     item {
@@ -186,7 +186,7 @@ private fun LoadedAdapterRow(
     onRemove: () -> Unit,
 ) {
     val clipboardManager = LocalClipboardManager.current
-    val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
+    val examplePrompts = remember(adapter.adapter_path) { LoraExamplePrompts.forAdapterPath(adapter.adapter_path) }
 
     Column(
         modifier =
@@ -202,7 +202,7 @@ private fun LoadedAdapterRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    adapter.path.substringAfterLast("/"),
+                    adapter.adapter_path.substringAfterLast("/"),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                 )

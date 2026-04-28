@@ -39,6 +39,10 @@ protoc \
     --ts_proto_out="${TS_OUT_DIR}" \
     --ts_proto_opt=esModuleInterop=true,outputServices=false,env=browser,useOptionals=messages \
     model_types.proto voice_events.proto pipeline.proto solutions.proto voice_agent_service.proto llm_service.proto download_service.proto \
-    llm_options.proto chat.proto tool_calling.proto
+    llm_options.proto chat.proto tool_calling.proto \
+    diffusion_options.proto embeddings_options.proto errors.proto \
+    lora_options.proto rag.proto sdk_events.proto storage_types.proto \
+    structured_output.proto stt_options.proto tts_options.proto \
+    vad_options.proto vlm_options.proto
 
 echo "✓ TS proto codegen → ${TS_OUT_DIR}"

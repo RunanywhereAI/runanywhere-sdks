@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/adapters/model_download_adapter.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -74,7 +74,7 @@ class OnnxDownloadStrategy {
         progressHandler: progressHandler,
       );
     } else {
-      throw SDKError.downloadFailed(
+      throw SDKException.downloadFailed(
         urlString,
         'Unsupported ONNX model format',
       );
@@ -239,7 +239,7 @@ class OnnxDownloadStrategy {
       );
 
       if (result != 0) {
-        throw SDKError.downloadFailed(
+        throw SDKException.downloadFailed(
           archivePath,
           'Native extraction failed with code: $result',
         );
@@ -273,7 +273,7 @@ class OnnxDownloadStrategy {
         },
       );
     } catch (e) {
-      throw SDKError.downloadFailed(
+      throw SDKException.downloadFailed(
         from.toString(),
         e.toString(),
       );

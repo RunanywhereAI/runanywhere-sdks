@@ -13,14 +13,14 @@
  * implementation here so the public API is the same regardless.
  */
 
-import { SDKError } from '../../Foundation/ErrorTypes';
+import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import type {
   RAGConfiguration,
   RAGQueryOptions,
   RAGResult,
   RAGStatistics,
-} from '../../types/RAGTypes';
+} from '@runanywhere/proto-ts/rag';
 
 const logger = new SDKLogger('RAG');
 
@@ -43,7 +43,8 @@ export function setRAGProvider(provider: RAGProvider | null): void {
 
 function requireProvider(): RAGProvider {
   if (_provider == null) {
-    throw SDKError.backendNotAvailable(
+    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+    throw SDKException.backendNotAvailable(
       'RAG',
       'No RAG backend registered. Install a Web SDK build that ships the ' +
       'rac_rag_* WASM exports, or register a JS-only RAG provider via setRAGProvider().',
@@ -106,11 +107,24 @@ export async function ragGetStatistics(): Promise<RAGStatistics> {
   const p = requireProvider();
   if (p.ragGetStatistics) return p.ragGetStatistics();
   // Synthesize minimal stats from documentCount.
-  const documentCount = await p.ragGetDocumentCount();
+  const indexedDocuments = await p.ragGetDocumentCount();
   return {
-    documentCount,
-    chunkCount: documentCount,
-    vectorStoreSize: 0,
-    statsJson: '{}',
+    indexedDocuments,
+    indexedChunks: indexedDocuments,
+    totalTokensIndexed: 0,
+    lastUpdatedMs: 0,
+    indexPath: undefined,
   };
 }
+
+export const RAG = {
+  setProvider: setRAGProvider,
+  createPipeline: ragCreatePipeline,
+  destroyPipeline: ragDestroyPipeline,
+  ingest: ragIngest,
+  addDocumentsBatch: ragAddDocumentsBatch,
+  query: ragQuery,
+  clearDocuments: ragClearDocuments,
+  documentCount: ragDocumentCount,
+  getStatistics: ragGetStatistics,
+};

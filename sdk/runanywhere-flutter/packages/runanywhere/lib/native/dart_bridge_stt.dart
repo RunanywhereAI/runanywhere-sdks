@@ -177,7 +177,7 @@ class DartBridgeSTT {
     bool enableTimestamps = true,
     bool detectLanguage = false,
   }) async {
-    STTConfiguration(sampleRate: sampleRate).validate();
+    STTComponentConfig(sampleRate: sampleRate).validate();
 
     final handle = getHandle();
 

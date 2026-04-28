@@ -1,15 +1,11 @@
-//
+///
 //  Generated code. Do not modify.
 //  source: download_service.proto
 //
 // @dart = 2.12
+// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
 
-// ignore_for_file: always_use_package_imports
-// ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
-
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -20,24 +16,23 @@ import 'download_service.pbenum.dart';
 export 'download_service.pbenum.dart';
 
 class DownloadSubscribeRequest extends $pb.GeneratedMessage {
-  factory DownloadSubscribeRequest({
-    $core.String? modelId,
-  }) {
-    final $result = create();
-    if (modelId != null) {
-      $result.modelId = modelId;
-    }
-    return $result;
-  }
-  DownloadSubscribeRequest._() : super();
-  factory DownloadSubscribeRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory DownloadSubscribeRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'DownloadSubscribeRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'DownloadSubscribeRequest', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'modelId')
     ..hasRequiredFields = false
   ;
 
+  DownloadSubscribeRequest._() : super();
+  factory DownloadSubscribeRequest({
+    $core.String? modelId,
+  }) {
+    final _result = create();
+    if (modelId != null) {
+      _result.modelId = modelId;
+    }
+    return _result;
+  }
+  factory DownloadSubscribeRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory DownloadSubscribeRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -47,10 +42,8 @@ class DownloadSubscribeRequest extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  DownloadSubscribeRequest copyWith(void Function(DownloadSubscribeRequest) updates) => super.copyWith((message) => updates(message as DownloadSubscribeRequest)) as DownloadSubscribeRequest;
-
+  DownloadSubscribeRequest copyWith(void Function(DownloadSubscribeRequest) updates) => super.copyWith((message) => updates(message as DownloadSubscribeRequest)) as DownloadSubscribeRequest; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static DownloadSubscribeRequest create() => DownloadSubscribeRequest._();
   DownloadSubscribeRequest createEmptyInstance() => create();
@@ -70,6 +63,21 @@ class DownloadSubscribeRequest extends $pb.GeneratedMessage {
 }
 
 class DownloadProgress extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'DownloadProgress', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'modelId')
+    ..e<DownloadStage>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'stage', $pb.PbFieldType.OE, defaultOrMaker: DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED, valueOf: DownloadStage.valueOf, enumValues: DownloadStage.values)
+    ..aInt64(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'bytesDownloaded')
+    ..aInt64(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'totalBytes')
+    ..a<$core.double>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'stageProgress', $pb.PbFieldType.OF)
+    ..a<$core.double>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'overallSpeedBps', $pb.PbFieldType.OF)
+    ..aInt64(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'etaSeconds')
+    ..e<DownloadState>(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: DownloadState.DOWNLOAD_STATE_UNSPECIFIED, valueOf: DownloadState.valueOf, enumValues: DownloadState.values)
+    ..a<$core.int>(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'retryAttempt', $pb.PbFieldType.O3)
+    ..aOS(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  DownloadProgress._() : super();
   factory DownloadProgress({
     $core.String? modelId,
     DownloadStage? stage,
@@ -82,57 +90,41 @@ class DownloadProgress extends $pb.GeneratedMessage {
     $core.int? retryAttempt,
     $core.String? errorMessage,
   }) {
-    final $result = create();
+    final _result = create();
     if (modelId != null) {
-      $result.modelId = modelId;
+      _result.modelId = modelId;
     }
     if (stage != null) {
-      $result.stage = stage;
+      _result.stage = stage;
     }
     if (bytesDownloaded != null) {
-      $result.bytesDownloaded = bytesDownloaded;
+      _result.bytesDownloaded = bytesDownloaded;
     }
     if (totalBytes != null) {
-      $result.totalBytes = totalBytes;
+      _result.totalBytes = totalBytes;
     }
     if (stageProgress != null) {
-      $result.stageProgress = stageProgress;
+      _result.stageProgress = stageProgress;
     }
     if (overallSpeedBps != null) {
-      $result.overallSpeedBps = overallSpeedBps;
+      _result.overallSpeedBps = overallSpeedBps;
     }
     if (etaSeconds != null) {
-      $result.etaSeconds = etaSeconds;
+      _result.etaSeconds = etaSeconds;
     }
     if (state != null) {
-      $result.state = state;
+      _result.state = state;
     }
     if (retryAttempt != null) {
-      $result.retryAttempt = retryAttempt;
+      _result.retryAttempt = retryAttempt;
     }
     if (errorMessage != null) {
-      $result.errorMessage = errorMessage;
+      _result.errorMessage = errorMessage;
     }
-    return $result;
+    return _result;
   }
-  DownloadProgress._() : super();
   factory DownloadProgress.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory DownloadProgress.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'DownloadProgress', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..e<DownloadStage>(2, _omitFieldNames ? '' : 'stage', $pb.PbFieldType.OE, defaultOrMaker: DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED, valueOf: DownloadStage.valueOf, enumValues: DownloadStage.values)
-    ..aInt64(3, _omitFieldNames ? '' : 'bytesDownloaded')
-    ..aInt64(4, _omitFieldNames ? '' : 'totalBytes')
-    ..a<$core.double>(5, _omitFieldNames ? '' : 'stageProgress', $pb.PbFieldType.OF)
-    ..a<$core.double>(6, _omitFieldNames ? '' : 'overallSpeedBps', $pb.PbFieldType.OF)
-    ..aInt64(7, _omitFieldNames ? '' : 'etaSeconds')
-    ..e<DownloadState>(8, _omitFieldNames ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: DownloadState.DOWNLOAD_STATE_UNSPECIFIED, valueOf: DownloadState.valueOf, enumValues: DownloadState.values)
-    ..a<$core.int>(9, _omitFieldNames ? '' : 'retryAttempt', $pb.PbFieldType.O3)
-    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -142,10 +134,8 @@ class DownloadProgress extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  DownloadProgress copyWith(void Function(DownloadProgress) updates) => super.copyWith((message) => updates(message as DownloadProgress)) as DownloadProgress;
-
+  DownloadProgress copyWith(void Function(DownloadProgress) updates) => super.copyWith((message) => updates(message as DownloadProgress)) as DownloadProgress; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static DownloadProgress create() => DownloadProgress._();
   DownloadProgress createEmptyInstance() => create();
@@ -245,6 +235,13 @@ class DownloadProgress extends $pb.GeneratedMessage {
   void clearErrorMessage() => clearField(10);
 }
 
+class DownloadApi {
+  $pb.RpcClient _client;
+  DownloadApi(this._client);
 
-const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
-const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');
+  $async.Future<DownloadProgress> subscribe($pb.ClientContext? ctx, DownloadSubscribeRequest request) {
+    var emptyResponse = DownloadProgress();
+    return _client.invoke<DownloadProgress>(ctx, 'Download', 'Subscribe', request, emptyResponse);
+  }
+}
+

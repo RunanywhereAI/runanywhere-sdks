@@ -113,12 +113,69 @@ public class VoiceEvent(
     schemaIndex = 9,
   )
   public val metrics: MetricsEvent? = null,
+  /**
+   * v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+   * VoiceAgentComponentStates and the AsyncSequence-style lifecycle
+   * signals consumed by the cross-platform VoiceAgent extensions
+   * (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
+   * VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
+   * voice_agent_types.dart).
+   */
+  @field:WireField(
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.VoiceAgentComponentStates#ADAPTER",
+    jsonName = "componentStateChanged",
+    oneofName = "payload",
+    schemaIndex = 10,
+  )
+  public val component_state_changed: VoiceAgentComponentStates? = null,
+  @field:WireField(
+    tag = 19,
+    adapter = "ai.runanywhere.proto.v1.VoiceSessionError#ADAPTER",
+    jsonName = "sessionError",
+    oneofName = "payload",
+    schemaIndex = 11,
+  )
+  public val session_error: VoiceSessionError? = null,
+  @field:WireField(
+    tag = 20,
+    adapter = "ai.runanywhere.proto.v1.SessionStartedEvent#ADAPTER",
+    jsonName = "sessionStarted",
+    oneofName = "payload",
+    schemaIndex = 12,
+  )
+  public val session_started: SessionStartedEvent? = null,
+  @field:WireField(
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.SessionStoppedEvent#ADAPTER",
+    jsonName = "sessionStopped",
+    oneofName = "payload",
+    schemaIndex = 13,
+  )
+  public val session_stopped: SessionStoppedEvent? = null,
+  @field:WireField(
+    tag = 22,
+    adapter = "ai.runanywhere.proto.v1.AgentResponseStartedEvent#ADAPTER",
+    jsonName = "agentResponseStarted",
+    oneofName = "payload",
+    schemaIndex = 14,
+  )
+  public val agent_response_started: AgentResponseStartedEvent? = null,
+  @field:WireField(
+    tag = 23,
+    adapter = "ai.runanywhere.proto.v1.AgentResponseCompletedEvent#ADAPTER",
+    jsonName = "agentResponseCompleted",
+    oneofName = "payload",
+    schemaIndex = 15,
+  )
+  public val agent_response_completed: AgentResponseCompletedEvent? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceEvent, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(user_said, assistant_token, audio, vad, interrupted, state, error,
-        metrics) <= 1) {
-      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics may be non-null"
+    require(countNonNull(user_said, assistant_token, audio, vad, interrupted, state, error, metrics,
+        component_state_changed, session_error, session_started, session_stopped,
+        agent_response_started, agent_response_completed) <= 1) {
+      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed may be non-null"
     }
   }
 
@@ -143,6 +200,12 @@ public class VoiceEvent(
     if (state != other.state) return false
     if (error != other.error) return false
     if (metrics != other.metrics) return false
+    if (component_state_changed != other.component_state_changed) return false
+    if (session_error != other.session_error) return false
+    if (session_started != other.session_started) return false
+    if (session_stopped != other.session_stopped) return false
+    if (agent_response_started != other.agent_response_started) return false
+    if (agent_response_completed != other.agent_response_completed) return false
     return true
   }
 
@@ -160,6 +223,12 @@ public class VoiceEvent(
       result = result * 37 + (state?.hashCode() ?: 0)
       result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + (metrics?.hashCode() ?: 0)
+      result = result * 37 + (component_state_changed?.hashCode() ?: 0)
+      result = result * 37 + (session_error?.hashCode() ?: 0)
+      result = result * 37 + (session_started?.hashCode() ?: 0)
+      result = result * 37 + (session_stopped?.hashCode() ?: 0)
+      result = result * 37 + (agent_response_started?.hashCode() ?: 0)
+      result = result * 37 + (agent_response_completed?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -177,6 +246,15 @@ public class VoiceEvent(
     if (state != null) result += """state=$state"""
     if (error != null) result += """error=$error"""
     if (metrics != null) result += """metrics=$metrics"""
+    if (component_state_changed != null) result +=
+        """component_state_changed=$component_state_changed"""
+    if (session_error != null) result += """session_error=$session_error"""
+    if (session_started != null) result += """session_started=$session_started"""
+    if (session_stopped != null) result += """session_stopped=$session_stopped"""
+    if (agent_response_started != null) result +=
+        """agent_response_started=$agent_response_started"""
+    if (agent_response_completed != null) result +=
+        """agent_response_completed=$agent_response_completed"""
     return result.joinToString(prefix = "VoiceEvent{", separator = ", ", postfix = "}")
   }
 
@@ -191,9 +269,16 @@ public class VoiceEvent(
     state: StateChangeEvent? = this.state,
     error: ErrorEvent? = this.error,
     metrics: MetricsEvent? = this.metrics,
+    component_state_changed: VoiceAgentComponentStates? = this.component_state_changed,
+    session_error: VoiceSessionError? = this.session_error,
+    session_started: SessionStartedEvent? = this.session_started,
+    session_stopped: SessionStoppedEvent? = this.session_stopped,
+    agent_response_started: AgentResponseStartedEvent? = this.agent_response_started,
+    agent_response_completed: AgentResponseCompletedEvent? = this.agent_response_completed,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceEvent = VoiceEvent(seq, timestamp_us, user_said, assistant_token, audio, vad, interrupted,
-      state, error, metrics, unknownFields)
+      state, error, metrics, component_state_changed, session_error, session_started,
+      session_stopped, agent_response_started, agent_response_completed, unknownFields)
 
   public companion object {
     @JvmField
@@ -218,6 +303,15 @@ public class VoiceEvent(
         size += StateChangeEvent.ADAPTER.encodedSizeWithTag(15, value.state)
         size += ErrorEvent.ADAPTER.encodedSizeWithTag(16, value.error)
         size += MetricsEvent.ADAPTER.encodedSizeWithTag(17, value.metrics)
+        size += VoiceAgentComponentStates.ADAPTER.encodedSizeWithTag(18,
+            value.component_state_changed)
+        size += VoiceSessionError.ADAPTER.encodedSizeWithTag(19, value.session_error)
+        size += SessionStartedEvent.ADAPTER.encodedSizeWithTag(20, value.session_started)
+        size += SessionStoppedEvent.ADAPTER.encodedSizeWithTag(21, value.session_stopped)
+        size += AgentResponseStartedEvent.ADAPTER.encodedSizeWithTag(22,
+            value.agent_response_started)
+        size += AgentResponseCompletedEvent.ADAPTER.encodedSizeWithTag(23,
+            value.agent_response_completed)
         return size
       }
 
@@ -233,11 +327,25 @@ public class VoiceEvent(
         StateChangeEvent.ADAPTER.encodeWithTag(writer, 15, value.state)
         ErrorEvent.ADAPTER.encodeWithTag(writer, 16, value.error)
         MetricsEvent.ADAPTER.encodeWithTag(writer, 17, value.metrics)
+        VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 18, value.component_state_changed)
+        VoiceSessionError.ADAPTER.encodeWithTag(writer, 19, value.session_error)
+        SessionStartedEvent.ADAPTER.encodeWithTag(writer, 20, value.session_started)
+        SessionStoppedEvent.ADAPTER.encodeWithTag(writer, 21, value.session_stopped)
+        AgentResponseStartedEvent.ADAPTER.encodeWithTag(writer, 22, value.agent_response_started)
+        AgentResponseCompletedEvent.ADAPTER.encodeWithTag(writer, 23,
+            value.agent_response_completed)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceEvent) {
         writer.writeBytes(value.unknownFields)
+        AgentResponseCompletedEvent.ADAPTER.encodeWithTag(writer, 23,
+            value.agent_response_completed)
+        AgentResponseStartedEvent.ADAPTER.encodeWithTag(writer, 22, value.agent_response_started)
+        SessionStoppedEvent.ADAPTER.encodeWithTag(writer, 21, value.session_stopped)
+        SessionStartedEvent.ADAPTER.encodeWithTag(writer, 20, value.session_started)
+        VoiceSessionError.ADAPTER.encodeWithTag(writer, 19, value.session_error)
+        VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 18, value.component_state_changed)
         MetricsEvent.ADAPTER.encodeWithTag(writer, 17, value.metrics)
         ErrorEvent.ADAPTER.encodeWithTag(writer, 16, value.error)
         StateChangeEvent.ADAPTER.encodeWithTag(writer, 15, value.state)
@@ -262,6 +370,12 @@ public class VoiceEvent(
         var state: StateChangeEvent? = null
         var error: ErrorEvent? = null
         var metrics: MetricsEvent? = null
+        var component_state_changed: VoiceAgentComponentStates? = null
+        var session_error: VoiceSessionError? = null
+        var session_started: SessionStartedEvent? = null
+        var session_stopped: SessionStoppedEvent? = null
+        var agent_response_started: AgentResponseStartedEvent? = null
+        var agent_response_completed: AgentResponseCompletedEvent? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
@@ -274,6 +388,12 @@ public class VoiceEvent(
             15 -> state = StateChangeEvent.ADAPTER.decode(reader)
             16 -> error = ErrorEvent.ADAPTER.decode(reader)
             17 -> metrics = MetricsEvent.ADAPTER.decode(reader)
+            18 -> component_state_changed = VoiceAgentComponentStates.ADAPTER.decode(reader)
+            19 -> session_error = VoiceSessionError.ADAPTER.decode(reader)
+            20 -> session_started = SessionStartedEvent.ADAPTER.decode(reader)
+            21 -> session_stopped = SessionStoppedEvent.ADAPTER.decode(reader)
+            22 -> agent_response_started = AgentResponseStartedEvent.ADAPTER.decode(reader)
+            23 -> agent_response_completed = AgentResponseCompletedEvent.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -288,6 +408,12 @@ public class VoiceEvent(
           state = state,
           error = error,
           metrics = metrics,
+          component_state_changed = component_state_changed,
+          session_error = session_error,
+          session_started = session_started,
+          session_stopped = session_stopped,
+          agent_response_started = agent_response_started,
+          agent_response_completed = agent_response_completed,
           unknownFields = unknownFields
         )
       }
@@ -301,6 +427,15 @@ public class VoiceEvent(
         state = value.state?.let(StateChangeEvent.ADAPTER::redact),
         error = value.error?.let(ErrorEvent.ADAPTER::redact),
         metrics = value.metrics?.let(MetricsEvent.ADAPTER::redact),
+        component_state_changed =
+            value.component_state_changed?.let(VoiceAgentComponentStates.ADAPTER::redact),
+        session_error = value.session_error?.let(VoiceSessionError.ADAPTER::redact),
+        session_started = value.session_started?.let(SessionStartedEvent.ADAPTER::redact),
+        session_stopped = value.session_stopped?.let(SessionStoppedEvent.ADAPTER::redact),
+        agent_response_started =
+            value.agent_response_started?.let(AgentResponseStartedEvent.ADAPTER::redact),
+        agent_response_completed =
+            value.agent_response_completed?.let(AgentResponseCompletedEvent.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

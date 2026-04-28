@@ -1,0 +1,150 @@
+// RunAnywhere IDL — LoRA (Low-Rank Adaptation) adapter types.
+//
+// Every message below is the *union* of fields currently declared by hand
+// across Swift, Kotlin, Dart, React Native, Web, and the C ABI. Generating
+// from a single proto definition removes hand-written duplicate shape
+// definitions and locks the field names + types across all SDKs.
+//
+// ABI note: the existing rac_lora_entry_t C ABI struct
+// (sdk/runanywhere-commons/include/rac/infrastructure/model_management/rac_lora_registry.h)
+// is the C-side counterpart for LoraAdapterCatalogEntry; codegen does NOT
+// replace that — Swift's `init(from cEntry: rac_lora_entry_t)` style bridge
+// still flows fields one-by-one into the C struct.
+//
+// Pre-IDL drift table (source-file:line):
+//
+//   LoRAAdapterConfig
+//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:397
+//              (path: String, scale: Float = 1.0)              ← no adapter_id
+//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/LLM/LLMTypes.kt:197
+//              (path: String, scale: Float = 1.0f)             ← no adapter_id
+//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:8
+//              (path: String, scale: double = 1.0)             ← no adapter_id
+//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:15
+//              (path: string, scale?: number)                  ← no adapter_id
+//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:15
+//              (path: string, scale?: number)                  ← no adapter_id
+//
+//   LoRAAdapterInfo
+//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:413
+//              (path, scale, applied)                          ← no adapter_id, no error_message
+//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/LLM/LLMTypes.kt:212
+//              (path, scale, applied)                          ← no adapter_id, no error_message
+//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:22
+//              (path, scale, applied)                          ← no adapter_id, no error_message
+//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:28
+//              (path, scale, applied)                          ← no adapter_id, no error_message
+//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:28
+//              (path, scale, applied)                          ← no adapter_id, no error_message
+//
+//   LoraAdapterCatalogEntry
+//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:427
+//              (id, name, description, downloadURL: URL, filename,
+//               compatibleModelIds: [String], fileSize: Int64 = 0,
+//               defaultScale: Float = 1.0)                     ← no author
+//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RunAnywhere+LoRA.kt:77
+//              (id, name, description, downloadUrl: String, filename,
+//               compatibleModelIds: List<String>, fileSize: Long = 0,
+//               defaultScale: Float = 1.0f)                    ← no author
+//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:40
+//              (id, name, description, downloadUrl: String, filename,
+//               compatibleModelIds: List<String>, fileSize: int = 0,
+//               defaultScale: double = 1.0)                    ← no author
+//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:45
+//              (id, name, description, downloadURL: string, filename,
+//               compatibleModelIds: string[], fileSize?, defaultScale?) ← no author
+//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:45
+//              (id, name, description, downloadURL: string, filename,
+//               compatibleModelIds: string[], fileSize?, defaultScale?) ← no author
+//     C ABI  sdk/runanywhere-commons/include/rac/infrastructure/model_management/rac_lora_registry.h:28
+//              rac_lora_entry_t { id, name, description, download_url, filename,
+//                                 compatible_model_ids, compatible_model_count,
+//                                 file_size, default_scale }   ← no author
+//
+//   LoraCompatibilityResult
+//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:493
+//              (isCompatible: Bool, error: String? = nil)      ← no base_model_required
+//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RunAnywhere+LoRA.kt:58
+//              (isCompatible: Boolean, error: String? = null)  ← no base_model_required
+//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:78
+//              (isCompatible: bool, error: String?)            ← no base_model_required
+//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:76
+//              (isCompatible: boolean, error?: string)         ← no base_model_required
+//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:76
+//              (isCompatible: boolean, error?: string)         ← no base_model_required
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "LoraOptionsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Configuration for loading a LoRA adapter.
+//
+// `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
+// adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
+// quantized bases). `adapter_id` is optional and, when present, links the
+// runtime config back to a `LoraAdapterCatalogEntry.id` — none of the current
+// SDK shapes carry it, so it is encoded as a `proto3 optional` field.
+// ---------------------------------------------------------------------------
+message LoRAAdapterConfig {
+    string          adapter_path = 1;   // path on disk to the GGUF file
+    float           scale        = 2;   // default 1.0 (set by codegen layer)
+    optional string adapter_id   = 3;   // optional link to catalog entry id
+}
+
+// ---------------------------------------------------------------------------
+// Info about a currently-loaded LoRA adapter (read-only snapshot).
+//
+// `adapter_id` and `error_message` are not present in any current SDK shape;
+// they are encoded as `proto3 optional` so the existing fields (path, scale,
+// applied) round-trip exactly while reserving room for richer status reports.
+// ---------------------------------------------------------------------------
+message LoRAAdapterInfo {
+    string          adapter_id    = 1;   // catalog id if known, else empty
+    string          adapter_path  = 2;   // path used when loading
+    float           scale         = 3;   // active scale factor
+    bool            applied       = 4;   // currently applied to the context
+    optional string error_message = 5;   // populated when applied = false
+}
+
+// ---------------------------------------------------------------------------
+// Catalog entry for a LoRA adapter registered with the SDK.
+// Apps register entries at startup; SDKs query "which adapters work with this
+// model" without reinventing detection logic per platform.
+//
+// `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
+// Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
+// nullable / has-bit-tracked field.
+// ---------------------------------------------------------------------------
+message LoraAdapterCatalogEntry {
+    string          id                = 1;   // unique adapter identifier
+    string          name              = 2;   // human-readable display name
+    string          description       = 3;   // short description
+    string          url               = 4;   // direct download URL (.gguf)
+    string          filename          = 5;   // filename to save as on disk
+    repeated string compatible_models = 6;   // explicit base model IDs
+    int64           size_bytes        = 7;   // file size, 0 if unknown
+    optional string author            = 8;   // optional adapter author
+}
+
+// ---------------------------------------------------------------------------
+// Result of a LoRA compatibility pre-check.
+//
+// `base_model_required` is not present in any current SDK shape — it is
+// encoded as `proto3 optional` so a future implementation can surface "this
+// adapter requires base model X" without breaking wire compatibility.
+// ---------------------------------------------------------------------------
+message LoraCompatibilityResult {
+    bool            is_compatible       = 1;
+    optional string error_message       = 2;   // populated when is_compatible = false
+    optional string base_model_required = 3;   // base model id this adapter expects
+}

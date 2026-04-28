@@ -23,20 +23,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class VoiceAgentStreamAdapterFanOutTest {
-
     /**
      * A deterministic fake that records the Kotlin callback when
      * registerCallback is invoked and exposes `emit(event)` so tests can
@@ -95,104 +90,110 @@ class VoiceAgentStreamAdapterFanOutTest {
     }
 
     @Test
-    fun `single collector receives all events`() = runBlocking {
-        val bridge = FakeBridge()
-        val adapter = VoiceAgentStreamAdapter(handle = 1L, bridge = bridge)
+    fun `single collector receives all events`() =
+        runBlocking {
+            val bridge = FakeBridge()
+            val adapter = VoiceAgentStreamAdapter(handle = 1L, bridge = bridge)
 
-        val collected = async(Dispatchers.Default) {
-            withTimeout(2_000) {
-                adapter.stream().take(3).toList()
+            val collected =
+                async(Dispatchers.Default) {
+                    withTimeout(2_000) {
+                        adapter.stream().take(3).toList()
+                    }
+                }
+
+            // Wait for the collector to register before producing events.
+            awaitRegistered(bridge)
+            bridge.emit(event(1, "hello"))
+            bridge.emit(event(2, "world"))
+            bridge.emit(event(3, "!"))
+
+            val events = collected.await()
+            assertEquals(listOf(1L, 2L, 3L), events.map { it.seq })
+
+            // Collector completed via take(3) → awaitClose fires → unregister.
+            awaitUnregistered(bridge)
+            assertEquals(1, bridge.registerCount.get())
+            assertEquals(1, bridge.unregisterCount.get())
+        }
+
+    @Test
+    fun `two concurrent collectors each receive every event`() =
+        runBlocking {
+            val bridge = FakeBridge()
+            val adapter = VoiceAgentStreamAdapter(handle = 42L, bridge = bridge)
+
+            val a =
+                async(Dispatchers.Default) {
+                    withTimeout(2_000) { adapter.stream().take(4).toList() }
+                }
+            val b =
+                async(Dispatchers.Default) {
+                    withTimeout(2_000) { adapter.stream().take(4).toList() }
+                }
+
+            // Both collectors must be attached before we start emitting, or
+            // the late subscriber will miss events by design (DROP_OLDEST
+            // semantics are for overflow, not for "I subscribed late").
+            awaitCollectorCount(bridge, adapter, handle = 42L, expected = 2)
+
+            // ONE C-side registration despite TWO collectors — this is the
+            // central fan-out invariant we're validating.
+            assertEquals(
+                "expected exactly one native registration for two collectors",
+                1,
+                bridge.registerCount.get(),
+            )
+
+            for (i in 1..4) {
+                bridge.emit(event(i.toLong(), "msg-$i"))
             }
+
+            val eventsA = a.await()
+            val eventsB = b.await()
+            assertEquals(
+                "collector A did not observe the full sequence",
+                listOf(1L, 2L, 3L, 4L),
+                eventsA.map { it.seq },
+            )
+            assertEquals(
+                "collector B did not observe the full sequence",
+                listOf(1L, 2L, 3L, 4L),
+                eventsB.map { it.seq },
+            )
+
+            awaitUnregistered(bridge)
+            assertEquals(
+                "final teardown should unregister the shared C callback exactly once",
+                1,
+                bridge.unregisterCount.get(),
+            )
         }
-
-        // Wait for the collector to register before producing events.
-        awaitRegistered(bridge)
-        bridge.emit(event(1, "hello"))
-        bridge.emit(event(2, "world"))
-        bridge.emit(event(3, "!"))
-
-        val events = collected.await()
-        assertEquals(listOf(1L, 2L, 3L), events.map { it.seq })
-
-        // Collector completed via take(3) → awaitClose fires → unregister.
-        awaitUnregistered(bridge)
-        assertEquals(1, bridge.registerCount.get())
-        assertEquals(1, bridge.unregisterCount.get())
-    }
 
     @Test
-    fun `two concurrent collectors each receive every event`() = runBlocking {
-        val bridge = FakeBridge()
-        val adapter = VoiceAgentStreamAdapter(handle = 42L, bridge = bridge)
+    fun `second wave after teardown reinstalls the bridge`() =
+        runBlocking {
+            val bridge = FakeBridge()
+            val adapter = VoiceAgentStreamAdapter(handle = 7L, bridge = bridge)
 
-        val a = async(Dispatchers.Default) {
-            withTimeout(2_000) { adapter.stream().take(4).toList() }
+            // First wave.
+            val first = async(Dispatchers.Default) { adapter.stream().take(1).toList() }
+            awaitRegistered(bridge)
+            bridge.emit(event(1, "first"))
+            assertEquals(listOf(1L), first.await().map { it.seq })
+            awaitUnregistered(bridge)
+
+            // Second wave reuses the same handle+adapter; we should see a
+            // FRESH registration (register_count == 2 after this block).
+            val second = async(Dispatchers.Default) { adapter.stream().take(1).toList() }
+            awaitRegistered(bridge)
+            bridge.emit(event(99, "second"))
+            assertEquals(listOf(99L), second.await().map { it.seq })
+            awaitUnregistered(bridge)
+
+            assertEquals(2, bridge.registerCount.get())
+            assertEquals(2, bridge.unregisterCount.get())
         }
-        val b = async(Dispatchers.Default) {
-            withTimeout(2_000) { adapter.stream().take(4).toList() }
-        }
-
-        // Both collectors must be attached before we start emitting, or
-        // the late subscriber will miss events by design (DROP_OLDEST
-        // semantics are for overflow, not for "I subscribed late").
-        awaitCollectorCount(bridge, adapter, handle = 42L, expected = 2)
-
-        // ONE C-side registration despite TWO collectors — this is the
-        // central fan-out invariant we're validating.
-        assertEquals(
-            "expected exactly one native registration for two collectors",
-            1,
-            bridge.registerCount.get(),
-        )
-
-        for (i in 1..4) {
-            bridge.emit(event(i.toLong(), "msg-$i"))
-        }
-
-        val eventsA = a.await()
-        val eventsB = b.await()
-        assertEquals(
-            "collector A did not observe the full sequence",
-            listOf(1L, 2L, 3L, 4L),
-            eventsA.map { it.seq },
-        )
-        assertEquals(
-            "collector B did not observe the full sequence",
-            listOf(1L, 2L, 3L, 4L),
-            eventsB.map { it.seq },
-        )
-
-        awaitUnregistered(bridge)
-        assertEquals(
-            "final teardown should unregister the shared C callback exactly once",
-            1,
-            bridge.unregisterCount.get(),
-        )
-    }
-
-    @Test
-    fun `second wave after teardown reinstalls the bridge`() = runBlocking {
-        val bridge = FakeBridge()
-        val adapter = VoiceAgentStreamAdapter(handle = 7L, bridge = bridge)
-
-        // First wave.
-        val first = async(Dispatchers.Default) { adapter.stream().take(1).toList() }
-        awaitRegistered(bridge)
-        bridge.emit(event(1, "first"))
-        assertEquals(listOf(1L), first.await().map { it.seq })
-        awaitUnregistered(bridge)
-
-        // Second wave reuses the same handle+adapter; we should see a
-        // FRESH registration (register_count == 2 after this block).
-        val second = async(Dispatchers.Default) { adapter.stream().take(1).toList() }
-        awaitRegistered(bridge)
-        bridge.emit(event(99, "second"))
-        assertEquals(listOf(99L), second.await().map { it.seq })
-        awaitUnregistered(bridge)
-
-        assertEquals(2, bridge.registerCount.get())
-        assertEquals(2, bridge.unregisterCount.get())
-    }
 
     // -----------------------------------------------------------------
     // Small busy-wait helpers to synchronize with the callbackFlow setup.

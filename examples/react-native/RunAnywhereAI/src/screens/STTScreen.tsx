@@ -14,7 +14,7 @@
  * Architecture:
  * - Uses native audio recording (AudioService)
  * - Model loading via RunAnywhere.loadSTTModel()
- * - Transcription via RunAnywhere.transcribeAudio()
+ * - Transcription via RunAnywhere.transcribe()
  * - Supports ONNX-based Whisper models
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
@@ -52,7 +52,11 @@ import { ModelModality, LLMFramework } from '../types/model';
 import { STTMode } from '../types/voice';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  STTLanguage,
+  type ModelInfo as SDKModelInfo,
+} from '@runanywhere/core';
 
 // STT Model IDs (kept for reference, uses SDK model registry)
 const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
@@ -434,7 +438,7 @@ export const STTScreen: React.FC = () => {
       // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
       console.warn('[STTScreen] Starting transcription...');
       const result = await RunAnywhere.transcribeFile(normalizedPath, {
-        language: 'en',
+        language: STTLanguage.STT_LANGUAGE_EN,
       });
 
       console.warn('[STTScreen] Transcription result:', result);
@@ -601,7 +605,7 @@ export const STTScreen: React.FC = () => {
 
       // Transcribe using native module (handles audio decoding)
       const result = await RunAnywhere.transcribeFile(audioPath, {
-        language: 'en',
+        language: STTLanguage.STT_LANGUAGE_EN,
       });
       console.warn('[STTScreen] Live chunk transcription:', result.text);
 
@@ -674,7 +678,7 @@ export const STTScreen: React.FC = () => {
             console.warn('[STTScreen] Transcribing final live chunk...');
             // Transcribe using native module (handles audio decoding)
             const result = await RunAnywhere.transcribeFile(audioPath, {
-              language: 'en',
+              language: STTLanguage.STT_LANGUAGE_EN,
             });
             if (result.text && result.text.trim()) {
               const newText = result.text.trim();

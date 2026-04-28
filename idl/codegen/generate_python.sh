@@ -33,7 +33,11 @@ protoc \
     --pyi_out="${OUT_DIR}" \
     model_types.proto voice_events.proto pipeline.proto solutions.proto \
     voice_agent_service.proto llm_service.proto download_service.proto \
-    llm_options.proto chat.proto tool_calling.proto
+    llm_options.proto chat.proto tool_calling.proto \
+    diffusion_options.proto embeddings_options.proto errors.proto \
+    lora_options.proto rag.proto sdk_events.proto storage_types.proto \
+    structured_output.proto stt_options.proto tts_options.proto \
+    vad_options.proto vlm_options.proto
 
 # GAP 09: gRPC client stubs (AsyncIterator[T]) via grpcio-tools. Optional —
 # emits *_pb2_grpc.py only when the python -m grpc_tools.protoc plugin is

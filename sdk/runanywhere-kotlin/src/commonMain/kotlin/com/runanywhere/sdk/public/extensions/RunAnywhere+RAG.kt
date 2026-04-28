@@ -10,10 +10,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.RAGConfiguration
+import ai.runanywhere.proto.v1.RAGQueryOptions
+import ai.runanywhere.proto.v1.RAGResult
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.RAG.RAGConfiguration
-import com.runanywhere.sdk.public.extensions.RAG.RAGQueryOptions
-import com.runanywhere.sdk.public.extensions.RAG.RAGResult
 
 // MARK: - Pipeline Lifecycle
 

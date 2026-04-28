@@ -36,7 +36,7 @@ public class SimplifiedFileManager {
 
     public init() throws {
         guard let documentsFolder = Folder.documents else {
-            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
+            throw SDKException.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
         try createDirectoryStructure()
@@ -44,7 +44,7 @@ public class SimplifiedFileManager {
 
     private func createDirectoryStructure() throws {
         guard CppBridge.FileManager.createDirectoryStructure() else {
-            throw SDKError.fileManagement(.directoryCreationFailed, "Failed to create directory structure via C++ bridge")
+            throw SDKException.fileManagement(.directoryCreationFailed, "Failed to create directory structure via C++ bridge")
         }
     }
 
@@ -69,7 +69,7 @@ public class SimplifiedFileManager {
     /// Delete a model folder and all its contents
     public func deleteModel(modelId: String, framework: InferenceFramework) throws {
         guard CppBridge.FileManager.deleteModel(modelId: modelId, framework: framework) else {
-            throw SDKError.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
+            throw SDKException.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
         }
         logger.info("Deleted model: \(modelId) from \(framework.wireString)")
     }
@@ -150,7 +150,7 @@ public class SimplifiedFileManager {
 
     public func clearCache() throws {
         guard CppBridge.FileManager.clearCache() else {
-            throw SDKError.fileManagement(.deleteFailed, "Failed to clear cache")
+            throw SDKException.fileManagement(.deleteFailed, "Failed to clear cache")
         }
         logger.info("Cleared cache")
     }
@@ -159,7 +159,7 @@ public class SimplifiedFileManager {
 
     public func cleanTempFiles() throws {
         guard CppBridge.FileManager.clearTemp() else {
-            throw SDKError.fileManagement(.deleteFailed, "Failed to clean temp files")
+            throw SDKException.fileManagement(.deleteFailed, "Failed to clean temp files")
         }
         logger.info("Cleaned temp files")
     }

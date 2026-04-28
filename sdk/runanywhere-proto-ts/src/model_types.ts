@@ -732,6 +732,219 @@ export function archiveStructureToJSON(object: ArchiveStructure): string {
 
 /**
  * ---------------------------------------------------------------------------
+ * High-level artifact classification — what KIND of bundle a model ships as.
+ * Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
+ * compression flavor). Sources pre-IDL:
+ *   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
+ *   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
+ *   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
+ * ---------------------------------------------------------------------------
+ */
+export enum ModelArtifactType {
+  MODEL_ARTIFACT_TYPE_UNSPECIFIED = 0,
+  MODEL_ARTIFACT_TYPE_SINGLE_FILE = 1,
+  MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE = 2,
+  MODEL_ARTIFACT_TYPE_DIRECTORY = 3,
+  MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE = 4,
+  MODEL_ARTIFACT_TYPE_CUSTOM = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function modelArtifactTypeFromJSON(object: any): ModelArtifactType {
+  switch (object) {
+    case 0:
+    case "MODEL_ARTIFACT_TYPE_UNSPECIFIED":
+      return ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED;
+    case 1:
+    case "MODEL_ARTIFACT_TYPE_SINGLE_FILE":
+      return ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE;
+    case 2:
+    case "MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE":
+      return ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
+    case 3:
+    case "MODEL_ARTIFACT_TYPE_DIRECTORY":
+      return ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY;
+    case 4:
+    case "MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE":
+      return ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE;
+    case 5:
+    case "MODEL_ARTIFACT_TYPE_CUSTOM":
+      return ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ModelArtifactType.UNRECOGNIZED;
+  }
+}
+
+export function modelArtifactTypeToJSON(object: ModelArtifactType): string {
+  switch (object) {
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED:
+      return "MODEL_ARTIFACT_TYPE_UNSPECIFIED";
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE:
+      return "MODEL_ARTIFACT_TYPE_SINGLE_FILE";
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+      return "MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE";
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY:
+      return "MODEL_ARTIFACT_TYPE_DIRECTORY";
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+      return "MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE";
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM:
+      return "MODEL_ARTIFACT_TYPE_CUSTOM";
+    case ModelArtifactType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Hardware acceleration preference for inference. Sources pre-IDL:
+ *   Web    enums.ts:165   (Auto / WebGPU / CPU)
+ *   Swift  extensions     (CPU / GPU / NPU / Metal)
+ *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+ * Canonicalized union below.
+ * ---------------------------------------------------------------------------
+ */
+export enum AccelerationPreference {
+  ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
+  ACCELERATION_PREFERENCE_AUTO = 1,
+  ACCELERATION_PREFERENCE_CPU = 2,
+  ACCELERATION_PREFERENCE_GPU = 3,
+  ACCELERATION_PREFERENCE_NPU = 4,
+  ACCELERATION_PREFERENCE_WEBGPU = 5,
+  ACCELERATION_PREFERENCE_METAL = 6,
+  ACCELERATION_PREFERENCE_VULKAN = 7,
+  UNRECOGNIZED = -1,
+}
+
+export function accelerationPreferenceFromJSON(object: any): AccelerationPreference {
+  switch (object) {
+    case 0:
+    case "ACCELERATION_PREFERENCE_UNSPECIFIED":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED;
+    case 1:
+    case "ACCELERATION_PREFERENCE_AUTO":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_AUTO;
+    case 2:
+    case "ACCELERATION_PREFERENCE_CPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_CPU;
+    case 3:
+    case "ACCELERATION_PREFERENCE_GPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_GPU;
+    case 4:
+    case "ACCELERATION_PREFERENCE_NPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_NPU;
+    case 5:
+    case "ACCELERATION_PREFERENCE_WEBGPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU;
+    case 6:
+    case "ACCELERATION_PREFERENCE_METAL":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_METAL;
+    case 7:
+    case "ACCELERATION_PREFERENCE_VULKAN":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AccelerationPreference.UNRECOGNIZED;
+  }
+}
+
+export function accelerationPreferenceToJSON(object: AccelerationPreference): string {
+  switch (object) {
+    case AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED:
+      return "ACCELERATION_PREFERENCE_UNSPECIFIED";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_AUTO:
+      return "ACCELERATION_PREFERENCE_AUTO";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_CPU:
+      return "ACCELERATION_PREFERENCE_CPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_GPU:
+      return "ACCELERATION_PREFERENCE_GPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_NPU:
+      return "ACCELERATION_PREFERENCE_NPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU:
+      return "ACCELERATION_PREFERENCE_WEBGPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_METAL:
+      return "ACCELERATION_PREFERENCE_METAL";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN:
+      return "ACCELERATION_PREFERENCE_VULKAN";
+    case AccelerationPreference.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
+ *   Web    enums.ts (RoutingPolicy)
+ *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
+ *          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
+ *   Swift  extensions (RoutingPolicy)
+ * Canonical short-form below; specific PreferLocal/PreferCloud cover the
+ * "preferred" cases, MANUAL covers explicit user override.
+ * ---------------------------------------------------------------------------
+ */
+export enum RoutingPolicy {
+  ROUTING_POLICY_UNSPECIFIED = 0,
+  ROUTING_POLICY_PREFER_LOCAL = 1,
+  ROUTING_POLICY_PREFER_CLOUD = 2,
+  ROUTING_POLICY_COST_OPTIMIZED = 3,
+  ROUTING_POLICY_LATENCY_OPTIMIZED = 4,
+  ROUTING_POLICY_MANUAL = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function routingPolicyFromJSON(object: any): RoutingPolicy {
+  switch (object) {
+    case 0:
+    case "ROUTING_POLICY_UNSPECIFIED":
+      return RoutingPolicy.ROUTING_POLICY_UNSPECIFIED;
+    case 1:
+    case "ROUTING_POLICY_PREFER_LOCAL":
+      return RoutingPolicy.ROUTING_POLICY_PREFER_LOCAL;
+    case 2:
+    case "ROUTING_POLICY_PREFER_CLOUD":
+      return RoutingPolicy.ROUTING_POLICY_PREFER_CLOUD;
+    case 3:
+    case "ROUTING_POLICY_COST_OPTIMIZED":
+      return RoutingPolicy.ROUTING_POLICY_COST_OPTIMIZED;
+    case 4:
+    case "ROUTING_POLICY_LATENCY_OPTIMIZED":
+      return RoutingPolicy.ROUTING_POLICY_LATENCY_OPTIMIZED;
+    case 5:
+    case "ROUTING_POLICY_MANUAL":
+      return RoutingPolicy.ROUTING_POLICY_MANUAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return RoutingPolicy.UNRECOGNIZED;
+  }
+}
+
+export function routingPolicyToJSON(object: RoutingPolicy): string {
+  switch (object) {
+    case RoutingPolicy.ROUTING_POLICY_UNSPECIFIED:
+      return "ROUTING_POLICY_UNSPECIFIED";
+    case RoutingPolicy.ROUTING_POLICY_PREFER_LOCAL:
+      return "ROUTING_POLICY_PREFER_LOCAL";
+    case RoutingPolicy.ROUTING_POLICY_PREFER_CLOUD:
+      return "ROUTING_POLICY_PREFER_CLOUD";
+    case RoutingPolicy.ROUTING_POLICY_COST_OPTIMIZED:
+      return "ROUTING_POLICY_COST_OPTIMIZED";
+    case RoutingPolicy.ROUTING_POLICY_LATENCY_OPTIMIZED:
+      return "ROUTING_POLICY_LATENCY_OPTIMIZED";
+    case RoutingPolicy.ROUTING_POLICY_MANUAL:
+      return "ROUTING_POLICY_MANUAL";
+    case RoutingPolicy.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * Core metadata for a model entry.
  * Sources pre-IDL:
  *   Swift  ModelTypes.swift:393       (16 fields)
@@ -760,7 +973,27 @@ export interface ModelInfo {
   archive?: ArchiveArtifact | undefined;
   multiFile?: MultiFileArtifact | undefined;
   customStrategyId?: string | undefined;
-  builtIn?: boolean | undefined;
+  builtIn?:
+    | boolean
+    | undefined;
+  /**
+   * High-level artifact classification, complementary to the `artifact`
+   * oneof above. Allows catalog entries to carry a coarse type tag without
+   * resolving the full strategy variant.
+   */
+  artifactType?:
+    | ModelArtifactType
+    | undefined;
+  /** Manifest of files that are expected on disk after fetch/extraction. */
+  expectedFiles?:
+    | ExpectedModelFiles
+    | undefined;
+  /** Preferred hardware acceleration backend for this model. */
+  accelerationPreference?:
+    | AccelerationPreference
+    | undefined;
+  /** Hybrid (on-device vs cloud) routing policy for this entry. */
+  routingPolicy?: RoutingPolicy | undefined;
 }
 
 export interface SingleFileArtifact {
@@ -779,10 +1012,32 @@ export interface ModelFileDescriptor {
   url: string;
   filename: string;
   isRequired: boolean;
+  /**
+   * Extended descriptor fields (Flutter model_types.dart:~350,
+   * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
+   * canonical "required" flag — the documented `required` boolean from
+   * newer SDK sources maps onto it (default true, mirrored in Swift).
+   */
+  sizeBytes?: number | undefined;
+  checksum?: string | undefined;
 }
 
 export interface MultiFileArtifact {
   files: ModelFileDescriptor[];
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Declarative manifest of files a multi-file / directory model is expected
+ * to contain on disk after download/extraction. Used for verification before
+ * hand-off to the inference framework. Sources pre-IDL:
+ *   Flutter core/types/model_types.dart:420
+ *   Swift   ModelTypes.swift:~300
+ * ---------------------------------------------------------------------------
+ */
+export interface ExpectedModelFiles {
+  files: ModelFileDescriptor[];
+  rootDirectory?: string | undefined;
 }
 
 function createBaseModelInfo(): ModelInfo {
@@ -807,6 +1062,10 @@ function createBaseModelInfo(): ModelInfo {
     multiFile: undefined,
     customStrategyId: undefined,
     builtIn: undefined,
+    artifactType: undefined,
+    expectedFiles: undefined,
+    accelerationPreference: undefined,
+    routingPolicy: undefined,
   };
 }
 
@@ -871,6 +1130,18 @@ export const ModelInfo = {
     }
     if (message.builtIn !== undefined) {
       writer.uint32(192).bool(message.builtIn);
+    }
+    if (message.artifactType !== undefined) {
+      writer.uint32(200).int32(message.artifactType);
+    }
+    if (message.expectedFiles !== undefined) {
+      ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(210).fork()).ldelim();
+    }
+    if (message.accelerationPreference !== undefined) {
+      writer.uint32(216).int32(message.accelerationPreference);
+    }
+    if (message.routingPolicy !== undefined) {
+      writer.uint32(224).int32(message.routingPolicy);
     }
     return writer;
   },
@@ -1022,6 +1293,34 @@ export const ModelInfo = {
 
           message.builtIn = reader.bool();
           continue;
+        case 25:
+          if (tag !== 200) {
+            break;
+          }
+
+          message.artifactType = reader.int32() as any;
+          continue;
+        case 26:
+          if (tag !== 210) {
+            break;
+          }
+
+          message.expectedFiles = ExpectedModelFiles.decode(reader, reader.uint32());
+          continue;
+        case 27:
+          if (tag !== 216) {
+            break;
+          }
+
+          message.accelerationPreference = reader.int32() as any;
+          continue;
+        case 28:
+          if (tag !== 224) {
+            break;
+          }
+
+          message.routingPolicy = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1053,6 +1352,12 @@ export const ModelInfo = {
       multiFile: isSet(object.multiFile) ? MultiFileArtifact.fromJSON(object.multiFile) : undefined,
       customStrategyId: isSet(object.customStrategyId) ? globalThis.String(object.customStrategyId) : undefined,
       builtIn: isSet(object.builtIn) ? globalThis.Boolean(object.builtIn) : undefined,
+      artifactType: isSet(object.artifactType) ? modelArtifactTypeFromJSON(object.artifactType) : undefined,
+      expectedFiles: isSet(object.expectedFiles) ? ExpectedModelFiles.fromJSON(object.expectedFiles) : undefined,
+      accelerationPreference: isSet(object.accelerationPreference)
+        ? accelerationPreferenceFromJSON(object.accelerationPreference)
+        : undefined,
+      routingPolicy: isSet(object.routingPolicy) ? routingPolicyFromJSON(object.routingPolicy) : undefined,
     };
   },
 
@@ -1118,6 +1423,18 @@ export const ModelInfo = {
     if (message.builtIn !== undefined) {
       obj.builtIn = message.builtIn;
     }
+    if (message.artifactType !== undefined) {
+      obj.artifactType = modelArtifactTypeToJSON(message.artifactType);
+    }
+    if (message.expectedFiles !== undefined) {
+      obj.expectedFiles = ExpectedModelFiles.toJSON(message.expectedFiles);
+    }
+    if (message.accelerationPreference !== undefined) {
+      obj.accelerationPreference = accelerationPreferenceToJSON(message.accelerationPreference);
+    }
+    if (message.routingPolicy !== undefined) {
+      obj.routingPolicy = routingPolicyToJSON(message.routingPolicy);
+    }
     return obj;
   },
 
@@ -1152,6 +1469,12 @@ export const ModelInfo = {
       : undefined;
     message.customStrategyId = object.customStrategyId ?? undefined;
     message.builtIn = object.builtIn ?? undefined;
+    message.artifactType = object.artifactType ?? undefined;
+    message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
+      ? ExpectedModelFiles.fromPartial(object.expectedFiles)
+      : undefined;
+    message.accelerationPreference = object.accelerationPreference ?? undefined;
+    message.routingPolicy = object.routingPolicy ?? undefined;
     return message;
   },
 };
@@ -1343,7 +1666,7 @@ export const ArchiveArtifact = {
 };
 
 function createBaseModelFileDescriptor(): ModelFileDescriptor {
-  return { url: "", filename: "", isRequired: false };
+  return { url: "", filename: "", isRequired: false, sizeBytes: undefined, checksum: undefined };
 }
 
 export const ModelFileDescriptor = {
@@ -1356,6 +1679,12 @@ export const ModelFileDescriptor = {
     }
     if (message.isRequired !== false) {
       writer.uint32(24).bool(message.isRequired);
+    }
+    if (message.sizeBytes !== undefined) {
+      writer.uint32(32).int64(message.sizeBytes);
+    }
+    if (message.checksum !== undefined) {
+      writer.uint32(42).string(message.checksum);
     }
     return writer;
   },
@@ -1388,6 +1717,20 @@ export const ModelFileDescriptor = {
 
           message.isRequired = reader.bool();
           continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.sizeBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.checksum = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1402,6 +1745,8 @@ export const ModelFileDescriptor = {
       url: isSet(object.url) ? globalThis.String(object.url) : "",
       filename: isSet(object.filename) ? globalThis.String(object.filename) : "",
       isRequired: isSet(object.isRequired) ? globalThis.Boolean(object.isRequired) : false,
+      sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : undefined,
+      checksum: isSet(object.checksum) ? globalThis.String(object.checksum) : undefined,
     };
   },
 
@@ -1416,6 +1761,12 @@ export const ModelFileDescriptor = {
     if (message.isRequired !== false) {
       obj.isRequired = message.isRequired;
     }
+    if (message.sizeBytes !== undefined) {
+      obj.sizeBytes = Math.round(message.sizeBytes);
+    }
+    if (message.checksum !== undefined) {
+      obj.checksum = message.checksum;
+    }
     return obj;
   },
 
@@ -1427,6 +1778,8 @@ export const ModelFileDescriptor = {
     message.url = object.url ?? "";
     message.filename = object.filename ?? "";
     message.isRequired = object.isRequired ?? false;
+    message.sizeBytes = object.sizeBytes ?? undefined;
+    message.checksum = object.checksum ?? undefined;
     return message;
   },
 };
@@ -1488,6 +1841,82 @@ export const MultiFileArtifact = {
   fromPartial<I extends Exact<DeepPartial<MultiFileArtifact>, I>>(object: I): MultiFileArtifact {
     const message = createBaseMultiFileArtifact();
     message.files = object.files?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseExpectedModelFiles(): ExpectedModelFiles {
+  return { files: [], rootDirectory: undefined };
+}
+
+export const ExpectedModelFiles = {
+  encode(message: ExpectedModelFiles, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.files) {
+      ModelFileDescriptor.encode(v!, writer.uint32(10).fork()).ldelim();
+    }
+    if (message.rootDirectory !== undefined) {
+      writer.uint32(18).string(message.rootDirectory);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ExpectedModelFiles {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExpectedModelFiles();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.files.push(ModelFileDescriptor.decode(reader, reader.uint32()));
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.rootDirectory = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExpectedModelFiles {
+    return {
+      files: globalThis.Array.isArray(object?.files)
+        ? object.files.map((e: any) => ModelFileDescriptor.fromJSON(e))
+        : [],
+      rootDirectory: isSet(object.rootDirectory) ? globalThis.String(object.rootDirectory) : undefined,
+    };
+  },
+
+  toJSON(message: ExpectedModelFiles): unknown {
+    const obj: any = {};
+    if (message.files?.length) {
+      obj.files = message.files.map((e) => ModelFileDescriptor.toJSON(e));
+    }
+    if (message.rootDirectory !== undefined) {
+      obj.rootDirectory = message.rootDirectory;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(base?: I): ExpectedModelFiles {
+    return ExpectedModelFiles.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(object: I): ExpectedModelFiles {
+    const message = createBaseExpectedModelFiles();
+    message.files = object.files?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
+    message.rootDirectory = object.rootDirectory ?? undefined;
     return message;
   },
 };

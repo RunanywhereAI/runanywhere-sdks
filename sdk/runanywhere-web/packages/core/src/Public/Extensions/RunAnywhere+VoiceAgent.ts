@@ -17,17 +17,16 @@
  * the `rac_voice_agent_*` WASM exports are built).
  */
 
-import { SDKError } from '../../Foundation/ErrorTypes';
+import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
 import type { LLMProvider, STTProvider, TTSProvider } from '../../Infrastructure/ProviderTypes';
 import type {
   VoiceAgentConfig,
-  VoiceAgentComponentLoadState,
-  VoiceAgentComponentState,
   VoiceAgentComponentStates,
   VoiceAgentResult,
-} from '../../types/VoiceAgentCTypes';
+} from '../../types/index';
+import { ComponentLoadState } from '../../types/index';
 
 const logger = new SDKLogger('VoiceAgent');
 
@@ -79,9 +78,10 @@ function toFloat32(audio: Float32Array | Uint8Array): Float32Array {
   return samples;
 }
 
-function componentStateFromBoolean(loaded: boolean, modelId?: string): VoiceAgentComponentState {
-  const state: VoiceAgentComponentLoadState = loaded ? 'loaded' : 'notLoaded';
-  return { state, modelId };
+function componentLoadStateFromBoolean(loaded: boolean): ComponentLoadState {
+  return loaded
+    ? ComponentLoadState.COMPONENT_LOAD_STATE_LOADED
+    : ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ export async function initializeVoiceAgent(config: VoiceAgentConfig): Promise<vo
   // Compose-mode: just verify providers exist; concrete loaders are the
   // application's responsibility (loadModel via TextGeneration / STT.loadModel etc.).
   if (!getSTT() || !getLLM() || !getTTS()) {
-    throw SDKError.backendNotAvailable(
+    throw SDKException.backendNotAvailable(
       'VoiceAgent',
       'STT/LLM/TTS providers must be registered (via @runanywhere/web-llamacpp + ' +
       '@runanywhere/web-onnx) before initializing the voice agent.',
@@ -122,7 +122,7 @@ export async function isVoiceAgentReady(): Promise<boolean> {
     return Promise.resolve(_provider.isVoiceAgentReady());
   }
   const states = await getVoiceAgentComponentStates();
-  return states.isFullyReady;
+  return states.ready;
 }
 
 export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
@@ -133,18 +133,21 @@ export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponen
   const llm = getLLM() as (LLMProvider & { isModelLoaded?: boolean }) | undefined;
   const tts = getTTS() as (TTSProvider & { isVoiceLoaded?: boolean; voiceId?: string }) | undefined;
 
-  const sttState = componentStateFromBoolean(stt?.isModelLoaded ?? false, stt?.modelId);
-  const llmState = componentStateFromBoolean(llm?.isModelLoaded ?? false);
-  const ttsState = componentStateFromBoolean(tts?.isVoiceLoaded ?? false, tts?.voiceId);
+  const sttState = componentLoadStateFromBoolean(stt?.isModelLoaded ?? false);
+  const llmState = componentLoadStateFromBoolean(llm?.isModelLoaded ?? false);
+  const ttsState = componentLoadStateFromBoolean(tts?.isVoiceLoaded ?? false);
+  const vadState = ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED;
 
-  const isFullyReady =
-    sttState.state === 'loaded' && llmState.state === 'loaded' && ttsState.state === 'loaded';
+  const ready =
+    sttState === ComponentLoadState.COMPONENT_LOAD_STATE_LOADED &&
+    llmState === ComponentLoadState.COMPONENT_LOAD_STATE_LOADED &&
+    ttsState === ComponentLoadState.COMPONENT_LOAD_STATE_LOADED;
 
-  return { stt: sttState, llm: llmState, tts: ttsState, isFullyReady };
+  return { sttState, llmState, ttsState, vadState, ready, anyLoading: false };
 }
 
 export async function areAllVoiceComponentsReady(): Promise<boolean> {
-  return (await getVoiceAgentComponentStates()).isFullyReady;
+  return (await getVoiceAgentComponentStates()).ready;
 }
 
 /** Mirror Swift `RunAnywhere.processVoiceTurn(audioData) -> VoiceAgentResult`. */
@@ -157,25 +160,24 @@ export async function processVoiceTurn(
   // Compose mode: STT -> LLM -> TTS. Each step throws if its provider is absent.
   const samples = toFloat32(audio);
   const transcription = await voiceAgentTranscribe(samples);
-  const response = transcription
+  const assistantResponse = transcription
     ? await voiceAgentGenerateResponse(transcription)
     : '';
-  let synthesizedAudio: Float32Array | undefined;
-  let sampleRate: number | undefined;
-  if (response) {
+  let synthesizedAudio: Uint8Array | undefined;
+  if (assistantResponse) {
     const tts = getTTS();
     if (tts) {
-      const synth = await tts.synthesize(response);
-      synthesizedAudio = synth.audioData as unknown as Float32Array;
-      sampleRate = synth.sampleRate;
+      const synth = await tts.synthesize(assistantResponse);
+      // Proto carries audio as raw bytes (PCM-F32-LE per AudioFrameEvent
+      // conventions). Re-pack the Float32Array as a Uint8Array view.
+      synthesizedAudio = new Uint8Array(synth.audioData.buffer);
     }
   }
   return {
     speechDetected: transcription.length > 0,
     transcription: transcription || undefined,
-    response: response || undefined,
+    assistantResponse: assistantResponse || undefined,
     synthesizedAudio,
-    sampleRate,
   };
 }
 
@@ -187,7 +189,7 @@ export async function voiceAgentTranscribe(
   }
   const stt = getSTT();
   if (!stt) {
-    throw SDKError.backendNotAvailable(
+    throw SDKException.backendNotAvailable(
       'voiceAgentTranscribe',
       'No STT provider registered. Install and register @runanywhere/web-onnx.',
     );
@@ -202,14 +204,14 @@ export async function voiceAgentGenerateResponse(prompt: string): Promise<string
   }
   const llm = getLLM();
   if (!llm) {
-    throw SDKError.backendNotAvailable(
+    throw SDKException.backendNotAvailable(
       'voiceAgentGenerateResponse',
       'No LLM provider registered. Install and register @runanywhere/web-llamacpp.',
     );
   }
   if (typeof llm.generate === 'function') {
     const r = await llm.generate(prompt, {
-      systemPrompt: _config?.systemPrompt,
+      systemPrompt: _config?.systemPrompt ?? undefined,
     });
     return r.text;
   }
@@ -228,7 +230,7 @@ export async function voiceAgentSynthesizeSpeech(text: string): Promise<Float32A
   }
   const tts = getTTS();
   if (!tts) {
-    throw SDKError.backendNotAvailable(
+    throw SDKException.backendNotAvailable(
       'voiceAgentSynthesizeSpeech',
       'No TTS provider registered. Install and register @runanywhere/web-onnx.',
     );
@@ -243,3 +245,17 @@ export async function cleanupVoiceAgent(): Promise<void> {
   }
   _config = null;
 }
+
+export const VoiceAgent = {
+  setProvider: setVoiceAgentProvider,
+  initialize: initializeVoiceAgent,
+  initializeWithLoadedModels: initializeVoiceAgentWithLoadedModels,
+  isReady: isVoiceAgentReady,
+  getComponentStates: getVoiceAgentComponentStates,
+  areAllComponentsReady: areAllVoiceComponentsReady,
+  processTurn: processVoiceTurn,
+  transcribe: voiceAgentTranscribe,
+  generateResponse: voiceAgentGenerateResponse,
+  synthesizeSpeech: voiceAgentSynthesizeSpeech,
+  cleanup: cleanupVoiceAgent,
+};

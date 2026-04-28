@@ -228,3 +228,77 @@ public struct VLMStreamingResult: Sendable {
     public let stream: AsyncThrowingStream<String, Error>
     public let metrics: Task<VLMResult, Error>
 }
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/vlm_options.pb.swift`:
+//   • RAVLMImage           (oneof source: filePath/encoded/rawRgb/base64,
+//                            width, height, format: RAVLMImageFormat)
+//   • RAVLMConfiguration   (modelID, maxImageSizePx, maxTokens)
+//   • RAVLMGenerationOptions (prompt, maxTokens, temperature, topP, topK)
+//   • RAVLMResult          (text, promptTokens, completionTokens, totalTokens,
+//                            totalTimeMs, tokensPerSecond, …)
+//   • RAVLMImageFormat enum (.unspecified, .filePath, .jpeg, .png, .webp,
+//                             .rawRgb, .rawRgba, .base64)
+//   • RAVLMErrorCode enum
+//
+// Hand-rolled `VLMImage` is KEPT because it carries Apple-specific image
+// pipeline cases (UIImage, CVPixelBuffer) and the platform-side conversion
+// helpers (toCImage / withCPointers) that allocate scratch buffers for the
+// underlying C ABI call. The proto type only models the wire contract.
+// `VLMResult` keeps a custom `init(from cResult: rac_vlm_result_t)` C bridge.
+
+extension VLMResult {
+    /// Convert to canonical generated proto `RAVLMResult`.
+    public func toRAVLMResult() -> RAVLMResult {
+        var proto = RAVLMResult()
+        proto.text = text
+        proto.promptTokens = Int32(promptTokens)
+        proto.completionTokens = Int32(completionTokens)
+        proto.totalTokens = Int64(promptTokens + completionTokens)
+        return proto
+    }
+}
+
+extension VLMImage {
+    /// Convert to canonical generated proto `RAVLMImage`. Notes on cases:
+    /// • UIImage / CVPixelBuffer are NOT representable on the wire — they are
+    ///   converted to raw RGB bytes (caller-side) before being placed into the
+    ///   `rawRgb` oneof case. This matches the `withCPointers` C bridge
+    ///   semantics.
+    /// • RAVLMImageFormat values:
+    ///     .filePath, .jpeg/.png/.webp (encoded), .rawRgb/.rawRgba, .base64.
+    public func toRAVLMImage() -> RAVLMImage? {
+        var proto = RAVLMImage()
+        switch format {
+        case .filePath(let path):
+            proto.filePath = path
+            proto.format = .filePath
+        case .rgbPixels(let data, let w, let h):
+            proto.rawRgb = data
+            proto.width = Int32(w)
+            proto.height = Int32(h)
+            proto.format = .rawRgb
+        case .base64(let str):
+            proto.base64 = str
+            proto.format = .base64
+        #if canImport(UIKit)
+        case .uiImage(let img):
+            guard let rgb = img.toRGBData(), let cgImage = img.cgImage else { return nil }
+            proto.rawRgb = rgb
+            proto.width = Int32(cgImage.width)
+            proto.height = Int32(cgImage.height)
+            proto.format = .rawRgb
+        #endif
+        #if canImport(CoreVideo)
+        case .pixelBuffer(let buf):
+            guard let rgb = buf.toRGBData() else { return nil }
+            proto.rawRgb = rgb
+            proto.width = Int32(CVPixelBufferGetWidth(buf))
+            proto.height = Int32(CVPixelBufferGetHeight(buf))
+            proto.format = .rawRgb
+        #endif
+        }
+        return proto
+    }
+}

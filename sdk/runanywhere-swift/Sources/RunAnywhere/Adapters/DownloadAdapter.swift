@@ -146,7 +146,7 @@ public class DownloadAdapter: @unchecked Sendable {
         }
 
         guard let downloadURL = model.downloadURL else {
-            let downloadError = SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
+            let downloadError = SDKException.download(.invalidInput, "Invalid download URL for model: \(model.id)")
             CppBridge.Events.emitDownloadFailed(modelId: model.id, error: downloadError)
             throw downloadError
         }
@@ -198,7 +198,7 @@ public class DownloadAdapter: @unchecked Sendable {
                 } catch {
                     await CppBridge.Download.shared.markFailed(
                         taskId: taskId,
-                        error: SDKError.from(error, category: .download)
+                        error: SDKException.from(error, category: .network)
                     )
                     progressContinuation.yield(.failed(error, bytesDownloaded: 0, totalBytes: model.downloadSize ?? 0))
                     throw error
@@ -214,7 +214,7 @@ public class DownloadAdapter: @unchecked Sendable {
     /// Download a model that consists of multiple separate files.
     private func downloadMultiFileModel(_ model: ModelInfo, files: [ModelFileDescriptor]) async throws -> DownloadTask {
         guard !files.isEmpty else {
-            throw SDKError.download(.invalidInput, "No files specified for multi-file model: \(model.id)")
+            throw SDKException.download(.invalidInput, "No files specified for multi-file model: \(model.id)")
         }
 
         logger.info("Starting multi-file download for \(model.id) with \(files.count) files")
@@ -279,7 +279,7 @@ public class DownloadAdapter: @unchecked Sendable {
 
                     return destinationFolder
                 } catch {
-                    CppBridge.Events.emitDownloadFailed(modelId: model.id, error: SDKError.from(error, category: .download))
+                    CppBridge.Events.emitDownloadFailed(modelId: model.id, error: SDKException.from(error, category: .network))
                     progressContinuation.yield(.failed(error, bytesDownloaded: 0, totalBytes: model.downloadSize ?? 0))
                     throw error
                 }
@@ -426,35 +426,35 @@ public class DownloadAdapter: @unchecked Sendable {
 
     // MARK: - Error Mapping
 
-    /// Map a `rac_http_download_status_t` to the matching SDKError.
-    func mapDownloadError(_ status: rac_http_download_status_t, httpStatus: Int32) -> SDKError {
+    /// Map a `rac_http_download_status_t` to the matching SDKException.
+    func mapDownloadError(_ status: rac_http_download_status_t, httpStatus: Int32) -> SDKException {
         switch status {
         case RAC_HTTP_DL_OK:
-            return SDKError.download(.unknown, "Unexpected success status in error mapping")
+            return SDKException.download(.unknown, "Unexpected success status in error mapping")
         case RAC_HTTP_DL_NETWORK_ERROR:
-            return SDKError.download(.networkError, "Network error during download")
+            return SDKException.download(.networkError, "Network error during download")
         case RAC_HTTP_DL_FILE_ERROR:
-            return SDKError.download(.fileWriteFailed, "File system error during download")
+            return SDKException.download(.fileWriteFailed, "File system error during download")
         case RAC_HTTP_DL_INSUFFICIENT_STORAGE:
-            return SDKError.download(.insufficientStorage, "Insufficient storage for download")
+            return SDKException.download(.insufficientStorage, "Insufficient storage for download")
         case RAC_HTTP_DL_INVALID_URL:
-            return SDKError.download(.invalidInput, "Invalid download URL")
+            return SDKException.download(.invalidInput, "Invalid download URL")
         case RAC_HTTP_DL_CHECKSUM_FAILED:
-            return SDKError.download(.checksumMismatch, "Checksum verification failed")
+            return SDKException.download(.checksumMismatch, "Checksum verification failed")
         case RAC_HTTP_DL_CANCELLED:
-            return SDKError.download(.downloadFailed, "Download cancelled")
+            return SDKException.download(.downloadFailed, "Download cancelled")
         case RAC_HTTP_DL_SERVER_ERROR:
-            return SDKError.download(.httpError, "Server error (HTTP \(httpStatus))")
+            return SDKException.download(.httpError, "Server error (HTTP \(httpStatus))")
         case RAC_HTTP_DL_TIMEOUT:
-            return SDKError.download(.networkError, "Download timed out")
+            return SDKException.download(.networkError, "Download timed out")
         case RAC_HTTP_DL_NETWORK_UNAVAILABLE:
-            return SDKError.download(.networkError, "Network unavailable")
+            return SDKException.download(.networkError, "Network unavailable")
         case RAC_HTTP_DL_DNS_ERROR:
-            return SDKError.download(.networkError, "DNS resolution failed")
+            return SDKException.download(.networkError, "DNS resolution failed")
         case RAC_HTTP_DL_SSL_ERROR:
-            return SDKError.download(.networkError, "SSL/TLS error")
+            return SDKException.download(.networkError, "SSL/TLS error")
         default:
-            return SDKError.download(.unknown, "Unknown download error (rc=\(status.rawValue), http=\(httpStatus))")
+            return SDKException.download(.unknown, "Unknown download error (rc=\(status.rawValue), http=\(httpStatus))")
         }
     }
 }

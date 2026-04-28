@@ -319,13 +319,13 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       // Calculate total model storage from actual models
       int totalModelStorage = 0;
       for (final model in storedModels) {
-        totalModelStorage += model.size;
+        totalModelStorage += model.sizeBytes.toInt();
       }
 
       if (mounted) {
         setState(() {
-          _totalStorageSize = storageInfo.appStorage.totalSize;
-          _availableSpace = storageInfo.deviceStorage.freeSpace;
+          _totalStorageSize = storageInfo.app.totalBytes.toInt();
+          _availableSpace = storageInfo.device.freeBytes.toInt();
           _modelStorageSize = totalModelStorage;
           _storedModels = storedModels;
           _isRefreshingStorage = false;
@@ -377,7 +377,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   /// Delete a stored model using RunAnywhere SDK
   Future<void> _deleteModel(sdk.StoredModel model) async {
     try {
-      await sdk.RunAnywhereSDK.instance.downloads.delete(model.id);
+      await sdk.RunAnywhereSDK.instance.downloads.delete(model.modelId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${model.name} deleted')),
@@ -1047,7 +1047,7 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                     ),
                     const SizedBox(height: AppSpacing.xSmall),
                     Text(
-                      widget.model.size.formattedFileSize,
+                      widget.model.sizeBytes.toInt().formattedFileSize,
                       style: AppTypography.caption2(context).copyWith(
                         color: AppColors.textSecondary(context),
                       ),
@@ -1091,10 +1091,12 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildDetailRow(
-                      'Downloaded:', _formatDate(widget.model.createdDate)),
-                  _buildDetailRow('Size:', widget.model.size.formattedFileSize),
-                  _buildDetailRow(
-                      'Framework:', widget.model.framework.rawValue),
+                      'Downloaded:',
+                      _formatDate(DateTime.fromMillisecondsSinceEpoch(
+                          widget.model.downloadedAtMs.toInt()))),
+                  _buildDetailRow('Size:',
+                      widget.model.sizeBytes.toInt().formattedFileSize),
+                  _buildDetailRow('Path:', widget.model.localPath),
                 ],
               ),
             ),

@@ -52,6 +52,31 @@ export declare enum PipelineState {
 export declare function pipelineStateFromJSON(object: any): PipelineState;
 export declare function pipelineStateToJSON(object: PipelineState): string;
 /**
+ * Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
+ * UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
+ * the same as NOT_LOADED for forward-compatibility.
+ */
+export declare enum ComponentLoadState {
+    COMPONENT_LOAD_STATE_UNSPECIFIED = 0,
+    COMPONENT_LOAD_STATE_NOT_LOADED = 1,
+    COMPONENT_LOAD_STATE_LOADING = 2,
+    COMPONENT_LOAD_STATE_LOADED = 3,
+    COMPONENT_LOAD_STATE_ERROR = 4,
+    UNRECOGNIZED = -1
+}
+export declare function componentLoadStateFromJSON(object: any): ComponentLoadState;
+export declare function componentLoadStateToJSON(object: ComponentLoadState): string;
+export declare enum VoiceSessionErrorCode {
+    VOICE_SESSION_ERROR_CODE_UNSPECIFIED = 0,
+    VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED = 1,
+    VOICE_SESSION_ERROR_CODE_NOT_READY = 2,
+    VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING = 3,
+    VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE = 4,
+    UNRECOGNIZED = -1
+}
+export declare function voiceSessionErrorCodeFromJSON(object: any): VoiceSessionErrorCode;
+export declare function voiceSessionErrorCodeToJSON(object: VoiceSessionErrorCode): string;
+/**
  * ---------------------------------------------------------------------------
  * Sum type emitted on the output edge of the VoiceAgent pipeline.
  * ---------------------------------------------------------------------------
@@ -75,6 +100,20 @@ export interface VoiceEvent {
     state?: StateChangeEvent | undefined;
     error?: ErrorEvent | undefined;
     metrics?: MetricsEvent | undefined;
+    /**
+     * v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+     * VoiceAgentComponentStates and the AsyncSequence-style lifecycle
+     * signals consumed by the cross-platform VoiceAgent extensions
+     * (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
+     * VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
+     * voice_agent_types.dart).
+     */
+    componentStateChanged?: VoiceAgentComponentStates | undefined;
+    sessionError?: VoiceSessionError | undefined;
+    sessionStarted?: SessionStartedEvent | undefined;
+    sessionStopped?: SessionStoppedEvent | undefined;
+    agentResponseStarted?: AgentResponseStartedEvent | undefined;
+    agentResponseCompleted?: AgentResponseCompletedEvent | undefined;
 }
 /** User speech finalized by STT (is_final=false → partial hypothesis). */
 export interface UserSaidEvent {
@@ -164,6 +203,39 @@ export interface MetricsEvent {
      */
     createdAtNs: number;
 }
+/**
+ * Aggregate load state across all four voice-agent components. Mirrors Swift
+ * `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
+ * `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
+ * `VoiceAgentComponentStates`.
+ */
+export interface VoiceAgentComponentStates {
+    sttState: ComponentLoadState;
+    llmState: ComponentLoadState;
+    ttsState: ComponentLoadState;
+    vadState: ComponentLoadState;
+    /**
+     * Computed: true when stt_state, llm_state, tts_state, vad_state are all
+     * COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+     * recompute.
+     */
+    ready: boolean;
+    /** Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING. */
+    anyLoading: boolean;
+}
+export interface VoiceSessionError {
+    code: VoiceSessionErrorCode;
+    message: string;
+    failedComponent?: string | undefined;
+}
+export interface SessionStartedEvent {
+}
+export interface SessionStoppedEvent {
+}
+export interface AgentResponseStartedEvent {
+}
+export interface AgentResponseCompletedEvent {
+}
 export declare const VoiceEvent: {
     encode(message: VoiceEvent, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VoiceEvent;
@@ -235,6 +307,54 @@ export declare const MetricsEvent: {
     toJSON(message: MetricsEvent): unknown;
     create<I extends Exact<DeepPartial<MetricsEvent>, I>>(base?: I): MetricsEvent;
     fromPartial<I extends Exact<DeepPartial<MetricsEvent>, I>>(object: I): MetricsEvent;
+};
+export declare const VoiceAgentComponentStates: {
+    encode(message: VoiceAgentComponentStates, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentComponentStates;
+    fromJSON(object: any): VoiceAgentComponentStates;
+    toJSON(message: VoiceAgentComponentStates): unknown;
+    create<I extends Exact<DeepPartial<VoiceAgentComponentStates>, I>>(base?: I): VoiceAgentComponentStates;
+    fromPartial<I extends Exact<DeepPartial<VoiceAgentComponentStates>, I>>(object: I): VoiceAgentComponentStates;
+};
+export declare const VoiceSessionError: {
+    encode(message: VoiceSessionError, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceSessionError;
+    fromJSON(object: any): VoiceSessionError;
+    toJSON(message: VoiceSessionError): unknown;
+    create<I extends Exact<DeepPartial<VoiceSessionError>, I>>(base?: I): VoiceSessionError;
+    fromPartial<I extends Exact<DeepPartial<VoiceSessionError>, I>>(object: I): VoiceSessionError;
+};
+export declare const SessionStartedEvent: {
+    encode(_: SessionStartedEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): SessionStartedEvent;
+    fromJSON(_: any): SessionStartedEvent;
+    toJSON(_: SessionStartedEvent): unknown;
+    create<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(base?: I): SessionStartedEvent;
+    fromPartial<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(_: I): SessionStartedEvent;
+};
+export declare const SessionStoppedEvent: {
+    encode(_: SessionStoppedEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): SessionStoppedEvent;
+    fromJSON(_: any): SessionStoppedEvent;
+    toJSON(_: SessionStoppedEvent): unknown;
+    create<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(base?: I): SessionStoppedEvent;
+    fromPartial<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(_: I): SessionStoppedEvent;
+};
+export declare const AgentResponseStartedEvent: {
+    encode(_: AgentResponseStartedEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): AgentResponseStartedEvent;
+    fromJSON(_: any): AgentResponseStartedEvent;
+    toJSON(_: AgentResponseStartedEvent): unknown;
+    create<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(base?: I): AgentResponseStartedEvent;
+    fromPartial<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(_: I): AgentResponseStartedEvent;
+};
+export declare const AgentResponseCompletedEvent: {
+    encode(_: AgentResponseCompletedEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): AgentResponseCompletedEvent;
+    fromJSON(_: any): AgentResponseCompletedEvent;
+    toJSON(_: AgentResponseCompletedEvent): unknown;
+    create<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(base?: I): AgentResponseCompletedEvent;
+    fromPartial<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(_: I): AgentResponseCompletedEvent;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

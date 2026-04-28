@@ -39,3 +39,129 @@ service VoiceAgent {
     // cancels the stream or the agent reaches its terminal state.
     rpc Stream(VoiceAgentRequest) returns (stream VoiceEvent);
 }
+
+// ---------------------------------------------------------------------------
+// v3.2: One-shot voice-turn result.
+//
+// Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
+// `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
+// `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
+// Returned by the `processVoiceTurn` ergonomic API where a single audio
+// blob produces transcription + assistant response + synthesized audio in
+// one call (as opposed to the streaming path served by the Stream rpc).
+// ---------------------------------------------------------------------------
+message VoiceAgentResult {
+    // Whether the input audio passed VAD's speech-detected check.
+    bool speech_detected = 1;
+
+    // Transcribed text from STT. Unset when speech_detected=false.
+    optional string transcription = 2;
+
+    // Generated assistant response text from the LLM. Unset when STT
+    // produced no transcription or LLM was skipped.
+    optional string assistant_response = 3;
+
+    // Thinking content extracted from `<think>...</think>` tags
+    // (qwen3, deepseek-r1). Unset when the active LLM does not emit
+    // a chain-of-thought trace.
+    optional string thinking_content = 4;
+
+    // Synthesized audio data from TTS. Encoding follows AudioFrameEvent
+    // conventions (typically PCM-F32-LE, sample rate per voice). Unset
+    // when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
+    optional bytes synthesized_audio = 5;
+
+    // Component states captured at the end of the turn — useful for UIs
+    // surfacing readiness / partial-failure breakdowns alongside the
+    // final result. Unset when the caller does not ask for it.
+    optional VoiceAgentComponentStates final_state = 6;
+}
+
+// ---------------------------------------------------------------------------
+// v3.2: Voice session behavior configuration.
+//
+// Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
+// Controls runtime behavior of the voice agent's session loop — silence
+// timing, speech threshold, auto-TTS playback, continuous mode, and
+// LLM thinking-mode toggle.
+// ---------------------------------------------------------------------------
+message VoiceSessionConfig {
+    // Silence duration (milliseconds) before processing the speech
+    // buffer. Default per Swift/Kotlin: 1500 ms.
+    int32 silence_duration_ms = 1;
+
+    // Minimum audio level to detect speech (0.0 - 1.0). Default per
+    // Swift/Kotlin: 0.1.
+    float speech_threshold = 2;
+
+    // Whether to auto-play TTS response after synthesis. Default true.
+    bool  auto_play_tts = 3;
+
+    // Whether to auto-resume listening after TTS playback. Default true.
+    bool  continuous_mode = 4;
+
+    // Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
+    // Default false.
+    bool  thinking_mode_enabled = 5;
+}
+
+// ---------------------------------------------------------------------------
+// v3.2: Aggregated voice-agent compose configuration.
+//
+// Mirrors the C ABI `rac_voice_agent_config_t` and Swift
+// `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
+// (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
+// new message provides the fine-grained sub-component view consumed by the
+// `rac_voice_agent_initialize()` C entry-point.
+//
+// Each sub-config string field uses a "model_id" naming convention; the
+// runtime resolves IDs against the model registry. An empty string means
+// "use the currently loaded model/voice for that capability".
+// ---------------------------------------------------------------------------
+message VoiceAgentComposeConfig {
+    // -------------------------------------------------------------------
+    // STT sub-config (mirrors rac_voice_agent_stt_config_t).
+    // -------------------------------------------------------------------
+    optional string stt_model_path = 1;
+    optional string stt_model_id   = 2;
+    optional string stt_model_name = 3;
+
+    // -------------------------------------------------------------------
+    // LLM sub-config (mirrors rac_voice_agent_llm_config_t).
+    // -------------------------------------------------------------------
+    optional string llm_model_path = 4;
+    optional string llm_model_id   = 5;
+    optional string llm_model_name = 6;
+
+    // -------------------------------------------------------------------
+    // TTS sub-config (mirrors rac_voice_agent_tts_config_t).
+    // -------------------------------------------------------------------
+    optional string tts_voice_path = 7;
+    optional string tts_voice_id   = 8;
+    optional string tts_voice_name = 9;
+
+    // -------------------------------------------------------------------
+    // VAD sub-config (mirrors rac_voice_agent_vad_config_t).
+    // -------------------------------------------------------------------
+    int32  vad_sample_rate     = 10;   // default 16000
+    float  vad_frame_length    = 11;   // default 0.1
+    float  vad_energy_threshold = 12;  // default 0.005
+
+    // -------------------------------------------------------------------
+    // Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
+    // rac_wakeword_config_t).
+    // -------------------------------------------------------------------
+    bool   wakeword_enabled              = 13;
+    optional string wakeword_model_path  = 14;
+    optional string wakeword_model_id    = 15;
+    optional string wakeword_phrase      = 16;
+    float  wakeword_threshold            = 17;   // default 0.5
+    optional string wakeword_embedding_model_path = 18;
+    optional string wakeword_vad_model_path       = 19;
+
+    // -------------------------------------------------------------------
+    // Session-behavior sub-config. Optional so the C ABI can be invoked
+    // without runtime-behavior overrides (engine defaults applied).
+    // -------------------------------------------------------------------
+    optional VoiceSessionConfig session_config = 20;
+}

@@ -202,7 +202,7 @@ extension DownloadAdapter {
         } catch {
             CppBridge.Events.emitExtractionFailed(
                 modelId: model.id,
-                error: SDKError.from(error, category: .download)
+                error: SDKException.from(error, category: .network)
             )
             throw error
         }

@@ -143,7 +143,7 @@ extension CppBridge {
         /// Calculate size at a path
         public func calculateSize(at path: URL) throws -> Int64 {
             guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Storage analyzer not initialized")
+                throw SDKException.general(.initializationFailed, "Storage analyzer not initialized")
             }
 
             var size: Int64 = 0
@@ -153,9 +153,9 @@ extension CppBridge {
 
             guard result == RAC_SUCCESS else {
                 if result == RAC_ERROR_NOT_FOUND {
-                    throw SDKError.fileManagement(.fileNotFound, "Path not found: \(path.path)")
+                    throw SDKException.fileManagement(.fileNotFound, "Path not found: \(path.path)")
                 }
-                throw SDKError.general(.processingFailed, "Failed to calculate size")
+                throw SDKException.general(.processingFailed, "Failed to calculate size")
             }
 
             return size

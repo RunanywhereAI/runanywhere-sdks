@@ -86,6 +86,16 @@ public class WakeWordConfig(
     schemaIndex = 4,
   )
   public val sample_rate_hz: Int = 0,
+  /**
+   * Optional explicit solution-kind tag. See `SolutionType`.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
+    jsonName = "typeKind",
+    schemaIndex = 5,
+  )
+  public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<WakeWordConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -104,6 +114,7 @@ public class WakeWordConfig(
     if (threshold != other.threshold) return false
     if (pre_roll_ms != other.pre_roll_ms) return false
     if (sample_rate_hz != other.sample_rate_hz) return false
+    if (type_kind != other.type_kind) return false
     return true
   }
 
@@ -116,6 +127,7 @@ public class WakeWordConfig(
       result = result * 37 + threshold.hashCode()
       result = result * 37 + pre_roll_ms.hashCode()
       result = result * 37 + sample_rate_hz.hashCode()
+      result = result * 37 + (type_kind?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -128,6 +140,7 @@ public class WakeWordConfig(
     result += """threshold=$threshold"""
     result += """pre_roll_ms=$pre_roll_ms"""
     result += """sample_rate_hz=$sample_rate_hz"""
+    if (type_kind != null) result += """type_kind=$type_kind"""
     return result.joinToString(prefix = "WakeWordConfig{", separator = ", ", postfix = "}")
   }
 
@@ -137,9 +150,10 @@ public class WakeWordConfig(
     threshold: Float = this.threshold,
     pre_roll_ms: Int = this.pre_roll_ms,
     sample_rate_hz: Int = this.sample_rate_hz,
+    type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
   ): WakeWordConfig = WakeWordConfig(model_id, keyword, threshold, pre_roll_ms, sample_rate_hz,
-      unknownFields)
+      type_kind, unknownFields)
 
   public companion object {
     @JvmField
@@ -161,6 +175,7 @@ public class WakeWordConfig(
             value.pre_roll_ms)
         if (value.sample_rate_hz != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5,
             value.sample_rate_hz)
+        size += SolutionType.ADAPTER.encodedSizeWithTag(6, value.type_kind)
         return size
       }
 
@@ -172,11 +187,13 @@ public class WakeWordConfig(
         if (value.pre_roll_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.pre_roll_ms)
         if (value.sample_rate_hz != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
             value.sample_rate_hz)
+        SolutionType.ADAPTER.encodeWithTag(writer, 6, value.type_kind)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: WakeWordConfig) {
         writer.writeBytes(value.unknownFields)
+        SolutionType.ADAPTER.encodeWithTag(writer, 6, value.type_kind)
         if (value.sample_rate_hz != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
             value.sample_rate_hz)
         if (value.pre_roll_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.pre_roll_ms)
@@ -192,6 +209,7 @@ public class WakeWordConfig(
         var threshold: Float = 0f
         var pre_roll_ms: Int = 0
         var sample_rate_hz: Int = 0
+        var type_kind: SolutionType? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -199,6 +217,11 @@ public class WakeWordConfig(
             3 -> threshold = ProtoAdapter.FLOAT.decode(reader)
             4 -> pre_roll_ms = ProtoAdapter.INT32.decode(reader)
             5 -> sample_rate_hz = ProtoAdapter.INT32.decode(reader)
+            6 -> try {
+              type_kind = SolutionType.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -208,6 +231,7 @@ public class WakeWordConfig(
           threshold = threshold,
           pre_roll_ms = pre_roll_ms,
           sample_rate_hz = sample_rate_hz,
+          type_kind = type_kind,
           unknownFields = unknownFields
         )
       }

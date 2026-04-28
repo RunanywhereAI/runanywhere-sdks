@@ -6,9 +6,9 @@ import { expectType } from 'tsd';
 import {
   RunAnywhere,
   SDKEnvironment,
-  SDKError,
+  SDKException,
   SDKErrorCode,
-  isSDKError,
+  isSDKException,
   DownloadStage,
   type GenerateOptions,
   type ChatMessage,
@@ -28,9 +28,9 @@ expectType<Promise<void>>(RunAnywhere.initialize(opts));
 const genOpts: GenerateOptions = { temperature: 0.8 };
 expectType<number | undefined>(genOpts.temperature);
 
-// isSDKError must be a type guard
-const e: unknown = new SDKError(SDKErrorCode.NotInitialized, 'test');
-if (isSDKError(e)) {
+// isSDKException must be a type guard
+const e: unknown = new SDKException(SDKErrorCode.NotInitialized, 'test');
+if (isSDKException(e)) {
   const code: SDKErrorCode = e.code;
   expectType<SDKErrorCode>(code);
 }

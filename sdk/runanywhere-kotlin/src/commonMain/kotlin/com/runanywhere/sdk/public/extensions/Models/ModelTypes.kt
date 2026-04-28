@@ -37,14 +37,14 @@ enum class ModelSource(
     fun toProto(): ai.runanywhere.proto.v1.ModelSource =
         when (this) {
             REMOTE -> ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_REMOTE
-            LOCAL  -> ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_LOCAL
+            LOCAL -> ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_LOCAL
         }
 
     companion object {
         fun fromProto(proto: ai.runanywhere.proto.v1.ModelSource): ModelSource =
             when (proto) {
-                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_REMOTE      -> REMOTE
-                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_LOCAL       -> LOCAL
+                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_REMOTE -> REMOTE
+                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_LOCAL -> LOCAL
                 ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_UNSPECIFIED -> LOCAL
             }
     }
@@ -75,23 +75,23 @@ enum class ModelFormat(
 
     fun toProto(): ai.runanywhere.proto.v1.ModelFormat =
         when (this) {
-            ONNX        -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ONNX
-            ORT         -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ORT
-            GGUF        -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_GGUF
-            BIN         -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_BIN
+            ONNX -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ONNX
+            ORT -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ORT
+            GGUF -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_GGUF
+            BIN -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_BIN
             QNN_CONTEXT -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_QNN_CONTEXT
-            UNKNOWN     -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_UNKNOWN
+            UNKNOWN -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_UNKNOWN
         }
 
     companion object {
         fun fromProto(proto: ai.runanywhere.proto.v1.ModelFormat): ModelFormat =
             when (proto) {
-                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ONNX        -> ONNX
-                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ORT         -> ORT
-                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_GGUF        -> GGUF
-                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_BIN         -> BIN
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ONNX -> ONNX
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ORT -> ORT
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_GGUF -> GGUF
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_BIN -> BIN
                 ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_QNN_CONTEXT -> QNN_CONTEXT
-                else                                                         -> UNKNOWN
+                else -> UNKNOWN
             }
     }
 }
@@ -217,29 +217,29 @@ enum class ModelCategory(
 
     fun toProto(): ai.runanywhere.proto.v1.ModelCategory =
         when (this) {
-            LANGUAGE           -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_LANGUAGE
+            LANGUAGE -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_LANGUAGE
             SPEECH_RECOGNITION -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-            SPEECH_SYNTHESIS   -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-            VISION             -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VISION
-            IMAGE_GENERATION   -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION
-            MULTIMODAL         -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL
-            AUDIO              -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO
-            EMBEDDING          -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING
+            SPEECH_SYNTHESIS -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+            VISION -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VISION
+            IMAGE_GENERATION -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION
+            MULTIMODAL -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL
+            AUDIO -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO
+            EMBEDDING -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING
         }
 
     companion object {
         fun fromProto(proto: ai.runanywhere.proto.v1.ModelCategory): ModelCategory =
             when (proto) {
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_LANGUAGE                 -> LANGUAGE
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION       -> SPEECH_RECOGNITION
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS         -> SPEECH_SYNTHESIS
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VISION                   -> VISION
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION         -> IMAGE_GENERATION
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL               -> MULTIMODAL
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO                    -> AUDIO
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING                -> EMBEDDING
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_LANGUAGE -> LANGUAGE
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> SPEECH_RECOGNITION
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> SPEECH_SYNTHESIS
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VISION -> VISION
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> IMAGE_GENERATION
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL -> MULTIMODAL
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO -> AUDIO
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING -> EMBEDDING
                 ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> AUDIO // collapse into AUDIO for now
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED              -> AUDIO // defensive
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED -> AUDIO // defensive
             }
     }
 }
@@ -265,10 +265,10 @@ enum class ArchiveType(
 
     fun toProto(): ai.runanywhere.proto.v1.ArchiveType =
         when (this) {
-            ZIP     -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_ZIP
+            ZIP -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_ZIP
             TAR_BZ2 -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_BZ2
-            TAR_GZ  -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_GZ
-            TAR_XZ  -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_XZ
+            TAR_GZ -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_GZ
+            TAR_XZ -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_XZ
         }
 
     companion object {
@@ -286,10 +286,10 @@ enum class ArchiveType(
 
         fun fromProto(proto: ai.runanywhere.proto.v1.ArchiveType): ArchiveType? =
             when (proto) {
-                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_ZIP         -> ZIP
-                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_BZ2     -> TAR_BZ2
-                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_GZ      -> TAR_GZ
-                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_XZ      -> TAR_XZ
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_ZIP -> ZIP
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> TAR_BZ2
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_GZ -> TAR_GZ
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_XZ -> TAR_XZ
                 ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED -> null
             }
     }
@@ -312,18 +312,18 @@ enum class ArchiveStructure(
     fun toProto(): ai.runanywhere.proto.v1.ArchiveStructure =
         when (this) {
             SINGLE_FILE_NESTED -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED
-            DIRECTORY_BASED    -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED
-            NESTED_DIRECTORY   -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY
-            UNKNOWN            -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN
+            DIRECTORY_BASED -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED
+            NESTED_DIRECTORY -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY
+            UNKNOWN -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN
         }
 
     companion object {
         fun fromProto(proto: ai.runanywhere.proto.v1.ArchiveStructure): ArchiveStructure =
             when (proto) {
                 ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED -> SINGLE_FILE_NESTED
-                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED    -> DIRECTORY_BASED
-                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY   -> NESTED_DIRECTORY
-                else                                                                          -> UNKNOWN
+                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED -> DIRECTORY_BASED
+                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY -> NESTED_DIRECTORY
+                else -> UNKNOWN
             }
     }
 }

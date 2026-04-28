@@ -35,8 +35,9 @@ private val solutionsLogger = SDKLogger("Solutions")
  * always safe; the handle is also released by the finalizer if the caller
  * forgets — but explicit close is the contract.
  */
-public class SolutionHandle internal constructor(handle: Long) : AutoCloseable {
-
+public class SolutionHandle internal constructor(
+    handle: Long,
+) : AutoCloseable {
     private val handleRef = AtomicLong(handle)
 
     /** Start the underlying scheduler (non-blocking). */
@@ -120,7 +121,6 @@ public class SolutionHandle internal constructor(handle: Long) : AutoCloseable {
  * native solution and is released via [SolutionHandle.close].
  */
 public object RunAnywhereSolutions {
-
     /**
      * Construct a solution from a serialized `runanywhere.v1.SolutionConfig`
      * (or `PipelineSpec`) protobuf. The handle is returned in the **created**
@@ -130,12 +130,13 @@ public object RunAnywhereSolutions {
      *         the bytes (e.g. malformed proto, missing oneof, build without
      *         protobuf support).
      */
-    public suspend fun run(configBytes: ByteArray): SolutionHandle = withContext(Dispatchers.IO) {
-        ensureNativeReady()
-        val handle = RunAnywhereBridge.racSolutionCreateFromProto(configBytes)
-        check(handle != 0L) { "rac_solution_create_from_proto returned a null handle" }
-        SolutionHandle(handle)
-    }
+    public suspend fun run(configBytes: ByteArray): SolutionHandle =
+        withContext(Dispatchers.IO) {
+            ensureNativeReady()
+            val handle = RunAnywhereBridge.racSolutionCreateFromProto(configBytes)
+            check(handle != 0L) { "rac_solution_create_from_proto returned a null handle" }
+            SolutionHandle(handle)
+        }
 
     /**
      * Convenience overload — encode the typed proto and forward to
@@ -148,12 +149,13 @@ public object RunAnywhereSolutions {
      * YAML sugar — accept a `SolutionConfig`-shape or `PipelineSpec`-shape
      * YAML document. Loader auto-disambiguates on the presence of `operators:`.
      */
-    public suspend fun runYaml(yamlText: String): SolutionHandle = withContext(Dispatchers.IO) {
-        ensureNativeReady()
-        val handle = RunAnywhereBridge.racSolutionCreateFromYaml(yamlText)
-        check(handle != 0L) { "rac_solution_create_from_yaml returned a null handle" }
-        SolutionHandle(handle)
-    }
+    public suspend fun runYaml(yamlText: String): SolutionHandle =
+        withContext(Dispatchers.IO) {
+            ensureNativeReady()
+            val handle = RunAnywhereBridge.racSolutionCreateFromYaml(yamlText)
+            check(handle != 0L) { "rac_solution_create_from_yaml returned a null handle" }
+            SolutionHandle(handle)
+        }
 
     private fun ensureNativeReady() {
         if (!RunAnywhereBridge.ensureNativeLibraryLoaded()) {

@@ -10,9 +10,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.StorageAvailability
+import ai.runanywhere.proto.v1.StorageInfo
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Storage.StorageAvailability
-import com.runanywhere.sdk.public.extensions.Storage.StorageInfo
 
 // MARK: - Storage Information
 
@@ -75,7 +75,7 @@ expect suspend fun RunAnywhere.modelStorageUsed(): Long
 expect suspend fun RunAnywhere.checkStorageAvailability(
     requiredBytes: Long,
     safetyMargin: Double,
-): com.runanywhere.sdk.public.extensions.Storage.StorageAvailability
+): ai.runanywhere.proto.v1.StorageAvailability
 
 /**
  * Get on-disk metrics for a single model.
@@ -85,7 +85,7 @@ expect suspend fun RunAnywhere.checkStorageAvailability(
 expect suspend fun RunAnywhere.getModelStorageMetrics(
     modelId: String,
     framework: com.runanywhere.sdk.core.types.InferenceFramework? = null,
-): com.runanywhere.sdk.public.extensions.Storage.ModelStorageMetrics?
+): ai.runanywhere.proto.v1.ModelStorageMetrics?
 
 /**
  * Clean temporary cache files (downloads-in-progress, archive scratch dirs).

@@ -1,7 +1,13 @@
 /**
  * RunAnywhere React Native SDK - Data Models
  *
- * These interfaces match the iOS Swift SDK data structures.
+ * These interfaces match the iOS Swift SDK data structures and
+ * describe the JS-runtime shape exchanged with the native bridge.
+ * The canonical proto-encoded counterparts live in
+ * `@runanywhere/proto-ts/storage_types` (storage models) and
+ * `@runanywhere/proto-ts/llm_options` (perf metrics) and are
+ * re-exported under `*Proto` aliases.
+ *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/
  */
 
@@ -15,18 +21,15 @@ import type {
   SDKEnvironment,
 } from './enums';
 
-// Structured output types (inline definitions since handler was deleted)
-export type GeneratableType = 'string' | 'number' | 'boolean' | 'object' | 'array';
-
-export interface StructuredOutputConfig {
-  schema?: Record<string, unknown>;
-  jsonMode?: boolean;
-}
-
-export interface StructuredOutputValidation {
-  isValid: boolean;
-  errors?: string[];
-}
+// Canonical proto-encoded storage / model-info messages.
+export type {
+  DeviceStorageInfo as DeviceStorageInfoProto,
+  AppStorageInfo as AppStorageInfoProto,
+  ModelStorageMetrics as ModelStorageMetricsProto,
+  StorageInfo as StorageInfoProto,
+  StorageAvailability as StorageAvailabilityProto,
+  StoredModel as StoredModelProto,
+} from '@runanywhere/proto-ts/storage_types';
 
 // ============================================================================
 // Model Information
@@ -157,78 +160,6 @@ export interface ModelCompatibilityResult {
 // Generation Types
 // ============================================================================
 
-/**
- * Performance metrics for generation
- * Reference: GenerationResult.swift
- */
-export interface PerformanceMetrics {
-  /** Time to first token in milliseconds */
-  timeToFirstTokenMs?: number;
-
-  /** Tokens generated per second */
-  tokensPerSecond?: number;
-
-  /** Total inference time in milliseconds */
-  inferenceTimeMs: number;
-}
-
-// Structured output types are defined above
-
-/**
- * Result of a text generation request
- *
- * @deprecated Prefer the canonical `LLMGenerationResult` in
- * `types/LLMTypes.ts` which mirrors the Swift `LLMGenerationResult`
- * struct exactly. This type stays in place because the RN-only
- * `executionTarget` / `hardwareUsed` / `savedAmount` fields are still
- * referenced by sample apps. Phase 3 (IDL migration) will collapse
- * the two into a single shape.
- *
- * Reference: GenerationResult.swift
- */
-export interface GenerationResult {
-  /** Generated text (with thinking content removed if extracted) */
-  text: string;
-
-  /** Thinking/reasoning content extracted from the response */
-  thinkingContent?: string;
-
-  /** Number of tokens used */
-  tokensUsed: number;
-
-  /** Model used for generation */
-  modelUsed: string;
-
-  /** Latency in milliseconds */
-  latencyMs: number;
-
-  /** Execution target (device/cloud/hybrid) */
-  executionTarget: ExecutionTarget;
-
-  /** Amount saved by using on-device execution */
-  savedAmount: number;
-
-  /** Framework used for generation (if on-device) */
-  framework?: LLMFramework;
-
-  /** Hardware acceleration used */
-  hardwareUsed: HardwareAcceleration;
-
-  /** Memory used during generation (in bytes) */
-  memoryUsed: number;
-
-  /** Detailed performance metrics */
-  performanceMetrics: PerformanceMetrics;
-
-  /** Structured output validation result */
-  structuredOutputValidation?: StructuredOutputValidation;
-
-  /** Number of tokens used for thinking/reasoning */
-  thinkingTokens?: number;
-
-  /** Number of tokens in the actual response content */
-  responseTokens: number;
-}
 
 /**
  * Options for text generation
@@ -259,18 +190,10 @@ export interface GenerationOptions {
   /** Preferred framework for generation */
   preferredFramework?: LLMFramework;
 
-  /** Structured output configuration */
-  structuredOutput?: StructuredOutputConfig;
-
   /** System prompt to define AI behavior */
   systemPrompt?: string;
 }
 
-/**
- * Alias for GenerationOptions to match iOS SDK naming convention.
- * @see GenerationOptions
- */
-export type LLMGenerationOptions = GenerationOptions;
 
 // ============================================================================
 // Voice Types
@@ -297,136 +220,6 @@ export interface VoiceAudioChunk {
 
   /** Whether this is the final chunk */
   isFinal: boolean;
-}
-
-/**
- * STT segment with timing information
- */
-export interface STTSegment {
-  /** Transcribed text */
-  text: string;
-
-  /** Start time in seconds */
-  startTime: number;
-
-  /** End time in seconds */
-  endTime: number;
-
-  /** Speaker ID if diarization is enabled */
-  speakerId?: string;
-
-  /** Confidence score */
-  confidence: number;
-}
-
-/**
- * STT alternative transcription
- */
-export interface STTAlternative {
-  /** Alternative text */
-  text: string;
-
-  /** Confidence score */
-  confidence: number;
-}
-
-/**
- * Speech-to-text result.
- *
- * @deprecated Prefer the canonical `STTOutput` in `types/STTTypes.ts`
- * which mirrors the Swift `STTOutput: ComponentOutput` struct. This
- * type is retained for back-compat; Phase 3 (IDL migration) will
- * collapse the two.
- */
-export interface STTResult {
-  /** Main transcription text */
-  text: string;
-
-  /** Segments with timing */
-  segments: STTSegment[];
-
-  /** Detected language */
-  language?: string;
-
-  /** Overall confidence */
-  confidence: number;
-
-  /** Duration in seconds */
-  duration: number;
-
-  /** Alternative transcriptions */
-  alternatives: STTAlternative[];
-}
-
-/**
- * STT options for transcription
- */
-export interface STTOptions {
-  /** Language code (e.g., 'en', 'es') */
-  language?: string;
-
-  /** Enable punctuation */
-  punctuation?: boolean;
-
-  /** Enable speaker diarization */
-  diarization?: boolean;
-
-  /** Enable word timestamps */
-  wordTimestamps?: boolean;
-
-  /** Sample rate */
-  sampleRate?: number;
-}
-
-/**
- * TTS configuration
- */
-export interface TTSConfiguration {
-  /** Voice identifier */
-  voice?: string;
-
-  /** Speech rate (0.5 - 2.0) */
-  rate?: number;
-
-  /** Pitch (0.5 - 2.0) */
-  pitch?: number;
-
-  /** Volume (0.0 - 1.0) */
-  volume?: number;
-}
-
-/**
- * TTS synthesis result
- */
-export interface TTSResult {
-  /** Base64 encoded audio data */
-  audio: string;
-
-  /** Sample rate of the audio */
-  sampleRate: number;
-
-  /** Number of samples */
-  numSamples: number;
-
-  /** Duration in seconds */
-  duration: number;
-}
-
-/**
- * VAD configuration
- */
-export interface VADConfiguration {
-  /** Energy threshold */
-  energyThreshold?: number;
-
-  /** Sample rate */
-  sampleRate?: number;
-
-  /** Frame length in milliseconds */
-  frameLength?: number;
-
-  /** Enable auto calibration */
-  autoCalibration?: boolean;
 }
 
 // ============================================================================

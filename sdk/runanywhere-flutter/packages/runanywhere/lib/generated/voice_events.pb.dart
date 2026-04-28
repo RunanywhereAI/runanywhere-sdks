@@ -1,14 +1,9 @@
-//
+///
 //  Generated code. Do not modify.
 //  source: voice_events.proto
 //
 // @dart = 2.12
-
-// ignore_for_file: always_use_package_imports
-// ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
 
 import 'dart:core' as $core;
 
@@ -28,13 +23,55 @@ enum VoiceEvent_Payload {
   state, 
   error, 
   metrics, 
+  componentStateChanged, 
+  sessionError, 
+  sessionStarted, 
+  sessionStopped, 
+  agentResponseStarted, 
+  agentResponseCompleted, 
   notSet
 }
 
-/// ---------------------------------------------------------------------------
-/// Sum type emitted on the output edge of the VoiceAgent pipeline.
-/// ---------------------------------------------------------------------------
 class VoiceEvent extends $pb.GeneratedMessage {
+  static const $core.Map<$core.int, VoiceEvent_Payload> _VoiceEvent_PayloadByTag = {
+    10 : VoiceEvent_Payload.userSaid,
+    11 : VoiceEvent_Payload.assistantToken,
+    12 : VoiceEvent_Payload.audio,
+    13 : VoiceEvent_Payload.vad,
+    14 : VoiceEvent_Payload.interrupted,
+    15 : VoiceEvent_Payload.state,
+    16 : VoiceEvent_Payload.error,
+    17 : VoiceEvent_Payload.metrics,
+    18 : VoiceEvent_Payload.componentStateChanged,
+    19 : VoiceEvent_Payload.sessionError,
+    20 : VoiceEvent_Payload.sessionStarted,
+    21 : VoiceEvent_Payload.sessionStopped,
+    22 : VoiceEvent_Payload.agentResponseStarted,
+    23 : VoiceEvent_Payload.agentResponseCompleted,
+    0 : VoiceEvent_Payload.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
+    ..a<$fixnum.Int64>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'timestampUs')
+    ..aOM<UserSaidEvent>(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'userSaid', subBuilder: UserSaidEvent.create)
+    ..aOM<AssistantTokenEvent>(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'assistantToken', subBuilder: AssistantTokenEvent.create)
+    ..aOM<AudioFrameEvent>(12, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audio', subBuilder: AudioFrameEvent.create)
+    ..aOM<VADEvent>(13, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vad', subBuilder: VADEvent.create)
+    ..aOM<InterruptedEvent>(14, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'interrupted', subBuilder: InterruptedEvent.create)
+    ..aOM<StateChangeEvent>(15, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'state', subBuilder: StateChangeEvent.create)
+    ..aOM<ErrorEvent>(16, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'error', subBuilder: ErrorEvent.create)
+    ..aOM<MetricsEvent>(17, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'metrics', subBuilder: MetricsEvent.create)
+    ..aOM<VoiceAgentComponentStates>(18, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'componentStateChanged', subBuilder: VoiceAgentComponentStates.create)
+    ..aOM<VoiceSessionError>(19, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sessionError', subBuilder: VoiceSessionError.create)
+    ..aOM<SessionStartedEvent>(20, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sessionStarted', subBuilder: SessionStartedEvent.create)
+    ..aOM<SessionStoppedEvent>(21, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sessionStopped', subBuilder: SessionStoppedEvent.create)
+    ..aOM<AgentResponseStartedEvent>(22, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'agentResponseStarted', subBuilder: AgentResponseStartedEvent.create)
+    ..aOM<AgentResponseCompletedEvent>(23, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'agentResponseCompleted', subBuilder: AgentResponseCompletedEvent.create)
+    ..hasRequiredFields = false
+  ;
+
+  VoiceEvent._() : super();
   factory VoiceEvent({
     $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
@@ -46,70 +83,66 @@ class VoiceEvent extends $pb.GeneratedMessage {
     StateChangeEvent? state,
     ErrorEvent? error,
     MetricsEvent? metrics,
+    VoiceAgentComponentStates? componentStateChanged,
+    VoiceSessionError? sessionError,
+    SessionStartedEvent? sessionStarted,
+    SessionStoppedEvent? sessionStopped,
+    AgentResponseStartedEvent? agentResponseStarted,
+    AgentResponseCompletedEvent? agentResponseCompleted,
   }) {
-    final $result = create();
+    final _result = create();
     if (seq != null) {
-      $result.seq = seq;
+      _result.seq = seq;
     }
     if (timestampUs != null) {
-      $result.timestampUs = timestampUs;
+      _result.timestampUs = timestampUs;
     }
     if (userSaid != null) {
-      $result.userSaid = userSaid;
+      _result.userSaid = userSaid;
     }
     if (assistantToken != null) {
-      $result.assistantToken = assistantToken;
+      _result.assistantToken = assistantToken;
     }
     if (audio != null) {
-      $result.audio = audio;
+      _result.audio = audio;
     }
     if (vad != null) {
-      $result.vad = vad;
+      _result.vad = vad;
     }
     if (interrupted != null) {
-      $result.interrupted = interrupted;
+      _result.interrupted = interrupted;
     }
     if (state != null) {
-      $result.state = state;
+      _result.state = state;
     }
     if (error != null) {
-      $result.error = error;
+      _result.error = error;
     }
     if (metrics != null) {
-      $result.metrics = metrics;
+      _result.metrics = metrics;
     }
-    return $result;
+    if (componentStateChanged != null) {
+      _result.componentStateChanged = componentStateChanged;
+    }
+    if (sessionError != null) {
+      _result.sessionError = sessionError;
+    }
+    if (sessionStarted != null) {
+      _result.sessionStarted = sessionStarted;
+    }
+    if (sessionStopped != null) {
+      _result.sessionStopped = sessionStopped;
+    }
+    if (agentResponseStarted != null) {
+      _result.agentResponseStarted = agentResponseStarted;
+    }
+    if (agentResponseCompleted != null) {
+      _result.agentResponseCompleted = agentResponseCompleted;
+    }
+    return _result;
   }
-  VoiceEvent._() : super();
   factory VoiceEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VoiceEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static const $core.Map<$core.int, VoiceEvent_Payload> _VoiceEvent_PayloadByTag = {
-    10 : VoiceEvent_Payload.userSaid,
-    11 : VoiceEvent_Payload.assistantToken,
-    12 : VoiceEvent_Payload.audio,
-    13 : VoiceEvent_Payload.vad,
-    14 : VoiceEvent_Payload.interrupted,
-    15 : VoiceEvent_Payload.state,
-    16 : VoiceEvent_Payload.error,
-    17 : VoiceEvent_Payload.metrics,
-    0 : VoiceEvent_Payload.notSet
-  };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
-    ..aOM<UserSaidEvent>(10, _omitFieldNames ? '' : 'userSaid', subBuilder: UserSaidEvent.create)
-    ..aOM<AssistantTokenEvent>(11, _omitFieldNames ? '' : 'assistantToken', subBuilder: AssistantTokenEvent.create)
-    ..aOM<AudioFrameEvent>(12, _omitFieldNames ? '' : 'audio', subBuilder: AudioFrameEvent.create)
-    ..aOM<VADEvent>(13, _omitFieldNames ? '' : 'vad', subBuilder: VADEvent.create)
-    ..aOM<InterruptedEvent>(14, _omitFieldNames ? '' : 'interrupted', subBuilder: InterruptedEvent.create)
-    ..aOM<StateChangeEvent>(15, _omitFieldNames ? '' : 'state', subBuilder: StateChangeEvent.create)
-    ..aOM<ErrorEvent>(16, _omitFieldNames ? '' : 'error', subBuilder: ErrorEvent.create)
-    ..aOM<MetricsEvent>(17, _omitFieldNames ? '' : 'metrics', subBuilder: MetricsEvent.create)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -119,10 +152,8 @@ class VoiceEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VoiceEvent copyWith(void Function(VoiceEvent) updates) => super.copyWith((message) => updates(message as VoiceEvent)) as VoiceEvent;
-
+  VoiceEvent copyWith(void Function(VoiceEvent) updates) => super.copyWith((message) => updates(message as VoiceEvent)) as VoiceEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static VoiceEvent create() => VoiceEvent._();
   VoiceEvent createEmptyInstance() => create();
@@ -134,8 +165,6 @@ class VoiceEvent extends $pb.GeneratedMessage {
   VoiceEvent_Payload whichPayload() => _VoiceEvent_PayloadByTag[$_whichOneof(0)]!;
   void clearPayload() => clearField($_whichOneof(0));
 
-  /// Monotonic pipeline-local sequence number. Useful for frontends that
-  /// need to detect gaps after reconnection or out-of-order delivery.
   @$pb.TagNumber(1)
   $fixnum.Int64 get seq => $_getI64(0);
   @$pb.TagNumber(1)
@@ -145,8 +174,6 @@ class VoiceEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSeq() => clearField(1);
 
-  /// Wall-clock timestamp captured at the C++ edge, in microseconds since
-  /// Unix epoch. Frontends may re-timestamp for UI display.
   @$pb.TagNumber(2)
   $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -243,10 +270,85 @@ class VoiceEvent extends $pb.GeneratedMessage {
   void clearMetrics() => clearField(17);
   @$pb.TagNumber(17)
   MetricsEvent ensureMetrics() => $_ensure(9);
+
+  @$pb.TagNumber(18)
+  VoiceAgentComponentStates get componentStateChanged => $_getN(10);
+  @$pb.TagNumber(18)
+  set componentStateChanged(VoiceAgentComponentStates v) { setField(18, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasComponentStateChanged() => $_has(10);
+  @$pb.TagNumber(18)
+  void clearComponentStateChanged() => clearField(18);
+  @$pb.TagNumber(18)
+  VoiceAgentComponentStates ensureComponentStateChanged() => $_ensure(10);
+
+  @$pb.TagNumber(19)
+  VoiceSessionError get sessionError => $_getN(11);
+  @$pb.TagNumber(19)
+  set sessionError(VoiceSessionError v) { setField(19, v); }
+  @$pb.TagNumber(19)
+  $core.bool hasSessionError() => $_has(11);
+  @$pb.TagNumber(19)
+  void clearSessionError() => clearField(19);
+  @$pb.TagNumber(19)
+  VoiceSessionError ensureSessionError() => $_ensure(11);
+
+  @$pb.TagNumber(20)
+  SessionStartedEvent get sessionStarted => $_getN(12);
+  @$pb.TagNumber(20)
+  set sessionStarted(SessionStartedEvent v) { setField(20, v); }
+  @$pb.TagNumber(20)
+  $core.bool hasSessionStarted() => $_has(12);
+  @$pb.TagNumber(20)
+  void clearSessionStarted() => clearField(20);
+  @$pb.TagNumber(20)
+  SessionStartedEvent ensureSessionStarted() => $_ensure(12);
+
+  @$pb.TagNumber(21)
+  SessionStoppedEvent get sessionStopped => $_getN(13);
+  @$pb.TagNumber(21)
+  set sessionStopped(SessionStoppedEvent v) { setField(21, v); }
+  @$pb.TagNumber(21)
+  $core.bool hasSessionStopped() => $_has(13);
+  @$pb.TagNumber(21)
+  void clearSessionStopped() => clearField(21);
+  @$pb.TagNumber(21)
+  SessionStoppedEvent ensureSessionStopped() => $_ensure(13);
+
+  @$pb.TagNumber(22)
+  AgentResponseStartedEvent get agentResponseStarted => $_getN(14);
+  @$pb.TagNumber(22)
+  set agentResponseStarted(AgentResponseStartedEvent v) { setField(22, v); }
+  @$pb.TagNumber(22)
+  $core.bool hasAgentResponseStarted() => $_has(14);
+  @$pb.TagNumber(22)
+  void clearAgentResponseStarted() => clearField(22);
+  @$pb.TagNumber(22)
+  AgentResponseStartedEvent ensureAgentResponseStarted() => $_ensure(14);
+
+  @$pb.TagNumber(23)
+  AgentResponseCompletedEvent get agentResponseCompleted => $_getN(15);
+  @$pb.TagNumber(23)
+  set agentResponseCompleted(AgentResponseCompletedEvent v) { setField(23, v); }
+  @$pb.TagNumber(23)
+  $core.bool hasAgentResponseCompleted() => $_has(15);
+  @$pb.TagNumber(23)
+  void clearAgentResponseCompleted() => clearField(23);
+  @$pb.TagNumber(23)
+  AgentResponseCompletedEvent ensureAgentResponseCompleted() => $_ensure(15);
 }
 
-/// User speech finalized by STT (is_final=false → partial hypothesis).
 class UserSaidEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'UserSaidEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'text')
+    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isFinal')
+    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..aInt64(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioStartUs')
+    ..aInt64(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioEndUs')
+    ..hasRequiredFields = false
+  ;
+
+  UserSaidEvent._() : super();
   factory UserSaidEvent({
     $core.String? text,
     $core.bool? isFinal,
@@ -254,37 +356,26 @@ class UserSaidEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? audioStartUs,
     $fixnum.Int64? audioEndUs,
   }) {
-    final $result = create();
+    final _result = create();
     if (text != null) {
-      $result.text = text;
+      _result.text = text;
     }
     if (isFinal != null) {
-      $result.isFinal = isFinal;
+      _result.isFinal = isFinal;
     }
     if (confidence != null) {
-      $result.confidence = confidence;
+      _result.confidence = confidence;
     }
     if (audioStartUs != null) {
-      $result.audioStartUs = audioStartUs;
+      _result.audioStartUs = audioStartUs;
     }
     if (audioEndUs != null) {
-      $result.audioEndUs = audioEndUs;
+      _result.audioEndUs = audioEndUs;
     }
-    return $result;
+    return _result;
   }
-  UserSaidEvent._() : super();
   factory UserSaidEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory UserSaidEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'UserSaidEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aOB(2, _omitFieldNames ? '' : 'isFinal')
-    ..a<$core.double>(3, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
-    ..aInt64(4, _omitFieldNames ? '' : 'audioStartUs')
-    ..aInt64(5, _omitFieldNames ? '' : 'audioEndUs')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -294,10 +385,8 @@ class UserSaidEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  UserSaidEvent copyWith(void Function(UserSaidEvent) updates) => super.copyWith((message) => updates(message as UserSaidEvent)) as UserSaidEvent;
-
+  UserSaidEvent copyWith(void Function(UserSaidEvent) updates) => super.copyWith((message) => updates(message as UserSaidEvent)) as UserSaidEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static UserSaidEvent create() => UserSaidEvent._();
   UserSaidEvent createEmptyInstance() => create();
@@ -352,37 +441,34 @@ class UserSaidEvent extends $pb.GeneratedMessage {
   void clearAudioEndUs() => clearField(5);
 }
 
-/// Single token decoded by the LLM. is_final=true on the last token of a
-/// response (end-of-stream marker).
 class AssistantTokenEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'AssistantTokenEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'text')
+    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isFinal')
+    ..e<TokenKind>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: TokenKind.TOKEN_KIND_UNSPECIFIED, valueOf: TokenKind.valueOf, enumValues: TokenKind.values)
+    ..hasRequiredFields = false
+  ;
+
+  AssistantTokenEvent._() : super();
   factory AssistantTokenEvent({
     $core.String? text,
     $core.bool? isFinal,
     TokenKind? kind,
   }) {
-    final $result = create();
+    final _result = create();
     if (text != null) {
-      $result.text = text;
+      _result.text = text;
     }
     if (isFinal != null) {
-      $result.isFinal = isFinal;
+      _result.isFinal = isFinal;
     }
     if (kind != null) {
-      $result.kind = kind;
+      _result.kind = kind;
     }
-    return $result;
+    return _result;
   }
-  AssistantTokenEvent._() : super();
   factory AssistantTokenEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory AssistantTokenEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AssistantTokenEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aOB(2, _omitFieldNames ? '' : 'isFinal')
-    ..e<TokenKind>(3, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: TokenKind.TOKEN_KIND_UNSPECIFIED, valueOf: TokenKind.valueOf, enumValues: TokenKind.values)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -392,10 +478,8 @@ class AssistantTokenEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  AssistantTokenEvent copyWith(void Function(AssistantTokenEvent) updates) => super.copyWith((message) => updates(message as AssistantTokenEvent)) as AssistantTokenEvent;
-
+  AssistantTokenEvent copyWith(void Function(AssistantTokenEvent) updates) => super.copyWith((message) => updates(message as AssistantTokenEvent)) as AssistantTokenEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static AssistantTokenEvent create() => AssistantTokenEvent._();
   AssistantTokenEvent createEmptyInstance() => create();
@@ -432,42 +516,39 @@ class AssistantTokenEvent extends $pb.GeneratedMessage {
   void clearKind() => clearField(3);
 }
 
-/// A chunk of synthesized PCM audio, ready for the sink. The frontend is
-/// expected to copy the bytes out; the C ABI does NOT retain ownership.
 class AudioFrameEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'AudioFrameEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'pcm', $pb.PbFieldType.OY)
+    ..a<$core.int>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
+    ..a<$core.int>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'channels', $pb.PbFieldType.O3)
+    ..e<AudioEncoding>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: AudioEncoding.valueOf, enumValues: AudioEncoding.values)
+    ..hasRequiredFields = false
+  ;
+
+  AudioFrameEvent._() : super();
   factory AudioFrameEvent({
     $core.List<$core.int>? pcm,
     $core.int? sampleRateHz,
     $core.int? channels,
     AudioEncoding? encoding,
   }) {
-    final $result = create();
+    final _result = create();
     if (pcm != null) {
-      $result.pcm = pcm;
+      _result.pcm = pcm;
     }
     if (sampleRateHz != null) {
-      $result.sampleRateHz = sampleRateHz;
+      _result.sampleRateHz = sampleRateHz;
     }
     if (channels != null) {
-      $result.channels = channels;
+      _result.channels = channels;
     }
     if (encoding != null) {
-      $result.encoding = encoding;
+      _result.encoding = encoding;
     }
-    return $result;
+    return _result;
   }
-  AudioFrameEvent._() : super();
   factory AudioFrameEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory AudioFrameEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AudioFrameEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'pcm', $pb.PbFieldType.OY)
-    ..a<$core.int>(2, _omitFieldNames ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
-    ..a<$core.int>(3, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
-    ..e<AudioEncoding>(4, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: AudioEncoding.valueOf, enumValues: AudioEncoding.values)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -477,10 +558,8 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  AudioFrameEvent copyWith(void Function(AudioFrameEvent) updates) => super.copyWith((message) => updates(message as AudioFrameEvent)) as AudioFrameEvent;
-
+  AudioFrameEvent copyWith(void Function(AudioFrameEvent) updates) => super.copyWith((message) => updates(message as AudioFrameEvent)) as AudioFrameEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static AudioFrameEvent create() => AudioFrameEvent._();
   AudioFrameEvent createEmptyInstance() => create();
@@ -526,32 +605,29 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
   void clearEncoding() => clearField(4);
 }
 
-/// Voice Activity Detection output. Frontends usually do not need this —
-/// exposed for debugging and custom UIs (waveform highlighting, etc.).
 class VADEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VADEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<VADEventType>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: VADEventType.VAD_EVENT_UNSPECIFIED, valueOf: VADEventType.valueOf, enumValues: VADEventType.values)
+    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'frameOffsetUs')
+    ..hasRequiredFields = false
+  ;
+
+  VADEvent._() : super();
   factory VADEvent({
     VADEventType? type,
     $fixnum.Int64? frameOffsetUs,
   }) {
-    final $result = create();
+    final _result = create();
     if (type != null) {
-      $result.type = type;
+      _result.type = type;
     }
     if (frameOffsetUs != null) {
-      $result.frameOffsetUs = frameOffsetUs;
+      _result.frameOffsetUs = frameOffsetUs;
     }
-    return $result;
+    return _result;
   }
-  VADEvent._() : super();
   factory VADEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VADEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<VADEventType>(1, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: VADEventType.VAD_EVENT_UNSPECIFIED, valueOf: VADEventType.valueOf, enumValues: VADEventType.values)
-    ..aInt64(2, _omitFieldNames ? '' : 'frameOffsetUs')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -561,10 +637,8 @@ class VADEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VADEvent copyWith(void Function(VADEvent) updates) => super.copyWith((message) => updates(message as VADEvent)) as VADEvent;
-
+  VADEvent copyWith(void Function(VADEvent) updates) => super.copyWith((message) => updates(message as VADEvent)) as VADEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static VADEvent create() => VADEvent._();
   VADEvent createEmptyInstance() => create();
@@ -592,32 +666,29 @@ class VADEvent extends $pb.GeneratedMessage {
   void clearFrameOffsetUs() => clearField(2);
 }
 
-/// Assistant playback was interrupted by a barge-in. The reason distinguishes
-/// user barge-in from app-initiated cancel.
 class InterruptedEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'InterruptedEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<InterruptReason>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'reason', $pb.PbFieldType.OE, defaultOrMaker: InterruptReason.INTERRUPT_REASON_UNSPECIFIED, valueOf: InterruptReason.valueOf, enumValues: InterruptReason.values)
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'detail')
+    ..hasRequiredFields = false
+  ;
+
+  InterruptedEvent._() : super();
   factory InterruptedEvent({
     InterruptReason? reason,
     $core.String? detail,
   }) {
-    final $result = create();
+    final _result = create();
     if (reason != null) {
-      $result.reason = reason;
+      _result.reason = reason;
     }
     if (detail != null) {
-      $result.detail = detail;
+      _result.detail = detail;
     }
-    return $result;
+    return _result;
   }
-  InterruptedEvent._() : super();
   factory InterruptedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory InterruptedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'InterruptedEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<InterruptReason>(1, _omitFieldNames ? '' : 'reason', $pb.PbFieldType.OE, defaultOrMaker: InterruptReason.INTERRUPT_REASON_UNSPECIFIED, valueOf: InterruptReason.valueOf, enumValues: InterruptReason.values)
-    ..aOS(2, _omitFieldNames ? '' : 'detail')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -627,10 +698,8 @@ class InterruptedEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  InterruptedEvent copyWith(void Function(InterruptedEvent) updates) => super.copyWith((message) => updates(message as InterruptedEvent)) as InterruptedEvent;
-
+  InterruptedEvent copyWith(void Function(InterruptedEvent) updates) => super.copyWith((message) => updates(message as InterruptedEvent)) as InterruptedEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static InterruptedEvent create() => InterruptedEvent._();
   InterruptedEvent createEmptyInstance() => create();
@@ -658,31 +727,29 @@ class InterruptedEvent extends $pb.GeneratedMessage {
   void clearDetail() => clearField(2);
 }
 
-/// Pipeline lifecycle state. Ordered — callers can compare numerically.
 class StateChangeEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'StateChangeEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<PipelineState>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'previous', $pb.PbFieldType.OE, defaultOrMaker: PipelineState.PIPELINE_STATE_UNSPECIFIED, valueOf: PipelineState.valueOf, enumValues: PipelineState.values)
+    ..e<PipelineState>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'current', $pb.PbFieldType.OE, defaultOrMaker: PipelineState.PIPELINE_STATE_UNSPECIFIED, valueOf: PipelineState.valueOf, enumValues: PipelineState.values)
+    ..hasRequiredFields = false
+  ;
+
+  StateChangeEvent._() : super();
   factory StateChangeEvent({
     PipelineState? previous,
     PipelineState? current,
   }) {
-    final $result = create();
+    final _result = create();
     if (previous != null) {
-      $result.previous = previous;
+      _result.previous = previous;
     }
     if (current != null) {
-      $result.current = current;
+      _result.current = current;
     }
-    return $result;
+    return _result;
   }
-  StateChangeEvent._() : super();
   factory StateChangeEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory StateChangeEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'StateChangeEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<PipelineState>(1, _omitFieldNames ? '' : 'previous', $pb.PbFieldType.OE, defaultOrMaker: PipelineState.PIPELINE_STATE_UNSPECIFIED, valueOf: PipelineState.valueOf, enumValues: PipelineState.values)
-    ..e<PipelineState>(2, _omitFieldNames ? '' : 'current', $pb.PbFieldType.OE, defaultOrMaker: PipelineState.PIPELINE_STATE_UNSPECIFIED, valueOf: PipelineState.valueOf, enumValues: PipelineState.values)
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -692,10 +759,8 @@ class StateChangeEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  StateChangeEvent copyWith(void Function(StateChangeEvent) updates) => super.copyWith((message) => updates(message as StateChangeEvent)) as StateChangeEvent;
-
+  StateChangeEvent copyWith(void Function(StateChangeEvent) updates) => super.copyWith((message) => updates(message as StateChangeEvent)) as StateChangeEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static StateChangeEvent create() => StateChangeEvent._();
   StateChangeEvent createEmptyInstance() => create();
@@ -723,42 +788,39 @@ class StateChangeEvent extends $pb.GeneratedMessage {
   void clearCurrent() => clearField(2);
 }
 
-/// Terminal or recoverable error in the pipeline. Frontends map these to
-/// their native error types.
 class ErrorEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ErrorEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.int>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'code', $pb.PbFieldType.O3)
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'message')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'component')
+    ..aOB(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isRecoverable')
+    ..hasRequiredFields = false
+  ;
+
+  ErrorEvent._() : super();
   factory ErrorEvent({
     $core.int? code,
     $core.String? message,
     $core.String? component,
     $core.bool? isRecoverable,
   }) {
-    final $result = create();
+    final _result = create();
     if (code != null) {
-      $result.code = code;
+      _result.code = code;
     }
     if (message != null) {
-      $result.message = message;
+      _result.message = message;
     }
     if (component != null) {
-      $result.component = component;
+      _result.component = component;
     }
     if (isRecoverable != null) {
-      $result.isRecoverable = isRecoverable;
+      _result.isRecoverable = isRecoverable;
     }
-    return $result;
+    return _result;
   }
-  ErrorEvent._() : super();
   factory ErrorEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory ErrorEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ErrorEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..a<$core.int>(1, _omitFieldNames ? '' : 'code', $pb.PbFieldType.O3)
-    ..aOS(2, _omitFieldNames ? '' : 'message')
-    ..aOS(3, _omitFieldNames ? '' : 'component')
-    ..aOB(4, _omitFieldNames ? '' : 'isRecoverable')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -768,10 +830,8 @@ class ErrorEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  ErrorEvent copyWith(void Function(ErrorEvent) updates) => super.copyWith((message) => updates(message as ErrorEvent)) as ErrorEvent;
-
+  ErrorEvent copyWith(void Function(ErrorEvent) updates) => super.copyWith((message) => updates(message as ErrorEvent)) as ErrorEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static ErrorEvent create() => ErrorEvent._();
   ErrorEvent createEmptyInstance() => create();
@@ -817,8 +877,20 @@ class ErrorEvent extends $pb.GeneratedMessage {
   void clearIsRecoverable() => clearField(4);
 }
 
-/// Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop.
 class MetricsEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'MetricsEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.double>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sttFinalMs', $pb.PbFieldType.OD)
+    ..a<$core.double>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmFirstTokenMs', $pb.PbFieldType.OD)
+    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ttsFirstAudioMs', $pb.PbFieldType.OD)
+    ..a<$core.double>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'endToEndMs', $pb.PbFieldType.OD)
+    ..aInt64(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'tokensGenerated')
+    ..aInt64(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioSamplesPlayed')
+    ..aOB(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isOverBudget')
+    ..aInt64(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'createdAtNs')
+    ..hasRequiredFields = false
+  ;
+
+  MetricsEvent._() : super();
   factory MetricsEvent({
     $core.double? sttFinalMs,
     $core.double? llmFirstTokenMs,
@@ -829,49 +901,35 @@ class MetricsEvent extends $pb.GeneratedMessage {
     $core.bool? isOverBudget,
     $fixnum.Int64? createdAtNs,
   }) {
-    final $result = create();
+    final _result = create();
     if (sttFinalMs != null) {
-      $result.sttFinalMs = sttFinalMs;
+      _result.sttFinalMs = sttFinalMs;
     }
     if (llmFirstTokenMs != null) {
-      $result.llmFirstTokenMs = llmFirstTokenMs;
+      _result.llmFirstTokenMs = llmFirstTokenMs;
     }
     if (ttsFirstAudioMs != null) {
-      $result.ttsFirstAudioMs = ttsFirstAudioMs;
+      _result.ttsFirstAudioMs = ttsFirstAudioMs;
     }
     if (endToEndMs != null) {
-      $result.endToEndMs = endToEndMs;
+      _result.endToEndMs = endToEndMs;
     }
     if (tokensGenerated != null) {
-      $result.tokensGenerated = tokensGenerated;
+      _result.tokensGenerated = tokensGenerated;
     }
     if (audioSamplesPlayed != null) {
-      $result.audioSamplesPlayed = audioSamplesPlayed;
+      _result.audioSamplesPlayed = audioSamplesPlayed;
     }
     if (isOverBudget != null) {
-      $result.isOverBudget = isOverBudget;
+      _result.isOverBudget = isOverBudget;
     }
     if (createdAtNs != null) {
-      $result.createdAtNs = createdAtNs;
+      _result.createdAtNs = createdAtNs;
     }
-    return $result;
+    return _result;
   }
-  MetricsEvent._() : super();
   factory MetricsEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory MetricsEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'MetricsEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..a<$core.double>(1, _omitFieldNames ? '' : 'sttFinalMs', $pb.PbFieldType.OD)
-    ..a<$core.double>(2, _omitFieldNames ? '' : 'llmFirstTokenMs', $pb.PbFieldType.OD)
-    ..a<$core.double>(3, _omitFieldNames ? '' : 'ttsFirstAudioMs', $pb.PbFieldType.OD)
-    ..a<$core.double>(4, _omitFieldNames ? '' : 'endToEndMs', $pb.PbFieldType.OD)
-    ..aInt64(5, _omitFieldNames ? '' : 'tokensGenerated')
-    ..aInt64(6, _omitFieldNames ? '' : 'audioSamplesPlayed')
-    ..aOB(7, _omitFieldNames ? '' : 'isOverBudget')
-    ..aInt64(8, _omitFieldNames ? '' : 'createdAtNs')
-    ..hasRequiredFields = false
-  ;
-
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -881,10 +939,8 @@ class MetricsEvent extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  MetricsEvent copyWith(void Function(MetricsEvent) updates) => super.copyWith((message) => updates(message as MetricsEvent)) as MetricsEvent;
-
+  MetricsEvent copyWith(void Function(MetricsEvent) updates) => super.copyWith((message) => updates(message as MetricsEvent)) as MetricsEvent; // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
-
   @$core.pragma('dart2js:noInline')
   static MetricsEvent create() => MetricsEvent._();
   MetricsEvent createEmptyInstance() => create();
@@ -947,9 +1003,6 @@ class MetricsEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearAudioSamplesPlayed() => clearField(6);
 
-  /// True when `end_to_end_ms` exceeded the `PipelineOptions.latency_budget_ms`
-  /// configured for this run. Frontends can surface this to the UI for SLO
-  /// dashboards without re-computing the threshold themselves.
   @$pb.TagNumber(7)
   $core.bool get isOverBudget => $_getBF(6);
   @$pb.TagNumber(7)
@@ -959,12 +1012,6 @@ class MetricsEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearIsOverBudget() => clearField(7);
 
-  /// v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
-  /// producer (C++ dispatcher) at event-emit time; read by consumers
-  /// (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
-  /// latency without relying on wall-clock sync. Encoded as int64 so
-  /// std::chrono::steady_clock::now().time_since_epoch() values fit
-  /// directly (2^63 ns ≈ 292 years of runtime headroom).
   @$pb.TagNumber(8)
   $fixnum.Int64 get createdAtNs => $_getI64(7);
   @$pb.TagNumber(8)
@@ -975,6 +1022,311 @@ class MetricsEvent extends $pb.GeneratedMessage {
   void clearCreatedAtNs() => clearField(8);
 }
 
+class VoiceAgentComponentStates extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceAgentComponentStates', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<ComponentLoadState>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sttState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED, valueOf: ComponentLoadState.valueOf, enumValues: ComponentLoadState.values)
+    ..e<ComponentLoadState>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED, valueOf: ComponentLoadState.valueOf, enumValues: ComponentLoadState.values)
+    ..e<ComponentLoadState>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ttsState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED, valueOf: ComponentLoadState.valueOf, enumValues: ComponentLoadState.values)
+    ..e<ComponentLoadState>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vadState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED, valueOf: ComponentLoadState.valueOf, enumValues: ComponentLoadState.values)
+    ..aOB(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ready')
+    ..aOB(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'anyLoading')
+    ..hasRequiredFields = false
+  ;
 
-const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
-const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');
+  VoiceAgentComponentStates._() : super();
+  factory VoiceAgentComponentStates({
+    ComponentLoadState? sttState,
+    ComponentLoadState? llmState,
+    ComponentLoadState? ttsState,
+    ComponentLoadState? vadState,
+    $core.bool? ready,
+    $core.bool? anyLoading,
+  }) {
+    final _result = create();
+    if (sttState != null) {
+      _result.sttState = sttState;
+    }
+    if (llmState != null) {
+      _result.llmState = llmState;
+    }
+    if (ttsState != null) {
+      _result.ttsState = ttsState;
+    }
+    if (vadState != null) {
+      _result.vadState = vadState;
+    }
+    if (ready != null) {
+      _result.ready = ready;
+    }
+    if (anyLoading != null) {
+      _result.anyLoading = anyLoading;
+    }
+    return _result;
+  }
+  factory VoiceAgentComponentStates.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VoiceAgentComponentStates.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VoiceAgentComponentStates clone() => VoiceAgentComponentStates()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VoiceAgentComponentStates copyWith(void Function(VoiceAgentComponentStates) updates) => super.copyWith((message) => updates(message as VoiceAgentComponentStates)) as VoiceAgentComponentStates; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentComponentStates create() => VoiceAgentComponentStates._();
+  VoiceAgentComponentStates createEmptyInstance() => create();
+  static $pb.PbList<VoiceAgentComponentStates> createRepeated() => $pb.PbList<VoiceAgentComponentStates>();
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentComponentStates getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentComponentStates>(create);
+  static VoiceAgentComponentStates? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ComponentLoadState get sttState => $_getN(0);
+  @$pb.TagNumber(1)
+  set sttState(ComponentLoadState v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSttState() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSttState() => clearField(1);
+
+  @$pb.TagNumber(2)
+  ComponentLoadState get llmState => $_getN(1);
+  @$pb.TagNumber(2)
+  set llmState(ComponentLoadState v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasLlmState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLlmState() => clearField(2);
+
+  @$pb.TagNumber(3)
+  ComponentLoadState get ttsState => $_getN(2);
+  @$pb.TagNumber(3)
+  set ttsState(ComponentLoadState v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasTtsState() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTtsState() => clearField(3);
+
+  @$pb.TagNumber(4)
+  ComponentLoadState get vadState => $_getN(3);
+  @$pb.TagNumber(4)
+  set vadState(ComponentLoadState v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasVadState() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearVadState() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get ready => $_getBF(4);
+  @$pb.TagNumber(5)
+  set ready($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasReady() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearReady() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get anyLoading => $_getBF(5);
+  @$pb.TagNumber(6)
+  set anyLoading($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasAnyLoading() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAnyLoading() => clearField(6);
+}
+
+class VoiceSessionError extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceSessionError', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<VoiceSessionErrorCode>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'code', $pb.PbFieldType.OE, defaultOrMaker: VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED, valueOf: VoiceSessionErrorCode.valueOf, enumValues: VoiceSessionErrorCode.values)
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'message')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'failedComponent')
+    ..hasRequiredFields = false
+  ;
+
+  VoiceSessionError._() : super();
+  factory VoiceSessionError({
+    VoiceSessionErrorCode? code,
+    $core.String? message,
+    $core.String? failedComponent,
+  }) {
+    final _result = create();
+    if (code != null) {
+      _result.code = code;
+    }
+    if (message != null) {
+      _result.message = message;
+    }
+    if (failedComponent != null) {
+      _result.failedComponent = failedComponent;
+    }
+    return _result;
+  }
+  factory VoiceSessionError.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VoiceSessionError.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VoiceSessionError clone() => VoiceSessionError()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VoiceSessionError copyWith(void Function(VoiceSessionError) updates) => super.copyWith((message) => updates(message as VoiceSessionError)) as VoiceSessionError; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static VoiceSessionError create() => VoiceSessionError._();
+  VoiceSessionError createEmptyInstance() => create();
+  static $pb.PbList<VoiceSessionError> createRepeated() => $pb.PbList<VoiceSessionError>();
+  @$core.pragma('dart2js:noInline')
+  static VoiceSessionError getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceSessionError>(create);
+  static VoiceSessionError? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  VoiceSessionErrorCode get code => $_getN(0);
+  @$pb.TagNumber(1)
+  set code(VoiceSessionErrorCode v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasCode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCode() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get message => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set message($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMessage() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get failedComponent => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set failedComponent($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasFailedComponent() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFailedComponent() => clearField(3);
+}
+
+class SessionStartedEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'SessionStartedEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..hasRequiredFields = false
+  ;
+
+  SessionStartedEvent._() : super();
+  factory SessionStartedEvent() => create();
+  factory SessionStartedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SessionStartedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SessionStartedEvent clone() => SessionStartedEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SessionStartedEvent copyWith(void Function(SessionStartedEvent) updates) => super.copyWith((message) => updates(message as SessionStartedEvent)) as SessionStartedEvent; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static SessionStartedEvent create() => SessionStartedEvent._();
+  SessionStartedEvent createEmptyInstance() => create();
+  static $pb.PbList<SessionStartedEvent> createRepeated() => $pb.PbList<SessionStartedEvent>();
+  @$core.pragma('dart2js:noInline')
+  static SessionStartedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SessionStartedEvent>(create);
+  static SessionStartedEvent? _defaultInstance;
+}
+
+class SessionStoppedEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'SessionStoppedEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..hasRequiredFields = false
+  ;
+
+  SessionStoppedEvent._() : super();
+  factory SessionStoppedEvent() => create();
+  factory SessionStoppedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SessionStoppedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SessionStoppedEvent clone() => SessionStoppedEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SessionStoppedEvent copyWith(void Function(SessionStoppedEvent) updates) => super.copyWith((message) => updates(message as SessionStoppedEvent)) as SessionStoppedEvent; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static SessionStoppedEvent create() => SessionStoppedEvent._();
+  SessionStoppedEvent createEmptyInstance() => create();
+  static $pb.PbList<SessionStoppedEvent> createRepeated() => $pb.PbList<SessionStoppedEvent>();
+  @$core.pragma('dart2js:noInline')
+  static SessionStoppedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SessionStoppedEvent>(create);
+  static SessionStoppedEvent? _defaultInstance;
+}
+
+class AgentResponseStartedEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'AgentResponseStartedEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..hasRequiredFields = false
+  ;
+
+  AgentResponseStartedEvent._() : super();
+  factory AgentResponseStartedEvent() => create();
+  factory AgentResponseStartedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory AgentResponseStartedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  AgentResponseStartedEvent clone() => AgentResponseStartedEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  AgentResponseStartedEvent copyWith(void Function(AgentResponseStartedEvent) updates) => super.copyWith((message) => updates(message as AgentResponseStartedEvent)) as AgentResponseStartedEvent; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static AgentResponseStartedEvent create() => AgentResponseStartedEvent._();
+  AgentResponseStartedEvent createEmptyInstance() => create();
+  static $pb.PbList<AgentResponseStartedEvent> createRepeated() => $pb.PbList<AgentResponseStartedEvent>();
+  @$core.pragma('dart2js:noInline')
+  static AgentResponseStartedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentResponseStartedEvent>(create);
+  static AgentResponseStartedEvent? _defaultInstance;
+}
+
+class AgentResponseCompletedEvent extends $pb.GeneratedMessage {
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'AgentResponseCompletedEvent', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..hasRequiredFields = false
+  ;
+
+  AgentResponseCompletedEvent._() : super();
+  factory AgentResponseCompletedEvent() => create();
+  factory AgentResponseCompletedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory AgentResponseCompletedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  AgentResponseCompletedEvent clone() => AgentResponseCompletedEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  AgentResponseCompletedEvent copyWith(void Function(AgentResponseCompletedEvent) updates) => super.copyWith((message) => updates(message as AgentResponseCompletedEvent)) as AgentResponseCompletedEvent; // ignore: deprecated_member_use
+  $pb.BuilderInfo get info_ => _i;
+  @$core.pragma('dart2js:noInline')
+  static AgentResponseCompletedEvent create() => AgentResponseCompletedEvent._();
+  AgentResponseCompletedEvent createEmptyInstance() => create();
+  static $pb.PbList<AgentResponseCompletedEvent> createRepeated() => $pb.PbList<AgentResponseCompletedEvent>();
+  @$core.pragma('dart2js:noInline')
+  static AgentResponseCompletedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentResponseCompletedEvent>(create);
+  static AgentResponseCompletedEvent? _defaultInstance;
+}
+

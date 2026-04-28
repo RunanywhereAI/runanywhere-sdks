@@ -51,27 +51,6 @@ export enum ModelModality {
 }
 
 /**
- * Model load state
- */
-export enum ModelLoadState {
-  NotLoaded = 'notLoaded',
-  Loading = 'loading',
-  Loaded = 'loaded',
-  Error = 'error',
-  Unloading = 'unloading',
-}
-
-/**
- * Model download state
- */
-export enum ModelDownloadState {
-  NotDownloaded = 'notDownloaded',
-  Downloading = 'downloading',
-  Downloaded = 'downloaded',
-  Error = 'error',
-}
-
-/**
  * Model info
  */
 export interface ModelInfo {
@@ -116,78 +95,6 @@ export interface ModelInfo {
 
   /** Description */
   description?: string;
-}
-
-/**
- * Framework info
- */
-export interface FrameworkInfo {
-  /** Framework identifier */
-  framework: LLMFramework;
-
-  /** Display name */
-  displayName: string;
-
-  /** Whether available on this device */
-  isAvailable: boolean;
-
-  /** Reason if not available */
-  unavailableReason?: string;
-
-  /** Modalities supported */
-  modalities: ModelModality[];
-
-  /** Icon name for display */
-  iconName: string;
-
-  /** Theme color */
-  color: string;
-}
-
-/**
- * Current model state for a modality
- */
-export interface CurrentModelState {
-  /** Modality */
-  modality: ModelModality;
-
-  /** Model info if loaded */
-  model?: ModelInfo;
-
-  /** Framework being used */
-  framework?: LLMFramework;
-
-  /** Load state */
-  loadState: ModelLoadState;
-
-  /** Error message if any */
-  error?: string;
-
-  /** Load progress (0-1) */
-  loadProgress?: number;
-}
-
-/**
- * Stored model info
- */
-export interface StoredModel {
-  /** Model ID */
-  id: string;
-
-  /** Model name */
-  name: string;
-
-  /** Framework */
-  framework: LLMFramework;
-
-  /** Size on disk in bytes */
-  sizeOnDisk: number;
-
-  /** Download date */
-  downloadedAt: Date;
-
-  /** Last used date */
-  lastUsed?: Date;
 }
 
 /**
@@ -242,15 +149,3 @@ export const FrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.Sherpa]: 'Sherpa-ONNX',
 };
 
-/**
- * Category display name mapping
- */
-export const CategoryDisplayNames: Record<ModelCategory, string> = {
-  [ModelCategory.Language]: 'Language Model',
-  [ModelCategory.Embedding]: 'Embedding Model',
-  [ModelCategory.SpeechRecognition]: 'Speech Recognition',
-  [ModelCategory.SpeechSynthesis]: 'Text-to-Speech',
-  [ModelCategory.Vision]: 'Vision Model',
-  [ModelCategory.Multimodal]: 'Multimodal',
-  [ModelCategory.Audio]: 'Audio Processing',
-};

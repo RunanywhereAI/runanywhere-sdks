@@ -132,7 +132,7 @@ struct ModelSelectionSheet: View {
             }
             .navigationTitle(context.title)
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar { toolbarContent }
         }

@@ -280,6 +280,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
       case sdk.VoiceEvent_Payload.interrupted:
       case sdk.VoiceEvent_Payload.metrics:
+      case sdk.VoiceEvent_Payload.componentStateChanged:
+      case sdk.VoiceEvent_Payload.sessionError:
+      case sdk.VoiceEvent_Payload.sessionStarted:
+      case sdk.VoiceEvent_Payload.sessionStopped:
+      case sdk.VoiceEvent_Payload.agentResponseStarted:
+      case sdk.VoiceEvent_Payload.agentResponseCompleted:
       case sdk.VoiceEvent_Payload.notSet:
         // No UX impact today.
         break;

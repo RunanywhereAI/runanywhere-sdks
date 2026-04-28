@@ -5,7 +5,7 @@
 
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/public/types/lora_types.dart';
+import 'package:runanywhere/generated/lora_options.pb.dart';
 
 /// Static helpers for managing LoRA adapters.
 ///
@@ -28,7 +28,7 @@ class RunAnywhereLoRA {
     if (!SdkState.shared.isInitialized) {
       throw StateError('SDK not initialized');
     }
-    DartBridgeLora.shared.loadAdapter(config.path, config.scale);
+    DartBridgeLora.shared.loadAdapter(config.adapterPath, config.scale);
   }
 
   /// Remove a specific LoRA adapter by path.
@@ -56,9 +56,9 @@ class RunAnywhereLoRA {
   /// Whether the current backend supports the given LoRA adapter.
   static LoraCompatibilityResult checkLoraCompatibility(String loraPath) {
     if (!SdkState.shared.isInitialized) {
-      return const LoraCompatibilityResult(
+      return LoraCompatibilityResult(
         isCompatible: false,
-        error: 'SDK not initialized',
+        errorMessage: 'SDK not initialized',
       );
     }
     return DartBridgeLora.shared.checkCompatibility(loraPath);

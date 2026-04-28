@@ -287,7 +287,7 @@ extension DownloadState {
             self = .completed
         case RAC_DOWNLOAD_STATE_FAILED:
             let errorMessage = cProgress.error_message.map { String(cString: $0) } ?? "Download failed"
-            self = .failed(SDKError.download(.downloadFailed, errorMessage))
+            self = .failed(SDKException.download(.downloadFailed, errorMessage))
         case RAC_DOWNLOAD_STATE_CANCELLED:
             self = .cancelled
         default:

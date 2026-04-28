@@ -23,7 +23,7 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
 import {
@@ -76,7 +76,7 @@ async function collectGeneration(
 }
 
 function requireBridge(): LlamaCppBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return LlamaCppBridge.shared;
 }
 
@@ -161,7 +161,7 @@ function assertNativeToolCalling(): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod = bridge.module as any;
   if (typeof mod['_rac_tool_call_parse'] !== 'function') {
-    throw new SDKError(
+    throw new SDKException(
       SDKErrorCode.NotInitialized,
       'rac_tool_call_parse not exported by WASM module - rebuild with tool_calling.cpp compiled in',
     );
@@ -253,7 +253,7 @@ function formatToolsForPrompt(tools: ToolDefinition[], format: ToolCallFormat = 
     ) as number;
 
     if (rc !== 0) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.BackendError,
         `rac_tool_call_format_prompt_json_with_format_name failed with code ${rc}`,
       );
@@ -298,7 +298,7 @@ function buildFollowUpPrompt(
     ) as number;
 
     if (rc !== 0) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.BackendError,
         `rac_tool_call_build_followup_prompt failed with code ${rc}`,
       );
@@ -452,11 +452,11 @@ class ToolCallingImpl {
     options: ToolCallingOptions = {},
   ): Promise<ToolCallingResult> {
     if (!RunAnywhere.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     if (!TextGeneration.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
     const maxToolCalls = options.maxToolCalls ?? 5;

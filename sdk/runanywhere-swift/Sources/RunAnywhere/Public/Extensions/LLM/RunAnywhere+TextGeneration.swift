@@ -40,7 +40,7 @@ public extension RunAnywhere {
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -48,7 +48,7 @@ public extension RunAnywhere {
         let handle = try await CppBridge.LLM.shared.getHandle()
 
         guard await CppBridge.LLM.shared.isLoaded else {
-            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+            throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
         let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
@@ -86,7 +86,7 @@ public extension RunAnywhere {
         }
 
         guard generateResult == RAC_SUCCESS else {
-            throw SDKError.llm(.generationFailed, "Generation failed: \(generateResult)")
+            throw SDKException.llm(.generationFailed, "Generation failed: \(generateResult)")
         }
 
         let endTime = Date()
@@ -153,7 +153,7 @@ public extension RunAnywhere {
         options: LLMGenerationOptions? = nil
     ) async throws -> AsyncStream<RALLMStreamEvent> {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -161,7 +161,7 @@ public extension RunAnywhere {
         let handle = try await CppBridge.LLM.shared.getHandle()
 
         guard await CppBridge.LLM.shared.isLoaded else {
-            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+            throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
         let opts = options ?? LLMGenerationOptions()

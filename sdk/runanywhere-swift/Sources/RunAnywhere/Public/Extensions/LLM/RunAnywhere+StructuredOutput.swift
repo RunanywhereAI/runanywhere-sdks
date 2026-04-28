@@ -104,7 +104,7 @@ public extension RunAnywhere {
                         }
                         if event.isFinal {
                             if !event.errorMessage.isEmpty {
-                                throw SDKError.llm(.generationFailed, event.errorMessage)
+                                throw SDKException.llm(.generationFailed, event.errorMessage)
                             }
                             break
                         }
@@ -141,7 +141,7 @@ public extension RunAnywhere {
                 }
             }
 
-            throw lastError ?? SDKError.llm(.extractionFailed, "Failed to parse structured output after 3 attempts")
+            throw lastError ?? SDKException.llm(.extractionFailed, "Failed to parse structured output after 3 attempts")
         }
 
         return StructuredOutputStreamResult(tokenStream: tokenStream, result: resultTask)
@@ -210,7 +210,7 @@ public extension RunAnywhere {
         }
 
         guard extractResult == RAC_SUCCESS, let ptr = jsonPtr else {
-            throw SDKError.llm(.extractionFailed, "No valid JSON found in the response")
+            throw SDKException.llm(.extractionFailed, "No valid JSON found in the response")
         }
 
         let jsonString = String(cString: ptr)
@@ -218,7 +218,7 @@ public extension RunAnywhere {
 
         // Convert to Data and decode using Swift's JSONDecoder
         guard let jsonData = jsonString.data(using: .utf8) else {
-            throw SDKError.llm(.invalidFormat, "Failed to convert JSON string to data")
+            throw SDKException.llm(.invalidFormat, "Failed to convert JSON string to data")
         }
 
         let decoder = JSONDecoder()
@@ -227,7 +227,7 @@ public extension RunAnywhere {
         do {
             return try decoder.decode(type, from: jsonData)
         } catch {
-            throw SDKError.llm(.validationFailed, "JSON decoding failed: \(error.localizedDescription)")
+            throw SDKException.llm(.validationFailed, "JSON decoding failed: \(error.localizedDescription)")
         }
     }
 
@@ -237,13 +237,13 @@ public extension RunAnywhere {
         options: LLMGenerationOptions
     ) async throws -> LLMGenerationResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.LLM.shared.getHandle()
 
         guard await CppBridge.LLM.shared.isLoaded else {
-            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+            throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
         let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
@@ -274,7 +274,7 @@ public extension RunAnywhere {
         }
 
         guard generateResult == RAC_SUCCESS else {
-            throw SDKError.llm(.generationFailed, "Generation failed: \(generateResult)")
+            throw SDKException.llm(.generationFailed, "Generation failed: \(generateResult)")
         }
 
         let totalTimeMs = Date().timeIntervalSince(startTime) * 1000

@@ -398,7 +398,7 @@ private func platformTrackErrorCallback(
         return
     }
 
-    // Convert C++ structured error to Swift SDKError for consistent handling
+    // Convert C++ structured error to Swift SDKException for consistent handling
     let sdkError = createSDKErrorFromCppError(errorDict)
 
     // Log through the standard logging system (which routes to Sentry)
@@ -450,33 +450,34 @@ private func platformTrackErrorCallback(
     }
 }
 
-// Creates an SDKError from C++ error dictionary for consistent error handling
+// Creates an SDKException from C++ error dictionary for consistent error handling
 // swiftlint:disable:next avoid_any_type prefer_concrete_types
-private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKError {
+private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKException {
     let code = errorDict["code"] as? Int32 ?? Int32(RAC_ERROR_UNKNOWN)
     let message = errorDict["message"] as? String ?? "Unknown error"
-    let categoryName = errorDict["category"] as? String ?? "general"
+    let categoryName = errorDict["category"] as? String ?? "internal"
 
-    // Map category name to ErrorCategory
-    let category = ErrorCategory(rawValue: categoryName) ?? .general
-
-    // Map C++ error code to Swift ErrorCode
-    let errorCode = CommonsErrorMapping.toSDKError(code)?.code ?? .unknown
-
-    // Build stack trace from C++ if available
-    var stackTrace: [String] = []
-    if let sourceFile = errorDict["source_file"] as? String,
-       let sourceLine = errorDict["source_line"] as? Int,
-       let sourceFunction = errorDict["source_function"] as? String {
-        stackTrace.append("\(sourceFunction) at \(sourceFile):\(sourceLine)")
+    // Map category name to RAErrorCategory (proto canonical 9-bucket enum)
+    let category: RAErrorCategory
+    switch categoryName.lowercased() {
+    case "network":       category = .network
+    case "validation":    category = .validation
+    case "model":         category = .model
+    case "component":     category = .component
+    case "io":            category = .io
+    case "auth":          category = .auth
+    case "configuration": category = .configuration
+    default:              category = .internal
     }
 
-    return SDKError(
+    // Map C++ error code to RAErrorCode
+    let errorCode = CommonsErrorMapping.toSDKException(code)?.proto.code ?? .unknown
+
+    return SDKException(
         code: errorCode,
         message: message,
         category: category,
-        stackTrace: stackTrace,
-        underlyingError: nil
+        underlying: nil
     )
 }
 

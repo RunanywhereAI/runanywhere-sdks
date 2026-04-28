@@ -13,12 +13,13 @@ import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
+import 'package:fixnum/fixnum.dart' as fixnum;
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/public/types/lora_types.dart';
+import 'package:runanywhere/generated/lora_options.pb.dart';
 
 // =============================================================================
 // FFI Struct: rac_lora_entry_t
@@ -211,7 +212,7 @@ class DartBridgeLora {
       final result = fn(handle, pathPtr, outErrorPtr);
 
       if (result == RAC_SUCCESS) {
-        return const LoraCompatibilityResult(isCompatible: true);
+        return LoraCompatibilityResult(isCompatible: true);
       }
 
       // Read error message
@@ -228,7 +229,7 @@ class DartBridgeLora {
 
       return LoraCompatibilityResult(
         isCompatible: false,
-        error: errorMsg,
+        errorMessage: errorMsg ?? '',
       );
     } finally {
       calloc.free(pathPtr);
@@ -244,7 +245,7 @@ class DartBridgeLora {
       return list.map((item) {
         final map = item as Map<String, dynamic>;
         return LoRAAdapterInfo(
-          path: (map['path'] as String?) ?? '',
+          adapterPath: (map['path'] as String?) ?? '',
           scale: ((map['scale'] as num?) ?? 1.0).toDouble(),
           applied: (map['applied'] as bool?) ?? false,
         );
@@ -297,11 +298,11 @@ class DartBridgeLoraRegistry {
     final idDart = entry.id.toNativeUtf8();
     final nameDart = entry.name.toNativeUtf8();
     final descDart = entry.description.toNativeUtf8();
-    final urlDart = entry.downloadUrl.toNativeUtf8();
+    final urlDart = entry.url.toNativeUtf8();
     final filenameDart = entry.filename.toNativeUtf8();
 
     // Allocate compatible model IDs array
-    final compatCount = entry.compatibleModelIds.length;
+    final compatCount = entry.compatibleModels.length;
     final compatArrayPtr = calloc<Pointer<Utf8>>(compatCount);
     final compatDartPtrs = <Pointer<Utf8>>[];
 
@@ -315,14 +316,14 @@ class DartBridgeLoraRegistry {
 
       // Fill compatible model IDs
       for (int i = 0; i < compatCount; i++) {
-        final dartPtr = entry.compatibleModelIds[i].toNativeUtf8();
+        final dartPtr = entry.compatibleModels[i].toNativeUtf8();
         compatDartPtrs.add(dartPtr);
         compatArrayPtr[i] = strdupFn(dartPtr);
       }
       entryPtr.ref.compatibleModelIds = compatArrayPtr;
       entryPtr.ref.compatibleModelCount = compatCount;
-      entryPtr.ref.fileSize = entry.fileSize;
-      entryPtr.ref.defaultScale = entry.defaultScale;
+      entryPtr.ref.fileSize = entry.sizeBytes.toInt();
+      entryPtr.ref.defaultScale = 1.0;
 
       final result = registerFn(entryPtr);
       if (result != RAC_SUCCESS) {
@@ -481,15 +482,14 @@ class DartBridgeLoraRegistry {
           description: entry.description != nullptr
               ? entry.description.toDartString()
               : '',
-          downloadUrl: entry.downloadUrl != nullptr
+          url: entry.downloadUrl != nullptr
               ? entry.downloadUrl.toDartString()
               : '',
           filename: entry.filename != nullptr
               ? entry.filename.toDartString()
               : '',
-          compatibleModelIds: compatIds,
-          fileSize: entry.fileSize,
-          defaultScale: entry.defaultScale,
+          compatibleModels: compatIds,
+          sizeBytes: fixnum.Int64(entry.fileSize),
         ));
       }
       return results;

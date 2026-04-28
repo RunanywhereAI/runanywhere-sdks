@@ -7,7 +7,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkSce
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
-import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
+import ai.runanywhere.proto.v1.TTSOptions
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.extensions.unloadTTSVoice
@@ -59,8 +59,8 @@ class TTSBenchmarkProvider : BenchmarkScenarioProvider {
                 endToEndLatencyMs = endToEndMs,
                 loadTimeMs = loadTimeMs,
                 memoryDeltaBytes = memBefore - memAfter,
-                audioDurationSeconds = result.duration,
-                charactersProcessed = result.metadata.characterCount,
+                audioDurationSeconds = result.duration_ms / 1000.0,
+                charactersProcessed = result.metadata?.character_count ?: 0,
             )
         } finally {
             withContext(NonCancellable) {

@@ -31,7 +31,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.VoiceAgent.ComponentLoadState
 import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentComponentStates
@@ -43,7 +43,9 @@ import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentConfiguration
 private val voiceAgentLogger = SDKLogger.voiceAgent
 
 @Volatile private var voiceSessionActive: Boolean = false
+
 @Volatile private var currentSystemPrompt: String? = null
+
 @Volatile private var voiceAgentInitialized: Boolean = false
 
 private fun areAllComponentsLoaded(): Boolean =
@@ -58,7 +60,7 @@ private fun getMissingComponents(): List<String> {
 }
 
 actual suspend fun RunAnywhere.configureVoiceAgent(configuration: VoiceAgentConfiguration) {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceAgentInitialized = false
 }
 
@@ -76,11 +78,11 @@ actual suspend fun RunAnywhere.voiceAgentComponentStates(): VoiceAgentComponentS
 actual suspend fun RunAnywhere.isVoiceAgentReady(): Boolean = areAllComponentsLoaded()
 
 actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     if (voiceAgentInitialized && areAllComponentsLoaded()) return
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents()
-        throw SDKError.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
+        throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
     }
     voiceAgentInitialized = true
     voiceAgentLogger.info("VoiceAgent initialized successfully")
@@ -92,19 +94,21 @@ actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
 // turns (see Android sample's processVoiceTurnDirect helper).
 
 actual suspend fun RunAnywhere.stopVoiceSession() {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceSessionActive = false
-    CppBridgeSTT.cancel(); CppBridgeLLM.cancel(); CppBridgeTTS.cancel()
+    CppBridgeSTT.cancel()
+    CppBridgeLLM.cancel()
+    CppBridgeTTS.cancel()
 }
 
 actual suspend fun RunAnywhere.isVoiceSessionActive(): Boolean = voiceSessionActive
 
 actual suspend fun RunAnywhere.clearVoiceConversation() {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 }
 
 actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     currentSystemPrompt = prompt
 }
 
@@ -119,10 +123,10 @@ actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
 actual suspend fun RunAnywhere.processVoiceTurn(
     audioData: ByteArray,
 ): com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents().joinToString(", ")
-        throw SDKError.voiceAgent("Voice agent not ready: missing components: $missing")
+        throw SDKException.voiceAgent("Voice agent not ready: missing components: $missing")
     }
 
     val transcription = voiceAgentTranscribe(audioData)
@@ -138,13 +142,13 @@ actual suspend fun RunAnywhere.processVoiceTurn(
 }
 
 actual suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): String {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val result = CppBridgeSTT.transcribe(audioData)
     return result.text
 }
 
 actual suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val systemPrompt = currentSystemPrompt
     val cfg =
         if (systemPrompt != null) {
@@ -157,7 +161,7 @@ actual suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): Strin
 }
 
 actual suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): ByteArray {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val result = CppBridgeTTS.synthesize(text)
     return result.audioData
 }
@@ -166,5 +170,6 @@ actual suspend fun RunAnywhere.cleanupVoiceAgent() {
     // Match Swift: cleanup voice-agent handle + reset flag.
     voiceAgentInitialized = false
     voiceSessionActive = false
-    com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent.destroy()
+    com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
+        .destroy()
 }

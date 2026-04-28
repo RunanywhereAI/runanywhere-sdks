@@ -190,6 +190,48 @@ public class ModelInfo(
     schemaIndex = 19,
   )
   public val built_in: Boolean? = null,
+  /**
+   * High-level artifact classification, complementary to the `artifact`
+   * oneof above. Allows catalog entries to carry a coarse type tag without
+   * resolving the full strategy variant.
+   */
+  @field:WireField(
+    tag = 25,
+    adapter = "ai.runanywhere.proto.v1.ModelArtifactType#ADAPTER",
+    jsonName = "artifactType",
+    schemaIndex = 20,
+  )
+  public val artifact_type: ModelArtifactType? = null,
+  /**
+   * Manifest of files that are expected on disk after fetch/extraction.
+   */
+  @field:WireField(
+    tag = 26,
+    adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
+    jsonName = "expectedFiles",
+    schemaIndex = 21,
+  )
+  public val expected_files: ExpectedModelFiles? = null,
+  /**
+   * Preferred hardware acceleration backend for this model.
+   */
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
+    jsonName = "accelerationPreference",
+    schemaIndex = 22,
+  )
+  public val acceleration_preference: AccelerationPreference? = null,
+  /**
+   * Hybrid (on-device vs cloud) routing policy for this entry.
+   */
+  @field:WireField(
+    tag = 28,
+    adapter = "ai.runanywhere.proto.v1.RoutingPolicy#ADAPTER",
+    jsonName = "routingPolicy",
+    schemaIndex = 23,
+  )
+  public val routing_policy: RoutingPolicy? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelInfo, Nothing>(ADAPTER, unknownFields) {
   init {
@@ -229,6 +271,10 @@ public class ModelInfo(
     if (multi_file != other.multi_file) return false
     if (custom_strategy_id != other.custom_strategy_id) return false
     if (built_in != other.built_in) return false
+    if (artifact_type != other.artifact_type) return false
+    if (expected_files != other.expected_files) return false
+    if (acceleration_preference != other.acceleration_preference) return false
+    if (routing_policy != other.routing_policy) return false
     return true
   }
 
@@ -256,6 +302,10 @@ public class ModelInfo(
       result = result * 37 + (multi_file?.hashCode() ?: 0)
       result = result * 37 + (custom_strategy_id?.hashCode() ?: 0)
       result = result * 37 + (built_in?.hashCode() ?: 0)
+      result = result * 37 + (artifact_type?.hashCode() ?: 0)
+      result = result * 37 + (expected_files?.hashCode() ?: 0)
+      result = result * 37 + (acceleration_preference?.hashCode() ?: 0)
+      result = result * 37 + (routing_policy?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -284,6 +334,11 @@ public class ModelInfo(
     if (custom_strategy_id != null) result +=
         """custom_strategy_id=${sanitize(custom_strategy_id)}"""
     if (built_in != null) result += """built_in=$built_in"""
+    if (artifact_type != null) result += """artifact_type=$artifact_type"""
+    if (expected_files != null) result += """expected_files=$expected_files"""
+    if (acceleration_preference != null) result +=
+        """acceleration_preference=$acceleration_preference"""
+    if (routing_policy != null) result += """routing_policy=$routing_policy"""
     return result.joinToString(prefix = "ModelInfo{", separator = ", ", postfix = "}")
   }
 
@@ -308,11 +363,16 @@ public class ModelInfo(
     multi_file: MultiFileArtifact? = this.multi_file,
     custom_strategy_id: String? = this.custom_strategy_id,
     built_in: Boolean? = this.built_in,
+    artifact_type: ModelArtifactType? = this.artifact_type,
+    expected_files: ExpectedModelFiles? = this.expected_files,
+    acceleration_preference: AccelerationPreference? = this.acceleration_preference,
+    routing_policy: RoutingPolicy? = this.routing_policy,
     unknownFields: ByteString = this.unknownFields,
   ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path,
       download_size_bytes, context_length, supports_thinking, supports_lora, description, source,
       created_at_unix_ms, updated_at_unix_ms, single_file, archive, multi_file, custom_strategy_id,
-      built_in, unknownFields)
+      built_in, artifact_type, expected_files, acceleration_preference, routing_policy,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -359,6 +419,10 @@ public class ModelInfo(
         size += MultiFileArtifact.ADAPTER.encodedSizeWithTag(22, value.multi_file)
         size += ProtoAdapter.STRING.encodedSizeWithTag(23, value.custom_strategy_id)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(24, value.built_in)
+        size += ModelArtifactType.ADAPTER.encodedSizeWithTag(25, value.artifact_type)
+        size += ExpectedModelFiles.ADAPTER.encodedSizeWithTag(26, value.expected_files)
+        size += AccelerationPreference.ADAPTER.encodedSizeWithTag(27, value.acceleration_preference)
+        size += RoutingPolicy.ADAPTER.encodedSizeWithTag(28, value.routing_policy)
         return size
       }
 
@@ -390,6 +454,10 @@ public class ModelInfo(
             value.created_at_unix_ms)
         if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15,
             value.updated_at_unix_ms)
+        ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
+        ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
+        AccelerationPreference.ADAPTER.encodeWithTag(writer, 27, value.acceleration_preference)
+        RoutingPolicy.ADAPTER.encodeWithTag(writer, 28, value.routing_policy)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
@@ -405,6 +473,10 @@ public class ModelInfo(
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
+        RoutingPolicy.ADAPTER.encodeWithTag(writer, 28, value.routing_policy)
+        AccelerationPreference.ADAPTER.encodeWithTag(writer, 27, value.acceleration_preference)
+        ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
+        ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
         if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15,
             value.updated_at_unix_ms)
         if (value.created_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 14,
@@ -455,6 +527,10 @@ public class ModelInfo(
         var multi_file: MultiFileArtifact? = null
         var custom_strategy_id: String? = null
         var built_in: Boolean? = null
+        var artifact_type: ModelArtifactType? = null
+        var expected_files: ExpectedModelFiles? = null
+        var acceleration_preference: AccelerationPreference? = null
+        var routing_policy: RoutingPolicy? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -493,6 +569,22 @@ public class ModelInfo(
             22 -> multi_file = MultiFileArtifact.ADAPTER.decode(reader)
             23 -> custom_strategy_id = ProtoAdapter.STRING.decode(reader)
             24 -> built_in = ProtoAdapter.BOOL.decode(reader)
+            25 -> try {
+              artifact_type = ModelArtifactType.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            26 -> expected_files = ExpectedModelFiles.ADAPTER.decode(reader)
+            27 -> try {
+              acceleration_preference = AccelerationPreference.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            28 -> try {
+              routing_policy = RoutingPolicy.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -517,6 +609,10 @@ public class ModelInfo(
           multi_file = multi_file,
           custom_strategy_id = custom_strategy_id,
           built_in = built_in,
+          artifact_type = artifact_type,
+          expected_files = expected_files,
+          acceleration_preference = acceleration_preference,
+          routing_policy = routing_policy,
           unknownFields = unknownFields
         )
       }
@@ -525,6 +621,7 @@ public class ModelInfo(
         single_file = value.single_file?.let(SingleFileArtifact.ADAPTER::redact),
         archive = value.archive?.let(ArchiveArtifact.ADAPTER::redact),
         multi_file = value.multi_file?.let(MultiFileArtifact.ADAPTER::redact),
+        expected_files = value.expected_files?.let(ExpectedModelFiles.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

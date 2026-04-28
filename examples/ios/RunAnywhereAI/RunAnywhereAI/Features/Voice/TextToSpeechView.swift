@@ -72,7 +72,7 @@ struct TextToSpeechView: View {
             }
             .navigationTitle(hasModelSelected ? "Text to Speech" : "")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             .navigationBarHidden(!hasModelSelected)
             #endif
             .toolbar {

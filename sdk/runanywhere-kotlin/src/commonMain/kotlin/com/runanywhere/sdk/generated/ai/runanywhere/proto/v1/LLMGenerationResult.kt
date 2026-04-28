@@ -175,6 +175,28 @@ public class LLMGenerationResult(
     schemaIndex = 12,
   )
   public val json_output: String? = null,
+  /**
+   * Optional aggregated performance metrics. Web SDK surfaces this as a
+   * separate object alongside the result; consumers may ignore it if they
+   * already use the per-field timings above.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "ai.runanywhere.proto.v1.PerformanceMetrics#ADAPTER",
+    schemaIndex = 13,
+  )
+  public val performance: PerformanceMetrics? = null,
+  /**
+   * Where the generation actually ran (on-device, cloud, etc.). Useful
+   * when execution_target was AUTO and the SDK picked the route.
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.ExecutionTarget#ADAPTER",
+    jsonName = "executedOn",
+    schemaIndex = 14,
+  )
+  public val executed_on: ExecutionTarget? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -201,6 +223,8 @@ public class LLMGenerationResult(
     if (thinking_tokens != other.thinking_tokens) return false
     if (response_tokens != other.response_tokens) return false
     if (json_output != other.json_output) return false
+    if (performance != other.performance) return false
+    if (executed_on != other.executed_on) return false
     return true
   }
 
@@ -221,6 +245,8 @@ public class LLMGenerationResult(
       result = result * 37 + thinking_tokens.hashCode()
       result = result * 37 + response_tokens.hashCode()
       result = result * 37 + (json_output?.hashCode() ?: 0)
+      result = result * 37 + (performance?.hashCode() ?: 0)
+      result = result * 37 + (executed_on?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -241,6 +267,8 @@ public class LLMGenerationResult(
     result += """thinking_tokens=$thinking_tokens"""
     result += """response_tokens=$response_tokens"""
     if (json_output != null) result += """json_output=${sanitize(json_output)}"""
+    if (performance != null) result += """performance=$performance"""
+    if (executed_on != null) result += """executed_on=$executed_on"""
     return result.joinToString(prefix = "LLMGenerationResult{", separator = ", ", postfix = "}")
   }
 
@@ -258,10 +286,13 @@ public class LLMGenerationResult(
     thinking_tokens: Int = this.thinking_tokens,
     response_tokens: Int = this.response_tokens,
     json_output: String? = this.json_output,
+    performance: PerformanceMetrics? = this.performance,
+    executed_on: ExecutionTarget? = this.executed_on,
     unknownFields: ByteString = this.unknownFields,
   ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, input_tokens,
       tokens_generated, model_used, generation_time_ms, ttft_ms, tokens_per_second, framework,
-      finish_reason, thinking_tokens, response_tokens, json_output, unknownFields)
+      finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -297,6 +328,8 @@ public class LLMGenerationResult(
         if (value.response_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
             value.response_tokens)
         size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.json_output)
+        size += PerformanceMetrics.ADAPTER.encodedSizeWithTag(14, value.performance)
+        size += ExecutionTarget.ADAPTER.encodedSizeWithTag(15, value.executed_on)
         return size
       }
 
@@ -320,11 +353,15 @@ public class LLMGenerationResult(
         if (value.response_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
             value.response_tokens)
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.json_output)
+        PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
+        ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationResult) {
         writer.writeBytes(value.unknownFields)
+        ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
+        PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.json_output)
         if (value.response_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
             value.response_tokens)
@@ -360,6 +397,8 @@ public class LLMGenerationResult(
         var thinking_tokens: Int = 0
         var response_tokens: Int = 0
         var json_output: String? = null
+        var performance: PerformanceMetrics? = null
+        var executed_on: ExecutionTarget? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -375,6 +414,12 @@ public class LLMGenerationResult(
             11 -> thinking_tokens = ProtoAdapter.INT32.decode(reader)
             12 -> response_tokens = ProtoAdapter.INT32.decode(reader)
             13 -> json_output = ProtoAdapter.STRING.decode(reader)
+            14 -> performance = PerformanceMetrics.ADAPTER.decode(reader)
+            15 -> try {
+              executed_on = ExecutionTarget.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -392,11 +437,14 @@ public class LLMGenerationResult(
           thinking_tokens = thinking_tokens,
           response_tokens = response_tokens,
           json_output = json_output,
+          performance = performance,
+          executed_on = executed_on,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerationResult): LLMGenerationResult = value.copy(
+        performance = value.performance?.let(PerformanceMetrics.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

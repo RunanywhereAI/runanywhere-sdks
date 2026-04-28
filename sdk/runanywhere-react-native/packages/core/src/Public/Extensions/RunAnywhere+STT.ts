@@ -1,27 +1,79 @@
 /**
  * RunAnywhere+STT.ts
  *
- * Speech-to-Text extension for RunAnywhere SDK.
- * Matches iOS: RunAnywhere+STT.swift
+ * Speech-to-Text extension for RunAnywhere SDK. Wave 2: aligned to the
+ * proto-canonical STT types (`@runanywhere/proto-ts/stt_options`). All
+ * legacy ad-hoc shapes (the `STTResult` / `STTOutput` from
+ * `types/STTTypes.ts`) have been deleted; we work directly off the
+ * proto-generated interfaces.
+ *
+ * Matches Swift: `Public/Extensions/STT/RunAnywhere+STT.swift`.
  */
 
 import { EventBus } from '../Events';
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import type { STTOptions, STTResult } from '../../types';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import type {
-  STTOutput,
-  STTPartialResult,
-  STTStreamCallback,
-  STTStreamOptions,
-  TranscriptionMetadata,
-} from '../../types/STTTypes';
+import {
+  STTLanguage,
+  type STTOptions,
+  type STTOutput,
+  type STTPartialResult,
+  type TranscriptionMetadata,
+} from '@runanywhere/proto-ts/stt_options';
+import { STTOptions as STTOptionsCtor } from '@runanywhere/proto-ts/stt_options';
 
 const logger = new SDKLogger('RunAnywhere.STT');
 
+/** Build a default proto `STTOptions` for callers that pass no options. */
+function defaultSTTOptions(): STTOptions {
+  return STTOptionsCtor.create({
+    language: STTLanguage.STT_LANGUAGE_AUTO,
+    enablePunctuation: true,
+    enableDiarization: false,
+    maxSpeakers: 0,
+    vocabularyList: [],
+    enableWordTimestamps: false,
+    beamSize: 0,
+  });
+}
+
+/** Map a proto `STTLanguage` enum value to the BCP-47 string the native bridge expects. */
+function sttLanguageToCode(language?: STTLanguage): string {
+  switch (language) {
+    case STTLanguage.STT_LANGUAGE_AUTO:
+      return 'auto';
+    case STTLanguage.STT_LANGUAGE_EN:
+      return 'en';
+    case STTLanguage.STT_LANGUAGE_ES:
+      return 'es';
+    case STTLanguage.STT_LANGUAGE_FR:
+      return 'fr';
+    case STTLanguage.STT_LANGUAGE_DE:
+      return 'de';
+    case STTLanguage.STT_LANGUAGE_ZH:
+      return 'zh';
+    case STTLanguage.STT_LANGUAGE_JA:
+      return 'ja';
+    case STTLanguage.STT_LANGUAGE_KO:
+      return 'ko';
+    case STTLanguage.STT_LANGUAGE_IT:
+      return 'it';
+    case STTLanguage.STT_LANGUAGE_PT:
+      return 'pt';
+    case STTLanguage.STT_LANGUAGE_AR:
+      return 'ar';
+    case STTLanguage.STT_LANGUAGE_RU:
+      return 'ru';
+    case STTLanguage.STT_LANGUAGE_HI:
+      return 'hi';
+    default:
+      return 'en';
+  }
+}
+
 /**
- * Extended native module type for streaming STT methods
- * These methods are optional and may not be implemented in all backends
+ * Extended native module type for streaming STT methods. Optional —
+ * present only on backends that have implemented them.
  */
 interface StreamingSTTNativeModule {
   startStreamingSTT?: (language: string) => Promise<boolean>;
@@ -30,18 +82,12 @@ interface StreamingSTTNativeModule {
 }
 
 /**
- * Streaming transcription result returning AsyncIterable for partials.
- * Mirrors the Swift `transcribeStream` shape and the LLM/VLM streaming
- * pattern (`stream` + `result` + `cancel`).
+ * Streaming transcription handle. Mirrors the LLM/VLM streaming surface
+ * shape (`stream` + `result` + `cancel`).
  */
 export interface STTStreamingResult {
-  /** Async iterator over partial transcription updates */
   partials: AsyncIterable<STTPartialResult>;
-
-  /** Promise that resolves to the final STT output */
   result: Promise<STTOutput>;
-
-  /** Cancel the streaming transcription */
   cancel: () => void;
 }
 
@@ -49,9 +95,7 @@ export interface STTStreamingResult {
 // Speech-to-Text (STT) Extension
 // ============================================================================
 
-/**
- * Load an STT model
- */
+/** Load an STT model. */
 export async function loadSTTModel(
   modelPath: string,
   modelType: string = 'whisper',
@@ -69,9 +113,7 @@ export async function loadSTTModel(
   );
 }
 
-/**
- * Check if an STT model is loaded
- */
+/** Check if an STT model is loaded. */
 export async function isSTTModelLoaded(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     return false;
@@ -80,9 +122,7 @@ export async function isSTTModelLoaded(): Promise<boolean> {
   return native.isSTTModelLoaded();
 }
 
-/**
- * Unload the current STT model
- */
+/** Unload the current STT model. */
 export async function unloadSTTModel(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     return false;
@@ -91,323 +131,208 @@ export async function unloadSTTModel(): Promise<boolean> {
   return native.unloadSTTModel();
 }
 
-/**
- * Simple voice transcription
- * Matches Swift SDK: RunAnywhere.transcribe(_:)
- *
- * @param audioData Audio data (base64 string or ArrayBuffer)
- * @returns Transcribed text
- */
-export async function transcribeSimple(
-  audioData: string | ArrayBuffer
-): Promise<string> {
-  const result = await transcribe(audioData);
-  return result.text;
+/** Convert Uint8Array / ArrayBuffer / string audio input to a base64 string. */
+function audioToBase64(audio: Uint8Array | string | ArrayBuffer): string {
+  if (typeof audio === 'string') return audio;
+  const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    const byte = bytes[i];
+    if (byte !== undefined) binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
 }
 
 /**
- * Transcribe audio data with full options
- * Matches Swift SDK: RunAnywhere.transcribeWithOptions(_:options:)
+ * Transcribe audio data.
+ *
+ * Canonical cross-SDK signature: transcribe(audio: Uint8Array, options: STTOptions)
+ * Also accepts string | ArrayBuffer for legacy callers.
+ *
+ * Matches Swift SDK: `RunAnywhere.transcribe(_:options:)`.
  */
 export async function transcribe(
-  audioData: string | ArrayBuffer,
-  options?: STTOptions
-): Promise<STTResult> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
-
-  let audioBase64: string;
-  if (typeof audioData === 'string') {
-    audioBase64 = audioData;
-  } else {
-    const bytes = new Uint8Array(audioData);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      const byte = bytes[i];
-      if (byte !== undefined) {
-        binary += String.fromCharCode(byte);
-      }
-    }
-    audioBase64 = btoa(binary);
-  }
-
-  const sampleRate = options?.sampleRate ?? 16000;
-  const language = options?.language;
-
-  const resultJson = await native.transcribe(audioBase64, sampleRate, language);
-
-  try {
-    const result = JSON.parse(resultJson);
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    return {
-      text: result.text ?? '',
-      segments: result.segments ?? [],
-      language: result.language,
-      confidence: result.confidence ?? 1.0,
-      duration: result.duration ?? 0,
-      alternatives: result.alternatives ?? [],
-    };
-  } catch (err) {
-    if (err instanceof Error) throw err;
-    if (resultJson.includes('error')) {
-      const errorMatch = resultJson.match(/"error":\s*"([^"]+)"/);
-      throw new Error(errorMatch ? errorMatch[1] : resultJson);
-    }
-    return {
-      text: resultJson,
-      segments: [],
-      confidence: 1.0,
-      duration: 0,
-      alternatives: [],
-    };
-  }
-}
-
-/**
- * Transcribe audio buffer (Float32Array)
- * Matches Swift SDK: RunAnywhere.transcribeBuffer(_:language:)
- */
-export async function transcribeBuffer(
-  samples: Float32Array,
-  options?: STTOptions
+  audio: Uint8Array | string | ArrayBuffer,
+  options?: Partial<STTOptions>
 ): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-
-  const startTime = Date.now();
   const native = requireNativeModule();
-
-  // Convert Float32Array to base64
-  const bytes = new Uint8Array(samples.buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    const byte = bytes[i];
-    if (byte !== undefined) {
-      binary += String.fromCharCode(byte);
-    }
-  }
-  const audioBase64 = btoa(binary);
-
-  const sampleRate = options?.sampleRate ?? 16000;
-  const language = options?.language ?? 'en';
+  const startTime = Date.now();
+  const audioBase64 = audioToBase64(audio);
+  const sampleRate = 16000;
+  const language = sttLanguageToCode(options?.language);
 
   const resultJson = await native.transcribe(audioBase64, sampleRate, language);
   const endTime = Date.now();
-  const processingTime = (endTime - startTime) / 1000;
+  const processingTimeMs = endTime - startTime;
 
   try {
-    const result = JSON.parse(resultJson);
+    const parsed = JSON.parse(resultJson);
+    if (parsed.error) {
+      throw new Error(parsed.error);
+    }
 
-    // Estimate audio length from samples
-    const audioLength = samples.length / sampleRate;
-
+    const audioLengthMs =
+      typeof parsed.duration === 'number' ? parsed.duration * 1000 : 0;
     const metadata: TranscriptionMetadata = {
-      modelId: 'unknown',
-      processingTime,
-      audioLength,
-      realTimeFactor: processingTime / audioLength,
+      modelId: parsed.modelId ?? 'unknown',
+      processingTimeMs,
+      audioLengthMs,
+      realTimeFactor:
+        audioLengthMs > 0 ? processingTimeMs / audioLengthMs : 0,
     };
 
     return {
-      text: result.text ?? '',
-      confidence: result.confidence ?? 1.0,
-      wordTimestamps: result.timestamps,
-      detectedLanguage: result.language,
-      alternatives: result.alternatives,
+      text: parsed.text ?? '',
+      language: options?.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+      confidence: parsed.confidence ?? 1.0,
+      words: parsed.words ?? parsed.timestamps ?? [],
+      alternatives: parsed.alternatives ?? [],
       metadata,
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof Error) throw err;
     throw new Error(`Transcription failed: ${resultJson}`);
   }
 }
 
 /**
- * Transcribe audio with streaming partial results.
+ * Simple voice transcription — returns just the text.
  *
- * Matches Swift SDK: RunAnywhere.transcribeStream(audioData:options:onPartialResult:).
+ * Matches Swift SDK: `RunAnywhere.transcribe(_:)`.
+ */
+export async function transcribeSimple(
+  audio: string | ArrayBuffer
+): Promise<string> {
+  const result = await transcribe(audio);
+  return result.text;
+}
+
+/**
+ * Transcribe an audio buffer.
  *
- * Both calling styles are supported:
- *  - Callback style: pass `options.onPartialResult` and `await` the
- *    returned Promise<STTOutput>. This is the legacy shape and matches
- *    the Swift signature.
- *  - AsyncIterable style: use `transcribeStreamAsync()` which returns a
- *    `STTStreamingResult { partials, result, cancel }` consistent with
- *    the LLM / VLM streaming primitives.
+ * Matches Swift SDK: `RunAnywhere.transcribeBuffer(_:options:)`.
+ */
+export async function transcribeBuffer(
+  samples: Float32Array,
+  options?: Partial<STTOptions>
+): Promise<STTOutput> {
+  if (!isNativeModuleAvailable()) {
+    throw new Error('Native module not available');
+  }
+  const audioBase64 = audioToBase64(samples.buffer as ArrayBuffer);
+  return transcribe(audioBase64, options);
+}
+
+/**
+ * Streaming transcription with partial-result callback.
  *
- * @param audioData Audio data to transcribe
- * @param options Stream options with callback
- * @returns Final transcription output
+ * Matches Swift SDK: `RunAnywhere.transcribeStream(audioData:options:onPartialResult:)`.
  */
 export async function transcribeStream(
-  audioData: string | ArrayBuffer,
-  options: STTStreamOptions
+  audio: Uint8Array | string | ArrayBuffer,
+  options: Partial<STTOptions> & {
+    onPartialResult?: (partial: STTPartialResult) => void;
+  } = {}
 ): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
 
-  const startTime = Date.now();
-  const native = requireNativeModule();
+  const onPartialResult = options.onPartialResult;
+  let unsubscribe: (() => void) | null = null;
 
-  let audioBase64: string;
-  let audioSize: number;
-
-  if (typeof audioData === 'string') {
-    audioBase64 = audioData;
-    audioSize = atob(audioData).length;
-  } else {
-    const bytes = new Uint8Array(audioData);
-    audioSize = bytes.byteLength;
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      const byte = bytes[i];
-      if (byte !== undefined) {
-        binary += String.fromCharCode(byte);
-      }
-    }
-    audioBase64 = btoa(binary);
-  }
-
-  const sampleRate = options?.sampleRate ?? 16000;
-  const language = options?.language ?? 'en';
-
-  // Set up event listener for partial results
-  let finalText = '';
-  let finalConfidence = 1.0;
-
-  if (options.onPartialResult) {
-    const unsubscribe = EventBus.onVoice((event) => {
+  if (onPartialResult) {
+    unsubscribe = EventBus.onVoice((event) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const evt = event as any;
       if (evt.type === 'sttPartialResult') {
-        const partialResult: STTPartialResult = {
-          transcript: evt.text ?? '',
-          confidence: evt.confidence,
+        onPartialResult({
+          text: evt.text ?? '',
           isFinal: false,
-        };
-        options.onPartialResult?.(partialResult);
-      } else if (evt.type === 'sttCompleted') {
-        finalText = evt.text ?? '';
-        finalConfidence = evt.confidence ?? 1.0;
+          stability: typeof evt.confidence === 'number' ? evt.confidence : 0,
+        });
+      } else if (evt.type === 'sttCompleted' && unsubscribe) {
         unsubscribe();
       }
     });
   }
 
-  // Transcribe
-  const resultJson = await native.transcribe(audioBase64, sampleRate, language);
-  const endTime = Date.now();
-  const processingTime = (endTime - startTime) / 1000;
-
   try {
-    const result = JSON.parse(resultJson);
-
-    // Estimate audio length
-    const bytesPerSample = 2; // 16-bit
-    const audioLength = audioSize / (sampleRate * bytesPerSample);
-
-    const metadata: TranscriptionMetadata = {
-      modelId: 'unknown',
-      processingTime,
-      audioLength,
-      realTimeFactor: processingTime / audioLength,
-    };
-
-    // Emit final partial result
-    if (options.onPartialResult) {
-      options.onPartialResult({
-        transcript: result.text ?? '',
-        confidence: result.confidence ?? 1.0,
+    const output = await transcribe(audio, options);
+    if (onPartialResult) {
+      onPartialResult({
+        text: output.text,
         isFinal: true,
+        stability: output.confidence,
       });
     }
-
-    return {
-      text: result.text ?? finalText,
-      confidence: result.confidence ?? finalConfidence,
-      wordTimestamps: result.timestamps,
-      detectedLanguage: result.language,
-      alternatives: result.alternatives,
-      metadata,
-    };
-  } catch {
-    throw new Error(`Streaming transcription failed: ${resultJson}`);
+    return output;
+  } finally {
+    if (unsubscribe) unsubscribe();
   }
 }
 
 /**
- * Transcribe audio from a file path
+ * Transcribe audio from a file path.
+ *
+ * Matches Swift SDK: `RunAnywhere.transcribeFile(_:options:)`.
  */
 export async function transcribeFile(
   filePath: string,
-  options?: STTOptions
-): Promise<STTResult> {
+  options?: Partial<STTOptions>
+): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
   const native = requireNativeModule();
-
-  const language = options?.language ?? 'en';
+  const language = sttLanguageToCode(options?.language);
+  const startTime = Date.now();
   const resultJson = await native.transcribeFile(filePath, language);
+  const endTime = Date.now();
+  const processingTimeMs = endTime - startTime;
 
   try {
-    const result = JSON.parse(resultJson);
-    if (result.error) {
-      throw new Error(result.error);
-    }
+    const parsed = JSON.parse(resultJson);
+    if (parsed.error) throw new Error(parsed.error);
+
+    const audioLengthMs =
+      typeof parsed.duration === 'number' ? parsed.duration * 1000 : 0;
     return {
-      text: result.text ?? '',
-      segments: result.segments ?? [],
-      language: result.language,
-      confidence: result.confidence ?? 1.0,
-      duration: result.duration ?? 0,
-      alternatives: result.alternatives ?? [],
+      text: parsed.text ?? '',
+      language: options?.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+      confidence: parsed.confidence ?? 1.0,
+      words: parsed.words ?? parsed.timestamps ?? [],
+      alternatives: parsed.alternatives ?? [],
+      metadata: {
+        modelId: parsed.modelId ?? 'unknown',
+        processingTimeMs,
+        audioLengthMs,
+        realTimeFactor:
+          audioLengthMs > 0 ? processingTimeMs / audioLengthMs : 0,
+      },
     };
-  } catch {
-    if (resultJson.includes('error')) {
-      const errorMatch = resultJson.match(/"error":\s*"([^"]+)"/);
-      throw new Error(errorMatch ? errorMatch[1] : resultJson);
-    }
-    return {
-      text: resultJson,
-      segments: [],
-      confidence: 1.0,
-      duration: 0,
-      alternatives: [],
-    };
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error(`Transcription failed: ${resultJson}`);
   }
 }
 
 /**
  * AsyncIterable variant of `transcribeStream`.
  *
- * Returns `{ partials, result, cancel }` mirroring the LLM/VLM streaming
- * primitives. Use this when you want to consume partials with
- * `for await ... of partials`.
- *
- * Matches the Swift `RunAnywhere.transcribeStream(_:)` AsyncStream shape
- * (callback-based on the Swift side too, but exposed as `AsyncStream`).
- *
- * Example:
- * ```ts
- * const streaming = await transcribeStreamAsync(audioData, { language: 'en' });
- * for await (const partial of streaming.partials) {
- *   console.log(partial.transcript);
- * }
- * const final = await streaming.result;
- * ```
+ * Matches the LLM/VLM streaming primitives (`stream` + `result` + `cancel`).
  */
 export async function transcribeStreamAsync(
-  audioData: string | ArrayBuffer,
-  options: STTOptions = {}
+  audio: Uint8Array | string | ArrayBuffer,
+  options: Partial<STTOptions> = {}
 ): Promise<STTStreamingResult> {
   const queue: STTPartialResult[] = [];
-  let resolver: ((value: IteratorResult<STTPartialResult>) => void) | null = null;
+  let resolver:
+    | ((value: IteratorResult<STTPartialResult>) => void)
+    | null = null;
   let done = false;
   let streamError: Error | null = null;
   let cancelled = false;
@@ -429,11 +354,7 @@ export async function transcribeStreamAsync(
     }
   };
 
-  // Drive the underlying callback-based API.
-  transcribeStream(audioData, {
-    ...options,
-    onPartialResult: pushPartial,
-  })
+  transcribeStream(audio, { ...options, onPartialResult: pushPartial })
     .then((output) => {
       done = true;
       resolveResult(output);
@@ -486,19 +407,10 @@ export async function transcribeStreamAsync(
   };
 }
 
-// ============================================================================
-// Streaming STT (Real-time)
-// ============================================================================
-
-// v3.1: startStreamingSTT DELETED. Use transcribeStream() which provides
-// the same callback-based streaming via the canonical proto path.
-
 /**
  * Stop streaming speech-to-text transcription.
  *
  * Matches Swift SDK: `RunAnywhere.stopStreamingTranscription()`.
- * The legacy `stopStreamingSTT` name is retained as a re-export below
- * for backwards compatibility.
  */
 export async function stopStreamingTranscription(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
@@ -511,16 +423,7 @@ export async function stopStreamingTranscription(): Promise<boolean> {
   return native.stopStreamingSTT();
 }
 
-/**
- * @deprecated Use `stopStreamingTranscription` for parity with the Swift
- * SDK. This alias is kept for back-compat and will be removed in a future
- * version.
- */
-export const stopStreamingSTT = stopStreamingTranscription;
-
-/**
- * Check if streaming STT is currently active
- */
+/** Check if streaming STT is currently active. */
 export async function isStreamingSTT(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     return false;

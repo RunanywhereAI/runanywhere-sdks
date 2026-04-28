@@ -24,9 +24,11 @@ export {
   transcribeSimple,
   transcribeBuffer,
   transcribeStream,
+  transcribeStreamAsync,
   transcribeFile,
-  stopStreamingSTT,
+  stopStreamingTranscription,
   isStreamingSTT,
+  currentSTTModel,
 } from './RunAnywhere+STT';
 
 // Text-to-Speech
@@ -189,4 +191,4 @@ export {
   processImage,
   processImageStream,
   cancelVLMGeneration,
-} from './RunAnywhere+VLM';
+} from './RunAnywhere+VisionLanguage';

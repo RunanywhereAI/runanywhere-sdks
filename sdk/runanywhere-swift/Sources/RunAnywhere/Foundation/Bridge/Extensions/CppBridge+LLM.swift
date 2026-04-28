@@ -45,7 +45,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_llm_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKError.llm(.notInitialized, "Failed to create LLM component: \(result)")
+                throw SDKException.llm(.notInitialized, "Failed to create LLM component: \(result)")
             }
 
             self.handle = handle
@@ -77,7 +77,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKError.llm(.modelLoadFailed, "Failed to load model: \(result)")
+                throw SDKException.llm(.modelLoadFailed, "Failed to load model: \(result)")
             }
             loadedModelId = modelId
             logger.info("LLM model loaded: \(modelId)")
@@ -106,7 +106,7 @@ extension CppBridge {
                 rac_llm_component_load_lora(handle, pathPtr, config.scale)
             }
             guard result == RAC_SUCCESS else {
-                throw SDKError.llm(.modelLoadFailed, "Failed to load LoRA adapter: \(result)")
+                throw SDKException.llm(.modelLoadFailed, "Failed to load LoRA adapter: \(result)")
             }
             logger.info("LoRA adapter loaded: \(config.path) (scale=\(config.scale))")
         }
@@ -114,13 +114,13 @@ extension CppBridge {
         /// Remove a specific LoRA adapter by path
         public func removeLoraAdapter(_ path: String) throws {
             guard let handle = handle else {
-                throw SDKError.llm(.invalidState, "No LLM component active")
+                throw SDKException.llm(.invalidState, "No LLM component active")
             }
             let result = path.withCString { pathPtr in
                 rac_llm_component_remove_lora(handle, pathPtr)
             }
             guard result == RAC_SUCCESS else {
-                throw SDKError.llm(.invalidState, "Failed to remove LoRA adapter: \(result)")
+                throw SDKException.llm(.invalidState, "Failed to remove LoRA adapter: \(result)")
             }
             logger.info("LoRA adapter removed: \(path)")
         }
@@ -128,11 +128,11 @@ extension CppBridge {
         /// Remove all LoRA adapters
         public func clearLoraAdapters() throws {
             guard let handle = handle else {
-                throw SDKError.llm(.invalidState, "No LLM component active")
+                throw SDKException.llm(.invalidState, "No LLM component active")
             }
             let result = rac_llm_component_clear_lora(handle)
             guard result == RAC_SUCCESS else {
-                throw SDKError.llm(.invalidState, "Failed to clear LoRA adapters: \(result)")
+                throw SDKException.llm(.invalidState, "Failed to clear LoRA adapters: \(result)")
             }
             logger.info("All LoRA adapters cleared")
         }

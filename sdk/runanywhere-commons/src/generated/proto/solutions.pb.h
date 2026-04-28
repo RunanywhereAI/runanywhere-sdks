@@ -58,6 +58,8 @@ namespace runanywhere {
 namespace v1 {
 enum AudioSource : int;
 extern const uint32_t AudioSource_internal_data_[];
+enum SolutionType : int;
+extern const uint32_t SolutionType_internal_data_[];
 enum VectorStore : int;
 extern const uint32_t VectorStore_internal_data_[];
 class AgentLoopConfig;
@@ -72,6 +74,10 @@ class SolutionConfig;
 struct SolutionConfigDefaultTypeInternal;
 extern SolutionConfigDefaultTypeInternal _SolutionConfig_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull SolutionConfig_class_data_;
+class SolutionHandle;
+struct SolutionHandleDefaultTypeInternal;
+extern SolutionHandleDefaultTypeInternal _SolutionHandle_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull SolutionHandle_class_data_;
 class TimeSeriesConfig;
 struct TimeSeriesConfigDefaultTypeInternal;
 extern TimeSeriesConfigDefaultTypeInternal _TimeSeriesConfig_default_instance_;
@@ -96,6 +102,9 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::AudioSource_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::AudioSource>;
 template <>
+internal::EnumTraitsT<::runanywhere::v1::SolutionType_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::SolutionType>;
+template <>
 internal::EnumTraitsT<::runanywhere::v1::VectorStore_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::VectorStore>;
 }  // namespace protobuf
@@ -103,6 +112,50 @@ internal::EnumTraitsT<::runanywhere::v1::VectorStore_internal_data_>
 
 namespace runanywhere {
 namespace v1 {
+enum SolutionType : int {
+  SOLUTION_TYPE_UNSPECIFIED = 0,
+  SOLUTION_TYPE_VOICE_AGENT = 1,
+  SOLUTION_TYPE_RAG = 2,
+  SOLUTION_TYPE_WAKEWORD = 3,
+  SOLUTION_TYPE_TIME_SERIES = 4,
+  SOLUTION_TYPE_AGENT_LOOP = 5,
+  SolutionType_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  SolutionType_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t SolutionType_internal_data_[];
+inline constexpr SolutionType SolutionType_MIN =
+    static_cast<SolutionType>(0);
+inline constexpr SolutionType SolutionType_MAX =
+    static_cast<SolutionType>(5);
+[[nodiscard]] inline bool SolutionType_IsValid(int value) {
+  return 0 <= value && value <= 5;
+}
+inline constexpr int SolutionType_ARRAYSIZE = 5 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+SolutionType_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(SolutionType) {
+  return SolutionType_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& SolutionType_Name(T value) {
+  static_assert(::std::is_same<T, SolutionType>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to SolutionType_Name().");
+  return SolutionType_Name(static_cast<SolutionType>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& SolutionType_Name(SolutionType value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<SolutionType_descriptor, 0, 5>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool SolutionType_Parse(
+    ::absl::string_view name, SolutionType* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<SolutionType>(SolutionType_descriptor(), name,
+                                           value);
+}
 enum AudioSource : int {
   AUDIO_SOURCE_UNSPECIFIED = 0,
   AUDIO_SOURCE_MICROPHONE = 1,
@@ -248,7 +301,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED WakeWordConfig final : public ::goo
     return *reinterpret_cast<const WakeWordConfig*>(
         &_WakeWordConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(WakeWordConfig& a, WakeWordConfig& b) { a.Swap(&b); }
   inline void Swap(WakeWordConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -343,6 +396,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED WakeWordConfig final : public ::goo
     kThresholdFieldNumber = 3,
     kPreRollMsFieldNumber = 4,
     kSampleRateHzFieldNumber = 5,
+    kTypeKindFieldNumber = 6,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -404,11 +458,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED WakeWordConfig final : public ::goo
   void _internal_set_sample_rate_hz(::int32_t value);
 
   public:
+  // optional .runanywhere.v1.SolutionType type_kind = 6;
+  [[nodiscard]] bool has_type_kind()
+      const;
+  void clear_type_kind() ;
+  [[nodiscard]] ::runanywhere::v1::SolutionType type_kind() const;
+  void set_type_kind(::runanywhere::v1::SolutionType value);
+
+  private:
+  ::runanywhere::v1::SolutionType _internal_type_kind() const;
+  void _internal_set_type_kind(::runanywhere::v1::SolutionType value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.WakeWordConfig)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
                                    0, 53,
                                    2>
       _table_;
@@ -437,6 +503,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED WakeWordConfig final : public ::goo
     float threshold_;
     ::int32_t pre_roll_ms_;
     ::int32_t sample_rate_hz_;
+    int type_kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -502,7 +569,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentConfig final : public ::g
     return *reinterpret_cast<const VoiceAgentConfig*>(
         &_VoiceAgentConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 1;
+  static constexpr int kIndexInFileMessages = 2;
   friend void swap(VoiceAgentConfig& a, VoiceAgentConfig& b) { a.Swap(&b); }
   inline void Swap(VoiceAgentConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -607,6 +674,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentConfig final : public ::g
     kEmitPartialsFieldNumber = 13,
     kEmitThoughtsFieldNumber = 14,
     kTemperatureFieldNumber = 12,
+    kTypeKindFieldNumber = 16,
   };
   // string llm_model_id = 1;
   void clear_llm_model_id() ;
@@ -788,12 +856,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentConfig final : public ::g
   void _internal_set_temperature(float value);
 
   public:
+  // optional .runanywhere.v1.SolutionType type_kind = 16;
+  [[nodiscard]] bool has_type_kind()
+      const;
+  void clear_type_kind() ;
+  [[nodiscard]] ::runanywhere::v1::SolutionType type_kind() const;
+  void set_type_kind(::runanywhere::v1::SolutionType value);
+
+  private:
+  ::runanywhere::v1::SolutionType _internal_type_kind() const;
+  void _internal_set_type_kind(::runanywhere::v1::SolutionType value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentConfig)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 15,
-                                   0, 124,
+  static const ::google::protobuf::internal::TcParseTable<4, 16,
+                                   0, 132,
                                    2>
       _table_;
 
@@ -831,6 +911,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentConfig final : public ::g
     bool emit_partials_;
     bool emit_thoughts_;
     float temperature_;
+    int type_kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -896,7 +977,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolSpec final : public ::google::p
     return *reinterpret_cast<const ToolSpec*>(
         &_ToolSpec_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(ToolSpec& a, ToolSpec& b) { a.Swap(&b); }
   inline void Swap(ToolSpec* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1131,7 +1212,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TimeSeriesConfig final : public ::g
     return *reinterpret_cast<const TimeSeriesConfig*>(
         &_TimeSeriesConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(TimeSeriesConfig& a, TimeSeriesConfig& b) { a.Swap(&b); }
   inline void Swap(TimeSeriesConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1226,6 +1307,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TimeSeriesConfig final : public ::g
     kWindowSizeFieldNumber = 3,
     kStrideFieldNumber = 4,
     kAnomalyThresholdFieldNumber = 5,
+    kTypeKindFieldNumber = 6,
   };
   // string anomaly_model_id = 1;
   void clear_anomaly_model_id() ;
@@ -1287,11 +1369,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TimeSeriesConfig final : public ::g
   void _internal_set_anomaly_threshold(float value);
 
   public:
+  // optional .runanywhere.v1.SolutionType type_kind = 6;
+  [[nodiscard]] bool has_type_kind()
+      const;
+  void clear_type_kind() ;
+  [[nodiscard]] ::runanywhere::v1::SolutionType type_kind() const;
+  void set_type_kind(::runanywhere::v1::SolutionType value);
+
+  private:
+  ::runanywhere::v1::SolutionType _internal_type_kind() const;
+  void _internal_set_type_kind(::runanywhere::v1::SolutionType value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TimeSeriesConfig)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
                                    0, 68,
                                    2>
       _table_;
@@ -1320,6 +1414,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TimeSeriesConfig final : public ::g
     ::int32_t window_size_;
     ::int32_t stride_;
     float anomaly_threshold_;
+    int type_kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1327,6 +1422,255 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TimeSeriesConfig final : public ::g
 };
 
 extern const ::google::protobuf::internal::ClassDataFull TimeSeriesConfig_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SolutionHandle final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.SolutionHandle) */ {
+ public:
+  inline SolutionHandle() : SolutionHandle(nullptr) {}
+  ~SolutionHandle() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(SolutionHandle* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(SolutionHandle));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr SolutionHandle(::google::protobuf::internal::ConstantInitialized);
+
+  inline SolutionHandle(const SolutionHandle& from) : SolutionHandle(nullptr, from) {}
+  inline SolutionHandle(SolutionHandle&& from) noexcept
+      : SolutionHandle(nullptr, ::std::move(from)) {}
+  inline SolutionHandle& operator=(const SolutionHandle& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline SolutionHandle& operator=(SolutionHandle&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const SolutionHandle& default_instance() {
+    return *reinterpret_cast<const SolutionHandle*>(
+        &_SolutionHandle_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 1;
+  friend void swap(SolutionHandle& a, SolutionHandle& b) { a.Swap(&b); }
+  inline void Swap(SolutionHandle* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(SolutionHandle* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] SolutionHandle* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<SolutionHandle>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const SolutionHandle& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const SolutionHandle& from) { SolutionHandle::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(SolutionHandle* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.SolutionHandle"; }
+
+  explicit SolutionHandle(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  SolutionHandle(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const SolutionHandle& from);
+  SolutionHandle(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, SolutionHandle&& from) noexcept
+      : SolutionHandle(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kHandleIdFieldNumber = 1,
+    kSolutionTypeFieldNumber = 2,
+    kStateFieldNumber = 4,
+    kCreatedAtMsFieldNumber = 3,
+  };
+  // string handle_id = 1;
+  void clear_handle_id() ;
+  [[nodiscard]] const ::std::string& handle_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_handle_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_handle_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_handle_id();
+  void set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_handle_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_handle_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_handle_id();
+
+  public:
+  // string solution_type = 2;
+  void clear_solution_type() ;
+  [[nodiscard]] const ::std::string& solution_type() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_solution_type(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_solution_type();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_solution_type();
+  void set_allocated_solution_type(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_solution_type() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_solution_type(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_solution_type();
+
+  public:
+  // optional string state = 4;
+  [[nodiscard]] bool has_state()
+      const;
+  void clear_state() ;
+  [[nodiscard]] const ::std::string& state() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_state(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_state();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_state();
+  void set_allocated_state(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_state() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_state(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_state();
+
+  public:
+  // int64 created_at_ms = 3;
+  void clear_created_at_ms() ;
+  [[nodiscard]] ::int64_t created_at_ms() const;
+  void set_created_at_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_created_at_ms() const;
+  void _internal_set_created_at_ms(::int64_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.SolutionHandle)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 4,
+                                   0, 65,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const SolutionHandle& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr handle_id_;
+    ::google::protobuf::internal::ArenaStringPtr solution_type_;
+    ::google::protobuf::internal::ArenaStringPtr state_;
+    ::int64_t created_at_ms_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_solutions_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull SolutionHandle_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfig final : public ::google::protobuf::Message
@@ -1385,7 +1729,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfig final : public ::google::
     return *reinterpret_cast<const RAGConfig*>(
         &_RAGConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 3;
   friend void swap(RAGConfig& a, RAGConfig& b) { a.Swap(&b); }
   inline void Swap(RAGConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1486,6 +1830,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfig final : public ::google::
     kBm25K1FieldNumber = 8,
     kBm25BFieldNumber = 9,
     kRrfKFieldNumber = 10,
+    kTypeKindFieldNumber = 12,
   };
   // string embed_model_id = 1;
   void clear_embed_model_id() ;
@@ -1622,11 +1967,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfig final : public ::google::
   void _internal_set_rrf_k(::int32_t value);
 
   public:
+  // optional .runanywhere.v1.SolutionType type_kind = 12;
+  [[nodiscard]] bool has_type_kind()
+      const;
+  void clear_type_kind() ;
+  [[nodiscard]] ::runanywhere::v1::SolutionType type_kind() const;
+  void set_type_kind(::runanywhere::v1::SolutionType value);
+
+  private:
+  ::runanywhere::v1::SolutionType _internal_type_kind() const;
+  void _internal_set_type_kind(::runanywhere::v1::SolutionType value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGConfig)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 11,
+  static const ::google::protobuf::internal::TcParseTable<4, 12,
                                    0, 114,
                                    2>
       _table_;
@@ -1661,6 +2018,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfig final : public ::google::
     float bm25_k1_;
     float bm25_b_;
     ::int32_t rrf_k_;
+    int type_kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1726,7 +2084,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AgentLoopConfig final : public ::go
     return *reinterpret_cast<const AgentLoopConfig*>(
         &_AgentLoopConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(AgentLoopConfig& a, AgentLoopConfig& b) { a.Swap(&b); }
   inline void Swap(AgentLoopConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1821,6 +2179,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AgentLoopConfig final : public ::go
     kSystemPromptFieldNumber = 2,
     kMaxIterationsFieldNumber = 4,
     kMaxContextTokensFieldNumber = 5,
+    kTypeKindFieldNumber = 6,
   };
   // repeated .runanywhere.v1.ToolSpec tools = 3;
   [[nodiscard]] int tools_size()
@@ -1892,11 +2251,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AgentLoopConfig final : public ::go
   void _internal_set_max_context_tokens(::int32_t value);
 
   public:
+  // optional .runanywhere.v1.SolutionType type_kind = 6;
+  [[nodiscard]] bool has_type_kind()
+      const;
+  void clear_type_kind() ;
+  [[nodiscard]] ::runanywhere::v1::SolutionType type_kind() const;
+  void set_type_kind(::runanywhere::v1::SolutionType value);
+
+  private:
+  ::runanywhere::v1::SolutionType _internal_type_kind() const;
+  void _internal_set_type_kind(::runanywhere::v1::SolutionType value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.AgentLoopConfig)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
                                    1, 64,
                                    2>
       _table_;
@@ -1925,6 +2296,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AgentLoopConfig final : public ::go
     ::google::protobuf::internal::ArenaStringPtr system_prompt_;
     ::int32_t max_iterations_;
     ::int32_t max_context_tokens_;
+    int type_kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2685,6 +3057,234 @@ inline SolutionConfig::ConfigCase SolutionConfig::config_case() const {
 }
 // -------------------------------------------------------------------
 
+// SolutionHandle
+
+// string handle_id = 1;
+inline void SolutionHandle::clear_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& SolutionHandle::handle_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SolutionHandle.handle_id)
+  return _internal_handle_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SolutionHandle::set_handle_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.handle_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SolutionHandle.handle_id)
+}
+inline ::std::string* PROTOBUF_NONNULL SolutionHandle::mutable_handle_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_handle_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SolutionHandle.handle_id)
+  return _s;
+}
+inline const ::std::string& SolutionHandle::_internal_handle_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.handle_id_.Get();
+}
+inline void SolutionHandle::_internal_set_handle_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SolutionHandle::_internal_mutable_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.handle_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SolutionHandle::release_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SolutionHandle.handle_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.handle_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SolutionHandle::set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.handle_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.handle_id_.IsDefault()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SolutionHandle.handle_id)
+}
+
+// string solution_type = 2;
+inline void SolutionHandle::clear_solution_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.solution_type_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& SolutionHandle::solution_type() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SolutionHandle.solution_type)
+  return _internal_solution_type();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SolutionHandle::set_solution_type(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.solution_type_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SolutionHandle.solution_type)
+}
+inline ::std::string* PROTOBUF_NONNULL SolutionHandle::mutable_solution_type()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_solution_type();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SolutionHandle.solution_type)
+  return _s;
+}
+inline const ::std::string& SolutionHandle::_internal_solution_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.solution_type_.Get();
+}
+inline void SolutionHandle::_internal_set_solution_type(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.solution_type_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SolutionHandle::_internal_mutable_solution_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.solution_type_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SolutionHandle::release_solution_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SolutionHandle.solution_type)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.solution_type_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.solution_type_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SolutionHandle::set_allocated_solution_type(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.solution_type_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.solution_type_.IsDefault()) {
+    _impl_.solution_type_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SolutionHandle.solution_type)
+}
+
+// int64 created_at_ms = 3;
+inline void SolutionHandle::clear_created_at_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.created_at_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::int64_t SolutionHandle::created_at_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SolutionHandle.created_at_ms)
+  return _internal_created_at_ms();
+}
+inline void SolutionHandle::set_created_at_ms(::int64_t value) {
+  _internal_set_created_at_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SolutionHandle.created_at_ms)
+}
+inline ::int64_t SolutionHandle::_internal_created_at_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.created_at_ms_;
+}
+inline void SolutionHandle::_internal_set_created_at_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.created_at_ms_ = value;
+}
+
+// optional string state = 4;
+inline bool SolutionHandle::has_state() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
+inline void SolutionHandle::clear_state() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.state_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& SolutionHandle::state() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SolutionHandle.state)
+  return _internal_state();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SolutionHandle::set_state(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.state_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SolutionHandle.state)
+}
+inline ::std::string* PROTOBUF_NONNULL SolutionHandle::mutable_state()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_state();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SolutionHandle.state)
+  return _s;
+}
+inline const ::std::string& SolutionHandle::_internal_state() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.state_.Get();
+}
+inline void SolutionHandle::_internal_set_state(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.state_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SolutionHandle::_internal_mutable_state() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.state_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SolutionHandle::release_state() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SolutionHandle.state)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.state_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.state_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SolutionHandle::set_allocated_state(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.state_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.state_.IsDefault()) {
+    _impl_.state_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SolutionHandle.state)
+}
+
+// -------------------------------------------------------------------
+
 // VoiceAgentConfig
 
 // string llm_model_id = 1;
@@ -3302,6 +3902,35 @@ inline void VoiceAgentConfig::_internal_set_emit_thoughts(bool value) {
   _impl_.emit_thoughts_ = value;
 }
 
+// optional .runanywhere.v1.SolutionType type_kind = 16;
+inline bool VoiceAgentConfig::has_type_kind() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00008000U);
+  return value;
+}
+inline void VoiceAgentConfig::clear_type_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00008000U);
+}
+inline ::runanywhere::v1::SolutionType VoiceAgentConfig::type_kind() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentConfig.type_kind)
+  return _internal_type_kind();
+}
+inline void VoiceAgentConfig::set_type_kind(::runanywhere::v1::SolutionType value) {
+  _internal_set_type_kind(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentConfig.type_kind)
+}
+inline ::runanywhere::v1::SolutionType VoiceAgentConfig::_internal_type_kind() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
+}
+inline void VoiceAgentConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // RAGConfig
@@ -3781,6 +4410,35 @@ inline void RAGConfig::set_allocated_prompt_template(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfig.prompt_template)
 }
 
+// optional .runanywhere.v1.SolutionType type_kind = 12;
+inline bool RAGConfig::has_type_kind() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000800U);
+  return value;
+}
+inline void RAGConfig::clear_type_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000800U);
+}
+inline ::runanywhere::v1::SolutionType RAGConfig::type_kind() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfig.type_kind)
+  return _internal_type_kind();
+}
+inline void RAGConfig::set_type_kind(::runanywhere::v1::SolutionType value) {
+  _internal_set_type_kind(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfig.type_kind)
+}
+inline ::runanywhere::v1::SolutionType RAGConfig::_internal_type_kind() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
+}
+inline void RAGConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // WakeWordConfig
@@ -3988,6 +4646,35 @@ inline ::int32_t WakeWordConfig::_internal_sample_rate_hz() const {
 inline void WakeWordConfig::_internal_set_sample_rate_hz(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_hz_ = value;
+}
+
+// optional .runanywhere.v1.SolutionType type_kind = 6;
+inline bool WakeWordConfig::has_type_kind() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  return value;
+}
+inline void WakeWordConfig::clear_type_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::runanywhere::v1::SolutionType WakeWordConfig::type_kind() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.type_kind)
+  return _internal_type_kind();
+}
+inline void WakeWordConfig::set_type_kind(::runanywhere::v1::SolutionType value) {
+  _internal_set_type_kind(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.type_kind)
+}
+inline ::runanywhere::v1::SolutionType WakeWordConfig::_internal_type_kind() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
+}
+inline void WakeWordConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -4228,6 +4915,35 @@ inline ::int32_t AgentLoopConfig::_internal_max_context_tokens() const {
 inline void AgentLoopConfig::_internal_set_max_context_tokens(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_context_tokens_ = value;
+}
+
+// optional .runanywhere.v1.SolutionType type_kind = 6;
+inline bool AgentLoopConfig::has_type_kind() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  return value;
+}
+inline void AgentLoopConfig::clear_type_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::runanywhere::v1::SolutionType AgentLoopConfig::type_kind() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.AgentLoopConfig.type_kind)
+  return _internal_type_kind();
+}
+inline void AgentLoopConfig::set_type_kind(::runanywhere::v1::SolutionType value) {
+  _internal_set_type_kind(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.AgentLoopConfig.type_kind)
+}
+inline ::runanywhere::v1::SolutionType AgentLoopConfig::_internal_type_kind() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
+}
+inline void AgentLoopConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -4638,6 +5354,35 @@ inline void TimeSeriesConfig::_internal_set_anomaly_threshold(float value) {
   _impl_.anomaly_threshold_ = value;
 }
 
+// optional .runanywhere.v1.SolutionType type_kind = 6;
+inline bool TimeSeriesConfig::has_type_kind() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  return value;
+}
+inline void TimeSeriesConfig::clear_type_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::runanywhere::v1::SolutionType TimeSeriesConfig::type_kind() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TimeSeriesConfig.type_kind)
+  return _internal_type_kind();
+}
+inline void TimeSeriesConfig::set_type_kind(::runanywhere::v1::SolutionType value) {
+  _internal_set_type_kind(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TimeSeriesConfig.type_kind)
+}
+inline ::runanywhere::v1::SolutionType TimeSeriesConfig::_internal_type_kind() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
+}
+inline void TimeSeriesConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_kind_ = value;
+}
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -4650,6 +5395,12 @@ inline void TimeSeriesConfig::_internal_set_anomaly_threshold(float value) {
 namespace google {
 namespace protobuf {
 
+template <>
+struct is_proto_enum<::runanywhere::v1::SolutionType> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::SolutionType>() {
+  return ::runanywhere::v1::SolutionType_descriptor();
+}
 template <>
 struct is_proto_enum<::runanywhere::v1::AudioSource> : std::true_type {};
 template <>

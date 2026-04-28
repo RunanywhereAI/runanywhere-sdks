@@ -52,6 +52,15 @@ protoc \
     --dart_out="${OUT_DIR}" \
     llm_options.proto chat.proto tool_calling.proto
 
+# Phase B — additional duplicated data shapes (per-modality options + shared types).
+protoc \
+    --proto_path="${PROTO_DIR}" \
+    --dart_out="${OUT_DIR}" \
+    diffusion_options.proto embeddings_options.proto errors.proto \
+    lora_options.proto rag.proto sdk_events.proto storage_types.proto \
+    structured_output.proto stt_options.proto tts_options.proto \
+    vad_options.proto vlm_options.proto
+
 # Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
 # (some older protoc_plugin versions emit them even without the grpc: prefix).
 rm -f "${OUT_DIR}"/*.pbgrpc.dart

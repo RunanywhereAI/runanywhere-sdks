@@ -192,6 +192,18 @@ public class VoiceAgentConfig(
     schemaIndex = 14,
   )
   public val emit_thoughts: Boolean = false,
+  /**
+   * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
+   * oneof arm; provided so callers that pass this message standalone (or
+   * log it) can read a single discriminator. Defaults to UNSPECIFIED.
+   */
+  @field:WireField(
+    tag = 16,
+    adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
+    jsonName = "typeKind",
+    schemaIndex = 15,
+  )
+  public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -220,6 +232,7 @@ public class VoiceAgentConfig(
     if (temperature != other.temperature) return false
     if (emit_partials != other.emit_partials) return false
     if (emit_thoughts != other.emit_thoughts) return false
+    if (type_kind != other.type_kind) return false
     return true
   }
 
@@ -242,6 +255,7 @@ public class VoiceAgentConfig(
       result = result * 37 + temperature.hashCode()
       result = result * 37 + emit_partials.hashCode()
       result = result * 37 + emit_thoughts.hashCode()
+      result = result * 37 + (type_kind?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -264,6 +278,7 @@ public class VoiceAgentConfig(
     result += """temperature=$temperature"""
     result += """emit_partials=$emit_partials"""
     result += """emit_thoughts=$emit_thoughts"""
+    if (type_kind != null) result += """type_kind=$type_kind"""
     return result.joinToString(prefix = "VoiceAgentConfig{", separator = ", ", postfix = "}")
   }
 
@@ -283,11 +298,12 @@ public class VoiceAgentConfig(
     temperature: Float = this.temperature,
     emit_partials: Boolean = this.emit_partials,
     emit_thoughts: Boolean = this.emit_thoughts,
+    type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceAgentConfig = VoiceAgentConfig(llm_model_id, stt_model_id, tts_model_id, vad_model_id,
       sample_rate_hz, chunk_ms, audio_source, audio_file_path, enable_barge_in,
       barge_in_threshold_ms, system_prompt, max_context_tokens, temperature, emit_partials,
-      emit_thoughts, unknownFields)
+      emit_thoughts, type_kind, unknownFields)
 
   public companion object {
     @JvmField
@@ -330,6 +346,7 @@ public class VoiceAgentConfig(
             value.emit_partials)
         if (value.emit_thoughts != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(14,
             value.emit_thoughts)
+        size += SolutionType.ADAPTER.encodedSizeWithTag(16, value.type_kind)
         return size
       }
 
@@ -363,11 +380,13 @@ public class VoiceAgentConfig(
             value.emit_partials)
         if (value.emit_thoughts != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
             value.emit_thoughts)
+        SolutionType.ADAPTER.encodeWithTag(writer, 16, value.type_kind)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentConfig) {
         writer.writeBytes(value.unknownFields)
+        SolutionType.ADAPTER.encodeWithTag(writer, 16, value.type_kind)
         if (value.emit_thoughts != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
             value.emit_thoughts)
         if (value.emit_partials != false) ProtoAdapter.BOOL.encodeWithTag(writer, 13,
@@ -415,6 +434,7 @@ public class VoiceAgentConfig(
         var temperature: Float = 0f
         var emit_partials: Boolean = false
         var emit_thoughts: Boolean = false
+        var type_kind: SolutionType? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> llm_model_id = ProtoAdapter.STRING.decode(reader)
@@ -436,6 +456,11 @@ public class VoiceAgentConfig(
             12 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             13 -> emit_partials = ProtoAdapter.BOOL.decode(reader)
             14 -> emit_thoughts = ProtoAdapter.BOOL.decode(reader)
+            16 -> try {
+              type_kind = SolutionType.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -455,6 +480,7 @@ public class VoiceAgentConfig(
           temperature = temperature,
           emit_partials = emit_partials,
           emit_thoughts = emit_thoughts,
+          type_kind = type_kind,
           unknownFields = unknownFields
         )
       }

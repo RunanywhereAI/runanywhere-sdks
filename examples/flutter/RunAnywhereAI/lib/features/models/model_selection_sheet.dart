@@ -871,10 +871,10 @@ class _FlatModelRowState extends State<_FlatModelRow> {
         });
 
         // Check if completed or failed
-        if (progress.state == sdk.DownloadProgressState.completed) {
+        if (progress.state.isCompleted) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.state == sdk.DownloadProgressState.failed) {
+        } else if (progress.state.isFailed) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
           throw Exception('Download failed');
         }

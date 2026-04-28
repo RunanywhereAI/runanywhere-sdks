@@ -7,7 +7,7 @@
 import 'dart:async';
 
 import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
@@ -28,7 +28,7 @@ class RunAnywhereModels {
   /// Runs one-shot filesystem discovery on first call.
   Future<List<ModelInfo>> available() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     if (!SdkState.shared.hasRunDiscovery) {

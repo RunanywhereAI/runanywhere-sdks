@@ -15,12 +15,14 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/features/vad/vad_configuration.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/features/vad/vad_configuration.dart' show VADComponentConfig;
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/vad_options.pb.dart' show VADOptions, VADResult;
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_vad.dart' show VADResult, VADActivityEvent, VADSpeechStartedEvent, VADSpeechEndedEvent;
+import 'package:runanywhere/native/dart_bridge_vad.dart' as bridge
+    show VADActivityEvent, VADSpeechStartedEvent, VADSpeechEndedEvent;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 /// Speech-activity event lifecycle. Mirrors Swift's
@@ -39,10 +41,10 @@ class RunAnywhereVAD {
     // Bridge the bridge-level [VADActivityEvent] stream to the public
     // [SpeechActivityEvent] stream + invoke any registered callbacks.
     _bridgeSubscription = DartBridge.vad.activityStream.listen((event) {
-      if (event is VADSpeechStartedEvent) {
+      if (event is bridge.VADSpeechStartedEvent) {
         _speechActivityCallback?.call(SpeechActivityEvent.started);
         _activityController.add(SpeechActivityEvent.started);
-      } else if (event is VADSpeechEndedEvent) {
+      } else if (event is bridge.VADSpeechEndedEvent) {
         _speechActivityCallback?.call(SpeechActivityEvent.ended);
         _activityController.add(SpeechActivityEvent.ended);
       }
@@ -61,7 +63,7 @@ class RunAnywhereVAD {
   void Function(SpeechActivityEvent event)? _speechActivityCallback;
   void Function(Float32List samples)? _audioBufferCallback;
 
-  late final StreamSubscription<VADActivityEvent> _bridgeSubscription;
+  late final StreamSubscription<bridge.VADActivityEvent> _bridgeSubscription;
 
   // VAD model state — independent from the energy-based VAD process.
   String? _loadedModelId;
@@ -73,9 +75,9 @@ class RunAnywhereVAD {
 
   /// Initialize VAD with default configuration. Mirrors Swift's
   /// `initializeVAD()`.
-  Future<void> initializeVAD([VADConfiguration? config]) async {
+  Future<void> initializeVAD([VADComponentConfig? config]) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     if (config != null) {
       config.validate();
@@ -98,7 +100,7 @@ class RunAnywhereVAD {
   /// `detectSpeech(in: [Float])` overload.
   Future<bool> detectSpeech(Float32List samples) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     final result = DartBridge.vad.process(samples);
     // Forward to audio-buffer callback for parity with Swift.
@@ -106,22 +108,53 @@ class RunAnywhereVAD {
     return result.isSpeech;
   }
 
-  /// Detailed detection result (energy, probability, ...).
-  Future<VADResult> detectSpeechDetailed(Float32List samples) async {
+  /// Detect voice activity, returning a proto [VADResult]. Canonical
+  /// cross-SDK signature accepts raw PCM16 bytes (Uint8List) and
+  /// converts to Float32 samples for the energy-based detector.
+  /// Mirrors Swift's `detectVoiceActivity(_:options:)`.
+  Future<VADResult> detectVoiceActivity(
+    Uint8List audio, [
+    VADOptions? options,
+  ]) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
+    final samples = _pcm16ToFloat32(audio);
     final result = DartBridge.vad.process(samples);
     _audioBufferCallback?.call(samples);
-    return result;
+    return VADResult(
+      isSpeech: result.isSpeech,
+      confidence: result.speechProbability,
+      energy: result.energy,
+      durationMs: 0,
+    );
   }
 
-  /// Detect speech, returning a [SpeechActivityEvent]. Convenience
-  /// wrapper around [detectSpeech].
-  Future<SpeechActivityEvent> detectVoiceActivity(Float32List samples) async {
-    return await detectSpeech(samples)
-        ? SpeechActivityEvent.started
-        : SpeechActivityEvent.ended;
+  /// Detect voice activity from Float32 PCM samples (internal / advanced).
+  Future<VADResult> detectVoiceActivityFloat(
+    Float32List audio, [
+    VADOptions? options,
+  ]) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    final result = DartBridge.vad.process(audio);
+    _audioBufferCallback?.call(audio);
+    return VADResult(
+      isSpeech: result.isSpeech,
+      confidence: result.speechProbability,
+      energy: result.energy,
+      durationMs: 0,
+    );
+  }
+
+  static Float32List _pcm16ToFloat32(Uint8List pcm16) {
+    final samples = Float32List(pcm16.length ~/ 2);
+    final byteData = ByteData.sublistView(pcm16);
+    for (var i = 0; i < samples.length; i++) {
+      samples[i] = byteData.getInt16(i * 2, Endian.little) / 32768.0;
+    }
+    return samples;
   }
 
   // ---------------------------------------------------------------------
@@ -131,7 +164,7 @@ class RunAnywhereVAD {
   /// Start VAD processing. Mirrors Swift's `startVAD()`.
   Future<void> startVAD() async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
     DartBridge.vad.start();
   }
@@ -200,7 +233,7 @@ class RunAnywhereVAD {
   /// VAD model, then re-initializes the underlying VAD bridge.
   Future<void> loadModel(String modelId) async {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     _logger.info('Loading VAD model: $modelId');
@@ -208,10 +241,10 @@ class RunAnywhereVAD {
     final model = models.where((m) => m.id == modelId).firstOrNull;
 
     if (model == null) {
-      throw SDKError.modelNotFound('VAD model not found: $modelId');
+      throw SDKException.modelNotFound('VAD model not found: $modelId');
     }
     if (model.localPath == null) {
-      throw SDKError.modelNotDownloaded(
+      throw SDKException.modelNotDownloaded(
         'VAD model is not downloaded. Call downloadModel() first.',
       );
     }

@@ -43,7 +43,7 @@ public extension RunAnywhere {
     /// Initialize VAD with default configuration
     static func initializeVAD() async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await CppBridge.VAD.shared.initialize()
@@ -53,7 +53,7 @@ public extension RunAnywhere {
     /// - Parameter config: VAD configuration
     static func initializeVAD(_ config: VADConfiguration) async throws {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Get handle and configure
@@ -72,7 +72,7 @@ public extension RunAnywhere {
         // Initialize
         let result = rac_vad_component_initialize(handle)
         guard result == RAC_SUCCESS else {
-            throw SDKError.vad(.initializationFailed, "VAD initialization failed: \(result)")
+            throw SDKException.vad(.initializationFailed, "VAD initialization failed: \(result)")
         }
     }
 
@@ -90,12 +90,12 @@ public extension RunAnywhere {
     /// - Returns: Whether speech was detected
     static func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> Bool {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Convert AVAudioPCMBuffer to [Float]
         guard let channelData = buffer.floatChannelData else {
-            throw SDKError.vad(.emptyAudioBuffer, "Audio buffer has no channel data")
+            throw SDKException.vad(.emptyAudioBuffer, "Audio buffer has no channel data")
         }
 
         let frameLength = Int(buffer.frameLength)
@@ -109,7 +109,7 @@ public extension RunAnywhere {
     /// - Returns: Whether speech was detected
     static func detectSpeech(in samples: [Float]) async throws -> Bool {
         guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VAD.shared.getHandle()
@@ -125,7 +125,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.vad(.processingFailed, "Failed to process samples: \(result)")
+            throw SDKException.vad(.processingFailed, "Failed to process samples: \(result)")
         }
 
         let detected = hasVoice == RAC_TRUE

@@ -16,19 +16,19 @@
  *   await Embeddings.loadModel('/models/nomic-embed-text-v1.5.Q4_K_M.gguf', 'nomic-embed');
  *   const result = await Embeddings.embed('Hello, world!');
  *   console.log('Dimension:', result.dimension);
- *   console.log('Vector:', result.embeddings[0].data);
+ *   console.log('Vector:', result.vectors[0].data);
  *
  *   // Batch embedding
  *   const batch = await Embeddings.embedBatch(['text1', 'text2', 'text3']);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
 import type {
   EmbeddingVector,
   EmbeddingsResult,
-  EmbeddingsOptions,
+  EmbeddingsCallOptions,
 } from './EmbeddingsTypes';
 
 export {
@@ -36,7 +36,7 @@ export {
   EmbeddingsPooling,
   type EmbeddingVector,
   type EmbeddingsResult,
-  type EmbeddingsOptions,
+  type EmbeddingsCallOptions,
 } from './EmbeddingsTypes';
 
 const logger = new SDKLogger('Embeddings');
@@ -50,7 +50,7 @@ class EmbeddingsImpl {
   private _embeddingsComponentHandle = 0;
 
   private requireBridge(): LlamaCppBridge {
-    if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+    if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
     return LlamaCppBridge.shared;
   }
 
@@ -128,13 +128,13 @@ class EmbeddingsImpl {
   /**
    * Generate embedding for a single text.
    */
-  async embed(text: string, options: EmbeddingsOptions = {}): Promise<EmbeddingsResult> {
+  async embed(text: string, options: EmbeddingsCallOptions = {}): Promise<EmbeddingsResult> {
     const bridge = this.requireBridge();
     const m = bridge.module;
     const handle = this.ensureEmbeddingsComponent();
 
     if (!this.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No embeddings model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No embeddings model loaded. Call loadModel() first.');
     }
 
     logger.debug(`Embedding text (${text.length} chars)`);
@@ -171,13 +171,13 @@ class EmbeddingsImpl {
   /**
    * Generate embeddings for multiple texts at once.
    */
-  async embedBatch(texts: string[], options: EmbeddingsOptions = {}): Promise<EmbeddingsResult> {
+  async embedBatch(texts: string[], options: EmbeddingsCallOptions = {}): Promise<EmbeddingsResult> {
     const bridge = this.requireBridge();
     const m = bridge.module;
     const handle = this.ensureEmbeddingsComponent();
 
     if (!this.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No embeddings model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No embeddings model loaded. Call loadModel() first.');
     }
 
     logger.debug(`Embedding batch of ${texts.length} texts`);
@@ -266,18 +266,18 @@ function readEmbeddingsResult(
 ): EmbeddingsResult {
   // rac_embeddings_result_t (offsets from compiler via StructOffsets)
   const eRes = Offsets.embeddingsResult;
-  const embeddingsArrayPtr = m.getValue(resPtr + eRes.embeddings, '*');
-  const numEmbeddings = m.getValue(resPtr + eRes.numEmbeddings, 'i32');
+  const vectorsArrayPtr = m.getValue(resPtr + eRes.embeddings, '*');
+  const numVectors = m.getValue(resPtr + eRes.numEmbeddings, 'i32');
   const dimension = m.getValue(resPtr + eRes.dimension, 'i32');
   const processingTimeMs = m.getValue(resPtr + eRes.processingTimeMs, 'i32'); // low 32 bits of int64
-  const totalTokens = m.getValue(resPtr + eRes.totalTokens, 'i32');
+  const tokensUsed = m.getValue(resPtr + eRes.totalTokens, 'i32');
 
-  const embeddings: EmbeddingVector[] = [];
+  const vectors: EmbeddingVector[] = [];
   const ev = Offsets.embeddingVector;
 
-  for (let i = 0; i < numEmbeddings; i++) {
+  for (let i = 0; i < numVectors; i++) {
     // Each rac_embedding_vector_t
-    const vecPtr = embeddingsArrayPtr + i * ev.structSize;
+    const vecPtr = vectorsArrayPtr + i * ev.structSize;
     const dataPtr = m.getValue(vecPtr + ev.data, '*');
     const vecDim = m.getValue(vecPtr + ev.dimension, 'i32');
 
@@ -286,17 +286,17 @@ function readEmbeddingsResult(
       data.set(bridge.readFloat32Array(dataPtr, vecDim));
     }
 
-    embeddings.push({ data, dimension: vecDim });
+    vectors.push({ data, dimension: vecDim });
   }
 
   // Free C result
   m.ccall('rac_embeddings_result_free', null, ['number'], [resPtr]);
 
   EventBus.shared.emit('embeddings.generated', SDKEventType.Generation, {
-    numEmbeddings,
+    numEmbeddings: numVectors,
     dimension,
     processingTimeMs,
   });
 
-  return { embeddings, dimension, processingTimeMs, totalTokens };
+  return { vectors, dimension, processingTimeMs, tokensUsed };
 }

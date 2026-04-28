@@ -258,25 +258,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
                 // Map stored models to UI model
                 val storedModels =
-                    storageInfo.storedModels.map { model ->
+                    storageInfo.models.map { model ->
                         StoredModelInfo(
-                            id = model.id,
-                            name = model.name,
-                            size = model.size,
+                            id = model.model_id,
+                            name = model.model_id,
+                            size = model.size_on_disk_bytes,
                         )
                     }
 
                 Timber.d("Storage info received:")
-                Timber.d("  - Total space: ${storageInfo.deviceStorage.totalSpace}")
-                Timber.d("  - Free space: ${storageInfo.deviceStorage.freeSpace}")
-                Timber.d("  - Model storage size: ${storageInfo.totalModelsSize}")
+                Timber.d("  - Total space: ${storageInfo.device?.total_bytes ?: 0}")
+                Timber.d("  - Free space: ${storageInfo.device?.free_bytes ?: 0}")
+                Timber.d("  - Model storage size: ${storageInfo.total_models_bytes}")
                 Timber.d("  - Stored models count: ${storedModels.size}")
 
                 _uiState.update {
                     it.copy(
-                        totalStorageSize = storageInfo.deviceStorage.totalSpace,
-                        availableSpace = storageInfo.deviceStorage.freeSpace,
-                        modelStorageSize = storageInfo.totalModelsSize,
+                        totalStorageSize = storageInfo.device?.total_bytes ?: 0L,
+                        availableSpace = storageInfo.device?.free_bytes ?: 0L,
+                        modelStorageSize = storageInfo.total_models_bytes,
                         downloadedModels = storedModels,
                         isLoading = false,
                     )

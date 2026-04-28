@@ -22,7 +22,7 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/solutions.pb.dart' as proto;
 import 'package:runanywhere/internal/sdk_state.dart';
@@ -64,7 +64,7 @@ class SolutionHandle {
     try {
       final rc = NativeFunctions.solutionFeed(handle, itemPtr);
       if (rc != RAC_SUCCESS) {
-        throw SDKError.invalidState(
+        throw SDKException.invalidState(
           'rac_solution_feed failed: ${RacResultCode.getMessage(rc)}',
         );
       }
@@ -92,7 +92,7 @@ class SolutionHandle {
   RacHandle _requireHandle() {
     final handle = _handle;
     if (handle == null) {
-      throw SDKError.invalidState(
+      throw SDKException.invalidState(
         'SolutionHandle has already been destroyed',
       );
     }
@@ -103,7 +103,7 @@ class SolutionHandle {
     final handle = _requireHandle();
     final rc = fn(handle);
     if (rc != RAC_SUCCESS) {
-      throw SDKError.invalidState(
+      throw SDKException.invalidState(
         'rac_solution_$op failed: ${RacResultCode.getMessage(rc)}',
       );
     }
@@ -135,7 +135,7 @@ class RunAnywhereSolutions {
 
     final supplied = [config, configBytes, yaml].where((v) => v != null).length;
     if (supplied != 1) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'RunAnywhereSolutions.run requires exactly one of '
         'config / configBytes / yaml (got $supplied)',
       );
@@ -149,7 +149,7 @@ class RunAnywhereSolutions {
 
   SolutionHandle _createFromProto(Uint8List bytes) {
     if (bytes.isEmpty) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Solution config bytes are empty — refusing to call '
         'rac_solution_create_from_proto',
       );
@@ -165,7 +165,7 @@ class RunAnywhereSolutions {
         handlePtr,
       );
       if (rc != RAC_SUCCESS) {
-        throw SDKError.invalidConfiguration(
+        throw SDKException.invalidConfiguration(
           'rac_solution_create_from_proto failed: '
           '${RacResultCode.getMessage(rc)}',
         );
@@ -184,7 +184,7 @@ class RunAnywhereSolutions {
       final rc =
           NativeFunctions.solutionCreateFromYaml(yamlPtr, handlePtr);
       if (rc != RAC_SUCCESS) {
-        throw SDKError.invalidConfiguration(
+        throw SDKException.invalidConfiguration(
           'rac_solution_create_from_yaml failed: '
           '${RacResultCode.getMessage(rc)}',
         );
@@ -198,7 +198,7 @@ class RunAnywhereSolutions {
 
   void _ensureReady() {
     if (!SdkState.shared.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
   }
 }

@@ -20,7 +20,7 @@
  *   // result.audioData is Float32Array of PCM samples
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
@@ -39,7 +39,7 @@ const RAC_FRAMEWORK_ONNX = 0;
 // ---------------------------------------------------------------------------
 
 function requireSherpa(): SherpaONNXBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return SherpaONNXBridge.shared;
 }
 
@@ -105,7 +105,7 @@ class TTSImpl {
     } catch (initErr) {
       const msg = initErr instanceof Error ? initErr.message : JSON.stringify(initErr);
       logger.error(`Failed to build TTS config struct: ${msg}`);
-      throw new SDKError(SDKErrorCode.ModelLoadFailed,
+      throw new SDKException(SDKErrorCode.ModelLoadFailed,
         `Failed to build TTS config: ${msg}`);
     }
 
@@ -114,7 +114,7 @@ class TTSImpl {
       this._ttsHandle = m._SherpaOnnxCreateOfflineTts(configStruct.ptr);
 
       if (this._ttsHandle === 0) {
-        throw new SDKError(SDKErrorCode.ModelLoadFailed,
+        throw new SDKException(SDKErrorCode.ModelLoadFailed,
           `Failed to create TTS engine for voice: ${config.voiceId}`);
       }
 
@@ -130,7 +130,7 @@ class TTSImpl {
       this.cleanup();
       if (error instanceof Error) throw error;
       const msg = typeof error === 'object' ? JSON.stringify(error) : String(error);
-      throw new SDKError(SDKErrorCode.ModelLoadFailed, `TTS creation failed: ${msg}`);
+      throw new SDKException(SDKErrorCode.ModelLoadFailed, `TTS creation failed: ${msg}`);
     } finally {
       freeConfig(configStruct, m);
     }
@@ -176,7 +176,7 @@ class TTSImpl {
     const m = sherpa.module;
 
     if (this._ttsHandle === 0) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No TTS voice loaded. Call loadVoice() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No TTS voice loaded. Call loadVoice() first.');
     }
 
     const startMs = performance.now();
@@ -224,12 +224,12 @@ class TTSImpl {
           errMsg = String(wasmErr);
         }
         logger.error(`TTS WASM error: ${errMsg}`);
-        throw new SDKError(SDKErrorCode.GenerationFailed, `TTS synthesis WASM error: ${errMsg}`);
+        throw new SDKException(SDKErrorCode.GenerationFailed, `TTS synthesis WASM error: ${errMsg}`);
       }
       logger.debug(`_SherpaOnnxOfflineTtsGenerate returned: ${audioPtr}`);
 
       if (!audioPtr || audioPtr === 0) {
-        throw new SDKError(SDKErrorCode.GenerationFailed, 'TTS synthesis failed (null audio pointer)');
+        throw new SDKException(SDKErrorCode.GenerationFailed, 'TTS synthesis failed (null audio pointer)');
       }
 
       // Read the generated audio struct using HEAP32 (matches sherpa-onnx-tts.js pattern)
