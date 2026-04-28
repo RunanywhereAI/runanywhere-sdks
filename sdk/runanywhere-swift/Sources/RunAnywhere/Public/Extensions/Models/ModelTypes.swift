@@ -213,6 +213,7 @@ public extension RAInferenceFramework {
     var wireString: String {
         switch self {
         case .onnx:                return "ONNX"
+        case .sherpa:              return "Sherpa"
         case .llamaCpp:            return "LlamaCpp"
         case .foundationModels:    return "FoundationModels"
         case .systemTts:           return "SystemTTS"
@@ -242,6 +243,7 @@ public extension RAInferenceFramework {
     var displayName: String {
         switch self {
         case .onnx:                return "ONNX Runtime"
+        case .sherpa:              return "Sherpa-ONNX"
         case .llamaCpp:            return "llama.cpp"
         case .foundationModels:    return "Foundation Models"
         case .systemTts:           return "System TTS"
@@ -271,6 +273,7 @@ public extension RAInferenceFramework {
     var analyticsKey: String {
         switch self {
         case .onnx:                return "onnx"
+        case .sherpa:              return "sherpa"
         case .llamaCpp:            return "llama_cpp"
         case .foundationModels:    return "foundation_models"
         case .systemTts:           return "system_tts"
@@ -300,6 +303,7 @@ public extension RAInferenceFramework {
     func toCFramework() -> rac_inference_framework_t {
         switch self {
         case .onnx:                return RAC_FRAMEWORK_ONNX
+        case .sherpa:              return RAC_FRAMEWORK_SHERPA
         case .llamaCpp:            return RAC_FRAMEWORK_LLAMACPP
         case .foundationModels:    return RAC_FRAMEWORK_FOUNDATION_MODELS
         case .systemTts:           return RAC_FRAMEWORK_SYSTEM_TTS
@@ -318,6 +322,7 @@ public extension RAInferenceFramework {
     static func fromCFramework(_ cFramework: rac_inference_framework_t) -> RAInferenceFramework {
         switch cFramework {
         case RAC_FRAMEWORK_ONNX:                return .onnx
+        case RAC_FRAMEWORK_SHERPA:              return .sherpa
         case RAC_FRAMEWORK_LLAMACPP:            return .llamaCpp
         case RAC_FRAMEWORK_FOUNDATION_MODELS:   return .foundationModels
         case RAC_FRAMEWORK_SYSTEM_TTS:          return .systemTts
@@ -350,7 +355,7 @@ public extension RAInferenceFramework {
     /// All known concrete cases (excludes `.UNRECOGNIZED` and `.unspecified`).
     static var knownCases: [RAInferenceFramework] {
         [
-            .onnx, .llamaCpp, .foundationModels, .systemTts, .fluidAudio,
+            .onnx, .sherpa, .llamaCpp, .foundationModels, .systemTts, .fluidAudio,
             .coreml, .mlx, .whisperkitCoreml, .metalrt, .genie,
             .tflite, .executorch, .mediapipe, .mlc, .picoLlm,
             .piperTts, .whisperkit, .openaiWhisper, .swiftTransformers,

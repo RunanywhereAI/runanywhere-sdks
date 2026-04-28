@@ -156,12 +156,26 @@ class DartBridgeSTT {
   ///
   /// [audioData] - PCM16 audio data (WAV format expected with 16kHz sample rate).
   /// [sampleRate] - Sample rate of the audio (default: 16000 Hz for Whisper).
+  /// [language] - Optional language hint (e.g. "en").
+  /// [audioFormat] - Audio format constant (default WAV).
+  /// [enablePunctuation] - Whether to add punctuation (default true).
+  /// [enableDiarization] - Whether to enable speaker diarization (default false).
+  /// [maxSpeakers] - Maximum speakers when diarization is enabled (default 0).
+  /// [enableTimestamps] - Whether to include word timestamps (default true).
+  /// [detectLanguage] - Whether to auto-detect the language (default false).
   ///
   /// Returns the transcription result.
   /// Runs in a background isolate to prevent UI blocking.
   Future<STTComponentResult> transcribe(
     Uint8List audioData, {
     int sampleRate = 16000,
+    String language = 'en',
+    int audioFormat = racAudioFormatWav,
+    bool enablePunctuation = true,
+    bool enableDiarization = false,
+    int maxSpeakers = 0,
+    bool enableTimestamps = true,
+    bool detectLanguage = false,
   }) async {
     STTConfiguration(sampleRate: sampleRate).validate();
 
@@ -179,6 +193,13 @@ class DartBridgeSTT {
           handle.address,
           audioData,
           sampleRate,
+          language,
+          audioFormat,
+          enablePunctuation,
+          enableDiarization,
+          maxSpeakers,
+          enableTimestamps,
+          detectLanguage,
         ));
 
     _logger.info(
@@ -193,6 +214,13 @@ class DartBridgeSTT {
     int handleAddress,
     Uint8List audioData,
     int sampleRate,
+    String language,
+    int audioFormat,
+    bool enablePunctuation,
+    bool enableDiarization,
+    int maxSpeakers,
+    bool enableTimestamps,
+    bool detectLanguage,
   ) {
     final lib = PlatformLoader.loadCommons();
     final handle = RacHandle.fromAddress(handleAddress);
@@ -207,16 +235,15 @@ class DartBridgeSTT {
       final dataList = dataPtr.asTypedList(audioData.length);
       dataList.setAll(0, audioData);
 
-      // Set up options with correct sample rate
-      // Matches Swift's STTOptions setup
-      final languagePtr = 'en'.toNativeUtf8();
+      // Set up options matching Swift's STTOptions wire shape.
+      final languagePtr = language.toNativeUtf8();
       optionsPtr.ref.language = languagePtr;
-      optionsPtr.ref.detectLanguage = RAC_FALSE;
-      optionsPtr.ref.enablePunctuation = RAC_TRUE;
-      optionsPtr.ref.enableDiarization = RAC_FALSE;
-      optionsPtr.ref.maxSpeakers = 0;
-      optionsPtr.ref.enableTimestamps = RAC_TRUE;
-      optionsPtr.ref.audioFormat = racAudioFormatWav; // WAV format
+      optionsPtr.ref.detectLanguage = detectLanguage ? RAC_TRUE : RAC_FALSE;
+      optionsPtr.ref.enablePunctuation = enablePunctuation ? RAC_TRUE : RAC_FALSE;
+      optionsPtr.ref.enableDiarization = enableDiarization ? RAC_TRUE : RAC_FALSE;
+      optionsPtr.ref.maxSpeakers = maxSpeakers;
+      optionsPtr.ref.enableTimestamps = enableTimestamps ? RAC_TRUE : RAC_FALSE;
+      optionsPtr.ref.audioFormat = audioFormat;
       optionsPtr.ref.sampleRate = sampleRate;
 
       // Get transcribe function
@@ -258,14 +285,14 @@ class DartBridgeSTT {
       final text = result.text != nullptr ? result.text.toDartString() : '';
       final confidence = result.confidence;
       final durationMs = result.durationMs;
-      final language =
+      final detectedLanguage =
           result.language != nullptr ? result.language.toDartString() : null;
 
       return STTComponentResult(
         text: text,
         confidence: confidence,
         durationMs: durationMs,
-        language: language,
+        language: detectedLanguage,
       );
     } finally {
       // Free C-allocated strings inside the result (strdup'd by rac_stt_component_transcribe).

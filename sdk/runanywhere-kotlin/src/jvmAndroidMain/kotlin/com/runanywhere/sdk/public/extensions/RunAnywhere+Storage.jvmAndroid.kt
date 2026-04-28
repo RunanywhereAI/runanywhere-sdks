@@ -145,6 +145,41 @@ actual suspend fun RunAnywhere.modelStorageUsed(): Long {
     return CppBridgeFileManager.modelsStorageUsed()
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4a — Storage parity actuals.
+// ─────────────────────────────────────────────────────────────────────────────
+
+actual suspend fun RunAnywhere.checkStorageAvailability(
+    requiredBytes: Long,
+    safetyMargin: Double,
+): StorageAvailability {
+    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    // Apply safety margin client-side: bump the required bytes by the margin
+    // before forwarding to the C++ check (the bridge does not yet accept a
+    // margin parameter directly).
+    val padded = (requiredBytes.toDouble() * (1.0 + safetyMargin)).toLong()
+    return checkStorageAvailability(padded)
+}
+
+actual suspend fun RunAnywhere.getModelStorageMetrics(
+    modelId: String,
+    framework: com.runanywhere.sdk.core.types.InferenceFramework?,
+): ModelStorageMetrics? {
+    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    val info = storageInfo()
+    return info.models.firstOrNull { it.model.id == modelId }
+}
+
+actual suspend fun RunAnywhere.cleanTempFiles() {
+    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    // Reuse the cache-clearing pipeline; the C++ FileManager's cache namespace
+    // is the SDK's tmp/scratch root for downloads.
+    CppBridgeFileManager.clearCache()
+}
+
+actual fun RunAnywhere.getBaseDirectoryPath(): String =
+    CppBridgeModelPaths.getBaseDirectory()
+
 // Delegate to C++ for recursive directory size calculation
 private fun calculateDirectorySize(directory: File): Long {
     if (!directory.exists()) return 0L

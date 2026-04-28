@@ -284,6 +284,8 @@ const char* framework_to_string(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
             return "onnx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
         case RAC_FRAMEWORK_LLAMACPP:
             return "llamacpp";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:

@@ -13,14 +13,26 @@ sealed class ComponentLoadState {
   /// Component is not loaded
   const factory ComponentLoadState.notLoaded() = ComponentLoadStateNotLoaded;
 
+  /// Component is currently loading.
+  const factory ComponentLoadState.loading() = ComponentLoadStateLoading;
+
   /// Component is loaded with the given model ID
   const factory ComponentLoadState.loaded({required String modelId}) =
       ComponentLoadStateLoaded;
+
+  /// Component failed to load with an error message.
+  const factory ComponentLoadState.error(String message) =
+      ComponentLoadStateError;
 }
 
 /// Component not loaded state
 class ComponentLoadStateNotLoaded extends ComponentLoadState {
   const ComponentLoadStateNotLoaded();
+}
+
+/// Component is currently loading.
+class ComponentLoadStateLoading extends ComponentLoadState {
+  const ComponentLoadStateLoading();
 }
 
 /// Component loaded state
@@ -29,6 +41,14 @@ class ComponentLoadStateLoaded extends ComponentLoadState {
   final String modelId;
 
   const ComponentLoadStateLoaded({required this.modelId});
+}
+
+/// Component encountered a load error.
+class ComponentLoadStateError extends ComponentLoadState {
+  /// Failure reason / message.
+  final String message;
+
+  const ComponentLoadStateError(this.message);
 }
 
 // MARK: - Voice Agent Component States
@@ -64,12 +84,29 @@ class VoiceAgentComponentStates {
       llm is ComponentLoadStateLoaded ||
       tts is ComponentLoadStateLoaded;
 
+  /// True if any component is currently loading.
+  bool get isAnyLoading =>
+      stt is ComponentLoadStateLoading ||
+      llm is ComponentLoadStateLoading ||
+      tts is ComponentLoadStateLoading;
+
+  /// Names of components that are not yet loaded.
+  List<String> get missingComponents {
+    final missing = <String>[];
+    if (stt is! ComponentLoadStateLoaded) missing.add('stt');
+    if (llm is! ComponentLoadStateLoaded) missing.add('llm');
+    if (tts is! ComponentLoadStateLoaded) missing.add('tts');
+    return missing;
+  }
+
   @override
   String toString() {
     String stateToString(ComponentLoadState state) {
       if (state is ComponentLoadStateLoaded) {
         return 'loaded(${state.modelId})';
       }
+      if (state is ComponentLoadStateLoading) return 'loading';
+      if (state is ComponentLoadStateError) return 'error(${state.message})';
       return 'notLoaded';
     }
 

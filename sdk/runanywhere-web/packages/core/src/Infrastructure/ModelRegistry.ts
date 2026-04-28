@@ -69,6 +69,16 @@ export interface ManagedModel {
    * Maps logical name -> filesystem path.
    */
   extractedPaths?: Record<string, string>;
+
+  /**
+   * If true, this model must run on the CPU WASM build even when WebGPU is
+   * available. Set this for models that hit the llama.cpp Flash-Attention
+   * cross-backend issue (B-WEB-4-001) — e.g. Qwen / LFM2 derivatives.
+   * Mirrors the inline `FA_AFFECTED_MODEL_PATTERN` heuristic; populating
+   * this on a per-model basis is preferred so the runtime can stop relying
+   * on regex-on-id pattern matching.
+   */
+  requiresCPU?: boolean;
 }
 
 /** Structured download progress with stage information. */
@@ -124,6 +134,14 @@ export interface CompactModelDef {
    * Matches Swift SDK's `.archive(.tarGz, structure: .nestedDirectory)`.
    */
   artifactType?: ArtifactType;
+
+  /**
+   * Per-model "must run on CPU" flag. Use for models that hit the WebGPU FA
+   * cross-backend issue (B-WEB-4-001). Backends consult `ManagedModel.requiresCPU`
+   * during load-time and switch the bridge to CPU automatically. Preferred over
+   * inline regex/id-pattern heuristics so the registry stays the source of truth.
+   */
+  requiresCPU?: boolean;
 }
 
 /** Expand a compact definition into the full ManagedModel shape (minus status). */
@@ -145,6 +163,7 @@ function resolveModelDef(def: CompactModelDef): Omit<ManagedModel, 'status'> {
       modality: def.modality,
       memoryRequirement: def.memoryRequirement,
       isArchive: true,
+      ...(def.requiresCPU ? { requiresCPU: true } : {}),
     };
   }
 
@@ -164,6 +183,7 @@ function resolveModelDef(def: CompactModelDef): Omit<ManagedModel, 'status'> {
     modality: def.modality,
     memoryRequirement: def.memoryRequirement,
     ...(additionalFiles.length > 0 ? { additionalFiles } : {}),
+    ...(def.requiresCPU ? { requiresCPU: true } : {}),
   };
 }
 

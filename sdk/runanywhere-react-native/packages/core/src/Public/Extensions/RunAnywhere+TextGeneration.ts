@@ -321,3 +321,41 @@ export function cancelGeneration(): void {
   const native = requireNativeModule();
   native.cancelGeneration();
 }
+
+// ============================================================================
+// Introspection
+// ============================================================================
+
+/**
+ * Native dispatch surface for LLM introspection. Each method is optional —
+ * older bridges may not implement it.
+ */
+interface LLMIntrospectionNativeModule {
+  getCurrentLLMModelId?: () => Promise<string>;
+  currentLLMModel?: () => Promise<string>;
+}
+
+/**
+ * Get the currently loaded LLM model ID, or `null` if none is loaded.
+ *
+ * Matches Swift: `RunAnywhere.currentLLMModel`.
+ */
+export async function currentLLMModel(): Promise<string | null> {
+  if (!isNativeModuleAvailable()) return null;
+  const native = requireNativeModule() as unknown as LLMIntrospectionNativeModule;
+  // Prefer the getter name used elsewhere in the bridge; fall back to the
+  // alternate name for older native module shapes.
+  const fn = native.currentLLMModel ?? native.getCurrentLLMModelId;
+  if (!fn) return null;
+  const id = await fn.call(native);
+  return id && id.length > 0 ? id : null;
+}
+
+/**
+ * Generic helper that returns the currently loaded LLM model id.
+ *
+ * Matches Swift: `RunAnywhere.getCurrentModelId()`.
+ */
+export async function getCurrentModelId(): Promise<string | null> {
+  return currentLLMModel();
+}

@@ -87,3 +87,57 @@ expect suspend fun RunAnywhere.clearVoiceConversation()
  * @param prompt System prompt text
  */
 expect suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4a — VoiceAgent processing parity with Swift's
+// RunAnywhere+VoiceAgent.swift (`processVoiceTurn`, `voiceAgentTranscribe`,
+// `voiceAgentGenerateResponse`, `voiceAgentSynthesizeSpeech`,
+// `cleanupVoiceAgent`).
+//
+// These are *one-shot* helpers that compose the individual
+// STT/LLM/TTS bridges. They live here so cross-platform consumers can
+// migrate from Swift's API one-to-one. New code should still prefer the
+// streaming `VoiceAgentStreamAdapter` in
+// `com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Process a complete voice turn: audio -> transcription -> LLM response ->
+ * synthesized speech.
+ *
+ * Mirrors Swift's `RunAnywhere.processVoiceTurn(_ audioData:)`.
+ *
+ * @param audioData PCM audio bytes (16 kHz / 16-bit mono recommended).
+ * @return [VoiceAgentResult] with the transcript, response, and audio.
+ */
+expect suspend fun RunAnywhere.processVoiceTurn(
+    audioData: ByteArray,
+): com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult
+
+/**
+ * Transcribe audio using the voice-agent's STT component.
+ *
+ * Mirrors Swift's `RunAnywhere.voiceAgentTranscribe(_ audioData:)`.
+ */
+expect suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): String
+
+/**
+ * Generate an LLM response using the voice-agent's LLM component.
+ *
+ * Mirrors Swift's `RunAnywhere.voiceAgentGenerateResponse(_ prompt:)`.
+ */
+expect suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String
+
+/**
+ * Synthesize speech using the voice-agent's TTS component.
+ *
+ * Mirrors Swift's `RunAnywhere.voiceAgentSynthesizeSpeech(_ text:)`.
+ */
+expect suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): ByteArray
+
+/**
+ * Cleanup voice-agent resources.
+ *
+ * Mirrors Swift's `RunAnywhere.cleanupVoiceAgent()`.
+ */
+expect suspend fun RunAnywhere.cleanupVoiceAgent()

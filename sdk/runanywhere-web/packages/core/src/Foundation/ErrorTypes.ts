@@ -118,6 +118,19 @@ export class SDKError extends Error {
       details,
     );
   }
+
+  /**
+   * Convenience: feature/backend not available in this build.
+   * Used by stubs in the public API that depend on a backend (e.g. LoRA, RAG,
+   * voice-agent C-ABI, unsupported speech engines).
+   */
+  static backendNotAvailable(feature: string, details?: string): SDKError {
+    return new SDKError(
+      SDKErrorCode.BackendNotAvailable,
+      `Backend not available for: ${feature}`,
+      details,
+    );
+  }
 }
 
 /** Type guard: returns true if the value is an SDKError instance. */

@@ -1,0 +1,254 @@
+import _m0 from "protobufjs/minimal";
+export declare const protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * Supported parameter types.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum ToolParameterType {
+    TOOL_PARAMETER_TYPE_UNSPECIFIED = 0,
+    TOOL_PARAMETER_TYPE_STRING = 1,
+    TOOL_PARAMETER_TYPE_NUMBER = 2,
+    TOOL_PARAMETER_TYPE_BOOLEAN = 3,
+    TOOL_PARAMETER_TYPE_OBJECT = 4,
+    TOOL_PARAMETER_TYPE_ARRAY = 5,
+    UNRECOGNIZED = -1
+}
+export declare function toolParameterTypeFromJSON(object: any): ToolParameterType;
+export declare function toolParameterTypeToJSON(object: ToolParameterType): string;
+/**
+ * ---------------------------------------------------------------------------
+ * JSON-typed scalar / composite carrier for tool arguments and results.
+ * Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
+ * TypeScript discriminated union. Used inside ToolParameter.enum_values
+ * (string-only) and as the canonical wire shape when consumers want
+ * strongly-typed arguments rather than raw JSON.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolValue {
+    stringValue?: string | undefined;
+    numberValue?: number | undefined;
+    boolValue?: boolean | undefined;
+    arrayValue?: ToolValueArray | undefined;
+    /** No "null" arm — proto3 scalar defaults already represent absence. */
+    objectValue?: ToolValueObject | undefined;
+}
+export interface ToolValueArray {
+    values: ToolValue[];
+}
+export interface ToolValueObject {
+    fields: {
+        [key: string]: ToolValue;
+    };
+}
+export interface ToolValueObject_FieldsEntry {
+    key: string;
+    value?: ToolValue | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * A single parameter definition for a tool.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolParameter {
+    name: string;
+    type: ToolParameterType;
+    description: string;
+    required: boolean;
+    /** Allowed values for enum-like parameters. Empty = unconstrained. */
+    enumValues: string[];
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Definition of a tool that the LLM can call.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolDefinition {
+    name: string;
+    description: string;
+    parameters: ToolParameter[];
+    /** Optional category for grouping tools in catalogs / UIs. */
+    category?: string | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * A tool call requested by the LLM. `arguments_json` is a JSON object
+ * matching the parameter shape declared in the corresponding ToolDefinition.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolCall {
+    /** Unique ID (caller-supplied or generated). Empty = unset. */
+    id: string;
+    /** Tool name (matches ToolDefinition.name). */
+    name: string;
+    /** JSON-encoded arguments. Empty object "{}" if no args. */
+    argumentsJson: string;
+    /**
+     * Discriminator for OpenAI-compatible flows ("function" is the only
+     * value at the moment). Empty = unset.
+     */
+    type: string;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Result of executing a tool. `result_json` is a JSON-encoded payload;
+ * `error` is non-empty when the execution failed.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolResult {
+    toolCallId: string;
+    name: string;
+    resultJson: string;
+    error?: string | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Options for tool-enabled generation.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolCallingOptions {
+    /**
+     * Available tools for this generation. If empty, the SDK falls back to
+     * its registered tools (per-SDK convention).
+     */
+    tools: ToolDefinition[];
+    /**
+     * Maximum tool-call iterations in one conversation turn. 0 = SDK default
+     * (typically 5).
+     */
+    maxIterations: number;
+    /** Whether to auto-execute tools or hand them back to the caller. */
+    autoExecute: boolean;
+    /** Sampling temperature override (Swift: optional Float). */
+    temperature?: number | undefined;
+    /** Maximum tokens override. */
+    maxTokens?: number | undefined;
+    /** System prompt to use during tool-enabled generation. */
+    systemPrompt?: string | undefined;
+    /**
+     * If true, replaces the system prompt entirely (no auto-injected
+     * tool instructions).
+     */
+    replaceSystemPrompt: boolean;
+    /**
+     * If true, keeps tool definitions available across multiple sequential
+     * tool calls in one generation.
+     */
+    keepToolsAvailable: boolean;
+    /**
+     * Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
+     * Empty = SDK default.
+     */
+    formatHint: string;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Result of a tool-enabled generation.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolCallingResult {
+    /** Final text response from the assistant. */
+    text: string;
+    /** Tool calls the LLM made. */
+    toolCalls: ToolCall[];
+    /** Results of executed tools (only populated when auto_execute was true). */
+    toolResults: ToolResult[];
+    /** Whether the response is complete or waiting for more tool results. */
+    isComplete: boolean;
+    /** Conversation ID for continuing with tool results. */
+    conversationId?: string | undefined;
+    /** Number of tool-call iterations actually used. */
+    iterationsUsed: number;
+}
+export declare const ToolValue: {
+    encode(message: ToolValue, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValue;
+    fromJSON(object: any): ToolValue;
+    toJSON(message: ToolValue): unknown;
+    create<I extends Exact<DeepPartial<ToolValue>, I>>(base?: I): ToolValue;
+    fromPartial<I extends Exact<DeepPartial<ToolValue>, I>>(object: I): ToolValue;
+};
+export declare const ToolValueArray: {
+    encode(message: ToolValueArray, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueArray;
+    fromJSON(object: any): ToolValueArray;
+    toJSON(message: ToolValueArray): unknown;
+    create<I extends Exact<DeepPartial<ToolValueArray>, I>>(base?: I): ToolValueArray;
+    fromPartial<I extends Exact<DeepPartial<ToolValueArray>, I>>(object: I): ToolValueArray;
+};
+export declare const ToolValueObject: {
+    encode(message: ToolValueObject, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueObject;
+    fromJSON(object: any): ToolValueObject;
+    toJSON(message: ToolValueObject): unknown;
+    create<I extends Exact<DeepPartial<ToolValueObject>, I>>(base?: I): ToolValueObject;
+    fromPartial<I extends Exact<DeepPartial<ToolValueObject>, I>>(object: I): ToolValueObject;
+};
+export declare const ToolValueObject_FieldsEntry: {
+    encode(message: ToolValueObject_FieldsEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueObject_FieldsEntry;
+    fromJSON(object: any): ToolValueObject_FieldsEntry;
+    toJSON(message: ToolValueObject_FieldsEntry): unknown;
+    create<I extends Exact<DeepPartial<ToolValueObject_FieldsEntry>, I>>(base?: I): ToolValueObject_FieldsEntry;
+    fromPartial<I extends Exact<DeepPartial<ToolValueObject_FieldsEntry>, I>>(object: I): ToolValueObject_FieldsEntry;
+};
+export declare const ToolParameter: {
+    encode(message: ToolParameter, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolParameter;
+    fromJSON(object: any): ToolParameter;
+    toJSON(message: ToolParameter): unknown;
+    create<I extends Exact<DeepPartial<ToolParameter>, I>>(base?: I): ToolParameter;
+    fromPartial<I extends Exact<DeepPartial<ToolParameter>, I>>(object: I): ToolParameter;
+};
+export declare const ToolDefinition: {
+    encode(message: ToolDefinition, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolDefinition;
+    fromJSON(object: any): ToolDefinition;
+    toJSON(message: ToolDefinition): unknown;
+    create<I extends Exact<DeepPartial<ToolDefinition>, I>>(base?: I): ToolDefinition;
+    fromPartial<I extends Exact<DeepPartial<ToolDefinition>, I>>(object: I): ToolDefinition;
+};
+export declare const ToolCall: {
+    encode(message: ToolCall, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCall;
+    fromJSON(object: any): ToolCall;
+    toJSON(message: ToolCall): unknown;
+    create<I extends Exact<DeepPartial<ToolCall>, I>>(base?: I): ToolCall;
+    fromPartial<I extends Exact<DeepPartial<ToolCall>, I>>(object: I): ToolCall;
+};
+export declare const ToolResult: {
+    encode(message: ToolResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult;
+    fromJSON(object: any): ToolResult;
+    toJSON(message: ToolResult): unknown;
+    create<I extends Exact<DeepPartial<ToolResult>, I>>(base?: I): ToolResult;
+    fromPartial<I extends Exact<DeepPartial<ToolResult>, I>>(object: I): ToolResult;
+};
+export declare const ToolCallingOptions: {
+    encode(message: ToolCallingOptions, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingOptions;
+    fromJSON(object: any): ToolCallingOptions;
+    toJSON(message: ToolCallingOptions): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(base?: I): ToolCallingOptions;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(object: I): ToolCallingOptions;
+};
+export declare const ToolCallingResult: {
+    encode(message: ToolCallingResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingResult;
+    fromJSON(object: any): ToolCallingResult;
+    toJSON(message: ToolCallingResult): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingResult>, I>>(base?: I): ToolCallingResult;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingResult>, I>>(object: I): ToolCallingResult;
+};
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
+    [K in keyof T]?: DeepPartial<T[K]>;
+} : Partial<T>;
+type KeysOfUnion<T> = T extends T ? keyof T : never;
+export type Exact<P, I extends P> = P extends Builtin ? P : P & {
+    [K in keyof P]: Exact<P[K], I[K]>;
+} & {
+    [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+};
+export {};
+//# sourceMappingURL=tool_calling.d.ts.map

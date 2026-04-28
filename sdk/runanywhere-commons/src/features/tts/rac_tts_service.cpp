@@ -21,13 +21,17 @@
 
 static const char* LOG_CAT = "TTS.Service";
 
-// B-AK-13-001 fix: see matching comment in rac_stt_service.cpp.
-// RAC_FRAMEWORK_ONNX TTS voices (Piper etc.) are served by the Sherpa-ONNX
-// engine plugin, not "onnx" which has no tts_ops.
+// Phase 2.6 (engine independence refactor): identity stringify of the
+// framework enum to the plugin's metadata.name. Sherpa now declares
+// framework = RAC_FRAMEWORK_SHERPA in the registry, so we no longer
+// need the legacy ONNX -> "sherpa" hack. All 4 service files
+// (stt/tts/llm/embeddings) carry the same definition; if it drifts,
+// move to a shared header in rac/router/.
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
         case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:               return "sherpa";
+        case RAC_FRAMEWORK_ONNX:               return "onnx";
+        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
         case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
         case RAC_FRAMEWORK_METALRT:            return "metalrt";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";

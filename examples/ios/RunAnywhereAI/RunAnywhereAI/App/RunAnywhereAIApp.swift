@@ -553,14 +553,14 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ VLM models registered")
 
-        // Register ONNX STT and TTS models
+        // Register Sherpa-ONNX STT and TTS models — served by the Sherpa engine plugin
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
         if let whisperURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz") {
             RunAnywhere.registerModel(
                 id: "sherpa-onnx-whisper-tiny.en",
                 name: "Sherpa Whisper Tiny (ONNX)",
                 url: whisperURL,
-                framework: .onnx,
+                framework: .sherpa,
                 modality: .speechRecognition,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 75_000_000
@@ -571,7 +571,7 @@ struct RunAnywhereAIApp: App {
                 id: "vits-piper-en_US-lessac-medium",
                 name: "Piper TTS (US English - Medium)",
                 url: piperUSURL,
-                framework: .onnx,
+                framework: .sherpa,
                 modality: .speechSynthesis,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 65_000_000
@@ -582,7 +582,7 @@ struct RunAnywhereAIApp: App {
                 id: "vits-piper-en_GB-alba-medium",
                 name: "Piper TTS (British English)",
                 url: piperGBURL,
-                framework: .onnx,
+                framework: .sherpa,
                 modality: .speechSynthesis,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 65_000_000

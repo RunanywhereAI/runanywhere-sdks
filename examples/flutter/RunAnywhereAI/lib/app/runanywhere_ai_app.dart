@@ -304,13 +304,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     debugPrint('✅ VLM models registered');
     await Future<void>.delayed(Duration.zero);
 
-    // --- ONNX MODULE (STT/TTS via Core SDK) ---
-    // STT Models (Sherpa-ONNX Whisper)
+    // --- SHERPA-ONNX MODULE (STT/TTS via Core SDK) ---
+    // STT Models (Sherpa-ONNX Whisper) — served by the Sherpa-ONNX engine plugin
     RunAnywhereSDK.instance.models.register(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
-      framework: InferenceFramework.onnx,
+      framework: InferenceFramework.sherpa,
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 75000000,
     );
@@ -319,17 +319,17 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
-      framework: InferenceFramework.onnx,
+      framework: InferenceFramework.sherpa,
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 250000000,
     );
 
-    // TTS Models (Piper VITS)
+    // TTS Models (Piper VITS) — served by the Sherpa-ONNX engine plugin
     RunAnywhereSDK.instance.models.register(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
-      framework: InferenceFramework.onnx,
+      framework: InferenceFramework.sherpa,
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
     );
@@ -338,7 +338,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
-      framework: InferenceFramework.onnx,
+      framework: InferenceFramework.sherpa,
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
     );

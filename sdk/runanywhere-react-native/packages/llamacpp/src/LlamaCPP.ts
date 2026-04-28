@@ -14,6 +14,7 @@
 import { LlamaCppProvider } from './LlamaCppProvider';
 import {
   LLMFramework,
+  SDKComponent,
   SDKLogger,
 } from '@runanywhere/core';
 
@@ -54,7 +55,7 @@ export const LlamaCPP = {
   moduleId: 'llamacpp',
   moduleName: 'LlamaCPP',
   inferenceFramework: LLMFramework.LlamaCpp,
-  capabilities: ['llm'] as const,
+  capabilities: [SDKComponent.LLM] as const,
   defaultPriority: 100,
 
   /**

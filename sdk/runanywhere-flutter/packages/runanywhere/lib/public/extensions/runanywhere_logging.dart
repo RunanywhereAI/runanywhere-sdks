@@ -68,7 +68,7 @@ class RunAnywhereLogging {
   static void configureLogging(LoggingConfiguration config) {
     setLogLevel(config.minimumLevel);
     setLocalLoggingEnabled(config.localLoggingEnabled);
-    // Sentry is handled by DartBridgeTelemetry
+    setSentryLoggingEnabled(config.sentryEnabled);
   }
 
   /// Set minimum SDK log level.
@@ -79,6 +79,24 @@ class RunAnywhereLogging {
   /// Enable / disable local console logging.
   static void setLocalLoggingEnabled(bool enabled) {
     SDKLoggerConfig.shared.setLocalLoggingEnabled(enabled);
+  }
+
+  /// Enable / disable Sentry error reporting. Mirrors Swift's
+  /// `setSentryLoggingEnabled(_:)`.
+  static void setSentryLoggingEnabled(bool enabled) {
+    SDKLoggerConfig.shared.setSentryEnabled(enabled);
+  }
+
+  /// Register an additional log destination (file, network, custom
+  /// sink). Mirrors Swift's `addLogDestination(_:)`. Destinations
+  /// receive every log record after filtering by [SDKLogLevel].
+  static void addLogDestination(LogDestination destination) {
+    SDKLoggerConfig.shared.addDestination(destination);
+  }
+
+  /// Remove a previously-registered log destination.
+  static void removeLogDestination(LogDestination destination) {
+    SDKLoggerConfig.shared.removeDestination(destination);
   }
 
   /// Convenience: enable / disable verbose debug logging.
@@ -93,6 +111,18 @@ class RunAnywhereLogging {
   }
 }
 
+/// A pluggable log sink. Implement this to route SDK logs to your own
+/// telemetry/file/network destination. Mirrors Swift's `LogDestination`.
+abstract class LogDestination {
+  /// Receives a single log record.
+  void write({
+    required SDKLogLevel level,
+    required String category,
+    required String message,
+    DateTime? timestamp,
+  });
+}
+
 /// Singleton holding the currently-configured log level +
 /// local-console toggle. C++ logging is configured during
 /// `DartBridge.initialize()` based on environment.
@@ -102,9 +132,14 @@ class SDKLoggerConfig {
 
   SDKLogLevel _minLevel = SDKLogLevel.info;
   bool _localLoggingEnabled = true;
+  bool _sentryEnabled = false;
+  final List<LogDestination> _destinations = <LogDestination>[];
 
   SDKLogLevel get minLevel => _minLevel;
   bool get localLoggingEnabled => _localLoggingEnabled;
+  bool get sentryEnabled => _sentryEnabled;
+  List<LogDestination> get destinations =>
+      List<LogDestination>.unmodifiable(_destinations);
 
   void setMinLevel(SDKLogLevel level) {
     _minLevel = level;
@@ -112,5 +147,19 @@ class SDKLoggerConfig {
 
   void setLocalLoggingEnabled(bool enabled) {
     _localLoggingEnabled = enabled;
+  }
+
+  void setSentryEnabled(bool enabled) {
+    _sentryEnabled = enabled;
+  }
+
+  void addDestination(LogDestination destination) {
+    if (!_destinations.contains(destination)) {
+      _destinations.add(destination);
+    }
+  }
+
+  void removeDestination(LogDestination destination) {
+    _destinations.remove(destination);
   }
 }

@@ -10,7 +10,8 @@
 #include "test_config.h"
 
 #include "rac/backends/rac_tts_onnx.h"
-#include "rac/backends/rac_vad_onnx.h"
+#include "rac/backends/rac_vad_onnx.h"  // for RAC_VAD_ONNX_CONFIG_DEFAULT typedefs and rac_backend_onnx_register()
+#include "rac_vad_sherpa.h"  // engines/sherpa: rac_vad_sherpa_* function declarations
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 
@@ -156,11 +157,11 @@ static TestResult test_create_destroy() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_onnx_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -172,7 +173,7 @@ static TestResult test_create_destroy() {
         return result;
     }
 
-    rac_vad_onnx_destroy(handle);
+    rac_vad_sherpa_destroy(handle);
 
     result.passed = true;
     result.details = "create + destroy OK";
@@ -192,12 +193,12 @@ static TestResult test_create_invalid_path() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_onnx_create("/nonexistent.onnx", &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create("/nonexistent.onnx", &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc == RAC_SUCCESS) {
         result.passed = false;
         result.details = "expected error for invalid path, got RAC_SUCCESS";
-        if (handle != RAC_INVALID_HANDLE) rac_vad_onnx_destroy(handle);
+        if (handle != RAC_INVALID_HANDLE) rac_vad_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -225,10 +226,10 @@ static TestResult test_process_silence() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_onnx_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -243,12 +244,12 @@ static TestResult test_process_silence() {
 
     for (size_t offset = 0; offset + chunk_size <= total_samples; offset += chunk_size) {
         rac_bool_t is_speech = RAC_FALSE;
-        rc = rac_vad_onnx_process(handle, silence.data() + offset, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(handle, silence.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details =
-                "rac_vad_onnx_process failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(handle);
+                "rac_vad_sherpa_process failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
+            rac_vad_sherpa_destroy(handle);
             teardown();
             return result;
         }
@@ -271,7 +272,7 @@ static TestResult test_process_silence() {
                          std::to_string(speech_ratio * 100.0f) + "%)";
     }
 
-    rac_vad_onnx_destroy(handle);
+    rac_vad_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -293,10 +294,10 @@ static TestResult test_process_white_noise() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_onnx_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -311,12 +312,12 @@ static TestResult test_process_white_noise() {
 
     for (size_t offset = 0; offset + chunk_size <= total_samples; offset += chunk_size) {
         rac_bool_t is_speech = RAC_FALSE;
-        rc = rac_vad_onnx_process(handle, noise.data() + offset, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(handle, noise.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details =
-                "rac_vad_onnx_process failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(handle);
+                "rac_vad_sherpa_process failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
+            rac_vad_sherpa_destroy(handle);
             teardown();
             return result;
         }
@@ -333,7 +334,7 @@ static TestResult test_process_white_noise() {
                      std::to_string(total_chunks) + " (" +
                      std::to_string(speech_ratio * 100.0f) + "%)";
 
-    rac_vad_onnx_destroy(handle);
+    rac_vad_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -355,17 +356,17 @@ static TestResult test_start_stop_reset() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_onnx_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
-    rac_result_t rc_start = rac_vad_onnx_start(handle);
-    rac_result_t rc_stop = rac_vad_onnx_stop(handle);
-    rac_result_t rc_reset = rac_vad_onnx_reset(handle);
+    rac_result_t rc_start = rac_vad_sherpa_start(handle);
+    rac_result_t rc_stop = rac_vad_sherpa_stop(handle);
+    rac_result_t rc_reset = rac_vad_sherpa_reset(handle);
 
     if (rc_start != RAC_SUCCESS) {
         result.passed = false;
@@ -381,7 +382,7 @@ static TestResult test_start_stop_reset() {
         result.details = "start/stop/reset all returned RAC_SUCCESS";
     }
 
-    rac_vad_onnx_destroy(handle);
+    rac_vad_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -403,24 +404,24 @@ static TestResult test_set_threshold() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_onnx_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
-    rc = rac_vad_onnx_set_threshold(handle, 0.8f);
+    rc = rac_vad_sherpa_set_threshold(handle, 0.8f);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_set_threshold failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_set_threshold failed: " + std::to_string(rc);
     } else {
         result.passed = true;
         result.details = "set_threshold(0.8) OK";
     }
 
-    rac_vad_onnx_destroy(handle);
+    rac_vad_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -442,10 +443,10 @@ static TestResult test_is_speech_active() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_onnx_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -457,11 +458,11 @@ static TestResult test_is_speech_active() {
     rac_bool_t is_speech = RAC_FALSE;
 
     for (size_t i = 0; i < num_chunks; ++i) {
-        rc = rac_vad_onnx_process(handle, silence.data() + i * chunk_size, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(handle, silence.data() + i * chunk_size, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details = "process failed at chunk " + std::to_string(i) + ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(handle);
+            rac_vad_sherpa_destroy(handle);
             teardown();
             return result;
         }
@@ -470,13 +471,13 @@ static TestResult test_is_speech_active() {
     // is_speech_active may track internal state differently from per-frame results.
     // The key assertion is that the function doesn't crash; correctness is validated
     // by the process_silence test (which checks per-frame detection rate).
-    rac_bool_t active = rac_vad_onnx_is_speech_active(handle);
+    rac_bool_t active = rac_vad_sherpa_is_speech_active(handle);
     result.passed = true;
     result.details = "is_speech_active returned " +
                      std::string(active == RAC_TRUE ? "TRUE" : "FALSE") +
                      " after 1s of silence (no crash)";
 
-    rac_vad_onnx_destroy(handle);
+    rac_vad_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -531,10 +532,10 @@ static TestResult test_vad_detects_tts_speech() {
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
-    rc = rac_vad_onnx_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
+    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -548,12 +549,12 @@ static TestResult test_vad_detects_tts_speech() {
 
     for (size_t offset = 0; offset + chunk_size <= resampled.size(); offset += chunk_size) {
         rac_bool_t is_speech = RAC_FALSE;
-        rc = rac_vad_onnx_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details = "rac_vad_onnx_process failed at offset " + std::to_string(offset) +
+            result.details = "rac_vad_sherpa_process failed at offset " + std::to_string(offset) +
                              ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(vad_handle);
+            rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data) rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
@@ -578,7 +579,7 @@ static TestResult test_vad_detects_tts_speech() {
                          std::to_string(speech_ratio * 100.0f) + "%), expected >10%";
     }
 
-    rac_vad_onnx_destroy(vad_handle);
+    rac_vad_sherpa_destroy(vad_handle);
     if (tts_result.audio_data) rac_free(tts_result.audio_data);
     rac_tts_onnx_destroy(tts_handle);
     teardown();
@@ -641,10 +642,10 @@ static TestResult test_vad_mixed_speech_silence() {
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
-    rc = rac_vad_onnx_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
+    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -657,12 +658,12 @@ static TestResult test_vad_mixed_speech_silence() {
 
     for (size_t offset = 0; offset + chunk_size <= mixed.size(); offset += chunk_size) {
         rac_bool_t is_speech = RAC_FALSE;
-        rc = rac_vad_onnx_process(vad_handle, mixed.data() + offset, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(vad_handle, mixed.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details = "rac_vad_onnx_process failed at offset " + std::to_string(offset) +
+            result.details = "rac_vad_sherpa_process failed at offset " + std::to_string(offset) +
                              ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(vad_handle);
+            rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data) rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
@@ -680,7 +681,7 @@ static TestResult test_vad_mixed_speech_silence() {
     if (total_speech == 0) {
         result.passed = false;
         result.details = "no speech frames detected in mixed audio";
-        rac_vad_onnx_destroy(vad_handle);
+        rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -725,7 +726,7 @@ static TestResult test_vad_mixed_speech_silence() {
                          " (speech=" + std::to_string(middle_speech) + ")";
     }
 
-    rac_vad_onnx_destroy(vad_handle);
+    rac_vad_sherpa_destroy(vad_handle);
     if (tts_result.audio_data) rac_free(tts_result.audio_data);
     rac_tts_onnx_destroy(tts_handle);
     teardown();
@@ -777,10 +778,10 @@ static TestResult test_vad_threshold_sensitivity() {
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
-    rc = rac_vad_onnx_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
+    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -790,11 +791,11 @@ static TestResult test_vad_threshold_sensitivity() {
     const size_t chunk_size = 512;
 
     // Run 1: loose threshold (0.1)
-    rc = rac_vad_onnx_set_threshold(vad_handle, 0.1f);
+    rc = rac_vad_sherpa_set_threshold(vad_handle, 0.1f);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "set_threshold(0.1) failed: " + std::to_string(rc);
-        rac_vad_onnx_destroy(vad_handle);
+        rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -804,12 +805,12 @@ static TestResult test_vad_threshold_sensitivity() {
     int loose_count = 0;
     for (size_t offset = 0; offset + chunk_size <= resampled.size(); offset += chunk_size) {
         rac_bool_t is_speech = RAC_FALSE;
-        rc = rac_vad_onnx_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details = "process failed (loose) at offset " + std::to_string(offset) +
                              ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(vad_handle);
+            rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data) rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
@@ -819,11 +820,11 @@ static TestResult test_vad_threshold_sensitivity() {
     }
 
     // Reset VAD state between runs
-    rc = rac_vad_onnx_reset(vad_handle);
+    rc = rac_vad_sherpa_reset(vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_vad_onnx_reset failed: " + std::to_string(rc);
-        rac_vad_onnx_destroy(vad_handle);
+        result.details = "rac_vad_sherpa_reset failed: " + std::to_string(rc);
+        rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -831,11 +832,11 @@ static TestResult test_vad_threshold_sensitivity() {
     }
 
     // Run 2: strict threshold (0.9)
-    rc = rac_vad_onnx_set_threshold(vad_handle, 0.9f);
+    rc = rac_vad_sherpa_set_threshold(vad_handle, 0.9f);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "set_threshold(0.9) failed: " + std::to_string(rc);
-        rac_vad_onnx_destroy(vad_handle);
+        rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
@@ -845,12 +846,12 @@ static TestResult test_vad_threshold_sensitivity() {
     int strict_count = 0;
     for (size_t offset = 0; offset + chunk_size <= resampled.size(); offset += chunk_size) {
         rac_bool_t is_speech = RAC_FALSE;
-        rc = rac_vad_onnx_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
+        rc = rac_vad_sherpa_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details = "process failed (strict) at offset " + std::to_string(offset) +
                              ": " + std::to_string(rc);
-            rac_vad_onnx_destroy(vad_handle);
+            rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data) rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
@@ -870,7 +871,7 @@ static TestResult test_vad_threshold_sensitivity() {
                          " < strict(0.9)=" + std::to_string(strict_count);
     }
 
-    rac_vad_onnx_destroy(vad_handle);
+    rac_vad_sherpa_destroy(vad_handle);
     if (tts_result.audio_data) rac_free(tts_result.audio_data);
     rac_tts_onnx_destroy(tts_handle);
     teardown();

@@ -169,6 +169,7 @@ enum class InferenceFramework(
 ) {
     // Model-based frameworks
     ONNX("ONNX"),
+    SHERPA("Sherpa"), // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
     LLAMA_CPP("LlamaCpp"),
     FOUNDATION_MODELS("FoundationModels"),
     SYSTEM_TTS("SystemTTS"),
@@ -186,6 +187,7 @@ enum class InferenceFramework(
         get() =
             when (this) {
                 ONNX -> "ONNX Runtime"
+                SHERPA -> "Sherpa-ONNX"
                 LLAMA_CPP -> "llama.cpp"
                 FOUNDATION_MODELS -> "Foundation Models"
                 SYSTEM_TTS -> "System TTS"
@@ -201,6 +203,7 @@ enum class InferenceFramework(
         get() =
             when (this) {
                 ONNX -> "onnx"
+                SHERPA -> "sherpa"
                 LLAMA_CPP -> "llama_cpp"
                 FOUNDATION_MODELS -> "foundation_models"
                 SYSTEM_TTS -> "system_tts"
@@ -215,6 +218,7 @@ enum class InferenceFramework(
     fun toProto(): ai.runanywhere.proto.v1.InferenceFramework =
         when (this) {
             ONNX               -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+            SHERPA             -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
             LLAMA_CPP          -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
             FOUNDATION_MODELS  -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
             SYSTEM_TTS         -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
@@ -238,6 +242,7 @@ enum class InferenceFramework(
         fun fromProto(proto: ai.runanywhere.proto.v1.InferenceFramework): InferenceFramework =
             when (proto) {
                 ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX               -> ONNX
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA             -> SHERPA
                 ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP          -> LLAMA_CPP
                 ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS  -> FOUNDATION_MODELS
                 ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS         -> SYSTEM_TTS

@@ -29,6 +29,22 @@ interface StreamingSTTNativeModule {
   isStreamingSTT?: () => Promise<boolean>;
 }
 
+/**
+ * Streaming transcription result returning AsyncIterable for partials.
+ * Mirrors the Swift `transcribeStream` shape and the LLM/VLM streaming
+ * pattern (`stream` + `result` + `cancel`).
+ */
+export interface STTStreamingResult {
+  /** Async iterator over partial transcription updates */
+  partials: AsyncIterable<STTPartialResult>;
+
+  /** Promise that resolves to the final STT output */
+  result: Promise<STTOutput>;
+
+  /** Cancel the streaming transcription */
+  cancel: () => void;
+}
+
 // ============================================================================
 // Speech-to-Text (STT) Extension
 // ============================================================================
@@ -211,8 +227,17 @@ export async function transcribeBuffer(
 }
 
 /**
- * Transcribe audio with streaming callbacks
- * Matches Swift SDK: RunAnywhere.transcribeStream(audioData:options:onPartialResult:)
+ * Transcribe audio with streaming partial results.
+ *
+ * Matches Swift SDK: RunAnywhere.transcribeStream(audioData:options:onPartialResult:).
+ *
+ * Both calling styles are supported:
+ *  - Callback style: pass `options.onPartialResult` and `await` the
+ *    returned Promise<STTOutput>. This is the legacy shape and matches
+ *    the Swift signature.
+ *  - AsyncIterable style: use `transcribeStreamAsync()` which returns a
+ *    `STTStreamingResult { partials, result, cancel }` consistent with
+ *    the LLM / VLM streaming primitives.
  *
  * @param audioData Audio data to transcribe
  * @param options Stream options with callback
@@ -358,6 +383,109 @@ export async function transcribeFile(
   }
 }
 
+/**
+ * AsyncIterable variant of `transcribeStream`.
+ *
+ * Returns `{ partials, result, cancel }` mirroring the LLM/VLM streaming
+ * primitives. Use this when you want to consume partials with
+ * `for await ... of partials`.
+ *
+ * Matches the Swift `RunAnywhere.transcribeStream(_:)` AsyncStream shape
+ * (callback-based on the Swift side too, but exposed as `AsyncStream`).
+ *
+ * Example:
+ * ```ts
+ * const streaming = await transcribeStreamAsync(audioData, { language: 'en' });
+ * for await (const partial of streaming.partials) {
+ *   console.log(partial.transcript);
+ * }
+ * const final = await streaming.result;
+ * ```
+ */
+export async function transcribeStreamAsync(
+  audioData: string | ArrayBuffer,
+  options: STTOptions = {}
+): Promise<STTStreamingResult> {
+  const queue: STTPartialResult[] = [];
+  let resolver: ((value: IteratorResult<STTPartialResult>) => void) | null = null;
+  let done = false;
+  let streamError: Error | null = null;
+  let cancelled = false;
+
+  let resolveResult!: (value: STTOutput) => void;
+  let rejectResult!: (err: Error) => void;
+  const resultPromise = new Promise<STTOutput>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+
+  const pushPartial = (partial: STTPartialResult): void => {
+    if (cancelled) return;
+    if (resolver) {
+      resolver({ value: partial, done: false });
+      resolver = null;
+    } else {
+      queue.push(partial);
+    }
+  };
+
+  // Drive the underlying callback-based API.
+  transcribeStream(audioData, {
+    ...options,
+    onPartialResult: pushPartial,
+  })
+    .then((output) => {
+      done = true;
+      resolveResult(output);
+      if (resolver) {
+        resolver({ value: undefined as unknown as STTPartialResult, done: true });
+        resolver = null;
+      }
+    })
+    .catch((err: Error) => {
+      streamError = err;
+      done = true;
+      rejectResult(err);
+      if (resolver) {
+        resolver({ value: undefined as unknown as STTPartialResult, done: true });
+        resolver = null;
+      }
+    });
+
+  async function* partialGenerator(): AsyncGenerator<STTPartialResult> {
+    while (!done || queue.length > 0) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+      } else if (!done) {
+        const next = await new Promise<IteratorResult<STTPartialResult>>(
+          (resolve) => {
+            resolver = resolve;
+          }
+        );
+        if (next.done) break;
+        yield next.value;
+      }
+    }
+    if (streamError) throw streamError;
+  }
+
+  const cancel = (): void => {
+    cancelled = true;
+    void stopStreamingTranscription();
+    if (resolver) {
+      done = true;
+      resolver({ value: undefined as unknown as STTPartialResult, done: true });
+      resolver = null;
+    }
+  };
+
+  return {
+    partials: partialGenerator(),
+    result: resultPromise,
+    cancel,
+  };
+}
+
 // ============================================================================
 // Streaming STT (Real-time)
 // ============================================================================
@@ -366,9 +494,13 @@ export async function transcribeFile(
 // the same callback-based streaming via the canonical proto path.
 
 /**
- * Stop streaming speech-to-text transcription
+ * Stop streaming speech-to-text transcription.
+ *
+ * Matches Swift SDK: `RunAnywhere.stopStreamingTranscription()`.
+ * The legacy `stopStreamingSTT` name is retained as a re-export below
+ * for backwards compatibility.
  */
-export async function stopStreamingSTT(): Promise<boolean> {
+export async function stopStreamingTranscription(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     return false;
   }
@@ -378,6 +510,13 @@ export async function stopStreamingSTT(): Promise<boolean> {
   }
   return native.stopStreamingSTT();
 }
+
+/**
+ * @deprecated Use `stopStreamingTranscription` for parity with the Swift
+ * SDK. This alias is kept for back-compat and will be removed in a future
+ * version.
+ */
+export const stopStreamingSTT = stopStreamingTranscription;
 
 /**
  * Check if streaming STT is currently active
@@ -391,4 +530,27 @@ export async function isStreamingSTT(): Promise<boolean> {
     return false;
   }
   return native.isStreamingSTT();
+}
+
+// ============================================================================
+// Introspection
+// ============================================================================
+
+interface STTIntrospectionNativeModule {
+  currentSTTModel?: () => Promise<string>;
+  getCurrentSTTModelId?: () => Promise<string>;
+}
+
+/**
+ * Get the currently loaded STT model ID, or `null` if none.
+ *
+ * Matches Swift: `RunAnywhere.currentSTTModel`.
+ */
+export async function currentSTTModel(): Promise<string | null> {
+  if (!isNativeModuleAvailable()) return null;
+  const native = requireNativeModule() as unknown as STTIntrospectionNativeModule;
+  const fn = native.currentSTTModel ?? native.getCurrentSTTModelId;
+  if (!fn) return null;
+  const id = await fn.call(native);
+  return id && id.length > 0 ? id : null;
 }

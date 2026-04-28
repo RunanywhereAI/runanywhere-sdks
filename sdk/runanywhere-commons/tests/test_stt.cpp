@@ -9,9 +9,11 @@
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/backends/rac_stt_onnx.h"
+#include "rac/backends/rac_stt_onnx.h"  // for RAC_STT_ONNX_CONFIG_DEFAULT typedefs
 #include "rac/backends/rac_tts_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"  // for rac_backend_onnx_register()
+#include "rac_stt_sherpa.h"  // engines/sherpa: rac_stt_sherpa_* function declarations
+#include "rac_tts_sherpa.h"  // engines/sherpa: rac_tts_sherpa_* function declarations
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 
@@ -171,11 +173,11 @@ static TestResult test_create_destroy() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_stt_onnx_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -187,7 +189,7 @@ static TestResult test_create_destroy() {
         return result;
     }
 
-    rac_stt_onnx_destroy(handle);
+    rac_stt_sherpa_destroy(handle);
 
     result.passed = true;
     result.details = "create + destroy OK";
@@ -207,12 +209,12 @@ static TestResult test_create_invalid_path() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_stt_onnx_create("/nonexistent", &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+        rac_stt_sherpa_create("/nonexistent", &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc == RAC_SUCCESS) {
         result.passed = false;
         result.details = "expected error for invalid path, got RAC_SUCCESS";
-        if (handle != RAC_INVALID_HANDLE) rac_stt_onnx_destroy(handle);
+        if (handle != RAC_INVALID_HANDLE) rac_stt_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -240,10 +242,10 @@ static TestResult test_transcribe_silence() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_stt_onnx_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -255,13 +257,13 @@ static TestResult test_transcribe_silence() {
     rac_stt_result_t stt_result = {};
     {
         ScopedTimer timer("transcribe_silence");
-        rc = rac_stt_onnx_transcribe(handle, silence.data(), num_samples, nullptr, &stt_result);
+        rc = rac_stt_sherpa_transcribe(handle, silence.data(), num_samples, nullptr, &stt_result);
     }
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_transcribe failed: " + std::to_string(rc);
-        rac_stt_onnx_destroy(handle);
+        result.details = "rac_stt_sherpa_transcribe failed: " + std::to_string(rc);
+        rac_stt_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -282,7 +284,7 @@ static TestResult test_transcribe_silence() {
     if (stt_result.text) rac_free(stt_result.text);
     if (stt_result.detected_language) rac_free(stt_result.detected_language);
 
-    rac_stt_onnx_destroy(handle);
+    rac_stt_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -304,10 +306,10 @@ static TestResult test_transcribe_sine() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_stt_onnx_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
@@ -318,13 +320,13 @@ static TestResult test_transcribe_sine() {
     rac_stt_result_t stt_result = {};
     {
         ScopedTimer timer("transcribe_sine");
-        rc = rac_stt_onnx_transcribe(handle, sine.data(), sine.size(), nullptr, &stt_result);
+        rc = rac_stt_sherpa_transcribe(handle, sine.data(), sine.size(), nullptr, &stt_result);
     }
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_transcribe failed on sine wave: " + std::to_string(rc);
-        rac_stt_onnx_destroy(handle);
+        result.details = "rac_stt_sherpa_transcribe failed on sine wave: " + std::to_string(rc);
+        rac_stt_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -337,7 +339,7 @@ static TestResult test_transcribe_sine() {
     if (stt_result.text) rac_free(stt_result.text);
     if (stt_result.detected_language) rac_free(stt_result.detected_language);
 
-    rac_stt_onnx_destroy(handle);
+    rac_stt_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -359,20 +361,20 @@ static TestResult test_supports_streaming() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_stt_onnx_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
-    rac_bool_t streaming = rac_stt_onnx_supports_streaming(handle);
+    rac_bool_t streaming = rac_stt_sherpa_supports_streaming(handle);
 
     result.passed = true;
     result.details = "supports_streaming = " + std::string(streaming == RAC_TRUE ? "true" : "false");
 
-    rac_stt_onnx_destroy(handle);
+    rac_stt_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -394,30 +396,30 @@ static TestResult test_streaming_workflow() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_stt_onnx_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
-    rac_bool_t streaming = rac_stt_onnx_supports_streaming(handle);
+    rac_bool_t streaming = rac_stt_sherpa_supports_streaming(handle);
     if (streaming != RAC_TRUE) {
         result.passed = true;
         result.details = "SKIPPED - model does not support streaming";
-        rac_stt_onnx_destroy(handle);
+        rac_stt_sherpa_destroy(handle);
         teardown();
         return result;
     }
 
     // Create stream
     rac_handle_t stream = RAC_INVALID_HANDLE;
-    rc = rac_stt_onnx_create_stream(handle, &stream);
+    rc = rac_stt_sherpa_create_stream(handle, &stream);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "create_stream failed: " + std::to_string(rc);
-        rac_stt_onnx_destroy(handle);
+        rac_stt_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -428,39 +430,39 @@ static TestResult test_streaming_workflow() {
     std::vector<float> silence = generate_silence(total_samples);
 
     for (size_t offset = 0; offset + chunk_size <= total_samples; offset += chunk_size) {
-        rc = rac_stt_onnx_feed_audio(handle, stream, silence.data() + offset, chunk_size);
+        rc = rac_stt_sherpa_feed_audio(handle, stream, silence.data() + offset, chunk_size);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details =
                 "feed_audio failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
-            rac_stt_onnx_destroy_stream(handle, stream);
-            rac_stt_onnx_destroy(handle);
+            rac_stt_sherpa_destroy_stream(handle, stream);
+            rac_stt_sherpa_destroy(handle);
             teardown();
             return result;
         }
     }
 
     // Check if stream is ready and try decoding
-    rac_bool_t is_ready = rac_stt_onnx_stream_is_ready(handle, stream);
+    rac_bool_t is_ready = rac_stt_sherpa_stream_is_ready(handle, stream);
     (void)is_ready; // May or may not be ready, just check no crash
 
     char* decoded_text = nullptr;
-    rc = rac_stt_onnx_decode_stream(handle, stream, &decoded_text);
+    rc = rac_stt_sherpa_decode_stream(handle, stream, &decoded_text);
     // Decode may or may not succeed depending on model state - both are acceptable
     if (rc == RAC_SUCCESS && decoded_text != nullptr) {
         rac_free(decoded_text);
     }
 
     // Signal input finished
-    rac_stt_onnx_input_finished(handle, stream);
+    rac_stt_sherpa_input_finished(handle, stream);
 
     // Destroy stream
-    rac_stt_onnx_destroy_stream(handle, stream);
+    rac_stt_sherpa_destroy_stream(handle, stream);
 
     result.passed = true;
     result.details = "streaming workflow completed without crash";
 
-    rac_stt_onnx_destroy(handle);
+    rac_stt_sherpa_destroy(handle);
     teardown();
     return result;
 }
@@ -494,20 +496,20 @@ static TestResult test_transcribe_tts_hello() {
     // Create TTS handle and synthesize "Hello world"
     rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
+    rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle, "Hello world", nullptr, &tts_result);
+    rc = rac_tts_sherpa_synthesize(tts_handle, "Hello world", nullptr, &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
-        rac_tts_onnx_destroy(tts_handle);
+        result.details = "rac_tts_sherpa_synthesize failed: " + std::to_string(rc);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -518,14 +520,14 @@ static TestResult test_transcribe_tts_hello() {
     std::vector<float> resampled =
         resample_linear(tts_audio, num_tts_samples, tts_result.sample_rate, 16000);
 
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
 
     // Create STT handle and transcribe
     rac_handle_t stt_handle = RAC_INVALID_HANDLE;
-    rc = rac_stt_onnx_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
+    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         teardown();
         return result;
@@ -534,14 +536,14 @@ static TestResult test_transcribe_tts_hello() {
     rac_stt_result_t stt_result = {};
     {
         ScopedTimer timer("transcribe_tts_hello");
-        rc = rac_stt_onnx_transcribe(stt_handle, resampled.data(), resampled.size(), nullptr,
+        rc = rac_stt_sherpa_transcribe(stt_handle, resampled.data(), resampled.size(), nullptr,
                                      &stt_result);
     }
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_transcribe failed: " + std::to_string(rc);
-        rac_stt_onnx_destroy(stt_handle);
+        result.details = "rac_stt_sherpa_transcribe failed: " + std::to_string(rc);
+        rac_stt_sherpa_destroy(stt_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         teardown();
         return result;
@@ -565,7 +567,7 @@ static TestResult test_transcribe_tts_hello() {
     if (stt_result.detected_language) rac_free(stt_result.detected_language);
     if (tts_result.audio_data) rac_free(tts_result.audio_data);
 
-    rac_stt_onnx_destroy(stt_handle);
+    rac_stt_sherpa_destroy(stt_handle);
     teardown();
     return result;
 }
@@ -595,20 +597,20 @@ static TestResult test_transcribe_tts_numbers() {
     // Create TTS handle and synthesize "one two three four five"
     rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
+    rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle, "one two three four five", nullptr, &tts_result);
+    rc = rac_tts_sherpa_synthesize(tts_handle, "one two three four five", nullptr, &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
-        rac_tts_onnx_destroy(tts_handle);
+        result.details = "rac_tts_sherpa_synthesize failed: " + std::to_string(rc);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -619,14 +621,14 @@ static TestResult test_transcribe_tts_numbers() {
     std::vector<float> resampled =
         resample_linear(tts_audio, num_tts_samples, tts_result.sample_rate, 16000);
 
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
 
     // Create STT handle and transcribe
     rac_handle_t stt_handle = RAC_INVALID_HANDLE;
-    rc = rac_stt_onnx_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
+    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         teardown();
         return result;
@@ -635,14 +637,14 @@ static TestResult test_transcribe_tts_numbers() {
     rac_stt_result_t stt_result = {};
     {
         ScopedTimer timer("transcribe_tts_numbers");
-        rc = rac_stt_onnx_transcribe(stt_handle, resampled.data(), resampled.size(), nullptr,
+        rc = rac_stt_sherpa_transcribe(stt_handle, resampled.data(), resampled.size(), nullptr,
                                      &stt_result);
     }
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_transcribe failed: " + std::to_string(rc);
-        rac_stt_onnx_destroy(stt_handle);
+        result.details = "rac_stt_sherpa_transcribe failed: " + std::to_string(rc);
+        rac_stt_sherpa_destroy(stt_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         teardown();
         return result;
@@ -677,7 +679,7 @@ static TestResult test_transcribe_tts_numbers() {
     if (stt_result.detected_language) rac_free(stt_result.detected_language);
     if (tts_result.audio_data) rac_free(tts_result.audio_data);
 
-    rac_stt_onnx_destroy(stt_handle);
+    rac_stt_sherpa_destroy(stt_handle);
     teardown();
     return result;
 }
@@ -707,20 +709,20 @@ static TestResult test_transcribe_tts_sentence() {
     // Create TTS handle and synthesize "The weather is sunny today"
     rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
+    rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle, "The weather is sunny today", nullptr, &tts_result);
+    rc = rac_tts_sherpa_synthesize(tts_handle, "The weather is sunny today", nullptr, &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
-        rac_tts_onnx_destroy(tts_handle);
+        result.details = "rac_tts_sherpa_synthesize failed: " + std::to_string(rc);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -731,14 +733,14 @@ static TestResult test_transcribe_tts_sentence() {
     std::vector<float> resampled =
         resample_linear(tts_audio, num_tts_samples, tts_result.sample_rate, 16000);
 
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
 
     // Create STT handle and transcribe
     rac_handle_t stt_handle = RAC_INVALID_HANDLE;
-    rc = rac_stt_onnx_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
+    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         teardown();
         return result;
@@ -747,14 +749,14 @@ static TestResult test_transcribe_tts_sentence() {
     rac_stt_result_t stt_result = {};
     {
         ScopedTimer timer("transcribe_tts_sentence");
-        rc = rac_stt_onnx_transcribe(stt_handle, resampled.data(), resampled.size(), nullptr,
+        rc = rac_stt_sherpa_transcribe(stt_handle, resampled.data(), resampled.size(), nullptr,
                                      &stt_result);
     }
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_stt_onnx_transcribe failed: " + std::to_string(rc);
-        rac_stt_onnx_destroy(stt_handle);
+        result.details = "rac_stt_sherpa_transcribe failed: " + std::to_string(rc);
+        rac_stt_sherpa_destroy(stt_handle);
         if (tts_result.audio_data) rac_free(tts_result.audio_data);
         teardown();
         return result;
@@ -781,7 +783,7 @@ static TestResult test_transcribe_tts_sentence() {
     if (stt_result.detected_language) rac_free(stt_result.detected_language);
     if (tts_result.audio_data) rac_free(tts_result.audio_data);
 
-    rac_stt_onnx_destroy(stt_handle);
+    rac_stt_sherpa_destroy(stt_handle);
     teardown();
     return result;
 }

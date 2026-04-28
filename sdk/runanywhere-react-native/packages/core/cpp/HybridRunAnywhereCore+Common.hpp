@@ -289,6 +289,7 @@ rac_inference_framework_t frameworkFromString(const std::string& framework) {
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
     if (framework == "Genie" || framework == "genie") return (rac_inference_framework_t)11; // RAC_FRAMEWORK_GENIE
+    if (framework == "Sherpa" || framework == "sherpa") return (rac_inference_framework_t)12; // RAC_FRAMEWORK_SHERPA (B-RN-Sherpa-001)
     return RAC_FRAMEWORK_UNKNOWN;
 }
 

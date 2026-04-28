@@ -39,6 +39,10 @@ MESSAGE_PROTOS=(
     "${PROTO_DIR}/voice_agent_service.proto"
     "${PROTO_DIR}/llm_service.proto"
     "${PROTO_DIR}/download_service.proto"
+    # Phase 3 IDL exhaustiveness — duplicated data shapes across SDKs.
+    "${PROTO_DIR}/llm_options.proto"
+    "${PROTO_DIR}/chat.proto"
+    "${PROTO_DIR}/tool_calling.proto"
 )
 
 protoc \

@@ -24,6 +24,7 @@ export enum LLMFramework {
   SystemTTS = 'SystemTTS',
   PiperTTS = 'PiperTTS',
   Genie = 'Genie',
+  Sherpa = 'Sherpa',
 }
 
 /**
@@ -238,6 +239,7 @@ export const FrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.SystemTTS]: 'System TTS',
   [LLMFramework.PiperTTS]: 'Piper TTS',
   [LLMFramework.Genie]: 'Genie NPU',
+  [LLMFramework.Sherpa]: 'Sherpa-ONNX',
 };
 
 /**

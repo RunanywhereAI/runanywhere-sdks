@@ -48,6 +48,7 @@ abstract class RacInferenceFramework {
   static const int whisperkitCoreml = 9;
   static const int metalrt = 10; // RAC_FRAMEWORK_METALRT
   static const int genie = 11; // RAC_FRAMEWORK_GENIE
+  static const int sherpa = 12; // RAC_FRAMEWORK_SHERPA
   static const int unknown = 99;
 }
 
@@ -198,6 +199,8 @@ extension InferenceFrameworkCppBridge on InferenceFramework {
         return RacInferenceFramework.none;
       case InferenceFramework.genie:
         return RacInferenceFramework.genie;
+      case InferenceFramework.sherpa:
+        return RacInferenceFramework.sherpa;
       case InferenceFramework.unknown:
         return RacInferenceFramework.unknown;
     }
@@ -222,6 +225,8 @@ extension InferenceFrameworkCppBridge on InferenceFramework {
         return InferenceFramework.none;
       case RacInferenceFramework.genie:
         return InferenceFramework.genie;
+      case RacInferenceFramework.sherpa:
+        return InferenceFramework.sherpa;
       default:
         return InferenceFramework.unknown;
     }

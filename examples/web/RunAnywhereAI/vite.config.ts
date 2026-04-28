@@ -13,6 +13,11 @@ const workspaceRoot = path.resolve(__dir, '../../..');
 const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
 const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm/sherpa');
 
+// proto-ts package.json lacks an `exports` field, so Vite cannot resolve
+// subpath imports like `@runanywhere/proto-ts/llm_service` to dist/llm_service.js.
+// Map subpath imports to source files explicitly during dev.
+const protoTsDist = path.resolve(workspaceRoot, 'sdk/runanywhere-proto-ts/dist');
+
 /**
  * Vite plugin to copy WASM binaries into the build output.
  *
@@ -51,12 +56,15 @@ function copyWasmPlugin(): Plugin {
 export default defineConfig({
   plugins: [copyWasmPlugin()],
   resolve: {
-    alias: {
+    alias: [
       // Ensure all packages resolve to the same source modules during development.
       // Without this, @runanywhere/web imports from llamacpp/onnx packages resolve
       // to dist/ while main.ts imports from src/, creating duplicate singletons.
-      '@runanywhere/web': path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts'),
-    },
+      { find: '@runanywhere/web', replacement: path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts') },
+      // Map @runanywhere/proto-ts/<subpath> -> dist/<subpath>.js (proto-ts has no exports field)
+      { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: protoTsDist + '/$1.js' },
+      { find: '@runanywhere/proto-ts', replacement: protoTsDist + '/index.js' },
+    ],
   },
   server: {
     headers: {

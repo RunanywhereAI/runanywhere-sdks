@@ -55,6 +55,7 @@ export type {
   LLMStreamCompleteCallback,
   LLMStreamErrorCallback,
 } from './LLMTypes';
+export { LLM_GENERATION_DEFAULTS, applyLLMGenerationDefaults } from './LLMTypes';
 
 // VLM Types
 export { VLMImageFormat } from './VLMTypes';
@@ -86,3 +87,29 @@ export type {
   SpeechActivityCallback,
   SpeechSegment,
 } from './VADTypes';
+
+// LoRA Types
+export type {
+  LoRAAdapterConfig,
+  LoRAAdapterInfo,
+  LoraAdapterCatalogEntry,
+  LoraCompatibilityResult,
+} from './LoRATypes';
+
+// RAG Types
+export type {
+  RAGConfiguration,
+  RAGQueryOptions,
+  RAGSearchResult,
+  RAGResult,
+  RAGStatistics,
+} from './RAGTypes';
+
+// Voice Agent C-ABI Types
+export type {
+  VoiceAgentComponentLoadState,
+  VoiceAgentComponentState,
+  VoiceAgentComponentStates,
+  VoiceAgentConfig,
+  VoiceAgentResult,
+} from './VoiceAgentCTypes';

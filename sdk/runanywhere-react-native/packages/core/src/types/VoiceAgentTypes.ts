@@ -112,37 +112,6 @@ export interface VoiceAgentMetrics {
   audioDurationSeconds: number;
 }
 
-/**
- * Voice session configuration (matches Swift VoiceSessionConfig)
- */
-export interface VoiceSessionConfig {
-  /** Silence duration (seconds) before processing speech (default: 1.5) */
-  silenceDuration?: number;
-
-  /** Minimum audio level to detect speech (0.0 - 1.0, default: 0.1) */
-  speechThreshold?: number;
-
-  /** Whether to auto-play TTS response (default: true) */
-  autoPlayTTS?: boolean;
-
-  /** Whether to auto-resume listening after TTS playback (default: true) */
-  continuousMode?: boolean;
-
-  /** Language code (default: 'en') */
-  language?: string;
-
-  /** System prompt for LLM */
-  systemPrompt?: string;
-}
-
-// v3.1: VoiceSessionEventKind DELETED. Use VoiceEvent (ts-proto)
-// payload.$case switch directly.
-
-/**
- * Voice session error types
- */
-export enum VoiceSessionErrorType {
-  MicrophonePermissionDenied = 'microphonePermissionDenied',
-  NotReady = 'notReady',
-  AlreadyRunning = 'alreadyRunning',
-}
+// v3.1: VoiceSessionConfig / VoiceSessionEventKind / VoiceSessionErrorType
+// DELETED. Use VoiceAgentConfig + VoiceEvent (ts-proto) directly via
+// VoiceAgentStreamAdapter.

@@ -623,7 +623,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
         RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
         RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-        RAC_FRAMEWORK_UNKNOWN};
+        RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
     // Collect discovered models

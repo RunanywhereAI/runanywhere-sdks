@@ -176,6 +176,14 @@ export interface PerformanceMetrics {
 
 /**
  * Result of a text generation request
+ *
+ * @deprecated Prefer the canonical `LLMGenerationResult` in
+ * `types/LLMTypes.ts` which mirrors the Swift `LLMGenerationResult`
+ * struct exactly. This type stays in place because the RN-only
+ * `executionTarget` / `hardwareUsed` / `savedAmount` fields are still
+ * referenced by sample apps. Phase 3 (IDL migration) will collapse
+ * the two into a single shape.
+ *
  * Reference: GenerationResult.swift
  */
 export interface GenerationResult {
@@ -323,7 +331,12 @@ export interface STTAlternative {
 }
 
 /**
- * Speech-to-text result
+ * Speech-to-text result.
+ *
+ * @deprecated Prefer the canonical `STTOutput` in `types/STTTypes.ts`
+ * which mirrors the Swift `STTOutput: ComponentOutput` struct. This
+ * type is retained for back-compat; Phase 3 (IDL migration) will
+ * collapse the two.
  */
 export interface STTResult {
   /** Main transcription text */

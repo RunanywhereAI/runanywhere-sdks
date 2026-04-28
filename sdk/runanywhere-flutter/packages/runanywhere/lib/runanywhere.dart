@@ -30,10 +30,12 @@ export 'generated/voice_events.pb.dart'
     show VoiceEvent, StateChangeEvent, VADEvent, VoiceEvent_Payload;
 export 'generated/voice_events.pbenum.dart'
     show PipelineState, VADEventType;
-export 'native/dart_bridge_rag.dart' show DartBridgeRAG;
-export 'native/dart_bridge_voice_agent.dart' show DartBridgeVoiceAgent;
+// FFI bridges and platform loader are SDK-internal — consumers reach
+// the high-level capability classes via `RunAnywhereSDK.instance.*`.
+// `NativeBackend` / `NativeBackendException` are kept exposed because
+// sub-packages (runanywhere_llamacpp, _onnx, _genie) implement and
+// register backends through them.
 export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
-export 'native/platform_loader.dart' show PlatformLoader;
 // v4.0: canonical instance API. Use RunAnywhereSDK.instance.{capability}.
 export 'public/capabilities/runanywhere_downloads.dart'
     show RunAnywhereDownloads;
@@ -43,8 +45,11 @@ export 'public/capabilities/runanywhere_rag.dart' show RunAnywhereRAG;
 export 'public/capabilities/runanywhere_stt.dart' show RunAnywhereSTT;
 export 'public/capabilities/runanywhere_tools.dart' show RunAnywhereTools;
 export 'public/capabilities/runanywhere_tts.dart' show RunAnywhereTTS;
+export 'public/capabilities/runanywhere_vad.dart'
+    show RunAnywhereVAD, SpeechActivityEvent;
 export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
-export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
+export 'public/capabilities/runanywhere_voice.dart'
+    show RunAnywhereVoice, VoiceAgentConfiguration, VoiceAgentResult;
 export 'public/configuration/sdk_environment.dart';
 export 'public/errors/errors.dart';
 export 'public/events/event_bus.dart';

@@ -153,14 +153,14 @@ object ModelList {
             ),
         )
 
-    // STT / TTS
+    // STT / TTS — served by the Sherpa-ONNX engine plugin (framework = SHERPA)
     private val sttModels =
         listOf(
             AppModel(
                 id = "sherpa-onnx-whisper-tiny.en",
                 name = "Sherpa Whisper Tiny (ONNX)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
-                framework = InferenceFramework.ONNX,
+                framework = InferenceFramework.SHERPA,
                 category = ModelCategory.SPEECH_RECOGNITION,
                 memoryRequirement = 75_000_000,
             ),
@@ -171,7 +171,7 @@ object ModelList {
                 id = "vits-piper-en_US-lessac-medium",
                 name = "Piper TTS (US English - Medium)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
-                framework = InferenceFramework.ONNX,
+                framework = InferenceFramework.SHERPA,
                 category = ModelCategory.SPEECH_SYNTHESIS,
                 memoryRequirement = 65_000_000,
             ),
@@ -179,7 +179,7 @@ object ModelList {
                 id = "vits-piper-en_GB-alba-medium",
                 name = "Piper TTS (British English)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
-                framework = InferenceFramework.ONNX,
+                framework = InferenceFramework.SHERPA,
                 category = ModelCategory.SPEECH_SYNTHESIS,
                 memoryRequirement = 65_000_000,
             ),

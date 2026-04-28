@@ -21,21 +21,17 @@
 
 static const char* LOG_CAT = "STT.Service";
 
-// v3 Phase B8: same framework -> plugin-name mapping used in
-// rac_llm_service.cpp (and 5 other consumers). Kept in sync by
-// convention; if this drifts, add a shared helper in rac_router.h.
-//
-// B-AK-11-001 fix: for STT specifically, RAC_FRAMEWORK_ONNX models are
-// served by the Sherpa-ONNX engine plugin (registered as "sherpa"), not
-// the bare "onnx" engine plugin (which only owns embeddings). Mapping
-// to "onnx" caused rac_plugin_route to hard-reject all candidates and
-// return -423 even though Sherpa was correctly registered. The frameworks
-// field is a consumer-level concept; the plugin name has to match what
-// the engine's vtable advertises in its metadata.name slot.
+// Phase 2.6 (engine independence refactor): identity stringify of the
+// framework enum to the plugin's metadata.name. Sherpa now declares
+// framework = RAC_FRAMEWORK_SHERPA in the registry, so we no longer
+// need the legacy ONNX -> "sherpa" hack. All 4 service files
+// (stt/tts/llm/embeddings) carry the same definition; if it drifts,
+// move to a shared header in rac/router/.
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
         case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:               return "sherpa";
+        case RAC_FRAMEWORK_ONNX:               return "onnx";
+        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
         case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
         case RAC_FRAMEWORK_METALRT:            return "metalrt";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";

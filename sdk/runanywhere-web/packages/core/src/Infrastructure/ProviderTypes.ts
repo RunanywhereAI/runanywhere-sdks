@@ -10,9 +10,10 @@
  * are defined in core so providers return properly typed results.
  */
 
-import type { LLMGenerationResult } from '../types/LLMTypes';
+import type { LLMGenerationOptions, LLMGenerationResult } from '../types/LLMTypes';
 import type { STTTranscriptionResult, STTTranscribeOptions } from '../types/STTTypes';
 import type { TTSSynthesisResult, TTSSynthesizeOptions } from '../types/TTSTypes';
+import type { SpeechActivityCallback } from '../types/VADTypes';
 
 // ---------------------------------------------------------------------------
 // Provider Capability Keys
@@ -22,7 +23,7 @@ import type { TTSSynthesisResult, TTSSynthesizeOptions } from '../types/TTSTypes
  * Typed capability keys for the provider registry.
  * Each key maps to exactly one provider interface.
  */
-export type ProviderCapability = 'llm' | 'stt' | 'tts';
+export type ProviderCapability = 'llm' | 'stt' | 'tts' | 'vad';
 
 // ---------------------------------------------------------------------------
 // Provider Interfaces
@@ -32,6 +33,10 @@ export type ProviderCapability = 'llm' | 'stt' | 'tts';
  * LLM (text generation) provider — implemented by @runanywhere/web-llamacpp.
  */
 export interface LLMProvider {
+  generate?(
+    prompt: string,
+    options?: LLMGenerationOptions,
+  ): Promise<LLMGenerationResult>;
   generateStream(
     prompt: string,
     options?: {
@@ -66,6 +71,20 @@ export interface TTSProvider {
   ): Promise<TTSSynthesisResult>;
 }
 
+/**
+ * VAD (voice activity detection) provider — implemented by @runanywhere/web-onnx.
+ * Top-level `RunAnywhere.detectSpeech(...)` / `setVADCallback(...)` /
+ * `startVAD()` / `stopVAD()` / `cleanupVAD()` dispatch through this provider.
+ */
+export interface VADProvider {
+  /** Whether the underlying VAD model has been loaded. */
+  readonly isInitialized: boolean;
+  processSamples(samples: Float32Array): boolean;
+  onSpeechActivity(callback: SpeechActivityCallback): () => void;
+  reset(): void;
+  cleanup(): void;
+}
+
 // ---------------------------------------------------------------------------
 // Provider Type Map (capability key → interface)
 // ---------------------------------------------------------------------------
@@ -78,4 +97,5 @@ export interface ProviderMap {
   llm: LLMProvider;
   stt: STTProvider;
   tts: TTSProvider;
+  vad: VADProvider;
 }

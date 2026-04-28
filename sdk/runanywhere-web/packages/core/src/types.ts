@@ -58,6 +58,8 @@ export type {
   LLMStreamCompleteCallback,
   LLMStreamErrorCallback,
 } from './types/LLMTypes';
+// Phase 4d: Swift-aligned defaults helpers.
+export { LLM_GENERATION_DEFAULTS, applyLLMGenerationDefaults } from './types/LLMTypes';
 
 // VLM Types (backend-agnostic image/generation types)
 export { VLMImageFormat } from './types/VLMTypes';
@@ -89,6 +91,28 @@ export type {
   SpeechActivityCallback,
   SpeechSegment,
 } from './types/VADTypes';
+
+// Phase 4d: LoRA / RAG / Voice Agent C-ABI types.
+export type {
+  LoRAAdapterConfig,
+  LoRAAdapterInfo,
+  LoraAdapterCatalogEntry,
+  LoraCompatibilityResult,
+} from './types/LoRATypes';
+export type {
+  RAGConfiguration,
+  RAGQueryOptions,
+  RAGSearchResult,
+  RAGResult,
+  RAGStatistics,
+} from './types/RAGTypes';
+export type {
+  VoiceAgentComponentLoadState,
+  VoiceAgentComponentState,
+  VoiceAgentComponentStates,
+  VoiceAgentConfig,
+  VoiceAgentResult,
+} from './types/VoiceAgentCTypes';
 
 // ---------------------------------------------------------------------------
 // Aliases for spec/README convenience (match React Native naming where used)

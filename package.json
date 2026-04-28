@@ -1,0 +1,13 @@
+{
+  "name": "runanywhere-sdks-root",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "sdk/runanywhere-proto-ts",
+    "sdk/runanywhere-react-native/packages/core",
+    "sdk/runanywhere-react-native/packages/llamacpp",
+    "sdk/runanywhere-react-native/packages/onnx",
+    "examples/react-native/RunAnywhereAI"
+  ],
+  "packageManager": "yarn@3.6.1"
+}

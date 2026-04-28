@@ -28,7 +28,12 @@ import { ExtensionPoint } from '../Infrastructure/ExtensionPoint';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSStorage } from '../Infrastructure/OPFSStorage';
 import { SDKError, SDKErrorCode } from '../Foundation/ErrorTypes';
+import { Runtime } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import * as Convenience from './Extensions/RunAnywhere+Convenience';
+import * as LoRAExt from './Extensions/RunAnywhere+LoRA';
+import * as RAGExt from './Extensions/RunAnywhere+RAG';
+import * as VoiceAgentExt from './Extensions/RunAnywhere+VoiceAgent';
 import { ModelRegistryAdapter, type RefreshOptions } from '../Adapters/ModelRegistryAdapter';
 
 /**
@@ -59,6 +64,51 @@ let _isInitialized = false;
 let _initOptions: SDKInitOptions | null = null;
 let _initializingPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
+let _deviceId: string | null = null;
+
+// Phase 2 (services) init state — mirrors Swift's
+// `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split. On Web today
+// there is no backend authentication or device registration step, so Phase 2
+// mostly just marks "ready to issue API calls". Wired so `ensureServicesReady()`
+// is symmetric with the other SDKs and apps can opt into a future-real Phase 2
+// without code changes.
+let _hasCompletedServicesInit = false;
+let _servicesInitPromise: Promise<void> | null = null;
+
+/** Generate (and cache) a stable device ID, matching Swift's UUID-style. */
+function generateDeviceId(): string {
+  // Try Web Crypto first; fall back to a Math-based UUID v4 if unavailable.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/** Persist + retrieve a device ID across SDK sessions (best-effort localStorage). */
+function ensureDeviceId(): string {
+  if (_deviceId) return _deviceId;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('runanywhere.deviceId');
+      if (stored) {
+        _deviceId = stored;
+        return stored;
+      }
+    }
+  } catch { /* ignore */ }
+  const id = generateDeviceId();
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('runanywhere.deviceId', id);
+    }
+  } catch { /* ignore */ }
+  _deviceId = id;
+  return id;
+}
 
 // ---------------------------------------------------------------------------
 // RunAnywhere Public API
@@ -73,6 +123,21 @@ export const RunAnywhere = {
     return _isInitialized;
   },
 
+  /** Mirror Swift `RunAnywhere.isSDKInitialized` (Phase 1 complete). */
+  get isSDKInitialized(): boolean {
+    return _isInitialized;
+  },
+
+  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete). */
+  get areServicesReady(): boolean {
+    return _hasCompletedServicesInit;
+  },
+
+  /** Mirror Swift `RunAnywhere.isActive`. */
+  get isActive(): boolean {
+    return _isInitialized && _initOptions !== null;
+  },
+
   get version(): string {
     return '0.1.0';
   },
@@ -83,6 +148,36 @@ export const RunAnywhere = {
 
   get events(): EventBus {
     return EventBus.shared;
+  },
+
+  /**
+   * Stable device identifier (Swift `RunAnywhere.deviceId`).
+   * On the Web SDK this is persisted in `localStorage` so it survives reloads.
+   */
+  get deviceId(): string {
+    return ensureDeviceId();
+  },
+
+  /** Authentication hook — Web has no backend auth yet, so always false. */
+  isAuthenticated(): boolean {
+    return false;
+  },
+
+  /**
+   * Runtime configuration surface (acceleration mode etc.).
+   * Mirror of the unified `RunAnywhere.runtime` accessor.
+   */
+  get runtime(): typeof Runtime {
+    return Runtime;
+  },
+
+  /** Convenience setter for the preferred acceleration. */
+  async setRuntime(mode: 'cpu' | 'webgpu' | 'auto'): Promise<void> {
+    if (mode === 'auto') {
+      Runtime.preferred = 'auto';
+      return;
+    }
+    await Runtime.setAcceleration(mode);
   },
 
   // =========================================================================
@@ -145,9 +240,21 @@ export const RunAnywhere = {
 
         _isInitialized = true;
 
+        // Eagerly resolve the device ID so `RunAnywhere.deviceId` is non-empty
+        // before the first call.
+        ensureDeviceId();
+
         logger.info('RunAnywhere Web SDK initialized successfully');
         EventBus.shared.emit('sdk.initialized', SDKEventType.Initialization, {
           environment: env,
+        });
+
+        // Kick off Phase 2 in the background so `ensureServicesReady()` is
+        // a fast-path on the next API call. Failures are non-fatal.
+        void RunAnywhere.completeServicesInitialization().catch((err) => {
+          logger.warning(
+            `Phase 2 init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          );
         });
       } finally {
         _initializingPromise = null;
@@ -155,6 +262,42 @@ export const RunAnywhere = {
     })();
 
     return _initializingPromise;
+  },
+
+  /**
+   * Complete the Phase 2 (services) initialization. Mirror of Swift's
+   * `RunAnywhere.completeServicesInitialization()`. Idempotent — concurrent
+   * callers share a single in-flight promise.
+   *
+   * On Web this is currently a near-no-op (no auth, no device registration),
+   * but the function is exposed so applications can `await` services-ready
+   * before issuing time-sensitive calls. Future versions may perform real
+   * backend work here.
+   */
+  async completeServicesInitialization(): Promise<void> {
+    if (_hasCompletedServicesInit) return;
+    if (_servicesInitPromise) return _servicesInitPromise;
+
+    _servicesInitPromise = (async () => {
+      try {
+        // Future: HTTP/auth/device registration goes here.
+        _hasCompletedServicesInit = true;
+        logger.debug('Services initialization complete (Phase 2)');
+      } finally {
+        _servicesInitPromise = null;
+      }
+    })();
+    return _servicesInitPromise;
+  },
+
+  /**
+   * Internal-style guard used by extensions that need a fully-initialized
+   * SDK. Mirror of Swift's `RunAnywhere.ensureServicesReady()`. Awaits Phase
+   * 2 completion if it isn't already done.
+   */
+  async ensureServicesReady(): Promise<void> {
+    if (_hasCompletedServicesInit) return;
+    return RunAnywhere.completeServicesInitialization();
   },
 
   // =========================================================================
@@ -383,6 +526,67 @@ export const RunAnywhere = {
   },
 
   // =========================================================================
+  // Top-level convenience verbs — mirror Swift's `RunAnywhere.chat / generate /
+  // transcribe / synthesize / speak / detectSpeech / setVADCallback / etc.`
+  // Each delegates through ExtensionPoint to the appropriate backend.
+  // =========================================================================
+
+  // LLM
+  chat: Convenience.chat,
+  generate: Convenience.generate,
+  generateStream: Convenience.generateStream,
+  generateStructured: Convenience.generateStructured,
+
+  // STT
+  transcribe: Convenience.transcribe,
+
+  // TTS
+  synthesize: Convenience.synthesize,
+  speak: Convenience.speak,
+  isSpeaking: Convenience.isSpeaking,
+  stopSpeaking: Convenience.stopSpeaking,
+
+  // VAD
+  detectSpeech: Convenience.detectSpeech,
+  setVADCallback: Convenience.setVADCallback,
+  startVAD: Convenience.startVAD,
+  stopVAD: Convenience.stopVAD,
+  cleanupVAD: Convenience.cleanupVAD,
+  isVADReady: Convenience.isVADReady,
+
+  // LoRA — mirrors Swift `RunAnywhere+LoRA.swift`
+  loadLoraAdapter: LoRAExt.loadLoraAdapter,
+  removeLoraAdapter: LoRAExt.removeLoraAdapter,
+  clearLoraAdapters: LoRAExt.clearLoraAdapters,
+  getLoadedLoraAdapters: LoRAExt.getLoadedLoraAdapters,
+  checkLoraCompatibility: LoRAExt.checkLoraCompatibility,
+  registerLoraAdapter: LoRAExt.registerLoraAdapter,
+  loraAdaptersForModel: LoRAExt.loraAdaptersForModel,
+  allRegisteredLoraAdapters: LoRAExt.allRegisteredLoraAdapters,
+
+  // RAG — mirrors Swift `RunAnywhere+RAG.swift`
+  ragCreatePipeline: RAGExt.ragCreatePipeline,
+  ragDestroyPipeline: RAGExt.ragDestroyPipeline,
+  ragIngest: RAGExt.ragIngest,
+  ragAddDocumentsBatch: RAGExt.ragAddDocumentsBatch,
+  ragQuery: RAGExt.ragQuery,
+  ragClearDocuments: RAGExt.ragClearDocuments,
+  ragDocumentCount: RAGExt.ragDocumentCount,
+  ragGetStatistics: RAGExt.ragGetStatistics,
+
+  // VoiceAgent C-ABI parity — mirrors Swift `RunAnywhere+VoiceAgent.swift`
+  initializeVoiceAgent: VoiceAgentExt.initializeVoiceAgent,
+  initializeVoiceAgentWithLoadedModels: VoiceAgentExt.initializeVoiceAgentWithLoadedModels,
+  isVoiceAgentReady: VoiceAgentExt.isVoiceAgentReady,
+  getVoiceAgentComponentStates: VoiceAgentExt.getVoiceAgentComponentStates,
+  areAllVoiceComponentsReady: VoiceAgentExt.areAllVoiceComponentsReady,
+  processVoiceTurn: VoiceAgentExt.processVoiceTurn,
+  voiceAgentTranscribe: VoiceAgentExt.voiceAgentTranscribe,
+  voiceAgentGenerateResponse: VoiceAgentExt.voiceAgentGenerateResponse,
+  voiceAgentSynthesizeSpeech: VoiceAgentExt.voiceAgentSynthesizeSpeech,
+  cleanupVoiceAgent: VoiceAgentExt.cleanupVoiceAgent,
+
+  // =========================================================================
   // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
   // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
   // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
@@ -414,6 +618,8 @@ export const RunAnywhere = {
     _initOptions = null;
     _initializingPromise = null;
     _localFileStorage = null;
+    _hasCompletedServicesInit = false;
+    _servicesInitPromise = null;
 
     logger.info('RunAnywhere Web SDK shut down');
   },

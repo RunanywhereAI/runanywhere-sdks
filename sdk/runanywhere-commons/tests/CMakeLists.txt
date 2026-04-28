@@ -485,15 +485,21 @@ rac_link_archive_deps(test_download_orchestrator)
 target_compile_features(test_download_orchestrator PRIVATE cxx_std_17)
 add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
 
-# --- ONNX backend tests (VAD, STT, TTS, WakeWord) ---
-if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
+# --- Sherpa-ONNX speech tests (VAD, STT, TTS, WakeWord) ---
+# Phase 2.7 (engine independence refactor): tests link rac_backend_sherpa
+# (which owns the speech ops) and depend on rac_backend_onnx only for the
+# ONNX-named typedefs used in their config defaults. The engines/sherpa/
+# include path exposes the public sherpa function declarations.
+if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx
+   AND RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa)
     # VAD test
     add_executable(test_vad test_vad.cpp)
     target_include_directories(test_vad PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/sherpa
     )
-    target_link_libraries(test_vad PRIVATE rac_commons rac_backend_onnx)
+    target_link_libraries(test_vad PRIVATE rac_commons rac_backend_onnx rac_backend_sherpa)
     target_compile_features(test_vad PRIVATE cxx_std_20)
     add_test(NAME vad_tests COMMAND test_vad --run-all)
 
@@ -502,8 +508,9 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     target_include_directories(test_stt PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/sherpa
     )
-    target_link_libraries(test_stt PRIVATE rac_commons rac_backend_onnx)
+    target_link_libraries(test_stt PRIVATE rac_commons rac_backend_onnx rac_backend_sherpa)
     target_compile_features(test_stt PRIVATE cxx_std_20)
     add_test(NAME stt_tests COMMAND test_stt --run-all)
 
@@ -512,8 +519,9 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     target_include_directories(test_tts PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/sherpa
     )
-    target_link_libraries(test_tts PRIVATE rac_commons rac_backend_onnx)
+    target_link_libraries(test_tts PRIVATE rac_commons rac_backend_onnx rac_backend_sherpa)
     target_compile_features(test_tts PRIVATE cxx_std_20)
     add_test(NAME tts_tests COMMAND test_tts --run-all)
 
@@ -522,8 +530,9 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     target_include_directories(test_wakeword PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/sherpa
     )
-    target_link_libraries(test_wakeword PRIVATE rac_commons rac_backend_onnx)
+    target_link_libraries(test_wakeword PRIVATE rac_commons rac_backend_onnx rac_backend_sherpa)
     target_compile_features(test_wakeword PRIVATE cxx_std_20)
     add_test(NAME wakeword_tests COMMAND test_wakeword --run-all)
 endif()
@@ -540,16 +549,17 @@ if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
     add_test(NAME llm_tests COMMAND test_llm --run-all)
 endif()
 
-# --- Voice Agent test: Requires ONNX + LlamaCPP ---
-if(RAC_BACKEND_ONNX AND RAC_BACKEND_LLAMACPP
-   AND TARGET rac_backend_onnx AND TARGET rac_backend_llamacpp)
+# --- Voice Agent test: Requires Sherpa (speech ops) + ONNX (typedefs) + LlamaCPP ---
+if(RAC_BACKEND_ONNX AND RAC_BACKEND_LLAMACPP AND RAC_BACKEND_SHERPA
+   AND TARGET rac_backend_onnx AND TARGET rac_backend_llamacpp AND TARGET rac_backend_sherpa)
     add_executable(test_voice_agent test_voice_agent.cpp)
     target_include_directories(test_voice_agent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/sherpa
     )
     target_link_libraries(test_voice_agent PRIVATE
-        rac_commons rac_backend_onnx rac_backend_llamacpp)
+        rac_commons rac_backend_onnx rac_backend_sherpa rac_backend_llamacpp)
     target_compile_features(test_voice_agent PRIVATE cxx_std_20)
     add_test(NAME voice_agent_tests COMMAND test_voice_agent --run-all)
 endif()

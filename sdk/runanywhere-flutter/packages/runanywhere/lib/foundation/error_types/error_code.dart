@@ -45,7 +45,41 @@ enum ErrorCode {
   generationTimeout(1701),
   tokenLimitExceeded(1702),
   costLimitExceeded(1703),
-  contextTooLong(1704);
+  contextTooLong(1704),
+  streamCancelled(1705),
+  cancelled(1706),
+
+  // Audio / voice errors (1800-1899)
+  audioFormatNotSupported(1800),
+  microphonePermissionDenied(1801),
+  emptyAudioBuffer(1802),
+  audioProcessingFailed(1803),
+  speakerDiarizationFailed(1804),
+  wakeWordNotDetected(1805),
+  vadProcessingFailed(1806),
+  sttProcessingFailed(1807),
+  ttsProcessingFailed(1808),
+  vlmProcessingFailed(1809),
+  ragQueryFailed(1810),
+  streamingNotSupported(1811),
+
+  // Component errors (1900-1999)
+  componentNotInitialized(1900),
+  componentInitializationFailed(1901),
+  componentCleanupFailed(1902),
+  invalidComponentState(1903),
+  invalidComponentConfiguration(1904),
+
+  // Security errors (2000-2099)
+  keychainError(2000),
+  encryptionFailed(2001),
+  decryptionFailed(2002),
+
+  // Runtime errors (2100-2199)
+  extractionFailed(2100),
+  conversionFailed(2101),
+  validationFailed(2102),
+  parsingFailed(2103);
 
   final int rawValue;
 
@@ -124,6 +158,62 @@ enum ErrorCode {
         return 'Cost limit exceeded';
       case ErrorCode.contextTooLong:
         return 'Context too long';
+      case ErrorCode.streamCancelled:
+        return 'Stream cancelled';
+      case ErrorCode.cancelled:
+        return 'Operation cancelled';
+
+      case ErrorCode.audioFormatNotSupported:
+        return 'Audio format not supported';
+      case ErrorCode.microphonePermissionDenied:
+        return 'Microphone permission denied';
+      case ErrorCode.emptyAudioBuffer:
+        return 'Audio buffer is empty';
+      case ErrorCode.audioProcessingFailed:
+        return 'Audio processing failed';
+      case ErrorCode.speakerDiarizationFailed:
+        return 'Speaker diarization failed';
+      case ErrorCode.wakeWordNotDetected:
+        return 'Wake word not detected';
+      case ErrorCode.vadProcessingFailed:
+        return 'VAD processing failed';
+      case ErrorCode.sttProcessingFailed:
+        return 'Transcription failed';
+      case ErrorCode.ttsProcessingFailed:
+        return 'Synthesis failed';
+      case ErrorCode.vlmProcessingFailed:
+        return 'Vision-language processing failed';
+      case ErrorCode.ragQueryFailed:
+        return 'RAG query failed';
+      case ErrorCode.streamingNotSupported:
+        return 'Streaming not supported by this model';
+
+      case ErrorCode.componentNotInitialized:
+        return 'Component not initialized';
+      case ErrorCode.componentInitializationFailed:
+        return 'Component initialization failed';
+      case ErrorCode.componentCleanupFailed:
+        return 'Component cleanup failed';
+      case ErrorCode.invalidComponentState:
+        return 'Invalid component state';
+      case ErrorCode.invalidComponentConfiguration:
+        return 'Invalid component configuration';
+
+      case ErrorCode.keychainError:
+        return 'Keychain error';
+      case ErrorCode.encryptionFailed:
+        return 'Encryption failed';
+      case ErrorCode.decryptionFailed:
+        return 'Decryption failed';
+
+      case ErrorCode.extractionFailed:
+        return 'Data extraction failed';
+      case ErrorCode.conversionFailed:
+        return 'Data conversion failed';
+      case ErrorCode.validationFailed:
+        return 'Validation failed';
+      case ErrorCode.parsingFailed:
+        return 'Parsing failed';
     }
   }
 }

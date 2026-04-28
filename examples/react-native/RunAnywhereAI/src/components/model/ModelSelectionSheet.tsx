@@ -190,6 +190,7 @@ const getFrameworkInfo = (
     [LLMFramework.MediaPipe]: Colors.primaryOrange,
     [LLMFramework.OpenAIWhisper]: Colors.primaryGreen,
     [LLMFramework.Genie]: Colors.primaryPurple,
+    [LLMFramework.Sherpa]: Colors.primaryBlue,
   };
 
   const iconMap: Record<LLMFramework, string> = {
@@ -209,6 +210,7 @@ const getFrameworkInfo = (
     [LLMFramework.MediaPipe]: 'videocam-outline',
     [LLMFramework.OpenAIWhisper]: 'ear-outline',
     [LLMFramework.Genie]: 'hardware-chip-outline',
+    [LLMFramework.Sherpa]: 'mic-outline',
   };
 
   return {

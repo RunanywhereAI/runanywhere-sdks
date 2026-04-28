@@ -348,11 +348,12 @@ async function registerModulesAndModels(): Promise<void> {
   await ONNX.register();
 
   await Promise.all([
+    // Sherpa-ONNX speech models — served by the Sherpa engine plugin
     RunAnywhere.registerModel({
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
       url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-      framework: LLMFramework.ONNX,
+      framework: LLMFramework.Sherpa,
       modality: ModelCategory.SpeechRecognition,
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 75_000_000,
@@ -361,7 +362,7 @@ async function registerModulesAndModels(): Promise<void> {
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
       url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
-      framework: LLMFramework.ONNX,
+      framework: LLMFramework.Sherpa,
       modality: ModelCategory.SpeechSynthesis,
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 65_000_000,
@@ -370,7 +371,7 @@ async function registerModulesAndModels(): Promise<void> {
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
       url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
-      framework: LLMFramework.ONNX,
+      framework: LLMFramework.Sherpa,
       modality: ModelCategory.SpeechSynthesis,
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 65_000_000,

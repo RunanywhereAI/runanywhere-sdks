@@ -190,8 +190,29 @@ class STTImpl {
    * Load an STT model via sherpa-onnx.
    * Model files must already be written to sherpa-onnx virtual FS
    * (use SherpaONNXBridge.shared.downloadAndWrite() or .writeFile()).
+   *
+   * Currently the bundled `sherpa-onnx.wasm` only includes Whisper, Zipformer,
+   * and Paraformer. Calling with other model types (SenseVoice, Moonshine, etc.)
+   * will throw `BackendNotAvailable` with a descriptive message rather than
+   * silently failing inside sherpa-onnx.
    */
   async loadModel(config: STTModelConfig): Promise<void> {
+    // Phase 4d: validate the requested STT model type up-front. The current
+    // sherpa-onnx WASM build only ships Whisper / Zipformer / Paraformer
+    // recognizers — other STTModelType values would silently fail at
+    // SherpaOnnx*Recognizer creation with an opaque error.
+    if (
+      config.type !== STTModelType.Whisper &&
+      config.type !== STTModelType.Zipformer &&
+      config.type !== STTModelType.Paraformer
+    ) {
+      throw SDKError.backendNotAvailable(
+        `STT.${config.type}`,
+        `The bundled sherpa-onnx WASM only supports Whisper, Zipformer, and ` +
+        `Paraformer. Received: ${config.type}.`,
+      );
+    }
+
     const sherpa = requireSherpa();
     await sherpa.ensureLoaded();
     const m = sherpa.module;

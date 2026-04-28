@@ -30,6 +30,7 @@ export enum LLMFramework {
   MLX = 'MLX',
   SwiftTransformers = 'SwiftTransformers',
   ONNX = 'ONNX',
+  Sherpa = 'Sherpa', // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
   ExecuTorch = 'ExecuTorch',
   LlamaCpp = 'LlamaCpp',
   FoundationModels = 'FoundationModels',
@@ -265,6 +266,7 @@ export function llmFrameworkToProto(f: LLMFramework): proto.InferenceFramework {
     case LLMFramework.OpenAIWhisper:      return proto.InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER;
     case LLMFramework.SystemTTS:          return proto.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
     case LLMFramework.PiperTTS:           return proto.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS;
+    default:                              return proto.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED;
   }
 }
 

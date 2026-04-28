@@ -142,6 +142,7 @@ class InferenceFramework extends $pb.ProtobufEnum {
   static const InferenceFramework INFERENCE_FRAMEWORK_BUILT_IN = InferenceFramework._(20, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_BUILT_IN');
   static const InferenceFramework INFERENCE_FRAMEWORK_NONE = InferenceFramework._(21, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_NONE');
   static const InferenceFramework INFERENCE_FRAMEWORK_UNKNOWN = InferenceFramework._(22, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_UNKNOWN');
+  static const InferenceFramework INFERENCE_FRAMEWORK_SHERPA = InferenceFramework._(23, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_SHERPA');
 
   static const $core.List<InferenceFramework> values = <InferenceFramework> [
     INFERENCE_FRAMEWORK_UNSPECIFIED,
@@ -167,6 +168,7 @@ class InferenceFramework extends $pb.ProtobufEnum {
     INFERENCE_FRAMEWORK_BUILT_IN,
     INFERENCE_FRAMEWORK_NONE,
     INFERENCE_FRAMEWORK_UNKNOWN,
+    INFERENCE_FRAMEWORK_SHERPA,
   ];
 
   static final $core.Map<$core.int, InferenceFramework> _byValue = $pb.ProtobufEnum.initByValue(values);

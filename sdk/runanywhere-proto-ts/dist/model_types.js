@@ -278,6 +278,8 @@ export var InferenceFramework;
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_BUILT_IN"] = 20] = "INFERENCE_FRAMEWORK_BUILT_IN";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_NONE"] = 21] = "INFERENCE_FRAMEWORK_NONE";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_UNKNOWN"] = 22] = "INFERENCE_FRAMEWORK_UNKNOWN";
+    /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+    InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_SHERPA"] = 23] = "INFERENCE_FRAMEWORK_SHERPA";
     InferenceFramework[InferenceFramework["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(InferenceFramework || (InferenceFramework = {}));
 export function inferenceFrameworkFromJSON(object) {
@@ -351,6 +353,9 @@ export function inferenceFrameworkFromJSON(object) {
         case 22:
         case "INFERENCE_FRAMEWORK_UNKNOWN":
             return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+        case 23:
+        case "INFERENCE_FRAMEWORK_SHERPA":
+            return InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -405,6 +410,8 @@ export function inferenceFrameworkToJSON(object) {
             return "INFERENCE_FRAMEWORK_NONE";
         case InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN:
             return "INFERENCE_FRAMEWORK_UNKNOWN";
+        case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+            return "INFERENCE_FRAMEWORK_SHERPA";
         case InferenceFramework.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";

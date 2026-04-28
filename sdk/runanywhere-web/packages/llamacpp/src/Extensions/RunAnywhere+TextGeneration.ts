@@ -27,7 +27,7 @@
 
 import {
   RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
-  LLMFramework, LLMStreamAdapter,
+  LLMFramework, LLMStreamAdapter, applyLLMGenerationDefaults,
 } from '@runanywhere/web';
 import type {
   ModelLoadContext, HardwareAcceleration, EmscriptenRunanywhereModule,
@@ -45,8 +45,19 @@ import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } fr
  * time. The CPU WASM build does not have this cross-backend issue.
  * Force CPU build for these. SmolLM2 stays on WebGPU because it doesn't
  * trigger FA. (B-WEB-4-001)
+ *
+ * Phase 4d migration: this regex is now a fallback. The preferred way to mark
+ * a model as CPU-only is to set `requiresCPU: true` on its `CompactModelDef` /
+ * `ManagedModel` entry. The regex remains so existing model IDs continue to
+ * work without registry changes.
  */
 const FA_AFFECTED_MODEL_PATTERN = /^(qwen|lfm2)/i;
+
+/** Centralised "must run on CPU?" check that prefers per-model metadata. */
+function modelRequiresCPU(ctx: ModelLoadContext): boolean {
+  if (ctx.model.requiresCPU === true) return true;
+  return FA_AFFECTED_MODEL_PATTERN.test(ctx.model.id);
+}
 
 const logger = new SDKLogger('TextGeneration');
 
@@ -107,9 +118,12 @@ class TextGenerationImpl {
     // loading the model. The CPU build is fully functional and doesn't suffer
     // from the FA disable-at-load / use-at-decode mismatch. SmolLM2 stays on
     // WebGPU because it doesn't trigger the FA auto-disable at load time.
-    if (FA_AFFECTED_MODEL_PATTERN.test(ctx.model.id) && bridge.accelerationMode === 'webgpu') {
+    //
+    // Phase 4d: prefer per-model metadata (`ctx.model.requiresCPU === true`),
+    // fall back to the legacy id regex for older registry entries.
+    if (modelRequiresCPU(ctx) && bridge.accelerationMode === 'webgpu') {
       logger.info(
-        `FA-affected model detected (${ctx.model.id}) — switching bridge to CPU WASM ` +
+        `Model requires CPU (${ctx.model.id}) — switching bridge to CPU WASM ` +
         '(WebGPU FA cross-backend bug, see B-WEB-4-001)',
       );
       // Drop any cached LLM component handle from the old WASM module.
@@ -270,6 +284,10 @@ class TextGenerationImpl {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
+    // Apply Swift-aligned defaults (maxTokens=100, temperature=0.8) so the
+    // call shape matches across SDKs when the caller omits fields.
+    options = applyLLMGenerationDefaults(options);
+
     logger.debug(`Generating from prompt (${prompt.length} chars)`);
     const startTime = performance.now();
 
@@ -425,6 +443,9 @@ class TextGenerationImpl {
     if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
+
+    // Apply Swift-aligned defaults so streaming behavior matches across SDKs.
+    options = applyLLMGenerationDefaults(options);
 
     // Subscribe to the proto-byte stream BEFORE driving the engine so we
     // never miss tokens emitted synchronously from inside the native call.

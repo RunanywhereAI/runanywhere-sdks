@@ -46,6 +46,12 @@ protoc \
     --dart_out="${OUT_DIR}" \
     voice_agent_service.proto llm_service.proto download_service.proto
 
+# Phase 3 IDL exhaustiveness — duplicated data shapes across SDKs.
+protoc \
+    --proto_path="${PROTO_DIR}" \
+    --dart_out="${OUT_DIR}" \
+    llm_options.proto chat.proto tool_calling.proto
+
 # Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
 # (some older protoc_plugin versions emit them even without the grpc: prefix).
 rm -f "${OUT_DIR}"/*.pbgrpc.dart

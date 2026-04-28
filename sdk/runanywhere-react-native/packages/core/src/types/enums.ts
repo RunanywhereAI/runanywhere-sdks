@@ -40,6 +40,7 @@ export enum LLMFramework {
   MLX = 'MLX',
   SwiftTransformers = 'SwiftTransformers',
   ONNX = 'ONNX',
+  Sherpa = 'Sherpa', // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
   ExecuTorch = 'ExecuTorch',
   LlamaCpp = 'LlamaCpp',
   FoundationModels = 'FoundationModels',
@@ -62,6 +63,7 @@ export const LLMFrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.MLX]: 'MLX',
   [LLMFramework.SwiftTransformers]: 'Swift Transformers',
   [LLMFramework.ONNX]: 'ONNX Runtime',
+  [LLMFramework.Sherpa]: 'Sherpa-ONNX',
   [LLMFramework.ExecuTorch]: 'ExecuTorch',
   [LLMFramework.LlamaCpp]: 'llama.cpp',
   [LLMFramework.FoundationModels]: 'Foundation Models',
@@ -392,6 +394,7 @@ export function llmFrameworkToProto(f: LLMFramework): proto.InferenceFramework {
     case LLMFramework.MLX:                return proto.InferenceFramework.INFERENCE_FRAMEWORK_MLX;
     case LLMFramework.SwiftTransformers:  return proto.InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS;
     case LLMFramework.ONNX:               return proto.InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
+    case LLMFramework.Sherpa:             return proto.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
     case LLMFramework.ExecuTorch:         return proto.InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH;
     case LLMFramework.LlamaCpp:           return proto.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
     case LLMFramework.FoundationModels:   return proto.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS;
@@ -413,6 +416,7 @@ export function llmFrameworkFromProto(p: proto.InferenceFramework): LLMFramework
     case proto.InferenceFramework.INFERENCE_FRAMEWORK_MLX:                 return LLMFramework.MLX;
     case proto.InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:  return LLMFramework.SwiftTransformers;
     case proto.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:                return LLMFramework.ONNX;
+    case proto.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:              return LLMFramework.Sherpa;
     case proto.InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:          return LLMFramework.ExecuTorch;
     case proto.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:           return LLMFramework.LlamaCpp;
     case proto.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:   return LLMFramework.FoundationModels;

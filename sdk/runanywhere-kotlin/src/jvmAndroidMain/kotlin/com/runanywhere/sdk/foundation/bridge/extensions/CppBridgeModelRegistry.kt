@@ -100,6 +100,7 @@ object CppBridgeModelRegistry {
         const val WHISPERKIT_COREML = 9 // RAC_FRAMEWORK_WHISPERKIT_COREML
         const val METALRT = 10 // RAC_FRAMEWORK_METALRT
         const val GENIE = 11 // RAC_FRAMEWORK_GENIE
+        const val SHERPA = 12 // RAC_FRAMEWORK_SHERPA (Sherpa-ONNX speech engine)
         const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 
@@ -270,6 +271,13 @@ object CppBridgeModelRegistry {
      *
      * For archive models with flat extraction (e.g. Genie), see
      * [RunAnywhere.restorePersistedDownloadPaths] in RunAnywhere+ModelManagement.jvmAndroid.kt.
+     *
+     * B-AK-17-RAG: Validates that restored model files contain actual bytes (size > 0).
+     * Previously a partially-failed download could leave a 0-byte stub on disk, which
+     * the scan would happily restore as "downloaded" — the C++ pipeline would then
+     * fail with `nativeCreatePipeline returned 0` because ONNX runtime can't parse a
+     * 0-byte file. Now we check file size and treat zero-byte stubs as corruption,
+     * deleting them so the next download attempt starts clean.
      */
     fun scanAndRestoreDownloadedModels() {
         val baseDir = CppBridgeModelPaths.getBaseDirectory()
@@ -282,6 +290,7 @@ object CppBridgeModelRegistry {
 
         log(LogLevel.DEBUG, "Scanning for previously downloaded models...")
         var restoredCount = 0
+        var purgedCount = 0
 
         val typeDirectories = listOf("llm", "stt", "tts", "vad", "embedding", "vision", "multimodal", "other")
         for (dirName in typeDirectories) {
@@ -292,6 +301,21 @@ object CppBridgeModelRegistry {
                 val modelId = modelPath.name
                 val existingModel = get(modelId)
                 if (existingModel != null && existingModel.localPath == null) {
+                    if (!isModelPathValid(modelPath)) {
+                        // Stub or corrupt restore — purge so the model re-downloads cleanly.
+                        log(
+                            LogLevel.WARN,
+                            "Skipping $modelId: on-disk artefact at ${modelPath.absolutePath} " +
+                                "is empty/corrupt (0-byte file or empty directory). Purging stub.",
+                        )
+                        try {
+                            if (modelPath.isDirectory) modelPath.deleteRecursively() else modelPath.delete()
+                            purgedCount++
+                        } catch (e: Exception) {
+                            log(LogLevel.ERROR, "Failed to purge stub at ${modelPath.absolutePath}: ${e.message}")
+                        }
+                        return@forEach
+                    }
                     if (updateDownloadStatus(modelId, modelPath.absolutePath)) {
                         restoredCount++
                         log(LogLevel.DEBUG, "Restored $modelId at ${modelPath.absolutePath}")
@@ -300,7 +324,36 @@ object CppBridgeModelRegistry {
             }
         }
 
-        log(LogLevel.INFO, "Filesystem scan complete: restored $restoredCount models")
+        log(LogLevel.INFO, "Filesystem scan complete: restored $restoredCount models, purged $purgedCount stubs")
+    }
+
+    /**
+     * Validate a model artefact on disk before restoring it as "downloaded".
+     *
+     * Rules:
+     * - Single-file model (e.g. GGUF, single ONNX): file must exist and size > 0.
+     * - Directory model (e.g. extracted archive, multi-file embedding):
+     *   directory must contain at least one regular file with size > 0.
+     *
+     * Returns true if the artefact looks like a real, completed download.
+     */
+    private fun isModelPathValid(modelPath: File): Boolean {
+        if (!modelPath.exists()) return false
+        if (modelPath.isFile) {
+            return modelPath.length() > 0L
+        }
+        if (modelPath.isDirectory) {
+            val children = modelPath.listFiles() ?: return false
+            // Walk one level deep and check for any regular file with bytes.
+            return children.any { child ->
+                when {
+                    child.isFile -> child.length() > 0L
+                    child.isDirectory -> isModelPathValid(child)
+                    else -> false
+                }
+            }
+        }
+        return false
     }
 
     // ========================================================================

@@ -38,6 +38,7 @@ protoc \
     --proto_path="${PROTO_DIR}" \
     --ts_proto_out="${TS_OUT_DIR}" \
     --ts_proto_opt=esModuleInterop=true,outputServices=false,env=browser,useOptionals=messages \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto voice_agent_service.proto llm_service.proto download_service.proto
+    model_types.proto voice_events.proto pipeline.proto solutions.proto voice_agent_service.proto llm_service.proto download_service.proto \
+    llm_options.proto chat.proto tool_calling.proto
 
 echo "✓ TS proto codegen → ${TS_OUT_DIR}"

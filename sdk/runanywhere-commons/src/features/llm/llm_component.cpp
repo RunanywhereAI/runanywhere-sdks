@@ -257,6 +257,16 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
         }
     }
 
+    // B-FL-5-001 fix: clear any lingering proto-stream callback registration
+    // keyed by this component handle BEFORE freeing the memory. If the
+    // allocator later hands the same address back to a fresh component
+    // (rac_llm_component_create), the new component would otherwise inherit
+    // the previous slot's stale seq counter / callback pointer — corrupting
+    // the LLMStreamEvent wire seq sequence and causing the Flutter Java
+    // protobuf decoder to throw "end-group tag did not match" on the first
+    // generate after a model switch.
+    rac_llm_unset_stream_proto_callback(handle);
+
     log_info("LLM.Component", "LLM component destroyed");
 
     delete component;
@@ -273,6 +283,14 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    // B-FL-5-001 v2 fix: clear any prior proto-stream callback registration
+    // BEFORE re-creating the internal service for a new model. Without this,
+    // the wire-seq counter in g_slots() retains its prior value and corrupts
+    // the proto stream on the very first generate after a model switch (the
+    // load_model path elides destroy → original B-FL-5-001 fix in destroy()
+    // never fires for handle reuse).
+    rac_llm_unset_stream_proto_callback(handle);
 
     // Emit model load started event
     {

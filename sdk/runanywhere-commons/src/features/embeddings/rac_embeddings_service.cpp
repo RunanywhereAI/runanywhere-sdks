@@ -36,10 +36,21 @@
 
 static const char* LOG_CAT = "Embeddings.Service";
 
+// Phase 2.6 (engine independence refactor): identity stringify of the
+// framework enum to the plugin's metadata.name. Kept identical to the
+// matching helpers in rac_stt_service.cpp / rac_tts_service.cpp /
+// rac_llm_service.cpp; if this drifts, move to a shared header in
+// rac/router/.
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
         case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
         case RAC_FRAMEWORK_ONNX:               return "onnx";
+        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
+        case RAC_FRAMEWORK_METALRT:            return "metalrt";
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:         return "platform";
+        case RAC_FRAMEWORK_COREML:             return "platform";
         default:                               return nullptr;
     }
 }

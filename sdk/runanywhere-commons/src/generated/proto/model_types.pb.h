@@ -251,6 +251,7 @@ enum InferenceFramework : int {
   INFERENCE_FRAMEWORK_BUILT_IN = 20,
   INFERENCE_FRAMEWORK_NONE = 21,
   INFERENCE_FRAMEWORK_UNKNOWN = 22,
+  INFERENCE_FRAMEWORK_SHERPA = 23,
   InferenceFramework_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   InferenceFramework_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -261,11 +262,11 @@ extern const uint32_t InferenceFramework_internal_data_[];
 inline constexpr InferenceFramework InferenceFramework_MIN =
     static_cast<InferenceFramework>(0);
 inline constexpr InferenceFramework InferenceFramework_MAX =
-    static_cast<InferenceFramework>(22);
+    static_cast<InferenceFramework>(23);
 [[nodiscard]] inline bool InferenceFramework_IsValid(int value) {
-  return 0 <= value && value <= 22;
+  return 0 <= value && value <= 23;
 }
-inline constexpr int InferenceFramework_ARRAYSIZE = 22 + 1;
+inline constexpr int InferenceFramework_ARRAYSIZE = 23 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 InferenceFramework_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(InferenceFramework) {
@@ -280,7 +281,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& InferenceFramework_Name(InferenceFramework value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<InferenceFramework_descriptor, 0, 22>(
+  return ::google::protobuf::internal::NameOfDenseEnum<InferenceFramework_descriptor, 0, 23>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool InferenceFramework_Parse(

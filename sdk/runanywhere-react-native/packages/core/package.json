@@ -48,7 +48,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@runanywhere/proto-ts": "file:../../../runanywhere-proto-ts",
+    "@runanywhere/proto-ts": "workspace:*",
     "long": "^5.2.3",
     "protobufjs": "^7.2.6"
   },

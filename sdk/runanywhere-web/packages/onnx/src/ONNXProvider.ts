@@ -382,6 +382,7 @@ const onnxExtension: BackendExtension = {
     VAD.cleanup();
     ExtensionPoint.removeProvider('stt');
     ExtensionPoint.removeProvider('tts');
+    ExtensionPoint.removeProvider('vad');
     try { SherpaONNXBridge.shared.shutdown(); } catch { /* ignore */ }
     _isRegistered = false;
     logger.info('ONNX backend cleaned up');
@@ -427,6 +428,7 @@ export const ONNXProvider = {
     // STT/TTS via ExtensionPoint.getProvider() at runtime.
     ExtensionPoint.registerProvider('stt', STT);
     ExtensionPoint.registerProvider('tts', TTS);
+    ExtensionPoint.registerProvider('vad', VAD);
 
     _isRegistered = true;
     logger.info('ONNX backend registered successfully');

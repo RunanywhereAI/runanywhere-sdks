@@ -48,7 +48,10 @@ import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
 import * as Device from './Extensions/RunAnywhere+Device';
 import * as VLM from './Extensions/RunAnywhere+VLM';
+import * as LoRA from './Extensions/RunAnywhere+LoRA';
+import * as Diffusion from './Extensions/RunAnywhere+Diffusion';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -415,6 +418,68 @@ export const RunAnywhere = {
     return native.isInitialized();
   },
 
+  /**
+   * Whether the SDK is fully active (core initialised AND services ready).
+   *
+   * Matches Swift: `RunAnywhere.isActive`.
+   */
+  get isActive(): boolean {
+    return initState.isCoreInitialized && initState.hasCompletedServicesInit;
+  },
+
+  /**
+   * Retry just the Phase-2 (services) initialisation. Useful after a
+   * transient connectivity failure where Phase 1 (core) succeeded but
+   * services init failed or was skipped.
+   *
+   * Matches Swift: `RunAnywhere.completeServicesInitialization()`.
+   */
+  async completeServicesInitialization(): Promise<void> {
+    if (!initState.isCoreInitialized) {
+      throw new Error(
+        'completeServicesInitialization() requires the SDK core to be initialised. Call initialize() first.'
+      );
+    }
+    if (initState.hasCompletedServicesInit) {
+      logger.debug('Services already initialised; nothing to do.');
+      return;
+    }
+
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    try {
+      const native = requireNativeModule();
+      // Re-trigger model registry hydration; native side is idempotent.
+      await ModelRegistry.initialize();
+
+      // Best-effort device registration retry. Build token resolution is
+      // identical to the original `initialize()` path.
+      const env = initState.environment ?? SDKEnvironment.Production;
+      const buildToken = this._resolveBuildToken();
+      try {
+        await this._registerDeviceIfNeeded(env, undefined, buildToken);
+      } catch (e) {
+        logger.warning(
+          `Device registration retry failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`
+        );
+      }
+
+      ServiceContainer.shared.markInitialized();
+      initState = markServicesInitialized(initState);
+      // Touch native to keep the bridge warm; ignore returned bool here.
+      void native.isInitialized();
+      logger.info('Services initialisation completed.');
+      EventBus.publish('Initialization', { type: 'completed' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Services initialisation failed: ${msg}`);
+      EventBus.publish('Initialization', { type: 'failed', error: msg });
+      throw error;
+    }
+  },
+
   // ============================================================================
   // Authentication Info (Production/Staging only)
   // Matches Swift SDK: RunAnywhere.getUserId(), getOrganizationId(), etc.
@@ -520,6 +585,9 @@ export const RunAnywhere = {
   generate: TextGeneration.generate,
   generateStream: TextGeneration.generateStream,
   cancelGeneration: TextGeneration.cancelGeneration,
+  // Introspection (matches Swift: currentLLMModel, getCurrentModelId)
+  currentLLMModel: TextGeneration.currentLLMModel,
+  getCurrentModelId: TextGeneration.getCurrentModelId,
 
   // ============================================================================
   // Speech-to-Text (Delegated to Extension)
@@ -532,7 +600,16 @@ export const RunAnywhere = {
   transcribeSimple: STT.transcribeSimple,
   transcribeBuffer: STT.transcribeBuffer,
   transcribeStream: STT.transcribeStream,
+  transcribeStreamAsync: STT.transcribeStreamAsync,
   transcribeFile: STT.transcribeFile,
+  // Streaming control (matches Swift: stopStreamingTranscription)
+  stopStreamingTranscription: STT.stopStreamingTranscription,
+  stopStreamingSTT: STT.stopStreamingSTT,
+  isStreamingSTT: STT.isStreamingSTT,
+  // Introspection (matches Swift: currentSTTModel)
+  currentSTTModel: STT.currentSTTModel,
+  // Live transcription session (matches Swift: startLiveTranscription)
+  startLiveTranscription,
 
   // ============================================================================
   // Text-to-Speech (Delegated to Extension)
@@ -546,11 +623,14 @@ export const RunAnywhere = {
   unloadTTSModel: TTS.unloadTTSModel,
   synthesize: TTS.synthesize,
   synthesizeStream: TTS.synthesizeStream,
+  synthesizeStreamAsync: TTS.synthesizeStreamAsync,
   speak: TTS.speak,
   isSpeaking: TTS.isSpeaking,
   stopSpeaking: TTS.stopSpeaking,
   availableTTSVoices: TTS.availableTTSVoices,
   stopSynthesis: TTS.stopSynthesis,
+  // Introspection (matches Swift: currentTTSModel / currentTTSVoiceId)
+  currentTTSModel: TTS.currentTTSModel,
 
   // ============================================================================
   // Voice Activity Detection (Delegated to Extension)
@@ -631,6 +711,35 @@ export const RunAnywhere = {
   processImage: VLM.processImage,
   processImageStream: VLM.processImageStream,
   cancelVLMGeneration: VLM.cancelVLMGeneration,
+
+  // ============================================================================
+  // LoRA Adapters (Delegated to Extension)
+  // Matches Swift: RunAnywhere+LoRA.swift
+  // ============================================================================
+
+  loadLoraAdapter: LoRA.loadLoraAdapter,
+  removeLoraAdapter: LoRA.removeLoraAdapter,
+  clearLoraAdapters: LoRA.clearLoraAdapters,
+  getLoadedLoraAdapters: LoRA.getLoadedLoraAdapters,
+  checkLoraCompatibility: LoRA.checkLoraCompatibility,
+  registerLoraAdapter: LoRA.registerLoraAdapter,
+  loraAdaptersForModel: LoRA.loraAdaptersForModel,
+  allRegisteredLoraAdapters: LoRA.allRegisteredLoraAdapters,
+
+  // ============================================================================
+  // Diffusion / Image Generation (Delegated to Extension)
+  // Matches Swift: RunAnywhere+Diffusion.swift
+  // ============================================================================
+
+  generateImage: Diffusion.generateImage,
+  generateImageStream: Diffusion.generateImageStream,
+  loadDiffusionModel: Diffusion.loadDiffusionModel,
+  unloadDiffusionModel: Diffusion.unloadDiffusionModel,
+  isDiffusionModelLoaded: Diffusion.isDiffusionModelLoaded,
+  currentDiffusionModelId: Diffusion.currentDiffusionModelId,
+  currentDiffusionFramework: Diffusion.currentDiffusionFramework,
+  cancelImageGeneration: Diffusion.cancelImageGeneration,
+  getDiffusionCapabilities: Diffusion.getDiffusionCapabilities,
 
   // ============================================================================
   // RAG Pipeline (Delegated to Extension)

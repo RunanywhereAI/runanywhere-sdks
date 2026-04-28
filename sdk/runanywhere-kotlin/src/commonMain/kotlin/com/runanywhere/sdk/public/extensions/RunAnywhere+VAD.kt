@@ -12,6 +12,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.VAD.SpeechActivityEvent
 import com.runanywhere.sdk.public.extensions.VAD.VADConfiguration
 import com.runanywhere.sdk.public.extensions.VAD.VADResult
 import com.runanywhere.sdk.public.extensions.VAD.VADStatistics
@@ -60,3 +61,101 @@ expect suspend fun RunAnywhere.calibrateVAD(ambientAudioData: ByteArray)
  * Reset VAD state.
  */
 expect suspend fun RunAnywhere.resetVAD()
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4a — VAD lifecycle parity with Swift's RunAnywhere+VAD.swift
+//
+// Mirrors:
+//   `initializeVAD()` / `initializeVAD(_ config:)`
+//   `isVADReady`     / `startVAD()` / `stopVAD()`
+//   `setVADSpeechActivityCallback(...)` / `setVADAudioBufferCallback(...)`
+//   `cleanupVAD()`   / `loadVADModel(_)`
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Initialize VAD with default configuration.
+ *
+ * Mirrors Swift's `RunAnywhere.initializeVAD()`.
+ */
+expect suspend fun RunAnywhere.initializeVAD()
+
+/**
+ * Initialize VAD with the given configuration.
+ *
+ * Mirrors Swift's `RunAnywhere.initializeVAD(_ config:)`. This is the
+ * preferred name going forward — `configureVAD(...)` remains as an
+ * alias for backwards compatibility.
+ */
+expect suspend fun RunAnywhere.initializeVAD(configuration: VADConfiguration)
+
+/**
+ * True when the VAD subsystem is initialized and ready to process audio.
+ *
+ * Mirrors Swift's `RunAnywhere.isVADReady` getter.
+ */
+expect suspend fun RunAnywhere.isVADReady(): Boolean
+
+/**
+ * Start VAD processing. Mirrors Swift's `RunAnywhere.startVAD()`.
+ */
+expect suspend fun RunAnywhere.startVAD()
+
+/**
+ * Stop VAD processing. Mirrors Swift's `RunAnywhere.stopVAD()`.
+ */
+expect suspend fun RunAnywhere.stopVAD()
+
+/**
+ * Set the speech-activity callback that fires whenever the VAD detects
+ * the start or end of speech.
+ *
+ * Mirrors Swift's `RunAnywhere.setVADSpeechActivityCallback(_:)`.
+ *
+ * Idiomatic Kotlin alternative: collect [streamVAD] for a Flow.
+ */
+expect suspend fun RunAnywhere.setVADSpeechActivityCallback(callback: (SpeechActivityEvent) -> Unit)
+
+/**
+ * Set the audio-buffer callback that fires for each processed VAD frame.
+ *
+ * Mirrors Swift's `RunAnywhere.setVADAudioBufferCallback(_:)`.
+ */
+expect suspend fun RunAnywhere.setVADAudioBufferCallback(callback: (FloatArray) -> Unit)
+
+/**
+ * Cleanup VAD resources. Mirrors Swift's `RunAnywhere.cleanupVAD()`.
+ */
+expect suspend fun RunAnywhere.cleanupVAD()
+
+/**
+ * Load a VAD model. Mirrors Swift's
+ * `RunAnywhere.loadVADModel(_ modelId:)`.
+ */
+expect suspend fun RunAnywhere.loadVADModel(modelId: String)
+
+/**
+ * Unload the currently loaded VAD model.
+ * Mirrors Swift's `RunAnywhere.unloadVADModel()`.
+ */
+expect suspend fun RunAnywhere.unloadVADModel()
+
+/**
+ * True if a VAD model is currently loaded.
+ * Mirrors Swift's `RunAnywhere.isVADModelLoaded` getter.
+ */
+expect suspend fun RunAnywhere.isVADModelLoaded(): Boolean
+
+/**
+ * The currently loaded VAD model ID, or `null` if no model is loaded.
+ * Mirrors Swift's `RunAnywhere.currentVADModel` getter.
+ */
+expect suspend fun RunAnywhere.currentVADModelId(): String?
+
+/**
+ * Detect speech in raw audio samples.
+ *
+ * Naming aligned with Swift's `RunAnywhere.detectSpeech(in:)`. This is a
+ * thin alias over `detectVoiceActivity(audioData)`; new callers should
+ * prefer `detectSpeech` for cross-platform parity.
+ */
+expect suspend fun RunAnywhere.detectSpeech(audioData: ByteArray): VADResult

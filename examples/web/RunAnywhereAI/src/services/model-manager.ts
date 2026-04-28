@@ -92,12 +92,13 @@ const REGISTERED_MODELS: CompactModelDef[] = [
 
   // =========================================================================
   // STT models (sherpa-onnx Whisper, tar.gz archive — matches Swift SDK)
+  // Served by the Sherpa-ONNX engine plugin (framework = SHERPA).
   // =========================================================================
   {
     id: 'sherpa-onnx-whisper-tiny.en',
     name: 'Whisper Tiny English (ONNX)',
     url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
-    framework: LLMFramework.ONNX,
+    framework: LLMFramework.Sherpa,
     modality: ModelCategory.SpeechRecognition,
     memoryRequirement: 105_000_000,
     artifactType: 'archive',
@@ -106,12 +107,13 @@ const REGISTERED_MODELS: CompactModelDef[] = [
   // =========================================================================
   // TTS models (sherpa-onnx Piper VITS, tar.gz archives — matches Swift SDK)
   // Archives bundle model.onnx + tokens.txt + espeak-ng-data/ in one file.
+  // Served by the Sherpa-ONNX engine plugin (framework = SHERPA).
   // =========================================================================
   {
     id: 'vits-piper-en_US-lessac-medium',
     name: 'Piper TTS US English (Lessac)',
     url: 'https://huggingface.co/runanywhere/vits-piper-en_US-lessac-medium/resolve/main/vits-piper-en_US-lessac-medium.tar.gz',
-    framework: LLMFramework.ONNX,
+    framework: LLMFramework.Sherpa,
     modality: ModelCategory.SpeechSynthesis,
     memoryRequirement: 65_000_000,
     artifactType: 'archive',
@@ -120,7 +122,7 @@ const REGISTERED_MODELS: CompactModelDef[] = [
     id: 'vits-piper-en_GB-alba-medium',
     name: 'Piper TTS British English (Alba)',
     url: 'https://huggingface.co/runanywhere/vits-piper-en_GB-alba-medium/resolve/main/vits-piper-en_GB-alba-medium.tar.gz',
-    framework: LLMFramework.ONNX,
+    framework: LLMFramework.Sherpa,
     modality: ModelCategory.SpeechSynthesis,
     memoryRequirement: 65_000_000,
     artifactType: 'archive',

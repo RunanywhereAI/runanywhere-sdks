@@ -248,7 +248,6 @@ set(SHERPA_BACKEND_SOURCES
     rac_stt_sherpa.cpp
     rac_tts_sherpa.cpp
     rac_vad_sherpa.cpp
-    rac_onnx_compat.cpp
     rac_backend_sherpa_register.cpp
     wakeword_sherpa.cpp
     rac_plugin_entry_sherpa.cpp

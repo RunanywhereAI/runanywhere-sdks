@@ -25,6 +25,10 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/voice_agent_service.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/llm_service.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/download_service.proto
+    # Phase 3 IDL exhaustiveness — duplicated data shapes across SDKs.
+    ${CMAKE_CURRENT_SOURCE_DIR}/llm_options.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/chat.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/tool_calling.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

@@ -22,6 +22,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
@@ -32,6 +33,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_solutions.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tools.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -59,6 +61,46 @@ class RunAnywhereSDK {
   /// True if the SDK is active (initialized + has init params).
   bool get isActive =>
       SdkState.shared.isInitialized && SdkState.shared.initParams != null;
+
+  /// True once Phase 2 (services) initialization has completed. Mirrors
+  /// Swift's `areServicesReady`. In Flutter, Phase 2 runs eagerly inside
+  /// [initialize] so this returns true alongside [isInitialized] today.
+  bool get areServicesReady =>
+      SdkState.shared.isInitialized && DartBridge.servicesInitialized;
+
+  /// Cached device id — populated during initialization. Mirrors Swift's
+  /// `deviceId: String`.
+  String get deviceId =>
+      DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
+
+  /// Authenticated user id, or null if not signed in. Mirrors Swift's
+  /// `getUserId()`.
+  String? get userId => DartBridgeAuth.instance.getUserId();
+
+  /// Authenticated organization id, or null. Mirrors Swift's
+  /// `getOrganizationId()`.
+  String? get organizationId =>
+      DartBridgeAuth.instance.getOrganizationId();
+
+  /// True if the SDK has a valid authentication token.
+  bool get isAuthenticated => DartBridgeAuth.instance.isAuthenticated();
+
+  /// True if the device has been registered with the backend. Mirrors
+  /// Swift's `isDeviceRegistered()`.
+  bool get isDeviceRegistered =>
+      DartBridgeDevice.cachedDeviceId != null &&
+      DartBridgeDevice.cachedDeviceId!.isNotEmpty;
+
+  /// Awaitable Phase-2 completion. Mirrors Swift's
+  /// `completeServicesInitialization()`. In Flutter Phase 2 already
+  /// completes synchronously inside [initialize]; this getter exists
+  /// for API parity and resolves immediately if initialization is done.
+  Future<void> completeServicesInitialization() async {
+    if (areServicesReady) return;
+    if (!isInitialized) {
+      throw SDKError.notInitialized();
+    }
+  }
 
   /// Initialization params (apiKey, baseURL, environment) — null
   /// until [initialize] runs.
@@ -200,8 +242,12 @@ class RunAnywhereSDK {
   /// STT (speech-to-text) — load, transcribe.
   RunAnywhereSTT get stt => RunAnywhereSTT.shared;
 
-  /// TTS (text-to-speech) — load voice, synthesize.
+  /// TTS (text-to-speech) — load voice, synthesize, speak.
   RunAnywhereTTS get tts => RunAnywhereTTS.shared;
+
+  /// VAD (voice activity detection) — initialize, detectSpeech, start/stop,
+  /// load model. Mirrors Swift's `RunAnywhere+VAD.swift` extension.
+  RunAnywhereVAD get vad => RunAnywhereVAD.shared;
 
   /// VLM (vision-language model) — load, processImage, processImageStream,
   /// describe, askAbout.

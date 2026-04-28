@@ -196,6 +196,7 @@ enum ModelCategory {
 enum InferenceFramework {
   // Model-based frameworks
   onnx('ONNX', 'ONNX Runtime', 'onnx'),
+  sherpa('Sherpa', 'Sherpa-ONNX', 'sherpa'),
   llamaCpp('LlamaCpp', 'llama.cpp', 'llama_cpp'),
   foundationModels(
       'FoundationModels', 'Foundation Models', 'foundation_models'),
@@ -228,6 +229,8 @@ enum InferenceFramework {
     switch (this) {
       case InferenceFramework.onnx:
         return pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
+      case InferenceFramework.sherpa:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
       case InferenceFramework.llamaCpp:
         return pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
       case InferenceFramework.foundationModels:
@@ -250,6 +253,9 @@ enum InferenceFramework {
   static InferenceFramework fromProto(pb.InferenceFramework proto) {
     if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX) {
       return InferenceFramework.onnx;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA) {
+      return InferenceFramework.sherpa;
     }
     if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP) {
       return InferenceFramework.llamaCpp;

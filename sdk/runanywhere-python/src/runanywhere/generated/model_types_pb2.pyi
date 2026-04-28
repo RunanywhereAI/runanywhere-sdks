@@ -64,6 +64,7 @@ class InferenceFramework(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     INFERENCE_FRAMEWORK_BUILT_IN: _ClassVar[InferenceFramework]
     INFERENCE_FRAMEWORK_NONE: _ClassVar[InferenceFramework]
     INFERENCE_FRAMEWORK_UNKNOWN: _ClassVar[InferenceFramework]
+    INFERENCE_FRAMEWORK_SHERPA: _ClassVar[InferenceFramework]
 
 class ModelCategory(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -155,6 +156,7 @@ INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS: InferenceFramework
 INFERENCE_FRAMEWORK_BUILT_IN: InferenceFramework
 INFERENCE_FRAMEWORK_NONE: InferenceFramework
 INFERENCE_FRAMEWORK_UNKNOWN: InferenceFramework
+INFERENCE_FRAMEWORK_SHERPA: InferenceFramework
 MODEL_CATEGORY_UNSPECIFIED: ModelCategory
 MODEL_CATEGORY_LANGUAGE: ModelCategory
 MODEL_CATEGORY_SPEECH_RECOGNITION: ModelCategory

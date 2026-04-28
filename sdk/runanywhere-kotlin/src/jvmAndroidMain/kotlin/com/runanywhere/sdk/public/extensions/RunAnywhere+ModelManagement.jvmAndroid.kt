@@ -97,6 +97,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                     when (modelInfo.framework) {
                         InferenceFramework.LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
                         InferenceFramework.ONNX -> CppBridgeModelRegistry.Framework.ONNX
+                        InferenceFramework.SHERPA -> CppBridgeModelRegistry.Framework.SHERPA
                         InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
                         InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
                         InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
@@ -301,6 +302,7 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
             when (bridge.framework) {
                 CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
                 CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
+                CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.SHERPA
                 CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
                 CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
                 CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
@@ -910,6 +912,19 @@ private suspend fun downloadEmbeddingModelFiles(
                 downloadFileWithNativeRunner(url, destFile) { _ -> }
             }
 
+            // B-AK-17-RAG: verify the file actually has bytes on disk. Some download
+            // providers (HttpURLConnection on flaky redirects, certain proxy setups)
+            // can return success while writing a 0-byte file. Catching that here
+            // means we throw before the registry is updated, so the catch block
+            // below rolls back cleanly instead of leaving a 0-byte stub that the
+            // next cold-start scan would happily restore.
+            val writtenSize = withContext(Dispatchers.IO) { destFile.length() }
+            if (!destFile.exists() || writtenSize <= 0L) {
+                throw IOException(
+                    "Download wrote 0 bytes for [$filename] at ${destFile.absolutePath} (url=$url)",
+                )
+            }
+
             val overallProgress = (index + 1f) / fileCount
             emit(
                 DownloadProgress(
@@ -920,7 +935,7 @@ private suspend fun downloadEmbeddingModelFiles(
                     state = if (overallProgress >= 1f) DownloadState.COMPLETED else DownloadState.DOWNLOADING,
                 ),
             )
-            logger.info("Downloaded [$filename] to ${destFile.absolutePath}")
+            logger.info("Downloaded [$filename] to ${destFile.absolutePath} ($writtenSize bytes)")
         }
 
         val dirPath = embeddingDir.absolutePath

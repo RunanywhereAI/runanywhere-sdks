@@ -74,6 +74,10 @@ public enum class InferenceFramework(
   INFERENCE_FRAMEWORK_BUILT_IN(20),
   INFERENCE_FRAMEWORK_NONE(21),
   INFERENCE_FRAMEWORK_UNKNOWN(22),
+  /**
+   * Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+   */
+  INFERENCE_FRAMEWORK_SHERPA(23),
   ;
 
   public companion object {
@@ -112,6 +116,7 @@ public enum class InferenceFramework(
       20 -> INFERENCE_FRAMEWORK_BUILT_IN
       21 -> INFERENCE_FRAMEWORK_NONE
       22 -> INFERENCE_FRAMEWORK_UNKNOWN
+      23 -> INFERENCE_FRAMEWORK_SHERPA
       else -> null
     }
   }

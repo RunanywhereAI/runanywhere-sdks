@@ -260,6 +260,8 @@ int _frameworkToCValue(InferenceFramework framework) {
       return 6; // RAC_FRAMEWORK_NONE
     case InferenceFramework.genie:
       return 11; // RAC_FRAMEWORK_GENIE
+    case InferenceFramework.sherpa:
+      return 12; // RAC_FRAMEWORK_SHERPA
     case InferenceFramework.unknown:
       return 99;
   }

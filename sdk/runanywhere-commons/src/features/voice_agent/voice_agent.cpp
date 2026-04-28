@@ -23,6 +23,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/voice_agent/rac_voice_event_abi.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
@@ -271,6 +272,14 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
                 rac_llm_component_destroy(handle->llm_handle);
         }
     }
+
+    // B-FL-13/B-FL-5-001 sibling fix: clear any lingering proto-stream
+    // callback registration keyed by this voice-agent handle BEFORE freeing
+    // the memory. Without this, heap-pointer reuse on the next
+    // rac_voice_agent_create() inherits a stale CallbackSlot { fn, user_data,
+    // seq } from the previous session, corrupting the wire-seq sequence on
+    // the very first VoiceEvent dispatch.
+    rac_voice_agent_set_proto_callback(handle, nullptr, nullptr);
 
     // All threads that held/waited on mutex have now exited
     delete handle;

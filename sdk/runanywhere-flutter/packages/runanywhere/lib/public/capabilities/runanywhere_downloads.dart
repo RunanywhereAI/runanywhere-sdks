@@ -284,6 +284,8 @@ class RunAnywhereDownloads {
         return 6;
       case InferenceFramework.genie:
         return 11;
+      case InferenceFramework.sherpa:
+        return 12;
       case InferenceFramework.unknown:
         return 99;
     }

@@ -159,6 +159,11 @@ class DartBridgeTTS {
   /// [rate] - Speech rate (0.5 to 2.0, 1.0 is normal).
   /// [pitch] - Speech pitch (0.5 to 2.0, 1.0 is normal).
   /// [volume] - Speech volume (0.0 to 1.0).
+  /// [language] - BCP-47 language tag (default "en-US").
+  /// [audioFormat] - Output audio format constant (default PCM).
+  /// [sampleRate] - Output sample rate (default 22050).
+  /// [useSsml] - Whether the input is SSML (default false).
+  /// [voiceId] - Override the loaded voice (rarely needed; default null).
   ///
   /// Returns audio data and metadata.
   /// Runs in a background isolate to prevent UI blocking.
@@ -167,6 +172,11 @@ class DartBridgeTTS {
     double rate = 1.0,
     double pitch = 1.0,
     double volume = 1.0,
+    String language = 'en-US',
+    int audioFormat = racAudioFormatPcm,
+    int sampleRate = 22050,
+    bool useSsml = false,
+    String? voiceId,
   }) async {
     TTSConfiguration(
       speakingRate: rate,
@@ -190,6 +200,11 @@ class DartBridgeTTS {
           rate,
           pitch,
           volume,
+          language,
+          audioFormat,
+          sampleRate,
+          useSsml,
+          voiceId,
         ));
 
     _logger.info(
@@ -206,6 +221,11 @@ class DartBridgeTTS {
     double rate,
     double pitch,
     double volume,
+    String language,
+    int audioFormat,
+    int sampleRate,
+    bool useSsml,
+    String? voiceId,
   ) {
     final lib = PlatformLoader.loadCommons();
     final handle = RacHandle.fromAddress(handleAddress);
@@ -214,18 +234,19 @@ class DartBridgeTTS {
     final textPtr = text.toNativeUtf8();
     final optionsPtr = calloc<RacTtsOptionsStruct>();
     final resultPtr = calloc<RacTtsResultStruct>();
+    final voicePtr = voiceId?.toNativeUtf8();
 
     try {
-      // Set up options (matches Swift's TTSOptions)
-      final languagePtr = 'en-US'.toNativeUtf8();
-      optionsPtr.ref.voice = nullptr; // Use default voice
+      // Set up options (matches Swift's TTSOptions wire shape).
+      final languagePtr = language.toNativeUtf8();
+      optionsPtr.ref.voice = voicePtr ?? nullptr;
       optionsPtr.ref.language = languagePtr;
       optionsPtr.ref.rate = rate;
       optionsPtr.ref.pitch = pitch;
       optionsPtr.ref.volume = volume;
-      optionsPtr.ref.audioFormat = racAudioFormatPcm;
-      optionsPtr.ref.sampleRate = 22050; // Piper default
-      optionsPtr.ref.useSsml = RAC_FALSE;
+      optionsPtr.ref.audioFormat = audioFormat;
+      optionsPtr.ref.sampleRate = sampleRate;
+      optionsPtr.ref.useSsml = useSsml ? RAC_TRUE : RAC_FALSE;
 
       // Get synthesize function
       final synthesizeFn = lib.lookupFunction<
@@ -261,7 +282,7 @@ class DartBridgeTTS {
       // Extract result before freeing
       final result = resultPtr.ref;
       final audioSize = result.audioSize;
-      final sampleRate = result.sampleRate;
+      final outputSampleRate = result.sampleRate;
       final durationMs = result.durationMs;
 
       // Convert audio data to Float32List
@@ -271,29 +292,75 @@ class DartBridgeTTS {
         // Audio size is in bytes, each float is 4 bytes
         final numSamples = audioSize ~/ 4;
         final floatPtr = result.audioData.cast<Float>();
+        // `Float32List.fromList` performs an element-by-element copy out of
+        // the native buffer so the returned list is owned by the Dart heap.
         samples = Float32List.fromList(floatPtr.asTypedList(numSamples));
       } else {
         samples = Float32List(0);
       }
 
+      // B-FL-12-002: the C ABI is "callee allocates audio_data via malloc(),
+      // caller MUST free via rac_tts_result_free()" (see rac_tts_service.h
+      // line 115). Skipping this leaks ~1 MiB per synthesis and — combined
+      // with the Cleaner-thread sweep that runs on the libc heap — eventually
+      // trips Scudo's corrupted-chunk-header detector inside
+      // BinderProxy_destroy / Binder_destroy on the ReferenceQueueDaemon
+      // thread, killing the process via SIGABRT. Calling
+      // rac_tts_result_free after the copy returns the buffer to libc through
+      // the same allocator that produced it (Sherpa malloc -> libc free) and
+      // matches the contract every other binding (Swift / Kotlin / RN) honors.
+      try {
+        final freeFn = lib.lookupFunction<
+            Void Function(Pointer<RacTtsResultStruct>),
+            void Function(Pointer<RacTtsResultStruct>)>('rac_tts_result_free');
+        freeFn(resultPtr);
+      } catch (_) {
+        // If the symbol isn't exported on this build, fall back silently —
+        // we still surface the synthesized samples to the caller.
+      }
+
       return TTSComponentResult(
         samples: samples,
-        sampleRate: sampleRate,
+        sampleRate: outputSampleRate,
         durationMs: durationMs,
       );
     } finally {
       calloc.free(textPtr);
       calloc.free(optionsPtr);
       calloc.free(resultPtr);
+      if (voicePtr != null) {
+        calloc.free(voicePtr);
+      }
     }
   }
 
   /// Synthesize with streaming.
   ///
-  /// Returns a stream of audio chunks.
-  Stream<TTSStreamResult> synthesizeStream(String text) async* {
-    // For now, generate all audio and emit in chunks
-    final result = await synthesize(text);
+  /// Returns a stream of audio chunks. Until the underlying C bridge
+  /// supports per-chunk callbacks, this fans out the synchronous
+  /// result in ~100 ms slices.
+  Stream<TTSStreamResult> synthesizeStream(
+    String text, {
+    double rate = 1.0,
+    double pitch = 1.0,
+    double volume = 1.0,
+    String language = 'en-US',
+    int audioFormat = racAudioFormatPcm,
+    int sampleRate = 22050,
+    bool useSsml = false,
+    String? voiceId,
+  }) async* {
+    final result = await synthesize(
+      text,
+      rate: rate,
+      pitch: pitch,
+      volume: volume,
+      language: language,
+      audioFormat: audioFormat,
+      sampleRate: sampleRate,
+      useSsml: useSsml,
+      voiceId: voiceId,
+    );
 
     // Emit in ~100ms chunks
     final samplesPerChunk = (result.sampleRate * 0.1).round();

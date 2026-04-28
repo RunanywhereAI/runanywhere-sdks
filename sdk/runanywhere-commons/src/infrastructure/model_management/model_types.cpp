@@ -103,6 +103,11 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
             return RAC_MODEL_CATEGORY_LANGUAGE;
         case RAC_FRAMEWORK_ONNX:
             return RAC_MODEL_CATEGORY_MULTIMODAL;
+        case RAC_FRAMEWORK_SHERPA:
+            // Sherpa-ONNX serves STT/TTS/VAD/wakeword speech models;
+            // MULTIMODAL keeps the existing routing (consumer maps to
+            // STT vs TTS via model.category at registration time).
+            return RAC_MODEL_CATEGORY_MULTIMODAL;
         case RAC_FRAMEWORK_SYSTEM_TTS:
             return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS;
         case RAC_FRAMEWORK_FLUID_AUDIO:
@@ -125,7 +130,8 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
 
     // Mirrors Swift's InferenceFramework.supportedFormats
     switch (framework) {
-        case RAC_FRAMEWORK_ONNX: {
+        case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_SHERPA: {
             *out_count = 2;
             *out_formats = (rac_model_format_t*)malloc(2 * sizeof(rac_model_format_t));
             if (!*out_formats)
@@ -170,6 +176,7 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
     // Mirrors Swift's InferenceFramework.supports(format:)
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_SHERPA:
             return (format == RAC_MODEL_FORMAT_ONNX || format == RAC_MODEL_FORMAT_ORT) ? RAC_TRUE
                                                                                        : RAC_FALSE;
         case RAC_FRAMEWORK_LLAMACPP:
@@ -189,6 +196,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
     // Mirrors Swift's InferenceFramework.usesDirectoryBasedModels
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_SHERPA:  // Sherpa-ONNX speech models extract to directories (encoder/decoder/tokens.txt)
         case RAC_FRAMEWORK_COREML:             // CoreML compiled models (.mlmodelc) are directories
         case RAC_FRAMEWORK_WHISPERKIT_COREML:  // WhisperKit models are directories of .mlmodelc
                                                // files
@@ -217,6 +225,7 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
     // Mirrors Swift's InferenceFramework.supportsSTT
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_SHERPA:
         case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return RAC_TRUE;
         default:
@@ -229,6 +238,7 @@ rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_SYSTEM_TTS:
         case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_SHERPA:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -240,6 +250,8 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
             return "ONNX Runtime";
+        case RAC_FRAMEWORK_SHERPA:
+            return "Sherpa-ONNX";
         case RAC_FRAMEWORK_LLAMACPP:
             return "llama.cpp";
         case RAC_FRAMEWORK_COREML:
@@ -270,6 +282,8 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
             return "onnx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
         case RAC_FRAMEWORK_LLAMACPP:
             return "llama_cpp";
         case RAC_FRAMEWORK_COREML:

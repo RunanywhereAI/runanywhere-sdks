@@ -107,6 +107,8 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
             return "ONNX";
+        case RAC_FRAMEWORK_SHERPA:
+            return "Sherpa";
         case RAC_FRAMEWORK_LLAMACPP:
             return "LlamaCpp";
         case RAC_FRAMEWORK_COREML:

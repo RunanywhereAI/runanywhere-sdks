@@ -1,0 +1,124 @@
+// RunAnywhere v2 IDL — LLM generation options + result.
+//
+// Phase 3 of v2 IDL Exhaustiveness migration. These two messages were
+// hand-rolled in 5 SDKs:
+//   - Swift  Public/Extensions/LLM/LLMTypes.swift (LLMGenerationOptions, LLMGenerationResult)
+//   - Kotlin commonMain/.../LLMOptions.kt
+//   - Dart   lib/public/types/llm_options.dart
+//   - RN     core/src/types/llm.ts
+//   - Web    packages/core/src/llm/types.ts
+//
+// Generating from a single proto definition removes ~1,500 LOC of duplicated
+// shape definitions and locks the field names + types across all 5 SDKs.
+//
+// ABI note: LLMGenerationOptions is the user-facing knobs struct. The
+// existing rac_llm_options_t C ABI struct (Foundation/Bridge/) is the C-side
+// counterpart; codegen does NOT replace that — Swift's withCOptions() bridge
+// closure still flows fields one-by-one into the C struct.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LLMOptionsProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Options for a single text generation invocation.
+//
+// Field names match Swift LLMGenerationOptions exactly; consumers may treat
+// proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
+// represents optional reference fields explicitly via `optional` keyword).
+// ---------------------------------------------------------------------------
+message LLMGenerationOptions {
+    // Maximum number of tokens to generate. 0 (default) = unset → engine
+    // default (typically 100).
+    int32  max_tokens          = 1;
+
+    // Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
+    float  temperature         = 2;
+
+    // Nucleus sampling (top-p). 1.0 = no nucleus truncation.
+    float  top_p               = 3;
+
+    // Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
+    int32  top_k               = 4;
+
+    // Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
+    float  repetition_penalty  = 5;
+
+    // Stop sequences. Generation halts when any of these strings appears in
+    // the output stream.
+    repeated string stop_sequences = 6;
+
+    // Whether to stream tokens vs return result at end (Swift field).
+    bool   streaming_enabled   = 7;
+
+    // Preferred inference framework. UNSPECIFIED = pick automatically.
+    InferenceFramework preferred_framework = 8;
+
+    // System prompt to define AI behavior and formatting rules.
+    optional string system_prompt = 9;
+
+    // Optional structured-output mode (JSON schema). Engine returns text
+    // that conforms to this schema. Swift wraps this in a StructuredOutputConfig
+    // struct with the Generatable.Type — proto carries just the schema string.
+    optional string json_schema = 10;
+}
+
+// ---------------------------------------------------------------------------
+// Result of a single text generation. Same fields as the Swift
+// LLMGenerationResult plus the fields RN/Web carry that Swift derives from
+// the rac_llm_stream_result_t C struct.
+// ---------------------------------------------------------------------------
+message LLMGenerationResult {
+    // Generated text (with thinking content removed if extracted).
+    string text                = 1;
+
+    // Optional thinking/reasoning content extracted from the response.
+    optional string thinking_content = 2;
+
+    // Number of input/prompt tokens (from tokenizer).
+    int32  input_tokens        = 3;
+
+    // Number of tokens used (output / completion tokens).
+    int32  tokens_generated    = 4;
+
+    // Model used for generation.
+    string model_used          = 5;
+
+    // Total wall-clock generation time in milliseconds.
+    double generation_time_ms  = 6;
+
+    // Time-to-first-token in milliseconds (only set in streaming mode).
+    optional double ttft_ms    = 7;
+
+    // Tokens-per-second throughput.
+    double tokens_per_second   = 8;
+
+    // Framework that actually performed the generation. Optional because
+    // some C ABI paths don't surface it.
+    optional string framework  = 9;
+
+    // Reason the generation stopped: "stop", "length", "cancelled", "error".
+    // Empty = unset.
+    string finish_reason       = 10;
+
+    // Number of tokens used for thinking/reasoning. 0 = not applicable.
+    int32  thinking_tokens     = 11;
+
+    // Number of tokens in the actual response content (vs thinking).
+    int32  response_tokens     = 12;
+
+    // Optional JSON output (when structured-output mode was requested).
+    // Empty = no structured output.
+    optional string json_output = 13;
+}

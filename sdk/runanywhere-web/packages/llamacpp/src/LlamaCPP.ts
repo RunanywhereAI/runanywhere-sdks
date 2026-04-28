@@ -10,6 +10,7 @@
  *   LlamaCPP.addModel({ id: 'my-model', name: 'My Model', url: '...' });
  */
 
+import { setAccelerationSwitcher, setActiveAccelerationMode } from '@runanywhere/web';
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 import { LlamaCppProvider } from './LlamaCppProvider';
 
@@ -54,13 +55,28 @@ export const LlamaCPP = {
     const bridge = LlamaCppBridge.shared;
     if (options?.wasmUrl) bridge.wasmUrl = options.wasmUrl;
     if (options?.webgpuWasmUrl) bridge.webgpuWasmUrl = options.webgpuWasmUrl;
-    return LlamaCppProvider.register(options?.acceleration);
+
+    // Wire `RunAnywhere.runtime.setAcceleration(mode)` into the bridge so the
+    // public surface no longer needs to expose `LlamaCppBridge.switchToAcceleration`
+    // directly. Cleared on unregister(). (Phase 4d P1.)
+    setAccelerationSwitcher(async (mode: 'cpu' | 'webgpu') => {
+      await bridge.switchToAcceleration(mode);
+      setActiveAccelerationMode(bridge.accelerationMode as 'cpu' | 'webgpu');
+    });
+
+    await LlamaCppProvider.register(options?.acceleration);
+
+    // After a successful load, publish the active mode so `RunAnywhere.runtime.active`
+    // reflects what the bridge actually picked (auto -> webgpu/cpu resolution).
+    setActiveAccelerationMode(bridge.accelerationMode as 'cpu' | 'webgpu');
   },
 
   /**
    * Unregister the backend and clean up.
    */
   unregister(): void {
+    setAccelerationSwitcher(null);
+    setActiveAccelerationMode(null);
     LlamaCppProvider.unregister();
   },
 };

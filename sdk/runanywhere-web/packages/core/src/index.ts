@@ -24,6 +24,89 @@
 export { RunAnywhere } from './Public/RunAnywhere';
 export type { StorageBackend } from './Public/RunAnywhere';
 
+// Phase 4d: top-level convenience verbs (chat / generate / transcribe /
+// synthesize / speak / detectSpeech / setVADCallback / etc.) — also reachable
+// as static methods on `RunAnywhere`. Re-exported for tree-shakability.
+export {
+  chat,
+  generate,
+  generateStream,
+  generateStructured,
+  transcribe,
+  synthesize,
+  speak,
+  isSpeaking,
+  stopSpeaking,
+  detectSpeech,
+  setVADCallback,
+  startVAD,
+  stopVAD,
+  cleanupVAD,
+  isVADReady,
+} from './Public/Extensions/RunAnywhere+Convenience';
+
+// LoRA / RAG / VoiceAgent C-ABI extensions (Phase 4d).
+// Today these dispatch through provider hooks installed by backend packages.
+export {
+  loadLoraAdapter,
+  removeLoraAdapter,
+  clearLoraAdapters,
+  getLoadedLoraAdapters,
+  checkLoraCompatibility,
+  registerLoraAdapter,
+  loraAdaptersForModel,
+  allRegisteredLoraAdapters,
+  setLoRAProvider,
+} from './Public/Extensions/RunAnywhere+LoRA';
+export type { LoRAProvider } from './Public/Extensions/RunAnywhere+LoRA';
+
+export {
+  ragCreatePipeline,
+  ragDestroyPipeline,
+  ragIngest,
+  ragAddDocumentsBatch,
+  ragQuery,
+  ragClearDocuments,
+  ragDocumentCount,
+  ragGetStatistics,
+  setRAGProvider,
+} from './Public/Extensions/RunAnywhere+RAG';
+export type { RAGProvider } from './Public/Extensions/RunAnywhere+RAG';
+
+export {
+  initializeVoiceAgent,
+  initializeVoiceAgentWithLoadedModels,
+  isVoiceAgentReady,
+  getVoiceAgentComponentStates,
+  areAllVoiceComponentsReady,
+  processVoiceTurn,
+  voiceAgentTranscribe,
+  voiceAgentGenerateResponse,
+  voiceAgentSynthesizeSpeech,
+  cleanupVoiceAgent,
+  setVoiceAgentProvider,
+} from './Public/Extensions/RunAnywhere+VoiceAgent';
+export type { VoiceAgentProvider } from './Public/Extensions/RunAnywhere+VoiceAgent';
+
+// Runtime config (acceleration). Backend hooks for the llamacpp pkg.
+export {
+  Runtime,
+  setAccelerationSwitcher,
+  setActiveAccelerationMode,
+} from './Foundation/RuntimeConfig';
+export type {
+  RuntimeAccelerationMode,
+  RuntimeAccelerationSwitcher,
+} from './Foundation/RuntimeConfig';
+
+// Storage provider interface (Phase 4d P1) — uniform contract for OPFS /
+// File System Access / memory backends.
+export type {
+  StorageProvider,
+  StorageProviderId,
+  StorageProviderCapabilities,
+} from './Infrastructure/StorageProvider';
+
 // Voice orchestration — two paths:
 //   1. VoicePipeline      — TS-side composition (STT -> LLM -> TTS) via ExtensionPoint.
 //   2. VoiceAgentStreamAdapter — WASM proto-stream (VoiceEvent) parity with iOS/Android/Flutter/RN.
@@ -154,6 +237,7 @@ export type {
   LLMProvider,
   STTProvider,
   TTSProvider,
+  VADProvider,
 } from './Infrastructure/ProviderTypes';
 export type { ModelLoadContext, LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader } from './Infrastructure/ModelLoaderTypes';
 export { extractTarGz } from './Infrastructure/ArchiveUtility';

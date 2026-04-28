@@ -52,6 +52,13 @@ task syncSdkNativeLibs {
                 logger.lifecycle("[syncSdkNativeLibs] Skipping ${sdkPkg} — node_modules dest missing (run yarn install?)")
                 return
             }
+            // When yarn workspaces hoist + symlink node_modules/@runanywhere/* back into
+            // sdk/runanywhere-react-native/packages/*, src and dst resolve to the same
+            // canonical path — copying onto itself wipes header bytes. Skip in that case.
+            if (src.canonicalPath == dst.canonicalPath) {
+                logger.lifecycle("[syncSdkNativeLibs] Skipping ${sdkPkg} — node_modules entry is symlinked to SDK source (no copy needed)")
+                return
+            }
             project.copy {
                 from src
                 into dst

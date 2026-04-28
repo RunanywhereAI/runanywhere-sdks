@@ -99,11 +99,15 @@ data class LLMConfiguration(
 /**
  * Options for text generation.
  * Mirrors Swift LLMGenerationOptions exactly.
+ *
+ * Defaults aligned with Swift's `LLMGenerationOptions` (LLMTypes.swift):
+ * `maxTokens=100`, `temperature=0.8f`. Phase 4a Kotlin alignment fix —
+ * previous Kotlin defaults (`1000`, `0.7f`) were drifting from Swift.
  */
 @Serializable
 data class LLMGenerationOptions(
-    val maxTokens: Int = 1000,
-    val temperature: Float = 0.7f,
+    val maxTokens: Int = 100,
+    val temperature: Float = 0.8f,
     val topP: Float = 1.0f,
     val stopSequences: List<String> = emptyList(),
     val streamingEnabled: Boolean = false,

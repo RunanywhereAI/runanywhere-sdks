@@ -5,6 +5,7 @@
 
 import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/adapters/model_download_adapter.dart';
+import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -15,18 +16,49 @@ class RunAnywhereStorage {
   RunAnywhereStorage._();
 
   /// True if the device has enough free storage for [modelSize].
-  /// [safetyMargin] pads the check by a fraction (default 10%).
-  static Future<bool> checkStorageAvailable({
+  ///
+  /// [safetyMargin] pads the check by a fraction (default 10%). Returns
+  /// the rich [StorageAvailability] shape so callers can surface the
+  /// required/available bytes and any warning. Mirrors Swift's
+  /// `checkStorageAvailable(for:safetyMargin:) -> StorageAvailability`.
+  static Future<StorageAvailability> checkStorageAvailable({
     required int modelSize,
     double safetyMargin = 0.1,
   }) async {
-    try {
-      final requiredWithMargin = (modelSize * (1 + safetyMargin)).toInt();
-      return DartBridgeFileManager.checkStorage(requiredWithMargin);
-    } catch (_) {
-      // Fail-open: assume available if the native check fails.
-      return true;
+    final requiredWithMargin = (modelSize * (1 + safetyMargin)).toInt();
+
+    final native =
+        DartBridgeFileManager.checkStorageAvailability(requiredWithMargin);
+    if (native != null) {
+      return StorageAvailability(
+        isAvailable: native.isAvailable,
+        requiredSpace: native.requiredSpace,
+        availableSpace: native.availableSpace,
+        hasWarning: native.hasWarning,
+        recommendation: native.recommendation,
+      );
     }
+
+    // Fail-open: assume available if the native call returns null.
+    return StorageAvailability(
+      isAvailable: true,
+      requiredSpace: requiredWithMargin,
+      availableSpace: 0,
+      hasWarning: false,
+    );
+  }
+
+  /// Boolean-only convenience matching the legacy v3 surface. Prefer
+  /// [checkStorageAvailable] which returns the rich shape.
+  static Future<bool> isStorageAvailable({
+    required int modelSize,
+    double safetyMargin = 0.1,
+  }) async {
+    final result = await checkStorageAvailable(
+      modelSize: modelSize,
+      safetyMargin: safetyMargin,
+    );
+    return result.isAvailable;
   }
 
   /// Get a value from native storage.

@@ -2,6 +2,7 @@
 /// Matches iOS ErrorCategory from Foundation/ErrorTypes/ErrorCategory.swift
 enum ErrorCategory {
   initialization,
+  general,
   model,
   generation,
   network,
@@ -12,6 +13,20 @@ enum ErrorCategory {
   authentication,
   component,
   framework,
+  // Component-specific categories — mirror Swift's `ErrorCategory` cases.
+  stt,
+  tts,
+  vad,
+  llm,
+  vlm,
+  speakerDiarization,
+  wakeWord,
+  voiceAgent,
+  rag,
+  download,
+  fileManagement,
+  security,
+  runtime,
   unknown;
 
   /// Initialize from an error by analyzing its type and message

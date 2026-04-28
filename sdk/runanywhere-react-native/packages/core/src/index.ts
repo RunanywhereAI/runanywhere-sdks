@@ -295,6 +295,78 @@ export {
   cancelVLMGeneration,
 } from './Public/Extensions/RunAnywhere+VLM';
 
+// =============================================================================
+// LoRA Adapter Management
+// =============================================================================
+
+export {
+  loadLoraAdapter,
+  removeLoraAdapter,
+  clearLoraAdapters,
+  getLoadedLoraAdapters,
+  checkLoraCompatibility,
+  registerLoraAdapter,
+  loraAdaptersForModel,
+  allRegisteredLoraAdapters,
+} from './Public/Extensions/RunAnywhere+LoRA';
+
+export type {
+  LoRAAdapterConfig,
+  LoRAAdapterInfo,
+  LoraAdapterCatalogEntry,
+  LoraCompatibilityResult,
+} from './types/LoRATypes';
+
+// =============================================================================
+// Diffusion / Image Generation
+// =============================================================================
+
+export {
+  generateImage,
+  generateImageStream,
+  loadDiffusionModel,
+  unloadDiffusionModel,
+  isDiffusionModelLoaded,
+  currentDiffusionModelId,
+  currentDiffusionFramework,
+  cancelImageGeneration,
+  getDiffusionCapabilities,
+} from './Public/Extensions/RunAnywhere+Diffusion';
+
+export {
+  DiffusionModelVariant,
+  DiffusionScheduler,
+  DiffusionMode,
+} from './types/DiffusionTypes';
+
+export type {
+  DiffusionConfiguration,
+  DiffusionGenerationOptions,
+  DiffusionProgress,
+  DiffusionResult,
+  DiffusionCapabilities,
+  DiffusionStreamingResult,
+  DiffusionTokenizerSource,
+} from './types/DiffusionTypes';
+
+// =============================================================================
+// Live Transcription Session
+// =============================================================================
+
+export {
+  LiveTranscriptionSession,
+  LiveTranscriptionError,
+  startLiveTranscription,
+} from './Public/Sessions/LiveTranscriptionSession';
+export type { LiveTranscriptionListener } from './Public/Sessions/LiveTranscriptionSession';
+
+// =============================================================================
+// Streaming type re-exports for newly aligned AsyncIterable shapes
+// =============================================================================
+
+export type { STTStreamingResult } from './Public/Extensions/RunAnywhere+STT';
+export type { TTSStreamingResult } from './Public/Extensions/RunAnywhere+TTS';
+
 export type {
   RAGConfiguration,
   RAGQueryOptions,

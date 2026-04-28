@@ -274,8 +274,25 @@ export async function synthesize(
 }
 
 /**
- * Synthesize with streaming (chunked audio output)
- * Matches Swift SDK: RunAnywhere.synthesizeStream(_:options:onAudioChunk:)
+ * Streaming result for TTS, mirrors LLM/VLM streaming primitives.
+ * Consumers can either `for await` over `chunks` or supply the legacy
+ * callback variant via `synthesizeStream`.
+ */
+export interface TTSStreamingResult {
+  /** Async iterator over audio chunks (raw PCM as ArrayBuffer) */
+  chunks: AsyncIterable<ArrayBuffer>;
+  /** Promise that resolves to the final TTS output */
+  result: Promise<TTSOutput>;
+  /** Cancel the synthesis */
+  cancel: () => void;
+}
+
+/**
+ * Synthesize with streaming (chunked audio output) — callback variant.
+ * Matches Swift SDK: RunAnywhere.synthesizeStream(_:options:onAudioChunk:).
+ *
+ * For an AsyncIterable surface (consistent with LLM/VLM streaming),
+ * use `synthesizeStreamAsync()` instead.
  */
 export async function synthesizeStream(
   text: string,
@@ -285,8 +302,6 @@ export async function synthesizeStream(
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-
-  const startTime = Date.now();
 
   // For now, synthesize and emit as single chunk
   // In a full implementation, this would stream chunks from native
@@ -307,6 +322,93 @@ export async function synthesizeStream(
   }
 
   return output;
+}
+
+/**
+ * AsyncIterable variant of `synthesizeStream`.
+ *
+ * Returns `{ chunks, result, cancel }` mirroring the LLM/VLM streaming
+ * shape. Consume audio chunks with `for await ... of chunks` and obtain
+ * the final metadata via `await result`.
+ *
+ * Matches the Swift `synthesizeStream` AsyncStream shape.
+ */
+export async function synthesizeStreamAsync(
+  text: string,
+  options: TTSOptions = {}
+): Promise<TTSStreamingResult> {
+  const queue: ArrayBuffer[] = [];
+  let resolver: ((value: IteratorResult<ArrayBuffer>) => void) | null = null;
+  let done = false;
+  let streamError: Error | null = null;
+  let cancelled = false;
+
+  let resolveResult!: (value: TTSOutput) => void;
+  let rejectResult!: (err: Error) => void;
+  const resultPromise = new Promise<TTSOutput>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+
+  const pushChunk = (chunk: ArrayBuffer): void => {
+    if (cancelled) return;
+    if (resolver) {
+      resolver({ value: chunk, done: false });
+      resolver = null;
+    } else {
+      queue.push(chunk);
+    }
+  };
+
+  synthesizeStream(text, options, pushChunk)
+    .then((output) => {
+      done = true;
+      resolveResult(output);
+      if (resolver) {
+        resolver({ value: undefined as unknown as ArrayBuffer, done: true });
+        resolver = null;
+      }
+    })
+    .catch((err: Error) => {
+      streamError = err;
+      done = true;
+      rejectResult(err);
+      if (resolver) {
+        resolver({ value: undefined as unknown as ArrayBuffer, done: true });
+        resolver = null;
+      }
+    });
+
+  async function* chunkGenerator(): AsyncGenerator<ArrayBuffer> {
+    while (!done || queue.length > 0) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+      } else if (!done) {
+        const next = await new Promise<IteratorResult<ArrayBuffer>>((resolve) => {
+          resolver = resolve;
+        });
+        if (next.done) break;
+        yield next.value;
+      }
+    }
+    if (streamError) throw streamError;
+  }
+
+  const cancel = (): void => {
+    cancelled = true;
+    cancelTTS();
+    if (resolver) {
+      done = true;
+      resolver({ value: undefined as unknown as ArrayBuffer, done: true });
+      resolver = null;
+    }
+  };
+
+  return {
+    chunks: chunkGenerator(),
+    result: resultPromise,
+    cancel,
+  };
 }
 
 /**
@@ -419,4 +521,31 @@ export function cleanupTTS(): void {
     ttsAudioPlayback.cleanup();
     ttsAudioPlayback = null;
   }
+}
+
+// ============================================================================
+// Introspection
+// ============================================================================
+
+interface TTSIntrospectionNativeModule {
+  currentTTSModel?: () => Promise<string>;
+  getCurrentTTSVoiceId?: () => Promise<string>;
+  currentTTSVoiceId?: () => Promise<string>;
+}
+
+/**
+ * Get the currently loaded TTS model/voice ID, or `null` if none.
+ *
+ * Matches Swift: `RunAnywhere.currentTTSModel` / `currentTTSVoiceId`.
+ */
+export async function currentTTSModel(): Promise<string | null> {
+  if (!isNativeModuleAvailable()) return null;
+  const native = requireNativeModule() as unknown as TTSIntrospectionNativeModule;
+  const fn =
+    native.currentTTSModel ??
+    native.currentTTSVoiceId ??
+    native.getCurrentTTSVoiceId;
+  if (!fn) return null;
+  const id = await fn.call(native);
+  return id && id.length > 0 ? id : null;
 }
