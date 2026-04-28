@@ -1,0 +1,144 @@
+val llm_backend = RAC.LLM(model_path)
+val remote_llm = RAC.OPEN_ROUTER()
+val capability_type = RAC.CapabilityType.LLM
+val condations = RAC.CondationType.CONFIDANCE
+
+val router = HybridRouter(llm_backend, remote_llm, capability_type)
+
+router.sendRequest(JSON())
+
+
+// ──────────────────────────────────────────────────────────────
+// HOW ROUTING IS ACTUALLY CALCULATED
+// (mirrors HybridRouter.kt lines 70-155)
+// ──────────────────────────────────────────────────────────────
+//
+// Input  : Set<BackendDescriptor>  +  RoutingContext
+// Output : ordered List<BackendDescriptor>  (primary first)
+//
+// Each backend supplies its OWN descriptor. Router injects nothing.
+// Routing = filter -> filter -> score -> sort -> cascade.
+
+
+// ── STEP 1: gather every backend registered for this capability ──
+val all = registry.values
+    .flatten()
+    .filter { it.capability == capability }       // e.g. STT, LLM
+
+
+// ── STEP 2: hard gate — every declared condition must pass ──
+val eligible = all.filter { desc ->
+    desc.conditions.all { cond ->
+        when (cond) {
+            LocalOnly                    -> true                    // marker
+            NetworkRequired              -> ctx.isNetworkAvailable
+            ModelAvailability(id, check) -> check()                 // e.g. "whisper loaded?"
+            Custom(_, check)             -> check(ctx)              // e.g. "API key set?"
+            QualityTier(_)               -> true                    // used only by scoring
+            CostModel(_)                 -> true                    // used only by scoring
+        }
+    }
+}
+
+
+// ── STEP 3: policy filter — user preference trims the pool ──
+val candidates = when (ctx.routingPolicy) {
+    LOCAL_ONLY           -> eligible.filter { it.isLocalOnly }
+    CLOUD_ONLY           -> eligible.filter { it.requiresNetwork }
+    AUTO,
+    PREFER_LOCAL,
+    PREFER_ACCURACY,
+    FRAMEWORK_PREFERRED  -> eligible
+}
+
+
+// ── STEP 4: score each candidate ──
+fun score(d: BackendDescriptor, ctx: RoutingContext): Int {
+    var s = d.basePriority                            // e.g. 200 (Whisper) / 80 (Sarvam)
+    if (d.isLocalOnly)              s += 50           // LocalOnly bonus
+    if (d.costPerMinuteCents == 0f) s += 20           // CostFree bonus
+
+    when (ctx.routingPolicy) {
+        PREFER_LOCAL        -> { if (d.isLocalOnly)          s += 50
+                                 if (d.requiresNetwork)      s -= 30 }
+        PREFER_ACCURACY     -> { if (d.qualityTier == HIGH)  s += 50 }
+        FRAMEWORK_PREFERRED -> { if (d.framework == ctx.preferredFramework) s += 200 }
+        else                -> { /* no-op */ }
+    }
+
+    // Framework hint ALWAYS adds a bonus, regardless of policy
+    if (d.framework == ctx.preferredFramework) s += 200
+    return s
+}
+
+val ordered = candidates.sortedByDescending { score(it, ctx) }
+
+
+// ── WORKED EXAMPLE: STT, AUTO policy, online, no framework hint ──
+//
+// Whisper (local, ONNX,  base=200, LocalOnly, cost=0):
+//    200 +50 (LocalOnly) +20 (CostFree)                  = 270
+//
+// Sarvam  (cloud, HTTP,  base= 80, NetworkRequired, cost>0):
+//     80                                                  =  80
+//
+// Google  (cloud, HTTP,  base= 80, NetworkRequired, cost>0, HIGH):
+//     80                                                  =  80
+//
+//   ordered = [ Whisper(270), Sarvam(80), Google(80) ]
+//
+// Change policy to PREFER_ACCURACY:
+//   Whisper stays  = 270
+//   Google  +50    = 130     (HIGH quality bonus)
+//   Sarvam  stays  =  80
+//   ordered = [ Whisper(270), Google(130), Sarvam(80) ]
+
+
+// ── STEP 5: invoke with confidence cascade ──
+// (this part lives in runWithCascade — the capability-agnostic helper)
+
+for ((i, desc) in ordered.withIndex()) {
+    val out  = desc.backend.invoke(request, opts)        // e.g. transcribe()
+    val conf = out.confidence                            // real, from ys_log_probs
+
+    // return immediately when:
+    //   - confidence is good, OR
+    //   - primary is already a cloud/non-local backend, OR
+    //   - no fallback left in the list
+    val noCascade =
+        conf >= threshold ||
+        !desc.isLocalOnly ||
+        i == ordered.lastIndex
+
+    if (noCascade) return out.with(backend = desc, wasFallback = false)
+
+    // low confidence on local primary + cloud fallback exists -> cascade
+    val next = ordered[i + 1]
+    onBeforeCascade(desc, next)                          // e.g. remember current model
+    return try {
+        next.backend.invoke(request, opts).with(
+            backend           = next,
+            wasFallback       = true,
+            primaryConfidence = conf,
+        )
+    } finally {
+        onAfterCascade()                                 // e.g. restoreLocalModel()
+    }
+}
+
+
+// ──────────────────────────────────────────────────────────────
+// WHY THE ROUTER IS CAPABILITY-AGNOSTIC
+// ──────────────────────────────────────────────────────────────
+// It touches exactly these fields from a backend:
+//   • descriptor.capability           (enum — which pool am I in?)
+//   • descriptor.conditions           (eligibility)
+//   • descriptor.basePriority         (int, for scoring)
+//   • descriptor.isLocalOnly          (derived from LocalOnly condition)
+//   • descriptor.requiresNetwork      (derived from NetworkRequired)
+//   • descriptor.framework            (for framework hint)
+//   • result.confidence               (via ConfidenceScored interface)
+//
+// Nothing STT-specific, nothing LLM-specific. Swap `transcribe` for
+// `generate` or `describe` and the router doesn't notice.
+

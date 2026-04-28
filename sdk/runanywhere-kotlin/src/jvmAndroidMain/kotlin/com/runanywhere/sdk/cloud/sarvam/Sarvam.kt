@@ -97,6 +97,28 @@ object Sarvam {
     }
 
     /**
+     * Update the Sarvam API key without re-running the full register flow.
+     * Useful when the app pre-registered Sarvam at startup with a stale key
+     * and a fresh key needs to take effect immediately.
+     */
+    @JvmStatic
+    fun updateApiKey(apiKey: String): Boolean {
+        try {
+            SarvamBridge.ensureLoaded()
+        } catch (e: UnsatisfiedLinkError) {
+            logger.error("Sarvam native library not available: ${e.message}")
+            return false
+        }
+        val rc = SarvamBridge.nativeSetApiKey(apiKey)
+        if (rc != 0) {
+            logger.error("Failed to update Sarvam API key: $rc")
+            return false
+        }
+        logger.info("Sarvam API key updated")
+        return true
+    }
+
+    /**
      * Check if Sarvam can handle a model.
      */
     fun canHandleSTT(modelId: String?): Boolean {

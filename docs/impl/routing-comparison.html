@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hybrid Routing — Cactus vs Ours</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font: 14px/1.5 ui-sans-serif, system-ui, sans-serif;
+    background: #0e0f12; color: #e7e7ea;
+  }
+  h1 { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
+  p.sub { margin: 0 0 20px; color: #9a9aa4; font-size: 13px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel {
+    background: #16171b; border: 1px solid #26272d;
+    border-radius: 10px; padding: 14px;
+  }
+  .panel h2 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+  .panel .tag { color: #9a9aa4; font-size: 12px; margin-bottom: 10px; }
+  canvas { width: 100%; height: 380px; display: block; background: #0b0c0f; border-radius: 6px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: #bcbcc4; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .controls { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+  button {
+    background: #2a2b32; color: #e7e7ea; border: 1px solid #3a3b44;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit;
+  }
+  button:hover { background: #353640; }
+  select { background: #2a2b32; color: #e7e7ea; border: 1px solid #3a3b44; padding: 6px 8px; border-radius: 6px; font: inherit; }
+  .hint { color: #7a7a84; font-size: 12px; }
+  .diffs { margin-top: 20px; padding: 14px; background: #16171b; border: 1px solid #26272d; border-radius: 10px; }
+  .diffs h3 { margin: 0 0 10px; font-size: 14px; }
+  .diffs ul { margin: 0; padding-left: 18px; color: #bcbcc4; }
+  .diffs li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>Hybrid Routing Systems — Visual Comparison</h1>
+<p class="sub">Left: Cactus (tripwire inside each primitive). Right: Ours (capability routers + shared cloud backends).</p>
+
+<div class="controls">
+  <button id="play">▶ Play request</button>
+  <button id="reset">Reset</button>
+  <label class="hint">Quality of local result:
+    <select id="quality">
+      <option value="high">High confidence (local wins)</option>
+      <option value="low" selected>Low confidence (cascade / handoff)</option>
+      <option value="fail">Local fails</option>
+    </select>
+  </label>
+  <span class="hint" id="status">Idle.</span>
+</div>
+
+<div class="row" style="margin-top:16px">
+  <div class="panel">
+    <h2>Cactus — tripwire inside primitive</h2>
+    <div class="tag">One primitive call. Local runs. If confidence low → single cloud. Coupled.</div>
+    <canvas id="cactus" width="700" height="380"></canvas>
+    <div class="legend">
+      <span><i class="dot" style="background:#6fb3ff"></i>request</span>
+      <span><i class="dot" style="background:#f0b429"></i>local model</span>
+      <span><i class="dot" style="background:#e25c5c"></i>Cactus Cloud (closed)</span>
+      <span><i class="dot" style="background:#8dd27e"></i>result</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Ours — capability routers + shared cloud</h2>
+    <div class="tag">Per-capability router. N backends. OpenRouter registered against multiple routers. Eligibility → score → cascade.</div>
+    <canvas id="ours" width="700" height="380"></canvas>
+    <div class="legend">
+      <span><i class="dot" style="background:#6fb3ff"></i>request</span>
+      <span><i class="dot" style="background:#f0b429"></i>offline backend</span>
+      <span><i class="dot" style="background:#b37dff"></i>OpenRouter (shared)</span>
+      <span><i class="dot" style="background:#8dd27e"></i>result</span>
+    </div>
+  </div>
+</div>
+
+<div class="diffs">
+  <h3>What the animation shows</h3>
+  <ul>
+    <li><b>Cactus</b>: request enters the primitive → local runs → if confidence &lt; threshold, a single proprietary cloud is called. One path, one cloud, one API key.</li>
+    <li><b>Ours</b>: request enters a capability router (STT / LLM) → eligibility + score picks top candidate → on low confidence the result is <i>checkpointed</i> and the next candidate is tried → cloud can be the shared OpenRouter backend reused across capabilities.</li>
+    <li>In "Low confidence" mode you can see the cascade step and the checkpoint preservation — a low-conf local answer still returns if the cloud attempt later fails.</li>
+  </ul>
+</div>
+
+<script>
+// ---------- shared helpers ----------
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeInOut = t => t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
+
+function drawBox(ctx, x, y, w, h, label, sub, color, active) {
+  ctx.fillStyle = active ? color : '#1c1d23';
+  ctx.strokeStyle = active ? color : '#3a3b44';
+  ctx.lineWidth = active ? 2 : 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = active ? '#0b0c0f' : '#e7e7ea';
+  ctx.font = '600 12px ui-sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w/2, y + h/2 - (sub ? 4 : -4));
+  if (sub) {
+    ctx.fillStyle = active ? '#0b0c0f' : '#9a9aa4';
+    ctx.font = '11px ui-sans-serif';
+    ctx.fillText(sub, x + w/2, y + h/2 + 12);
+  }
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, alpha=1) {
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 8*Math.cos(a - 0.4), y2 - 8*Math.sin(a - 0.4));
+  ctx.lineTo(x2 - 8*Math.cos(a + 0.4), y2 - 8*Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawPacket(ctx, x, y, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+}
+
+// ---------- scene state ----------
+const statusEl = document.getElementById('status');
+const qualityEl = document.getElementById('quality');
+let playing = false;
+let t0 = 0;
+
+const cactus = document.getElementById('cactus').getContext('2d');
+const ours = document.getElementById('ours').getContext('2d');
+
+function setStatus(s) { statusEl.textContent = s; }
+
+// ---------- Cactus scene ----------
+function drawCactus(time, quality) {
+  const ctx = cactus;
+  const W = cactus.canvas.width, H = cactus.canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // nodes
+  const req   = { x: 40,  y: 170, w: 110, h: 50 };
+  const local = { x: 260, y: 100, w: 160, h: 60 };
+  const check = { x: 260, y: 200, w: 160, h: 50 };
+  const cloud = { x: 500, y: 200, w: 160, h: 60 };
+  const out   = { x: 500, y: 100, w: 160, h: 60 };
+
+  // static edges
+  drawArrow(ctx, req.x+req.w, req.y+req.h/2, local.x, local.y+local.h/2, '#555');
+  drawArrow(ctx, local.x+local.w/2, local.y+local.h, check.x+check.w/2, check.y, '#555');
+  drawArrow(ctx, check.x+check.w, check.y+check.h/2, cloud.x, cloud.y+cloud.h/2, '#555');
+  drawArrow(ctx, local.x+local.w, local.y+local.h/2, out.x, out.y+out.h/2, '#555');
+  drawArrow(ctx, cloud.x+cloud.w/2, cloud.y, out.x+out.w/2, out.y+out.h, '#555');
+
+  // phase timing
+  const phase = (() => {
+    if (time < 0.15) return { name: 'req->local', k: time/0.15 };
+    if (time < 0.35) return { name: 'local-run', k: (time-0.15)/0.20 };
+    if (time < 0.45) return { name: 'check', k: (time-0.35)/0.10 };
+    if (quality === 'high') {
+      if (time < 0.70) return { name: 'local->out', k: (time-0.45)/0.25 };
+      return { name: 'done', k: 1 };
+    }
+    if (time < 0.60) return { name: 'check->cloud', k: (time-0.45)/0.15 };
+    if (time < 0.80) return { name: 'cloud-run', k: (time-0.60)/0.20 };
+    if (time < 1.00) return { name: 'cloud->out', k: (time-0.80)/0.20 };
+    return { name: 'done', k: 1 };
+  })();
+
+  // boxes
+  const localActive = ['local-run'].includes(phase.name);
+  const checkActive = ['check'].includes(phase.name);
+  const cloudActive = ['cloud-run'].includes(phase.name);
+  const outActive   = phase.name === 'done';
+
+  drawBox(ctx, req.x, req.y, req.w, req.h, 'request', 'audio bytes', '#6fb3ff', time > 0 && time < 0.2);
+  drawBox(ctx, local.x, local.y, local.w, local.h, 'local primitive', 'cactus_stt / cactus_llm', '#f0b429', localActive);
+  drawBox(ctx, check.x, check.y, check.w, check.h, 'confidence >= 0.7?', quality === 'high' ? 'yes → return' : 'no → handoff', '#d07a32', checkActive);
+  drawBox(ctx, cloud.x, cloud.y, cloud.w, cloud.h, 'Cactus Cloud', 'single proprietary endpoint', '#e25c5c', cloudActive);
+  drawBox(ctx, out.x, out.y, out.w, out.h, 'result', '', '#8dd27e', outActive);
+
+  // packets
+  if (phase.name === 'req->local') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(req.x+req.w, local.x, k), lerp(req.y+req.h/2, local.y+local.h/2, k), '#6fb3ff');
+  } else if (phase.name === 'local->out') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(local.x+local.w, out.x, k), lerp(local.y+local.h/2, out.y+out.h/2, k), '#8dd27e');
+  } else if (phase.name === 'check->cloud') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(check.x+check.w, cloud.x, k), lerp(check.y+check.h/2, cloud.y+cloud.h/2, k), '#e25c5c');
+  } else if (phase.name === 'cloud->out') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(cloud.x+cloud.w/2, out.x+out.w/2, k), lerp(cloud.y, out.y+out.h, k), '#8dd27e');
+  }
+
+  // labels
+  ctx.fillStyle = '#7a7a84'; ctx.font = '11px ui-sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('1 cloud · 1 API key · binary handoff', 40, 360);
+}
+
+// ---------- Ours scene ----------
+function drawOurs(time, quality) {
+  const ctx = ours;
+  const W = ours.canvas.width, H = ours.canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // nodes
+  const req     = { x: 20,  y: 170, w: 100, h: 50 };
+  const router  = { x: 180, y: 150, w: 170, h: 90 };
+  const offline = { x: 420, y: 60,  w: 170, h: 55 };
+  const openrt  = { x: 420, y: 160, w: 170, h: 55 };
+  const out     = { x: 420, y: 280, w: 170, h: 55 };
+  // shared-cloud hint: OpenRouter connects to another (dashed) router above
+  const otherRouter = { x: 180, y: 30, w: 170, h: 50 };
+
+  // edges
+  drawArrow(ctx, req.x+req.w, req.y+req.h/2, router.x, router.y+router.h/2, '#555');
+  drawArrow(ctx, router.x+router.w, router.y+25, offline.x, offline.y+offline.h/2, '#555');
+  drawArrow(ctx, router.x+router.w, router.y+router.h/2, openrt.x, openrt.y+openrt.h/2, '#555');
+  // dashed line showing OpenRouter reused by other capability router
+  ctx.save();
+  ctx.setLineDash([5,4]); ctx.strokeStyle = '#b37dff'; ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(openrt.x+openrt.w/2, openrt.y);
+  ctx.lineTo(openrt.x+openrt.w/2, otherRouter.y+otherRouter.h+8);
+  ctx.lineTo(otherRouter.x+otherRouter.w, otherRouter.y+otherRouter.h/2);
+  ctx.stroke();
+  ctx.restore();
+  // arrow to out
+  drawArrow(ctx, offline.x+offline.w/2, offline.y+offline.h, out.x+out.w/2-30, out.y, '#555', 0.5);
+  drawArrow(ctx, openrt.x+openrt.w/2, openrt.y+openrt.h, out.x+out.w/2, out.y, '#555', 0.5);
+
+  // phase
+  const phase = (() => {
+    if (time < 0.12) return { name: 'req->router', k: time/0.12 };
+    if (time < 0.25) return { name: 'score', k: (time-0.12)/0.13 };
+    if (time < 0.45) return { name: 'try-local', k: (time-0.25)/0.20 };
+    if (quality === 'high') {
+      if (time < 0.75) return { name: 'local->out', k: (time-0.45)/0.30 };
+      return { name: 'done', k: 1 };
+    }
+    // low or fail: checkpoint + cascade
+    if (time < 0.55) return { name: 'checkpoint', k: (time-0.45)/0.10 };
+    if (time < 0.72) return { name: 'try-cloud', k: (time-0.55)/0.17 };
+    if (quality === 'fail') {
+      // cloud fails → restore checkpoint
+      if (time < 0.85) return { name: 'restore', k: (time-0.72)/0.13 };
+      if (time < 1.00) return { name: 'local->out', k: (time-0.85)/0.15 };
+      return { name: 'done', k: 1 };
+    }
+    if (time < 0.92) return { name: 'cloud->out', k: (time-0.72)/0.20 };
+    return { name: 'done', k: 1 };
+  })();
+
+  // box states
+  const routerActive = ['score','checkpoint','restore'].includes(phase.name);
+  const offlineActive = phase.name === 'try-local';
+  const cloudActive   = phase.name === 'try-cloud';
+  const outActive     = phase.name === 'done';
+
+  drawBox(ctx, otherRouter.x, otherRouter.y, otherRouter.w, otherRouter.h, 'LLM Hybrid Router', '(also uses OpenRouter)', '#3a3b44', false);
+  drawBox(ctx, req.x, req.y, req.w, req.h, 'request', 'audio', '#6fb3ff', time > 0 && time < 0.15);
+  drawBox(ctx, router.x, router.y, router.w, router.h,
+    'STT Hybrid Router',
+    phase.name === 'score' ? 'eligibility → score' :
+    phase.name === 'checkpoint' ? 'save low-conf local' :
+    phase.name === 'restore' ? 'restore checkpoint' : 'cascade engine',
+    '#d07a32', routerActive);
+  drawBox(ctx, offline.x, offline.y, offline.w, offline.h, 'Offline STT', 'Whisper (local)', '#f0b429', offlineActive);
+  drawBox(ctx, openrt.x, openrt.y, openrt.w, openrt.h, 'OpenRouter', 'shared cloud backend', '#b37dff', cloudActive);
+  drawBox(ctx, out.x, out.y, out.w, out.h, 'result',
+    phase.name === 'done' && quality === 'fail' ? 'checkpoint restored (was_fallback=true)' :
+    phase.name === 'done' && quality === 'low'  ? 'cloud (was_fallback=true)' :
+    phase.name === 'done' && quality === 'high' ? 'local (was_fallback=false)' : '',
+    '#8dd27e', outActive);
+
+  // packets
+  if (phase.name === 'req->router') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(req.x+req.w, router.x, k), lerp(req.y+req.h/2, router.y+router.h/2, k), '#6fb3ff');
+  } else if (phase.name === 'try-local') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(router.x+router.w, offline.x, k), lerp(router.y+25, offline.y+offline.h/2, k), '#f0b429');
+  } else if (phase.name === 'try-cloud') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(router.x+router.w, openrt.x, k), lerp(router.y+router.h/2, openrt.y+openrt.h/2, k), '#b37dff');
+  } else if (phase.name === 'local->out') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(offline.x+offline.w/2, out.x+out.w/2-30, k), lerp(offline.y+offline.h, out.y, k), '#8dd27e');
+  } else if (phase.name === 'cloud->out') {
+    const k = easeInOut(phase.k);
+    drawPacket(ctx, lerp(openrt.x+openrt.w/2, out.x+out.w/2, k), lerp(openrt.y+openrt.h, out.y, k), '#8dd27e');
+  }
+
+  // phase caption
+  ctx.fillStyle = '#7a7a84'; ctx.font = '11px ui-sans-serif'; ctx.textAlign = 'left';
+  const caption = {
+    'req->router': '1. request enters STT router',
+    'score': '2. eligibility + policy + score candidates',
+    'try-local': '3. invoke top candidate (offline)',
+    'checkpoint': '4. low confidence → checkpoint result',
+    'try-cloud': '5. cascade to next candidate (OpenRouter)',
+    'cloud->out': '6. high-confidence cloud result wins',
+    'restore': '5b. cloud failed → restore checkpoint',
+    'local->out': quality === 'fail' ? '6. return preserved local (low-conf beats nothing)' : '4. high confidence → return local',
+    'done': '✓ done',
+    'req->local': '', 'local-run': '', 'check': '', 'check->cloud': '', 'cloud-run': ''
+  }[phase.name] || '';
+  ctx.fillText(caption, 20, 365);
+}
+
+// ---------- loop ----------
+function frame(ts) {
+  if (!t0) t0 = ts;
+  const t = Math.min(1, (ts - t0) / 4500);
+  const q = qualityEl.value;
+  drawCactus(t, q);
+  drawOurs(t, q);
+  if (t >= 1) {
+    playing = false;
+    setStatus('Done.');
+    return;
+  }
+  if (playing) requestAnimationFrame(frame);
+}
+
+document.getElementById('play').onclick = () => {
+  t0 = 0; playing = true; setStatus('Playing…');
+  requestAnimationFrame(frame);
+};
+document.getElementById('reset').onclick = () => {
+  playing = false; t0 = 0;
+  drawCactus(0, qualityEl.value);
+  drawOurs(0, qualityEl.value);
+  setStatus('Idle.');
+};
+qualityEl.onchange = () => {
+  if (!playing) { drawCactus(0, qualityEl.value); drawOurs(0, qualityEl.value); }
+};
+
+// initial paint
+drawCactus(0, qualityEl.value);
+drawOurs(0, qualityEl.value);
+</script>
+</body>
+</html>

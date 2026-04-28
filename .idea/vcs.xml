@@ -2,5 +2,10 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build-test/_deps/googletest-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build-test/_deps/libarchive-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build-test/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/arm64-v8a/_deps/libarchive-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/arm64-v8a/_deps/nlohmann_json-src" vcs="Git" />
   </component>
 </project>

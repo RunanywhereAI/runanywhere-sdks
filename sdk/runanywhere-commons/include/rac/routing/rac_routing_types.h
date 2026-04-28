@@ -36,8 +36,17 @@ typedef enum rac_routing_policy {
     RAC_ROUTING_POLICY_CLOUD_ONLY = 2,
     RAC_ROUTING_POLICY_PREFER_LOCAL = 3,
     RAC_ROUTING_POLICY_PREFER_ACCURACY = 4,
-    RAC_ROUTING_POLICY_FRAMEWORK_PREFERRED = 5
+    RAC_ROUTING_POLICY_FRAMEWORK_PREFERRED = 5,
+    // App-supplied scoring fn registered via rac_hybrid_router_set_custom_policy.
+    RAC_ROUTING_POLICY_CUSTOM = 99
 } rac_routing_policy_t;
+
+// Custom scoring fn — higher score wins. Called for every eligible candidate
+// when ctx.policy == RAC_ROUTING_POLICY_CUSTOM. Must be thread-safe; the
+// router may call concurrently from different request threads.
+typedef int32_t (*rac_custom_policy_fn)(const struct rac_backend_descriptor* descriptor,
+                                        const struct rac_routing_context*    context,
+                                        void*                                user_data);
 
 typedef enum rac_condition_kind {
     RAC_COND_LOCAL_ONLY = 1,
@@ -88,6 +97,13 @@ typedef struct rac_routed_metadata {
     bool    was_fallback;
     float   primary_confidence;
     int32_t attempt_count;
+    // When the cascade tried a cloud backend after a low-confidence local
+    // primary and that cloud attempt failed, this captures the last error
+    // code seen and the module_id that produced it. Allows the UI to surface
+    // "we tried X, it failed with rc=Y" instead of silently returning the
+    // restored local result. Defaults: code=0, id=empty.
+    int32_t cascade_error_code;
+    char    cascade_error_module_id[64];
 } rac_routed_metadata_t;
 
 // Confidence below which a local-only backend will cascade to the next

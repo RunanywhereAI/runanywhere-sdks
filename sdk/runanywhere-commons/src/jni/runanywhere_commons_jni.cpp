@@ -41,7 +41,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
-#include "rac/routing/rac_router.h"
+#include "rac/routing/rac_hybrid_router.h"
 #include "rac/routing/rac_routing_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
@@ -1638,19 +1638,54 @@ void build_stt_descriptor(const char* module_id, const char* module_name, int32_
 
 }  // namespace
 
+
+// =============================================================================
+// JNI FUNCTIONS - Hybrid Router (handle-based, capability-agnostic)
+// =============================================================================
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterCreate(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jint capability) {
+    auto* r = rac_hybrid_router_create(static_cast<rac_routed_capability_t>(capability));
+    return reinterpret_cast<jlong>(r);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterDestroy(
+    JNIEnv* env, jclass clazz, jlong routerHandle) {
+    rac_hybrid_router_destroy(reinterpret_cast<rac_hybrid_router_t*>(routerHandle));
+}
+
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterRegisterStt(
-    JNIEnv* env, jclass clazz, jlong componentHandle, jstring moduleId, jstring moduleName,
-    jint priority, jboolean isLocalOnly, jboolean needsNetwork, jfloat costCentsPerMinute,
-    jstring inferenceFramework) {
-    if (componentHandle == 0 || moduleId == nullptr) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterCapability(
+    JNIEnv* env, jclass clazz, jlong routerHandle) {
+    if (routerHandle == 0) return 0;
+    return static_cast<jint>(
+        rac_hybrid_router_capability(reinterpret_cast<rac_hybrid_router_t*>(routerHandle)));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterSetCascade(
+    JNIEnv* env, jclass clazz, jlong routerHandle, jboolean enabled, jfloat threshold) {
+    if (routerHandle == 0) return RAC_ERROR_INVALID_PARAMETER;
+    return static_cast<jint>(rac_hybrid_router_set_cascade(
+        reinterpret_cast<rac_hybrid_router_t*>(routerHandle), enabled == JNI_TRUE,
+        static_cast<float>(threshold)));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterRegisterStt(
+    JNIEnv* env, jclass clazz, jlong routerHandle, jlong componentHandle, jstring moduleId,
+    jstring moduleName, jint priority, jboolean isLocalOnly, jboolean needsNetwork,
+    jfloat costCentsPerMinute, jstring inferenceFramework) {
+    if (routerHandle == 0 || componentHandle == 0 || moduleId == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
-
     rac_stt_service_t* service =
         rac_stt_component_get_service(reinterpret_cast<rac_handle_t>(componentHandle));
     if (!service) {
-        LOGe("racRouterRegisterStt: component has no loaded service");
+        LOGe("racHybridRouterRegisterStt: component has no loaded service");
         return RAC_ERROR_MODEL_NOT_LOADED;
     }
 
@@ -1661,49 +1696,49 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterRegisterStt(
     std::vector<rac_routing_condition_t> conditions;
     rac_backend_descriptor_t             descriptor;
     build_stt_descriptor(id.c_str(), name.c_str(), priority,
-                         fw.empty() ? nullptr : fw.c_str(),
-                         isLocalOnly == JNI_TRUE, needsNetwork == JNI_TRUE,
-                         static_cast<float>(costCentsPerMinute), conditions, descriptor);
+                         fw.empty() ? nullptr : fw.c_str(), isLocalOnly == JNI_TRUE,
+                         needsNetwork == JNI_TRUE, static_cast<float>(costCentsPerMinute),
+                         conditions, descriptor);
 
-    rac_result_t rc = rac_router_register_stt(rac_router_global(), &descriptor, service);
+    rac_result_t rc = rac_hybrid_router_register_backend(
+        reinterpret_cast<rac_hybrid_router_t*>(routerHandle), &descriptor, service);
     if (rc != RAC_SUCCESS) {
-        LOGe("racRouterRegisterStt('%s') failed with %d", id.c_str(), rc);
+        LOGe("racHybridRouterRegisterStt('%s') failed with %d", id.c_str(), rc);
     } else {
-        LOGi("racRouterRegisterStt('%s') OK — priority=%d local=%d network=%d", id.c_str(),
+        LOGi("racHybridRouterRegisterStt('%s') OK — priority=%d local=%d network=%d", id.c_str(),
              priority, isLocalOnly == JNI_TRUE ? 1 : 0, needsNetwork == JNI_TRUE ? 1 : 0);
     }
     return static_cast<jint>(rc);
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterUnregisterStt(JNIEnv* env,
-                                                                                jclass clazz,
-                                                                                jstring moduleId) {
-    if (moduleId == nullptr) return RAC_ERROR_INVALID_PARAMETER;
-    std::string  id = getCString(env, moduleId);
-    rac_result_t rc = rac_router_unregister_stt(rac_router_global(), id.c_str());
-    LOGi("racRouterUnregisterStt('%s') -> %d", id.c_str(), rc);
-    return static_cast<jint>(rc);
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterUnregister(
+    JNIEnv* env, jclass clazz, jlong routerHandle, jstring moduleId) {
+    if (routerHandle == 0 || moduleId == nullptr) return RAC_ERROR_INVALID_PARAMETER;
+    std::string id = getCString(env, moduleId);
+    return static_cast<jint>(rac_hybrid_router_unregister(
+        reinterpret_cast<rac_hybrid_router_t*>(routerHandle), id.c_str()));
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterSttCount(JNIEnv* env,
-                                                                           jclass clazz) {
-    return static_cast<jint>(rac_router_stt_count(rac_router_global()));
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterCount(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jlong routerHandle) {
+    if (routerHandle == 0) return 0;
+    return static_cast<jint>(
+        rac_hybrid_router_count(reinterpret_cast<rac_hybrid_router_t*>(routerHandle)));
 }
 
-JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterRunStt(
-    JNIEnv* env, jclass clazz, jboolean isOnline, jint policy, jstring preferredFramework,
-    jbyteArray audioData, jstring optionsJson) {
-    if (audioData == nullptr) return nullptr;
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterRunStt(
+    JNIEnv* env, jclass clazz, jlong routerHandle, jboolean isOnline, jint policy,
+    jstring preferredFramework, jbyteArray audioData, jstring optionsJson) {
+    if (routerHandle == 0 || audioData == nullptr) return nullptr;
 
     jsize  len  = env->GetArrayLength(audioData);
     jbyte* data = env->GetByteArrayElements(audioData, nullptr);
 
     rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-
-    // Option parsing mirrors racSttComponentTranscribe. Kept inline (no shared
-    // helper yet) to keep this JNI layer self-contained and auditable.
     if (optionsJson != nullptr) {
         const char* json_str = env->GetStringUTFChars(optionsJson, nullptr);
         if (json_str != nullptr) {
@@ -1719,7 +1754,7 @@ JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBrid
                     options.language = lang_buf.c_str();
                 }
             } catch (const nlohmann::json::exception& e) {
-                LOGe("racRouterRunStt: failed to parse options JSON: %s", e.what());
+                LOGe("racHybridRouterRunStt: failed to parse options JSON: %s", e.what());
             }
             env->ReleaseStringUTFChars(optionsJson, json_str);
         }
@@ -1736,25 +1771,24 @@ JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBrid
 
     rac_stt_result_t      result = {};
     rac_routed_metadata_t meta   = {};
-
-    rac_result_t status = rac_router_run_stt(rac_router_global(), &context, data,
-                                             static_cast<size_t>(len), &options, &result, &meta);
+    rac_result_t          status = rac_hybrid_router_run_stt(
+        reinterpret_cast<rac_hybrid_router_t*>(routerHandle), &context, data,
+        static_cast<size_t>(len), &options, &result, &meta);
 
     env->ReleaseByteArrayElements(audioData, data, JNI_ABORT);
 
     if (status != RAC_SUCCESS) {
-        LOGe("racRouterRunStt failed with status=%d", status);
+        LOGe("racHybridRouterRunStt failed with status=%d", status);
         rac_stt_result_free(&result);
         return nullptr;
     }
 
-    // Serialize result. NaN confidence → JSON null (see racSttComponentTranscribe
-    // for the same handling).
     nlohmann::json json_obj;
-    json_obj["text"]     = result.text ? std::string(result.text) : "";
-    json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
+    json_obj["text"] = result.text ? std::string(result.text) : "";
+    json_obj["language"] =
+        result.detected_language ? std::string(result.detected_language) : "en";
     json_obj["duration_ms"]       = result.processing_time_ms;
-    json_obj["completion_reason"] = 1;  // END_OF_AUDIO
+    json_obj["completion_reason"] = 1;
     if (std::isnan(result.confidence) || std::isinf(result.confidence)) {
         json_obj["confidence"] = nullptr;
     } else {
@@ -1769,10 +1803,100 @@ JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBrid
     }
     json_obj["attempt_count"] = meta.attempt_count;
 
-    std::string json_result = json_obj.dump();
+    std::string out = json_obj.dump();
     rac_stt_result_free(&result);
+    return env->NewStringUTF(out.c_str());
+}
 
-    return env->NewStringUTF(json_result.c_str());
+// --- VAD via hybrid router ---------------------------------------------------
+
+namespace {
+void build_descriptor_for(const char* module_id, const char* module_name, int32_t priority,
+                          const char* inference_framework, bool local_only, bool needs_network,
+                          float cost_cents, rac_routed_capability_t cap,
+                          std::vector<rac_routing_condition_t>& out_conditions,
+                          rac_backend_descriptor_t&             out_descriptor) {
+    build_stt_descriptor(module_id, module_name, priority, inference_framework, local_only,
+                         needs_network, cost_cents, out_conditions, out_descriptor);
+    out_descriptor.capability = cap;  // override (build_stt_descriptor hardcodes STT)
+}
+}  // namespace
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterRegisterVad(
+    JNIEnv* env, jclass clazz, jlong routerHandle, jlong serviceHandle, jstring moduleId,
+    jstring moduleName, jint priority, jboolean isLocalOnly, jboolean needsNetwork,
+    jfloat costCentsPerMinute, jstring inferenceFramework) {
+    if (routerHandle == 0 || serviceHandle == 0 || moduleId == nullptr) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    std::string id   = getCString(env, moduleId);
+    std::string name = getCString(env, moduleName);
+    std::string fw   = getCString(env, inferenceFramework);
+
+    std::vector<rac_routing_condition_t> conditions;
+    rac_backend_descriptor_t             descriptor;
+    build_descriptor_for(id.c_str(), name.c_str(), priority,
+                         fw.empty() ? nullptr : fw.c_str(), isLocalOnly == JNI_TRUE,
+                         needsNetwork == JNI_TRUE, static_cast<float>(costCentsPerMinute),
+                         RAC_ROUTED_CAP_VAD, conditions, descriptor);
+
+    auto* svc = reinterpret_cast<rac_vad_routing_service_t*>(serviceHandle);
+    rac_result_t rc = rac_hybrid_router_register_backend(
+        reinterpret_cast<rac_hybrid_router_t*>(routerHandle), &descriptor, svc);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racHybridRouterRegisterVad('%s') failed with %d", id.c_str(), rc);
+    } else {
+        LOGi("racHybridRouterRegisterVad('%s') OK", id.c_str());
+    }
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRouterRunVad(
+    JNIEnv* env, jclass clazz, jlong routerHandle, jboolean isOnline, jint policy,
+    jstring preferredFramework, jfloatArray samples) {
+    if (routerHandle == 0 || samples == nullptr) return nullptr;
+
+    jsize   n   = env->GetArrayLength(samples);
+    jfloat* buf = env->GetFloatArrayElements(samples, nullptr);
+
+    rac_routing_context_t context = {};
+    context.is_online             = isOnline == JNI_TRUE;
+    context.policy                = static_cast<rac_routing_policy_t>(policy);
+    if (preferredFramework != nullptr) {
+        std::string fw = getCString(env, preferredFramework);
+        std::strncpy(context.preferred_framework, fw.c_str(),
+                     sizeof(context.preferred_framework) - 1);
+    }
+
+    rac_vad_routed_result_t result = {};
+    rac_routed_metadata_t   meta   = {};
+    rac_result_t            status = rac_hybrid_router_run_vad(
+        reinterpret_cast<rac_hybrid_router_t*>(routerHandle), &context, buf,
+        static_cast<size_t>(n), &result, &meta);
+
+    env->ReleaseFloatArrayElements(samples, buf, JNI_ABORT);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("racHybridRouterRunVad failed with status=%d", status);
+        return nullptr;
+    }
+
+    nlohmann::json json_obj;
+    json_obj["is_speech"] = result.is_speech == RAC_TRUE;
+    if (std::isnan(result.confidence) || std::isinf(result.confidence)) {
+        json_obj["confidence"] = nullptr;
+    } else {
+        json_obj["confidence"] = result.confidence;
+    }
+    json_obj["was_fallback"]     = meta.was_fallback;
+    json_obj["chosen_module_id"] = std::string(meta.chosen_module_id);
+    json_obj["attempt_count"]    = meta.attempt_count;
+    json_obj["cascade_error_code"] = meta.cascade_error_code;
+    json_obj["cascade_error_module_id"] = std::string(meta.cascade_error_module_id);
+
+    return env->NewStringUTF(json_obj.dump().c_str());
 }
 
 // =============================================================================

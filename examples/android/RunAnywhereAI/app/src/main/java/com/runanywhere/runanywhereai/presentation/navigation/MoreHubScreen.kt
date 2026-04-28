@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -43,6 +44,7 @@ import com.runanywhere.runanywhereai.ui.theme.Dimensions
 @Composable
 fun MoreHubScreen(
     onNavigateToSTT: () -> Unit,
+    onNavigateToHybridRouter: () -> Unit = {},
     onNavigateToTTS: () -> Unit,
     onNavigateToRAG: () -> Unit,
     onNavigateToBenchmarks: () -> Unit,
@@ -80,6 +82,16 @@ fun MoreHubScreen(
                 title = "Text to Speech",
                 subtitle = "Convert text to natural-sounding speech",
                 onClick = onNavigateToTTS,
+            )
+
+            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+
+            MoreFeatureCard(
+                icon = Icons.Filled.Hub,
+                iconColor = AppColors.primaryAccent,
+                title = "Hybrid Router (STT)",
+                subtitle = "Demo the public HybridRouter API: policies, cascade, cloud fallback",
+                onClick = onNavigateToHybridRouter,
             )
 
             Spacer(modifier = Modifier.height(Dimensions.xxLarge))

@@ -256,49 +256,51 @@ object RunAnywhereBridge {
     external fun racSttSetCallbacks(frameCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
-    // HYBRID ROUTER (rac_router.h)
+    // HYBRID ROUTER — handle-based, capability-agnostic
+    //   (rac_hybrid_router.h)
+    //
+    // Each handle is bound to one capability at create time. Multiple handles
+    // for the same capability are allowed. All routing logic (eligibility,
+    // policy, cascade) lives in C++; this layer is pure marshalling.
     // ========================================================================
-    //
-    // The router selects one STT backend per request from a set of registered
-    // candidates, applying eligibility conditions, a routing policy, and a
-    // confidence cascade. Backends are plain rac_stt_component handles that
-    // have a model loaded; their underlying service is handed to the router.
-    //
-    // Typical flow:
-    //   1. Create a component per backend, load the model:
-    //        val local = racSttComponentCreate()
-    //        racSttComponentLoadModel(local, whisperPath, "whisper", "Whisper")
-    //   2. Register the component with the router:
-    //        racRouterRegisterStt(local, "whisper-local", "Whisper (local)",
-    //                             priority = 100, isLocalOnly = true,
-    //                             needsNetwork = false, costCentsPerMinute = 0.0f)
-    //   3. Transcribe via the router (picks a candidate, cascades on low
-    //      local confidence, returns JSON with routing metadata):
-    //        val json = racRouterRunStt(
-    //            isOnline = true, policy = 0, preferredFramework = null,
-    //            audioData = bytes, optionsJson = null)
-    //   4. On unload / shutdown, unregister before destroying the component:
-    //        racRouterUnregisterStt("whisper-local")
 
     /**
-     * Register an STT component's loaded service with the global router.
-     *
-     * @param componentHandle Pointer returned by racSttComponentCreate after a
-     *   successful racSttComponentLoadModel.
-     * @param moduleId Unique identifier (e.g. "whisper-local", "sarvam-cloud").
-     * @param moduleName Human-readable name for logs/UI.
-     * @param priority Base priority; higher wins when both are eligible.
-     * @param isLocalOnly Backend runs on-device; triggers cascade on low
-     *   confidence.
-     * @param needsNetwork Backend requires network connectivity; skipped when
-     *   `isOnline=false` in the routing context.
-     * @param costCentsPerMinute Advisory cost signal; 0 for free/local.
-     * @param inferenceFramework Optional framework name for PREFER_FRAMEWORK
-     *   scoring (e.g. "onnx", "sarvam").
-     * @return rac_result_t; 0 on success.
+     * Create a hybrid router for one capability.
+     * Capability values match `rac_routed_capability_t`:
+     *   1 STT, 2 LLM, 3 VLM, 4 TTS, 5 VAD.
+     * @return non-zero handle on success, 0 on allocation failure.
      */
     @JvmStatic
-    external fun racRouterRegisterStt(
+    external fun racHybridRouterCreate(capability: Int): Long
+
+    @JvmStatic
+    external fun racHybridRouterDestroy(routerHandle: Long)
+
+    /** @return rac_routed_capability_t the router was created with. */
+    @JvmStatic
+    external fun racHybridRouterCapability(routerHandle: Long): Int
+
+    /**
+     * Configure the confidence cascade for this router.
+     * @param threshold confidence below which a local primary cascades to the
+     *   next candidate. 0..1. Default RAC_ROUTING_CONFIDENCE_THRESHOLD (0.5).
+     */
+    @JvmStatic
+    external fun racHybridRouterSetCascade(
+        routerHandle: Long,
+        enabled: Boolean,
+        threshold: Float,
+    ): Int
+
+    /**
+     * Register an STT backend. Capability of the router must be STT (1).
+     * @param componentHandle pointer from racSttComponentCreate after a
+     *   successful racSttComponentLoadModel.
+     * @return rac_result_t.
+     */
+    @JvmStatic
+    external fun racHybridRouterRegisterStt(
+        routerHandle: Long,
         componentHandle: Long,
         moduleId: String,
         moduleName: String,
@@ -309,36 +311,59 @@ object RunAnywhereBridge {
         inferenceFramework: String?,
     ): Int
 
-    /** Unregister a previously-registered STT backend. */
     @JvmStatic
-    external fun racRouterUnregisterStt(moduleId: String): Int
+    external fun racHybridRouterUnregister(routerHandle: Long, moduleId: String): Int
 
-    /** @return count of STT backends currently registered with the router. */
     @JvmStatic
-    external fun racRouterSttCount(): Int
+    external fun racHybridRouterCount(routerHandle: Long): Int
 
     /**
-     * Run STT transcription through the router.
-     *
-     * @param isOnline Whether network is available; gates NetworkRequired
-     *   backends.
-     * @param policy Routing policy, matching rac_routing_policy_t:
-     *   0 AUTO, 1 LOCAL_ONLY, 2 CLOUD_ONLY, 3 PREFER_LOCAL,
-     *   4 PREFER_ACCURACY, 5 FRAMEWORK_PREFERRED.
-     * @param preferredFramework Framework name for FRAMEWORK_PREFERRED, else
-     *   null.
-     * @return JSON object on success with keys: `text`, `language`,
-     *   `duration_ms`, `confidence` (number or null for NaN), and routing
-     *   metadata `was_fallback`, `primary_confidence` (number or null),
-     *   `chosen_module_id`. Null on failure.
+     * Run STT through the router. Same JSON shape as [racRouterRunStt].
      */
     @JvmStatic
-    external fun racRouterRunStt(
+    external fun racHybridRouterRunStt(
+        routerHandle: Long,
         isOnline: Boolean,
         policy: Int,
         preferredFramework: String?,
         audioData: ByteArray,
         optionsJson: String?,
+    ): String?
+
+    // ------------------------------------------------------------------------
+    // VAD via hybrid router
+    // ------------------------------------------------------------------------
+
+    /**
+     * Register a VAD backend with a router. Capability of the router must be
+     * VAD (5). [serviceHandle] points to a `rac_vad_routing_service_t`.
+     */
+    @JvmStatic
+    external fun racHybridRouterRegisterVad(
+        routerHandle: Long,
+        serviceHandle: Long,
+        moduleId: String,
+        moduleName: String,
+        priority: Int,
+        isLocalOnly: Boolean,
+        needsNetwork: Boolean,
+        costCentsPerMinute: Float,
+        inferenceFramework: String?,
+    ): Int
+
+    /**
+     * Run VAD through the router on one frame of float PCM samples.
+     * @return JSON `{ "is_speech": bool, "confidence": number|null,
+     *   "chosen_module_id": str, "was_fallback": bool, "attempt_count": int }`
+     *   or null on failure.
+     */
+    @JvmStatic
+    external fun racHybridRouterRunVad(
+        routerHandle: Long,
+        isOnline: Boolean,
+        policy: Int,
+        preferredFramework: String?,
+        samples: FloatArray,
     ): String?
 
     // ========================================================================

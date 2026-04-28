@@ -34,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDashboardScreen
 import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDetailScreen
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
+import com.runanywhere.runanywhereai.presentation.hybridrouter.HybridRouterScreen
 import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
 import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
 import com.runanywhere.runanywhereai.presentation.components.LocalTopBarState
@@ -165,6 +166,9 @@ fun AppNavigation() {
                         onNavigateToSTT = {
                             navController.navigate(NavigationRoute.STT)
                         },
+                        onNavigateToHybridRouter = {
+                            navController.navigate(NavigationRoute.HYBRID_ROUTER)
+                        },
                         onNavigateToTTS = {
                             navController.navigate(NavigationRoute.TTS)
                         },
@@ -182,6 +186,12 @@ fun AppNavigation() {
 
                 composable(NavigationRoute.STT) {
                     SpeechToTextScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
+                composable(NavigationRoute.HYBRID_ROUTER) {
+                    HybridRouterScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -241,6 +251,7 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
         route in listOf(
             NavigationRoute.MORE,
             NavigationRoute.STT,
+            NavigationRoute.HYBRID_ROUTER,
             NavigationRoute.TTS,
             NavigationRoute.RAG,
             NavigationRoute.BENCHMARKS,
@@ -268,6 +279,7 @@ object NavigationRoute {
     const val VOICE = "voice"
     const val MORE = "more"
     const val STT = "stt"
+    const val HYBRID_ROUTER = "hybrid_router"
     const val TTS = "tts"
     const val RAG = "rag"
     const val BENCHMARKS = "benchmarks"

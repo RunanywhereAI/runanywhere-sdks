@@ -1,6 +1,13 @@
 /**
  * @file rac_routing_internal.h
- * @brief Router internals shared across capabilities.
+ * @brief Router internals — capability-agnostic.
+ *
+ * After the modular refactor the registry is no longer parameterized by a
+ * service vtable. An entry stores `void* impl` (the capability-typed service
+ * handle, e.g. rac_stt_service_t*) and the per-capability `run_*` C API does
+ * the cast at the boundary. Eligibility, scoring and the cascade only touch
+ * the descriptor + conditions + impl pointer, so they share one set of
+ * functions across STT / VAD / LLM / TTS / VLM.
  */
 
 #ifndef RAC_ROUTING_INTERNAL_H
@@ -9,64 +16,51 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <functional>
 #include <limits>
 #include <mutex>
-#include <string>
 #include <vector>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/routing/rac_router.h"
 #include "rac/routing/rac_routing_types.h"
 
 namespace rac::routing {
 
-template <typename Vtable>
 struct Entry {
-    rac_backend_descriptor_t descriptor;
-    std::vector<rac_routing_condition_t> conditions;  // copied
-    void*                                impl;
-    const Vtable*                        vtable;
+    rac_backend_descriptor_t             descriptor;
+    std::vector<rac_routing_condition_t> conditions;  // owned copy
+    void*                                impl;        // capability-typed service handle
 };
 
-template <typename Vtable>
 struct Registry {
-    std::mutex                mutex;
-    std::vector<Entry<Vtable>> entries;
+    std::mutex         mutex;
+    std::vector<Entry> entries;
 };
 
-// Is a descriptor's framework flagged local-only?
-inline bool is_local_only(const Entry<void>* = nullptr) { return false; }
+// Per-router configuration — held by the public handle, threaded into
+// resolve()/cascade() so each instance can have its own policy/threshold.
+struct RouterConfig {
+    bool                 cascade_enabled    = true;
+    float                cascade_threshold  = RAC_ROUTING_CONFIDENCE_THRESHOLD;
+    rac_custom_policy_fn custom_policy_fn   = nullptr;
+    void*                custom_policy_user = nullptr;
+};
 
-template <typename Vtable>
-bool entry_is_local_only(const Entry<Vtable>& e) {
+inline bool entry_is_local_only(const Entry& e) {
     for (int32_t i = 0; i < e.descriptor.condition_count; ++i) {
         if (e.conditions[i].kind == RAC_COND_LOCAL_ONLY) return true;
     }
     return false;
 }
 
-template <typename Vtable>
-bool entry_needs_network(const Entry<Vtable>& e) {
+inline bool entry_needs_network(const Entry& e) {
     for (int32_t i = 0; i < e.descriptor.condition_count; ++i) {
         if (e.conditions[i].kind == RAC_COND_NETWORK_REQUIRED) return true;
     }
     return false;
 }
 
-template <typename Vtable>
-float entry_cost(const Entry<Vtable>& e) {
-    for (int32_t i = 0; i < e.descriptor.condition_count; ++i) {
-        if (e.conditions[i].kind == RAC_COND_COST_MODEL) {
-            return e.conditions[i].data.cost_per_minute_cents;
-        }
-    }
-    return 0.0f;
-}
-
-template <typename Vtable>
-bool eligible(const Entry<Vtable>& e, const rac_routing_context_t& ctx) {
+inline bool eligible(const Entry& e, const rac_routing_context_t& ctx) {
     for (int32_t i = 0; i < e.descriptor.condition_count; ++i) {
         const auto& c = e.conditions[i];
         switch (c.kind) {
@@ -94,19 +88,21 @@ bool eligible(const Entry<Vtable>& e, const rac_routing_context_t& ctx) {
     return true;
 }
 
-template <typename Vtable>
-bool policy_allows(const Entry<Vtable>& e, rac_routing_policy_t policy) {
+inline bool policy_allows(const Entry& e, rac_routing_policy_t policy) {
     const bool local = entry_is_local_only(e);
     switch (policy) {
-        case RAC_ROUTING_POLICY_LOCAL_ONLY:  return local;
-        case RAC_ROUTING_POLICY_CLOUD_ONLY:  return !local;
-        default:                             return true;
+        case RAC_ROUTING_POLICY_LOCAL_ONLY: return local;
+        case RAC_ROUTING_POLICY_CLOUD_ONLY: return !local;
+        default:                            return true;
     }
 }
 
-template <typename Vtable>
-int32_t score(const Entry<Vtable>& e, const rac_routing_context_t& ctx) {
-    int32_t s = e.descriptor.base_priority;
+inline int32_t score(const Entry& e, const rac_routing_context_t& ctx,
+                     const RouterConfig& cfg) {
+    if (ctx.policy == RAC_ROUTING_POLICY_CUSTOM && cfg.custom_policy_fn) {
+        return cfg.custom_policy_fn(&e.descriptor, &ctx, cfg.custom_policy_user);
+    }
+    int32_t    s     = e.descriptor.base_priority;
     const bool local = entry_is_local_only(e);
     switch (ctx.policy) {
         case RAC_ROUTING_POLICY_PREFER_LOCAL:
@@ -127,22 +123,18 @@ int32_t score(const Entry<Vtable>& e, const rac_routing_context_t& ctx) {
     return s;
 }
 
-template <typename Vtable>
-std::vector<Entry<Vtable>> resolve(Registry<Vtable>& reg, const rac_routing_context_t& ctx) {
-    std::vector<Entry<Vtable>> snapshot;
+inline std::vector<Entry> resolve(Registry& reg, const rac_routing_context_t& ctx,
+                                  const RouterConfig& cfg) {
+    std::vector<Entry> snapshot;
     {
         std::lock_guard<std::mutex> lock(reg.mutex);
         snapshot.reserve(reg.entries.size());
-        for (const auto& e : reg.entries) {
-            // Deep-copy entry with its conditions (already owned).
-            snapshot.push_back(e);
-        }
+        for (const auto& e : reg.entries) snapshot.push_back(e);
     }
 
-    std::vector<Entry<Vtable>> filtered;
+    std::vector<Entry> filtered;
     filtered.reserve(snapshot.size());
     for (auto& e : snapshot) {
-        // Rewire descriptor.conditions to the snapshot's own vector storage.
         e.descriptor.conditions = e.conditions.data();
         if (!eligible(e, ctx)) continue;
         if (!policy_allows(e, ctx.policy)) continue;
@@ -150,52 +142,36 @@ std::vector<Entry<Vtable>> resolve(Registry<Vtable>& reg, const rac_routing_cont
     }
 
     std::sort(filtered.begin(), filtered.end(),
-              [&](const Entry<Vtable>& a, const Entry<Vtable>& b) {
-                  return score(a, ctx) > score(b, ctx);
+              [&](const Entry& a, const Entry& b) {
+                  return score(a, ctx, cfg) > score(b, ctx, cfg);
               });
     return filtered;
 }
 
-// Generic cascade. Invoker runs one candidate and reports its confidence.
-//
-// Semantics:
-//   - Stops at the first candidate returning a trusted high-confidence result.
-//   - If a local candidate returns SUCCESS with low confidence, tries more
-//     candidates to improve accuracy. Result slots are owned by the caller and
-//     reused across invokes, so a low-confidence local success is "checkpointed"
-//     via on_keep() before the next attempt; if every later attempt fails,
-//     on_restore() brings the checkpoint back and we return SUCCESS.
-//   - If NO candidate ever returns SUCCESS, returns the last backend's error.
-//
-// Callbacks (all optional, but on_keep/on_restore must be provided together
-// to enable low-confidence fallback preservation):
-//   - on_keep():    save caller-owned result into internal checkpoint storage
-//                   (must take ownership — cascade will not touch it again
-//                   except via on_restore/on_drop)
-//   - on_restore(): write checkpoint back into caller-owned result slot
-//   - on_drop():    free checkpoint storage (called when a later high-conf
-//                   success supersedes the checkpoint)
-template <typename Vtable, typename Invoker, typename OnKeep, typename OnRestore,
-          typename OnDrop>
-rac_result_t cascade(Registry<Vtable>&            reg,
+// Generic cascade. Capability-specific lambdas: `invoke` runs one candidate;
+// `on_keep`/`on_restore`/`on_drop` manage the low-confidence checkpoint slot
+// owned by the caller (the result struct shape is per-capability).
+template <typename Invoker, typename OnKeep, typename OnRestore, typename OnDrop>
+rac_result_t cascade(Registry&                    reg,
                      const rac_routing_context_t& ctx,
+                     const RouterConfig&          cfg,
                      rac_routed_metadata_t*       out_meta,
                      Invoker                      invoke,
                      OnKeep                       on_keep,
                      OnRestore                    on_restore,
                      OnDrop                       on_drop) {
-    auto candidates = resolve(reg, ctx);
-    if (candidates.empty()) {
-        return RAC_ERROR_SERVICE_NOT_AVAILABLE;
-    }
+    auto candidates = resolve(reg, ctx, cfg);
+    if (candidates.empty()) return RAC_ERROR_SERVICE_NOT_AVAILABLE;
 
-    rac_result_t last_error        = RAC_ERROR_SERVICE_NOT_AVAILABLE;
-    float        primary_conf      = std::numeric_limits<float>::quiet_NaN();
-    bool         have_primary      = false;
-    int32_t      attempts          = 0;
-    bool         have_checkpoint   = false;
-    size_t       checkpoint_index  = 0;
-    float        checkpoint_conf   = std::numeric_limits<float>::quiet_NaN();
+    rac_result_t last_error            = RAC_ERROR_SERVICE_NOT_AVAILABLE;
+    float        primary_conf          = std::numeric_limits<float>::quiet_NaN();
+    bool         have_primary          = false;
+    int32_t      attempts              = 0;
+    bool         have_checkpoint       = false;
+    size_t       checkpoint_index      = 0;
+    float        checkpoint_conf       = std::numeric_limits<float>::quiet_NaN();
+    rac_result_t cascade_err_code      = RAC_SUCCESS;
+    const char*  cascade_err_module_id = nullptr;
 
     for (size_t i = 0; i < candidates.size(); ++i) {
         const auto& e    = candidates[i];
@@ -204,19 +180,24 @@ rac_result_t cascade(Registry<Vtable>&            reg,
         rac_result_t rc = invoke(e, &conf);
         if (rc != RAC_SUCCESS) {
             last_error = rc;
+            // If we've already checkpointed a low-conf local, this failed
+            // attempt is the cascade target — capture it for the UI.
+            if (have_checkpoint) {
+                cascade_err_code      = rc;
+                cascade_err_module_id = e.descriptor.module_id;
+            }
             RAC_LOG_WARNING("RAC.ROUTER", "backend '%s' failed with %d, trying next",
                             e.descriptor.module_id, rc);
             continue;
         }
-
         if (!have_primary) {
             primary_conf = conf;
             have_primary = true;
         }
-
         const bool local = entry_is_local_only(e);
-        const bool low   = !std::isnan(conf) && conf < RAC_ROUTING_CONFIDENCE_THRESHOLD;
-        const bool can_cascade = local && low && (i + 1 < candidates.size());
+        const bool low   = !std::isnan(conf) && conf < cfg.cascade_threshold;
+        const bool can_cascade =
+            cfg.cascade_enabled && local && low && (i + 1 < candidates.size());
 
         if (!can_cascade) {
             if (have_checkpoint) on_drop();
@@ -227,24 +208,26 @@ rac_result_t cascade(Registry<Vtable>&            reg,
                 out_meta->was_fallback       = (i > 0);
                 out_meta->primary_confidence = primary_conf;
                 out_meta->attempt_count      = attempts;
+                out_meta->cascade_error_code = cascade_err_code;
+                out_meta->cascade_error_module_id[0] = '\0';
+                if (cascade_err_module_id) {
+                    std::strncpy(out_meta->cascade_error_module_id, cascade_err_module_id,
+                                 sizeof(out_meta->cascade_error_module_id) - 1);
+                }
             }
             return RAC_SUCCESS;
         }
 
-        // Low-confidence local — checkpoint current result and try next.
         if (have_checkpoint) on_drop();
         on_keep();
         have_checkpoint  = true;
         checkpoint_index = i;
         checkpoint_conf  = conf;
-
         RAC_LOG_INFO("RAC.ROUTER", "confidence %.2f below threshold, cascading from '%s'",
                      conf, e.descriptor.module_id);
         last_error = RAC_ERROR_SERVICE_NOT_AVAILABLE;
     }
 
-    // Every post-checkpoint attempt failed. Restore the checkpoint if we have
-    // one — a low-confidence answer beats no answer.
     if (have_checkpoint) {
         on_restore();
         const auto& e = candidates[checkpoint_index];
@@ -258,23 +241,26 @@ rac_result_t cascade(Registry<Vtable>&            reg,
             out_meta->was_fallback       = (checkpoint_index > 0);
             out_meta->primary_confidence = primary_conf;
             out_meta->attempt_count      = attempts;
+            out_meta->cascade_error_code = cascade_err_code;
+            out_meta->cascade_error_module_id[0] = '\0';
+            if (cascade_err_module_id) {
+                std::strncpy(out_meta->cascade_error_module_id, cascade_err_module_id,
+                             sizeof(out_meta->cascade_error_module_id) - 1);
+            }
         }
         return RAC_SUCCESS;
     }
-
     return last_error;
 }
 
-// Convenience overload for callers that don't need checkpointing (e.g. ops
-// where the result is trivial to recompute, or where low-confidence fallback
-// doesn't apply).
-template <typename Vtable, typename Invoker>
-rac_result_t cascade(Registry<Vtable>&            reg,
+template <typename Invoker>
+rac_result_t cascade(Registry&                    reg,
                      const rac_routing_context_t& ctx,
+                     const RouterConfig&          cfg,
                      rac_routed_metadata_t*       out_meta,
                      Invoker                      invoke) {
     auto noop = [] {};
-    return cascade(reg, ctx, out_meta, invoke, noop, noop, noop);
+    return cascade(reg, ctx, cfg, out_meta, invoke, noop, noop, noop);
 }
 
 }  // namespace rac::routing

@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-#include "rac/routing/rac_router.h"
+#include "rac/routing/rac_hybrid_router.h"
 #include "test_common.h"
 
 namespace {
@@ -148,24 +148,24 @@ static void free_result(rac_stt_result_t* r) {
 
 static TestResult test_register_and_list() {
     TestResult r{"register_and_list"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService a("a"), b("b"), c("c");
     std::vector<rac_routing_condition_t> ca, cb, cc;
     auto da = make_desc({"a", 10, true, false}, ca);
     auto db = make_desc({"b", 30, true, false}, cb);
     auto dc = make_desc({"c", 20, true, false}, cc);
-    rac_router_register_stt(router, &da, &a.service);
-    rac_router_register_stt(router, &db, &b.service);
-    rac_router_register_stt(router, &dc, &c.service);
-    r.passed  = (rac_router_stt_count(router) == 3);
+    rac_hybrid_router_register_backend(router, &da, &a.service);
+    rac_hybrid_router_register_backend(router, &db, &b.service);
+    rac_hybrid_router_register_backend(router, &dc, &c.service);
+    r.passed  = (rac_hybrid_router_count(router) == 3);
     r.details = "registered 3 backends";
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_eligibility_network_required() {
     TestResult r{"eligibility_network_required"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService local("local"), cloud("cloud");
     local.impl.confidence = 0.9f;
     cloud.impl.confidence = 0.9f;
@@ -173,26 +173,26 @@ static TestResult test_eligibility_network_required() {
     std::vector<rac_routing_condition_t> cl, cc;
     auto dl = make_desc({"local", 10, true, false}, cl);
     auto dc = make_desc({"cloud", 100, false, true}, cc);
-    rac_router_register_stt(router, &dl, &local.service);
-    rac_router_register_stt(router, &dc, &cloud.service);
+    rac_hybrid_router_register_backend(router, &dl, &local.service);
+    rac_hybrid_router_register_backend(router, &dc, &cloud.service);
 
     auto ctx = make_ctx(/*online=*/false);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_result_t rc = rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_result_t rc = rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed  = (rc == RAC_SUCCESS) && cloud.impl.call_count == 0 &&
                local.impl.call_count == 1 && std::strcmp(meta.chosen_module_id, "local") == 0;
     r.details = "offline → cloud skipped, local wins";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_policy_local_only() {
     TestResult r{"policy_local_only"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService local("local"), cloud("cloud");
     local.impl.confidence = 0.9f;
     cloud.impl.confidence = 0.9f;
@@ -200,26 +200,26 @@ static TestResult test_policy_local_only() {
     std::vector<rac_routing_condition_t> cl, cc;
     auto dl = make_desc({"local", 10, true, false}, cl);
     auto dc = make_desc({"cloud", 999, false, true}, cc);
-    rac_router_register_stt(router, &dl, &local.service);
-    rac_router_register_stt(router, &dc, &cloud.service);
+    rac_hybrid_router_register_backend(router, &dl, &local.service);
+    rac_hybrid_router_register_backend(router, &dc, &cloud.service);
 
     auto ctx = make_ctx(/*online=*/true, RAC_ROUTING_POLICY_LOCAL_ONLY);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_result_t rc = rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_result_t rc = rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed  = (rc == RAC_SUCCESS) && cloud.impl.call_count == 0 &&
                std::strcmp(meta.chosen_module_id, "local") == 0;
     r.details = "LOCAL_ONLY filters cloud";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_cascade_triggers_on_low_confidence() {
     TestResult r{"cascade_triggers_on_low_confidence"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService local("local"), cloud("cloud");
     local.impl.confidence = 0.2f;
     cloud.impl.confidence = 0.95f;
@@ -227,27 +227,27 @@ static TestResult test_cascade_triggers_on_low_confidence() {
     std::vector<rac_routing_condition_t> cl, cc;
     auto dl = make_desc({"local", 100, true, false}, cl);
     auto dc = make_desc({"cloud", 50, false, false}, cc);
-    rac_router_register_stt(router, &dl, &local.service);
-    rac_router_register_stt(router, &dc, &cloud.service);
+    rac_hybrid_router_register_backend(router, &dl, &local.service);
+    rac_hybrid_router_register_backend(router, &dc, &cloud.service);
 
     auto ctx = make_ctx(true);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_result_t rc = rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_result_t rc = rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed  = (rc == RAC_SUCCESS) && local.impl.call_count == 1 && cloud.impl.call_count == 1 &&
                meta.was_fallback && std::fabs(meta.primary_confidence - 0.2f) < 1e-4f &&
                std::strcmp(meta.chosen_module_id, "cloud") == 0;
     r.details = "local 0.2 < 0.5 → cloud fallback";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_cascade_skipped_when_not_local() {
     TestResult r{"cascade_skipped_when_not_local"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService primary("cloud1"), fallback("cloud2");
     primary.impl.confidence  = 0.2f;
     fallback.impl.confidence = 0.9f;
@@ -255,26 +255,26 @@ static TestResult test_cascade_skipped_when_not_local() {
     std::vector<rac_routing_condition_t> c1, c2;
     auto d1 = make_desc({"cloud1", 100, false, false}, c1);
     auto d2 = make_desc({"cloud2", 50, false, false}, c2);
-    rac_router_register_stt(router, &d1, &primary.service);
-    rac_router_register_stt(router, &d2, &fallback.service);
+    rac_hybrid_router_register_backend(router, &d1, &primary.service);
+    rac_hybrid_router_register_backend(router, &d2, &fallback.service);
 
     auto ctx = make_ctx(true);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed  = primary.impl.call_count == 1 && fallback.impl.call_count == 0 &&
                !meta.was_fallback && std::strcmp(meta.chosen_module_id, "cloud1") == 0;
     r.details = "non-local primary does not cascade";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_nan_confidence_is_trusted() {
     TestResult r{"nan_confidence_is_trusted"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService local("local"), cloud("cloud");
     local.impl.confidence = std::numeric_limits<float>::quiet_NaN();
     cloud.impl.confidence = 0.9f;
@@ -282,46 +282,46 @@ static TestResult test_nan_confidence_is_trusted() {
     std::vector<rac_routing_condition_t> cl, cc;
     auto dl = make_desc({"local", 100, true, false}, cl);
     auto dc = make_desc({"cloud", 50, false, false}, cc);
-    rac_router_register_stt(router, &dl, &local.service);
-    rac_router_register_stt(router, &dc, &cloud.service);
+    rac_hybrid_router_register_backend(router, &dl, &local.service);
+    rac_hybrid_router_register_backend(router, &dc, &cloud.service);
 
     auto ctx = make_ctx(true);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed  = local.impl.call_count == 1 && cloud.impl.call_count == 0 && !meta.was_fallback &&
                std::strcmp(meta.chosen_module_id, "local") == 0;
     r.details = "NaN confidence → no cascade";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_unregister_removes_backend() {
     TestResult r{"unregister_removes_backend"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService a("a");
     std::vector<rac_routing_condition_t> ca;
     auto da = make_desc({"a", 10, true, false}, ca);
-    rac_router_register_stt(router, &da, &a.service);
-    int before      = rac_router_stt_count(router);
-    rac_result_t rc = rac_router_unregister_stt(router, "a");
-    int after       = rac_router_stt_count(router);
+    rac_hybrid_router_register_backend(router, &da, &a.service);
+    int before      = rac_hybrid_router_count(router);
+    rac_result_t rc = rac_hybrid_router_unregister(router, "a");
+    int after       = rac_hybrid_router_count(router);
     r.passed        = before == 1 && after == 0 && rc == RAC_SUCCESS;
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_concurrent_run_and_register() {
     TestResult r{"concurrent_run_and_register"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService primary("primary");
     primary.impl.confidence = 0.9f;
     std::vector<rac_routing_condition_t> ca;
     auto da = make_desc({"primary", 50, true, false}, ca);
-    rac_router_register_stt(router, &da, &primary.service);
+    rac_hybrid_router_register_backend(router, &da, &primary.service);
 
     auto ctx = make_ctx(true);
     std::atomic<bool> stop{false};
@@ -331,7 +331,7 @@ static TestResult test_concurrent_run_and_register() {
         while (!stop.load(std::memory_order_relaxed)) {
             rac_stt_result_t out{};
             uint8_t          audio[16] = {0};
-            if (rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, nullptr) ==
+            if (rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, nullptr) ==
                 RAC_SUCCESS) {
                 successes.fetch_add(1);
             }
@@ -346,8 +346,8 @@ static TestResult test_concurrent_run_and_register() {
         extras.emplace_back("extra" + std::to_string(i));
         extras.back().impl.confidence = 0.9f;
         auto d = make_desc({extras.back().impl.id, 10, true, false}, extra_conds[i]);
-        rac_router_register_stt(router, &d, &extras.back().service);
-        rac_router_unregister_stt(router, extras.back().impl.id.c_str());
+        rac_hybrid_router_register_backend(router, &d, &extras.back().service);
+        rac_hybrid_router_unregister(router, extras.back().impl.id.c_str());
     }
 
     stop.store(true);
@@ -355,7 +355,7 @@ static TestResult test_concurrent_run_and_register() {
 
     r.passed  = successes.load() > 0;
     r.details = "runs survived concurrent (un)registrations";
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
@@ -367,7 +367,7 @@ static bool always_false(void* user_data, const rac_routing_context_t* /*ctx*/) 
 
 static TestResult test_custom_condition_callback() {
     TestResult r{"custom_condition_callback"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService blocked("blocked"), allowed("allowed");
     blocked.impl.confidence = 0.9f;
     allowed.impl.confidence = 0.9f;
@@ -391,26 +391,26 @@ static TestResult test_custom_condition_callback() {
     std::vector<rac_routing_condition_t> ca_conds;
     auto da = make_desc({"allowed", 10, true, false}, ca_conds);
 
-    rac_router_register_stt(router, &db, &blocked.service);
-    rac_router_register_stt(router, &da, &allowed.service);
+    rac_hybrid_router_register_backend(router, &db, &blocked.service);
+    rac_hybrid_router_register_backend(router, &da, &allowed.service);
 
     auto ctx = make_ctx(true);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed = cb_hits >= 1 && blocked.impl.call_count == 0 && allowed.impl.call_count == 1 &&
                std::strcmp(meta.chosen_module_id, "allowed") == 0;
     r.details = "custom condition user_data is threaded + respected";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 
 static TestResult test_scoring_order() {
     TestResult r{"scoring_order"};
-    rac_router_t* router = rac_router_create();
+    rac_hybrid_router_t* router = rac_hybrid_router_create(RAC_ROUTED_CAP_STT);
     FakeService low("low"), high("high");
     low.impl.confidence  = 0.9f;
     high.impl.confidence = 0.9f;
@@ -418,20 +418,20 @@ static TestResult test_scoring_order() {
     std::vector<rac_routing_condition_t> cl, ch;
     auto dl = make_desc({"low", 10, true, false}, cl);
     auto dh = make_desc({"high", 200, true, false}, ch);
-    rac_router_register_stt(router, &dl, &low.service);
-    rac_router_register_stt(router, &dh, &high.service);
+    rac_hybrid_router_register_backend(router, &dl, &low.service);
+    rac_hybrid_router_register_backend(router, &dh, &high.service);
 
     auto ctx = make_ctx(true);
     rac_stt_result_t out{};
     rac_routed_metadata_t meta{};
     uint8_t audio[16] = {0};
-    rac_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
+    rac_hybrid_router_run_stt(router, &ctx, audio, sizeof(audio), nullptr, &out, &meta);
 
     r.passed  = high.impl.call_count == 1 && low.impl.call_count == 0 &&
                std::strcmp(meta.chosen_module_id, "high") == 0;
     r.details = "higher base_priority wins";
     free_result(&out);
-    rac_router_destroy(router);
+    rac_hybrid_router_destroy(router);
     return r;
 }
 

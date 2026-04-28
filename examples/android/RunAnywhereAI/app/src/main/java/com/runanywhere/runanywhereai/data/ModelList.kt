@@ -191,7 +191,7 @@ object ModelList {
 
         // Cloud backends
         try {
-            Sarvam.register(apiKey = "sk_2srlg3nz_HUHzTsQJhhH3fIxQ182XpoV2")
+            Sarvam.register(apiKey = "sk_x7budlot_PfLY2e4fP0kdJVMc1Thn33hK")
 
             // Register Sarvam model in C++ registry (not in UI model lists)
             RunAnywhere.registerModel(
