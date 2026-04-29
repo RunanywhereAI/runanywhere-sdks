@@ -256,7 +256,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // --- GENIE NPU MODULE (Android/Snapdragon only) ---
     if (Genie.isAvailable) {
       await Genie.register(priority: 200);
-      final chip = await RunAnywhereDevice.getChip();
+      final chip = await RunAnywhereSDK.instance.hardware.getChipEnum();
       if (chip != null) {
         // Models with per-chip availability
         const genieModels = [

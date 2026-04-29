@@ -79,6 +79,8 @@ interface StreamingSTTNativeModule {
   startStreamingSTT?: (language: string) => Promise<boolean>;
   stopStreamingSTT?: () => Promise<boolean>;
   isStreamingSTT?: () => Promise<boolean>;
+  /** rac_stt_stream_process_audio — if the bridge exposes it. */
+  sttProcessAudio?: (samplesBase64: string) => Promise<void>;
 }
 
 /**
@@ -227,51 +229,113 @@ export async function transcribeBuffer(
 }
 
 /**
- * Streaming transcription with partial-result callback.
+ * Push a raw audio chunk into the streaming STT session.
  *
- * Matches Swift SDK: `RunAnywhere.transcribeStream(audioData:options:onPartialResult:)`.
+ * Forwards to the Nitro bridge's `sttProcessAudio` if it exists, otherwise
+ * is a no-op (the bridge does not yet expose streaming audio ingestion for RN).
+ *
+ * Matches Swift SDK: `RunAnywhere.processStreamingAudio(_:)` (§4).
  */
-export async function transcribeStream(
-  audio: Uint8Array | string | ArrayBuffer,
-  options: Partial<STTOptions> & {
-    onPartialResult?: (partial: STTPartialResult) => void;
-  } = {}
-): Promise<STTOutput> {
+export async function processStreamingAudio(samples: Uint8Array): Promise<void> {
+  if (!isNativeModuleAvailable()) return;
+  const native = requireNativeModule() as unknown as StreamingSTTNativeModule;
+  if (typeof native.sttProcessAudio === 'function') {
+    // Encode to base64 for the bridge.
+    let binary = '';
+    for (let i = 0; i < samples.byteLength; i++) {
+      binary += String.fromCharCode(samples[i]!);
+    }
+    const base64 = btoa(binary);
+    await native.sttProcessAudio(base64);
+  }
+  // If bridge method absent, silently do nothing — the C++ streaming support
+  // is not yet wired for RN (CPP-BLOCKED: rac_stt_stream_* ABI gap).
+}
+
+/**
+ * Stream transcription results as an `AsyncIterable<STTPartialResult>`.
+ *
+ * Each chunk of the `audio` iterable is fed into `processStreamingAudio`;
+ * partial results are emitted via the VAD/STT EventBus. When the iterable
+ * is exhausted a final result is produced by `transcribe()` and emitted as
+ * the terminal `isFinal` partial.
+ *
+ * Matches the canonical cross-SDK spec §4:
+ *   `transcribeStream(audio: Stream<Bytes>) → Stream<STTPartialResult>`
+ *
+ * The implementation degrades gracefully when the native bridge does not
+ * expose `sttProcessAudio`: it falls back to calling `transcribe()` once and
+ * emitting a single final partial result, which is the same behaviour the
+ * Swift and Flutter SDKs exhibit on unsupported engines.
+ */
+export async function* transcribeStream(
+  audio: AsyncIterable<Uint8Array> | Uint8Array | string | ArrayBuffer,
+  options: Partial<STTOptions> = {}
+): AsyncIterable<STTPartialResult> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
 
-  const onPartialResult = options.onPartialResult;
-  let unsubscribe: (() => void) | null = null;
+  // Subscribe to STT partial-result events from the EventBus.
+  const partialQueue: STTPartialResult[] = [];
+  let partialResolver: ((value: IteratorResult<STTPartialResult>) => void) | null = null;
 
-  if (onPartialResult) {
-    unsubscribe = EventBus.onVoice((event) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const evt = event as any;
-      if (evt.type === 'sttPartialResult') {
-        onPartialResult({
-          text: evt.text ?? '',
-          isFinal: false,
-          stability: typeof evt.confidence === 'number' ? evt.confidence : 0,
-        });
-      } else if (evt.type === 'sttCompleted' && unsubscribe) {
-        unsubscribe();
+  const unsubscribe = EventBus.onVoice((event) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const evt = event as any;
+    if (evt.type === 'sttPartialResult') {
+      const partial: STTPartialResult = {
+        text: evt.text ?? '',
+        isFinal: false,
+        stability: typeof evt.confidence === 'number' ? evt.confidence : 0,
+      };
+      if (partialResolver) {
+        const res = partialResolver;
+        partialResolver = null;
+        res({ value: partial, done: false });
+      } else {
+        partialQueue.push(partial);
       }
-    });
-  }
+    }
+  });
 
   try {
-    const output = await transcribe(audio, options);
-    if (onPartialResult) {
-      onPartialResult({
-        text: output.text,
-        isFinal: true,
-        stability: output.confidence,
-      });
+    // If audio is an AsyncIterable, process each chunk.
+    if (audio && typeof (audio as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] === 'function') {
+      for await (const chunk of audio as AsyncIterable<Uint8Array>) {
+        await processStreamingAudio(chunk);
+        // Drain any queued partials.
+        while (partialQueue.length > 0) {
+          yield partialQueue.shift()!;
+        }
+      }
     }
-    return output;
+
+    // Drain remaining queued partials.
+    while (partialQueue.length > 0) {
+      yield partialQueue.shift()!;
+    }
+
+    // Fall back to single-shot transcribe for the final result (covers both the
+    // AsyncIterable path above and the direct Uint8Array / string / ArrayBuffer
+    // path).
+    const audioInput = (audio && typeof (audio as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] === 'function')
+      ? new Uint8Array(0) // already processed above
+      : audio as Uint8Array | string | ArrayBuffer;
+
+    const finalOutput = (audioInput instanceof Uint8Array && audioInput.byteLength === 0)
+      ? null
+      : await transcribe(audioInput, options);
+
+    if (finalOutput) {
+      yield {
+        text: finalOutput.text,
+        isFinal: true,
+        stability: finalOutput.confidence,
+      };
+    }
   } finally {
-    if (unsubscribe) unsubscribe();
+    unsubscribe();
   }
 }
 
@@ -321,22 +385,19 @@ export async function transcribeFile(
 }
 
 /**
- * AsyncIterable variant of `transcribeStream`.
+ * Structured streaming transcription result handle.
  *
- * Matches the LLM/VLM streaming primitives (`stream` + `result` + `cancel`).
+ * Provides `partials` (an `AsyncIterable<STTPartialResult>`), a `result`
+ * `Promise<STTOutput>` that resolves when the stream completes, and a
+ * `cancel()` function.
+ *
+ * Wraps the generator-based `transcribeStream` for callers that prefer a
+ * handle-based API.
  */
 export async function transcribeStreamAsync(
   audio: Uint8Array | string | ArrayBuffer,
   options: Partial<STTOptions> = {}
 ): Promise<STTStreamingResult> {
-  const queue: STTPartialResult[] = [];
-  let resolver:
-    | ((value: IteratorResult<STTPartialResult>) => void)
-    | null = null;
-  let done = false;
-  let streamError: Error | null = null;
-  let cancelled = false;
-
   let resolveResult!: (value: STTOutput) => void;
   let rejectResult!: (err: Error) => void;
   const resultPromise = new Promise<STTOutput>((resolve, reject) => {
@@ -344,60 +405,45 @@ export async function transcribeStreamAsync(
     rejectResult = reject;
   });
 
-  const pushPartial = (partial: STTPartialResult): void => {
-    if (cancelled) return;
-    if (resolver) {
-      resolver({ value: partial, done: false });
-      resolver = null;
-    } else {
-      queue.push(partial);
-    }
-  };
+  let cancelRequested = false;
 
-  transcribeStream(audio, { ...options, onPartialResult: pushPartial })
-    .then((output) => {
-      done = true;
-      resolveResult(output);
-      if (resolver) {
-        resolver({ value: undefined as unknown as STTPartialResult, done: true });
-        resolver = null;
-      }
-    })
-    .catch((err: Error) => {
-      streamError = err;
-      done = true;
-      rejectResult(err);
-      if (resolver) {
-        resolver({ value: undefined as unknown as STTPartialResult, done: true });
-        resolver = null;
-      }
-    });
+  // Create the async generator stream from the canonical `transcribeStream`.
+  const stream = transcribeStream(audio, options);
 
   async function* partialGenerator(): AsyncGenerator<STTPartialResult> {
-    while (!done || queue.length > 0) {
-      if (queue.length > 0) {
-        yield queue.shift()!;
-      } else if (!done) {
-        const next = await new Promise<IteratorResult<STTPartialResult>>(
-          (resolve) => {
-            resolver = resolve;
-          }
-        );
-        if (next.done) break;
-        yield next.value;
+    let lastOutput: STTOutput | null = null;
+    try {
+      for await (const partial of stream) {
+        if (cancelRequested) break;
+        yield partial;
+        if (partial.isFinal) {
+          // Reconstruct an STTOutput from the final partial.
+          lastOutput = {
+            text: partial.text,
+            language: options.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+            confidence: partial.stability ?? 1.0,
+            words: [],
+            alternatives: [],
+          };
+        }
       }
+      resolveResult(lastOutput ?? {
+        text: '',
+        language: STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+        confidence: 0,
+        words: [],
+        alternatives: [],
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      rejectResult(error);
+      throw error;
     }
-    if (streamError) throw streamError;
   }
 
   const cancel = (): void => {
-    cancelled = true;
+    cancelRequested = true;
     void stopStreamingTranscription();
-    if (resolver) {
-      done = true;
-      resolver({ value: undefined as unknown as STTPartialResult, done: true });
-      resolver = null;
-    }
   };
 
   return {

@@ -26,6 +26,27 @@ import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
+// MARK: - DiffusionConfig
+
+/**
+ * Canonical single-parameter configuration object for [loadDiffusionModel].
+ *
+ * Per §8 of CANONICAL_API.md the load call must accept a single `DiffusionConfig`
+ * instead of 4 positional parameters. This Kotlin data class serves as
+ * `DiffusionConfig` until the IDL generates a proto message of that name.
+ *
+ * @param modelPath Absolute filesystem path to the model directory / bundle
+ * @param modelId Model identifier (must match a registered model in the registry)
+ * @param modelName Human-readable model name
+ * @param configuration Optional runtime tuning settings (steps, guidance scale, etc.)
+ */
+data class DiffusionConfig(
+    val modelPath: String,
+    val modelId: String,
+    val modelName: String,
+    val configuration: DiffusionConfiguration? = null,
+)
+
 // MARK: - Image Generation
 
 /**
@@ -75,23 +96,20 @@ expect suspend fun RunAnywhere.cancelImageGeneration()
 /**
  * Load a diffusion model.
  *
- * @param modelPath Path to the model directory (e.g. CoreML .mlmodelc bundle on Apple).
- * @param modelId Model identifier.
- * @param modelName Human-readable model name.
- * @param configuration Optional configuration for the model.
+ * @param config Single configuration object carrying model path, ID, name,
+ *               and optional runtime tuning settings.
  */
-expect suspend fun RunAnywhere.loadDiffusionModel(
-    modelPath: String,
-    modelId: String,
-    modelName: String,
-    configuration: DiffusionConfiguration? = null,
-)
+expect suspend fun RunAnywhere.loadDiffusionModel(config: DiffusionConfig)
 
 /** Unload the current diffusion model. */
 expect suspend fun RunAnywhere.unloadDiffusionModel()
 
-/** Whether a diffusion model is currently loaded. */
-expect suspend fun RunAnywhere.isDiffusionModelLoaded(): Boolean
+/**
+ * Whether a diffusion model is currently loaded.
+ *
+ * Sync property — reads cached state from the component layer without suspension.
+ */
+expect val RunAnywhere.isDiffusionModelLoaded: Boolean
 
 /** The currently loaded diffusion model ID, if any. */
 expect suspend fun RunAnywhere.currentDiffusionModelId(): String?

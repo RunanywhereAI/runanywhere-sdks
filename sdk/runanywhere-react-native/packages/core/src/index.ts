@@ -187,6 +187,12 @@ export type {
 // v3.1: proto-stream VoiceAgentStreamAdapter (canonical path).
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 
+// Canonical public streaming method for voice agent (§10 spec).
+export { streamVoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
+
+// G-A2: proto-stream LLMStreamAdapter (canonical path) — mirrors Web's adapter.
+export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
+
 // =============================================================================
 // Native Module (now part of core)
 // =============================================================================
@@ -270,19 +276,10 @@ export {
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
 
 // =============================================================================
-// LoRA Adapter Management
+// LoRA Adapter Management — canonical `RunAnywhere.lora.*` namespace
 // =============================================================================
 
-export {
-  loadLoraAdapter,
-  removeLoraAdapter,
-  clearLoraAdapters,
-  getLoadedLoraAdapters,
-  checkLoraCompatibility,
-  registerLoraAdapter,
-  loraAdaptersForModel,
-  allRegisteredLoraAdapters,
-} from './Public/Extensions/RunAnywhere+LoRA';
+export { lora } from './Public/Extensions/RunAnywhere+LoRA';
 
 export type {
   LoRAAdapterConfig,
@@ -384,7 +381,8 @@ export {
 // Phase C-prime ergonomic helpers — proto factory defaults + predicates
 // =============================================================================
 
-export * as helpers from './helpers';
+import * as helpers from './helpers';
+export { helpers };
 
 export type {
   RAGConfiguration,

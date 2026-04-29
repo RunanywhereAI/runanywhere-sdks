@@ -26,13 +26,13 @@ expect suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramewor
 /**
  * Get all registered frameworks that provide a specific capability.
  *
- * Mirrors Swift's `RunAnywhere.getFrameworks(for: SDKComponent)`.
+ * Canonical cross-SDK name per §13 spec. Replaces the deleted `getFrameworks`.
  *
  * @param capability The SDK component to filter by.
  * @return The sorted (by display name) list of frameworks supporting the
  *         requested capability via at least one registered model.
  */
-expect suspend fun RunAnywhere.getFrameworks(capability: SDKComponent): List<InferenceFramework>
+expect suspend fun RunAnywhere.getFrameworksForCapability(capability: SDKComponent): List<InferenceFramework>
 
 /**
  * Flush any pending model-registration writes to the C++ registry.

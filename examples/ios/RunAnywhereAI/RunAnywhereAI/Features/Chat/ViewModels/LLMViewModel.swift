@@ -251,8 +251,21 @@ final class LLMViewModel {
         do {
             try await ensureModelIsLoaded()
             let options = getGenerationOptions()
-            let effectivePrompt = applyThinkingModePrefix(to: prompt)
-            try await performGeneration(prompt: effectivePrompt, options: options, messageIndex: messageIndex)
+            // Build a ChatML-formatted prompt from the full conversation history.
+            // LFM2 / Qwen models require the chatml template; sending raw text
+            // causes the model to emit control/reserved tokens instead of text.
+            let chatMLPrompt = buildChatMLPrompt(systemPrompt: options.systemPrompt)
+            let effectiveOptions = LLMGenerationOptions(
+                maxTokens: options.maxTokens,
+                temperature: options.temperature,
+                topP: options.topP,
+                stopSequences: options.stopSequences,
+                streamingEnabled: options.streamingEnabled,
+                preferredFramework: options.preferredFramework,
+                structuredOutput: options.structuredOutput,
+                systemPrompt: nil   // Already embedded in chatMLPrompt
+            )
+            try await performGeneration(prompt: chatMLPrompt, options: effectiveOptions, messageIndex: messageIndex)
         } catch {
             await handleGenerationError(error, at: messageIndex)
         }
@@ -260,10 +273,39 @@ final class LLMViewModel {
         await finalizeGeneration(at: messageIndex)
     }
 
-    private func applyThinkingModePrefix(to prompt: String) -> String {
-        guard loadedModelSupportsThinking else { return prompt }
-        let thinkingModeEnabled = SettingsViewModel.shared.thinkingModeEnabled
-        return thinkingModeEnabled ? prompt : "/no_think\n\(prompt)"
+    // Formats the current conversation as a ChatML string for instruction-tuned models
+    // (LFM2, Qwen, and any other model using the im_start/im_end template).
+    // Reads `messages`, which already contains the latest user turn and a trailing
+    // empty assistant placeholder added by prepareMessagesForSending(); the placeholder
+    // is excluded — we close with <|im_start|>assistant to trigger generation.
+    private func buildChatMLPrompt(systemPrompt: String?) -> String {
+        var parts: [String] = []
+        if let system = systemPrompt, !system.isEmpty {
+            parts.append("<|im_start|>system\n\(system)<|im_end|>")
+        }
+        // Drop the trailing empty assistant placeholder.
+        let conversationMessages = messages.dropLast()
+        let isThinkingModel = loadedModelSupportsThinking
+        let thinkingDisablePrefix: String = {
+            guard isThinkingModel else { return "" }
+            return SettingsViewModel.shared.thinkingModeEnabled ? "" : "/no_think\n"
+        }()
+        for (index, msg) in conversationMessages.enumerated() {
+            switch msg.role {
+            case .system:
+                break   // System prompt is included above via the options parameter
+            case .user:
+                let isLast = index == conversationMessages.index(before: conversationMessages.endIndex)
+                let content = isLast ? (thinkingDisablePrefix + msg.content) : msg.content
+                parts.append("<|im_start|>user\n\(content)<|im_end|>")
+            case .assistant:
+                if !msg.content.isEmpty {
+                    parts.append("<|im_start|>assistant\n\(msg.content)<|im_end|>")
+                }
+            }
+        }
+        parts.append("<|im_start|>assistant")
+        return parts.joined(separator: "\n")
     }
 
     private func performGeneration(
@@ -340,7 +382,7 @@ final class LLMViewModel {
         isLoadingLoRA = true
         error = nil
         do {
-            try await RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path: path, scale: scale))
+            try await RunAnywhere.lora.load(LoRAAdapterConfig(path: path, scale: scale))
             await refreshLoraAdapters()
             logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
         } catch {
@@ -352,7 +394,7 @@ final class LLMViewModel {
 
     func removeLoraAdapter(path: String) async {
         do {
-            try await RunAnywhere.removeLoraAdapter(path)
+            try await RunAnywhere.lora.remove(path)
             await refreshLoraAdapters()
         } catch {
             logger.error("Failed to remove LoRA adapter: \(error)")
@@ -362,7 +404,7 @@ final class LLMViewModel {
 
     func clearLoraAdapters() async {
         do {
-            try await RunAnywhere.clearLoraAdapters()
+            try await RunAnywhere.lora.clear()
             loraAdapters = []
         } catch {
             logger.error("Failed to clear LoRA adapters: \(error)")
@@ -372,7 +414,7 @@ final class LLMViewModel {
 
     func refreshLoraAdapters() async {
         do {
-            loraAdapters = try await RunAnywhere.getLoadedLoraAdapters()
+            loraAdapters = try await RunAnywhere.lora.getLoaded()
         } catch {
             logger.error("Failed to refresh LoRA adapters: \(error)")
         }
@@ -381,12 +423,27 @@ final class LLMViewModel {
     // MARK: - LoRA Adapter Catalog & Download
 
     /// Refreshes the list of available adapters for the currently loaded model from the SDK registry.
+    ///
+    /// `adaptersForModel` returns `[LoRAAdapterInfo]` keyed by adapter path/id.
+    /// We cross-reference the app's local catalog (`LoRAAdapterCatalog.adapters`) to
+    /// reconstruct the full `LoraAdapterCatalogEntry` (which carries download URL, filename, etc.)
+    /// needed by the download/install flow.
     func refreshAvailableAdapters() async {
         guard let modelId = ModelListViewModel.shared.currentModel?.id else {
             availableAdapters = []
             return
         }
-        availableAdapters = await RunAnywhere.loraAdaptersForModel(modelId)
+        let registeredAdapters = await RunAnywhere.lora.adaptersForModel(modelId)
+        let registeredIds = Set(registeredAdapters.map(\.path))
+        // Return catalog entries whose id appears in the registered set, preserving catalog order.
+        availableAdapters = LoRAAdapterCatalog.adapters.filter { registeredIds.contains($0.id) }
+        // If the registry returned adapters that aren't in our local catalog, fall back to
+        // showing the full catalog so the user can still browse and download.
+        if availableAdapters.isEmpty && !registeredAdapters.isEmpty {
+            availableAdapters = LoRAAdapterCatalog.adapters.filter { entry in
+                LoRAAdapterCatalog.adapters.contains { $0.id == entry.id }
+            }
+        }
         syncDownloadedAdapterPaths()
     }
 

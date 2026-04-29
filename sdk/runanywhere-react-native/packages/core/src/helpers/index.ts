@@ -15,12 +15,24 @@
  * and never need to touch `@runanywhere/proto-ts` directly.
  */
 
-export * as sttHelpers from './stt';
-export * as ttsHelpers from './tts';
-export * as vadHelpers from './vad';
-export * as visionLanguageHelpers from './visionLanguage';
-export * as ragHelpers from './rag';
-export * as loraHelpers from './lora';
-export * as diffusionHelpers from './diffusion';
-export * as structuredOutputHelpers from './structuredOutput';
-export * as voiceAgentHelpers from './voiceAgent';
+import * as sttHelpers from './stt';
+import * as ttsHelpers from './tts';
+import * as vadHelpers from './vad';
+import * as visionLanguageHelpers from './visionLanguage';
+import * as ragHelpers from './rag';
+import * as loraHelpers from './lora';
+import * as diffusionHelpers from './diffusion';
+import * as structuredOutputHelpers from './structuredOutput';
+import * as voiceAgentHelpers from './voiceAgent';
+
+export {
+  sttHelpers,
+  ttsHelpers,
+  vadHelpers,
+  visionLanguageHelpers,
+  ragHelpers,
+  loraHelpers,
+  diffusionHelpers,
+  structuredOutputHelpers,
+  voiceAgentHelpers,
+};

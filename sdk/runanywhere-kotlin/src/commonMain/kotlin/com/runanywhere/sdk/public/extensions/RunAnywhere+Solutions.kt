@@ -9,11 +9,14 @@
  * C++ core compiles into a GraphScheduler DAG and executes through the
  * `rac_solution_*` C ABI. Mirrors Swift RunAnywhere+Solutions.swift.
  *
- * Wave 2 KOTLIN: Added missing namespace extension to align with Swift.
+ * Round 1 KOTLIN (G-A1): Migrated from bare `RunAnywhere.runSolution(...)`
+ * top-level methods to the canonical `RunAnywhere.solutions.run(...)`
+ * namespace. Bare names DELETED — no aliases, no @Deprecated.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.SolutionConfig
 import com.runanywhere.sdk.public.RunAnywhere
 
 /**
@@ -21,8 +24,14 @@ import com.runanywhere.sdk.public.RunAnywhere
  *
  * Owns the underlying C handle and guarantees `rac_solution_destroy`
  * runs at most once. Lifecycle verbs are forwarded one-to-one to the C ABI.
+ *
+ * Per canonical §11: every method `start, stop, cancel, feed, closeInput,
+ * destroy` exists, plus `isAlive` query.
  */
 expect class SolutionHandle {
+    /** Whether the handle still owns a live C-side solution. */
+    val isAlive: Boolean
+
     /** Start the underlying scheduler. Non-blocking. */
     suspend fun start()
 
@@ -32,8 +41,8 @@ expect class SolutionHandle {
     /** Force-cancel the graph. Returns once worker threads observe cancellation. */
     suspend fun cancel()
 
-    /** Feed a single UTF-8 item into the root input edge. */
-    suspend fun feed(item: String)
+    /** Feed a single byte payload into the root input edge. */
+    suspend fun feed(input: ByteArray)
 
     /** Signal end-of-stream on the root input edge. */
     suspend fun closeInput()
@@ -43,16 +52,36 @@ expect class SolutionHandle {
 }
 
 /**
- * Construct and return a started solution from a serialised
- * `runanywhere.v1.SolutionConfig` proto.
+ * Capability namespace for solution-runtime operations.
  *
- * @param configBytes Serialized SolutionConfig proto bytes.
+ * Stateless from the public perspective — every handle returned by
+ * `run` owns its own native solution and is released via
+ * [SolutionHandle.destroy].
  */
-expect suspend fun RunAnywhere.runSolution(configBytes: ByteArray): SolutionHandle
+expect class Solutions internal constructor() {
+    /**
+     * Construct and return a started solution from a YAML document.
+     */
+    suspend fun run(yaml: String): SolutionHandle
+
+    /**
+     * Construct and return a started solution from a serialised
+     * `runanywhere.v1.SolutionConfig` proto.
+     */
+    suspend fun run(configBytes: ByteArray): SolutionHandle
+
+    /**
+     * Construct and return a started solution from a typed
+     * `SolutionConfig` proto. Encoded internally and forwarded to the
+     * `configBytes` overload.
+     */
+    suspend fun run(config: SolutionConfig): SolutionHandle
+}
 
 /**
- * YAML sugar — construct a solution from a YAML document.
+ * Public capability accessor — `RunAnywhere.solutions.run(yaml)`.
  *
- * @param yaml YAML document body.
+ * Backed by a singleton so callers can hold a stable reference and the
+ * JVM does not allocate per-call.
  */
-expect suspend fun RunAnywhere.runSolutionFromYaml(yaml: String): SolutionHandle
+expect val RunAnywhere.solutions: Solutions

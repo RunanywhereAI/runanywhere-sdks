@@ -212,6 +212,27 @@ RAC_API rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,
  */
 RAC_API void rac_vad_component_destroy(rac_handle_t handle);
 
+/**
+ * @brief Get running VAD statistics (ambient level, recent average, recent max).
+ *
+ * Reads live statistics from the VAD's internal energy buffer.  Only the
+ * energy-based VAD path populates these values — when a model-based VAD
+ * (e.g. Silero ONNX) is loaded the function returns RAC_SUCCESS with
+ * zeroes for all three outputs so callers don't need to special-case.
+ *
+ * Blocked on CPP implementation (Swift fix report, G-C6).
+ *
+ * @param handle           Component handle
+ * @param ambient_level_out   Output: ambient noise level from calibration
+ * @param recent_avg_out      Output: recent average energy across frames
+ * @param recent_max_out      Output: recent maximum energy across frames
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
+                                                      float* ambient_level_out,
+                                                      float* recent_avg_out,
+                                                      float* recent_max_out);
+
 #ifdef __cplusplus
 }
 #endif

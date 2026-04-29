@@ -21,10 +21,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.ToolCall
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallingResult
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
@@ -108,30 +108,26 @@ expect suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult
  * 5. Repeats until no more tool calls or `maxToolCalls` is reached.
  *
  * @param prompt The user's prompt
- * @param options Tool-calling options (tools, maxToolCalls, autoExecute, etc.)
- * @return Result containing final text, all tool calls made, and their results
+ * @param options LLM generation options (tool definitions passed via
+ *   [LLMGenerationOptions.tool_calling] field when set by the caller)
+ * @return [LLMGenerationResult] with the final text response
  */
 expect suspend fun RunAnywhere.generateWithTools(
     prompt: String,
-    options: ToolCallingOptions? = null,
-): ToolCallingResult
+    options: LLMGenerationOptions? = null,
+): LLMGenerationResult
 
 /**
  * Continue generation after a manual tool execution.
  *
- * Use this when `autoExecute` is false. After receiving a `ToolCallingResult`
- * with `isComplete == false`, execute the tool yourself, then call this to
- * continue.
+ * Use this after calling [generateWithTools] and executing the tool call
+ * returned in the response externally.
  *
- * @param previousPrompt The original user prompt
- * @param toolCall The tool call that was executed
- * @param toolResult The result of executing the tool
- * @param options Tool-calling options for the continuation
- * @return Result of the continued generation
+ * @param toolCallId The ID of the tool call that was executed
+ * @param result The result string from executing the tool
+ * @return [LLMGenerationResult] of the continued generation
  */
 expect suspend fun RunAnywhere.continueWithToolResult(
-    previousPrompt: String,
-    toolCall: ToolCall,
-    toolResult: ToolResult,
-    options: ToolCallingOptions? = null,
-): ToolCallingResult
+    toolCallId: String,
+    result: String,
+): LLMGenerationResult

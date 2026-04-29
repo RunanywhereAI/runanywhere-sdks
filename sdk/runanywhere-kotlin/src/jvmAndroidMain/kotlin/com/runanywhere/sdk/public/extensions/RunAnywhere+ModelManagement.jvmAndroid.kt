@@ -1108,6 +1108,21 @@ actual suspend fun RunAnywhere.refreshModelRegistry(
     }
 }
 
+actual suspend fun RunAnywhere.loadModel(modelId: String) {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    val model =
+        CppBridgeModelRegistry.get(modelId)
+            ?: throw SDKException.model("Model '$modelId' not found in registry")
+    // Route to the type-specific loader based on registered category.
+    when (model.category) {
+        CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> loadSTTModel(modelId)
+        CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> loadTTSModel(modelId)
+        else -> loadLLMModel(modelId)
+    }
+}
+
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -1135,21 +1150,21 @@ actual suspend fun RunAnywhere.unloadLLMModel() {
     CppBridgeLLM.unload()
 }
 
-actual suspend fun RunAnywhere.isLLMModelLoaded(): Boolean {
-    return CppBridgeLLM.isLoaded
-}
+actual val RunAnywhere.isLLMModelLoaded: Boolean
+    get() = CppBridgeLLM.isLoaded
 
-actual val RunAnywhere.currentLLMModelId: String?
-    get() = CppBridgeLLM.getLoadedModelId()
+// Round 1 KOTLIN (G-A8): `currentLLMModelId` deleted — callers use
+// `currentLLMModel?.id` for the legacy ID-only access pattern.
 
-actual suspend fun RunAnywhere.currentLLMModel(): ModelInfo? {
-    val modelId = CppBridgeLLM.getLoadedModelId() ?: return null
-    // Look up in registered models first
-    val registeredModel = getRegisteredModels().find { it.id == modelId }
-    if (registeredModel != null) return registeredModel
-    // Fall back to bridge models
-    return getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
-}
+actual val RunAnywhere.currentLLMModel: ModelInfo?
+    get() {
+        val modelId = CppBridgeLLM.getLoadedModelId() ?: return null
+        // Look up in registered models first
+        val registeredModel = getRegisteredModels().find { it.id == modelId }
+        if (registeredModel != null) return registeredModel
+        // Fall back to bridge models
+        return getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
+    }
 
 actual suspend fun RunAnywhere.currentSTTModel(): ModelInfo? {
     val modelId = CppBridgeSTT.getLoadedModelId() ?: return null

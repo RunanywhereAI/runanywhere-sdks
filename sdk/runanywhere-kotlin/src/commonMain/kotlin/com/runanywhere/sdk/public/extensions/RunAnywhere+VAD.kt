@@ -141,9 +141,11 @@ expect suspend fun RunAnywhere.unloadVADModel()
 
 /**
  * True if a VAD model is currently loaded.
+ *
+ * Sync property — reads cached state from the component layer without suspension.
  * Mirrors Swift's `RunAnywhere.isVADModelLoaded` getter.
  */
-expect suspend fun RunAnywhere.isVADModelLoaded(): Boolean
+expect val RunAnywhere.isVADModelLoaded: Boolean
 
 /**
  * The currently loaded VAD model ID, or `null` if no model is loaded.
@@ -154,8 +156,18 @@ expect suspend fun RunAnywhere.currentVADModelId(): String?
 /**
  * Detect speech in raw audio samples.
  *
- * Naming aligned with Swift's `RunAnywhere.detectSpeech(in:)`. This is a
- * thin alias over `detectVoiceActivity(audioData)`; new callers should
- * prefer `detectSpeech` for cross-platform parity.
+ * Returns `true` if speech is detected, `false` otherwise.
+ * Canonical cross-SDK name per §6 spec. New callers should prefer
+ * `detectVoiceActivity` for richer output (confidence, energy, etc.).
  */
-expect suspend fun RunAnywhere.detectSpeech(audioData: ByteArray): VADResult
+expect suspend fun RunAnywhere.detectSpeech(audioData: ByteArray): Boolean
+
+/**
+ * Set a callback to receive VAD statistics after each processing call.
+ *
+ * The callback is invoked after `detectVoiceActivity` or `streamVAD` processes
+ * a frame, delivering ambient level, recent average, and recent max energy.
+ *
+ * @param callback Invoked with [VADStatistics] for each processed frame.
+ */
+expect fun RunAnywhere.setVADStatisticsCallback(callback: (VADStatistics) -> Unit)

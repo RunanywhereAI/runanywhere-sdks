@@ -13,7 +13,12 @@ export {
   generate,
   generateStream,
   cancelGeneration,
+  // Thinking token utilities (§3)
+  extractThinkingTokens,
+  stripThinkingTokens,
+  splitThinkingAndResponse,
 } from './RunAnywhere+TextGeneration';
+export type { ThinkingExtractionResult } from './RunAnywhere+TextGeneration';
 
 // Speech-to-Text
 export {
@@ -26,6 +31,8 @@ export {
   transcribeStream,
   transcribeStreamAsync,
   transcribeFile,
+  // Streaming audio ingestion (§4)
+  processStreamingAudio,
   stopStreamingTranscription,
   isStreamingSTT,
   currentSTTModel,
@@ -59,15 +66,21 @@ export {
   isVADModelLoaded,
   unloadVADModel,
   detectSpeech,
+  detectVoiceActivity,
   processVAD,
   startVAD,
   stopVAD,
   resetVAD,
   setVADSpeechActivityCallback,
   setVADAudioBufferCallback,
+  // VAD statistics callback (§6)
+  setVADStatisticsCallback,
+  // VAD streaming (§6)
+  streamVAD,
   cleanupVAD,
   getVADState,
 } from './RunAnywhere+VAD';
+export type { VADStatisticsCallback } from './RunAnywhere+VAD';
 
 // Voice Agent
 export {
@@ -90,13 +103,13 @@ export {
 export {
   generateStructured,
   generateStructuredStream,
+  extractStructuredOutput,
   generate as generateStructuredType,
   extractEntities,
   classify,
 } from './RunAnywhere+StructuredOutput';
 export type {
   StreamToken,
-  StructuredOutputStreamResult
 } from './RunAnywhere+StructuredOutput';
 
 // Device (NPU Chip Detection)
@@ -147,7 +160,8 @@ export type {
 } from './RunAnywhere+Audio';
 
 // Re-export Audio as namespace for RunAnywhere.Audio access
-export * as Audio from './RunAnywhere+Audio';
+import * as Audio from './RunAnywhere+Audio';
+export { Audio };
 
 // Tool Calling
 export {
@@ -192,3 +206,13 @@ export {
   processImageStream,
   cancelVLMGeneration,
 } from './RunAnywhere+VisionLanguage';
+
+// Plugin Loader (§12)
+export {
+  pluginApiVersion,
+  loadPlugin,
+  unloadPlugin,
+  registeredPluginCount,
+  registeredPluginNames,
+} from './RunAnywhere+PluginLoader';
+export type { PluginInfo } from './RunAnywhere+PluginLoader';

@@ -125,43 +125,15 @@ class ModelListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Convert SDK InferenceFramework to app LLMFramework
-  LLMFramework _convertFramework(sdk.InferenceFramework sdkFramework) {
-    switch (sdkFramework) {
-      case sdk.InferenceFramework.llamaCpp:
-        return LLMFramework.llamaCpp;
-      case sdk.InferenceFramework.foundationModels:
-        return LLMFramework.foundationModels;
-      case sdk.InferenceFramework.onnx:
-        return LLMFramework.onnxRuntime;
-      case sdk.InferenceFramework.systemTTS:
-        return LLMFramework.systemTTS;
-      case sdk.InferenceFramework.genie:
-        return LLMFramework.genie;
-      default:
-        return LLMFramework.unknown;
-    }
-  }
+  /// Convert SDK InferenceFramework to app LLMFramework.
+  /// LLMFramework is now a typedef for sdk.InferenceFramework, so this
+  /// is an identity conversion — no switch needed.
+  LLMFramework _convertFramework(sdk.InferenceFramework sdkFramework) =>
+      sdkFramework;
 
-  /// Convert app LLMFramework to SDK InferenceFramework
-  sdk.InferenceFramework _convertToSDKFramework(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.llamaCpp:
-        return sdk.InferenceFramework.llamaCpp;
-      case LLMFramework.foundationModels:
-        return sdk.InferenceFramework.foundationModels;
-      case LLMFramework.onnxRuntime:
-        return sdk.InferenceFramework.onnx;
-      case LLMFramework.systemTTS:
-        return sdk.InferenceFramework.systemTTS;
-      case LLMFramework.genie:
-        return sdk.InferenceFramework.genie;
-      case LLMFramework.mediaPipe:
-      case LLMFramework.whisperKit:
-      case LLMFramework.unknown:
-        return sdk.InferenceFramework.unknown;
-    }
-  }
+  /// Convert app LLMFramework to SDK InferenceFramework (identity).
+  sdk.InferenceFramework _convertToSDKFramework(LLMFramework framework) =>
+      framework;
 
   /// Get available frameworks based on registered models
   Future<void> loadAvailableFrameworks() async {
@@ -229,20 +201,22 @@ class ModelListViewModel extends ChangeNotifier {
 
       await for (final progress
           in sdk.RunAnywhereSDK.instance.downloads.start(model.id)) {
-        final progressValue = progress.totalBytes > 0
-            ? progress.bytesDownloaded / progress.totalBytes
-            : 0.0;
+        final totalBytes = progress.totalBytes.toInt();
+        final progressValue = totalBytes > 0
+            ? progress.bytesDownloaded.toInt() / totalBytes
+            : progress.stageProgress.toDouble();
 
         _downloadProgress[model.id] = progressValue;
         progressHandler(progressValue);
         notifyListeners();
 
         // Check if completed or failed
-        if (progress.state.isCompleted) {
+        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${model.name}');
           break;
-        } else if (progress.state.isFailed) {
-          throw Exception('Download failed');
+        } else if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+            progress.errorMessage.isNotEmpty) {
+          throw Exception('Download failed: ${progress.errorMessage}');
         }
       }
 

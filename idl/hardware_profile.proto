@@ -1,0 +1,32 @@
+syntax = "proto3";
+package runanywhere.v1;
+
+message HardwareProfile {
+  string chip = 1;
+  bool has_neural_engine = 2;
+  string acceleration_mode = 3; // "ane", "gpu", "cpu"
+  uint64 total_memory_bytes = 4;
+  uint32 core_count = 5;
+  uint32 performance_cores = 6;
+  uint32 efficiency_cores = 7;
+  string architecture = 8; // "arm64", "x86_64"
+  string platform = 9; // "ios", "android", "web", "macos", "linux", "windows"
+}
+
+enum AcceleratorPreference {
+  ACCELERATOR_PREFERENCE_AUTO = 0;
+  ACCELERATOR_PREFERENCE_ANE = 1;
+  ACCELERATOR_PREFERENCE_GPU = 2;
+  ACCELERATOR_PREFERENCE_CPU = 3;
+}
+
+message AcceleratorInfo {
+  string name = 1;
+  AcceleratorPreference type = 2;
+  bool available = 3;
+}
+
+message HardwareProfileResult {
+  HardwareProfile profile = 1;
+  repeated AcceleratorInfo accelerators = 2;
+}

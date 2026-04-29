@@ -571,24 +571,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     ));
   }
 
-  /// Map SDK InferenceFramework enum to app framework enum
-  LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) {
-    if (framework == null) return LLMFramework.unknown;
-    switch (framework) {
-      case sdk.InferenceFramework.llamaCpp:
-        return LLMFramework.llamaCpp;
-      case sdk.InferenceFramework.foundationModels:
-        return LLMFramework.foundationModels;
-      case sdk.InferenceFramework.onnx:
-        return LLMFramework.onnxRuntime;
-      case sdk.InferenceFramework.systemTTS:
-        return LLMFramework.systemTTS;
-      case sdk.InferenceFramework.genie:
-        return LLMFramework.genie;
-      default:
-        return LLMFramework.unknown;
-    }
-  }
+  /// Map SDK InferenceFramework to LLMFramework (identity — both are the same type).
+  LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) =>
+      framework ?? LLMFramework.unknown;
 
   Widget _buildModelStatusBanner() {
     // Use local state synced from SDK (matches Swift pattern)

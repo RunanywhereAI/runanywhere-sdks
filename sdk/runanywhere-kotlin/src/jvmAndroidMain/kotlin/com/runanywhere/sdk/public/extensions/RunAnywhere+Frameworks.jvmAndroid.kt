@@ -51,7 +51,7 @@ actual suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramewor
         .sortedBy { it.displayName }
 }
 
-actual suspend fun RunAnywhere.getFrameworks(capability: SDKComponent): List<InferenceFramework> {
+actual suspend fun RunAnywhere.getFrameworksForCapability(capability: SDKComponent): List<InferenceFramework> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
     val relevantCategories: Set<ModelCategory> =

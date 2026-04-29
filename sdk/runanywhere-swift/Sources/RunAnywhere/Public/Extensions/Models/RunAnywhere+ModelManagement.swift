@@ -239,6 +239,25 @@ extension RunAnywhere {
         return modelFiles.first
     }
 
+    /// Load an LLM model by ID — canonical §3 name (`loadLLMModel`).
+    ///
+    /// Delegates to `loadModel(_:)` for actual resolution and loading.
+    public static func loadLLMModel(_ modelId: String) async throws {
+        try await loadModel(modelId)
+    }
+
+    /// Unload the currently loaded LLM model — canonical §3 name (`unloadLLMModel`).
+    ///
+    /// Delegates to `unloadModel()`.
+    public static func unloadLLMModel() async throws {
+        try await unloadModel()
+    }
+
+    /// Whether an LLM model is currently loaded — canonical §3 name (`isLLMModelLoaded`).
+    public static var isLLMModelLoaded: Bool {
+        get async { await isModelLoaded }
+    }
+
     /// Unload the currently loaded LLM model
     public static func unloadModel() async throws {
         guard isInitialized else {
@@ -449,6 +468,11 @@ extension RunAnywhere {
             let models = (try? await availableModels()) ?? []
             return models.first { $0.id == modelId }
         }
+    }
+
+    /// Unload the current TTS voice/model — canonical §5 name (`unloadTTSModel`).
+    public static func unloadTTSModel() async {
+        await CppBridge.TTS.shared.unload()
     }
 
     /// Whether a VAD model is loaded (vs. built-in energy VAD)

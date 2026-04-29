@@ -15,6 +15,7 @@ import {
   type VADConfiguration,
   type VADOptions,
   type VADResult,
+  type VADStatistics,
   SpeechActivityKind,
 } from '@runanywhere/proto-ts/vad_options';
 
@@ -30,6 +31,13 @@ export interface VADState {
 
 export type VADSpeechActivityCallback = (kind: SpeechActivityKind) => void;
 export type VADAudioBufferCallback = (samples: Float32Array) => void;
+export type VADStatisticsCallback = (statistics: VADStatistics) => void;
+
+/** Native module interface extension for VAD statistics. */
+interface VADStatisticsNativeModule {
+  /** rac_vad_component_get_statistics — wired by round1 C++ fix. */
+  vadGetStatistics?: () => Promise<string>;
+}
 
 let vadState: VADState = {
   isInitialized: false,
@@ -40,6 +48,7 @@ let vadState: VADState = {
 
 let speechActivityCallback: VADSpeechActivityCallback | null = null;
 let audioBufferCallback: VADAudioBufferCallback | null = null;
+let statisticsCallback: VADStatisticsCallback | null = null;
 
 // ============================================================================
 // VAD Initialization
@@ -193,6 +202,37 @@ export async function detectVoiceActivity(
     audioBufferCallback(audio);
   }
 
+  // Fire statistics callback if set and the bridge exposes vadGetStatistics.
+  if (statisticsCallback && isNativeModuleAvailable()) {
+    const native = requireNativeModule() as unknown as VADStatisticsNativeModule;
+    if (typeof native.vadGetStatistics === 'function') {
+      native.vadGetStatistics().then((statsJson) => {
+        try {
+          const stats = JSON.parse(statsJson) as {
+            currentEnergy?: number;
+            current_energy?: number;
+            currentThreshold?: number;
+            current_threshold?: number;
+            ambientLevel?: number;
+            ambient_level?: number;
+            recentAvg?: number;
+            recent_avg?: number;
+            recentMax?: number;
+            recent_max?: number;
+          };
+          const vadStats: VADStatistics = {
+            currentEnergy: stats.currentEnergy ?? stats.current_energy ?? 0,
+            currentThreshold: stats.currentThreshold ?? stats.current_threshold ?? 0,
+            ambientLevel: stats.ambientLevel ?? stats.ambient_level ?? 0,
+            recentAvg: stats.recentAvg ?? stats.recent_avg ?? 0,
+            recentMax: stats.recentMax ?? stats.recent_max ?? 0,
+          };
+          statisticsCallback?.(vadStats);
+        } catch { /* ignore parse errors */ }
+      }).catch(() => { /* ignore errors */ });
+    }
+  }
+
   return result;
 }
 
@@ -297,6 +337,41 @@ export function setVADAudioBufferCallback(
   logger.debug('VAD audio buffer callback set');
 }
 
+/**
+ * Set a callback that receives VAD statistics on each detection call.
+ *
+ * When the Nitro bridge exposes `vadGetStatistics` (wired to
+ * `rac_vad_component_get_statistics`), the callback is invoked after each
+ * `detectVoiceActivity` call with the freshly-fetched statistics. Otherwise
+ * the callback is stored but never invoked until the bridge ships the method.
+ *
+ * Matches Swift SDK: `RunAnywhere.setVADStatisticsCallback(_:)` (§6).
+ */
+export function setVADStatisticsCallback(
+  callback: VADStatisticsCallback | null
+): void {
+  statisticsCallback = callback;
+  logger.debug('VAD statistics callback set');
+}
+
+/**
+ * Stream VAD results for an async sequence of audio chunks.
+ *
+ * For each chunk yielded by `audio`, calls `detectVoiceActivity` and yields
+ * the resulting `VADResult`. The stream terminates when `audio` is exhausted.
+ *
+ * Matches canonical cross-SDK spec §6:
+ *   `streamVAD(audio: Stream<Bytes>) → Stream<VADResult>`
+ */
+export async function* streamVAD(
+  audio: AsyncIterable<Uint8Array>
+): AsyncIterable<VADResult> {
+  for await (const chunk of audio) {
+    const result = await detectVoiceActivity(chunk);
+    yield result;
+  }
+}
+
 // ============================================================================
 // Cleanup
 // ============================================================================
@@ -307,6 +382,7 @@ export async function cleanupVAD(): Promise<void> {
   await unloadVADModel();
   speechActivityCallback = null;
   audioBufferCallback = null;
+  statisticsCallback = null;
   vadState = {
     isInitialized: false,
     isRunning: false,

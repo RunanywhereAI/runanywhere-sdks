@@ -5,8 +5,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' as ffi;
 
 import 'package:runanywhere/adapters/llm_stream_adapter.dart';
+import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
@@ -286,6 +288,27 @@ class RunAnywhereLLM {
     }
 
     final handle = DartBridge.llm.getHandle();
+
+    // Probe whether proto streaming is available for this handle.
+    // When the native library is built without Protobuf (e.g. simulator
+    // builds), rac_llm_set_stream_proto_callback returns
+    // RAC_ERROR_FEATURE_NOT_AVAILABLE and LLMStreamAdapter immediately
+    // emits a StateError on first listen.  We detect this by checking
+    // whether _install() succeeded via a test StreamController.
+    final protoAvailable = _probeProtoAvailability(handle);
+
+    if (!protoAvailable) {
+      // Struct-based fallback: forward DartBridge.llm.generateStream tokens
+      // as synthetic LLMStreamEvents so the UI works on simulator builds.
+      return _generateStreamStructFallback(
+        prompt,
+        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
+        temperature: opts.hasTemperature() ? opts.temperature : 0.8,
+        systemPrompt: effectiveSystemPrompt,
+      );
+    }
+
+    // Proto path — canonical production path.
     final adapter = LLMStreamAdapter(handle);
     final eventStream = adapter.stream();
 
@@ -297,7 +320,7 @@ class RunAnywhereLLM {
     );
     DartBridge.llm.setActiveStreamSubscription(
       driver.listen(
-        (_) {/* ignore struct-callback tokens; we use proto events */},
+        (_) {/* struct tokens ignored; proto events are canonical */},
         onError: (Object _) {/* surfaced via terminal proto event */},
         onDone: () {
           DartBridge.llm.setActiveStreamSubscription(null);
@@ -306,6 +329,105 @@ class RunAnywhereLLM {
     );
 
     return eventStream;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /// Cached result of the proto-availability probe (null = not yet checked).
+  bool? _protoAvailableCache;
+
+  /// Probe whether rac_llm_set_stream_proto_callback is functional for
+  /// [handle].  The result is cached per-instance because the availability
+  /// is determined by the native library build flags (fixed at compile time).
+  ///
+  /// Strategy: call [LLMStreamAdapter.stream()] and subscribe; if the
+  /// adapter's _install() fails it emits a StateError synchronously as a
+  /// microtask.  We use a synchronous-looking StreamController trick: we
+  /// wrap the subscription result in a flag that is set during the first
+  /// microtask drain.
+  ///
+  /// Simpler approach used here: attempt to register the proto callback
+  /// directly via [RacNative.bindings.rac_llm_set_stream_proto_callback]
+  /// with a null function pointer (which is a no-op) and check the return
+  /// code.  RAC_SUCCESS (0) means proto is available; any other code means
+  /// it is not.  We immediately call unset to leave the handle clean.
+  bool _probeProtoAvailability(ffi.Pointer<ffi.Void> handle) {
+    if (_protoAvailableCache != null) return _protoAvailableCache!;
+
+    try {
+      final rc = RacNative.bindings.rac_llm_set_stream_proto_callback(
+        handle,
+        ffi.nullptr,
+        ffi.nullptr,
+      );
+      if (rc == 0) {
+        // Registered successfully (with null callback = no-op); unset it.
+        RacNative.bindings.rac_llm_unset_stream_proto_callback(handle);
+        _protoAvailableCache = true;
+      } else {
+        _protoAvailableCache = false;
+      }
+    } catch (_) {
+      _protoAvailableCache = false;
+    }
+
+    return _protoAvailableCache!;
+  }
+
+  /// Struct-based streaming fallback used when Protobuf is not linked.
+  ///
+  /// Wraps [DartBridge.llm.generateStream] (which uses the C struct callback
+  /// path) and converts each token string into a synthetic [LLMStreamEvent]
+  /// so the UI receives the same type it expects from the proto path.
+  Stream<LLMStreamEvent> _generateStreamStructFallback(
+    String prompt, {
+    required int maxTokens,
+    required double temperature,
+    String? systemPrompt,
+  }) {
+    final controller = StreamController<LLMStreamEvent>();
+
+    final driver = DartBridge.llm.generateStream(
+      prompt,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+    );
+
+    DartBridge.llm.setActiveStreamSubscription(
+      driver.listen(
+        (token) {
+          if (!controller.isClosed && token.isNotEmpty) {
+            controller.add(LLMStreamEvent(token: token));
+          }
+        },
+        onError: (Object err) {
+          if (!controller.isClosed) {
+            controller.add(LLMStreamEvent(
+              isFinal: true,
+              errorMessage: err.toString(),
+            ));
+            unawaited(controller.close());
+          }
+          DartBridge.llm.setActiveStreamSubscription(null);
+        },
+        onDone: () {
+          if (!controller.isClosed) {
+            controller.add(LLMStreamEvent(isFinal: true));
+            unawaited(controller.close());
+          }
+          DartBridge.llm.setActiveStreamSubscription(null);
+        },
+      ),
+    );
+
+    controller.onCancel = () {
+      DartBridge.llm.cancelGeneration();
+    };
+
+    return controller.stream;
   }
 
   /// Cancel any in-flight LLM generation.

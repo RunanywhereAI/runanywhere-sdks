@@ -36,7 +36,6 @@ This repository contains cross-platform SDKs for the RunAnywhere on-device AI pl
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
 - **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
 - **Web Demo** (`examples/web/RunAnywhereAI/`) - Sample web app demonstrating SDK usage
-- **IntelliJ Plugin Demo** (`examples/intellij-plugin-demo/`) - IntelliJ/Android Studio plugin for voice features
 
 ## Common Development Commands
 
@@ -299,7 +298,7 @@ The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native 
    - Model management abstractions
 
 2. **Platform-Specific Implementations**:
-   - **JVM** (`jvmMain/`) - Desktop/IntelliJ plugin support
+   - **JVM** (`jvmMain/`) - Desktop/server JVM consumers
    - **Android** (`androidMain/`) - Android-specific implementations with Room DB
    - **Native** (`nativeMain/`) - Linux, macOS, Windows support
 
@@ -340,7 +339,7 @@ The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native 
 
 ## Maven Coordinates
 
-For IntelliJ/JetBrains plugin development:
+For JVM consumers (Kotlin/Java applications, server-side, custom integrations):
 ```kotlin
 dependencies {
     implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
@@ -348,6 +347,8 @@ dependencies {
 ```
 
 Location after local publish: `~/.m2/repository/com/runanywhere/sdk/`
+
+Note: The IntelliJ plugin demo (formerly at `examples/intellij-plugin-demo/`) was removed in commit `52f8b2fd`. The JVM target of the Kotlin SDK is example-less by design; consumers integrate directly via the Maven coordinate above.
 
 ## CI/CD Pipeline
 

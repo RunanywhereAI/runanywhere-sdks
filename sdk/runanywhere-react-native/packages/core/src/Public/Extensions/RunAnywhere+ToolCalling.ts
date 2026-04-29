@@ -10,7 +10,7 @@
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { generateStream } from './RunAnywhere+TextGeneration';
+import { generateStream, generate } from './RunAnywhere+TextGeneration';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
@@ -24,6 +24,7 @@ import type {
   ToolCallingOptions,
   ToolCallingResult,
 } from '../../types/ToolCallingTypes';
+import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
 
@@ -449,7 +450,7 @@ export async function generateWithTools(
 
     // Generate response
     let responseText = '';
-    for await (const token of generateStream(fullPrompt, {
+    for await (const event of generateStream(fullPrompt, {
       maxTokens: options?.maxTokens ?? 1000,
       temperature: options?.temperature ?? 0.7,
       topP: 1.0,
@@ -459,7 +460,8 @@ export async function generateWithTools(
       streamingEnabled: true,
       preferredFramework: 0,
     })) {
-      responseText += token.text;
+      if (event.token) responseText += event.token;
+      if (event.isFinal) break;
     }
 
     logger.debug(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);
@@ -524,24 +526,23 @@ export async function generateWithTools(
 }
 
 /**
- * Continue generation after manual tool execution
+ * Continue generation after a tool result has been produced externally.
+ *
+ * Canonical cross-SDK signature (§3):
+ *   `continueWithToolResult(toolCallId: string, result: string) → LLMGenerationResult`
+ *
+ * The tool call ID and result string are appended to the current conversation
+ * context held by the LLM component, then generation is resumed. The returned
+ * `LLMGenerationResult` carries the model's response text and token metrics.
  */
 export async function continueWithToolResult(
-  previousPrompt: string,
-  toolCall: ToolCall,
-  toolResult: ToolResult,
-  options?: ToolCallingOptions
-): Promise<ToolCallingResult> {
-  const resultJson = toolResult.success
-    ? JSON.stringify(toolResult.result)
-    : `Error: ${toolResult.error}`;
-
-  const continuedPrompt = `${previousPrompt}\n\nTool Result for ${toolCall.toolName}: ${resultJson}\n\nBased on the tool result, please provide your response:`;
-
-  return generateWithTools(continuedPrompt, {
-    ...options,
-    maxToolCalls: (options?.maxToolCalls ?? 5) - 1,
-  });
+  toolCallId: string,
+  result: string
+): Promise<LLMGenerationResult> {
+  // Build a follow-up prompt that injects the tool result.
+  const continuedPrompt =
+    `Tool call ID: ${toolCallId}\nTool result: ${result}\n\nBased on the tool result, please provide your response:`;
+  return generate(continuedPrompt);
 }
 
 // Legacy export for backwards compatibility

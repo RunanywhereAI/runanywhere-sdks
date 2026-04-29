@@ -522,17 +522,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
     try {
-      // Use real download API with progress callback
-      await RunAnywhere.downloadModel(model.id, (progress) => {
+      // Use real download API — iterate over streaming DownloadProgress events.
+      for await (const progress of RunAnywhere.downloadModel(model.id)) {
         // Update progress for this specific model
         setDownloadingModels((prev) => ({
           ...prev,
-          [model.id]: progress.progress,
+          [model.id]: progress.stageProgress ?? 0,
         }));
         console.warn(
-          `[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
+          `[Download] ${model.id}: ${Math.round((progress.stageProgress ?? 0) * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
         );
-      });
+      }
 
       // Refresh models after download
       await loadData();

@@ -18,6 +18,32 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
+# MF-3 (AG-V3): rac_commons no longer propagates RAC_HAVE_PROTOBUF=1 via its
+# PUBLIC interface (it is PRIVATE so it does not leak through the L5 ABI).
+# Tests that intentionally exercise the proto-byte path (test_solution_runner,
+# test_pipeline_executor, test_proto_event_dispatch, test_llm_stream_proto)
+# are internal consumers — re-define the macro here using the same predicate
+# the library uses (`Protobuf_FOUND` + the generated headers exist).
+find_package(Protobuf QUIET)
+set(_RAC_COMMONS_TESTS_HAVE_PROTOBUF 0)
+if(Protobuf_FOUND AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/../src/generated/proto/voice_events.pb.cc)
+    set(_RAC_COMMONS_TESTS_HAVE_PROTOBUF 1)
+endif()
+
+# Helper to apply the proto compile definition to test targets that need it.
+# Also re-attaches the (now-PRIVATE) src/generated/proto include path so the
+# test TU can resolve `*.pb.h` direct includes (same path the library uses).
+function(rac_test_define_have_protobuf target)
+    if(_RAC_COMMONS_TESTS_HAVE_PROTOBUF)
+        target_compile_definitions(${target} PRIVATE RAC_HAVE_PROTOBUF=1)
+        target_include_directories(${target} PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/../src/generated/proto
+            ${CMAKE_CURRENT_LIST_DIR}/../src/generated
+            ${Protobuf_INCLUDE_DIRS}
+        )
+    endif()
+endfunction()
+
 set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
 # Tests may need access to commons private headers (e.g. the internal
@@ -107,6 +133,7 @@ target_include_directories(test_pipeline_executor PRIVATE
 target_link_libraries(test_pipeline_executor PRIVATE rac_commons)
 rac_link_archive_deps(test_pipeline_executor)
 target_compile_features(test_pipeline_executor PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_pipeline_executor)
 add_test(NAME pipeline_executor_tests COMMAND test_pipeline_executor)
 
 add_executable(test_solution_runner test_solution_runner.cpp)
@@ -117,6 +144,7 @@ target_include_directories(test_solution_runner PRIVATE
 target_link_libraries(test_solution_runner PRIVATE rac_commons)
 rac_link_archive_deps(test_solution_runner)
 target_compile_features(test_solution_runner PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_solution_runner)
 add_test(NAME solution_runner_tests COMMAND test_solution_runner)
 
 # --- v2 close-out Phase 5: rac_llm_thinking C ABI test -----------------------
@@ -160,6 +188,7 @@ target_include_directories(test_proto_event_dispatch PRIVATE
 target_link_libraries(test_proto_event_dispatch PRIVATE rac_commons)
 rac_link_archive_deps(test_proto_event_dispatch)
 target_compile_features(test_proto_event_dispatch PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_proto_event_dispatch)
 add_test(NAME proto_event_dispatch_tests COMMAND test_proto_event_dispatch)
 
 # --- v2 close-out Phase G-2: LLM proto-byte stream dispatch test --------------
@@ -175,6 +204,7 @@ target_include_directories(test_llm_stream_proto PRIVATE
 target_link_libraries(test_llm_stream_proto PRIVATE rac_commons)
 rac_link_archive_deps(test_llm_stream_proto)
 target_compile_features(test_llm_stream_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_llm_stream_proto)
 add_test(NAME llm_stream_proto_tests COMMAND test_llm_stream_proto)
 
 # --- GAP 02 Phase 10: unified engine plugin registry tests --------------------

@@ -34,6 +34,21 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 
+// MF-3 (AG-V3): the generated .pb.h files live here, NOT in the public
+// header. The header forward-declares every proto class; the full message
+// definitions are only needed inside the adapter implementation TU. Anyone
+// editing this file should add new proto includes here, not in the header.
+#include "stt_options.pb.h"
+#include "tts_options.pb.h"
+#include "vad_options.pb.h"
+#include "vlm_options.pb.h"
+#include "diffusion_options.pb.h"
+#include "embeddings_options.pb.h"
+#include "rag.pb.h"
+#include "storage_types.pb.h"
+#include "lora_options.pb.h"
+#include "errors.pb.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 

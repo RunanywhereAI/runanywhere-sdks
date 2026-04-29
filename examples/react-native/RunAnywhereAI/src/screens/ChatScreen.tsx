@@ -438,11 +438,11 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Send a message using the real SDK with tool calling support
-   * Uses RunAnywhere.generateWithTools() for AI that can take actions
+   * Send a message and stream the response token-by-token.
+   * Uses RunAnywhere.generateStream() for real-time streaming UI.
    *
-   * Example: "What's the weather in Tokyo?"
-   * → LLM calls get_weather tool → Real API call → Final response
+   * generateWithTools() is still available on RunAnywhere for callers
+   * that genuinely need the batch tool-calling form.
    */
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !currentConversation) return;
@@ -460,9 +460,6 @@ export const ChatScreen: React.FC = () => {
     setInputText('');
     setIsLoading(true);
 
-    // The assistant message is appended only once the response arrives. The
-    // <TypingIndicator /> rendered while isLoading is true communicates the
-    // "thinking" state to the user, so no stand-in row is inserted.
     const assistantMessageId = generateId();
 
     setTimeout(() => {
@@ -470,79 +467,56 @@ export const ChatScreen: React.FC = () => {
     }, 100);
 
     try {
-      // Detect tool call format based on loaded model (matches iOS LLMViewModel+ToolCalling.swift)
-      const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
-      // eslint-disable-next-line no-console -- demo generation diagnostic
-      console.log(
-        '[ChatScreen] Starting generation with tools for:',
-        prompt,
-        'model:',
-        currentModel?.id,
-        'format:',
-        format
-      );
-
       // Get user-configured generation options
       const options = await getGenerationOptions();
 
-      // Use tool-enabled generation
-      // If the LLM needs to call a tool (like weather API), it happens automatically
-      const result = await RunAnywhere.generateWithTools(prompt, {
-        autoExecute: true,
-        maxToolCalls: 3,
+      // eslint-disable-next-line no-console -- demo generation diagnostic
+      console.log(
+        '[ChatScreen] Starting streaming generation for:',
+        prompt,
+        'model:',
+        currentModel?.id,
+      );
+
+      // Stream tokens as they arrive — canonical cross-SDK path (§1 spec).
+      const stream = RunAnywhere.generateStream(prompt, {
         maxTokens: options.maxTokens,
         temperature: options.temperature,
         systemPrompt: options.systemPrompt,
-        format: format,
       });
 
-      // Log tool usage for debugging
-      if (result.toolCalls.length > 0) {
-        /* eslint-disable no-console -- demo tool-use diagnostic */
-        console.log(
-          '[ChatScreen] Tools used:',
-          result.toolCalls.map((t) => t.toolName)
-        );
-        console.log('[ChatScreen] Tool results:', result.toolResults);
-        /* eslint-enable no-console */
+      let accumulatedText = '';
+
+      for await (const event of stream) {
+        if (event.token) {
+          accumulatedText += event.token;
+          // Update the in-flight assistant message with each new token
+          const partialMessage: Message = {
+            id: assistantMessageId,
+            role: MessageRole.Assistant,
+            content: accumulatedText,
+            timestamp: new Date(),
+            modelInfo: {
+              modelId: currentModel?.id || 'unknown',
+              modelName: currentModel?.name || 'Unknown Model',
+              framework: currentModel?.preferredFramework || 'unknown',
+              frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
+            },
+          };
+          await addMessage(partialMessage, currentConversation.id);
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }
+        if (event.isFinal) break;
       }
 
-      // Build final message content
-      const finalContent = result.text || '(No response generated)';
+      const finalContent = accumulatedText || '(No response generated)';
 
-      // Extract tool call info from result (matching iOS implementation)
-      let toolCallInfo: ToolCallInfo | undefined;
-      if (result.toolCalls.length > 0) {
-        const lastToolCall = result.toolCalls[result.toolCalls.length - 1];
-        const lastToolResult =
-          result.toolResults[result.toolResults.length - 1];
-
-        toolCallInfo = {
-          toolName: lastToolCall.toolName,
-          arguments: JSON.stringify(lastToolCall.arguments, null, 2),
-          result: lastToolResult?.success
-            ? JSON.stringify(lastToolResult.result, null, 2)
-            : undefined,
-          success: lastToolResult?.success ?? false,
-          error: lastToolResult?.error,
-        };
-
-        // eslint-disable-next-line no-console -- demo tool-use diagnostic
-        console.log(
-          '[ChatScreen] Created toolCallInfo:',
-          toolCallInfo.toolName,
-          'success:',
-          toolCallInfo.success
-        );
-      }
-
-      // Update with final message
+      // Persist the final message with analytics
       const finalMessage: Message = {
         id: assistantMessageId,
         role: MessageRole.Assistant,
         content: finalContent,
         timestamp: new Date(),
-        toolCallInfo, // Attach tool call info to message
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',

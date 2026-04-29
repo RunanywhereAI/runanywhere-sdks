@@ -163,8 +163,104 @@ public extension RunAnywhere {
         return VLMStreamingResult(stream: stream, metrics: metricsTask)
     }
 
+    // MARK: - Canonical Overloads (CANONICAL_API §7)
+
+    /// Process an image with VLM — canonical form.
+    ///
+    /// Accepts `VLMGenerationOptions` (alias for proto `RAVLMGenerationOptions`) as a single
+    /// optional parameter, matching the cross-SDK canonical spec.
+    ///
+    /// - Parameters:
+    ///   - image: The image to process.
+    ///   - prompt: Text prompt for the VLM.
+    ///   - options: Optional `VLMGenerationOptions`; uses proto defaults when nil.
+    /// - Returns: `VLMResult` with generated text and metrics.
+    static func processImage(
+        _ image: VLMImage,
+        prompt: String,
+        options: VLMGenerationOptions? = nil
+    ) async throws -> VLMResult {
+        let opts = options ?? VLMGenerationOptions()
+        return try await processImage(
+            image,
+            prompt: prompt,
+            maxTokens: opts.maxTokens > 0 ? opts.maxTokens : 2048,
+            temperature: opts.temperature > 0 ? opts.temperature : 0.7,
+            topP: opts.topP > 0 ? opts.topP : 0.9
+        )
+    }
+
+    /// Stream image processing — canonical form.
+    ///
+    /// Accepts `VLMGenerationOptions` and returns `AsyncStream<String>` matching
+    /// the cross-SDK canonical spec (CANONICAL_API §7).
+    ///
+    /// - Parameters:
+    ///   - image: The image to process.
+    ///   - prompt: Text prompt for the VLM.
+    ///   - options: Optional `VLMGenerationOptions`; uses proto defaults when nil.
+    /// - Returns: `AsyncStream<String>` yielding tokens as they are generated.
+    static func processImageStream(
+        _ image: VLMImage,
+        prompt: String,
+        options: VLMGenerationOptions? = nil
+    ) -> AsyncStream<String> {
+        let opts = options ?? VLMGenerationOptions()
+        let maxTokens = opts.maxTokens > 0 ? opts.maxTokens : 2048
+        let temperature = opts.temperature > 0 ? opts.temperature : Float(0.7)
+        let topP = opts.topP > 0 ? opts.topP : Float(0.9)
+        return AsyncStream { continuation in
+            Task {
+                do {
+                    let streamingResult = try await processImageStream(
+                        image,
+                        prompt: prompt,
+                        maxTokens: maxTokens,
+                        temperature: temperature,
+                        topP: topP
+                    )
+                    for try await token in streamingResult.stream {
+                        continuation.yield(token)
+                    }
+                } catch {
+                    // Swallow errors; caller cannot throw from AsyncStream body.
+                }
+                continuation.finish()
+            }
+        }
+    }
+
     // MARK: - Model Management
 
+    /// Load a VLM model by its registry ID (CANONICAL_API §7).
+    ///
+    /// Looks up the model in the registry and resolves its local path, then
+    /// delegates to the 4-arg internal form.
+    ///
+    /// - Parameter modelId: Registry model identifier.
+    static func loadVLMModel(_ modelId: String) async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
+
+        // Resolve model path from registry
+        let allModels = try await availableModels()
+        if let modelInfo = allModels.first(where: { $0.id == modelId }),
+           let localPath = modelInfo.localPath {
+            try await CppBridge.VLM.shared.loadModel(
+                localPath.path,
+                mmprojPath: nil,
+                modelId: modelId,
+                modelName: modelInfo.name
+            )
+        } else {
+            // Fall back to treating modelId as a direct path (development convenience).
+            try await CppBridge.VLM.shared.loadModel(modelId, mmprojPath: nil, modelId: modelId, modelName: modelId)
+        }
+    }
+
+    /// Load a VLM model with explicit paths (internal / advanced usage).
     static func loadVLMModel(_ modelPath: String, mmprojPath: String?, modelId: String, modelName: String) async throws {
         try await CppBridge.VLM.shared.loadModel(modelPath, mmprojPath: mmprojPath, modelId: modelId, modelName: modelName)
     }

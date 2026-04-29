@@ -10,6 +10,7 @@ import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ConversationsStore, type Conversation } from '../services/conversations-store';
+import { getSettings } from './settings';
 import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
 
 // ---------------------------------------------------------------------------
@@ -653,9 +654,10 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
     throw new Error('Model not loaded in WASM backend');
   }
 
+  const settings = getSettings();
   const { stream, result: resultPromise, cancel } = await TextGeneration.generateStream(text, {
-    maxTokens: 512,
-    temperature: 0.7,
+    maxTokens: settings.maxTokens,
+    temperature: settings.temperature,
   });
   cancelGeneration = cancel;
 
@@ -714,11 +716,12 @@ async function sendWithToolCalling(text: string, loaded: ModelInfo): Promise<voi
     typingEl.querySelector('.typing-text')!.textContent = 'Thinking with tools...';
   }
 
+  const settings = getSettings();
   const result = await ToolCalling.generateWithTools(text, {
     maxToolCalls: 3,
     autoExecute: true,
-    temperature: 0.3,
-    maxTokens: 1024,
+    temperature: settings.temperature,
+    maxTokens: settings.maxTokens,
   });
 
   hideTypingIndicator();

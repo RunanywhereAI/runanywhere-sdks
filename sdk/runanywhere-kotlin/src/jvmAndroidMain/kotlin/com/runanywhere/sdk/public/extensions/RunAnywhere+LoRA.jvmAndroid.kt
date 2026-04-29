@@ -9,6 +9,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
@@ -25,6 +26,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.boolean
@@ -99,14 +101,23 @@ actual suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo> {
 }
 
 // MARK: - LoRA Compatibility Check
+//
+// Round 1 KOTLIN (G-B2 / Task 5): returns proto-generated type directly.
 
-actual fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibilityResult {
-    if (!isInitialized) return LoraCompatibilityResult(isCompatible = false, error = "SDK not initialized")
+actual fun RunAnywhere.checkLoraCompatibility(loraPath: String): ai.runanywhere.proto.v1.LoraCompatibilityResult {
+    if (!isInitialized) {
+        return ai.runanywhere.proto.v1.LoraCompatibilityResult(
+            is_compatible = false,
+            error_message = "SDK not initialized",
+        )
+    }
     val error = CppBridgeLLM.checkLoraCompatibility(loraPath)
     return if (error == null) {
-        LoraCompatibilityResult(isCompatible = true)
+        ai.runanywhere.proto.v1
+            .LoraCompatibilityResult(is_compatible = true)
     } else {
-        LoraCompatibilityResult(isCompatible = false, error = error)
+        ai.runanywhere.proto.v1
+            .LoraCompatibilityResult(is_compatible = false, error_message = error)
     }
 }
 
@@ -317,3 +328,127 @@ actual fun RunAnywhere.deleteDownloadedLoraAdapter(adapterId: String): Boolean {
     val path = loraAdapterLocalPath(adapterId) ?: return false
     return File(path).delete()
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Round 1 KOTLIN (G-A7): canonical `RunAnywhere.lora.*` namespace actual.
+//
+// Routes through canonical `racLora*` JNI thunks. If the C++ side is missing
+// (CPP-blocked), callers see UnsatisfiedLinkError at runtime — that's the
+// C++ track's problem.
+// ─────────────────────────────────────────────────────────────────────────────
+
+actual class LoRA internal actual constructor() {
+    actual suspend fun load(config: LoRAAdapterConfig): LoRAAdapterInfo =
+        withContext(Dispatchers.IO) {
+            val rc = RunAnywhereBridge.racLoraLoad(config.encode())
+            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                throw SDKException.llm("rac_lora_load failed with rc=$rc")
+            }
+            // Echo the supplied config back as an adapter info snapshot so
+            // callers don't need a separate getLoaded() round-trip after load.
+            LoRAAdapterInfo(
+                adapter_id = config.adapter_id ?: config.adapter_path,
+                adapter_path = config.adapter_path,
+                scale = config.scale,
+                applied = true,
+            )
+        }
+
+    actual suspend fun remove(adapterId: String) =
+        withContext(Dispatchers.IO) {
+            val rc = RunAnywhereBridge.racLoraRemove(adapterId)
+            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                throw SDKException.llm("rac_lora_remove failed with rc=$rc")
+            }
+        }
+
+    actual suspend fun clear() =
+        withContext(Dispatchers.IO) {
+            val rc = RunAnywhereBridge.racLoraClear()
+            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                throw SDKException.llm("rac_lora_clear failed with rc=$rc")
+            }
+        }
+
+    actual suspend fun getLoaded(): List<LoRAAdapterInfo> =
+        withContext(Dispatchers.IO) {
+            val jsonStr = RunAnywhereBridge.racLoraGetLoaded() ?: return@withContext emptyList()
+            try {
+                val arr =
+                    loraNamespaceJson.parseToJsonElement(jsonStr) as? JsonArray
+                        ?: return@withContext emptyList()
+                arr.map { element ->
+                    val obj = element.jsonObject
+                    LoRAAdapterInfo(
+                        adapter_path = obj["path"]?.jsonPrimitive?.content ?: "",
+                        adapter_id = obj["id"]?.jsonPrimitive?.content ?: "",
+                        scale = obj["scale"]?.jsonPrimitive?.float ?: 1.0f,
+                        applied = obj["applied"]?.jsonPrimitive?.boolean ?: false,
+                    )
+                }
+            } catch (e: Exception) {
+                loraLogger.error("Failed to parse rac_lora_get_loaded JSON: ${e.message}")
+                emptyList()
+            }
+        }
+
+    actual suspend fun checkCompatibility(adapterId: String, modelId: String): LoraCompatibilityResult =
+        withContext(Dispatchers.IO) {
+            val bytes =
+                RunAnywhereBridge.racLoraCheckCompatibility(adapterId, modelId)
+                    ?: return@withContext LoraCompatibilityResult(
+                        is_compatible = false,
+                        error_message = "rac_lora_check_compatibility returned null",
+                    )
+            LoraCompatibilityResult.ADAPTER.decode(bytes)
+        }
+
+    actual suspend fun register(config: LoRAAdapterConfig) =
+        withContext(Dispatchers.IO) {
+            // Mirror the registry-side path (rac_lora_registry_register), keeping
+            // the high-level shape symmetric with Swift's `lora.register(_:)`.
+            val resolvedId = config.adapter_id ?: config.adapter_path
+            CppBridgeLoraRegistry.register(
+                CppBridgeLoraRegistry.LoraEntry(
+                    id = resolvedId,
+                    name = resolvedId,
+                    description = "",
+                    downloadUrl = "",
+                    filename = config.adapter_path,
+                    compatibleModelIds = emptyList(),
+                    fileSize = 0L,
+                    defaultScale = config.scale,
+                ),
+            )
+        }
+
+    actual suspend fun adaptersForModel(modelId: String): List<LoRAAdapterInfo> =
+        withContext(Dispatchers.IO) {
+            CppBridgeLoraRegistry.getForModel(modelId).map { entry ->
+                LoRAAdapterInfo(
+                    adapter_id = entry.id,
+                    adapter_path = entry.filename,
+                    scale = entry.defaultScale,
+                    applied = false,
+                )
+            }
+        }
+
+    actual suspend fun allRegistered(): List<LoRAAdapterInfo> =
+        withContext(Dispatchers.IO) {
+            CppBridgeLoraRegistry.getAll().map { entry ->
+                LoRAAdapterInfo(
+                    adapter_id = entry.id,
+                    adapter_path = entry.filename,
+                    scale = entry.defaultScale,
+                    applied = false,
+                )
+            }
+        }
+}
+
+private val loraNamespaceJson = Json { ignoreUnknownKeys = true }
+private val LoRASingleton = LoRA()
+
+actual val RunAnywhere.lora: LoRA
+    get() = LoRASingleton

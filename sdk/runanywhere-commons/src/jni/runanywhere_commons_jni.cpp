@@ -63,6 +63,10 @@
 #include "rac/solutions/rac_solution.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
 #include "rac/features/llm/rac_llm_stream.h"
+// Round-1 CPP fix: hardware ABI, structured output, VAD statistics.
+#include "rac/features/llm/rac_llm_structured_output.h"
+#include "rac/plugin/rac_plugin_loader.h"
+#include "rac/router/rac_hardware_abi.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -6112,6 +6116,153 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
     env->ReleaseStringUTFChars(jUrl, url);
 
     return result;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Hardware Profile (Task 1 — CPP-blocked G-C6 round-1 fix)
+// Mirrors Swift's RunAnywhere+Hardware.swift / Kotlin's hardware namespace.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareProfileGet(JNIEnv* env,
+                                                                               jclass clazz) {
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t rc = rac_hardware_profile_get(&bytes, &size);
+    if (rc != RAC_SUCCESS || bytes == nullptr) {
+        LOGe("racHardwareProfileGet: failed with code %d", rc);
+        return nullptr;
+    }
+
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
+    if (jArr == nullptr) {
+        rac_hardware_profile_free(bytes);
+        LOGe("racHardwareProfileGet: failed to allocate jbyteArray");
+        return nullptr;
+    }
+
+    if (size > 0) {
+        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+    rac_hardware_profile_free(bytes);
+    return jArr;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareGetAccelerators(JNIEnv* env,
+                                                                                    jclass clazz) {
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t rc = rac_hardware_get_accelerators(&bytes, &size);
+    if (rc != RAC_SUCCESS || bytes == nullptr) {
+        LOGe("racHardwareGetAccelerators: failed with code %d", rc);
+        return nullptr;
+    }
+
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
+    if (jArr != nullptr && size > 0) {
+        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+    rac_hardware_profile_free(bytes);
+    return jArr;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareSetAcceleratorPreference(
+    JNIEnv* env, jclass clazz, jint preferenceEnum) {
+    return static_cast<jint>(
+        rac_hardware_set_accelerator_preference(static_cast<int>(preferenceEnum)));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Structured Output (Task 2 — CPP-blocked G-A4 round-1 fix)
+// Kotlin's racStructuredOutputExtractJson(text, schemaJson) declared in
+// RunAnywhereBridge.kt — now wired to the C implementation.
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputExtractJson(
+    JNIEnv* env, jclass clazz, jstring jText, jstring jSchemaJson) {
+    if (jText == nullptr) return nullptr;
+
+    std::string text = getCString(env, jText);
+    // schemaJson is reserved for future validation; extract_json only needs the text.
+    (void)jSchemaJson;
+
+    char* out_json = nullptr;
+    size_t out_len = 0;
+    rac_result_t rc = rac_structured_output_extract_json(text.c_str(), &out_json, &out_len);
+    if (rc != RAC_SUCCESS || out_json == nullptr) {
+        LOGd("racStructuredOutputExtractJson: no JSON found (rc=%d)", rc);
+        return nullptr;
+    }
+
+    jstring jResult = env->NewStringUTF(out_json);
+    rac_free(out_json);
+    return jResult;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - VAD Statistics (Task 3 — CPP-blocked G-C6 round-1 fix)
+// Swift's setVADStatisticsCallback needs ambientLevel, recentAvg, recentMax.
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetStatistics(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) return nullptr;
+
+    float ambient = 0.0f, recent_avg = 0.0f, recent_max = 0.0f;
+    rac_result_t rc = rac_vad_component_get_statistics(
+        reinterpret_cast<rac_handle_t>(handle), &ambient, &recent_avg, &recent_max);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racVadComponentGetStatistics: failed with code %d", rc);
+        return nullptr;
+    }
+
+    char buf[256];
+    snprintf(buf, sizeof(buf), "{\"ambient_level\":%.6f,\"recent_avg\":%.6f,\"recent_max\":%.6f}",
+             static_cast<double>(ambient), static_cast<double>(recent_avg),
+             static_cast<double>(recent_max));
+    return env->NewStringUTF(buf);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Model Registry Fetch Assignments (Task 5 — Web WASM / Kotlin)
+// Web SDK's fetchModelAssignments() and Kotlin's complementary path.
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryFetchAssignments(
+    JNIEnv* env, jclass clazz, jboolean forceRefresh) {
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+
+    rac_result_t rc = rac_model_registry_fetch_assignments(
+        forceRefresh == JNI_TRUE ? RAC_TRUE : RAC_FALSE, &models, &count);
+
+    if (rc != RAC_SUCCESS) {
+        LOGe("racModelRegistryFetchAssignments: failed with code %d", rc);
+        return nullptr;
+    }
+
+    // Return JSON array of model IDs so Kotlin can update its own registry.
+    std::string json = "[";
+    for (size_t i = 0; i < count; ++i) {
+        if (i > 0) json += ",";
+        json += "\"";
+        if (models[i] && models[i]->id) {
+            json += models[i]->id;
+        }
+        json += "\"";
+    }
+    json += "]";
+
+    rac_model_info_array_free(models, count);
+    LOGi("racModelRegistryFetchAssignments: fetched %zu model assignments", count);
+    return env->NewStringUTF(json.c_str());
 }
 
 }  // extern "C"

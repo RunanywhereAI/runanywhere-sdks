@@ -18,6 +18,10 @@
  *   capabilities — static, advertises FP16 + quantised paths which every
  *                  modern CPU backend supports via NEON / AVX / VNNI.
  *   sessions — delegated to registered rac_cpu_runtime_provider_t entries.
+ *
+ * NOTE: `k_supported_primitives` is pruned to the honest set
+ * (RAC_PRIMITIVE_GENERATE_TEXT only) — additional primitives are restored as
+ * engine providers register for them. See the array below.
  */
 
 #include "rac_runtime_entry_cpu.h"
@@ -47,16 +51,19 @@ constexpr uint64_t kCpuSessionMagic = 0x5241434350555345ull; /* "RACCPUSE" */
 
 const rac_device_class_t k_supported_devices[] = {RAC_DEVICE_CLASS_CPU};
 
-/* Supported primitives — the CPU runtime is format-agnostic, so it declares
- * the service primitives that have a credible CPU path today. Kept static
- * to avoid a separate data-segment allocation at register time. */
+/* Supported primitives — pruned to the honest set of primitives that have a
+ * working CPU provider registered in-tree today (only llamacpp registers a
+ * GENERATE_TEXT provider). The other primitives below are commented out and
+ * will be restored on a per-primitive basis as engine plugins start calling
+ * `rac_cpu_runtime_register_provider` for them. Kept static to avoid a
+ * separate data-segment allocation at register time. */
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT,
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_SYNTHESIZE,
-    RAC_PRIMITIVE_DETECT_VOICE,
-    RAC_PRIMITIVE_EMBED,
-    RAC_PRIMITIVE_RERANK,
+    // RAC_PRIMITIVE_TRANSCRIBE,    // restore when an STT engine registers a CPU provider
+    // RAC_PRIMITIVE_SYNTHESIZE,    // restore when a TTS engine registers a CPU provider
+    // RAC_PRIMITIVE_DETECT_VOICE,  // restore when a VAD engine registers a CPU provider
+    // RAC_PRIMITIVE_EMBED,         // restore when an embedding engine registers a CPU provider
+    // RAC_PRIMITIVE_RERANK,        // restore when a reranker engine registers a CPU provider
 };
 
 struct CpuRuntimeSession {

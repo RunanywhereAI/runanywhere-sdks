@@ -423,7 +423,7 @@ public struct LoRAAdapterInfo: Sendable {
 }
 
 /// Catalog entry for a LoRA adapter registered with the SDK.
-/// Register adapters at app startup via RunAnywhere.registerLoraAdapter(_:).
+/// Register adapters at app startup via `RunAnywhere.lora.register(_:)`.
 public struct LoraAdapterCatalogEntry: Sendable {
 
     /// Unique adapter identifier

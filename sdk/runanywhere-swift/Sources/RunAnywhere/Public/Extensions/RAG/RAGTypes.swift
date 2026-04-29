@@ -265,6 +265,27 @@ public struct RAGResult: Sendable {
     }
 }
 
+// MARK: - RAG Document
+
+/// A document submitted to the RAG pipeline for ingestion.
+///
+/// Used by `ragAddDocumentsBatch(documents:)` (canonical §9 batch-ingest API).
+/// For single documents use `ragIngest(text:metadataJSON:)` directly.
+public struct RAGDocument: Sendable {
+
+    /// Plain-text content of the document.
+    public let text: String
+
+    /// Optional JSON string attached to all chunks produced from this document.
+    /// Pass `nil` to omit metadata.
+    public let metadataJSON: String?
+
+    public init(text: String, metadataJSON: String? = nil) {
+        self.text = text
+        self.metadataJSON = metadataJSON
+    }
+}
+
 // MARK: - Private Helpers
 
 /// Execute a synchronous closure with an optional C string pointer.

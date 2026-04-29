@@ -175,10 +175,27 @@ actual suspend fun RunAnywhere.unloadVADModel() {
     vadCurrentModelId = null
 }
 
-actual suspend fun RunAnywhere.isVADModelLoaded(): Boolean = CppBridgeVAD.isLoaded
+actual val RunAnywhere.isVADModelLoaded: Boolean
+    get() = CppBridgeVAD.isLoaded
 
 actual suspend fun RunAnywhere.currentVADModelId(): String? =
     CppBridgeVAD.getLoadedModelId() ?: vadCurrentModelId
 
-actual suspend fun RunAnywhere.detectSpeech(audioData: ByteArray): VADResult =
-    detectVoiceActivity(audioData)
+actual suspend fun RunAnywhere.detectSpeech(audioData: ByteArray): Boolean {
+    val result = detectVoiceActivity(audioData)
+    vadStatisticsCallback?.invoke(
+        VADStatistics(
+            current_energy = result.energy,
+            ambient_level = 0f,
+            recent_avg = 0f,
+            recent_max = 0f,
+        ),
+    )
+    return result.is_speech
+}
+
+@Volatile private var vadStatisticsCallback: ((VADStatistics) -> Unit)? = null
+
+actual fun RunAnywhere.setVADStatisticsCallback(callback: (VADStatistics) -> Unit) {
+    vadStatisticsCallback = callback
+}

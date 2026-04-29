@@ -138,6 +138,11 @@ class LLMStreamAdapter internal constructor(
                     return
                 }
             for (c in collectors) c.trySendBlocking(event)
+            // Close all channels when the stream is terminated so that
+            // callbackFlow's awaitClose unblocks and the Flow completes.
+            if (event.is_final) {
+                for (c in collectors) c.close()
+            }
         }
     }
 

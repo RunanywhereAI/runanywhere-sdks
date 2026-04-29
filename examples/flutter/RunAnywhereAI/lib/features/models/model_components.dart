@@ -72,18 +72,23 @@ class FrameworkRow extends StatelessWidget {
     switch (framework) {
       case LLMFramework.foundationModels:
         return Icons.apple;
-      case LLMFramework.mediaPipe:
-        return Icons.psychology;
       case LLMFramework.llamaCpp:
         return Icons.memory;
-      case LLMFramework.whisperKit:
-        return Icons.mic;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return Icons.developer_board;
+      case LLMFramework.sherpa:
+        return Icons.mic;
       case LLMFramework.systemTTS:
         return Icons.volume_up;
-      default:
-        return Icons.memory;
+      case LLMFramework.genie:
+        return Icons.bolt;
+      case LLMFramework.fluidAudio:
+        return Icons.audiotrack;
+      case LLMFramework.builtIn:
+        return Icons.phone_android;
+      case LLMFramework.none:
+      case LLMFramework.unknown:
+        return Icons.psychology;
     }
   }
 
@@ -91,11 +96,17 @@ class FrameworkRow extends StatelessWidget {
     switch (framework) {
       case LLMFramework.foundationModels:
         return Colors.black;
-      case LLMFramework.mediaPipe:
-        return AppColors.statusBlue;
-      case LLMFramework.whisperKit:
+      case LLMFramework.genie:
         return AppColors.statusGreen;
-      default:
+      case LLMFramework.onnx:
+      case LLMFramework.sherpa:
+        return AppColors.statusBlue;
+      case LLMFramework.llamaCpp:
+      case LLMFramework.systemTTS:
+      case LLMFramework.fluidAudio:
+      case LLMFramework.builtIn:
+      case LLMFramework.none:
+      case LLMFramework.unknown:
         return AppColors.statusGray;
     }
   }
@@ -104,17 +115,22 @@ class FrameworkRow extends StatelessWidget {
     switch (framework) {
       case LLMFramework.foundationModels:
         return "Apple's pre-installed system models";
-      case LLMFramework.mediaPipe:
-        return "Google's cross-platform ML framework";
       case LLMFramework.llamaCpp:
         return 'Fast C++ inference for GGUF models';
-      case LLMFramework.whisperKit:
-        return 'OpenAI Whisper for speech recognition';
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return 'Microsoft ONNX inference runtime';
+      case LLMFramework.sherpa:
+        return 'OpenAI Whisper for speech recognition';
       case LLMFramework.systemTTS:
         return 'Built-in system text-to-speech';
-      default:
+      case LLMFramework.genie:
+        return 'Qualcomm Genie NPU inference';
+      case LLMFramework.fluidAudio:
+        return 'FluidAudio audio inference';
+      case LLMFramework.builtIn:
+        return 'Built-in platform model';
+      case LLMFramework.none:
+      case LLMFramework.unknown:
         return 'Machine learning framework';
     }
   }
@@ -398,23 +414,24 @@ class _ModelRowState extends State<ModelRow> {
       final progressStream =
           sdk.RunAnywhereSDK.instance.downloads.start(widget.model.id);
 
-      // Listen to real download progress
+      // Listen to real download progress (sdk.DownloadProgress proto type)
       await for (final progress in progressStream) {
         if (!mounted) return;
 
-        final progressValue = progress.overallProgress;
+        final progressValue = progress.stageProgress.clamp(0.0, 1.0);
 
         setState(() {
           _downloadProgress = progressValue;
         });
 
-        // Check if completed or failed
-        if (progress.state.isCompleted) {
+        // Check if completed or failed using canonical DownloadStage
+        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.state.isFailed) {
+        } else if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+            progress.errorMessage.isNotEmpty) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
-          throw Exception('Download failed');
+          throw Exception('Download failed: ${progress.errorMessage}');
         }
       }
 

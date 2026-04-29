@@ -21,11 +21,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -63,7 +67,8 @@ import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.currentLLMModelId
+// Round 1 KOTLIN (G-A8): currentLLMModelId removed; resolve via currentLLMModel().
+import com.runanywhere.sdk.public.extensions.currentLLMModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -112,7 +117,7 @@ fun ChatScreen(
                 onInfoClick = { showingChatDetails = true },
                 onModelClick = { showingModelSelection = true },
                 onLoraClick = {
-                    RunAnywhere.currentLLMModelId?.let { modelId ->
+                    RunAnywhere.currentLLMModel?.id?.let { modelId ->
                         loraViewModel.refreshForModel(modelId)
                     }
                     showingLoraAdapterPicker = true
@@ -1282,6 +1287,14 @@ fun ChatInputView(
     isModelLoaded: Boolean,
 ) {
     val canSendMessage = isModelLoaded && !isGenerating && value.trim().isNotBlank()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var isFocused by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isFocused) {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
 
     Row(
         modifier =
@@ -1296,7 +1309,7 @@ fun ChatInputView(
         TextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).onFocusChanged { isFocused = it.isFocused },
             placeholder = {
                 Text(
                     text = "Type a message...",

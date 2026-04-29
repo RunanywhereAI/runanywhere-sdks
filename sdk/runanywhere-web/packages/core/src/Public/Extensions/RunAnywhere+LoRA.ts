@@ -35,11 +35,11 @@ const logger = new SDKLogger('LoRA');
  * partial support without breaking compile-time typing of the public API.
  */
 export interface LoRAProvider {
-  loadLoraAdapter?(config: LoRAAdapterConfig): Promise<void>;
+  loadLoraAdapter?(config: LoRAAdapterConfig): Promise<LoRAAdapterInfo | void>;
   removeLoraAdapter?(path: string): Promise<void>;
   clearLoraAdapters?(): Promise<void>;
   getLoadedLoraAdapters?(): Promise<LoRAAdapterInfo[]>;
-  checkLoraCompatibility?(path: string): Promise<LoraCompatibilityResult>;
+  checkLoraCompatibility?(adapterId: string, modelId: string): Promise<LoraCompatibilityResult>;
   registerLoraAdapter?(entry: LoraAdapterCatalogEntry): Promise<void>;
   loraAdaptersForModel?(modelId: string): Promise<LoraAdapterCatalogEntry[]>;
   allRegisteredLoraAdapters?(): Promise<LoraAdapterCatalogEntry[]>;
@@ -68,9 +68,23 @@ function require<TKey extends keyof LoRAProvider>(method: TKey): NonNullable<LoR
 // Public API — mirror Swift signatures one-to-one.
 // ---------------------------------------------------------------------------
 
-export async function loadLoraAdapter(config: LoRAAdapterConfig): Promise<void> {
-  await require('loadLoraAdapter')(config);
+/**
+ * Load a LoRA adapter and return its info (§3 `lora.load`).
+ * Returns `LoRAAdapterInfo` describing the loaded adapter.
+ */
+export async function loadLoraAdapter(config: LoRAAdapterConfig): Promise<LoRAAdapterInfo> {
+  const result = await require('loadLoraAdapter')(config);
   logger.info(`LoRA adapter loaded: ${config.adapterPath}`);
+  // If the backend returns LoRAAdapterInfo, use it; otherwise synthesize from config.
+  if (result != null && typeof result === 'object' && 'adapterPath' in result) {
+    return result as LoRAAdapterInfo;
+  }
+  return {
+    adapterId: config.adapterId ?? '',
+    adapterPath: config.adapterPath,
+    scale: config.scale,
+    applied: true,
+  };
 }
 
 export async function removeLoraAdapter(path: string): Promise<void> {
@@ -87,11 +101,18 @@ export async function getLoadedLoraAdapters(): Promise<LoRAAdapterInfo[]> {
   return require('getLoadedLoraAdapters')();
 }
 
-export async function checkLoraCompatibility(loraPath: string): Promise<LoraCompatibilityResult> {
+/**
+ * Check LoRA adapter / model compatibility (§3 `lora.checkCompatibility`).
+ * Canonical signature: `(adapterId: string, modelId: string)`.
+ */
+export async function checkLoraCompatibility(
+  adapterId: string,
+  modelId: string,
+): Promise<LoraCompatibilityResult> {
   if (_provider?.checkLoraCompatibility == null) {
     return { isCompatible: false, errorMessage: 'LoRA support not available' };
   }
-  return _provider.checkLoraCompatibility(loraPath);
+  return _provider.checkLoraCompatibility(adapterId, modelId);
 }
 
 export async function registerLoraAdapter(entry: LoraAdapterCatalogEntry): Promise<void> {

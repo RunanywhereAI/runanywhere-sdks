@@ -416,6 +416,34 @@ typedef struct {
 RAC_API rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
                                                 rac_model_registry_refresh_opts_t opts);
 
+// =============================================================================
+// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)
+// =============================================================================
+
+/**
+ * @brief Fetch model assignments from the server and populate the registry.
+ *
+ * Thin wrapper over rac_model_assignment_fetch() that keeps the results in
+ * the global model registry.  Intended for the Web/WASM binding
+ * (fetchModelAssignments) and any other SDK frontend that needs a single
+ * C ABI call instead of the two-step fetch+register pattern.
+ *
+ * If rac_model_assignment_set_callbacks() has not been called yet the
+ * function returns RAC_SUCCESS with zero models so that WASM callers that
+ * operate offline don't see an error.
+ *
+ * @param force_refresh     Pass RAC_TRUE to bypass the cache.
+ * @param out_models        Output: caller-owned array (free with
+ *                          rac_model_info_array_free).  May be NULL if the
+ *                          caller only wants the side-effect of populating the
+ *                          registry.
+ * @param out_count         Output: number of models.  May be NULL.
+ * @return RAC_SUCCESS or error code.
+ */
+RAC_API rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refresh,
+                                                          rac_model_info_t*** out_models,
+                                                          size_t* out_count);
+
 #ifdef __cplusplus
 }
 #endif

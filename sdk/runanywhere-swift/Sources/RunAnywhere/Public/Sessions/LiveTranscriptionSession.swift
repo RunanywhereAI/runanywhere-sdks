@@ -301,7 +301,7 @@ public extension RunAnywhere {
         options: STTOptions = STTOptions(),
         onPartial: ((String) -> Void)? = nil
     ) async throws -> LiveTranscriptionSession {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 

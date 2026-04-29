@@ -18,6 +18,9 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.protoext.bcp47
 import com.runanywhere.sdk.public.RunAnywhere
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 private val sttLogger = SDKLogger.stt
 
@@ -33,9 +36,8 @@ actual suspend fun RunAnywhere.unloadSTTModel() {
     CppBridgeSTT.unload()
 }
 
-actual suspend fun RunAnywhere.isSTTModelLoaded(): Boolean {
-    return CppBridgeSTT.isLoaded
-}
+actual val RunAnywhere.isSTTModelLoaded: Boolean
+    get() = CppBridgeSTT.isLoaded
 
 actual val RunAnywhere.currentSTTModelId: String?
     get() = CppBridgeSTT.getLoadedModelId()
@@ -84,60 +86,52 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
     )
 }
 
-actual suspend fun RunAnywhere.transcribeStream(
+@Volatile private var sttStreamingActive: Boolean = false
+
+actual val RunAnywhere.isStreamingSTT: Boolean
+    get() = sttStreamingActive
+
+actual fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions,
-    onPartialResult: (STTPartialResult) -> Unit,
-): STTOutput {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
+): Flow<STTPartialResult> =
+    callbackFlow {
+        if (!isInitialized) {
+            throw SDKException.notInitialized("SDK not initialized")
+        }
+
+        val langCode =
+            if (options.language == STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
+                CppBridgeSTT.Language.AUTO
+            } else {
+                options.language.bcp47
+            }
+        val config =
+            CppBridgeSTT.TranscriptionConfig(
+                language = langCode,
+                sampleRate = 16000,
+            )
+
+        sttStreamingActive = true
+        CppBridgeSTT.transcribeStream(audioData, config) { partialText, isFinal ->
+            val result = STTPartialResult(text = partialText, is_final = isFinal)
+            trySend(result)
+            !isFinal // continue if not final
+        }
+        awaitClose { sttStreamingActive = false }
     }
 
-    val audioLengthSec = estimateAudioLength(audioData.size)
-
-    val langCode =
-        if (options.language == STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-            CppBridgeSTT.Language.AUTO
-        } else {
-            options.language.bcp47
-        }
-    val config =
-        CppBridgeSTT.TranscriptionConfig(
-            language = langCode,
-            sampleRate = 16000,
-        )
-
-    val result =
-        CppBridgeSTT.transcribeStream(audioData, config) { partialText, isFinal ->
-            onPartialResult(STTPartialResult(text = partialText, is_final = isFinal))
-            true // Continue processing
-        }
-
-    val metadata =
-        TranscriptionMetadata(
-            model_id = CppBridgeSTT.getLoadedModelId() ?: "unknown",
-            processing_time_ms = result.processingTimeMs,
-            audio_length_ms = (audioLengthSec * 1000).toLong(),
-        )
-
-    return STTOutput(
-        text = result.text,
-        confidence = result.confidence,
-        metadata = metadata,
-    )
-}
-
-actual suspend fun RunAnywhere.processStreamingAudio(samples: FloatArray) {
+actual suspend fun RunAnywhere.processStreamingAudio(samples: ByteArray) {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
 
     val config = CppBridgeSTT.TranscriptionConfig()
-    val audioData = samples.toByteArray()
-    CppBridgeSTT.transcribe(audioData, config)
+    CppBridgeSTT.transcribe(samples, config)
 }
 
 actual suspend fun RunAnywhere.stopStreamingTranscription() {
+    sttStreamingActive = false
     CppBridgeSTT.cancel()
 }
 
@@ -147,11 +141,4 @@ private fun estimateAudioLength(dataSize: Int): Double {
     val sampleRate = 16000.0
     val samples = dataSize.toDouble() / bytesPerSample.toDouble()
     return samples / sampleRate
-}
-
-private fun FloatArray.toByteArray(): ByteArray {
-    val buffer = java.nio.ByteBuffer.allocate(size * 4)
-    buffer.order(java.nio.ByteOrder.LITTLE_ENDIAN)
-    buffer.asFloatBuffer().put(this)
-    return buffer.array()
 }

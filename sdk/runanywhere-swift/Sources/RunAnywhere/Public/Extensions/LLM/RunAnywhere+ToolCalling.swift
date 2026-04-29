@@ -142,7 +142,7 @@ public extension RunAnywhere {
 
     // MARK: - Generate with Tools
 
-    /// Generates a response with tool calling support.
+    /// Generates a response with tool calling support (CANONICAL_API §3).
     ///
     /// Orchestrates a generate → parse → execute → loop cycle:
     /// 1. Builds a system prompt describing available tools
@@ -153,40 +153,43 @@ public extension RunAnywhere {
     ///
     /// - Parameters:
     ///   - prompt: The user's prompt
-    ///   - options: Tool calling options (tools, maxToolCalls, autoExecute, etc.)
-    /// - Returns: Result containing final text, all tool calls made, and their results
+    ///   - options: Generation options (optional); tool-calling behaviour is
+    ///              controlled via registered tools and `ToolCallingOptions`.
+    /// - Returns: `LLMGenerationResult` with the final text and any tool metadata.
     static func generateWithTools(
         _ prompt: String,
-        options: ToolCallingOptions? = nil
-    ) async throws -> ToolCallingResult {
+        options: LLMGenerationOptions? = nil
+    ) async throws -> LLMGenerationResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        let opts = options ?? ToolCallingOptions()
+        // Use registered tools; generation options control temperature/maxTokens.
+        let tcOpts = ToolCallingOptions()
         let registeredTools = await ToolRegistry.shared.getAll()
-        let tools = opts.tools ?? registeredTools
+        let tools = tcOpts.tools ?? registeredTools
+        let genOpts = options ?? LLMGenerationOptions()
 
-        // Extract /no_think prefix before building the full prompt so it stays
-        // at the beginning where the C++ inference layer expects it.
+        // Extract /no_think prefix before building the full prompt.
         let noThinkPrefix = "/no_think\n"
         let hasNoThink = prompt.hasPrefix(noThinkPrefix)
         let cleanPrompt = hasNoThink ? String(prompt.dropFirst(noThinkPrefix.count)) : prompt
 
-        let systemPrompt = buildToolSystemPrompt(tools: tools, options: opts)
+        let systemPrompt = buildToolSystemPrompt(tools: tools, options: tcOpts)
         var fullPrompt = systemPrompt.isEmpty ? cleanPrompt : "\(systemPrompt)\n\nUser: \(cleanPrompt)"
         if hasNoThink {
             fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
         }
 
-        var allToolCalls: [ToolCall] = []
-        var allToolResults: [ToolResult] = []
         var finalText = ""
+        let startTime = Date()
 
-        for _ in 0..<opts.maxToolCalls {
+        for _ in 0..<tcOpts.maxToolCalls {
             let responseText = try await generateAndCollect(
-                fullPrompt, temperature: opts.temperature, maxTokens: opts.maxTokens
+                fullPrompt,
+                temperature: tcOpts.temperature ?? genOpts.temperature,
+                maxTokens: tcOpts.maxTokens ?? genOpts.maxTokens
             )
 
             // Parse using C++ implementation (SINGLE SOURCE OF TRUTH - NO FALLBACK)
@@ -194,34 +197,36 @@ public extension RunAnywhere {
             finalText = text
 
             guard let toolCall = toolCall else { break }
-            allToolCalls.append(toolCall)
 
-            if !opts.autoExecute {
-                return ToolCallingResult(
-                    text: finalText, toolCalls: allToolCalls, toolResults: [], isComplete: false
-                )
-            }
+            if !tcOpts.autoExecute { break }
 
-            let result = await executeTool(toolCall)
-            allToolResults.append(result)
+            let toolResult = await executeTool(toolCall)
 
             fullPrompt = buildFollowUpPrompt(
                 prompt: cleanPrompt,
                 systemPrompt: systemPrompt,
                 toolCall: toolCall,
-                result: result,
-                keepToolsAvailable: opts.keepToolsAvailable
+                result: toolResult,
+                keepToolsAvailable: tcOpts.keepToolsAvailable
             )
             if hasNoThink {
                 fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
             }
         }
 
-        return ToolCallingResult(
+        let latencyMs = Date().timeIntervalSince(startTime) * 1000
+        return LLMGenerationResult(
             text: finalText,
-            toolCalls: allToolCalls,
-            toolResults: allToolResults,
-            isComplete: true
+            thinkingContent: nil,
+            inputTokens: 0,
+            tokensUsed: 0,
+            modelUsed: await CppBridge.LLM.shared.currentModelId ?? "unknown",
+            latencyMs: latencyMs,
+            framework: "llamacpp",
+            tokensPerSecond: 0,
+            timeToFirstTokenMs: nil,
+            thinkingTokens: nil,
+            responseTokens: 0
         )
     }
 
@@ -279,52 +284,57 @@ public extension RunAnywhere {
         }
     }
 
-    /// Continue generation after manual tool execution.
+    /// Continue LLM generation after providing a tool result (CANONICAL_API §3).
     ///
-    /// Use this when `autoExecute` is false. After receiving a `ToolCallingResult`
-    /// with `isComplete: false`, execute the tool yourself, then call this to continue.
+    /// The canonical signature: `continueWithToolResult(toolCallId:result:) -> LLMGenerationResult`.
+    ///
+    /// After the LLM requested a tool call (identified by `toolCallId`), the
+    /// caller executes the tool and passes the stringified result here. The SDK
+    /// resumes the conversation with that context and returns the next generation
+    /// result.
     ///
     /// - Parameters:
-    ///   - previousPrompt: The original user prompt
-    ///   - toolCall: The tool call that was executed
-    ///   - toolResult: The result of executing the tool
-    ///   - options: Tool calling options for the continuation
-    /// - Returns: Result of the continued generation
+    ///   - toolCallId: The identifier of the tool call to answer (from the
+    ///                 `ToolCall.callId` in the previous generation result).
+    ///   - result: The tool's output as a string (JSON or plain text).
+    /// - Returns: `LLMGenerationResult` containing the model's response after
+    ///            seeing the tool result.
     static func continueWithToolResult(
-        previousPrompt: String,
-        toolCall: ToolCall,
-        toolResult: ToolResult,
-        options: ToolCallingOptions? = nil
-    ) async throws -> ToolCallingResult {
-        let resultJson: String
-        if toolResult.success, let result = toolResult.result,
-           let jsonData = try? JSONSerialization.data(withJSONObject: result),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            resultJson = jsonString
-        } else {
-            resultJson = "Error: \(toolResult.error ?? "Unknown error")"
+        toolCallId: String,
+        result: String
+    ) async throws -> LLMGenerationResult {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
+        try await ensureServicesReady()
 
         let continuedPrompt = """
-            \(previousPrompt)
+            Tool result for call '\(toolCallId)': \(result)
 
-            Tool Result for \(toolCall.toolName): \(resultJson)
-
-            Based on the tool result, please provide your response:
+            Based on this tool result, please provide your response:
             """
 
-        let continuationOptions = ToolCallingOptions(
-            tools: options?.tools,
-            maxToolCalls: (options?.maxToolCalls ?? 5) - 1,
-            autoExecute: options?.autoExecute ?? true,
-            temperature: options?.temperature,
-            maxTokens: options?.maxTokens,
-            systemPrompt: options?.systemPrompt,
-            replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
-            keepToolsAvailable: options?.keepToolsAvailable ?? false
+        let startTime = Date()
+        let responseText = try await generateAndCollect(
+            continuedPrompt,
+            temperature: Float(0.3),
+            maxTokens: 1024
         )
+        let latencyMs = Date().timeIntervalSince(startTime) * 1000
 
-        return try await generateWithTools(continuedPrompt, options: continuationOptions)
+        return LLMGenerationResult(
+            text: responseText,
+            thinkingContent: nil,
+            inputTokens: 0,
+            tokensUsed: 0,
+            modelUsed: await CppBridge.LLM.shared.currentModelId ?? "unknown",
+            latencyMs: latencyMs,
+            framework: "llamacpp",
+            tokensPerSecond: 0,
+            timeToFirstTokenMs: nil,
+            thinkingTokens: nil,
+            responseTokens: 0
+        )
     }
 
     // MARK: - Private Helpers

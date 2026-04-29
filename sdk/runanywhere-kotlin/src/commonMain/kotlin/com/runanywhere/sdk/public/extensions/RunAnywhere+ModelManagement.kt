@@ -348,6 +348,17 @@ expect suspend fun RunAnywhere.refreshModelRegistry(
 // MARK: - Model Loading
 
 /**
+ * Load any model by ID (generic model loader).
+ *
+ * Routes to the appropriate type-specific loader based on the model's
+ * registered category. New callers should prefer this over the
+ * type-specific `loadLLMModel`, `loadSTTModel`, etc.
+ *
+ * @param modelId Model identifier
+ */
+expect suspend fun RunAnywhere.loadModel(modelId: String)
+
+/**
  * Load an LLM model.
  *
  * @param modelId Model identifier
@@ -362,27 +373,17 @@ expect suspend fun RunAnywhere.unloadLLMModel()
 /**
  * Check if an LLM model is loaded.
  *
- * @return True if a model is loaded
+ * Sync property — reads cached state from the component layer without suspension.
  */
-expect suspend fun RunAnywhere.isLLMModelLoaded(): Boolean
-
-/**
- * Get the currently loaded LLM model ID.
- *
- * This is a synchronous property that returns the ID of the currently loaded model,
- * or null if no model is loaded. Mirrors iOS RunAnywhere.getCurrentModelId().
- */
-expect val RunAnywhere.currentLLMModelId: String?
+expect val RunAnywhere.isLLMModelLoaded: Boolean
 
 /**
  * Get the currently loaded LLM model info.
  *
- * This is a convenience property that combines currentLLMModelId with
- * a lookup in the available models registry.
- *
- * @return The currently loaded ModelInfo, or null if no model is loaded
+ * Sync property — reads cached state from the component layer without suspension.
+ * Returns null if no model is loaded.
  */
-expect suspend fun RunAnywhere.currentLLMModel(): ModelInfo?
+expect val RunAnywhere.currentLLMModel: ModelInfo?
 
 /**
  * Get the currently loaded STT model info.

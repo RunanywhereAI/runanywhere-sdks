@@ -45,26 +45,26 @@ export async function loadModelByCategory(modelId: string): Promise<void> {
   logger.info(`Routing loadModel for category=${model.category} model=${modelId}`);
 
   switch (model.category) {
-    case ModelCategory.Language:
+    case ModelCategory.MODEL_CATEGORY_LANGUAGE:
       await loadLLMModel(modelId);
       return;
-    case ModelCategory.SpeechRecognition:
+    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
       await loadSTTModel(modelId);
       return;
-    case ModelCategory.SpeechSynthesis:
+    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
       await loadTTSModel(modelId);
       return;
-    case ModelCategory.Audio: {
+    case ModelCategory.MODEL_CATEGORY_AUDIO: {
       const vadPath = await getModelPath(modelId);
       if (!vadPath) throw SDKException.modelNotFound(modelId);
       await loadVADModel(vadPath);
       return;
     }
-    case ModelCategory.Vision:
-    case ModelCategory.Multimodal:
+    case ModelCategory.MODEL_CATEGORY_VISION:
+    case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
       await loadVLMModelById(modelId);
       return;
-    case ModelCategory.ImageGeneration: {
+    case ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION: {
       const localPath = await getModelPath(modelId);
       if (!localPath) {
         throw SDKException.modelNotFound(modelId);
@@ -72,9 +72,13 @@ export async function loadModelByCategory(modelId: string): Promise<void> {
       await loadDiffusionModel(localPath, modelId, model.name);
       return;
     }
-    case ModelCategory.Embedding:
+    case ModelCategory.MODEL_CATEGORY_EMBEDDING:
       throw SDKException.notImplemented(
         `Embedding model loading not implemented for ${modelId}`
+      );
+    default:
+      throw SDKException.notImplemented(
+        `Model category ${model.category} not supported for ${modelId}`
       );
   }
 }

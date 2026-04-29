@@ -264,16 +264,14 @@ export class LiveTranscriptionSession {
 
     try {
       // Kick off the streaming transcription. The native side feeds back
-      // partials via the `onPartialResult` callback. We deliberately pass
-      // an empty buffer because audio is being driven by the audio
-      // capture path below — the native streaming STT pipeline reads from
-      // its own ring buffer.
-      await transcribeStream(new ArrayBuffer(0), {
-        ...this.options,
-        onPartialResult: (partial) => {
-          this.pushText(partial.text);
-        },
-      });
+      // partials via the async generator. We deliberately pass an empty
+      // buffer because audio is being driven by the audio capture path
+      // below — the native streaming STT pipeline reads from its own ring
+      // buffer.
+      for await (const partial of transcribeStream(new Uint8Array(0), this.options)) {
+        this.pushText(partial.text);
+        if (partial.isFinal) break;
+      }
     } catch (err) {
       this.handleError(err as Error);
     }

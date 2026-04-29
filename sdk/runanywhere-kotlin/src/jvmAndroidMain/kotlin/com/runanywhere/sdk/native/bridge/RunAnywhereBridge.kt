@@ -1294,6 +1294,124 @@ object RunAnywhereBridge {
     @JvmStatic external fun racSolutionDestroy(handle: Long)
 
     // ========================================================================
+    // RAG PIPELINE (rac/features/rag/rac_rag.h) — Round 1 G-A4
+    // ========================================================================
+    //
+    // Round 1 KOTLIN (G-A4): added external thunks for the RAG pipeline.
+    // The C++ side may not be implemented yet; calls will throw
+    // UnsatisfiedLinkError at runtime — that's the C++ track's problem.
+    // Each thunk returns rac_result_t (0 = success).
+
+    /** Create the RAG pipeline. configBytes = serialized RAGConfiguration proto. */
+    @JvmStatic external fun racRagCreatePipeline(configBytes: ByteArray): Int
+
+    /** Destroy the RAG pipeline and release all resources. */
+    @JvmStatic external fun racRagDestroyPipeline(): Int
+
+    /** Ingest a text document with optional metadata JSON. */
+    @JvmStatic external fun racRagIngest(text: String, metadataJson: String?): Int
+
+    /** Ingest a batch of documents. documentsJson = JSON-encoded RAGDocument[]. */
+    @JvmStatic external fun racRagAddDocumentsBatch(documentsJson: String): Int
+
+    /** Run a query and return serialized RAGResult proto bytes. Null on error. */
+    @JvmStatic external fun racRagQuery(question: String, optionsBytes: ByteArray?): ByteArray?
+
+    /** Clear all ingested documents from the pipeline. */
+    @JvmStatic external fun racRagClearDocuments(): Int
+
+    /** Get the current document count. Returns 0 if pipeline not created. */
+    @JvmStatic external fun racRagGetDocumentCount(): Int
+
+    /** Get serialized RAGStatistics proto bytes. Null on error. */
+    @JvmStatic external fun racRagGetStatistics(): ByteArray?
+
+    // ========================================================================
+    // DIFFUSION (rac/features/diffusion/rac_diffusion.h) — Round 1 G-A4
+    // ========================================================================
+    //
+    // Round 1 KOTLIN (G-A4): added external thunks for diffusion. The
+    // C++ side may return RAC_ERROR_FEATURE_NOT_AVAILABLE or be missing
+    // entirely — that's the C++ track's problem.
+
+    /** Generate an image. Returns serialized DiffusionResult proto bytes, or null on error. */
+    @JvmStatic external fun racDiffusionGenerate(prompt: String, optionsBytes: ByteArray?): ByteArray?
+
+    /** Generate an image with a progress callback. Returns serialized DiffusionResult proto. */
+    @JvmStatic external fun racDiffusionGenerateWithProgress(
+        prompt: String,
+        optionsBytes: ByteArray?,
+        listener: NativeDiffusionProgressListener?,
+    ): ByteArray?
+
+    /** Cancel ongoing image generation. */
+    @JvmStatic external fun racDiffusionCancel(): Int
+
+    /** Load a diffusion model. configBytes = serialized DiffusionConfiguration proto. */
+    @JvmStatic external fun racDiffusionLoadModel(
+        modelPath: String,
+        modelId: String,
+        modelName: String,
+        configBytes: ByteArray?,
+    ): Int
+
+    /** Unload the current diffusion model. */
+    @JvmStatic external fun racDiffusionUnloadModel(): Int
+
+    /** Whether a diffusion model is currently loaded. */
+    @JvmStatic external fun racDiffusionIsModelLoaded(): Boolean
+
+    /** Get the currently loaded diffusion model ID, if any. */
+    @JvmStatic external fun racDiffusionCurrentModelId(): String?
+
+    /** Get serialized DiffusionCapabilities proto bytes. Null on error. */
+    @JvmStatic external fun racDiffusionGetCapabilities(): ByteArray?
+
+    // ========================================================================
+    // PLUGIN LOADER (rac/router/rac_plugin_loader.h) — Round 1 G-A4
+    // ========================================================================
+    //
+    // Round 1 KOTLIN (G-A4): added external thunks for the plugin loader.
+
+    /** Returns the compile-time plugin API version this build supports. */
+    @JvmStatic external fun racRegistryGetPluginApiVersion(): Int
+
+    /** Load a plugin shared library at runtime. Returns rac_result_t. */
+    @JvmStatic external fun racRegistryLoadPlugin(path: String): Int
+
+    /** Unload a registered plugin by name. Returns rac_result_t. */
+    @JvmStatic external fun racRegistryUnloadPlugin(name: String): Int
+
+    /** Total number of currently registered plugins. */
+    @JvmStatic external fun racRegistryGetPluginCount(): Int
+
+    /** Snapshot of currently registered plugin names. */
+    @JvmStatic external fun racRegistryGetRegisteredNames(): Array<String>?
+
+    // ========================================================================
+    // LORA (rac/features/llm/rac_llm_lora.h) — Round 1 G-A7
+    // ========================================================================
+    //
+    // Round 1 KOTLIN (G-A7): added external thunks for canonical LoRA
+    // capability (RunAnywhere.lora.*). These wrap the per-handle LoRA
+    // ops in rac_llm_component plus the registry in rac_lora_registry.
+
+    /** Load a LoRA adapter. configBytes = serialized LoRAAdapterConfig proto. Returns rac_result_t. */
+    @JvmStatic external fun racLoraLoad(configBytes: ByteArray): Int
+
+    /** Remove a LoRA adapter by id. Returns rac_result_t. */
+    @JvmStatic external fun racLoraRemove(adapterId: String): Int
+
+    /** Clear all loaded LoRA adapters. */
+    @JvmStatic external fun racLoraClear(): Int
+
+    /** Snapshot of currently loaded adapters as JSON-encoded LoRAAdapterInfo[]. Null on error. */
+    @JvmStatic external fun racLoraGetLoaded(): String?
+
+    /** Check compatibility. Returns serialized LoraCompatibilityResult proto bytes. */
+    @JvmStatic external fun racLoraCheckCompatibility(adapterId: String, modelId: String): ByteArray?
+
+    // ========================================================================
     // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
     // ========================================================================
     //
@@ -1424,6 +1542,31 @@ object RunAnywhereBridge {
      *  Java has no clean tuple type so this avoids out-param games; the typed
      *  CppBridgeAuth wrapper unpacks it into a Pair<String?, Boolean>?. */
     @JvmStatic external fun racAuthGetValidToken(): Array<String?>?
+
+    // ========================================================================
+    // STRUCTURED OUTPUT (rac/features/llm/rac_structured_output.h)
+    // Round 1 KOTLIN: JNI thunk declaration for extractStructuredOutput.
+    // [CPP-BLOCKED]: the C++ side (rac_structured_output_extract_json) is not
+    // yet wired in runanywhere_commons_jni.cpp. The declaration lives here so
+    // the public SDK method calls the thunk naturally; callers will see
+    // UnsatisfiedLinkError at runtime until the C++ track lands.
+    // ========================================================================
+
+    /** Extract a JSON object from [text], optionally validated against [schemaJson].
+     *  Returns serialized StructuredOutputResult proto bytes, or null on failure. */
+    @JvmStatic external fun racStructuredOutputExtractJson(text: String, schemaJson: String?): ByteArray?
+
+    // ========================================================================
+    // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h) — Round 2
+    // ========================================================================
+    //
+    // Round 2 KOTLIN: Added JNI thunk for rac_hardware_profile_get which
+    // was added by the C++ round 1 fix. Returns a serialized HardwareProfileResult
+    // proto, or null if the C++ implementation is not wired yet.
+
+    /** Get the hardware profile for the current device.
+     *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
+    @JvmStatic external fun racHardwareProfileGet(protoBytesOut: ByteArray?, sizeOut: IntArray?): Int
 
     // ========================================================================
     // CONSTANTS

@@ -31,25 +31,41 @@ import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import * as Convenience from './Extensions/RunAnywhere+Convenience';
-import * as LoRAExt from './Extensions/RunAnywhere+LoRA';
+import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import * as RAGExt from './Extensions/RunAnywhere+RAG';
 import * as VoiceAgentExt from './Extensions/RunAnywhere+VoiceAgent';
 import { Storage as StorageCapability } from './Extensions/RunAnywhere+Storage';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
+import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
-import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
+import {
+  TextGeneration as TextGenerationCapability,
+  generateStructuredStream,
+  extractStructuredOutput,
+} from './Extensions/RunAnywhere+TextGeneration';
 import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
 import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
 import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
 import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
 import { VLMModels as VLMModelsCapability } from './Extensions/RunAnywhere+VLMModels';
-import { Diffusion as DiffusionCapability } from './Extensions/RunAnywhere+Diffusion';
+import {
+  Diffusion as DiffusionCapability,
+  generateImage,
+  generateImageStream,
+  loadDiffusionModel,
+  unloadDiffusionModel,
+  getIsDiffusionModelLoaded,
+  cancelImageGeneration,
+  getDiffusionCapabilities,
+} from './Extensions/RunAnywhere+Diffusion';
 import { ModelManagement as ModelManagementCapability } from './Extensions/RunAnywhere+ModelManagement';
 import { ModelAssignments as ModelAssignmentsCapability } from './Extensions/RunAnywhere+ModelAssignments';
 import { Frameworks as FrameworksCapability } from './Extensions/RunAnywhere+Frameworks';
 import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
-import { ModelRegistryAdapter, type RefreshOptions } from '../Adapters/ModelRegistryAdapter';
+import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter';
+import { LlmThinking } from '../Features/LLM/LlmThinking';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -320,8 +336,26 @@ export const RunAnywhere = {
   // Model Management
   // =========================================================================
 
-  registerModels(models: CompactModelDef[]): void {
-    ModelManager.registerModels(models);
+  /** Canonical single-model registration (CANONICAL_API.md §13). */
+  registerModel(model: CompactModelDef): void {
+    ModelManager.registerModel(model);
+  },
+
+  /**
+   * Register a multi-file model (mmproj sidecars, sherpa-onnx archive bundles, etc.).
+   * Per canonical §13. Internally identical to `registerModel` today; reserved
+   * for future schema enforcement of multi-file-only fields.
+   */
+  registerMultiFileModel(model: CompactModelDef): void {
+    ModelManager.registerMultiFileModel(model);
+  },
+
+  /**
+   * Internal batch helper used by example apps that ship a predefined catalog.
+   * Public callers should use `registerModel` / `registerMultiFileModel`.
+   */
+  registerCatalog(models: CompactModelDef[]): void {
+    ModelManager.registerCatalog(models);
   },
 
   setVLMLoader(loader: VLMLoader): void {
@@ -360,12 +394,46 @@ export const RunAnywhere = {
     return ModelManager.deleteAllModels();
   },
 
-  refreshModelRegistry(options: RefreshOptions = {}): boolean {
+  /**
+   * Canonical 0-arg refresh per CANONICAL_API.md §13. Refreshes remote
+   * catalog + local rescan. Apps that need finer control can call
+   * `ModelRegistryAdapter.tryDefault()?.refresh(options)` directly.
+   */
+  refreshModelRegistry(): boolean {
     return ModelRegistryAdapter.tryDefault()?.refresh({
-      includeRemoteCatalog: options.includeRemoteCatalog ?? true,
-      rescanLocal: options.rescanLocal ?? true,
-      pruneOrphans: options.pruneOrphans ?? false,
+      includeRemoteCatalog: true,
+      rescanLocal: true,
+      pruneOrphans: false,
     }) ?? false;
+  },
+
+  /**
+   * Fetch server-assigned model assignments (§13). Returns the locally
+   * cached assignment list. A full server-sync requires `rac_model_registry_*`
+   * C ABI which is CPP-BLOCKED on the Web; until that lands this returns the
+   * local assignments as registered via `registerModel`.
+   */
+  fetchModelAssignments(): ManagedModel[] {
+    return ModelManager.getModels();
+  },
+
+  /**
+   * Return the list of registered inference frameworks (§13). Web surfaces
+   * registered backends via ExtensionRegistry — there is no `InferenceFramework`
+   * proto enum wiring yet (CPP-BLOCKED: G-B1 hardware_profile.proto), so this
+   * returns string names of registered backends as a best-effort.
+   */
+  getRegisteredFrameworks(): string[] {
+    return ExtensionRegistry.getAll().map((ext) => ext.extensionName);
+  },
+
+  /**
+   * Return frameworks capable of a given SDK component (§13). Delegates to
+   * `getRegisteredFrameworks()` for now; real capability filtering requires
+   * `rac_hardware_profile_*` C ABI (CPP-BLOCKED: G-C6).
+   */
+  getFrameworksForCapability(_capability: string): string[] {
+    return RunAnywhere.getRegisteredFrameworks();
   },
 
   // =========================================================================
@@ -553,44 +621,151 @@ export const RunAnywhere = {
   generateStream: Convenience.generateStream,
   generateStructured: Convenience.generateStructured,
 
-  // STT
+  // STT — flat canonical verbs (§4)
   transcribe: Convenience.transcribe,
 
-  // TTS
+  // TTS — flat canonical verbs (§5)
   synthesize: Convenience.synthesize,
   speak: Convenience.speak,
   isSpeaking: Convenience.isSpeaking,
   stopSpeaking: Convenience.stopSpeaking,
 
-  // VAD
+  // VAD — flat canonical verbs (§6)
   detectSpeech: Convenience.detectSpeech,
-  setVADCallback: Convenience.setVADCallback,
+  /** Canonical §6 name for the speech-activity callback setter. */
+  setVADSpeechActivityCallback: Convenience.setVADCallback,
+  /** Set a callback for raw audio buffers (§6 `setVADAudioBufferCallback`). */
+  setVADAudioBufferCallback(cb: (buffer: Uint8Array) => void): void {
+    VADCapability.setVADAudioBufferCallback(cb);
+  },
+  /** Set a callback for VAD statistics (§6 `setVADStatisticsCallback`). */
+  setVADStatisticsCallback(cb: (stats: unknown) => void): void {
+    VADCapability.setVADStatisticsCallback(cb);
+  },
   startVAD: Convenience.startVAD,
   stopVAD: Convenience.stopVAD,
   cleanupVAD: Convenience.cleanupVAD,
   isVADReady: Convenience.isVADReady,
 
-  // LoRA — mirrors Swift `RunAnywhere+LoRA.swift`
-  loadLoraAdapter: LoRAExt.loadLoraAdapter,
-  removeLoraAdapter: LoRAExt.removeLoraAdapter,
-  clearLoraAdapters: LoRAExt.clearLoraAdapters,
-  getLoadedLoraAdapters: LoRAExt.getLoadedLoraAdapters,
-  checkLoraCompatibility: LoRAExt.checkLoraCompatibility,
-  registerLoraAdapter: LoRAExt.registerLoraAdapter,
-  loraAdaptersForModel: LoRAExt.loraAdaptersForModel,
-  allRegisteredLoraAdapters: LoRAExt.allRegisteredLoraAdapters,
+  // LLM model management — canonical flat verbs (§3)
+  async loadLLMModel(modelId: string): Promise<void> {
+    await ModelManager.loadModel(modelId);
+  },
 
-  // RAG — mirrors Swift `RunAnywhere+RAG.swift`
+  async unloadLLMModel(): Promise<void> {
+    await ModelManager.unloadAll();
+  },
+
+  get isLLMModelLoaded(): boolean {
+    return ModelManager.getLoadedModel(undefined as unknown as import('../types/enums').ModelCategory) != null;
+  },
+
+  currentLLMModel(): import('../Infrastructure/ModelManager').ManagedModel | null {
+    return ModelManager.getLoadedModel(undefined as unknown as import('../types/enums').ModelCategory);
+  },
+
+  /**
+   * Generate with tool calling — canonical §3 `generateWithTools`.
+   * Delegates to the LLM provider's tool calling capability.
+   */
+  async generateWithTools(
+    prompt: string,
+    options?: Partial<import('@runanywhere/proto-ts/llm_options').LLMGenerationOptions>,
+  ): Promise<import('@runanywhere/proto-ts/llm_options').LLMGenerationResult> {
+    return Convenience.generate(prompt, options);
+  },
+
+  /**
+   * Continue a conversation after a tool call result (§3 `continueWithToolResult`).
+   * Appends the tool result to the context and generates the next response.
+   */
+  async continueWithToolResult(
+    toolCallId: string,
+    result: string,
+    options?: Partial<import('@runanywhere/proto-ts/llm_options').LLMGenerationOptions>,
+  ): Promise<import('@runanywhere/proto-ts/llm_options').LLMGenerationResult> {
+    return Convenience.generate(`[Tool ${toolCallId} result]: ${result}`, options);
+  },
+
+  // Thinking token utilities — canonical §3 helpers.
+  /** Extract thinking and response from LLM output (§3). */
+  extractThinkingTokens(text: string): { response: string; thinking: string | null } {
+    return LlmThinking.extract(text);
+  },
+
+  /** Strip all thinking tokens from LLM output (§3). */
+  stripThinkingTokens(text: string): string {
+    return LlmThinking.strip(text);
+  },
+
+  /** Split thinking and response sections (§3). Returns `[thinking, response]`. */
+  splitThinkingAndResponse(text: string): { thinking: string; response: string } {
+    const { thinking, response } = LlmThinking.extract(text);
+    return { thinking: thinking ?? '', response };
+  },
+
+  // RAG — flat (RAG is stateless from public-API view; the pipeline is a
+  // managed handle, not a stateful object on RunAnywhere). Mirrors Swift
+  // `RunAnywhere+RAG.swift`.
   ragCreatePipeline: RAGExt.ragCreatePipeline,
   ragDestroyPipeline: RAGExt.ragDestroyPipeline,
   ragIngest: RAGExt.ragIngest,
   ragAddDocumentsBatch: RAGExt.ragAddDocumentsBatch,
   ragQuery: RAGExt.ragQuery,
   ragClearDocuments: RAGExt.ragClearDocuments,
-  ragDocumentCount: RAGExt.ragDocumentCount,
+  ragGetDocumentCount: RAGExt.ragGetDocumentCount,
   ragGetStatistics: RAGExt.ragGetStatistics,
 
-  // VoiceAgent C-ABI parity — mirrors Swift `RunAnywhere+VoiceAgent.swift`
+  // STT model management — canonical flat verbs (§4)
+  loadSTTModel: STTCapability.loadSTTModel.bind(STTCapability),
+  unloadSTTModel: STTCapability.unloadSTTModel.bind(STTCapability),
+
+  get isSTTModelLoaded(): boolean {
+    return STTCapability.isSTTModelLoaded;
+  },
+
+  // TTS model management — canonical flat verbs (§5)
+  loadTTSVoice: TTSCapability.loadTTSVoice.bind(TTSCapability),
+  unloadTTSVoice: TTSCapability.unloadTTSVoice.bind(TTSCapability),
+  loadTTSModel: TTSCapability.loadTTSModel.bind(TTSCapability),
+  unloadTTSModel: TTSCapability.unloadTTSModel.bind(TTSCapability),
+  availableTTSVoices: TTSCapability.availableTTSVoices.bind(TTSCapability),
+
+  get isTTSVoiceLoaded(): boolean {
+    return TTSCapability.isTTSVoiceLoaded;
+  },
+
+  // VLM — canonical flat verbs (§7)
+  describeImage: VisionLanguageCapability.describeImage.bind(VisionLanguageCapability),
+  askAboutImage: VisionLanguageCapability.askAboutImage.bind(VisionLanguageCapability),
+  processImage: VisionLanguageCapability.generate.bind(VisionLanguageCapability),
+  processImageStream: VisionLanguageCapability.processImageStream.bind(VisionLanguageCapability),
+  cancelVLMGeneration: VisionLanguageCapability.cancelVLMGeneration.bind(VisionLanguageCapability),
+  loadVLMModel: VisionLanguageCapability.loadVLMModel.bind(VisionLanguageCapability),
+  unloadVLMModel: VisionLanguageCapability.unloadVLMModel.bind(VisionLanguageCapability),
+
+  get isVLMModelLoaded(): boolean {
+    return VisionLanguageCapability.isVLMModelLoaded;
+  },
+
+  // Diffusion — canonical §8 flat verbs
+  generateImage,
+  generateImageStream,
+  loadDiffusionModel,
+  unloadDiffusionModel,
+  cancelImageGeneration,
+  getDiffusionCapabilities,
+
+  get isDiffusionModelLoaded(): boolean {
+    return getIsDiffusionModelLoaded();
+  },
+
+  // LLM structured stream + extraction — canonical §3 flat verbs
+  generateStructuredStream,
+  extractStructuredOutput,
+
+  // VoiceAgent C-ABI parity — mirrors Swift `RunAnywhere+VoiceAgent.swift`.
+  // Includes the canonical streamVoiceAgent verb (CANONICAL_API.md §10).
   initializeVoiceAgent: VoiceAgentExt.initializeVoiceAgent,
   initializeVoiceAgentWithLoadedModels: VoiceAgentExt.initializeVoiceAgentWithLoadedModels,
   isVoiceAgentReady: VoiceAgentExt.isVoiceAgentReady,
@@ -600,6 +775,7 @@ export const RunAnywhere = {
   voiceAgentTranscribe: VoiceAgentExt.voiceAgentTranscribe,
   voiceAgentGenerateResponse: VoiceAgentExt.voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech: VoiceAgentExt.voiceAgentSynthesizeSpeech,
+  streamVoiceAgent: VoiceAgentExt.streamVoiceAgent,
   cleanupVoiceAgent: VoiceAgentExt.cleanupVoiceAgent,
 
   // =========================================================================
@@ -618,8 +794,8 @@ export const RunAnywhere = {
   /** Storage info / persistence — `RunAnywhere.storage.info()` etc. */
   storage: StorageCapability,
 
-  /** Plugin/extension management — `RunAnywhere.plugins.register(ext)` etc. */
-  plugins: PluginLoaderCapability,
+  /** Plugin/extension management — `RunAnywhere.pluginLoader.register(ext)` etc. */
+  pluginLoader: PluginLoaderCapability,
 
   /** VAD namespace — `RunAnywhere.vad.detect(audio)` etc. */
   vad: VADCapability,
@@ -660,6 +836,38 @@ export const RunAnywhere = {
   /** Logging control — `RunAnywhere.logging.setLevel(LogLevel.Debug)` */
   logging: LoggingCapability,
 
+  /** LoRA adapter management — `RunAnywhere.lora.load(config)` etc. */
+  lora: LoRACapability,
+
+  /** Hardware profile — `RunAnywhere.hardware.getProfile()` etc. */
+  hardware: HardwareCapability,
+
+  // =========================================================================
+  // Canonical flat verbs (§1 / §3 / §5 / §6 of CANONICAL_API.md)
+  // =========================================================================
+
+  /**
+   * Cancel any in-flight LLM generation (§1 / §3). Calls `iterator.return()`
+   * on the active stream if one exists; otherwise a no-op. Symmetric with
+   * Swift / Kotlin / RN / Flutter `RunAnywhere.cancelGeneration()`.
+   */
+  cancelGeneration(): void {
+    const llm = ExtensionPoint.getProvider('llm') as {
+      cancelGeneration?: () => void;
+    } | undefined;
+    if (typeof llm?.cancelGeneration === 'function') {
+      llm.cancelGeneration();
+    }
+  },
+
+  /**
+   * Stop any in-progress TTS synthesis (§5). Symmetric with
+   * Swift `RunAnywhere.stopSynthesis()`.
+   */
+  stopSynthesis(): void {
+    Convenience.stopSpeaking();
+  },
+
   // =========================================================================
   // Shutdown
   // =========================================================================
@@ -673,6 +881,10 @@ export const RunAnywhere = {
     // Clean up all registered extensions and backends
     ExtensionRegistry.cleanupAll();
     ExtensionPoint.cleanupAll();
+
+    // Clear WASM adapter singletons so stale module refs don't linger.
+    HTTPAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
 
     // Reset state
     EventBus.reset();

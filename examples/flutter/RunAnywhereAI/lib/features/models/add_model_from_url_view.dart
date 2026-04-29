@@ -37,7 +37,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
 
   final List<LLMFramework> _availableFrameworks = [
     LLMFramework.llamaCpp,
-    LLMFramework.onnxRuntime,
+    LLMFramework.onnx,
     LLMFramework.genie,
   ];
 
@@ -408,21 +408,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
   }
 
   sdk.InferenceFramework _toSDKFramework(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.llamaCpp:
-        return sdk.InferenceFramework.llamaCpp;
-      case LLMFramework.onnxRuntime:
-        return sdk.InferenceFramework.onnx;
-      case LLMFramework.genie:
-        return sdk.InferenceFramework.genie;
-      case LLMFramework.foundationModels:
-        return sdk.InferenceFramework.foundationModels;
-      case LLMFramework.systemTTS:
-        return sdk.InferenceFramework.systemTTS;
-      case LLMFramework.mediaPipe:
-      case LLMFramework.whisperKit:
-      case LLMFramework.unknown:
-        throw UnsupportedError('Unsupported framework for URL import: ${framework.displayName}');
-    }
+    // LLMFramework is a typedef for sdk.InferenceFramework — identity conversion.
+    return framework;
   }
 }

@@ -91,6 +91,76 @@ extension CppBridge {
             }
         }
 
+        /// Add multiple documents to the pipeline in a single batch call.
+        ///
+        /// More efficient than calling `addDocument` repeatedly because it avoids
+        /// per-call actor-hop overhead and may use a single C++ embedding pass.
+        public func addDocumentsBatch(texts: [String], metadataJSONs: [String?]) throws {
+            guard let pipeline else {
+                throw SDKException.rag(.notInitialized, "RAG pipeline not created")
+            }
+            guard !texts.isEmpty else { return }
+            let count = texts.count
+
+            // Convert Swift strings to UTF-8 C strings via Data buffers so they
+            // remain valid pointers for the entire duration of the C call.
+            let textBuffers: [ContiguousArray<CChar>] = texts.map { s in
+                ContiguousArray(s.utf8CString)
+            }
+            let metaBuffers: [ContiguousArray<CChar>?] = (0..<count).map { i -> ContiguousArray<CChar>? in
+                guard metadataJSONs.indices.contains(i), let m = metadataJSONs[i] else { return nil }
+                return ContiguousArray(m.utf8CString)
+            }
+
+            var textPtrs: [UnsafePointer<CChar>?] = textBuffers.map { buf in
+                buf.withUnsafeBufferPointer { $0.baseAddress }
+            }
+            var metaPtrs: [UnsafePointer<CChar>?] = metaBuffers.map { buf in
+                buf?.withUnsafeBufferPointer { $0.baseAddress }
+            }
+
+            let result = textPtrs.withUnsafeMutableBufferPointer { tBuf in
+                metaPtrs.withUnsafeMutableBufferPointer { mBuf in
+                    rac_rag_add_documents_batch(
+                        pipeline,
+                        tBuf.baseAddress,
+                        mBuf.baseAddress,
+                        count
+                    )
+                }
+            }
+            guard result == RAC_SUCCESS else {
+                throw SDKException.rag(.invalidInput, "Failed to add document batch: \(result)")
+            }
+        }
+
+        /// Get pipeline statistics as a `RARAGStatistics` proto, decoded from the JSON string
+        /// returned by `rac_rag_get_statistics`.
+        public func getStatistics() throws -> RARAGStatistics {
+            guard let pipeline else {
+                throw SDKException.rag(.notInitialized, "RAG pipeline not created")
+            }
+            var statsJsonPtr: UnsafeMutablePointer<CChar>?
+            let result = rac_rag_get_statistics(pipeline, &statsJsonPtr)
+            guard result == RAC_SUCCESS, let statsJsonPtr else {
+                throw SDKException.rag(.generationFailed, "Failed to get RAG statistics: \(result)")
+            }
+            defer { free(statsJsonPtr) }
+            let jsonString = String(cString: statsJsonPtr)
+
+            // The C layer returns a JSON string; decode the proto fields manually.
+            var stats = RARAGStatistics()
+            if let data = jsonString.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                stats.indexedDocuments = obj["indexed_documents"].flatMap { $0 as? Int }.map { Int64($0) } ?? 0
+                stats.indexedChunks = obj["indexed_chunks"].flatMap { $0 as? Int }.map { Int64($0) } ?? 0
+                stats.totalTokensIndexed = obj["total_tokens_indexed"].flatMap { $0 as? Int }.map { Int64($0) } ?? 0
+                stats.lastUpdatedMs = obj["last_updated_ms"].flatMap { $0 as? Int }.map { Int64($0) } ?? 0
+                if let path = obj["index_path"] as? String { stats.indexPath = path }
+            }
+            return stats
+        }
+
         /// Clear all documents from the pipeline
         public func clearDocuments() throws {
             guard let pipeline else {

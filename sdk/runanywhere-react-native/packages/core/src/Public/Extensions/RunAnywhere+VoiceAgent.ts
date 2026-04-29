@@ -16,6 +16,14 @@ import type {
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
+import type { VoiceEvent } from '@runanywhere/proto-ts/dist/voice_events';
+import {
+  STTLanguage,
+  type STTOutput as STTOutputType,
+} from '@runanywhere/proto-ts/stt_options';
+import type { TTSOutput } from '@runanywhere/proto-ts/tts_options';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
 
@@ -151,10 +159,16 @@ export async function processVoiceTurn(
   }
 }
 
-/** Transcribe audio using voice agent. */
+/**
+ * Transcribe audio using the voice agent's STT component.
+ *
+ * Returns a `STTOutput` proto object.
+ *
+ * Matches Swift SDK: `RunAnywhere.voiceAgentTranscribe(_:) → STTOutput` (§10).
+ */
 export async function voiceAgentTranscribe(
   audioData: ArrayBuffer | string
-): Promise<string> {
+): Promise<STTOutputType> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
@@ -166,7 +180,29 @@ export async function voiceAgentTranscribe(
   } else {
     base64Audio = audioData;
   }
-  return native.voiceAgentTranscribe(base64Audio);
+  const raw = await native.voiceAgentTranscribe(base64Audio);
+  // The native call may return a plain string (the transcript text) or a
+  // JSON-encoded STTOutput. Normalise to STTOutput shape.
+  try {
+    const parsed = JSON.parse(raw) as Partial<STTOutputType>;
+    return {
+      text: parsed.text ?? raw,
+      language: parsed.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+      confidence: parsed.confidence ?? 1.0,
+      words: parsed.words ?? [],
+      alternatives: parsed.alternatives ?? [],
+      metadata: parsed.metadata,
+    };
+  } catch {
+    // Native returned a plain text string — wrap it.
+    return {
+      text: raw,
+      language: STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+      confidence: 1.0,
+      words: [],
+      alternatives: [],
+    };
+  }
 }
 
 /** Generate a response using the voice-agent LLM. */
@@ -180,15 +216,65 @@ export async function voiceAgentGenerateResponse(
   return native.voiceAgentGenerateResponse(prompt);
 }
 
-/** Synthesize speech using the voice-agent TTS. */
+/**
+ * Synthesize speech using the voice-agent TTS component.
+ *
+ * Returns a `TTSOutput` proto object.
+ *
+ * Matches Swift SDK: `RunAnywhere.voiceAgentSynthesizeSpeech(_:) → TTSOutput` (§10).
+ */
 export async function voiceAgentSynthesizeSpeech(
   text: string
-): Promise<string> {
+): Promise<TTSOutput> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
   const native = requireNativeModule();
-  return native.voiceAgentSynthesizeSpeech(text);
+  const raw = await native.voiceAgentSynthesizeSpeech(text);
+  // The native call may return a base64 audio string or a JSON-encoded TTSOutput.
+  try {
+    const parsed = JSON.parse(raw) as Partial<{
+      audioData: string | Uint8Array;
+      audio_data: string;
+      audioFormat: number;
+      audio_format: number;
+      sampleRate: number;
+      sample_rate: number;
+      durationMs: number;
+      duration_ms: number;
+      phonemeTimestamps: unknown[];
+      timestampMs: number;
+    }>;
+    // audio_data may arrive as a base64 string from the native bridge.
+    let audioData: Uint8Array;
+    const rawAudio = parsed.audioData ?? parsed.audio_data;
+    if (typeof rawAudio === 'string') {
+      audioData = base64ToBytes(rawAudio);
+    } else if (rawAudio instanceof Uint8Array) {
+      audioData = rawAudio;
+    } else {
+      audioData = new Uint8Array(0);
+    }
+    return {
+      audioData,
+      audioFormat: (parsed.audioFormat ?? parsed.audio_format ?? AudioFormat.AUDIO_FORMAT_PCM) as AudioFormat,
+      sampleRate: parsed.sampleRate ?? parsed.sample_rate ?? 22050,
+      durationMs: parsed.durationMs ?? parsed.duration_ms ?? 0,
+      phonemeTimestamps: [],
+      timestampMs: parsed.timestampMs ?? Date.now(),
+    };
+  } catch {
+    // Native returned a base64 audio string directly.
+    const audioData = raw ? base64ToBytes(raw) : new Uint8Array(0);
+    return {
+      audioData,
+      audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+      sampleRate: 22050,
+      durationMs: 0,
+      phonemeTimestamps: [],
+      timestampMs: Date.now(),
+    };
+  }
 }
 
 /**
@@ -211,4 +297,23 @@ export async function cleanupVoiceAgent(): Promise<void> {
   logger.info('Cleaning up voice agent...');
   await native.cleanupVoiceAgent();
   logger.info('Voice agent cleaned up');
+}
+
+/**
+ * Stream voice agent events as an AsyncIterable<VoiceEvent>.
+ *
+ * This is the canonical cross-SDK public method for voice agent streaming.
+ * Internally obtains the native voice-agent handle and wraps it with
+ * `VoiceAgentStreamAdapter` so callers never need to reach into internals.
+ *
+ * Matches Swift: `RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>`.
+ *
+ * Usage:
+ *   const stream = await RunAnywhere.streamVoiceAgent()
+ *   for await (const evt of stream) { handleEvent(evt) }
+ */
+export async function streamVoiceAgent(): Promise<AsyncIterable<VoiceEvent>> {
+  const handle = await getVoiceAgentHandle();
+  const adapter = new VoiceAgentStreamAdapter(handle);
+  return adapter.stream();
 }

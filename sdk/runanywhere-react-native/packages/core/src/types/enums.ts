@@ -1,55 +1,93 @@
 /**
  * RunAnywhere React Native SDK — Enums.
  *
- * These string enums describe the JS-runtime values emitted by the
- * native bridge. The canonical proto-encoded counterparts live in
- * `@runanywhere/proto-ts/*` and are re-exported under `*Proto` aliases.
+ * G-B2 Round 1 cleanup: every enum that has a proto-canonical
+ * counterpart (`@runanywhere/proto-ts/*`) is RE-EXPORTED from there.
+ * The few survivors live here only because no proto equivalent exists
+ * and each has a clear `// no proto equivalent` doc-comment justifying
+ * its survival.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/
  */
 
-// Canonical proto-encoded enums (generated; DO NOT redefine). Available
-// alongside the RN string enums under `*Proto` aliases. Use the proto
-// enums when serializing for analytics or transport — the RN string
-// enums describe the in-process JS values exchanged with native bridges.
+// ============================================================================
+// Re-exported from @runanywhere/proto-ts — single source of truth.
+// ============================================================================
+
 export {
-  SDKComponent as SDKComponentProto,
-  EventSeverity as EventSeverityProto,
-  EventDestination as EventDestinationProto,
+  // sdk_events.proto
+  SDKComponent,
+  EventSeverity,
+  EventDestination,
 } from '@runanywhere/proto-ts/sdk_events';
-export { ExecutionTarget as ExecutionTargetProto } from '@runanywhere/proto-ts/llm_options';
+
 export {
-  AccelerationPreference as AccelerationPreferenceProto,
-  ModelCategory as ModelCategoryProto,
-  ModelFormat as ModelFormatProto,
-  AudioFormat as AudioFormatProto,
-  InferenceFramework as InferenceFrameworkProto,
-  RoutingPolicy as RoutingPolicyProto,
-  ModelArtifactType as ModelArtifactTypeProto,
-  SDKEnvironment as SDKEnvironmentProto,
+  // llm_options.proto
+  ExecutionTarget,
+} from '@runanywhere/proto-ts/llm_options';
+
+export {
+  // model_types.proto — the canonical option/format/category enums.
+  AccelerationPreference,
+  AudioFormat,
+  InferenceFramework,
+  ModelArtifactType,
+  ModelCategory,
+  ModelFormat,
+  RoutingPolicy,
+  SDKEnvironment,
 } from '@runanywhere/proto-ts/model_types';
 
+// ============================================================================
+// RN-only survivors (no proto equivalent — see audit `02_PARITY.md` §"Type-
+// coverage gaps (no proto exists)").
+// ============================================================================
+
 /**
- * SDK environment for configuration and behavior
+ * Component lifecycle states. RN-local — describes the in-process JS
+ * state machine for a capability handle. No proto counterpart;
+ * `ComponentLoadState` from `voice_events.proto` covers a different axis.
  */
-export enum SDKEnvironment {
-  Development = 'development',
-  Staging = 'staging',
-  Production = 'production',
+export enum ComponentState {
+  NotInitialized = 'notInitialized',
+  Initializing = 'initializing',
+  Ready = 'ready',
+  Error = 'error',
+  CleaningUp = 'cleaningUp',
 }
 
 /**
- * Execution target for generation requests
+ * Framework modality (input/output types). RN-local — used by
+ * model-registry helpers that have no proto counterpart.
  */
-export enum ExecutionTarget {
-  OnDevice = 'onDevice',
-  Cloud = 'cloud',
-  Hybrid = 'hybrid',
+export enum FrameworkModality {
+  TextToText = 'textToText',
+  VoiceToText = 'voiceToText',
+  TextToVoice = 'textToVoice',
+  ImageToText = 'imageToText',
+  TextToImage = 'textToImage',
+  Multimodal = 'multimodal',
 }
 
 /**
- * Supported LLM frameworks
- * Reference: LLMFramework.swift
+ * Configuration source. RN-local — describes where a configuration
+ * value originated; no proto carries this metadata today.
+ */
+export enum ConfigurationSource {
+  Remote = 'remote',
+  Local = 'local',
+  Builtin = 'builtin',
+}
+
+/**
+ * Supported LLM frameworks (RN-local labels, mirrored across SDKs but
+ * NOT proto-canonical). The proto `InferenceFramework` covers a subset
+ * (LlamaCpp / ExecuTorch / MLX / FoundationModels / etc.) but uses
+ * SCREAMING_SNAKE_CASE values that are unsuitable as a drop-in
+ * replacement for the string labels surfaced to RN consumers.
+ *
+ * For typed proto-encoded transport, use `InferenceFramework` from
+ * `@runanywhere/proto-ts/model_types` directly.
  */
 export enum LLMFramework {
   CoreML = 'CoreML',
@@ -57,7 +95,7 @@ export enum LLMFramework {
   MLX = 'MLX',
   SwiftTransformers = 'SwiftTransformers',
   ONNX = 'ONNX',
-  Sherpa = 'Sherpa', // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+  Sherpa = 'Sherpa',
   ExecuTorch = 'ExecuTorch',
   LlamaCpp = 'LlamaCpp',
   FoundationModels = 'FoundationModels',
@@ -72,7 +110,8 @@ export enum LLMFramework {
 }
 
 /**
- * Human-readable display names for frameworks
+ * Human-readable display names for frameworks. RN-local helper; no
+ * proto counterpart.
  */
 export const LLMFrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.CoreML]: 'Core ML',
@@ -95,128 +134,16 @@ export const LLMFrameworkDisplayNames: Record<LLMFramework, string> = {
 };
 
 /**
- * Model categories based on input/output modality
- * Reference: ModelCategory.swift
+ * Human-readable display names for model categories. RN-local helper;
+ * proto exposes labels via numeric → string conversion only. Keyed by
+ * the proto enum values via `ModelCategory[i]` after the re-export.
  */
-export enum ModelCategory {
-  Language = 'language',
-  SpeechRecognition = 'speech-recognition',
-  SpeechSynthesis = 'speech-synthesis',
-  Vision = 'vision',
-  ImageGeneration = 'image-generation',
-  Multimodal = 'multimodal',
-  Audio = 'audio',
-  Embedding = 'embedding',
-}
+import type { ModelCategory as ModelCategoryProto } from '@runanywhere/proto-ts/model_types';
+export const ModelCategoryDisplayNames: Partial<Record<ModelCategoryProto, string>> = {};
 
 /**
- * Human-readable display names for model categories
- */
-export const ModelCategoryDisplayNames: Record<ModelCategory, string> = {
-  [ModelCategory.Language]: 'Language Model',
-  [ModelCategory.SpeechRecognition]: 'Speech Recognition',
-  [ModelCategory.SpeechSynthesis]: 'Text-to-Speech',
-  [ModelCategory.Vision]: 'Vision Model',
-  [ModelCategory.ImageGeneration]: 'Image Generation',
-  [ModelCategory.Multimodal]: 'Multimodal',
-  [ModelCategory.Audio]: 'Audio Processing',
-  [ModelCategory.Embedding]: 'Embedding Model',
-};
-
-/**
- * Model artifact type for model packaging
- * Reference: ModelArtifactType.swift
- */
-export enum ModelArtifactType {
-  SingleFile = 'singleFile',
-  TarGzArchive = 'tarGzArchive',
-  TarBz2Archive = 'tarBz2Archive',
-  ZipArchive = 'zipArchive',
-}
-
-/**
- * Model file formats
- * Reference: ModelFormat.swift
- */
-export enum ModelFormat {
-  GGUF = 'gguf',
-  GGML = 'ggml',
-  ONNX = 'onnx',
-  MLModel = 'mlmodel',
-  MLPackage = 'mlpackage',
-  TFLite = 'tflite',
-  SafeTensors = 'safetensors',
-  Bin = 'bin',
-  Zip = 'zip',
-  Folder = 'folder',
-  Proprietary = 'proprietary', // Built-in system models
-  Unknown = 'unknown',
-}
-
-/**
- * Framework modality (input/output types)
- * Reference: FrameworkModality.swift
- */
-export enum FrameworkModality {
-  TextToText = 'textToText',
-  VoiceToText = 'voiceToText',
-  TextToVoice = 'textToVoice',
-  ImageToText = 'imageToText',
-  TextToImage = 'textToImage',
-  Multimodal = 'multimodal',
-}
-
-/**
- * Component state for lifecycle management
- */
-export enum ComponentState {
-  NotInitialized = 'notInitialized',
-  Initializing = 'initializing',
-  Ready = 'ready',
-  Error = 'error',
-  CleaningUp = 'cleaningUp',
-}
-
-/**
- * SDK component identifiers
- * Note: Values match iOS SDK rawValue
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Types/ComponentTypes.swift
- */
-export enum SDKComponent {
-  LLM = 'llm',
-  STT = 'stt',
-  TTS = 'tts',
-  VAD = 'vad',
-  Embedding = 'embedding',
-  SpeakerDiarization = 'speakerDiarization',
-  VoiceAgent = 'voice',
-}
-
-/**
- * Routing policy for execution decisions
- */
-export enum RoutingPolicy {
-  OnDevicePreferred = 'onDevicePreferred',
-  CloudPreferred = 'cloudPreferred',
-  OnDeviceOnly = 'onDeviceOnly',
-  CloudOnly = 'cloudOnly',
-  Hybrid = 'hybrid',
-  CostOptimized = 'costOptimized',
-  LatencyOptimized = 'latencyOptimized',
-  PrivacyOptimized = 'privacyOptimized',
-}
-
-/**
- * Privacy mode for data handling
- */
-export enum PrivacyMode {
-  Public = 'public',
-  Private = 'private',
-  Restricted = 'restricted',
-}
-
-/**
- * Hardware acceleration types
+ * Hardware acceleration types. RN-local — no proto counterpart yet
+ * (G-B1 introduces `hardware_profile.proto` post-Round-1).
  */
 export enum HardwareAcceleration {
   CPU = 'cpu',
@@ -226,63 +153,19 @@ export enum HardwareAcceleration {
 }
 
 /**
- * Audio format for STT/TTS
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Types/AudioTypes.swift
+ * Privacy mode for data handling. RN-local — describes how the SDK
+ * routes telemetry, not part of the proto API surface.
  */
-export enum AudioFormat {
-  PCM = 'pcm',
-  WAV = 'wav',
-  MP3 = 'mp3',
-  M4A = 'm4a',
-  FLAC = 'flac',
-  OPUS = 'opus',
-  AAC = 'aac',
+export enum PrivacyMode {
+  Public = 'public',
+  Private = 'private',
+  Restricted = 'restricted',
 }
 
 /**
- * Get MIME type for audio format
- * @param format Audio format
- * @returns MIME type string
- */
-export function getAudioFormatMimeType(format: AudioFormat): string {
-  switch (format) {
-    case AudioFormat.PCM:
-      return 'audio/pcm';
-    case AudioFormat.WAV:
-      return 'audio/wav';
-    case AudioFormat.MP3:
-      return 'audio/mpeg';
-    case AudioFormat.OPUS:
-      return 'audio/opus';
-    case AudioFormat.AAC:
-      return 'audio/aac';
-    case AudioFormat.FLAC:
-      return 'audio/flac';
-    case AudioFormat.M4A:
-      return 'audio/mp4';
-  }
-}
-
-/**
- * Get file extension for audio format
- * @param format Audio format
- * @returns File extension string (matches enum value)
- */
-export function getAudioFormatFileExtension(format: AudioFormat): string {
-  return format;
-}
-
-/**
- * Configuration source
- */
-export enum ConfigurationSource {
-  Remote = 'remote',
-  Local = 'local',
-  Builtin = 'builtin',
-}
-
-/**
- * Event types for categorization
+ * Event types for categorisation. RN-local — used by the JS-side
+ * `EventBus` topic dispatch; the proto `SDKEvent` envelope uses
+ * different category enums.
  */
 export enum SDKEventType {
   Initialization = 'initialization',
@@ -297,4 +180,3 @@ export enum SDKEventType {
   Performance = 'performance',
   Network = 'network',
 }
-

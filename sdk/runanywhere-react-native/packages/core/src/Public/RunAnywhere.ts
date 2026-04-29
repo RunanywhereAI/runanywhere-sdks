@@ -31,9 +31,12 @@ import {
   resetState,
 } from '../Foundation/Initialization';
 import type { ModelInfo, SDKInitOptions } from '../types';
+import type { DownloadProgress as ProtoDownloadProgress } from '@runanywhere/proto-ts/download_service';
+import { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
 
 // Import extensions
 import * as TextGeneration from './Extensions/RunAnywhere+TextGeneration';
+import type { ThinkingExtractionResult } from './Extensions/RunAnywhere+TextGeneration';
 import * as STT from './Extensions/RunAnywhere+STT';
 import * as TTS from './Extensions/RunAnywhere+TTS';
 import * as VAD from './Extensions/RunAnywhere+VAD';
@@ -48,7 +51,7 @@ import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
 import * as Device from './Extensions/RunAnywhere+Device';
 import * as VLM from './Extensions/RunAnywhere+VisionLanguage';
-import * as LoRA from './Extensions/RunAnywhere+LoRA';
+import { lora as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import * as Diffusion from './Extensions/RunAnywhere+Diffusion';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
@@ -134,12 +137,12 @@ export const RunAnywhere = {
   // ============================================================================
 
   async initialize(options: SDKInitOptions): Promise<void> {
-    const environment = options.environment ?? SDKEnvironment.Production;
+    const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
 
     // Fail fast: API key is required for production/staging environments
     // Development mode uses C++ dev config (Supabase credentials) instead
-    if (environment !== SDKEnvironment.Development && !options.apiKey) {
-      const envName = environment === SDKEnvironment.Staging ? 'staging' : 'production';
+    if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && !options.apiKey) {
+      const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
       throw new Error(
         `API key is required for ${envName} environment. ` +
         `Pass apiKey in initialize() options or use SDKEnvironment.Development for local testing.`
@@ -177,8 +180,8 @@ export const RunAnywhere = {
       // layer only needs to stash the base URL / API key with the native
       // HTTPBridge so downstream native consumers (DeviceBridge, telemetry)
       // resolve the right endpoint.
-      const envString = environment === SDKEnvironment.Development ? 'development'
-        : environment === SDKEnvironment.Staging ? 'staging'
+      const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
+        : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
           : 'production';
 
       await native.configureHttp(
@@ -186,7 +189,7 @@ export const RunAnywhere = {
         options.apiKey ?? ''
       );
 
-      if (environment === SDKEnvironment.Development && options.supabaseURL) {
+      if (environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && options.supabaseURL) {
         logger.debug('Development mode - Supabase config provided');
       }
 
@@ -221,7 +224,7 @@ export const RunAnywhere = {
 
       // For production/staging mode, authenticate with backend to get JWT tokens
       // This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-      if (environment !== SDKEnvironment.Development && options.apiKey) {
+      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && options.apiKey) {
         try {
           logger.info('Authenticating with backend (production/staging mode)...');
           const authenticated = await this._authenticateWithBackend(
@@ -244,8 +247,8 @@ export const RunAnywhere = {
       // C++ has a baked-in dev fallback used only when environment === development,
       // so dev mode may proceed with an undefined token.
       const resolvedBuildToken = this._resolveBuildToken(options.buildToken);
-      if (!resolvedBuildToken && environment !== SDKEnvironment.Development) {
-        const envName = environment === SDKEnvironment.Staging ? 'staging' : 'production';
+      if (!resolvedBuildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+        const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
         throw new Error(
           `Build token is required for ${envName} environment. ` +
           'Pass `buildToken` in initialize() options or set the ' +
@@ -365,13 +368,13 @@ export const RunAnywhere = {
     supabaseKey?: string,
     buildToken?: string
   ): Promise<void> {
-    const envString = environment === SDKEnvironment.Development ? 'development'
-      : environment === SDKEnvironment.Staging ? 'staging'
+    const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
+      : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
         : 'production';
 
     // Defensive: non-dev must have a token (initialize() already enforces this,
     // but guard here too so we never silently register with an empty token).
-    if (!buildToken && environment !== SDKEnvironment.Development) {
+    if (!buildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       logger.warning('Skipping device registration: no build token resolved.');
       return;
     }
@@ -462,7 +465,7 @@ export const RunAnywhere = {
 
       // Best-effort device registration retry. Build token resolution is
       // identical to the original `initialize()` path.
-      const env = initState.environment ?? SDKEnvironment.Production;
+      const env = initState.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
       const buildToken = this._resolveBuildToken();
       try {
         await this._registerDeviceIfNeeded(env, undefined, buildToken);
@@ -543,29 +546,12 @@ export const RunAnywhere = {
   },
 
   /**
-   * Get device ID (Keychain-persisted, survives reinstalls)
-   * Note: This is async because it uses secure storage
+   * Get device ID (Keychain-persisted, survives reinstalls).
+   *
+   * Cached during `initialize()`. Empty string until then.
    */
   get deviceId(): string {
-    // Return cached value if available (set during init)
     return cachedDeviceId;
-  },
-
-  /**
-   * Get device ID asynchronously (Keychain-persisted, survives reinstalls)
-   */
-  async getDeviceId(): Promise<string> {
-    if (cachedDeviceId) {
-      return cachedDeviceId;
-    }
-    try {
-      const native = requireNativeModule();
-      const uuid = await native.getPersistentDeviceUUID();
-      cachedDeviceId = uuid;
-      return uuid;
-    } catch {
-      return '';
-    }
   },
 
   // ============================================================================
@@ -587,13 +573,20 @@ export const RunAnywhere = {
   loadModel: TextGeneration.loadModel,
   isModelLoaded: TextGeneration.isModelLoaded,
   unloadModel: TextGeneration.unloadModel,
+  // Canonical spec names (§3)
+  loadLLMModel: TextGeneration.loadModel,
+  unloadLLMModel: TextGeneration.unloadModel,
+  isLLMModelLoaded: TextGeneration.isModelLoaded,
   chat: TextGeneration.chat,
   generate: TextGeneration.generate,
   generateStream: TextGeneration.generateStream,
   cancelGeneration: TextGeneration.cancelGeneration,
-  // Introspection (matches Swift: currentLLMModel, getCurrentModelId)
+  // Introspection — canonical: `currentLLMModel()` only.
   currentLLMModel: TextGeneration.currentLLMModel,
-  getCurrentModelId: TextGeneration.getCurrentModelId,
+  // Thinking token utilities (§3)
+  extractThinkingTokens: TextGeneration.extractThinkingTokens,
+  stripThinkingTokens: TextGeneration.stripThinkingTokens,
+  splitThinkingAndResponse: TextGeneration.splitThinkingAndResponse,
 
   // ============================================================================
   // Speech-to-Text (Delegated to Extension)
@@ -608,6 +601,8 @@ export const RunAnywhere = {
   transcribeStream: STT.transcribeStream,
   transcribeStreamAsync: STT.transcribeStreamAsync,
   transcribeFile: STT.transcribeFile,
+  // Streaming audio ingestion (§4)
+  processStreamingAudio: STT.processStreamingAudio,
   // Streaming control (matches Swift: stopStreamingTranscription)
   stopStreamingTranscription: STT.stopStreamingTranscription,
   isStreamingSTT: STT.isStreamingSTT,
@@ -647,12 +642,17 @@ export const RunAnywhere = {
   isVADModelLoaded: VAD.isVADModelLoaded,
   unloadVADModel: VAD.unloadVADModel,
   detectSpeech: VAD.detectSpeech,
+  detectVoiceActivity: VAD.detectVoiceActivity,
   processVAD: VAD.processVAD,
   startVAD: VAD.startVAD,
   stopVAD: VAD.stopVAD,
   resetVAD: VAD.resetVAD,
   setVADSpeechActivityCallback: VAD.setVADSpeechActivityCallback,
   setVADAudioBufferCallback: VAD.setVADAudioBufferCallback,
+  // VAD statistics callback (§6)
+  setVADStatisticsCallback: VAD.setVADStatisticsCallback,
+  // VAD streaming (§6)
+  streamVAD: VAD.streamVAD,
   cleanupVAD: VAD.cleanupVAD,
   getVADState: VAD.getVADState,
 
@@ -674,6 +674,8 @@ export const RunAnywhere = {
   // to feed VoiceAgentStreamAdapter; previously missing from this facade.
   getVoiceAgentHandle: VoiceAgent.getVoiceAgentHandle,
   cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
+  // Canonical public streaming surface — callers never need to import the adapter.
+  streamVoiceAgent: VoiceAgent.streamVoiceAgent,
 
   // v3.1: Voice Session methods DELETED. Use VoiceAgentStreamAdapter
   // for streaming; compose STT/LLM/TTS directly for one-shot turns.
@@ -684,6 +686,8 @@ export const RunAnywhere = {
 
   generateStructured: StructuredOutput.generateStructured,
   generateStructuredStream: StructuredOutput.generateStructuredStream,
+  // Extract structured data from existing text (§3)
+  extractStructuredOutput: StructuredOutput.extractStructuredOutput,
   extractEntities: StructuredOutput.extractEntities,
   classify: StructuredOutput.classify,
 
@@ -718,18 +722,11 @@ export const RunAnywhere = {
   cancelVLMGeneration: VLM.cancelVLMGeneration,
 
   // ============================================================================
-  // LoRA Adapters (Delegated to Extension)
+  // LoRA Adapters — canonical `RunAnywhere.lora.*` namespace
   // Matches Swift: RunAnywhere+LoRA.swift
   // ============================================================================
 
-  loadLoraAdapter: LoRA.loadLoraAdapter,
-  removeLoraAdapter: LoRA.removeLoraAdapter,
-  clearLoraAdapters: LoRA.clearLoraAdapters,
-  getLoadedLoraAdapters: LoRA.getLoadedLoraAdapters,
-  checkLoraCompatibility: LoRA.checkLoraCompatibility,
-  registerLoraAdapter: LoRA.registerLoraAdapter,
-  loraAdaptersForModel: LoRA.loraAdaptersForModel,
-  allRegisteredLoraAdapters: LoRA.allRegisteredLoraAdapters,
+  lora: LoRACapability,
 
   // ============================================================================
   // Diffusion / Image Generation (Delegated to Extension)
@@ -780,17 +777,101 @@ export const RunAnywhere = {
   // Model Registry (Delegated to Extension)
   // ============================================================================
 
+  // Canonical name §13: availableModels()
+  availableModels: Models.getAvailableModels,
+  // Legacy alias kept for internal callers already using the old name.
   getAvailableModels: Models.getAvailableModels,
   getModelInfo: Models.getModelInfo,
   getModelPath: Models.getModelPath,
   isModelDownloaded: Models.isModelDownloaded,
-  downloadModel: Models.downloadModel,
+  /**
+   * Download a model and stream `DownloadProgress` events.
+   *
+   * Returns an `AsyncIterable<DownloadProgress>` per canonical spec §13.
+   * Each yielded value is a proto `DownloadProgress` object with `modelId`,
+   * `bytesDownloaded`, `totalBytes`, and a 0-1 `progress` field.
+   *
+   * The actual download is delegated to the native C++ transport
+   * (`rac_http_download_execute`). Callers can break out of the for-await
+   * at any time; cancellation is performed via `cancelDownload(modelId)`.
+   */
+  downloadModel(modelId: string): AsyncIterable<ProtoDownloadProgress> {
+    return {
+      [Symbol.asyncIterator](): AsyncIterator<ProtoDownloadProgress> {
+        const queue: ProtoDownloadProgress[] = [];
+        let done = false;
+        let dlError: Error | null = null;
+        let resolver: ((v: IteratorResult<ProtoDownloadProgress>) => void) | null = null;
+
+        const push = (progress: ProtoDownloadProgress): void => {
+          if (resolver) {
+            const res = resolver;
+            resolver = null;
+            res({ value: progress, done: false });
+          } else {
+            queue.push(progress);
+          }
+        };
+
+        // Kick off the underlying download with a callback to push progress.
+        Models.downloadModel(modelId, (p) => {
+          const protoProgress: ProtoDownloadProgress = {
+            modelId: p.modelId,
+            bytesDownloaded: p.bytesDownloaded,
+            totalBytes: p.totalBytes,
+            stageProgress: p.progress,
+            stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+            state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+            overallSpeedBps: 0,
+            etaSeconds: -1,
+            retryAttempt: 0,
+            errorMessage: '',
+          };
+          push(protoProgress);
+        }).then(() => {
+          done = true;
+          if (resolver) {
+            resolver({ value: undefined as unknown as ProtoDownloadProgress, done: true });
+            resolver = null;
+          }
+        }).catch((err: unknown) => {
+          dlError = err instanceof Error ? err : new Error(String(err));
+          done = true;
+          if (resolver) {
+            resolver({ value: undefined as unknown as ProtoDownloadProgress, done: true });
+            resolver = null;
+          }
+        });
+
+        return {
+          async next(): Promise<IteratorResult<ProtoDownloadProgress>> {
+            if (queue.length > 0) {
+              return { value: queue.shift()!, done: false };
+            }
+            if (done) {
+              if (dlError) throw dlError;
+              return { value: undefined as unknown as ProtoDownloadProgress, done: true };
+            }
+            return new Promise<IteratorResult<ProtoDownloadProgress>>((resolve) => {
+              resolver = resolve;
+            });
+          },
+          async return(): Promise<IteratorResult<ProtoDownloadProgress>> {
+            void Models.cancelDownload(modelId);
+            return { value: undefined as unknown as ProtoDownloadProgress, done: true };
+          },
+        };
+      },
+    };
+  },
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
   deleteAllModels: Models.deleteAllModels,
   checkCompatibility: Models.checkCompatibility,
   registerModel: Models.registerModel,
   registerMultiFileModel: Models.registerMultiFileModel,
+  // Refresh model registry (§13) — was present in Models extension but not wired to facade.
+  refreshModelRegistry: Models.refreshModelRegistry,
 
   // ============================================================================
   // Utilities
@@ -811,15 +892,6 @@ export const RunAnywhere = {
     } catch {
       return {};
     }
-  },
-
-  /**
-   * Get SDK version
-   * @returns Version string
-   */
-  async getVersion(): Promise<string> {
-    // Return centralized SDK version constant
-    return SDKConstants.version;
   },
 
   /**
@@ -895,12 +967,12 @@ export const RunAnywhere = {
   resolveModelFilePath: ModelManagement.resolveModelFilePath,
   ensureModelDownloaded: ModelManagement.ensureModelDownloaded,
 
-  // Plugin loader (mirrors Swift +PluginLoader)
-  PluginLoader: {
-    apiVersion: PluginLoader.pluginApiVersion,
+  // Plugin loader — canonical `RunAnywhere.pluginLoader.*` namespace (§12).
+  pluginLoader: {
+    get apiVersion() { return PluginLoader.pluginApiVersion(); },
     load: PluginLoader.loadPlugin,
     unload: PluginLoader.unloadPlugin,
-    registeredCount: PluginLoader.registeredPluginCount,
+    get registeredCount() { return PluginLoader.registeredPluginCount(); },
     registeredNames: PluginLoader.registeredPluginNames,
   },
 

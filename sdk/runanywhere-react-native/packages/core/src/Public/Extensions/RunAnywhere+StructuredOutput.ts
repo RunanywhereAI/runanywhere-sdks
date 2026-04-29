@@ -19,6 +19,13 @@ import {
   JSONSchemaType,
 } from '@runanywhere/proto-ts/structured_output';
 
+// ============================================================================
+// Types re-exported for callers
+// ============================================================================
+
+// StructuredOutputResult and JSONSchema are re-exported from proto-ts (no
+// local duplicates per §15 Iron Rule 2).
+
 const logger = new SDKLogger('RunAnywhere.StructuredOutput');
 
 /** Stream token emitted during structured-output streaming. */
@@ -26,12 +33,6 @@ export interface StreamToken {
   text: string;
   timestamp: Date;
   tokenIndex: number;
-}
-
-/** Streaming structured-output handle. */
-export interface StructuredOutputStreamResult<T> {
-  tokenStream: AsyncIterable<StreamToken>;
-  result: Promise<T>;
 }
 
 /** UTF-8 encoder for serializing parsed JSON to `Uint8Array`. */
@@ -119,29 +120,25 @@ export async function generateStructured<T = unknown>(
 /**
  * Generate structured output with streaming support.
  *
- * Matches Swift SDK: `RunAnywhere.generateStructuredStream(_:content:options:)`.
+ * Returns an `AsyncIterable<StructuredOutputResult>` that emits one item per
+ * streaming token's accumulated JSON, finishing with the final parsed result
+ * when the stream ends.
+ *
+ * Matches Swift SDK: `RunAnywhere.generateStructuredStream(_:content:options:)`
+ * and the canonical cross-SDK spec §3 return type.
  */
-export function generateStructuredStream<T = unknown>(
+export function generateStructuredStream(
   prompt: string,
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): StructuredOutputStreamResult<T> {
+): AsyncIterable<StructuredOutputResult> {
   const systemPrompt = buildStructuredOutputSystemPrompt(schema);
   const fullPrompt = `${systemPrompt}\n\n${prompt}`;
 
-  let fullText = '';
-  let resolveResult: ((value: T) => void) | null = null;
-  let rejectResult: ((error: Error) => void) | null = null;
-
-  const resultPromise = new Promise<T>((resolve, reject) => {
-    resolveResult = resolve;
-    rejectResult = reject;
-  });
-
-  async function* tokenGenerator(): AsyncGenerator<StreamToken> {
+  async function* resultGenerator(): AsyncGenerator<StructuredOutputResult> {
+    let fullText = '';
     try {
-      let tokenIndex = 0;
-      for await (const token of generateStream(fullPrompt, {
+      for await (const event of generateStream(fullPrompt, {
         maxTokens: 1500,
         temperature: 0.7,
         topP: 1.0,
@@ -151,26 +148,119 @@ export function generateStructuredStream<T = unknown>(
         streamingEnabled: true,
         preferredFramework: 0,
       })) {
-        fullText += token.text;
+        if (event.token) {
+          fullText += event.token;
+          // Emit a partial result on each token — callers can display
+          // streaming progress. The partial result carries the raw accumulated
+          // text and marks isValid=false until the stream completes.
+          const partialValidation: StructuredOutputValidation = {
+            isValid: false,
+            containsJson: fullText.includes('{'),
+            rawOutput: fullText,
+          };
+          yield {
+            parsedJson: jsonToBytes({}),
+            validation: partialValidation,
+            rawText: fullText,
+          };
+        }
+        if (event.isFinal) break;
+      }
+
+      // Final result — attempt to parse the full accumulated text.
+      try {
+        const parsed = parseStructuredOutput<unknown>(fullText);
+        const finalValidation: StructuredOutputValidation = {
+          isValid: true,
+          containsJson: true,
+        };
         yield {
-          text: token.text,
-          timestamp: new Date(),
-          tokenIndex: tokenIndex++,
+          parsedJson: jsonToBytes(parsed),
+          validation: finalValidation,
+          rawText: fullText,
+        };
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+        const errorValidation: StructuredOutputValidation = {
+          isValid: false,
+          containsJson: false,
+          errorMessage: msg,
+          rawOutput: fullText,
+        };
+        yield {
+          parsedJson: new Uint8Array(0),
+          validation: errorValidation,
+          rawText: fullText,
         };
       }
-      const parsed = parseStructuredOutput<T>(fullText);
-      if (resolveResult) resolveResult(parsed);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      if (rejectResult) rejectResult(err);
-      throw err;
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Structured stream failed: ${msg}`);
+      const errorValidation: StructuredOutputValidation = {
+        isValid: false,
+        containsJson: false,
+        errorMessage: msg,
+      };
+      yield {
+        parsedJson: new Uint8Array(0),
+        validation: errorValidation,
+      };
     }
   }
 
-  return {
-    tokenStream: tokenGenerator(),
-    result: resultPromise,
-  };
+  return resultGenerator();
+}
+
+/**
+ * Extract structured data from an existing text string without invoking the LLM.
+ *
+ * - If the Nitro bridge exposes `rac_structured_output_extract_json` via a
+ *   `extractStructuredOutput(text, schemaJson)` native method, that is called
+ *   and the result is returned.
+ * - Otherwise a pure-TS JSON extraction is performed: the first JSON object
+ *   found in `text` is extracted and returned as a `StructuredOutputResult`.
+ *
+ * Matches Swift SDK: `RunAnywhere.extractStructuredOutput(_:schema:)` and
+ * canonical cross-SDK spec §3.
+ */
+export async function extractStructuredOutput(
+  text: string,
+  schema: JSONSchema
+): Promise<StructuredOutputResult> {
+  // Try native bridge first (rac_structured_output_extract_json).
+  if (isNativeModuleAvailable()) {
+    const native = requireNativeModule() as unknown as {
+      extractStructuredOutput?: (text: string, schemaJson: string) => Promise<string>;
+    };
+    if (typeof native.extractStructuredOutput === 'function') {
+      try {
+        const resultJson = await native.extractStructuredOutput(text, JSON.stringify(schema));
+        const parsed = JSON.parse(resultJson);
+        if (parsed && !parsed.error) {
+          const validation: StructuredOutputValidation = { isValid: true, containsJson: true };
+          return { parsedJson: jsonToBytes(parsed), validation, rawText: resultJson };
+        }
+      } catch (err) {
+        logger.debug(`Native extractStructuredOutput failed, falling back to TS: ${err}`);
+      }
+    }
+  }
+
+  // Pure-TS fallback: locate and parse the first JSON object in text.
+  try {
+    const parsed = parseStructuredOutput<unknown>(text);
+    const validation: StructuredOutputValidation = { isValid: true, containsJson: true };
+    return { parsedJson: jsonToBytes(parsed), validation, rawText: text };
+  } catch (parseErr) {
+    const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+    const validation: StructuredOutputValidation = {
+      isValid: false,
+      containsJson: false,
+      errorMessage: msg,
+      rawOutput: text,
+    };
+    return { parsedJson: new Uint8Array(0), validation, rawText: text };
+  }
 }
 
 /**

@@ -2,82 +2,106 @@
 //  RunAnywhere+PluginLoader.swift
 //  RunAnywhere
 //
-//  v2 close-out (B31): Swift wrapper around `rac_registry_load_plugin`
-//  so apps can dlopen third-party engine plugins at runtime on macOS /
-//  Linux. On iOS the App Store bans dlopen of third-party libraries, so
-//  every method here returns an `SDKException(featureNotAvailable)` —
-//  bundle your engines via SwiftPM dependencies on iOS instead.
+//  Public API for dynamic plugin loading (CANONICAL_API §12).
+//  Exposes `RunAnywhere.pluginLoader.*` as a lowercase property accessor
+//  backed by the C ABI (`rac_registry_*` symbols).
 //
-//  Mirrors GAP 03 dynamic plugin loading.
+//  On iOS / WASM where `dlopen` is banned, every method returns an
+//  `SDKException(featureNotAvailable)` — bundle engines via SwiftPM instead.
 //
 
 import CRACommons
 import Foundation
 
-extension RunAnywhere {
+// MARK: - PluginInfo
 
-    /// Runtime plugin loader.
-    ///
-    /// Use to load a vendor-supplied engine library at runtime on
-    /// platforms that allow `dlopen`:
-    ///
-    ///     try RunAnywhere.PluginLoader.load(at:
-    ///         URL(fileURLWithPath: "/opt/runanywhere/plugins/librunanywhere_acmevoice.dylib"))
-    ///
-    /// On iOS, every call returns `SDKException(featureNotAvailable)` —
-    /// link the engine at compile time via SwiftPM instead.
-    public enum PluginLoader {
+/// Information about a loaded plugin.
+public struct PluginInfo: Sendable {
+    /// The plugin name (library stem, e.g. "runanywhere_acmevoice")
+    public let name: String
 
-        /// Compile-time plugin API version this build of `RACommons`
-        /// was built against. Use to gate which plugin libraries are
-        /// loadable at all.
-        public static var apiVersion: UInt32 {
-            return rac_plugin_api_version()
+    /// The file-system path the plugin was loaded from
+    public let path: String
+
+    public init(name: String, path: String) {
+        self.name = name
+        self.path = path
+    }
+}
+
+// MARK: - RunAnywhere.pluginLoader capability
+
+public extension RunAnywhere {
+
+    /// Capability accessor for runtime plugin management (CANONICAL_API §12).
+    ///
+    /// Usage:
+    /// ```swift
+    /// let info = try RunAnywhere.pluginLoader.load(path: "/opt/plugins/librunanywhere_acmevoice.dylib")
+    /// RunAnywhere.pluginLoader.unload(name: info.name)
+    /// ```
+    static var pluginLoader: PluginLoaderNamespace { PluginLoaderNamespace() }
+
+    /// Stateless namespace for plugin-loader operations.
+    /// Backed by the `rac_registry_*` C ABI.
+    struct PluginLoaderNamespace: Sendable {
+
+        fileprivate init() {}
+
+        /// Compile-time plugin API version this build of `RACommons` was built
+        /// against. Gate on this before loading third-party plugin binaries.
+        public var apiVersion: UInt32 {
+            rac_plugin_api_version()
         }
 
-        /// Load a shared library at `url` and register the
+        /// Load a shared library at `path` and register the
         /// `rac_plugin_entry_<stem>` it exposes with the in-process
-        /// plugin registry. Symbol-resolution convention:
+        /// plugin registry.
         ///
-        ///     librunanywhere_<name>.dylib  → rac_plugin_entry_<name>
-        ///     librunanywhere_<name>.so     → rac_plugin_entry_<name>
-        ///     runanywhere_<name>.dll       → rac_plugin_entry_<name>
+        /// Symbol-resolution convention:
+        /// ```
+        /// librunanywhere_<name>.dylib  → rac_plugin_entry_<name>
+        /// librunanywhere_<name>.so     → rac_plugin_entry_<name>
+        /// runanywhere_<name>.dll       → rac_plugin_entry_<name>
+        /// ```
         ///
-        /// - Throws: `SDKException` with codes:
-        ///   `.featureNotAvailable` (host built with `RAC_STATIC_PLUGINS=ON`,
-        ///       typically iOS / WASM),
-        ///   `.invalidConfiguration` (path resolution / dlopen failed),
-        ///   `.invalidModelFormat` (ABI mismatch — plugin built against a
-        ///       different `RAC_PLUGIN_API_VERSION`),
-        ///   `.unsupportedModality` (plugin's `capability_check` declined),
-        ///   `.alreadyInitialized` (a higher-priority plugin with the same
-        ///       name is already registered),
-        ///   `.unknown` for any other commons error.
-        public static func load(at url: URL) throws {
-            let path = url.path
+        /// - Parameter path: Absolute or relative path to the shared library.
+        /// - Returns: `PluginInfo` describing the loaded plugin.
+        /// - Throws: `SDKException` on failure (see error codes below).
+        @discardableResult
+        public func load(path: String) throws -> PluginInfo {
             let result = path.withCString { rac_registry_load_plugin($0) }
             try throwIfFailed(result, op: "load", context: path)
+
+            // Derive the plugin name from the library stem.
+            let stem = URL(fileURLWithPath: path)
+                .deletingPathExtension()
+                .lastPathComponent
+                .replacingOccurrences(of: "lib", with: "", range:
+                    URL(fileURLWithPath: path)
+                        .deletingPathExtension()
+                        .lastPathComponent
+                        .range(of: "^lib", options: .regularExpression)
+                )
+            return PluginInfo(name: stem, path: path)
         }
 
-        /// Unregister a previously-loaded plugin and `dlclose` its
-        /// underlying handle (statically-registered plugins stay linked).
+        /// Unregister a previously-loaded plugin and `dlclose` its handle.
         ///
-        /// - Throws: `SDKException(.notImplemented)` (statically-registered),
-        ///   `SDKException(.modelNotFound)` (plugin name unknown), or other
-        ///   commons errors.
-        public static func unload(name: String) throws {
+        /// - Parameter name: The plugin name (library stem).
+        /// - Throws: `SDKException` on failure.
+        public func unload(name: String) throws {
             let result = name.withCString { rac_registry_unload_plugin($0) }
             try throwIfFailed(result, op: "unload", context: name)
         }
 
-        /// Total number of plugins currently registered (one count per
-        /// plugin, not per primitive).
-        public static var registeredCount: Int {
-            return rac_registry_plugin_count()
+        /// Total number of plugins currently registered.
+        public var registeredCount: Int {
+            rac_registry_plugin_count()
         }
 
         /// Snapshot of currently-registered plugin names.
-        public static func registeredNames() -> [String] {
+        public func registeredNames() -> [String] {
             var names: UnsafeMutablePointer<UnsafePointer<CChar>?>?
             var count: Int = 0
             let rc = rac_registry_list_plugins(&names, &count)
@@ -93,40 +117,49 @@ extension RunAnywhere {
             return out
         }
 
-        // MARK: - Helpers
+        /// Snapshot of all currently-loaded plugins.
+        ///
+        /// Returned `PluginInfo` contains the plugin name only; the original
+        /// load path is not persisted by the C registry. Use `registeredNames()`
+        /// if only names are needed.
+        public func listLoaded() -> [PluginInfo] {
+            registeredNames().map { PluginInfo(name: $0, path: "") }
+        }
 
-        private static func throwIfFailed(_ rc: rac_result_t, op: String, context: String) throws {
+        // MARK: - Private helpers
+
+        private func throwIfFailed(_ rc: rac_result_t, op: String, context: String) throws {
             guard rc != RAC_SUCCESS else { return }
-            let suffix = " (PluginLoader.\(op): \(context))"
+            let suffix = " (pluginLoader.\(op): \(context))"
             switch rc {
             case RAC_ERROR_NULL_POINTER:
                 throw SDKException.runtime(.invalidConfiguration, "Null path/name" + suffix)
             case RAC_ERROR_PLUGIN_LOAD_FAILED:
                 throw SDKException.runtime(.invalidConfiguration,
-                                       "dlopen / dlsym failed" + suffix)
+                                           "dlopen / dlsym failed" + suffix)
             case RAC_ERROR_ABI_VERSION_MISMATCH:
                 throw SDKException.runtime(.invalidModelFormat,
-                                       "Plugin built against a different RAC_PLUGIN_API_VERSION " +
-                                       "(host = \(apiVersion))" + suffix)
+                                           "Plugin built against a different RAC_PLUGIN_API_VERSION " +
+                                           "(host = \(apiVersion))" + suffix)
             case RAC_ERROR_CAPABILITY_UNSUPPORTED:
                 throw SDKException.runtime(.unsupportedModality,
-                                       "Plugin capability_check() declined" + suffix)
+                                           "Plugin capability_check() declined" + suffix)
             case RAC_ERROR_PLUGIN_DUPLICATE:
                 throw SDKException.runtime(.alreadyInitialized,
-                                       "Plugin name already registered with higher priority" + suffix)
+                                           "Plugin name already registered with higher priority" + suffix)
             case RAC_ERROR_FEATURE_NOT_AVAILABLE:
                 throw SDKException.runtime(.featureNotAvailable,
-                                       "Dynamic plugin loading not available — host built with " +
-                                       "RAC_STATIC_PLUGINS=ON (typically iOS / WASM). Bundle the " +
-                                       "engine at compile time instead." + suffix)
+                                           "Dynamic plugin loading not available — host built with " +
+                                           "RAC_STATIC_PLUGINS=ON (typically iOS / WASM). Bundle the " +
+                                           "engine at compile time instead." + suffix)
             case RAC_ERROR_NOT_FOUND:
                 throw SDKException.runtime(.modelNotFound, "Plugin not registered" + suffix)
             case RAC_ERROR_PLUGIN_BUSY:
                 throw SDKException.runtime(.notImplemented,
-                                       "Plugin held by an active session (refcount wired in GAP 04+)" + suffix)
+                                           "Plugin held by an active session" + suffix)
             default:
                 throw SDKException.runtime(.unknown,
-                                       "rac_registry_\(op)_plugin returned \(rc)" + suffix)
+                                           "rac_registry_\(op)_plugin returned \(rc)" + suffix)
             }
         }
     }

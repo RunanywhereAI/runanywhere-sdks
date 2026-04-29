@@ -92,9 +92,9 @@ rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
     out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
-    out->supported_primitives = k_supported_primitives;
-    out->supported_primitives_count =
-        sizeof(k_supported_primitives) / sizeof(k_supported_primitives[0]);
+    // Capability shrunk: run_session is NULL; declare zero primitives until tensor execution path lands.
+    out->supported_primitives = nullptr;
+    out->supported_primitives_count = 0;
     return RAC_SUCCESS;
 }
 

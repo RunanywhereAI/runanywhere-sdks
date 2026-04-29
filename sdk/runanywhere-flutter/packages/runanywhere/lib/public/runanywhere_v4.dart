@@ -14,11 +14,21 @@
 //   await ra.llm.load('llama-3-8b');
 //   final response = await ra.llm.chat('Hello!');
 
+import 'dart:typed_data';
+
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationOptions, LLMGenerationResult;
+import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
+import 'package:runanywhere/generated/stt_options.pb.dart'
+    show STTOptions, STTOutput, STTPartialResult;
+import 'package:runanywhere/generated/tts_options.pb.dart'
+    show TTSOptions, TTSOutput, TTSSpeakResult, TTSVoiceInfo;
+import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
@@ -27,8 +37,11 @@ import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_hardware.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_lora.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_plugin_loader.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_rag.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_solutions.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
@@ -39,7 +52,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vlm_models.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice_agent.dart';
-import 'package:runanywhere/public/extensions/runanywhere_plugin_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -293,10 +305,137 @@ class RunAnywhereSDK {
   /// Wraps `voice` with VoiceAgent-themed aliases.
   RunAnywhereVoiceAgent get voiceAgent => RunAnywhereVoiceAgent.shared;
 
-  /// Diffusion (image generation). Currently throws
-  /// `featureNotAvailable` until the FFI bridge lands.
+  /// Diffusion (image generation). Calls the `rac_diffusion_*` C ABI;
+  /// surfaces `featureNotAvailable` only when commons indicates so.
   RunAnywhereDiffusion get diffusion => RunAnywhereDiffusion.shared;
 
   /// Runtime plugin loader (parity with Swift `RunAnywhere.PluginLoader`).
-  RunAnywherePluginLoader get pluginLoader => RunAnywherePluginLoader.shared;
+  RunAnywherePluginLoaderCapability get pluginLoader =>
+      RunAnywherePluginLoaderCapability.shared;
+
+  /// LoRA (Low-Rank Adaptation) capability — load, remove, register,
+  /// query loaded/registered adapters. Canonical §3 namespace.
+  RunAnywhereLoRACapability get lora => RunAnywhereLoRACapability.shared;
+
+  /// Hardware profile (chip, NPU presence, acceleration mode).
+  /// Canonical §14 namespace.
+  RunAnywhereHardware get hardware => RunAnywhereHardware.shared;
+
+  // -- Flat aliases for cross-SDK portability (canonical §0 — RN/Web/Swift use
+  //    flat method names; Flutter additionally exposes them so portable
+  //    code reads identically across SDKs).
+
+  /// Flat alias for `llm.load(modelId)`.
+  Future<void> loadLLMModel(String modelId) => RunAnywhereLLM.shared.load(modelId);
+
+  /// Flat alias for `llm.unload()`.
+  Future<void> unloadLLMModel() => RunAnywhereLLM.shared.unload();
+
+  /// Flat alias for `stt.load(modelId)`.
+  Future<void> loadSTTModel(String modelId) => RunAnywhereSTT.shared.load(modelId);
+
+  /// Flat alias for `stt.unload()`.
+  Future<void> unloadSTTModel() => RunAnywhereSTT.shared.unload();
+
+  /// Flat alias for `tts.loadVoice(voiceId)` — the canonical TTS load.
+  Future<void> loadTTSVoice(String voiceId) =>
+      RunAnywhereTTS.shared.loadVoice(voiceId);
+
+  /// Flat alias for `tts.unloadVoice()`.
+  Future<void> unloadTTSVoice() => RunAnywhereTTS.shared.unloadVoice();
+
+  /// Flat alias for `vlm.load(modelId)`.
+  Future<void> loadVLMModel(String modelId) =>
+      RunAnywhereVLM.shared.load(modelId);
+
+  /// Flat alias for `vlm.unload()`.
+  Future<void> unloadVLMModel() => RunAnywhereVLM.shared.unload();
+
+  /// Flat alias for `vad.loadModel(modelId)`.
+  Future<void> loadVADModel(String modelId) =>
+      RunAnywhereVAD.shared.loadModel(modelId);
+
+  /// Flat alias for `vad.unloadModel()`.
+  Future<void> unloadVADModel() => RunAnywhereVAD.shared.unloadModel();
+
+  /// Flat alias for `models.refreshModelRegistry()`.
+  Future<void> refreshModelRegistry() =>
+      RunAnywhereModels.shared.refreshModelRegistry();
+
+  // --- Canonical flat methods (§3-§10 of spec) --------------------------------
+
+  /// Canonical flat method — cancel any in-flight LLM generation.
+  /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.
+  Future<void> cancelGeneration() async => RunAnywhereLLM.shared.cancel();
+
+  /// True when an LLM model is currently loaded. Mirrors Swift's
+  /// `isLLMModelLoaded: Bool` property.
+  bool get isLLMModelLoaded => RunAnywhereLLM.shared.isLoaded;
+
+  /// Currently-loaded LLM model info, or null.
+  Future<dynamic> get currentLLMModel => RunAnywhereLLM.shared.currentModel();
+
+  /// True when an STT model is currently loaded.
+  bool get isSTTModelLoaded => RunAnywhereSTT.shared.isLoaded;
+
+  /// True when a TTS voice is currently loaded.
+  bool get isTTSVoiceLoaded => RunAnywhereTTS.shared.isLoaded;
+
+  /// True when a VAD model is currently loaded.
+  bool get isVADModelLoaded => RunAnywhereVAD.shared.isModelLoaded;
+
+  /// Flat alias — transcribe audio to proto [STTOutput].
+  /// Mirrors Swift / RN / Web `RunAnywhere.transcribe(audio:options:)`.
+  Future<STTOutput> transcribe(Uint8List audio, [STTOptions? options]) =>
+      RunAnywhereSTT.shared.transcribe(audio, options);
+
+  /// Flat streaming alias — real FFI-backed streaming STT.
+  /// Mirrors Swift / RN / Web `RunAnywhere.transcribeStream`.
+  Stream<STTPartialResult> transcribeStream(Uint8List audio, {STTOptions? options}) =>
+      RunAnywhereSTT.shared.transcribeStream(audio, options: options);
+
+  /// Flat alias — synthesize text to proto [TTSOutput].
+  /// Mirrors Swift / RN / Web `RunAnywhere.synthesize(text:options:)`.
+  Future<TTSOutput> synthesize(String text, [TTSOptions? options]) =>
+      RunAnywhereTTS.shared.synthesize(text, options);
+
+  /// Flat alias — speak text and return proto [TTSSpeakResult].
+  /// Mirrors Swift `RunAnywhere.speak(text:options:)`.
+  Future<TTSSpeakResult> speak(String text, [TTSOptions? options]) =>
+      RunAnywhereTTS.shared.speak(text, options);
+
+  /// Flat alias — stop any in-flight synthesis.
+  Future<void> stopSynthesis() => RunAnywhereTTS.shared.stopSynthesis();
+
+  /// Flat alias — list available TTS voices as [TTSVoiceInfo] proto objects.
+  /// Mirrors Swift `RunAnywhere.availableTTSVoices()`.
+  Future<List<TTSVoiceInfo>> availableTTSVoices() async {
+    final voiceIds = await RunAnywhereTTS.shared.availableVoices();
+    return voiceIds.map((id) => TTSVoiceInfo(id: id, displayName: id)).toList();
+  }
+
+  /// Flat alias for loading a TTS model (distinct from loading a TTS voice).
+  /// Mirrors Swift `RunAnywhere.loadTTSModel(modelId:)`.
+  Future<void> loadTTSModel(String modelId) => loadTTSVoice(modelId);
+
+  /// Flat alias for unloading the active TTS model.
+  Future<void> unloadTTSModel() => unloadTTSVoice();
+
+  /// Flat generate — canonical cross-SDK positional signature.
+  /// Mirrors Swift / RN / Web `RunAnywhere.generate(prompt:options:)`.
+  Future<LLMGenerationResult> generate(
+    String prompt, [
+    LLMGenerationOptions? options,
+  ]) => RunAnywhereLLM.shared.generate(prompt, options);
+
+  /// Flat streaming generate.
+  /// Mirrors Swift / RN / Web `RunAnywhere.generateStream(prompt:options:)`.
+  Stream<LLMStreamEvent> generateStream(
+    String prompt, [
+    LLMGenerationOptions? options,
+  ]) => RunAnywhereLLM.shared.generateStream(prompt, options);
+
+  /// Flat streaming voice agent events.
+  /// Mirrors Swift `RunAnywhere.streamVoiceAgent()`.
+  Stream<VoiceEvent> streamVoiceAgent() => RunAnywhereVoice.shared.eventStream();
 }

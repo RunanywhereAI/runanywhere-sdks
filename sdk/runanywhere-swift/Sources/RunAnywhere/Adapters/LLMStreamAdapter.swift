@@ -28,6 +28,7 @@
 import CRACommons
 import Foundation
 import SwiftProtobuf
+import os
 
 /// AsyncStream-based wrapper over the Phase G-2 proto-byte LLM stream ABI.
 ///
@@ -44,12 +45,16 @@ public final class LLMStreamAdapter {
     ) -> Void
 
     private final class HandleFanOut {
+        // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
+        private struct FanOutState {
+            var continuations: [UUID: AsyncStream<RALLMStreamEvent>.Continuation] = [:]
+            var userPtr: UnsafeMutableRawPointer?
+            var installed: Bool = false
+        }
+
         private let handle: rac_handle_t
         private let key: UInt
-        private let lock = NSLock()
-        private var continuations: [UUID: AsyncStream<RALLMStreamEvent>.Continuation] = [:]
-        private var userPtr: UnsafeMutableRawPointer?
-        private var installed = false
+        private let state = OSAllocatedUnfairLock<FanOutState>(initialState: FanOutState())
 
         init(handle: rac_handle_t, key: UInt) {
             self.handle = handle
@@ -57,30 +62,37 @@ public final class LLMStreamAdapter {
         }
 
         func attach(_ continuation: AsyncStream<RALLMStreamEvent>.Continuation) -> UUID? {
-            lock.lock()
-            defer { lock.unlock() }
+            // We must install the trampoline outside the lock because
+            // installLocked invokes a C registration that might call back
+            // synchronously on some platforms.
+            var didInstall = true
+            state.withLock { s in
+                if !s.installed { didInstall = false }
+            }
 
-            if !installed && !installLocked() {
-                return nil
+            if !didInstall {
+                if !install() { return nil }
             }
 
             let id = UUID()
-            continuations[id] = continuation
+            state.withLock { $0.continuations[id] = continuation }
             return id
         }
 
         func detach(_ id: UUID) {
-            lock.lock()
-            continuations.removeValue(forKey: id)
-            let shouldTearDown = continuations.isEmpty
-            lock.unlock()
+            let shouldTearDown = state.withLock { s -> Bool in
+                s.continuations.removeValue(forKey: id)
+                return s.continuations.isEmpty
+            }
 
             if shouldTearDown {
                 tearDown()
             }
         }
 
-        private func installLocked() -> Bool {
+        private func install() -> Bool {
+            // Reserve the userPtr/installed flag under lock first, then call
+            // the C ABI. If install fails we have to revert.
             let userPtr = Unmanaged.passRetained(self).toOpaque()
             let trampoline: CCallback = { bytesPtr, bytesLen, userData in
                 guard let bytesPtr = bytesPtr,
@@ -95,24 +107,32 @@ public final class LLMStreamAdapter {
                 fanOut.broadcast(event)
             }
 
+            // Optimistic write — assume the registration will succeed.
+            state.withLock {
+                $0.userPtr = userPtr
+                $0.installed = true
+            }
+
             let result = rac_llm_set_stream_proto_callback(handle, trampoline, userPtr)
             if result != RAC_SUCCESS {
+                state.withLock {
+                    $0.userPtr = nil
+                    $0.installed = false
+                }
                 Unmanaged<HandleFanOut>.fromOpaque(userPtr).release()
                 return false
             }
-
-            self.userPtr = userPtr
-            installed = true
             return true
         }
 
         private func broadcast(_ event: RALLMStreamEvent) {
-            lock.lock()
-            let snapshot = Array(continuations.values)
-            if event.isFinal {
-                continuations.removeAll()
+            let snapshot: [AsyncStream<RALLMStreamEvent>.Continuation] = state.withLock { s in
+                let values = Array(s.continuations.values)
+                if event.isFinal {
+                    s.continuations.removeAll()
+                }
+                return values
             }
-            lock.unlock()
 
             for continuation in snapshot {
                 continuation.yield(event)
@@ -127,10 +147,11 @@ public final class LLMStreamAdapter {
         }
 
         private func finishAll() {
-            lock.lock()
-            let snapshot = Array(continuations.values)
-            continuations.removeAll()
-            lock.unlock()
+            let snapshot: [AsyncStream<RALLMStreamEvent>.Continuation] = state.withLock { s in
+                let values = Array(s.continuations.values)
+                s.continuations.removeAll()
+                return values
+            }
 
             for continuation in snapshot {
                 continuation.finish()
@@ -139,18 +160,16 @@ public final class LLMStreamAdapter {
         }
 
         private func tearDown() {
-            var ptrToRelease: UnsafeMutableRawPointer?
-
-            lock.lock()
-            if installed {
+            let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { s in
+                guard s.installed else { return nil }
                 _ = rac_llm_unset_stream_proto_callback(handle)
-                installed = false
-                ptrToRelease = userPtr
-                userPtr = nil
+                s.installed = false
+                let ptr = s.userPtr
+                s.userPtr = nil
+                return ptr
             }
-            lock.unlock()
 
-            if let ptrToRelease = ptrToRelease {
+            if let ptrToRelease {
                 Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease).release()
             }
             LLMStreamAdapter.removeFanOut(for: key)
@@ -159,25 +178,22 @@ public final class LLMStreamAdapter {
 
     private let handle: rac_handle_t
 
-    private static let fanOutLock = NSLock()
-    private static var fanOuts: [UInt: HandleFanOut] = [:]
+    private static let fanOuts = OSAllocatedUnfairLock<[UInt: HandleFanOut]>(initialState: [:])
 
     private static func fanOut(for handle: rac_handle_t) -> HandleFanOut {
         let key = UInt(bitPattern: handle)
-        fanOutLock.lock()
-        defer { fanOutLock.unlock() }
-        if let existing = fanOuts[key] {
-            return existing
+        return fanOuts.withLock { dict in
+            if let existing = dict[key] {
+                return existing
+            }
+            let fanOut = HandleFanOut(handle: handle, key: key)
+            dict[key] = fanOut
+            return fanOut
         }
-        let fanOut = HandleFanOut(handle: handle, key: key)
-        fanOuts[key] = fanOut
-        return fanOut
     }
 
     private static func removeFanOut(for key: UInt) {
-        fanOutLock.lock()
-        fanOuts.removeValue(forKey: key)
-        fanOutLock.unlock()
+        fanOuts.withLock { _ = $0.removeValue(forKey: key) }
     }
 
     // MARK: - Init

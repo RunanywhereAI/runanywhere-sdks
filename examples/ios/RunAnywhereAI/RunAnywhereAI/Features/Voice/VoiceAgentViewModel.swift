@@ -14,9 +14,6 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
-// v3.1: CRACommons needed for `rac_voice_agent_handle_t` passed between
-// `CppBridge.VoiceAgent.shared.getHandle()` and `VoiceAgentStreamAdapter(handle:)`.
-import CRACommons
 import Combine
 import os
 
@@ -169,11 +166,11 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Private State
 
-    // v3.1: migrated off the deprecated VoiceSessionHandle to the
-    // proto-stream VoiceAgentStreamAdapter. The adapter wraps the
-    // raw C voice-agent handle and emits RAVoiceEvent proto messages;
-    // we switch on `event.payload` in `handleProtoEvent(_:)` below.
-    private var adapter: VoiceAgentStreamAdapter?
+    // v3.1: migrated off the deprecated VoiceSessionHandle to
+    // `RunAnywhere.streamVoiceAgent()` — the public proto-stream surface.
+    // The SDK wraps the raw C handle internally; we just consume
+    // `RAVoiceEvent`s and switch on `event.payload` in
+    // `handleProtoEvent(_:)` below.
     private var eventTask: Task<Void, Never>?
 
     // MARK: - Initialization State (for idempotency)
@@ -378,17 +375,19 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Conversation Control
 
-    /// Start a voice conversation using the proto-stream adapter.
+    /// Start a voice conversation using the canonical
+    /// `RunAnywhere.streamVoiceAgent()` proto-stream API.
     ///
     /// Pipeline:
     ///   1. Initialize voice agent against already-loaded STT/LLM/TTS models.
-    ///   2. Grab the raw handle via CppBridge.VoiceAgent.
-    ///   3. Wrap with VoiceAgentStreamAdapter (proto bytes → AsyncStream<RAVoiceEvent>).
-    ///   4. Consume RAVoiceEvent proto messages + drive UI state.
+    ///   2. Consume `AsyncStream<RAVoiceEvent>` from `streamVoiceAgent()`.
+    ///   3. Drive UI state by switching on `event.payload` in
+    ///      `handleProtoEvent(_:)`.
     ///
     /// `RunAnywhere.startVoiceSession` and `VoiceSessionHandle` were
-    /// removed in the v2 close-out — only the adapter pattern is
-    /// supported now.
+    /// removed in the v2 close-out; the SDK now exposes the proto stream
+    /// directly so example apps no longer reach into `CppBridge` /
+    /// `CRACommons`.
     func startConversation() async {
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")
@@ -411,21 +410,19 @@ final class VoiceAgentViewModel: ObservableObject {
             // layer via a future config surface; v3.1 keeps the init minimal.
             try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
-            // Wrap the raw handle as an AsyncStream of proto events.
-            let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-            let adapter = VoiceAgentStreamAdapter(handle: handle)
-            self.adapter = adapter
-
             sessionState = .listening
             currentStatus = "Listening..."
 
+            // Consume the public proto-event stream. The SDK constructs the
+            // adapter internally and tears it down via `onTermination` when
+            // the consuming task is cancelled.
             eventTask = Task { [weak self] in
-                for await event in adapter.stream() {
+                for await event in RunAnywhere.streamVoiceAgent() {
                     await MainActor.run { self?.handleProtoEvent(event) }
                 }
             }
 
-            logger.info("Voice session started successfully (proto-stream adapter)")
+            logger.info("Voice session started successfully (RunAnywhere.streamVoiceAgent)")
         } catch {
             sessionState = .error(error.localizedDescription)
             currentStatus = "Error"
@@ -439,7 +436,6 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Stopping voice session...")
         eventTask?.cancel()
         eventTask = nil
-        adapter = nil  // The adapter's `onTermination` hook deregisters the C callback.
         sessionState = .disconnected
         currentStatus = "Ready"
         audioLevel = 0.0

@@ -1,60 +1,16 @@
 // Model Types (mirroring iOS model types)
 //
 // Contains model-related enums and data classes.
+//
+// G-E10 / §15 — LLMFramework was deleted; callers now use the canonical
+// `sdk.InferenceFramework` from `package:runanywhere/runanywhere.dart`.
 
-/// LLM Framework enumeration
-enum LLMFramework {
-  llamaCpp,
-  foundationModels,
-  mediaPipe,
-  onnxRuntime,
-  systemTTS,
-  whisperKit,
-  genie,
-  unknown;
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
-  String get displayName {
-    switch (this) {
-      case LLMFramework.llamaCpp:
-        return 'LLaMA.cpp';
-      case LLMFramework.foundationModels:
-        return 'Foundation Models';
-      case LLMFramework.mediaPipe:
-        return 'MediaPipe';
-      case LLMFramework.onnxRuntime:
-        return 'ONNX Runtime';
-      case LLMFramework.systemTTS:
-        return 'System TTS';
-      case LLMFramework.whisperKit:
-        return 'WhisperKit';
-      case LLMFramework.genie:
-        return 'Genie NPU';
-      case LLMFramework.unknown:
-        return 'Unknown';
-    }
-  }
-
-  String get rawValue {
-    switch (this) {
-      case LLMFramework.llamaCpp:
-        return 'llama.cpp';
-      case LLMFramework.foundationModels:
-        return 'foundation_models';
-      case LLMFramework.mediaPipe:
-        return 'mediapipe';
-      case LLMFramework.onnxRuntime:
-        return 'onnx_runtime';
-      case LLMFramework.systemTTS:
-        return 'system_tts';
-      case LLMFramework.whisperKit:
-        return 'whisperkit';
-      case LLMFramework.genie:
-        return 'genie';
-      case LLMFramework.unknown:
-        return 'unknown';
-    }
-  }
-}
+// Re-export SDK's InferenceFramework under the app-level alias so existing
+// callers that reference `LLMFramework` compile without changes while
+// being transparently backed by the SDK enum.
+typedef LLMFramework = sdk.InferenceFramework;
 
 /// Model category enumeration
 /// Matches SDK ModelCategory for proper conversion
@@ -177,7 +133,7 @@ enum ModelSelectionContext {
   }
 }
 
-/// Model info class
+/// Model info class (app-local view over SDK models)
 class ModelInfo {
   final String id;
   final String name;
@@ -186,6 +142,7 @@ class ModelInfo {
   final String? downloadURL;
   final String? localPath;
   final int? memoryRequired;
+  // Uses canonical InferenceFramework (via LLMFramework typedef)
   final List<LLMFramework> compatibleFrameworks;
   final LLMFramework? preferredFramework;
   final bool supportsThinking;

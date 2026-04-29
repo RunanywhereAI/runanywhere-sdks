@@ -46,6 +46,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - Main Bridge Coordinator
 
@@ -55,30 +56,31 @@ public enum CppBridge {
 
     // MARK: - Shared State
 
-    private static var _environment: SDKEnvironment = .development
-    private static var _isInitialized = false
-    private static var _servicesInitialized = false
-    private static let lock = NSLock()
+    /// Combined synchronously-readable bridge state, guarded by a single
+    /// `OSAllocatedUnfairLock`. Replaces the prior NSLock + 3 vars layout
+    /// per CLAUDE.md "Do not use NSLock as it is outdated."
+    private struct CppBridgeSharedState {
+        var environment: SDKEnvironment = .development
+        var isInitialized: Bool = false
+        var servicesInitialized: Bool = false
+    }
+
+    private static let state =
+        OSAllocatedUnfairLock<CppBridgeSharedState>(initialState: CppBridgeSharedState())
 
     /// Current SDK environment
     static var environment: SDKEnvironment {
-        lock.lock()
-        defer { lock.unlock() }
-        return _environment
+        state.withLock { $0.environment }
     }
 
     /// Whether core bridges are initialized (Phase 1)
     public static var isInitialized: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return _isInitialized
+        state.withLock { $0.isInitialized }
     }
 
     /// Whether service bridges are initialized (Phase 2)
     public static var servicesInitialized: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return _servicesInitialized
+        state.withLock { $0.servicesInitialized }
     }
 
     // MARK: - Phase 1: Core Initialization (Synchronous)
@@ -90,13 +92,12 @@ public enum CppBridge {
     ///
     /// - Parameter environment: SDK environment
     public static func initialize(environment: SDKEnvironment) {
-        lock.lock()
-        guard !_isInitialized else {
-            lock.unlock()
-            return
+        let alreadyInitialized = state.withLock { s -> Bool in
+            if s.isInitialized { return true }
+            s.environment = environment
+            return false
         }
-        _environment = environment
-        lock.unlock()
+        guard !alreadyInitialized else { return }
 
         // Step 1: Platform adapter FIRST (logging, file ops, keychain)
         // This must be registered before any other C++ calls
@@ -116,9 +117,7 @@ public enum CppBridge {
         // Step 4: Device registration callbacks
         Device.register()
 
-        lock.lock()
-        _isInitialized = true
-        lock.unlock()
+        state.withLock { $0.isInitialized = true }
 
         SDKLogger(category: "CppBridge").debug("Core bridges initialized for \(environment)")
     }
@@ -131,13 +130,11 @@ public enum CppBridge {
     /// network access to function.
     @MainActor
     public static func initializeServices() {
-        lock.lock()
-        guard !_servicesInitialized else {
-            lock.unlock()
-            return
+        let snapshot = state.withLock { s -> (alreadyDone: Bool, env: SDKEnvironment) in
+            (s.servicesInitialized, s.environment)
         }
-        let currentEnv = _environment
-        lock.unlock()
+        guard !snapshot.alreadyDone else { return }
+        let currentEnv = snapshot.env
 
         // Model assignment (needs HTTP for API calls)
         // Only auto-fetch in staging/production, not development
@@ -162,9 +159,7 @@ public enum CppBridge {
         // Platform services (Foundation Models, System TTS)
         Platform.register()
 
-        lock.lock()
-        _servicesInitialized = true
-        lock.unlock()
+        state.withLock { $0.servicesInitialized = true }
 
         SDKLogger(category: "CppBridge").debug("Service bridges initialized (env: \(currentEnv), autoFetch: \(shouldAutoFetch))")
     }
@@ -177,10 +172,7 @@ public enum CppBridge {
     /// Awaiting them sequentially (instead of wrapping in `Task { ... }`)
     /// ensures Telemetry/Events teardown does not race destroy completion.
     public static func shutdown() async {
-        lock.lock()
-        let wasInitialized = _isInitialized
-        lock.unlock()
-
+        let wasInitialized = state.withLock { $0.isInitialized }
         guard wasInitialized else { return }
 
         // Destroy AI components sequentially before tearing down Telemetry/Events
@@ -199,10 +191,10 @@ public enum CppBridge {
         // PlatformAdapter callbacks remain valid (static)
         // Device callbacks remain valid (static)
 
-        lock.lock()
-        _isInitialized = false
-        _servicesInitialized = false
-        lock.unlock()
+        state.withLock {
+            $0.isInitialized = false
+            $0.servicesInitialized = false
+        }
 
         SDKLogger(category: "CppBridge").debug("All bridges shutdown")
     }

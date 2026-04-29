@@ -303,7 +303,7 @@ export async function registerModel(options: {
   const modelInfo: ModelInfo = {
     id: modelId,
     name: options.name,
-    category: options.modality ?? ModelCategory.Language,
+    category: options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
     format: inferFormat(options.url, options.framework),
     downloadURL: options.url,
     localPath,
@@ -367,8 +367,8 @@ export async function registerMultiFileModel(options: {
   const modelInfo: ModelInfo = {
     id: options.id,
     name: options.name,
-    category: options.modality ?? ModelCategory.Language,
-    format: ModelFormat.ONNX,
+    category: options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadURL: options.files[0]?.url,
     localPath,
     downloadSize: undefined,
@@ -500,17 +500,17 @@ async function reconcileLocalRegistryModels(options: {
 
 function inferFormat(url: string, framework?: LLMFramework): ModelFormat {
   const lower = url.toLowerCase();
-  if (lower.includes('.gguf')) return ModelFormat.GGUF;
-  if (lower.includes('.onnx')) return ModelFormat.ONNX;
-  if (lower.includes('.zip')) return ModelFormat.Zip;
+  if (lower.includes('.gguf')) return ModelFormat.MODEL_FORMAT_GGUF;
+  if (lower.includes('.onnx')) return ModelFormat.MODEL_FORMAT_ONNX;
+  if (lower.includes('.zip')) return ModelFormat.MODEL_FORMAT_ZIP;
   // Archives (.tar.gz, .tar.bz2) are packaging, not format.
   // Derive format from framework: ONNX archives contain ONNX models.
   if (lower.includes('.tar.gz') || lower.includes('.tar.bz2')) {
-    if (framework === 'ONNX') return ModelFormat.ONNX;
-    return ModelFormat.GGUF;
+    if (framework === 'ONNX') return ModelFormat.MODEL_FORMAT_ONNX;
+    return ModelFormat.MODEL_FORMAT_GGUF;
   }
-  if (framework === 'ONNX') return ModelFormat.ONNX;
-  return ModelFormat.GGUF;
+  if (framework === 'ONNX') return ModelFormat.MODEL_FORMAT_ONNX;
+  return ModelFormat.MODEL_FORMAT_GGUF;
 }
 
 function generateModelId(url: string): string {

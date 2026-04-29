@@ -22,7 +22,7 @@ public extension RunAnywhere {
     /// - Parameter config: RAG pipeline configuration (model paths, tuning parameters)
     /// - Throws: `SDKException` if the SDK is not initialized or pipeline creation fails
     static func ragCreatePipeline(config: RAGConfiguration) async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
@@ -49,7 +49,7 @@ public extension RunAnywhere {
     ///   - metadataJSON: Optional JSON string attached to all chunks from this document
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails
     static func ragIngest(text: String, metadataJSON: String? = nil) async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
@@ -64,11 +64,61 @@ public extension RunAnywhere {
         EventBus.shared.publish(RAGEvent.ingestionComplete(chunkCount: chunkCount, durationMs: durationMs))
     }
 
+    /// Ingest multiple text documents into the RAG pipeline in a single batch.
+    ///
+    /// Equivalent to calling `ragIngest` for each document but more efficient because
+    /// the C++ layer can embed all documents in a single pass.
+    ///
+    /// - Parameter documents: Array of `RAGDocument` values (each with `text` and optional `metadataJSON`).
+    /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails.
+    static func ragAddDocumentsBatch(documents: [RAGDocument]) async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        guard !documents.isEmpty else { return }
+        try await ensureServicesReady()
+
+        let texts = documents.map { $0.text }
+        let metas: [String?] = documents.map { $0.metadataJSON }
+
+        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: texts.joined().count))
+        let startTime = Date()
+
+        try await CppBridge.RAG.shared.addDocumentsBatch(texts: texts, metadataJSONs: metas)
+
+        let durationMs = Date().timeIntervalSince(startTime) * 1000
+        let chunkCount = await CppBridge.RAG.shared.documentCount
+        EventBus.shared.publish(RAGEvent.ingestionComplete(chunkCount: chunkCount, durationMs: durationMs))
+    }
+
+    /// Get the number of indexed document chunks in the pipeline as a function call.
+    ///
+    /// This is the canonical `ragGetDocumentCount()` form required by the spec (§9).
+    /// The computed var `ragDocumentCount` is retained as a convenience accessor.
+    ///
+    /// - Returns: Number of indexed chunks in the pipeline, or 0 if not initialized.
+    static func ragGetDocumentCount() async -> Int {
+        await CppBridge.RAG.shared.documentCount
+    }
+
+    /// Get RAG pipeline statistics.
+    ///
+    /// Returns an `RARAGStatistics` proto with `indexedDocuments`, `indexedChunks`,
+    /// `totalTokensIndexed`, `lastUpdatedMs`, and `indexPath`.
+    ///
+    /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready.
+    static func ragGetStatistics() async throws -> RARAGStatistics {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        return try await CppBridge.RAG.shared.getStatistics()
+    }
+
     /// Clear all previously ingested documents from the pipeline.
     ///
     /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready
     static func ragClearDocuments() async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await CppBridge.RAG.shared.clearDocuments()
@@ -95,7 +145,7 @@ public extension RunAnywhere {
     /// - Returns: A `RAGResult` containing the generated answer and retrieved chunks
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or the query fails
     static func ragQuery(question: String, options: RAGQueryOptions? = nil) async throws -> RAGResult {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()

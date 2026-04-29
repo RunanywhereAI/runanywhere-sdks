@@ -17,14 +17,16 @@ import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.events.SDKEvent
 import com.runanywhere.sdk.public.events.STTEvent
 import com.runanywhere.sdk.public.events.TTSEvent
+import ai.runanywhere.proto.v1.ComponentLoadState as ProtoComponentLoadState
 import com.runanywhere.sdk.public.extensions.VoiceAgent.ComponentLoadState
 import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
-import com.runanywhere.sdk.public.extensions.voiceAgentComponentStates
-// v3.1 P3.2: migrated off deprecated VoiceSessionEvent / processVoice /
-// startVoiceSession / stopVoiceSession. Pipeline now flows through the
-// proto-stream VoiceAgentStreamAdapter backed by a voice-agent handle.
-import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
+import com.runanywhere.sdk.public.extensions.getVoiceAgentComponentStates
+// Round 1 KOTLIN (G-E4 / Task 7): migrated off CppBridgeVoiceAgent direct
+// calls. Pipeline now flows through RunAnywhere.streamVoiceAgent() which
+// is the canonical public surface (Iron Rule 5).
+import com.runanywhere.sdk.public.extensions.streamVoiceAgent
+import com.runanywhere.sdk.public.extensions.processVoiceTurn
+import com.runanywhere.sdk.public.extensions.cleanupVoiceAgent
 import ai.runanywhere.proto.v1.VoiceEvent
 import ai.runanywhere.proto.v1.StateChangeEvent
 import ai.runanywhere.proto.v1.PipelineState
@@ -690,21 +692,32 @@ class VoiceAssistantViewModel(
      */
     private suspend fun syncModelStates() {
         try {
-            val states = RunAnywhere.voiceAgentComponentStates()
+            val protoStates = RunAnywhere.getVoiceAgentComponentStates()
 
-            // Extract model IDs with explicit casting to avoid smart cast issues
-            val sttModelId = (states.stt as? ComponentLoadState.Loaded)?.loadedModelId
-            val llmModelId = (states.llm as? ComponentLoadState.Loaded)?.loadedModelId
-            val ttsModelId = (states.tts as? ComponentLoadState.Loaded)?.loadedModelId
+            // Map proto ComponentLoadState values to local ComponentLoadState
+            fun protoToLocalState(protoState: ProtoComponentLoadState?, key: String): ComponentLoadState {
+                return when (protoState) {
+                    ProtoComponentLoadState.COMPONENT_LOAD_STATE_LOADED -> ComponentLoadState.Loaded(key)
+                    ProtoComponentLoadState.COMPONENT_LOAD_STATE_LOADING -> ComponentLoadState.Loading
+                    ProtoComponentLoadState.COMPONENT_LOAD_STATE_ERROR -> ComponentLoadState.Error("Error")
+                    else -> ComponentLoadState.NotLoaded
+                }
+            }
+
+            // getVoiceAgentComponentStates() now returns VoiceAgentComponentStates (proto message).
+            val sttState = protoToLocalState(protoStates.stt_state, "stt")
+            val llmState = protoToLocalState(protoStates.llm_state, "llm")
+            val ttsState = protoToLocalState(protoStates.tts_state, "tts")
+
+            val sttModelId = (sttState as? ComponentLoadState.Loaded)?.loadedModelId
+            val llmModelId = (llmState as? ComponentLoadState.Loaded)?.loadedModelId
+            val ttsModelId = (ttsState as? ComponentLoadState.Loaded)?.loadedModelId
 
             _uiState.update { currentState ->
                 currentState.copy(
-                    // Always update load states from SDK - this is the source of truth
-                    sttLoadState = ModelLoadState.fromSDK(states.stt),
-                    llmLoadState = ModelLoadState.fromSDK(states.llm),
-                    ttsLoadState = ModelLoadState.fromSDK(states.tts),
-                    // Preserve existing model selection info if present,
-                    // only fill in from SDK if no selection exists but model is loaded
+                    sttLoadState = ModelLoadState.fromSDK(sttState),
+                    llmLoadState = ModelLoadState.fromSDK(llmState),
+                    ttsLoadState = ModelLoadState.fromSDK(ttsState),
                     sttModel =
                         currentState.sttModel ?: sttModelId?.let { id ->
                             SelectedModel("ONNX Runtime", id, id)
@@ -717,14 +730,13 @@ class VoiceAssistantViewModel(
                         currentState.ttsModel ?: ttsModelId?.let { id ->
                             SelectedModel("ONNX Runtime", id, id)
                         },
-                    // Also update convenience fields for backward compatibility
                     whisperModel = sttModelId ?: currentState.whisperModel,
                     currentLLMModel = llmModelId ?: currentState.currentLLMModel,
                     ttsVoice = ttsModelId ?: currentState.ttsVoice,
                 )
             }
 
-            Timber.i("📊 Model states synced - STT: ${states.stt.isLoaded}, LLM: ${states.llm.isLoaded}, TTS: ${states.tts.isLoaded}")
+            Timber.i("Model states synced - STT: ${sttState.isLoaded}, LLM: ${llmState.isLoaded}, TTS: ${ttsState.isLoaded}")
         } catch (e: Exception) {
             Timber.w("Could not sync model states: ${e.message}")
         }
@@ -799,11 +811,9 @@ class VoiceAssistantViewModel(
                     return@launch
                 }
 
-                // v3.1: initialize voice-agent handle against already-loaded
-                // models + subscribe to the proto event stream.
-                val agentHandle = CppBridgeVoiceAgent.getHandle()
-                val adapter = VoiceAgentStreamAdapter(agentHandle)
-                val agentFlow = adapter.stream()
+                // Round 1 KOTLIN (G-E4): use public RunAnywhere.streamVoiceAgent()
+                // instead of reaching into CppBridgeVoiceAgent directly.
+                val agentFlow = RunAnywhere.streamVoiceAgent()
                 voiceAgentFlow = agentFlow
 
                 // Consume voice-agent proto events in background
@@ -1125,9 +1135,8 @@ class VoiceAssistantViewModel(
                 }
             }
 
-            // v3.1: tear down voice-agent handle (unregisters proto callback,
-            // releases owned component handles).
-            CppBridgeVoiceAgent.destroy()
+            // Round 1 KOTLIN (G-E4): tear down via public RunAnywhere.cleanupVoiceAgent().
+            viewModelScope.launch { RunAnywhere.cleanupVoiceAgent() }
             voiceAgentFlow = null
 
             Timber.i("Conversation stopped")
@@ -1235,9 +1244,10 @@ class VoiceAssistantViewModel(
         stopAudioPlayback()
         audioCaptureService?.release()
         audioCaptureService = null
-        // v3.1: synchronous handle teardown; no JNI cross-thread issue.
+        // Round 1 KOTLIN (G-E4): best-effort teardown via public SDK.
         try {
-            CppBridgeVoiceAgent.destroy()
+            // cleanupVoiceAgent is a suspend fn; fire-and-forget on viewModelScope.
+            viewModelScope.launch { RunAnywhere.cleanupVoiceAgent() }
         } catch (_: Exception) {
             // best-effort cleanup
         }
@@ -1245,8 +1255,7 @@ class VoiceAssistantViewModel(
     }
 
     // ========================================================================
-    // Voice pipeline composition (v3.1 replacement for deprecated
-    // RunAnywhere.processVoice)
+    // Voice pipeline composition (Round 1 KOTLIN G-E4)
     // ========================================================================
 
     private data class VoicePipelineResult(
@@ -1257,35 +1266,18 @@ class VoiceAssistantViewModel(
     )
 
     /**
-     * One-shot STT → LLM → TTS composition using direct CppBridge calls.
-     * Replaces the deprecated RunAnywhere.processVoice wrapper. Pure
-     * composition — same semantics as the SDK's wrapper but no
-     * deprecated surface.
+     * One-shot STT → LLM → TTS composition using the public
+     * [RunAnywhere.processVoiceTurn] API (Iron Rule 5 — no CppBridge* calls
+     * from example apps).
      */
     private suspend fun processVoiceTurnDirect(audioData: ByteArray): VoicePipelineResult {
         return try {
-            val transcription = com.runanywhere.sdk.foundation.bridge.extensions
-                .CppBridgeSTT.transcribe(audioData).text
-            if (transcription.isBlank()) {
-                return VoicePipelineResult(
-                    speechDetected = false, transcription = null,
-                    response = null, synthesizedAudio = null,
-                )
-            }
-            val prompt = "You are a helpful voice assistant.\n\nUser: $transcription\n\nAssistant:"
-            val response = com.runanywhere.sdk.foundation.bridge.extensions
-                .CppBridgeLLM.generate(prompt).text
-            val audio = if (response.isNotBlank()) {
-                com.runanywhere.sdk.foundation.bridge.extensions
-                    .CppBridgeTTS.synthesize(response).audioData
-            } else {
-                null
-            }
+            val result = RunAnywhere.processVoiceTurn(audioData)
             VoicePipelineResult(
-                speechDetected = true,
-                transcription = transcription,
-                response = response,
-                synthesizedAudio = audio,
+                speechDetected = result.speechDetected,
+                transcription = result.transcription,
+                response = result.response,
+                synthesizedAudio = result.synthesizedAudio,
             )
         } catch (e: Exception) {
             Timber.e(e, "Voice pipeline error")

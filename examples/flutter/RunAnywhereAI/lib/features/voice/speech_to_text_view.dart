@@ -133,13 +133,13 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
       setState(() {
         _selectedFramework =
-            model.preferredFramework ?? LLMFramework.whisperKit;
+            model.preferredFramework ?? LLMFramework.unknown;
         _selectedModelName = model.name;
-        // B-FL-11-001: Sherpa-ONNX (LLMFramework.onnxRuntime) supports
+        // B-FL-11-001: Sherpa-ONNX (LLMFramework.onnx) supports
         // streaming transcription via its zipformer/RNN-T runtime. Allow
         // Live mode for both WhisperKit and ONNX-backed STT models.
-        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit ||
-            model.preferredFramework == LLMFramework.onnxRuntime;
+        _supportsLiveMode = model.preferredFramework == LLMFramework.unknown ||
+            model.preferredFramework == LLMFramework.onnx;
         _isProcessing = false;
       });
 

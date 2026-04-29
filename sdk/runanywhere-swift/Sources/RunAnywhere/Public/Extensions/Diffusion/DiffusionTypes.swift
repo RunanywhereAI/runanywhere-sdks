@@ -793,3 +793,8 @@ extension DiffusionResult {
         return proto
     }
 }
+
+// MARK: - Canonical type aliases
+
+/// Canonical alias per CANONICAL_API §8 — mirrors the cross-SDK `DiffusionConfig` name.
+public typealias DiffusionConfig = DiffusionConfiguration

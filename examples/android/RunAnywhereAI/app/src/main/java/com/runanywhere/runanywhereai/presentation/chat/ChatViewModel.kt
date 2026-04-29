@@ -24,7 +24,7 @@ import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.currentLLMModel
-import com.runanywhere.sdk.public.extensions.currentLLMModelId
+// Round 1 KOTLIN (G-A8): currentLLMModelId removed; use currentLLMModel()?.id.
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -141,6 +142,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             LLMEvent.LLMEventType.STREAM_COMPLETED -> {
                 Timber.d("Stream completed")
+                // Fallback: if the Flow collector never sees is_final=true the UI stays
+                // stuck in isGenerating=true. STREAM_COMPLETED is the definitive signal
+                // from native that the stream is closed — always clear the generating flag.
+                if (_uiState.value.isGenerating) {
+                    _uiState.value = _uiState.value.copy(isGenerating = false)
+                    syncCurrentConversationToStore()
+                }
             }
         }
     }
@@ -340,13 +348,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         try {
             // v2 close-out Phase G-2: generateStream now returns
             // Flow<LLMStreamEvent>; collect token text off each event.
-            RunAnywhere.generateStream(prompt, getGenerationOptions()).collect { event ->
-                if (event.is_final) {
-                    if (event.error_message.isNotEmpty()) {
-                        throw RuntimeException(event.error_message)
+            // Use transformWhile so the flow terminates as soon as is_final=true
+            // arrives — plain return@collect does NOT close the upstream flow,
+            // leaving the collector suspended indefinitely.
+            var streamError: String? = null
+            RunAnywhere.generateStream(prompt, getGenerationOptions())
+                .transformWhile { event ->
+                    if (event.is_final) {
+                        if (event.error_message.isNotEmpty()) streamError = event.error_message
+                        false // stop the flow
+                    } else {
+                        emit(event)
+                        true // keep going
                     }
-                    return@collect
                 }
+                .collect { event ->
                 val token = event.token
                 if (token.isEmpty()) return@collect
                 fullResponse += token
@@ -409,6 +425,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     thinkingContent = if (thinkingContent.isEmpty()) null else thinkingContent.trim(),
                 )
             }
+            if (streamError != null) throw RuntimeException(streamError)
         } catch (e: kotlinx.coroutines.CancellationException) {
             Timber.i("Streaming cancelled by user")
             wasInterrupted = true
@@ -673,10 +690,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun createCurrentModelInfo(): MessageModelInfo? {
         val modelName = _uiState.value.loadedModelName ?: return null
-        val modelId = RunAnywhere.currentLLMModelId ?: modelName
-
+        // Round 1 (G-A8): currentLLMModelId removed. Reuse loadedModelName as
+        // the modelId fallback; the proper resolved id is captured in
+        // [refreshLoraState] / [checkModelStatus] via currentLLMModel().
         return MessageModelInfo(
-            modelId = modelId,
+            modelId = modelName,
             modelName = modelName,
             framework = "LLAMA_CPP",
         )
@@ -764,9 +782,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         try {
             if (app.isSDKReady()) {
                 // Check if LLM is already loaded via SDK
-                if (RunAnywhere.isLLMModelLoaded()) {
-                    val currentModel = RunAnywhere.currentLLMModel()
-                    val displayName = currentModel?.name ?: RunAnywhere.currentLLMModelId
+                if (RunAnywhere.isLLMModelLoaded) {
+                    val currentModel = RunAnywhere.currentLLMModel
+                    val displayName = currentModel?.name ?: currentModel?.id
                     Timber.i("✅ LLM model already loaded: $displayName")
                     _uiState.value =
                         _uiState.value.copy(

@@ -38,35 +38,17 @@ extension LLMViewModel {
         // Auto-detect the tool calling format based on the loaded model
         let format = detectToolCallFormat(for: loadedModelName)
 
-        // Get tool calling options with the appropriate format
-        let toolOptions = ToolCallingOptions(
-            maxToolCalls: 3,
-            autoExecute: true,
-            temperature: options.temperature,
-            maxTokens: options.maxTokens,
-            format: format
-        )
-
         // Log the format being used for debugging
         print("Using tool calling with format: \(format) for model: \(loadedModelName ?? "unknown")")
 
-        // Generate with tools
-        let result = try await RunAnywhere.generateWithTools(prompt, options: toolOptions)
+        // Generate with tools — pass generation options (temperature, maxTokens).
+        // Tool calling format is managed via ToolCallingOptions registered separately.
+        let result = try await RunAnywhere.generateWithTools(prompt, options: options)
 
-        // Extract tool call info if any tools were called
-        let toolCallInfo: ToolCallInfo?
-        if let lastCall = result.toolCalls.last,
-           let lastResult = result.toolResults.last {
-            toolCallInfo = ToolCallInfo(
-                toolName: lastCall.toolName,
-                arguments: lastCall.arguments,
-                result: lastResult.result,
-                success: lastResult.success,
-                error: lastResult.error
-            )
-        } else {
-            toolCallInfo = nil
-        }
+        // Tool call metadata is embedded in the result text (the SDK orchestrates
+        // tool call → execute → respond internally). No separate toolCalls/toolResults
+        // fields exist on LLMGenerationResult; ToolCallInfo is unavailable here.
+        let toolCallInfo: ToolCallInfo? = nil
 
         // Split `<think>...</think>` content from the response so the UI can render
         // the thinking block separately and avoid silently dropping SDK-provided

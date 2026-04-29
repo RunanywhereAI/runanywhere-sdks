@@ -583,11 +583,11 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     switch (framework) {
       case LLMFramework.llamaCpp:
         return AppColors.primaryBlue;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return Colors.purple;
       case LLMFramework.foundationModels:
         return Colors.grey;
-      case LLMFramework.whisperKit:
+      case LLMFramework.unknown:
         return Colors.green;
       default:
         return Colors.grey;
@@ -600,11 +600,11 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     switch (framework) {
       case LLMFramework.llamaCpp:
         return 'Fast';
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return 'ONNX';
       case LLMFramework.foundationModels:
         return 'Apple';
-      case LLMFramework.whisperKit:
+      case LLMFramework.unknown:
         return 'Whisper';
       default:
         return framework.displayName;
@@ -862,21 +862,23 @@ class _FlatModelRowState extends State<_FlatModelRow> {
       await for (final progress in downloadProgress) {
         if (!mounted) return;
 
-        final progressValue = progress.totalBytes > 0
-            ? progress.bytesDownloaded / progress.totalBytes
-            : 0.0;
+        final totalBytes = progress.totalBytes.toInt();
+        final progressValue = totalBytes > 0
+            ? progress.bytesDownloaded.toInt() / totalBytes
+            : progress.stageProgress.toDouble();
 
         setState(() {
           _downloadProgress = progressValue;
         });
 
         // Check if completed or failed
-        if (progress.state.isCompleted) {
+        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.state.isFailed) {
+        } else if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+            progress.errorMessage.isNotEmpty) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
-          throw Exception('Download failed');
+          throw Exception('Download failed: ${progress.errorMessage}');
         }
       }
 

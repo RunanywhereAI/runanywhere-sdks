@@ -16,6 +16,7 @@
 import CRACommons
 import Foundation
 import SwiftProtobuf
+import os
 
 // MARK: - SolutionHandle
 
@@ -27,15 +28,15 @@ import SwiftProtobuf
 /// to the C ABI.
 public final class SolutionHandle: @unchecked Sendable {
 
-    private let lock = NSLock()
-    private var handle: rac_solution_handle_t?
+    // Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
+    private let handle: OSAllocatedUnfairLock<rac_solution_handle_t?>
 
     fileprivate init(handle: rac_solution_handle_t) {
-        self.handle = handle
+        self.handle = OSAllocatedUnfairLock(initialState: handle)
     }
 
     deinit {
-        if let h = handle {
+        if let h = handle.withLock({ $0 }) {
             rac_solution_destroy(h)
         }
     }
@@ -69,24 +70,31 @@ public final class SolutionHandle: @unchecked Sendable {
 
     /// Cancel, join, and destroy the solution. Idempotent.
     public func destroy() {
-        lock.lock()
-        defer { lock.unlock() }
-        if let h = handle {
-            rac_solution_destroy(h)
-            handle = nil
+        handle.withLock { current in
+            if let h = current {
+                rac_solution_destroy(h)
+                current = nil
+            }
         }
     }
 
-    private func withHandle(_ body: (rac_solution_handle_t) -> rac_result_t) throws {
-        lock.lock()
-        let h = handle
-        lock.unlock()
+    /// Whether the underlying C handle is still live (CANONICAL_API §11).
+    ///
+    /// Returns `true` as long as `destroy()` has not been called (or `deinit`
+    /// triggered). Once destroyed, further calls to the lifecycle verbs throw
+    /// `SDKException(.invalidState)`.
+    public var isAlive: Bool {
+        handle.withLock { $0 != nil }
+    }
 
-        guard let h else {
+    private func withHandle(_ body: (rac_solution_handle_t) -> rac_result_t) throws {
+        let snapshot = handle.withLock { $0 }
+
+        guard let snapshot else {
             throw SDKException.runtime(.invalidState, "Solution handle has already been destroyed")
         }
 
-        let result = body(h)
+        let result = body(snapshot)
         guard result == RAC_SUCCESS else {
             throw SDKException.runtime(
                 .processingFailed,
@@ -168,7 +176,7 @@ public extension RunAnywhere {
         }
 
         private func ensureReady() async throws {
-            guard RunAnywhere.isSDKInitialized else {
+            guard RunAnywhere.isInitialized else {
                 throw SDKException.general(.notInitialized, "SDK not initialized")
             }
             try await RunAnywhere.ensureServicesReady()

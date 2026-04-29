@@ -21,7 +21,7 @@ export class ServiceContainer {
 
   private _apiKey?: string;
   private _baseURL?: string;
-  private _environment: SDKEnvironment = SDKEnvironment.Development;
+  private _environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   private _isInitialized: boolean = false;
 
   public constructor() {}
@@ -73,11 +73,11 @@ export class ServiceContainer {
 
   public get environmentString(): string {
     switch (this._environment) {
-      case SDKEnvironment.Development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'development';
-      case SDKEnvironment.Staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 'staging';
-      case SDKEnvironment.Production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'production';
       default:
         return 'unknown';
@@ -106,7 +106,7 @@ export class ServiceContainer {
   public reset(): void {
     this._apiKey = undefined;
     this._baseURL = undefined;
-    this._environment = SDKEnvironment.Development;
+    this._environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     this._isInitialized = false;
 
     logger.debug('ServiceContainer reset');
@@ -122,18 +122,18 @@ export class ServiceContainer {
       case 'development':
       case 'dev':
       case '0':
-        return SDKEnvironment.Development;
+        return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
       case 'staging':
       case 'stage':
       case '1':
-        return SDKEnvironment.Staging;
+        return SDKEnvironment.SDK_ENVIRONMENT_STAGING;
       case 'production':
       case 'prod':
       case '2':
-        return SDKEnvironment.Production;
+        return SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
       default:
         logger.warning(`Unknown environment '${env}', defaulting to Development`);
-        return SDKEnvironment.Development;
+        return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     }
   }
 }

@@ -31,6 +31,20 @@ expect suspend fun RunAnywhere.describeImage(
     prompt: String = "What's in this image?",
 ): String
 
+/**
+ * Ask a specific question about an image.
+ *
+ * Per canonical §7: `askAboutImage(question, image) → String`.
+ *
+ * @param question The question to ask about the image
+ * @param image The image to analyze
+ * @return Answer text
+ */
+expect suspend fun RunAnywhere.askAboutImage(
+    question: String,
+    image: VLMImage,
+): String
+
 // MARK: - Full API
 
 /**

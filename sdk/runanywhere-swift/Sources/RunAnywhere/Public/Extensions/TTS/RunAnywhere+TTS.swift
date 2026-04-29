@@ -21,7 +21,7 @@ public extension RunAnywhere {
     /// - Parameter voiceId: The voice identifier
     /// - Throws: Error if loading fails
     static func loadTTSVoice(_ voiceId: String) async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -39,7 +39,7 @@ public extension RunAnywhere {
 
     /// Unload the currently loaded TTS voice
     static func unloadTTSVoice() async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -53,12 +53,21 @@ public extension RunAnywhere {
         }
     }
 
-    /// Get available TTS voices
-    static var availableTTSVoices: [String] {
-        get async {
-            let allModels = await CppBridge.ModelRegistry.shared.getByFrameworks([.onnx])
-            let ttsModels = allModels.filter { $0.category == .speechSynthesis }
-            return ttsModels.map { $0.id }
+    /// Return available TTS voices as `[RATTSVoiceInfo]` (CANONICAL_API §5).
+    ///
+    /// Each `RATTSVoiceInfo` carries `.id`, `.displayName`, and `.languageCode`.
+    /// The list is derived from the model registry filtered to TTS-capable models.
+    ///
+    /// - Returns: Array of `RATTSVoiceInfo` proto values.
+    static func availableTTSVoices() async -> [RATTSVoiceInfo] {
+        let allModels = await CppBridge.ModelRegistry.shared.getByFrameworks([.onnx])
+        let ttsModels = allModels.filter { $0.category == .speechSynthesis }
+        return ttsModels.map { model in
+            var info = RATTSVoiceInfo()
+            info.id = model.id
+            info.displayName = model.name
+            info.languageCode = "en-US" // default; real locale from model metadata if available
+            return info
         }
     }
 
@@ -73,7 +82,7 @@ public extension RunAnywhere {
         _ text: String,
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -135,7 +144,63 @@ public extension RunAnywhere {
         )
     }
 
-    /// Stream synthesis for long text
+    /// Stream synthesis — canonical form (CANONICAL_API §5).
+    ///
+    /// Returns an `AsyncStream<TTSAudioChunk>` where each element wraps a PCM audio chunk
+    /// together with its sample rate and a `isFinal` flag.
+    /// The stream closes after all chunks have been emitted or on error.
+    ///
+    /// - Parameters:
+    ///   - text: Text to synthesize.
+    ///   - options: Synthesis options (optional).
+    /// - Returns: `AsyncStream<TTSAudioChunk>` of audio chunks.
+    static func synthesizeStream(
+        _ text: String,
+        options: TTSOptions = TTSOptions()
+    ) -> AsyncStream<TTSAudioChunk> {
+        AsyncStream { continuation in
+            Task {
+                guard isInitialized,
+                      let handle = try? await CppBridge.TTS.shared.getHandle(),
+                      await CppBridge.TTS.shared.isLoaded else {
+                    continuation.finish()
+                    return
+                }
+
+                var cOptions = rac_tts_options_t()
+                cOptions.rate = options.rate
+                cOptions.pitch = options.pitch
+                cOptions.volume = options.volume
+                cOptions.sample_rate = Int32(options.sampleRate)
+                let sampleRate = options.sampleRate
+
+                let context = TTSAsyncStreamContext(continuation: continuation, sampleRate: sampleRate)
+                let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+                let _ = text.withCString { textPtr in
+                    rac_tts_component_synthesize_stream(
+                        handle,
+                        textPtr,
+                        &cOptions,
+                        { audioPtr, audioSize, userData in
+                            guard let audioPtr = audioPtr, let userData = userData else { return }
+                            let ctx = Unmanaged<TTSAsyncStreamContext>.fromOpaque(userData)
+                                .takeUnretainedValue()
+                            let audioData = Data(bytes: audioPtr, count: audioSize)
+                            let chunk = TTSAudioChunk(audioData: audioData, sampleRate: ctx.sampleRate, isFinal: false)
+                            ctx.continuation.yield(chunk)
+                        },
+                        contextPtr
+                    )
+                }
+
+                Unmanaged<TTSAsyncStreamContext>.fromOpaque(contextPtr).release()
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Stream synthesis for long text — legacy callback form (prefer `synthesizeStream(_:options:)`).
     /// - Parameters:
     ///   - text: Text to synthesize
     ///   - options: Synthesis options
@@ -146,7 +211,7 @@ public extension RunAnywhere {
         options: TTSOptions = TTSOptions(),
         onAudioChunk: @escaping (Data) -> Void
     ) async throws -> TTSOutput {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -245,7 +310,7 @@ public extension RunAnywhere {
         _ text: String,
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSSpeakResult {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -314,5 +379,18 @@ private final class TTSStreamContext: @unchecked Sendable {
 
     init(onChunk: @escaping (Data) -> Void) {
         self.onChunk = onChunk
+    }
+}
+
+// MARK: - Async Stream Context (canonical synthesizeStream)
+
+/// Context bridge for the canonical `synthesizeStream(_:options:)` returning `AsyncStream<TTSAudioChunk>`.
+private final class TTSAsyncStreamContext: @unchecked Sendable {
+    let continuation: AsyncStream<TTSAudioChunk>.Continuation
+    let sampleRate: Int
+
+    init(continuation: AsyncStream<TTSAudioChunk>.Continuation, sampleRate: Int) {
+        self.continuation = continuation
+        self.sampleRate = sampleRate
     }
 }

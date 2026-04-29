@@ -160,7 +160,37 @@ public extension RunAnywhere {
         await CppBridge.Diffusion.shared.cancel()
     }
 
-    /// Load a diffusion model
+    /// Load a diffusion model from a `DiffusionConfig` (CANONICAL_API §8).
+    ///
+    /// `DiffusionConfig` is a typealias for `DiffusionConfiguration`. The `modelId`
+    /// field on the config is used as both the path (development convenience) and
+    /// the registry identifier when a local path is not separately specified.
+    ///
+    /// - Parameter config: `DiffusionConfig` (= `DiffusionConfiguration`) carrying
+    ///                     model ID, variant, and generation settings.
+    static func loadDiffusionModel(config: DiffusionConfig) async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
+
+        let modelId = config.modelId ?? "diffusion"
+        // Resolve local path from registry if available
+        let allModels = try await availableModels()
+        let localPath: String
+        if let modelInfo = allModels.first(where: { $0.id == modelId }),
+           let resolved = modelInfo.localPath {
+            localPath = resolved.path
+        } else {
+            // Fall back to treating modelId as a direct path.
+            localPath = modelId
+        }
+
+        try await CppBridge.Diffusion.shared.configure(config)
+        try await CppBridge.Diffusion.shared.loadModel(localPath, modelId: modelId, modelName: modelId)
+    }
+
+    /// Load a diffusion model with explicit decomposed parameters (advanced/internal).
     ///
     /// Expects a CoreML model directory containing .mlmodelc files
     /// (Unet.mlmodelc, TextEncoder.mlmodelc, etc.).

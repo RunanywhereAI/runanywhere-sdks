@@ -34,16 +34,19 @@ import {
  * Adapter that exposes the C++ proto-byte voice agent callback as a
  * standard JS AsyncIterable. Construct with either:
  *
- *   1. `new VoiceAgentStreamAdapter(handle)` — WASM path. `handle` is an
- *      opaque pointer returned from the backend package's
- *      `_rac_voice_agent_create*` thunk. This is the canonical path,
- *      parity with iOS / Android / Flutter / React Native.
+ *   1. `new VoiceAgentStreamAdapter(handle, module?)` — WASM path. `handle`
+ *      is an opaque pointer returned from the backend package's
+ *      `_rac_voice_agent_create*` thunk. The optional `module` arg lets
+ *      backend packages (e.g. `@runanywhere/web-llamacpp`) pass their own
+ *      Emscripten module instance directly — the global `runanywhereModule`
+ *      singleton is only used when no module is supplied (test harnesses
+ *      / future single-module deployments). Mirrors `LLMStreamAdapter`'s
+ *      ctor shape so multi-WASM apps (llamacpp + onnx) don't collapse
+ *      into the last-registered-wins singleton.
  *
- *   2. `new VoiceAgentStreamAdapter(transport)` — custom transport path.
- *      Useful for apps that drive a TS-side orchestrator (e.g.
- *      [`VoicePipeline`]) and want to emit `VoiceEvent`s, or for unit
- *      tests that inject a fake transport. The transport must satisfy
- *      the codegen'd [`VoiceAgentStreamTransport`] contract.
+ *   2. `new VoiceAgentStreamAdapter(transport)` — custom transport path
+ *      for unit tests that inject a fake transport satisfying the
+ *      codegen'd [`VoiceAgentStreamTransport`] contract.
  *
  * When constructed from a `handle`, multiple `.stream()` collectors on
  * the same adapter share a single C callback registration (per-handle
@@ -53,10 +56,13 @@ import {
 export class VoiceAgentStreamAdapter {
   private readonly transportImpl: VoiceAgentStreamTransport;
 
-  constructor(handleOrTransport: number | VoiceAgentStreamTransport) {
+  constructor(
+    handleOrTransport: number | VoiceAgentStreamTransport,
+    module: EmscriptenRunanywhereModule = runanywhereModule,
+  ) {
     this.transportImpl =
       typeof handleOrTransport === 'number'
-        ? fanOutTransportFor(handleOrTransport, runanywhereModule)
+        ? fanOutTransportFor(handleOrTransport, module)
         : handleOrTransport;
   }
 

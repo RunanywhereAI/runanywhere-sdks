@@ -47,7 +47,7 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
             // Transcribe
             let benchStart = Date()
             let options = STTOptions()
-            let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
+            let result = try await RunAnywhere.transcribe(audio: audioData, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
             // processingTime is in seconds

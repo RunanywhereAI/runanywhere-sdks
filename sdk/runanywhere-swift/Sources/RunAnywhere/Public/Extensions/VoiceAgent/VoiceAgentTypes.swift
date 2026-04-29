@@ -171,6 +171,27 @@ public struct VoiceAgentConfiguration: Sendable {
     }
 }
 
+// MARK: - Canonical Typealiases (CANONICAL_API §10)
+//
+// The spec names `VoiceAgentConfig` and `ComponentStates` as the canonical types.
+// Until the proto `idl/voice_*.proto` exports these exact names (CPP track),
+// we bridge from the hand-rolled Swift types with typealiases so all callers can
+// use the canonical names.
+//
+// Pending proto adoption: once generated `RAVoiceAgentConfig` and
+// `RAComponentStates` are available in `Generated/`, replace these typealiases
+// with re-exports of the generated forms.
+
+/// Canonical name for the voice agent configuration (CANONICAL_API §10).
+/// Backed by the hand-rolled `VoiceAgentConfiguration` struct;
+/// pending migration to proto-generated `RAVoiceAgentConfig`.
+public typealias VoiceAgentConfig = VoiceAgentConfiguration
+
+/// Canonical name for voice agent component states (CANONICAL_API §10).
+/// Backed by the hand-rolled `VoiceAgentComponentStates` struct;
+/// pending migration to proto-generated `RAComponentStates`.
+public typealias ComponentStates = VoiceAgentComponentStates
+
 // v3.1: VoiceSessionEvent enum + `from(_:)` mapper DELETED. Use
 // RAVoiceEvent (the proto-generated type) via
 // VoiceAgentStreamAdapter(handle:).stream().

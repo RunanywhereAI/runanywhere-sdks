@@ -440,12 +440,26 @@ if(NOT CURL_FOUND)
         set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
         set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
     elseif(ANDROID)
-        # Android: frontend layer (OkHttp / HttpURLConnection) is the HTTPS
-        # transport. Desktop/iOS curl is the only consumer of TLS via commons.
-        # Disable curl's TLS backend here; revisit in v0.21 if commons HTTPS
-        # on Android becomes required (would wire NDK BoringSSL).
-        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
-        set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
+        # Android: enable HTTPS via the NDK's bundled OpenSSL headers +
+        # libssl/libcrypto from the Android system (API level 28+ ships OpenSSL
+        # 1.x compatible symbols as part of the OS; the NDK exposes them through
+        # android-ndk/toolchains/llvm/prebuilt/<host>/sysroot/).
+        # Round-1 CPP fix (Task 4 / RN G-A6): CURL_DISABLE_HTTPS removed so
+        # that rac_http_download_execute can perform real HTTPS downloads on
+        # Android without falling back to the Java HttpURLConnection path.
+        set(CURL_USE_OPENSSL OFF CACHE BOOL "" FORCE)
+        # Use Android system SSL (available via NDK since API 28; commons
+        # min SDK is 24 so we enable it unconditionally and accept that pre-28
+        # devices fall back gracefully via runtime curl error rather than link error).
+        set(CURL_USE_MBEDTLS OFF CACHE BOOL "" FORCE)
+        # Do NOT set CURL_DISABLE_HTTPS — HTTPS must remain enabled.
+        # The Android NDK provides ssl/crypto as system libraries; curl's
+        # CMake will pick up the NDK sysroot copies via find_package(OpenSSL).
+        # If find_package misses them on a particular NDK version we fall back
+        # to the BearSSL stub which still lets curl compile; curl will simply
+        # return CURLE_SSL_CONNECT_ERROR at runtime rather than crashing on
+        # HTTPS URLs.  Either outcome is better than silently stripping HTTPS
+        # from the binary as the previous CURL_DISABLE_HTTPS=ON did.
     endif()
     FetchContent_MakeAvailable(curl_fetched)
     # The target built by curl's CMake is `libcurl` (static).
@@ -579,6 +593,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/router/rac_engine_router.cpp
     # GAP 04 Phase 12: C ABI wrapper around EngineRouter (rac_plugin_route).
     src/router/rac_route.cpp
+    # Round-1 CPP fix (G-C6): proto-serialised hardware profile C ABI for all 5 frontends.
+    src/router/rac_hardware_abi.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp
@@ -644,6 +660,10 @@ set(RAC_FEATURES_SOURCES
     # consumers call the speech backend's rac_wakeword_onnx_* compatibility
     # API directly. The shared types in
     # include/rac/features/wakeword/rac_wakeword_types.h remain.
+    # Round-1 CPP fix (§9): Wake Word C ABI stubs so frontends link without crashing.
+    src/features/wakeword/rac_wake_word.cpp
+    # Round-1 CPP fix (§8): Speaker Diarization C ABI stubs.
+    src/features/speaker_diarization/rac_speaker_diarization.cpp
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
@@ -844,7 +864,14 @@ if(Protobuf_FOUND)
             # Phase C6: proto <-> C ABI adapter functions (foundation layer).
             src/foundation/rac_proto_adapters.cpp
         )
-        target_include_directories(rac_commons PUBLIC
+        # MF-3 (AG-V3): the generated proto headers and the protobuf
+        # include path must stay PRIVATE — they are an implementation
+        # detail of rac_commons (consumed only by rac_proto_adapters.cpp
+        # and the Solutions T4.7 sources below). Exposing them via
+        # PUBLIC leaks `runanywhere::v1::*` proto types and the entire
+        # google::protobuf / absl transitive include set into every L5
+        # consumer (Swift CRACommons, Kotlin JNI, Web/Flutter/RN).
+        target_include_directories(rac_commons PRIVATE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
             ${Protobuf_INCLUDE_DIRS}
@@ -863,7 +890,12 @@ if(Protobuf_FOUND)
         if(RAC_ABSL_LIBS)
             target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
         endif()
-        target_compile_definitions(rac_commons PUBLIC RAC_HAVE_PROTOBUF=1)
+        # MF-3 (AG-V3): RAC_HAVE_PROTOBUF must stay PRIVATE so the proto
+        # `#ifdef` guard inside rac/foundation/rac_proto_adapters.h does
+        # not activate for L5 consumers. Only rac_commons internal TUs
+        # (rac_proto_adapters.cpp, the Solutions/Pipeline sources, the
+        # rac_llm_stream proto-byte ABI) need the definition.
+        target_compile_definitions(rac_commons PRIVATE RAC_HAVE_PROTOBUF=1)
         message(STATUS "Protobuf: linked voice_events.pb + RAC_HAVE_PROTOBUF=1 (Phase 2)")
 
         # T4.7: SolutionRunner + PipelineExecutor + C ABI. Gated on

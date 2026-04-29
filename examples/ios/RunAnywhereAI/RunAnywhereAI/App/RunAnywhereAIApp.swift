@@ -161,17 +161,14 @@ struct RunAnywhereAIApp: App {
             try RunAnywhere.initialize()
             logger.info("✅ SDK initialized in DEVELOPMENT mode")
             #else
-            // Production mode - requires API key and backend URL
-            // Configure these via Settings screen or set environment variables
-            let apiKey = "YOUR_API_KEY_HERE"
-            let baseURL = "YOUR_BASE_URL_HERE"
-
-            try RunAnywhere.initialize(
-                apiKey: apiKey,
-                baseURL: baseURL,
-                environment: .production
-            )
-            logger.info("✅ SDK initialized in PRODUCTION mode")
+            // Release builds must be configured before launch — either via
+            // the in-app Settings screen (which writes to Settings.bundle and
+            // is read back via SettingsViewModel.getStoredApiKey()/getStoredBaseURL())
+            // or via an .xcconfig that injects RUNANYWHERE_API_KEY /
+            // RUNANYWHERE_BASE_URL at build time. We deliberately fail loud
+            // here so a release build never silently runs against placeholder
+            // credentials.
+            fatalError("Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; set in Settings.bundle or .xcconfig before shipping.")
             #endif
         }
     }

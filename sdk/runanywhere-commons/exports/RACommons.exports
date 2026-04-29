@@ -564,3 +564,25 @@ _rac_image_normalize
 _rac_image_resize
 _rac_image_resize_max
 _rac_image_to_chw
+
+# Hardware Profile ABI (round-1 CPP fix — G-C6 / Task 1)
+_rac_hardware_profile_get
+_rac_hardware_profile_free
+_rac_hardware_get_accelerators
+_rac_hardware_set_accelerator_preference
+
+# VAD Component Statistics (round-1 CPP fix — G-C6 / Task 3)
+_rac_vad_component_get_statistics
+
+# Model Registry Fetch Assignments (round-1 CPP fix — Task 5)
+_rac_model_registry_fetch_assignments
+
+# Speaker Diarization stubs (§8)
+_rac_speaker_diarization_init
+_rac_speaker_diarization_process
+_rac_speaker_diarization_destroy
+
+# Wake Word stubs (§9)
+_rac_wake_word_init
+_rac_wake_word_process
+_rac_wake_word_destroy

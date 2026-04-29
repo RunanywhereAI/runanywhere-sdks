@@ -88,7 +88,8 @@ export async function ragClearDocuments(): Promise<void> {
   await requireProvider().ragClearDocuments();
 }
 
-export async function ragDocumentCount(): Promise<number> {
+/** Canonical name: `ragGetDocumentCount` (§9). */
+export async function ragGetDocumentCount(): Promise<number> {
   return requireProvider().ragGetDocumentCount();
 }
 
@@ -125,6 +126,6 @@ export const RAG = {
   addDocumentsBatch: ragAddDocumentsBatch,
   query: ragQuery,
   clearDocuments: ragClearDocuments,
-  documentCount: ragDocumentCount,
+  getDocumentCount: ragGetDocumentCount,
   getStatistics: ragGetStatistics,
 };

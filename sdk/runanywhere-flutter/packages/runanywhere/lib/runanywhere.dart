@@ -87,8 +87,14 @@ export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'
     show RunAnywhereDownloads;
+export 'public/capabilities/runanywhere_hardware.dart'
+    show RunAnywhereHardware, HardwareProfile;
 export 'public/capabilities/runanywhere_llm.dart' show RunAnywhereLLM;
+export 'public/capabilities/runanywhere_lora.dart'
+    show RunAnywhereLoRACapability, LoRACompatibilityResult;
 export 'public/capabilities/runanywhere_models.dart' show RunAnywhereModels;
+export 'public/capabilities/runanywhere_plugin_loader.dart'
+    show RunAnywherePluginLoaderCapability, PluginInfo;
 export 'public/capabilities/runanywhere_rag.dart' show RunAnywhereRAG;
 export 'public/capabilities/runanywhere_stt.dart' show RunAnywhereSTT;
 export 'public/capabilities/runanywhere_tools.dart' show RunAnywhereTools;
@@ -104,11 +110,15 @@ export 'public/capabilities/runanywhere_voice.dart'
     show RunAnywhereVoice, VoiceAgentConfiguration, VoiceAgentResult;
 export 'public/capabilities/runanywhere_voice_agent.dart'
     show RunAnywhereVoiceAgent;
+// Re-export proto types for canonical typing in consumer code (G-A7).
+export 'generated/download_service.pb.dart' show DownloadProgress;
+export 'generated/download_service.pbenum.dart' show DownloadStage;
+// Proto tool_calling types are SDK-internal; consumer-facing types are
+// the hand-rolled ones below (RunAnywhereTools.register takes them).
 export 'public/configuration/sdk_environment.dart';
 export 'public/events/event_bus.dart';
 export 'public/events/sdk_event.dart';
 export 'public/extensions/rag_module.dart';
-export 'public/extensions/runanywhere_device.dart';
 export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_lora.dart';
@@ -116,11 +126,12 @@ export 'public/extensions/runanywhere_model_assignments.dart'
     show RunAnywhereModelAssignments;
 export 'public/extensions/runanywhere_model_management.dart'
     show RunAnywhereModelManagement;
-export 'public/extensions/runanywhere_plugin_loader.dart'
-    show RunAnywherePluginLoader;
 export 'public/extensions/runanywhere_storage.dart';
+export 'public/extensions/runanywhere_flat_aliases.dart';
 export 'public/extensions/runanywhere_structured_output.dart'
     show RunAnywhereStructuredOutput;
+export 'public/extensions/runanywhere_thinking_utils.dart'
+    show RunAnywhereThinkingUtils, ThinkingExtractionResult;
 export 'public/runanywhere_v4.dart' show RunAnywhereSDK;
 export 'public/types/tool_calling_types.dart';
 export 'public/types/types.dart';

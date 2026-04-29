@@ -21,6 +21,7 @@
 import CRACommons
 import Foundation
 import SwiftProtobuf
+import os
 
 /// AsyncStream-based wrapper over the GAP 09 proto-byte voice agent ABI.
 ///
@@ -37,12 +38,16 @@ public final class VoiceAgentStreamAdapter {
     ) -> Void
 
     private final class HandleFanOut {
+        // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
+        private struct FanOutState {
+            var continuations: [UUID: AsyncStream<RAVoiceEvent>.Continuation] = [:]
+            var userPtr: UnsafeMutableRawPointer?
+            var installed: Bool = false
+        }
+
         private let handle: rac_voice_agent_handle_t
         private let key: UInt
-        private let lock = NSLock()
-        private var continuations: [UUID: AsyncStream<RAVoiceEvent>.Continuation] = [:]
-        private var userPtr: UnsafeMutableRawPointer?
-        private var installed = false
+        private let state = OSAllocatedUnfairLock<FanOutState>(initialState: FanOutState())
 
         init(handle: rac_voice_agent_handle_t, key: UInt) {
             self.handle = handle
@@ -50,30 +55,28 @@ public final class VoiceAgentStreamAdapter {
         }
 
         func attach(_ continuation: AsyncStream<RAVoiceEvent>.Continuation) -> UUID? {
-            lock.lock()
-            defer { lock.unlock() }
-
-            if !installed && !installLocked() {
-                return nil
+            let alreadyInstalled = state.withLock { $0.installed }
+            if !alreadyInstalled {
+                if !install() { return nil }
             }
 
             let id = UUID()
-            continuations[id] = continuation
+            state.withLock { $0.continuations[id] = continuation }
             return id
         }
 
         func detach(_ id: UUID) {
-            lock.lock()
-            continuations.removeValue(forKey: id)
-            let shouldTearDown = continuations.isEmpty
-            lock.unlock()
+            let shouldTearDown = state.withLock { s -> Bool in
+                s.continuations.removeValue(forKey: id)
+                return s.continuations.isEmpty
+            }
 
             if shouldTearDown {
                 tearDown()
             }
         }
 
-        private func installLocked() -> Bool {
+        private func install() -> Bool {
             let userPtr = Unmanaged.passRetained(self).toOpaque()
             let trampoline: CCallback = { bytesPtr, bytesLen, userData in
                 guard let bytesPtr = bytesPtr,
@@ -88,21 +91,26 @@ public final class VoiceAgentStreamAdapter {
                 fanOut.broadcast(event)
             }
 
+            state.withLock {
+                $0.userPtr = userPtr
+                $0.installed = true
+            }
+
             let result = rac_voice_agent_set_proto_callback(handle, trampoline, userPtr)
             if result != RAC_SUCCESS {
+                state.withLock {
+                    $0.userPtr = nil
+                    $0.installed = false
+                }
                 Unmanaged<HandleFanOut>.fromOpaque(userPtr).release()
                 return false
             }
-
-            self.userPtr = userPtr
-            installed = true
             return true
         }
 
         private func broadcast(_ event: RAVoiceEvent) {
-            lock.lock()
-            let snapshot = Array(continuations.values)
-            lock.unlock()
+            let snapshot: [AsyncStream<RAVoiceEvent>.Continuation] =
+                state.withLock { Array($0.continuations.values) }
 
             for continuation in snapshot {
                 continuation.yield(event)
@@ -110,10 +118,11 @@ public final class VoiceAgentStreamAdapter {
         }
 
         private func finishAll() {
-            lock.lock()
-            let snapshot = Array(continuations.values)
-            continuations.removeAll()
-            lock.unlock()
+            let snapshot: [AsyncStream<RAVoiceEvent>.Continuation] = state.withLock { s in
+                let values = Array(s.continuations.values)
+                s.continuations.removeAll()
+                return values
+            }
 
             for continuation in snapshot {
                 continuation.finish()
@@ -122,18 +131,16 @@ public final class VoiceAgentStreamAdapter {
         }
 
         private func tearDown() {
-            var ptrToRelease: UnsafeMutableRawPointer?
-
-            lock.lock()
-            if installed {
+            let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { s in
+                guard s.installed else { return nil }
                 rac_voice_agent_set_proto_callback(handle, nil, nil)
-                installed = false
-                ptrToRelease = userPtr
-                userPtr = nil
+                s.installed = false
+                let ptr = s.userPtr
+                s.userPtr = nil
+                return ptr
             }
-            lock.unlock()
 
-            if let ptrToRelease = ptrToRelease {
+            if let ptrToRelease {
                 Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease).release()
             }
             VoiceAgentStreamAdapter.removeFanOut(for: key)
@@ -142,25 +149,22 @@ public final class VoiceAgentStreamAdapter {
 
     private let handle: rac_voice_agent_handle_t
 
-    private static let fanOutLock = NSLock()
-    private static var fanOuts: [UInt: HandleFanOut] = [:]
+    private static let fanOuts = OSAllocatedUnfairLock<[UInt: HandleFanOut]>(initialState: [:])
 
     private static func fanOut(for handle: rac_voice_agent_handle_t) -> HandleFanOut {
         let key = UInt(bitPattern: handle)
-        fanOutLock.lock()
-        defer { fanOutLock.unlock() }
-        if let existing = fanOuts[key] {
-            return existing
+        return fanOuts.withLock { dict in
+            if let existing = dict[key] {
+                return existing
+            }
+            let fanOut = HandleFanOut(handle: handle, key: key)
+            dict[key] = fanOut
+            return fanOut
         }
-        let fanOut = HandleFanOut(handle: handle, key: key)
-        fanOuts[key] = fanOut
-        return fanOut
     }
 
     private static func removeFanOut(for key: UInt) {
-        fanOutLock.lock()
-        fanOuts.removeValue(forKey: key)
-        fanOutLock.unlock()
+        fanOuts.withLock { _ = $0.removeValue(forKey: key) }
     }
 
     // MARK: - Init

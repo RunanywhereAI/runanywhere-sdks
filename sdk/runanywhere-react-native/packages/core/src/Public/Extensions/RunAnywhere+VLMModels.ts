@@ -23,8 +23,8 @@ const logger = new SDKLogger('VLM.Models');
 /** Load a VLM model from a `ModelInfo`. Mirrors Swift `loadVLMModel(_:)`. */
 export async function loadVLMModel(model: ModelInfo): Promise<void> {
   if (
-    model.category !== ModelCategory.Vision &&
-    model.category !== ModelCategory.Multimodal
+    model.category !== ModelCategory.MODEL_CATEGORY_VISION &&
+    model.category !== ModelCategory.MODEL_CATEGORY_MULTIMODAL
   ) {
     throw SDKException.invalidInput(
       `Model ${model.id} is not a VLM (category=${model.category})`

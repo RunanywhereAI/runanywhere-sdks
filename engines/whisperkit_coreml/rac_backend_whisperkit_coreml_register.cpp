@@ -122,15 +122,31 @@ static rac_result_t whisperkit_coreml_stt_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
-const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
-    .initialize = whisperkit_coreml_stt_vtable_initialize,
-    .transcribe = whisperkit_coreml_stt_vtable_transcribe,
-    .transcribe_stream = whisperkit_coreml_stt_vtable_transcribe_stream,
-    .get_info = whisperkit_coreml_stt_vtable_get_info,
-    .cleanup = whisperkit_coreml_stt_vtable_cleanup,
-    .destroy = whisperkit_coreml_stt_vtable_destroy,
-    .create = whisperkit_coreml_stt_create_impl,
-};
+// SF-04: WhisperKit CoreML does not currently surface language enumeration
+// or language detection through the Swift bridge. Provide explicit
+// trampolines that return RAC_ERROR_NOT_SUPPORTED so callers receive a
+// well-defined error rather than NULL-derefing zero-initialized slots.
+static rac_result_t whisperkit_coreml_stt_vtable_get_languages(void* impl,
+                                                                char** out_json) {
+    (void)impl;
+    if (out_json) {
+        *out_json = nullptr;
+    }
+    return RAC_ERROR_NOT_SUPPORTED;
+}
+
+static rac_result_t whisperkit_coreml_stt_vtable_detect_language(
+    void* impl, const void* audio_data, size_t audio_size,
+    const rac_stt_options_t* options, char** out_language) {
+    (void)impl;
+    (void)audio_data;
+    (void)audio_size;
+    (void)options;
+    if (out_language) {
+        *out_language = nullptr;
+    }
+    return RAC_ERROR_NOT_SUPPORTED;
+}
 
 // =============================================================================
 // MODULE IDENTITY
@@ -144,7 +160,25 @@ const char* const MODULE_ID = "whisperkit_coreml";
 
 bool g_registered = false;
 
-}  // namespace
+}  // namespace (close anon — ops struct must have external linkage)
+
+// MF-02: keep external C linkage so rac_plugin_entry_whisperkit_coreml.cpp's
+// `extern const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops` declaration
+// is satisfied by a matching external-linkage definition. Defining this struct
+// inside the anonymous namespace gave it internal linkage, contradicting the
+// `extern` declaration in the plugin-entry TU. Match the pattern used by
+// llamacpp / sherpa / onnx (see rac_backend_sherpa_register.cpp:170).
+extern "C" const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
+    .initialize = whisperkit_coreml_stt_vtable_initialize,
+    .transcribe = whisperkit_coreml_stt_vtable_transcribe,
+    .transcribe_stream = whisperkit_coreml_stt_vtable_transcribe_stream,
+    .get_info = whisperkit_coreml_stt_vtable_get_info,
+    .cleanup = whisperkit_coreml_stt_vtable_cleanup,
+    .destroy = whisperkit_coreml_stt_vtable_destroy,
+    .create = whisperkit_coreml_stt_create_impl,
+    .get_languages = whisperkit_coreml_stt_vtable_get_languages,
+    .detect_language = whisperkit_coreml_stt_vtable_detect_language,
+};
 
 // =============================================================================
 // REGISTRATION API

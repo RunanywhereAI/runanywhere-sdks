@@ -841,3 +841,38 @@ void rac_discovery_result_free(rac_discovery_result_t* result) {
     result->discovered_count = 0;
     result->unregistered_count = 0;
 }
+
+// =============================================================================
+// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)
+// =============================================================================
+
+rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refresh,
+                                                  rac_model_info_t*** out_models,
+                                                  size_t* out_count) {
+    // Initialise caller outputs to safe defaults.
+    if (out_models) *out_models = nullptr;
+    if (out_count)  *out_count  = 0;
+
+    // Delegate to the model assignment layer which handles caching, HTTP, and
+    // JSON parsing.  If callbacks have not been set yet (e.g. offline WASM),
+    // rac_model_assignment_fetch returns RAC_SUCCESS with zero models — that
+    // is the correct behaviour for the Web SDK's offline path.
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+
+    rac_result_t rc = rac_model_assignment_fetch(force_refresh, &models, &count);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_WARNING("ModelRegistry", "rac_model_registry_fetch_assignments: fetch returned %d",
+                        rc);
+        return rc;
+    }
+
+    if (out_models) *out_models = models;
+    else            rac_model_info_array_free(models, count);  // caller doesn't want the array
+
+    if (out_count) *out_count = count;
+
+    RAC_LOG_INFO("ModelRegistry", "rac_model_registry_fetch_assignments: fetched %zu models",
+                 count);
+    return RAC_SUCCESS;
+}

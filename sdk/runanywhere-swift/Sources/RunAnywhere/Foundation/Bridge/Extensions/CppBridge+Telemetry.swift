@@ -8,6 +8,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - Events Bridge
 
@@ -68,23 +69,23 @@ extension CppBridge {
     /// C++ handles JSON building, batching; Swift handles HTTP transport only
     public enum Telemetry {
 
-        private static var manager: OpaquePointer?
-        private static let lock = NSLock()
+        // Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
+        // The lock guards an opaque manager pointer; Swift `OpaquePointer` is
+        // a value type so the locked state holds it directly.
+        private static let manager = OSAllocatedUnfairLock<OpaquePointer?>(initialState: nil)
 
         /// Initialize telemetry manager
         static func initialize(environment: SDKEnvironment) {
-            lock.lock()
-            defer { lock.unlock() }
-
             // Destroy existing if any
-            if let existing = manager {
+            let existing = manager.withLock { $0 }
+            if let existing {
                 rac_telemetry_manager_destroy(existing)
             }
 
             let deviceId = DeviceIdentity.persistentUUID
             let deviceInfo = DeviceInfo.current
 
-            manager = deviceId.withCString { did in
+            let newManager: OpaquePointer? = deviceId.withCString { did in
                 SDKConstants.platform.withCString { plat in
                     SDKConstants.version.withCString { ver in
                         rac_telemetry_manager_create(Environment.toC(environment), did, plat, ver)
@@ -92,27 +93,31 @@ extension CppBridge {
                 }
             }
 
+            manager.withLock { $0 = newManager }
+
             // Set device info
             deviceInfo.deviceModel.withCString { model in
                 deviceInfo.osVersion.withCString { os in
-                    rac_telemetry_manager_set_device_info(manager, model, os)
+                    rac_telemetry_manager_set_device_info(newManager, model, os)
                 }
             }
 
             // Register HTTP callback - Swift provides HTTP transport for C++
             let userData = Unmanaged.passUnretained(Telemetry.self as AnyObject).toOpaque()
-            rac_telemetry_manager_set_http_callback(manager, telemetryHttpCallback, userData)
+            rac_telemetry_manager_set_http_callback(newManager, telemetryHttpCallback, userData)
         }
 
         /// Shutdown telemetry manager
         static func shutdown() {
-            lock.lock()
-            defer { lock.unlock() }
+            let mgr = manager.withLock { current -> OpaquePointer? in
+                let snapshot = current
+                current = nil
+                return snapshot
+            }
 
-            if let mgr = manager {
+            if let mgr {
                 rac_telemetry_manager_flush(mgr)
                 rac_telemetry_manager_destroy(mgr)
-                manager = nil
             }
         }
 
@@ -121,21 +126,13 @@ extension CppBridge {
             type: rac_event_type_t,
             data: UnsafePointer<rac_analytics_event_data_t>
         ) {
-            lock.lock()
-            let mgr = manager
-            lock.unlock()
-
-            guard let mgr = mgr else { return }
+            guard let mgr = manager.withLock({ $0 }) else { return }
             rac_telemetry_manager_track_analytics(mgr, type, data)
         }
 
         /// Flush pending events
         public static func flush() {
-            lock.lock()
-            let mgr = manager
-            lock.unlock()
-
-            guard let mgr = mgr else { return }
+            guard let mgr = manager.withLock({ $0 }) else { return }
             rac_telemetry_manager_flush(mgr)
         }
     }

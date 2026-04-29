@@ -1,6 +1,9 @@
 package com.runanywhere.sdk.core.types
 
-import kotlinx.serialization.Serializable
+// Re-export the proto-generated AudioFormat so callers that previously imported
+// com.runanywhere.sdk.core.types.AudioFormat continue to resolve. The hand-rolled
+// enum class has been deleted per Iron Rule 2 / §15 of CANONICAL_API.md.
+typealias AudioFormat = ai.runanywhere.proto.v1.AudioFormat
 
 // MARK: - Component Protocols
 
@@ -28,71 +31,6 @@ interface ComponentConfiguration {
 interface ComponentOutput {
     val timestamp: Long
 }
-
-// MARK: - Audio Format
-//
-// GAP 01 Phase 3: canonical AudioFormat. The duplicate definition previously
-// living at `com.runanywhere.sdk.core.AudioFormat` (AudioTypes.kt) has been
-// deleted — there is now exactly one Kotlin AudioFormat.
-// The `toProto()` / `fromProto()` bridges to `ai.runanywhere.proto.v1.AudioFormat`
-// enforce drift-prevention: adding a case requires updating both sides.
-
-/**
- * Audio format enumeration. Superset of every format historically defined
- * across the SDK (the old `AudioTypes.kt` flavor added OGG + PCM_16BIT).
- *
- * Mirrors the IDL enum `runanywhere.v1.AudioFormat` in `idl/model_types.proto`.
- */
-@Serializable
-enum class AudioFormat(
-    val rawValue: String,
-) {
-    PCM("pcm"),
-    WAV("wav"),
-    MP3("mp3"),
-    OPUS("opus"),
-    AAC("aac"),
-    FLAC("flac"),
-    OGG("ogg"),
-    PCM_16BIT("pcm_16bit"), // Android-specific raw PCM (signed 16-bit LE)
-    ;
-
-    /** File extension for this format. */
-    val fileExtension: String get() = rawValue
-
-    companion object {
-        fun fromRawValue(value: String): AudioFormat? =
-            entries.find { it.rawValue.equals(value, ignoreCase = true) }
-    }
-
-    /** Convert to the IDL-generated Wire enum. Drift-preventing bijection. */
-    fun toProto(): ai.runanywhere.proto.v1.AudioFormat =
-        when (this) {
-            PCM -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM
-            WAV -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV
-            MP3 -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3
-            OPUS -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS
-            AAC -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC
-            FLAC -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC
-            OGG -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG
-            PCM_16BIT -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE
-        }
-}
-
-/** Decode from the IDL-generated Wire enum. Unknown proto cases → null. */
-fun audioFormatFromProto(proto: ai.runanywhere.proto.v1.AudioFormat): AudioFormat? =
-    when (proto) {
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM -> AudioFormat.PCM
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV -> AudioFormat.WAV
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3 -> AudioFormat.MP3
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS -> AudioFormat.OPUS
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC -> AudioFormat.AAC
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC -> AudioFormat.FLAC
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG -> AudioFormat.OGG
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE -> AudioFormat.PCM_16BIT
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_M4A -> null // iOS/Dart container, not exposed in Kotlin yet
-        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED -> null
-    }
 
 // MARK: - SDK Component
 

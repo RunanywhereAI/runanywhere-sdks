@@ -95,9 +95,35 @@ class ModelManagerImpl {
 
   // --- Registration API ---
 
-  registerModels(models: CompactModelDef[]): void {
+  /**
+   * Register a single model (canonical: `RunAnywhere.registerModel`).
+   * Multi-file models (mmproj sidecars, sherpa-onnx archive bundles) should
+   * use `registerMultiFileModel(model)` so the catalog records the extra
+   * artifacts properly.
+   */
+  registerModel(model: CompactModelDef): void {
+    this.registry.registerModels([model]);
+    void this.refreshDownloadStatus();
+  }
+
+  /**
+   * Register a multi-file model (additional GGUF files / sidecars / archive
+   * extraction). Today the schema is identical to `registerModel`; the
+   * separate verb exists so callers can express intent and so future
+   * multi-file-only metadata can be enforced statically.
+   */
+  registerMultiFileModel(model: CompactModelDef): void {
+    this.registry.registerModels([model]);
+    void this.refreshDownloadStatus();
+  }
+
+  /**
+   * Internal-only batch helper used by the example app to register a
+   * predefined catalog. Public callers must use `registerModel` /
+   * `registerMultiFileModel`.
+   */
+  registerCatalog(models: CompactModelDef[]): void {
     this.registry.registerModels(models);
-    // Fire-and-forget — status refresh errors are logged internally.
     void this.refreshDownloadStatus();
   }
 

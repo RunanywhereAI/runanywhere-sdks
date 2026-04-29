@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
 import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
-import com.runanywhere.sdk.public.extensions.LoraCompatibilityResult
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.allRegisteredLoraAdapters
 import com.runanywhere.sdk.public.extensions.checkLoraCompatibility

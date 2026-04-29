@@ -648,15 +648,15 @@ export const SettingsScreen: React.FC = () => {
       setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
       try {
-        await RunAnywhere.downloadModel(model.id, (progress) => {
+        for await (const progress of RunAnywhere.downloadModel(model.id)) {
           console.warn(
-            `[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`
+            `[Settings] Download progress for ${model.id}: ${((progress.stageProgress ?? 0) * 100).toFixed(1)}%`
           );
           setDownloadingModels((prev) => ({
             ...prev,
-            [model.id]: progress.progress,
+            [model.id]: progress.stageProgress ?? 0,
           }));
-        }); // Download complete
+        } // Download complete
 
         setDownloadingModels((prev) => {
           const updated = { ...prev };

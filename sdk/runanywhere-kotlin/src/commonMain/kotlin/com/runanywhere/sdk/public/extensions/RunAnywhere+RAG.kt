@@ -13,7 +13,20 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
+import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.public.RunAnywhere
+
+// MARK: - RAG Document
+//
+// Round 1 KOTLIN (G-A4): `RAGDocument` is currently absent from the
+// generated Wire types. Defined here as an SDK-local data shape that
+// mirrors the eventual `idl/rag.proto` :: RAGDocument message; once
+// the proto lands, this declaration is replaced with a re-export.
+public data class RAGDocument(
+    val id: String,
+    val text: String,
+    val metadataJson: String? = null,
+)
 
 // MARK: - Pipeline Lifecycle
 
@@ -54,10 +67,13 @@ expect suspend fun RunAnywhere.ragIngest(text: String, metadataJson: String? = n
 expect suspend fun RunAnywhere.ragClearDocuments()
 
 /**
- * The current number of indexed document chunks in the pipeline.
+ * Get the current number of indexed document chunks in the pipeline.
  * Returns 0 if pipeline has not been created.
+ *
+ * Per §9 of CANONICAL_API.md this is a function (ragGetDocumentCount()),
+ * not a property, to match the cross-SDK naming convention.
  */
-expect val RunAnywhere.ragDocumentCount: Int
+expect suspend fun RunAnywhere.ragGetDocumentCount(): Int
 
 // MARK: - Query
 
@@ -77,3 +93,19 @@ expect suspend fun RunAnywhere.ragQuery(
     question: String,
     options: RAGQueryOptions? = null,
 ): RAGResult
+
+/**
+ * Ingest a batch of documents into the RAG pipeline.
+ *
+ * @param documents List of documents to ingest
+ * @throws IllegalStateException if the pipeline is not created or ingestion fails
+ */
+expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>)
+
+/**
+ * Get statistics for the current RAG pipeline.
+ *
+ * @return RAGStatistics with chunk count, last query timing, etc.
+ * @throws IllegalStateException if the pipeline is not created
+ */
+expect suspend fun RunAnywhere.ragGetStatistics(): RAGStatistics

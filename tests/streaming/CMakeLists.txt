@@ -12,12 +12,38 @@ if(NOT RAC_BUILD_TESTS)
     return()
 endif()
 
+# MF-3 (AG-V3): rac_commons no longer propagates RAC_HAVE_PROTOBUF=1 via
+# its PUBLIC interface (the define and `src/generated/proto/` include path
+# are now PRIVATE so they do not leak through to L5 consumers). The proto-
+# byte producer / parity tests under this directory are intentional internal
+# consumers of that same proto path, so we re-define the macro here gated
+# on the same `Protobuf_FOUND` predicate the library uses.
+find_package(Protobuf QUIET)
+set(_RAC_TESTS_HAVE_PROTOBUF 0)
+if(Protobuf_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto/voice_events.pb.cc)
+    set(_RAC_TESTS_HAVE_PROTOBUF 1)
+endif()
+
+# Helper: apply RAC_HAVE_PROTOBUF + include path for the now-PRIVATE proto
+# headers in rac_commons. Mirrors the same predicate the library uses.
+function(rac_streaming_test_define_have_protobuf target)
+    if(_RAC_TESTS_HAVE_PROTOBUF)
+        target_compile_definitions(${target} PRIVATE RAC_HAVE_PROTOBUF=1)
+        target_include_directories(${target} PRIVATE
+            ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+            ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated
+            ${Protobuf_INCLUDE_DIRS}
+        )
+    endif()
+endfunction()
+
 add_executable(parity_test_cpp parity_test.cpp)
 target_include_directories(parity_test_cpp PRIVATE
     ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
 )
 target_link_libraries(parity_test_cpp PRIVATE rac_commons)
 target_compile_features(parity_test_cpp PRIVATE cxx_std_17)
+rac_streaming_test_define_have_protobuf(parity_test_cpp)
 
 set(_GOLDEN_PATH "${CMAKE_SOURCE_DIR}/tests/streaming/fixtures/golden_events.txt")
 file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/streaming/fixtures")
@@ -39,6 +65,7 @@ target_include_directories(llm_parity_test_cpp PRIVATE
 )
 target_link_libraries(llm_parity_test_cpp PRIVATE rac_commons)
 target_compile_features(llm_parity_test_cpp PRIVATE cxx_std_17)
+rac_streaming_test_define_have_protobuf(llm_parity_test_cpp)
 
 set(_LLM_GOLDEN_PATH "${CMAKE_SOURCE_DIR}/tests/streaming/fixtures/llm_golden_events.txt")
 
@@ -62,6 +89,7 @@ target_include_directories(perf_producer PRIVATE
 )
 target_link_libraries(perf_producer PRIVATE rac_commons)
 target_compile_features(perf_producer PRIVATE cxx_std_17)
+rac_streaming_test_define_have_protobuf(perf_producer)
 set_target_properties(perf_producer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${_PERF_OUTPUT_DIR}")
 
@@ -106,6 +134,7 @@ target_include_directories(cancel_producer PRIVATE
 )
 target_link_libraries(cancel_producer PRIVATE rac_commons)
 target_compile_features(cancel_producer PRIVATE cxx_std_17)
+rac_streaming_test_define_have_protobuf(cancel_producer)
 set_target_properties(cancel_producer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${_CANCEL_OUTPUT_DIR}")
 

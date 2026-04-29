@@ -9,6 +9,7 @@
 import CRACommons
 import Foundation
 import Security
+import os
 
 // MARK: - Platform Adapter Bridge
 
@@ -493,19 +494,15 @@ private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKExcept
 // to the C++ caller.
 
 private final class PlatformDownloadCancelFlag {
-    private let lock = NSLock()
-    private var cancelled = false
+    // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
+    private let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
 
     func cancel() {
-        lock.lock()
-        cancelled = true
-        lock.unlock()
+        cancelled.withLock { $0 = true }
     }
 
     var isCancelled: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return cancelled
+        cancelled.withLock { $0 }
     }
 }
 
@@ -515,25 +512,19 @@ private let platformHttpDownloadQueue = DispatchQueue(
     attributes: .concurrent
 )
 
-private let platformHttpDownloadRegistryLock = NSLock()
-private var platformHttpDownloadFlags: [String: PlatformDownloadCancelFlag] = [:]
+private let platformHttpDownloadFlagsRegistry =
+    OSAllocatedUnfairLock<[String: PlatformDownloadCancelFlag]>(initialState: [:])
 
 private func platformDownloadRegister(_ taskId: String, _ flag: PlatformDownloadCancelFlag) {
-    platformHttpDownloadRegistryLock.lock()
-    platformHttpDownloadFlags[taskId] = flag
-    platformHttpDownloadRegistryLock.unlock()
+    platformHttpDownloadFlagsRegistry.withLock { $0[taskId] = flag }
 }
 
 private func platformDownloadUnregister(_ taskId: String) {
-    platformHttpDownloadRegistryLock.lock()
-    platformHttpDownloadFlags.removeValue(forKey: taskId)
-    platformHttpDownloadRegistryLock.unlock()
+    platformHttpDownloadFlagsRegistry.withLock { _ = $0.removeValue(forKey: taskId) }
 }
 
 private func platformDownloadLookup(_ taskId: String) -> PlatformDownloadCancelFlag? {
-    platformHttpDownloadRegistryLock.lock()
-    defer { platformHttpDownloadRegistryLock.unlock() }
-    return platformHttpDownloadFlags[taskId]
+    platformHttpDownloadFlagsRegistry.withLock { $0[taskId] }
 }
 
 /// Boxed per-download state forwarded into the C progress callback

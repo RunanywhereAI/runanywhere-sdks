@@ -951,6 +951,18 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         callback(stop_window);
     }
 
+    // TODO(streaming-tools): Emit tool_call_delta events during stream.
+    // To support generateWithToolsStream for Web and RN, the generate_stream
+    // callback signature needs to be upgraded from `bool(std::string)` to
+    // `bool(LLMStreamEvent)` so that individual token deltas can carry
+    // tool_call_delta payloads (field populated via rac_tool_call_parse on
+    // the accumulated stop_window when a <tool_call> prefix is detected).
+    // This requires coordinated changes in:
+    //   1. llamacpp_backend.h: GenerationCallback typedef
+    //   2. rac_llm_llamacpp.cpp: wrapper that maps new callback to C ABI
+    //   3. rac_llm_stream.cpp: proto-byte event emitter
+    // Deferred to post-round-1 to avoid breaking changes to the stable ABI.
+
     if (llama_memory_t post_mem = llama_get_memory(context_)) {
         llama_memory_clear(post_mem, true);
     }

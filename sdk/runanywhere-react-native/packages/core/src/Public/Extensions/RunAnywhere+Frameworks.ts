@@ -49,24 +49,26 @@ export async function getFrameworks(
 
 function relevantCategoriesFor(capability: SDKComponent): Set<ModelCategory> {
   switch (capability) {
-    case SDKComponent.LLM:
-      return new Set([ModelCategory.Language]);
-    case SDKComponent.STT:
-      return new Set([ModelCategory.SpeechRecognition]);
-    case SDKComponent.TTS:
-      return new Set([ModelCategory.SpeechSynthesis]);
-    case SDKComponent.VAD:
-      return new Set([ModelCategory.Audio]);
-    case SDKComponent.VoiceAgent:
+    case SDKComponent.SDK_COMPONENT_LLM:
+      return new Set([ModelCategory.MODEL_CATEGORY_LANGUAGE]);
+    case SDKComponent.SDK_COMPONENT_STT:
+      return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION]);
+    case SDKComponent.SDK_COMPONENT_TTS:
+      return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS]);
+    case SDKComponent.SDK_COMPONENT_VAD:
+      return new Set([ModelCategory.MODEL_CATEGORY_AUDIO]);
+    case SDKComponent.SDK_COMPONENT_VOICE_AGENT:
       return new Set([
-        ModelCategory.Language,
-        ModelCategory.SpeechRecognition,
-        ModelCategory.SpeechSynthesis,
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       ]);
-    case SDKComponent.Embedding:
-      return new Set([ModelCategory.Embedding]);
-    case SDKComponent.SpeakerDiarization:
-      return new Set([ModelCategory.Audio]);
+    case SDKComponent.SDK_COMPONENT_EMBEDDINGS:
+      return new Set([ModelCategory.MODEL_CATEGORY_EMBEDDING]);
+    case SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION:
+      return new Set([ModelCategory.MODEL_CATEGORY_AUDIO]);
+    default:
+      return new Set([ModelCategory.MODEL_CATEGORY_LANGUAGE]);
   }
 }
 

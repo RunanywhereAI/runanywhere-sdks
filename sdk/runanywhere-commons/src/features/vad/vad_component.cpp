@@ -675,3 +675,38 @@ extern "C" rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,
 
     return RAC_SUCCESS;
 }
+
+extern "C" rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
+                                                          float* ambient_level_out,
+                                                          float* recent_avg_out,
+                                                          float* recent_max_out) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    // Initialise outputs to safe defaults regardless of code path.
+    if (ambient_level_out) *ambient_level_out = 0.0f;
+    if (recent_avg_out)    *recent_avg_out    = 0.0f;
+    if (recent_max_out)    *recent_max_out    = 0.0f;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // When a model-based VAD is active we cannot surface energy stats; return
+    // zeroes (RAC_SUCCESS) so callers don't need to special-case the path.
+    if (component->is_model_loaded || !component->vad_service) {
+        return RAC_SUCCESS;
+    }
+
+    // Delegate to the energy VAD statistics query.
+    rac_energy_vad_stats_t stats = {};
+    rac_result_t result = rac_energy_vad_get_statistics(component->vad_service, &stats);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    if (ambient_level_out) *ambient_level_out = stats.ambient;
+    if (recent_avg_out)    *recent_avg_out    = stats.recent_avg;
+    if (recent_max_out)    *recent_max_out    = stats.recent_max;
+
+    return RAC_SUCCESS;
+}

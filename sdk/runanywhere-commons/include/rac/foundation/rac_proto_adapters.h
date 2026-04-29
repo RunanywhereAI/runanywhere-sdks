@@ -146,20 +146,91 @@
 
 #ifdef __cplusplus
 
-// Proto type forward declarations — only included when Protobuf is available.
-// Keeps the header portable for C consumers that compile without protobuf.
-#ifdef RAC_HAVE_PROTOBUF
+// MF-3 (AG-V3): proto types are forward-declared here instead of included via
+// the generated `*.pb.h` headers. This keeps `runanywhere::v1::*` symbols and
+// the entire google::protobuf / absl transitive include set OUT of the public
+// interface of rac_commons — L5 consumers (Swift CRACommons, Kotlin JNI, Web,
+// Flutter, RN) include `rac_proto_adapters.h` indirectly and must not pull in
+// protobuf. The `#include` of the generated headers now lives in
+// rac_proto_adapters.cpp, which sees them via the PRIVATE include path
+// configured in CMakeLists.txt.
+//
+// Forward declarations are sufficient because every adapter parameter is
+// either a pointer-to-proto or a const-ref-to-proto. The only by-value uses
+// are the two scoped enums `ErrorCode` / `ErrorCategory`, which we forward
+// declare with their explicit `: int` underlying type so the compiler knows
+// their size at the function-prototype site.
 
-#include "stt_options.pb.h"
-#include "tts_options.pb.h"
-#include "vad_options.pb.h"
-#include "vlm_options.pb.h"
-#include "diffusion_options.pb.h"
-#include "embeddings_options.pb.h"
-#include "rag.pb.h"
-#include "storage_types.pb.h"
-#include "lora_options.pb.h"
-#include "errors.pb.h"
+namespace runanywhere {
+namespace v1 {
+
+// STT
+class STTConfiguration;
+class STTOptions;
+class STTOutput;
+class WordTimestamp;
+class TranscriptionMetadata;
+class TranscriptionAlternative;
+
+// TTS
+class TTSConfiguration;
+class TTSOptions;
+class TTSOutput;
+class TTSPhonemeTimestamp;
+class TTSSynthesisMetadata;
+class TTSSpeakResult;
+
+// VAD
+class VADConfiguration;
+class VADOptions;
+class VADResult;
+class VADStatistics;
+class SpeechActivityEvent;
+
+// VLM
+class VLMConfiguration;
+class VLMGenerationOptions;
+class VLMResult;
+class VLMImage;
+
+// Diffusion
+class DiffusionConfiguration;
+class DiffusionGenerationOptions;
+class DiffusionProgress;
+class DiffusionResult;
+
+// LoRA
+class LoraAdapterCatalogEntry;
+class LoRAAdapterInfo;
+
+// RAG
+class RAGConfiguration;
+class RAGQueryOptions;
+class RAGResult;
+class RAGSearchResult;
+
+// Embeddings
+class EmbeddingsConfiguration;
+class EmbeddingsOptions;
+class EmbeddingsResult;
+class EmbeddingVector;
+
+// Storage
+class DeviceStorageInfo;
+class AppStorageInfo;
+class ModelStorageMetrics;
+class StorageInfo;
+class StorageAvailability;
+
+// Errors — these are scoped enums that some adapter functions accept /
+// return by value; the explicit underlying type makes the forward
+// declaration usable at the function-prototype site.
+class SDKError;
+enum ErrorCode : int;
+enum ErrorCategory : int;
+
+}  // namespace v1
+}  // namespace runanywhere
 
 namespace rac::foundation {
 
@@ -477,8 +548,6 @@ rac_result_t rac_proto_error_code_to_result(::runanywhere::v1::ErrorCode code);
 rac_error_category_t rac_proto_to_category(::runanywhere::v1::ErrorCategory category);
 
 }  // namespace rac::foundation
-
-#endif  // RAC_HAVE_PROTOBUF
 
 #endif  // __cplusplus
 

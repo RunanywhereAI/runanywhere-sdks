@@ -7,6 +7,10 @@ import 'dart:io';
 
 import 'package:runanywhere/adapters/model_download_adapter.dart';
 import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/generated/download_service.pb.dart'
+    show DownloadProgress;
+import 'package:runanywhere/generated/download_service.pbenum.dart'
+    show DownloadStage;
 import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
@@ -20,33 +24,10 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:fixnum/fixnum.dart';
-// DownloadProgress + DownloadProgressState moved inline (Wave 3 deleted
-// the standalone download_types.dart since it only existed for this file).
-
-enum DownloadProgressState {
-  downloading,
-  completed,
-  failed,
-  cancelled;
-
-  bool get isCompleted => this == DownloadProgressState.completed;
-  bool get isFailed => this == DownloadProgressState.failed;
-}
-
-class DownloadProgress {
-  final int bytesDownloaded;
-  final int totalBytes;
-  final DownloadProgressState state;
-
-  const DownloadProgress({
-    required this.bytesDownloaded,
-    required this.totalBytes,
-    required this.state,
-  });
-
-  double get overallProgress =>
-      totalBytes > 0 ? bytesDownloaded / totalBytes : 0.0;
-}
+// Hand-rolled `DownloadProgressState` enum + `DownloadProgress` class
+// DELETED. The proto-generated `DownloadStage` + `DownloadProgress`
+// from `generated/download_service.pb.dart` are the canonical types
+// (canonical §13).
 
 /// Downloads / storage-management capability surface.
 ///
@@ -70,9 +51,12 @@ class RunAnywhereDownloads {
     await for (final progress
         in ModelDownloadService.shared.downloadModel(modelId)) {
       yield DownloadProgress(
-        bytesDownloaded: progress.bytesDownloaded,
-        totalBytes: progress.totalBytes,
-        state: _mapDownloadStage(progress.stage),
+        modelId: modelId,
+        bytesDownloaded: Int64(progress.bytesDownloaded),
+        totalBytes: Int64(progress.totalBytes),
+        stage: _mapDownloadStage(progress.stage),
+        stageProgress: progress.overallProgress,
+        errorMessage: progress.error,
       );
 
       if (progress.stage == ModelDownloadStage.downloading) {
@@ -244,18 +228,19 @@ class RunAnywhereDownloads {
 
   // -- private helpers ------------------------------------------------------
 
-  DownloadProgressState _mapDownloadStage(ModelDownloadStage stage) {
+  DownloadStage _mapDownloadStage(ModelDownloadStage stage) {
     switch (stage) {
       case ModelDownloadStage.downloading:
+        return DownloadStage.DOWNLOAD_STAGE_DOWNLOADING;
       case ModelDownloadStage.extracting:
+        return DownloadStage.DOWNLOAD_STAGE_EXTRACTING;
       case ModelDownloadStage.verifying:
-        return DownloadProgressState.downloading;
+        return DownloadStage.DOWNLOAD_STAGE_VALIDATING;
       case ModelDownloadStage.completed:
-        return DownloadProgressState.completed;
+        return DownloadStage.DOWNLOAD_STAGE_COMPLETED;
       case ModelDownloadStage.failed:
-        return DownloadProgressState.failed;
       case ModelDownloadStage.cancelled:
-        return DownloadProgressState.cancelled;
+        return DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED;
     }
   }
 

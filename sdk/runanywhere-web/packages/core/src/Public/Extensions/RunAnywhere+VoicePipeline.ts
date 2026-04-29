@@ -25,75 +25,11 @@
 
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
-import type { LLMProvider, STTProvider, TTSProvider } from '../../Infrastructure/ProviderTypes';
+import { PipelineState } from './VoiceAgentTypes';
+import type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './VoicePipelineTypes';
 
-// ---------------------------------------------------------------------------
-// PipelineState (inlined from deleted VoiceAgentTypes.ts)
-// ---------------------------------------------------------------------------
-
-export enum PipelineState {
-  Idle = 'idle',
-  Listening = 'listening',
-  ProcessingSTT = 'processingSTT',
-  GeneratingResponse = 'generatingResponse',
-  PlayingTTS = 'playingTTS',
-  Cooldown = 'cooldown',
-  Error = 'error',
-}
-
-// ---------------------------------------------------------------------------
-// VoicePipeline types (inlined from deleted VoicePipelineTypes.ts)
-// ---------------------------------------------------------------------------
-
-export interface VoicePipelineSTTResult {
-  text: string;
-  [key: string]: unknown;
-}
-
-export interface VoicePipelineLLMResult {
-  text: string;
-  tokensGenerated: number;
-  tokensPerSecond: number;
-}
-
-export interface VoicePipelineTTSResult {
-  audioData: Float32Array;
-  sampleRate: number;
-  durationMs: number;
-  processingTimeMs: number;
-  [key: string]: unknown;
-}
-
-export interface VoicePipelineCallbacks {
-  onStateChange?: (state: PipelineState) => void;
-  onTranscription?: (text: string, result: VoicePipelineSTTResult) => void;
-  onResponseToken?: (token: string, accumulated: string) => void;
-  onResponseComplete?: (text: string, result: VoicePipelineLLMResult) => void;
-  onSynthesisComplete?: (audio: Float32Array, sampleRate: number, result: VoicePipelineTTSResult) => void;
-  onError?: (error: Error, stage: PipelineState) => void;
-}
-
-export interface VoicePipelineOptions {
-  maxTokens?: number;
-  temperature?: number;
-  systemPrompt?: string;
-  ttsSpeed?: number;
-  sampleRate?: number;
-}
-
-export interface VoicePipelineTurnResult {
-  transcription: string;
-  response: string;
-  synthesizedAudio?: Float32Array;
-  sampleRate?: number;
-  timing: {
-    sttMs: number;
-    llmMs: number;
-    ttsMs: number;
-    totalMs: number;
-  };
-  llmResult?: VoicePipelineLLMResult;
-}
+export { PipelineState } from './VoiceAgentTypes';
+export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './VoicePipelineTypes';
 
 const logger = new SDKLogger('VoicePipeline');
 
@@ -101,15 +37,15 @@ const logger = new SDKLogger('VoicePipeline');
 // Dynamic backend access helpers (typed via ExtensionPoint provider registry)
 // ---------------------------------------------------------------------------
 
-function requireSTT(): STTProvider {
+function requireSTT() {
   return ExtensionPoint.requireProvider('stt', '@runanywhere/web-onnx');
 }
 
-function requireTextGeneration(): LLMProvider {
+function requireTextGeneration() {
   return ExtensionPoint.requireProvider('llm', '@runanywhere/web-llamacpp');
 }
 
-function requireTTS(): TTSProvider {
+function requireTTS() {
   return ExtensionPoint.requireProvider('tts', '@runanywhere/web-onnx');
 }
 
@@ -120,8 +56,7 @@ function requireTTS(): TTSProvider {
 const DEFAULT_OPTIONS: Required<VoicePipelineOptions> = {
   maxTokens: 60,
   temperature: 0.7,
-  systemPrompt:
-    'You are a helpful voice assistant. Keep responses concise — 1-2 sentences max.',
+  systemPrompt: 'You are a helpful voice assistant. Keep responses concise — 1-2 sentences max.',
   ttsSpeed: 1.0,
   sampleRate: 16000,
 };
@@ -154,7 +89,6 @@ export class VoicePipeline {
 
     // Step 1: STT
     this.transition(PipelineState.ProcessingSTT, callbacks);
-
     const sttStart = performance.now();
     logger.info(`STT: ${(audioData.length / opts.sampleRate).toFixed(1)}s of audio`);
     const sttResult = await stt.transcribe(audioData, {
@@ -162,7 +96,6 @@ export class VoicePipeline {
     });
     const sttMs = performance.now() - sttStart;
     const userText = sttResult.text.trim();
-
     logger.info(`STT complete: "${userText}" (${sttMs.toFixed(0)}ms)`);
     callbacks?.onTranscription?.(userText, sttResult);
 
@@ -177,16 +110,12 @@ export class VoicePipeline {
 
     // Step 2: LLM (streaming)
     this.transition(PipelineState.GeneratingResponse, callbacks);
-
     const llmStart = performance.now();
-    const { stream, result: llmResultPromise, cancel } = await textGen.generateStream(
-      userText,
-      {
-        maxTokens: opts.maxTokens,
-        temperature: opts.temperature,
-        systemPrompt: opts.systemPrompt,
-      },
-    );
+    const { stream, result: llmResultPromise, cancel } = await textGen.generateStream(userText, {
+      maxTokens: opts.maxTokens,
+      temperature: opts.temperature,
+      systemPrompt: opts.systemPrompt,
+    });
     this._cancelGeneration = cancel;
 
     let accumulated = '';
@@ -199,9 +128,14 @@ export class VoicePipeline {
     const llmResult = await llmResultPromise;
     const fullResponse = llmResult.text || accumulated;
     const llmMs = performance.now() - llmStart;
-
-    logger.info(`LLM complete: ${llmResult.tokensGenerated} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s (${llmMs.toFixed(0)}ms)`);
-    callbacks?.onResponseComplete?.(fullResponse, llmResult);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokensGenerated = (llmResult as any).tokensGenerated ?? (llmResult as any).tokensUsed ?? 0;
+    logger.info(`LLM complete: ${tokensGenerated} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s (${llmMs.toFixed(0)}ms)`);
+    callbacks?.onResponseComplete?.(fullResponse, {
+      text: fullResponse,
+      tokensGenerated,
+      tokensPerSecond: llmResult.tokensPerSecond,
+    });
 
     if (!fullResponse.trim()) {
       this.transition(PipelineState.Idle, callbacks);
@@ -209,25 +143,22 @@ export class VoicePipeline {
         transcription: userText,
         response: '',
         timing: { sttMs, llmMs, ttsMs: 0, totalMs: performance.now() - totalStart },
-        llmResult,
+        llmResult: { text: fullResponse, tokensGenerated, tokensPerSecond: llmResult.tokensPerSecond },
       };
     }
 
     // Step 3: TTS
     this.transition(PipelineState.PlayingTTS, callbacks);
-
     const ttsStart = performance.now();
     const ttsResult = await tts.synthesize(fullResponse.trim(), {
       speed: opts.ttsSpeed,
     });
     const ttsMs = performance.now() - ttsStart;
-
     logger.info(`TTS complete: ${ttsResult.durationMs}ms audio in ${ttsResult.processingTimeMs}ms`);
     callbacks?.onSynthesisComplete?.(ttsResult.audioData, ttsResult.sampleRate, ttsResult);
 
     // Done
     this.transition(PipelineState.Idle, callbacks);
-
     return {
       transcription: userText,
       response: fullResponse,
@@ -239,7 +170,7 @@ export class VoicePipeline {
         ttsMs,
         totalMs: performance.now() - totalStart,
       },
-      llmResult,
+      llmResult: { text: fullResponse, tokensGenerated, tokensPerSecond: llmResult.tokensPerSecond },
     };
   }
 

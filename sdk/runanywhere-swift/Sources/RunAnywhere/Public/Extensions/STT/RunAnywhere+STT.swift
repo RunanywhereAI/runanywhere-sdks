@@ -27,7 +27,7 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        let result = try await transcribeWithOptions(audioData, options: STTOptions())
+        let result = try await transcribe(audio: audioData, options: STTOptions())
         return result.text
     }
 
@@ -35,7 +35,7 @@ public extension RunAnywhere {
 
     /// Unload the currently loaded STT model
     static func unloadSTTModel() async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -49,18 +49,33 @@ public extension RunAnywhere {
         }
     }
 
+    /// Whether streaming transcription is currently active (CANONICAL_API §4).
+    ///
+    /// Forwards the underlying component's streaming-capable flag. A value of
+    /// `true` indicates the model supports and is configured for streaming.
+    static var isStreamingSTT: Bool {
+        get async {
+            guard await CppBridge.STT.shared.isLoaded else { return false }
+            return await CppBridge.STT.shared.supportsStreaming
+        }
+    }
+
     // MARK: - Transcription
 
-    /// Transcribe audio data to text (with options)
+    /// Transcribe audio data to text with options (CANONICAL_API §4).
+    ///
+    /// Canonical two-argument overload: `transcribe(audio:options:)`.
+    /// The previous name `transcribeWithOptions(_:options:)` has been removed.
+    ///
     /// - Parameters:
-    ///   - audioData: Raw audio data
+    ///   - audio: Raw audio data
     ///   - options: Transcription options
     /// - Returns: Transcription output with text and metadata
-    static func transcribeWithOptions(
-        _ audioData: Data,
+    static func transcribe(
+        audio audioData: Data,
         options: STTOptions
     ) async throws -> STTOutput {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -136,7 +151,7 @@ public extension RunAnywhere {
         _ buffer: AVAudioPCMBuffer,
         language: String? = nil
     ) async throws -> STTOutput {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -154,19 +169,78 @@ public extension RunAnywhere {
             options = STTOptions()
         }
 
-        return try await transcribeWithOptions(audioData, options: options)
+        return try await transcribe(audio: audioData, options: options)
     }
 
-    // v3.1: `startStreamingTranscription` DELETED. Use
-    // `transcribeStream(audioData:options:onPartialResult:)` below.
+    // MARK: - Streaming Transcription (CANONICAL_API §4)
 
-    /// Transcribe audio with streaming callbacks
+    /// Canonical stream-in / stream-out transcription (CANONICAL_API §4).
+    ///
+    /// Consumes an `AsyncStream<Data>` of PCM audio chunks and yields
+    /// `RASTTPartialResult` events. Each partial result carries an
+    /// incremental transcript and an `isFinal` flag; the stream closes after
+    /// the final event or on error.
+    ///
+    /// - Parameters:
+    ///   - audio: Source stream of raw PCM audio chunks.
+    ///   - options: Transcription options (optional).
+    /// - Returns: `AsyncStream<RASTTPartialResult>` of partial transcription events.
+    static func transcribeStream(
+        audio: AsyncStream<Data>,
+        options: STTOptions = STTOptions()
+    ) -> AsyncStream<RASTTPartialResult> {
+        AsyncStream { continuation in
+            Task {
+                guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+                guard let handle = try? await CppBridge.STT.shared.getHandle(),
+                      await CppBridge.STT.shared.isLoaded else {
+                    continuation.finish()
+                    return
+                }
+                for await chunk in audio {
+                    if Task.isCancelled { break }
+                    // Process each chunk as a discrete transcription unit and
+                    // emit a partial result for every response token.
+                    var sttResult = rac_stt_result_t()
+                    let rc = options.withCOptions { cOptionsPtr in
+                        chunk.withUnsafeBytes { audioPtr in
+                            rac_stt_component_transcribe(
+                                handle,
+                                audioPtr.baseAddress,
+                                chunk.count,
+                                cOptionsPtr,
+                                &sttResult
+                            )
+                        }
+                    }
+                    if rc == RAC_SUCCESS, let textPtr = sttResult.text {
+                        let text = String(cString: textPtr)
+                        var partial = RASTTPartialResult()
+                        partial.text = text
+                        partial.isFinal = false
+                        continuation.yield(partial)
+                    }
+                    rac_stt_result_free(&sttResult)
+                }
+                // Emit terminal final event
+                var finalPartial = RASTTPartialResult()
+                finalPartial.isFinal = true
+                continuation.yield(finalPartial)
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Transcribe audio with streaming callbacks (legacy form — prefer `transcribeStream(audio:options:)`)
     static func transcribeStream(
         audioData: Data,
         options: STTOptions = STTOptions(),
         onPartialResult: @escaping (STTTranscriptionResult) -> Void
     ) async throws -> STTOutput {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
@@ -245,7 +319,7 @@ public extension RunAnywhere {
 
     /// Process audio samples for streaming transcription
     static func processStreamingAudio(_ samples: [Float], options: STTOptions = STTOptions()) async throws {
-        guard isSDKInitialized else {
+        guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 

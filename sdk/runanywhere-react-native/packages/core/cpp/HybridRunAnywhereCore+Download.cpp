@@ -12,11 +12,16 @@ using namespace ::runanywhere::bridges;
 
 // Download Service
 // ============================================================================
-// B-RN-3-001 fix: route model downloads through the platform-adapter
+// B-RN-3-001 fix (original): route model downloads through the platform-adapter
 // HTTP runner (Java HttpURLConnection on Android, NSURLSession on iOS) instead
-// of `rac_http_download_execute`. The bundled libcurl on Android is built with
-// `CURL_DISABLE_HTTPS=ON` (see commons CMakeLists.txt:442-448), so every native
-// HTTPS download was returning INVALID_URL / "Unsupported protocol".
+// of `rac_http_download_execute`.
+//
+// Round-1 CPP fix (Task 4 / G-A6): CURL_DISABLE_HTTPS=ON has been removed from
+// the Android libcurl build in commons CMakeLists.txt.  libcurl on Android now
+// compiles with HTTPS enabled (backed by the NDK system SSL).  The platform-
+// adapter path below is retained for backward compatibility and reliability;
+// switch to `rac_http_download_execute` once end-to-end HTTPS is validated on
+// all Android ABIs.
 // ============================================================================
 
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::downloadModel(

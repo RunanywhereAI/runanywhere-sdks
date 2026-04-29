@@ -18,7 +18,8 @@ import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/features/vad/vad_configuration.dart' show VADComponentConfig;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/vad_options.pb.dart' show VADOptions, VADResult;
+import 'package:runanywhere/generated/vad_options.pb.dart'
+    show VADOptions, VADResult, VADStatistics;
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart' as bridge
@@ -31,6 +32,7 @@ enum SpeechActivityEvent {
   started,
   ended,
 }
+
 
 /// Voice Activity Detection (VAD) capability surface.
 ///
@@ -59,9 +61,16 @@ class RunAnywhereVAD {
   // Public broadcast stream for speech activity changes.
   final _activityController = StreamController<SpeechActivityEvent>.broadcast();
 
-  // Stored audio-buffer + speech-activity callbacks (mirroring Swift).
+  // Stored audio-buffer + speech-activity + statistics callbacks.
   void Function(SpeechActivityEvent event)? _speechActivityCallback;
   void Function(Float32List samples)? _audioBufferCallback;
+  void Function(VADStatistics stats)? _statisticsCallback;
+
+  // Running statistics counters (updated on every detectSpeech call).
+  int _speechEventCount = 0;
+  double _totalAudioMs = 0.0;
+  int _speechFrames = 0;
+  int _totalFrames = 0;
 
   late final StreamSubscription<bridge.VADActivityEvent> _bridgeSubscription;
 
@@ -103,8 +112,11 @@ class RunAnywhereVAD {
       throw SDKException.notInitialized();
     }
     final result = DartBridge.vad.process(samples);
+    // Estimate audio duration from sample count at 16kHz.
+    _totalAudioMs += samples.length / 16.0;
     // Forward to audio-buffer callback for parity with Swift.
     _audioBufferCallback?.call(samples);
+    _emitStatistics(result.isSpeech);
     return result.isSpeech;
   }
 
@@ -121,7 +133,9 @@ class RunAnywhereVAD {
     }
     final samples = _pcm16ToFloat32(audio);
     final result = DartBridge.vad.process(samples);
+    _totalAudioMs += audio.length / 32.0; // PCM-16 at 16kHz: 2 bytes * 16000 = 32000 bytes/s
     _audioBufferCallback?.call(samples);
+    _emitStatistics(result.isSpeech);
     return VADResult(
       isSpeech: result.isSpeech,
       confidence: result.speechProbability,
@@ -212,6 +226,44 @@ class RunAnywhereVAD {
     void Function(Float32List samples)? callback,
   ) {
     _audioBufferCallback = callback;
+  }
+
+  /// Register a single callback for VAD statistics (canonical §6).
+  /// The callback fires on every [detectSpeech] / [detectVoiceActivity] call
+  /// with an updated [VADStatistics] snapshot.
+  void setStatisticsCallback(
+    void Function(VADStatistics stats)? callback,
+  ) {
+    _statisticsCallback = callback;
+  }
+
+  /// Stream VAD results from a continuous audio byte stream (canonical §6).
+  ///
+  /// Each [Uint8List] chunk from [audio] is processed as PCM-16 audio and
+  /// mapped to a [VADResult]. The returned stream completes when [audio]
+  /// completes.
+  Stream<VADResult> streamVAD(Stream<Uint8List> audio) async* {
+    await for (final chunk in audio) {
+      yield await detectVoiceActivity(chunk);
+    }
+  }
+
+  // Internal helper to emit statistics after each detection call.
+  void _emitStatistics(bool isSpeech) {
+    _totalFrames++;
+    if (isSpeech) {
+      _speechFrames++;
+      _speechEventCount++;
+    }
+    // Map to proto VADStatistics fields: recentAvg as speech fraction,
+    // recentMax as total frames (normalized), ambientLevel as totalAudioMs.
+    final speechFraction =
+        _totalFrames > 0 ? _speechFrames / _totalFrames : 0.0;
+    _statisticsCallback?.call(VADStatistics(
+      ambientLevel: _totalAudioMs,
+      recentAvg: speechFraction,
+      recentMax: _speechEventCount.toDouble(),
+    ));
   }
 
   // ---------------------------------------------------------------------

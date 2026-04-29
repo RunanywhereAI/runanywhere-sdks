@@ -14,6 +14,7 @@
 import CRACommons
 import Files
 import Foundation
+import os
 
 /// DownloadAdapter — thin Swift wrapper over the canonical C download
 /// runner. Drop-in replacement for `AlamofireDownloadService`.
@@ -28,19 +29,16 @@ public class DownloadAdapter: @unchecked Sendable {
     /// One `CancelToken` per active task. The C progress callback
     /// polls it to signal curl to abort (returns `RAC_FALSE`).
     final class CancelToken {
-        private let lock = NSLock()
-        private var cancelled = false
+        // Per CLAUDE.md: NSLock is forbidden. `OSAllocatedUnfairLock` gives
+        // us synchronous Bool access from the C progress callback path.
+        private let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
 
         func cancel() {
-            lock.lock()
-            cancelled = true
-            lock.unlock()
+            cancelled.withLock { $0 = true }
         }
 
         var isCancelled: Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return cancelled
+            cancelled.withLock { $0 }
         }
     }
 

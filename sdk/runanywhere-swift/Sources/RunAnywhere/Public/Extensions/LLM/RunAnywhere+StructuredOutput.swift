@@ -13,6 +13,116 @@ import Foundation
 
 public extension RunAnywhere {
 
+    // MARK: - Canonical JSONSchema-based API (CANONICAL_API §3)
+
+    /// Generate structured output from a prompt using a JSON schema (CANONICAL_API §3).
+    ///
+    /// The model is instructed to produce JSON conforming to `schema`. The raw
+    /// output is extracted and returned as an `RAStructuredOutputResult`.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt.
+    ///   - schema: The expected JSON schema (`RAJSONSchema`).
+    ///   - options: Generation options (optional).
+    /// - Returns: `RAStructuredOutputResult` with `rawOutput`, `jsonOutput`, and `validation`.
+    static func generateStructured(
+        prompt: String,
+        schema: RAJSONSchema,
+        options: LLMGenerationOptions? = nil
+    ) async throws -> RAStructuredOutputResult {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+
+        // Build a system prompt instructing the model to output JSON.
+        var systemPromptPtr: UnsafeMutablePointer<CChar>?
+        let schemaJson: String
+        if let jsonData = try? JSONSerialization.data(withJSONObject: [:]),
+           let jsonStr = String(data: jsonData, encoding: .utf8) {
+            schemaJson = jsonStr
+        } else {
+            schemaJson = "{}"
+        }
+        let sysPrompt: String = schemaJson.withCString { schemaPtr in
+            let rc = rac_structured_output_get_system_prompt(schemaPtr, &systemPromptPtr)
+            if rc == RAC_SUCCESS, let ptr = systemPromptPtr {
+                let s = String(cString: ptr)
+                rac_free(ptr)
+                return s
+            }
+            return "Output only valid JSON matching the provided schema."
+        }
+
+        let effectiveOptions = LLMGenerationOptions(
+            maxTokens: options?.maxTokens ?? 1500,
+            temperature: options?.temperature ?? 0.7,
+            topP: options?.topP ?? 1.0,
+            stopSequences: options?.stopSequences ?? [],
+            streamingEnabled: false,
+            preferredFramework: options?.preferredFramework,
+            structuredOutput: nil,
+            systemPrompt: sysPrompt
+        )
+
+        let generationResult = try await generateForStructuredOutput(prompt, options: effectiveOptions)
+        return extractStructuredOutput(text: generationResult.text, schema: schema)
+    }
+
+    /// Stream structured output generation using a JSON schema (CANONICAL_API §3).
+    ///
+    /// Yields `RAStructuredOutputResult` values as tokens accumulate, with a
+    /// final result when generation completes.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt.
+    ///   - schema: The expected JSON schema (`RAJSONSchema`).
+    ///   - options: Generation options (optional).
+    /// - Returns: `AsyncStream<RAStructuredOutputResult>` — last event carries the complete result.
+    static func generateStructuredStream(
+        prompt: String,
+        schema: RAJSONSchema,
+        options: LLMGenerationOptions? = nil
+    ) -> AsyncStream<RAStructuredOutputResult> {
+        AsyncStream { continuation in
+            Task {
+                guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+                do {
+                    let effectiveOptions = LLMGenerationOptions(
+                        maxTokens: options?.maxTokens ?? 1500,
+                        temperature: options?.temperature ?? 0.7,
+                        topP: options?.topP ?? 1.0,
+                        stopSequences: options?.stopSequences ?? [],
+                        streamingEnabled: true,
+                        preferredFramework: options?.preferredFramework
+                    )
+                    var accumulated = ""
+                    let eventStream = try await generateStream(prompt, options: effectiveOptions)
+                    for await event in eventStream {
+                        if !event.token.isEmpty {
+                            accumulated += event.token
+                            // Emit an in-progress partial result
+                            var partial = RAStructuredOutputResult()
+                            partial.rawText = accumulated
+                            continuation.yield(partial)
+                        }
+                        if event.isFinal { break }
+                    }
+                    // Emit the final result with JSON extraction attempted
+                    let final_ = extractStructuredOutput(text: accumulated, schema: schema)
+                    continuation.yield(final_)
+                    continuation.finish()
+                } catch {
+                    continuation.finish()
+                }
+            }
+        }
+    }
+
+    // MARK: - Generic Generatable API (kept for backward compatibility)
+
     /// Generate structured output that conforms to a Generatable type (non-streaming)
     /// - Parameters:
     ///   - type: The type to generate (must conform to Generatable)

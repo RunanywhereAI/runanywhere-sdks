@@ -135,6 +135,16 @@ extension CppBridge {
             }
         }
 
+        /// Reset VAD internal state (clears adaptive thresholds, speech segments, timing)
+        public func reset() throws {
+            let handle = try getHandle()
+            let result = rac_vad_component_reset(handle)
+            guard result == RAC_SUCCESS else {
+                throw SDKException.vad(.processingFailed, "Failed to reset VAD: \(result)")
+            }
+            logger.info("VAD state reset")
+        }
+
         /// Cleanup VAD
         public func cleanup() {
             guard let handle = handle else { return }

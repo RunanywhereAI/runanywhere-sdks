@@ -229,6 +229,16 @@ public struct VLMStreamingResult: Sendable {
     public let metrics: Task<VLMResult, Error>
 }
 
+// MARK: - VLMGenerationOptions canonical typealias (CANONICAL_API §7)
+//
+// The proto-generated type `RAVLMGenerationOptions` (vlm_options.pb.swift)
+// IS the canonical wire type. Expose it under the spec name so callers can
+// write `VLMGenerationOptions` without knowing the `RA` prefix.
+//
+/// Canonical generation options for `processImage` / `processImageStream`.
+/// Backed by the proto-generated `RAVLMGenerationOptions` (idl/vlm_options.proto).
+public typealias VLMGenerationOptions = RAVLMGenerationOptions
+
 // MARK: - Phase C1: Generated Proto Bridges
 //
 // Canonical wire types live in `Sources/RunAnywhere/Generated/vlm_options.pb.swift`:

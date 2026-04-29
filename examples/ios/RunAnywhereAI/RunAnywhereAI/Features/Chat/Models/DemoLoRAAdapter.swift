@@ -17,7 +17,7 @@ enum LoRAAdapterCatalog {
     static func registerAll() async {
         for entry in adapters {
             do {
-                try await RunAnywhere.registerLoraAdapter(entry)
+                try await RunAnywhere.lora.register(entry)
             } catch {
                 logger.error("Failed to register adapter \(entry.id): \(error)")
             }

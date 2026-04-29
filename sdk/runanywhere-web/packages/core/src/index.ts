@@ -28,7 +28,8 @@ export type { StorageBackend } from './Public/RunAnywhere';
 export { Storage } from './Public/Extensions/RunAnywhere+Storage';
 export type { StorageInfoExtended } from './Public/Extensions/RunAnywhere+Storage';
 export { PluginLoader } from './Public/Extensions/RunAnywhere+PluginLoader';
-export { TextGeneration } from './Public/Extensions/RunAnywhere+TextGeneration';
+export { TextGeneration, generateStructuredStream, extractStructuredOutput } from './Public/Extensions/RunAnywhere+TextGeneration';
+export type { StructuredOutputResult, JSONSchemaDescriptor } from './Public/Extensions/RunAnywhere+TextGeneration';
 export { StructuredOutput } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export { ToolCalling } from './Public/Extensions/RunAnywhere+ToolCalling';
 export { LoRA } from './Public/Extensions/RunAnywhere+LoRA';
@@ -40,7 +41,22 @@ export { VisionLanguage } from './Public/Extensions/RunAnywhere+VisionLanguage';
 export type { VLMGenerationOptions, VLMResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
 export { VLMModels } from './Public/Extensions/RunAnywhere+VLMModels';
 export { Diffusion } from './Public/Extensions/RunAnywhere+Diffusion';
-export type { DiffusionGenerationOptions, DiffusionResult } from './Public/Extensions/RunAnywhere+Diffusion';
+export type {
+  DiffusionGenerationOptions,
+  DiffusionResult,
+  DiffusionConfiguration,
+  DiffusionCapabilities,
+  DiffusionProgress,
+} from './Public/Extensions/RunAnywhere+Diffusion';
+export {
+  generateImage,
+  generateImageStream,
+  loadDiffusionModel,
+  unloadDiffusionModel,
+  getIsDiffusionModelLoaded,
+  cancelImageGeneration,
+  getDiffusionCapabilities,
+} from './Public/Extensions/RunAnywhere+Diffusion';
 export { RAG } from './Public/Extensions/RunAnywhere+RAG';
 export { ModelManagement } from './Public/Extensions/RunAnywhere+ModelManagement';
 export { ModelAssignments } from './Public/Extensions/RunAnywhere+ModelAssignments';
@@ -48,6 +64,8 @@ export type { ModelAssignment } from './Public/Extensions/RunAnywhere+ModelAssig
 export { Frameworks } from './Public/Extensions/RunAnywhere+Frameworks';
 export { solutions as Solutions } from './Public/Extensions/RunAnywhere+Solutions';
 export { Logging } from './Public/Extensions/RunAnywhere+Logging';
+export { Hardware } from './Public/Extensions/RunAnywhere+Hardware';
+export type { HardwareProfile } from './Public/Extensions/RunAnywhere+Hardware';
 
 // Phase 4d: top-level convenience verbs (chat / generate / transcribe /
 // synthesize / speak / detectSpeech / setVADCallback / etc.) — also reachable
@@ -92,7 +110,7 @@ export {
   ragAddDocumentsBatch,
   ragQuery,
   ragClearDocuments,
-  ragDocumentCount,
+  ragGetDocumentCount,
   ragGetStatistics,
   setRAGProvider,
 } from './Public/Extensions/RunAnywhere+RAG';
@@ -108,6 +126,7 @@ export {
   voiceAgentTranscribe,
   voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech,
+  streamVoiceAgent,
   cleanupVoiceAgent,
   setVoiceAgentProvider,
 } from './Public/Extensions/RunAnywhere+VoiceAgent';
@@ -132,12 +151,22 @@ export type {
   StorageProviderCapabilities,
 } from './Infrastructure/StorageProvider';
 
-// Voice orchestration — two paths:
-//   1. VoicePipeline      — TS-side composition (STT -> LLM -> TTS) via ExtensionPoint.
-//   2. VoiceAgentStreamAdapter — WASM proto-stream (VoiceEvent) parity with iOS/Android/Flutter/RN.
-//      Also accepts a custom VoiceAgentStreamTransport for TS-backed / test transports.
+// TS-side voice pipeline orchestrator (STT -> LLM -> TTS).
+// Used by web example apps that drive orchestration on the TS side
+// before WASM voice-agent bindings are available.
 export { VoicePipeline, PipelineState } from './Public/Extensions/RunAnywhere+VoicePipeline';
-export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/RunAnywhere+VoicePipeline';
+export type {
+  VoicePipelineCallbacks,
+  VoicePipelineOptions,
+  VoicePipelineTurnResult,
+} from './Public/Extensions/VoicePipelineTypes';
+
+// Voice orchestration — single canonical path:
+//   `VoiceAgentStreamAdapter` wraps the WASM proto-stream
+//   (`rac_voice_agent_set_proto_callback`) and yields an
+//   `AsyncIterable<VoiceEvent>` symmetric with iOS / Android / Flutter / RN.
+//   The TS-side compose path (`VoicePipeline`) was available until v0.20.0
+//   and has been restored to support example apps that still use it.
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';

@@ -37,6 +37,16 @@ actual suspend fun RunAnywhere.describeImage(
     return result.text
 }
 
+actual suspend fun RunAnywhere.askAboutImage(
+    question: String,
+    image: VLMImage,
+): String {
+    // Per canonical §7: askAboutImage(question, image) is a convenience
+    // over processImage with the question as the prompt.
+    val result = processImage(image, question, null)
+    return result.text
+}
+
 // MARK: - Full API
 
 actual suspend fun RunAnywhere.processImage(

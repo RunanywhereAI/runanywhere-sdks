@@ -13,7 +13,8 @@ import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.availableModels
-import com.runanywhere.sdk.public.extensions.currentLLMModelId
+// Round 3 KOTLIN: currentLLMModel is now a sync val property.
+import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.currentVLMModelId
@@ -177,9 +178,10 @@ class ModelSelectionViewModel(
      * by file path at pipeline creation time and are not pre-loaded into memory.
      * This mirrors iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
-    private fun getCurrentLoadedModelIdForContext(): String? {
+    private suspend fun getCurrentLoadedModelIdForContext(): String? {
         return when (context) {
-            ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
+            // Round 3 KOTLIN: currentLLMModel is now a sync val property.
+            ModelSelectionContext.LLM -> RunAnywhere.currentLLMModel?.id
             ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
             ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
             ModelSelectionContext.VOICE -> null

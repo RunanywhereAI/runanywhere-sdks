@@ -239,7 +239,7 @@ class SecureStorageServiceImpl {
     if (params.baseURL) {
       promises.push(this.store(params.baseURL, SecureStorageKeys.baseURL));
     }
-    promises.push(this.store(params.environment, SecureStorageKeys.environment));
+    promises.push(this.store(String(params.environment), SecureStorageKeys.environment));
 
     await Promise.all(promises);
     this.logger.info('SDK parameters stored securely');
@@ -266,7 +266,7 @@ class SecureStorageServiceImpl {
     return {
       apiKey,
       baseURL,
-      environment: environment as SDKEnvironment,
+      environment: Number(environment) as SDKEnvironment,
     };
   }
 

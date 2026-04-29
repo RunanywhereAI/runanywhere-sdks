@@ -454,24 +454,26 @@ class SpeechToTextViewModel : ViewModel() {
                             withContext(Dispatchers.IO) {
                                 try {
                                     val options = STTOptions(language = com.runanywhere.sdk.foundation.protoext.sttLanguageFromBcp47(_uiState.value.language))
-                                    val result =
-                                        RunAnywhere.transcribeStream(
-                                            audioData = chunkData,
-                                            options = options,
-                                        ) { partial ->
-                                            // Update UI with partial result (non-suspend callback)
-                                            if (partial.text.isNotBlank()) {
-                                                val newText = lastTranscription + " " + partial.text
-                                                // Use launch since we're in a non-suspend callback
-                                                viewModelScope.launch(Dispatchers.Main) {
-                                                    handleSTTStreamText(newText.trim())
-                                                }
+                                    var finalText = ""
+                                    RunAnywhere.transcribeStream(
+                                        audioData = chunkData,
+                                        options = options,
+                                    ).collect { partial ->
+                                        // Update UI with partial result
+                                        if (partial.text.isNotBlank()) {
+                                            val newText = lastTranscription + " " + partial.text
+                                            withContext(Dispatchers.Main) {
+                                                handleSTTStreamText(newText.trim())
                                             }
+                                            finalText = partial.text
                                         }
+                                    }
                                     // Update with final result
-                                    lastTranscription = (lastTranscription + " " + result.text).trim()
-                                    withContext(Dispatchers.Main) {
-                                        handleSTTStreamText(lastTranscription)
+                                    if (finalText.isNotBlank()) {
+                                        lastTranscription = (lastTranscription + " " + finalText).trim()
+                                        withContext(Dispatchers.Main) {
+                                            handleSTTStreamText(lastTranscription)
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     Timber.w("Chunk transcription error: ${e.message}")

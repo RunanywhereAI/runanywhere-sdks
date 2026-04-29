@@ -148,9 +148,9 @@ class ModelStatusBanner extends StatelessWidget {
     switch (framework) {
       case LLMFramework.llamaCpp:
         return Icons.memory;
-      case LLMFramework.whisperKit:
+      case LLMFramework.unknown:
         return Icons.graphic_eq;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return Icons.developer_board;
       case LLMFramework.foundationModels:
         return Icons.apple;
@@ -165,9 +165,9 @@ class ModelStatusBanner extends StatelessWidget {
     switch (framework) {
       case LLMFramework.llamaCpp:
         return AppColors.primaryBlue;
-      case LLMFramework.whisperKit:
+      case LLMFramework.unknown:
         return AppColors.primaryGreen;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return AppColors.primaryPurple;
       case LLMFramework.foundationModels:
         return Colors.black;
@@ -598,9 +598,9 @@ class CompactModelIndicator extends StatelessWidget {
     switch (framework) {
       case LLMFramework.llamaCpp:
         return AppColors.primaryBlue;
-      case LLMFramework.whisperKit:
+      case LLMFramework.unknown:
         return AppColors.statusGreen;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.onnx:
         return AppColors.primaryPurple;
       case LLMFramework.foundationModels:
         return Colors.black;

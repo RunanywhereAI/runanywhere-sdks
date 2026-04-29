@@ -2,43 +2,96 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Runtime plugin loader — Kotlin equivalent of Swift's RunAnywhere.PluginLoader.
+ * Runtime plugin loader — namespaced as `RunAnywhere.pluginLoader.*`
+ * per CANONICAL_API.md §12.
  *
- * Wave 2 KOTLIN: Added missing namespace extension to align with Swift.
+ * Round 2 KOTLIN: Replaced flat API (loadPlugin, unloadPlugin, etc.)
+ * with the canonical `RunAnywhere.pluginLoader: PluginLoader` namespace,
+ * matching Swift, Flutter, RN and Web SDK surfaces.
  */
 
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
 
-/**
- * Compile-time plugin API version this build of `racommons` was built
- * against. Plugin libraries must report a matching version or `dlopen`
- * is rejected with `ABI_VERSION_MISMATCH`.
- */
-expect val RunAnywhere.pluginApiVersion: UInt
+// ---------------------------------------------------------------------------
+// PluginInfo — lightweight descriptor for a loaded plugin.
+// ---------------------------------------------------------------------------
 
 /**
- * Load a plugin library at runtime. On platforms that ship statically
- * linked plugins (iOS, WASM) this throws `SDKException.notImplemented`.
+ * Descriptor for a plugin loaded at runtime.
  *
- * @param path Absolute path to the shared library (.so / .dylib / .dll).
+ * @param id Plugin name / identifier (without `librunanywhere_` prefix or extension)
+ * @param path Absolute path to the shared library on disk, if known
  */
-expect suspend fun RunAnywhere.loadPlugin(path: String)
+data class PluginInfo(
+    val id: String,
+    val path: String? = null,
+)
+
+// ---------------------------------------------------------------------------
+// PluginLoader — namespaced capability class
+// ---------------------------------------------------------------------------
 
 /**
- * Unregister a previously-loaded plugin.
+ * Provides runtime plugin management: load, unload, and enumerate
+ * native extension plugins.
  *
- * @param name Plugin name (without `librunanywhere_` prefix or extension).
+ * Access via `RunAnywhere.pluginLoader`.
+ *
+ * On platforms that ship statically linked plugins (iOS, WASM) the
+ * mutating operations throw `SDKException.notImplemented`.
  */
-expect suspend fun RunAnywhere.unloadPlugin(name: String)
+expect class PluginLoader {
+    /**
+     * Compile-time plugin API version this build of `racommons` was built
+     * against. Plugin libraries must report a matching version.
+     *
+     * Type is UInt per §12 of CANONICAL_API.md (uint32).
+     */
+    val apiVersion: UInt
+
+    /**
+     * Total number of plugins currently registered.
+     */
+    val registeredCount: Int
+
+    /**
+     * Load a plugin library at runtime.
+     *
+     * @param path Absolute path to the shared library (.so / .dylib / .dll)
+     * @return [PluginInfo] describing the loaded plugin
+     */
+    suspend fun load(path: String): PluginInfo
+
+    /**
+     * Unregister a previously-loaded plugin.
+     *
+     * @param id Plugin name (without `librunanywhere_` prefix or extension)
+     */
+    suspend fun unload(id: String)
+
+    /**
+     * Names of all currently registered plugins.
+     *
+     * Per §12 of CANONICAL_API.md: `registeredNames() → String[]`.
+     *
+     * @return List of plugin name strings (without path or extension)
+     */
+    suspend fun registeredNames(): List<String>
+}
+
+// ---------------------------------------------------------------------------
+// RunAnywhere.pluginLoader accessor
+// ---------------------------------------------------------------------------
 
 /**
- * Snapshot of currently-registered plugin names.
+ * Namespace accessor for plugin-loader operations.
+ *
+ * Example:
+ * ```kotlin
+ * val info = RunAnywhere.pluginLoader.load("/data/lib/my_plugin.so")
+ * val count = RunAnywhere.pluginLoader.registeredCount
+ * ```
  */
-expect suspend fun RunAnywhere.registeredPluginNames(): List<String>
-
-/**
- * Total number of plugins currently registered (one count per plugin).
- */
-expect suspend fun RunAnywhere.registeredPluginCount(): Int
+expect val RunAnywhere.pluginLoader: PluginLoader
