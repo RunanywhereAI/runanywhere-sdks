@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
@@ -46,6 +47,7 @@ fun MoreHubScreen(
     onNavigateToRAG: () -> Unit,
     onNavigateToBenchmarks: () -> Unit,
     onNavigateToLoraManager: () -> Unit = {},
+    onNavigateToSolutions: () -> Unit = {},
 ) {
     ConfigureTopBar(title = "More")
 
@@ -134,6 +136,24 @@ fun MoreHubScreen(
             title = "Benchmarks",
             subtitle = "Measure on-device AI performance across models",
             onClick = onNavigateToBenchmarks,
+        )
+
+        Spacer(modifier = Modifier.height(Dimensions.xxLarge))
+
+        // Solutions section — Wave 3 Step 3.3 (G-E6)
+        Text(
+            "Solutions",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
+        )
+
+        MoreFeatureCard(
+            icon = Icons.Filled.Layers,
+            iconColor = AppColors.featureBlue,
+            title = "Solutions",
+            subtitle = "Run prepackaged pipelines (voice agent, RAG) from YAML",
+            onClick = onNavigateToSolutions,
         )
 
         Spacer(modifier = Modifier.height(Dimensions.large))

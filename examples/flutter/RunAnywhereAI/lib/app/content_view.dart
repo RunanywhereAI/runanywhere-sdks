@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/features/chat/chat_interface_view.dart';
 import 'package:runanywhere_ai/features/settings/combined_settings_view.dart';
+import 'package:runanywhere_ai/features/solutions/solutions_view.dart';
 import 'package:runanywhere_ai/features/tools/tools_view.dart';
 import 'package:runanywhere_ai/features/vision/vision_hub_view.dart';
 import 'package:runanywhere_ai/features/voice/speech_to_text_view.dart';
@@ -30,7 +31,8 @@ class _ContentViewState extends State<ContentView> {
     TextToSpeechView(), // Tab 3: Text-to-Speech (Speak)
     VoiceAssistantView(), // Tab 4: Voice Assistant (STT + LLM + TTS)
     ToolsView(), // Tab 5: Tools (Tool Calling)
-    CombinedSettingsView(), // Tab 6: Settings (includes Storage)
+    SolutionsView(), // Tab 6: Solutions (YAML pipeline runner)
+    CombinedSettingsView(), // Tab 7: Settings (includes Storage)
   ];
 
   @override
@@ -120,6 +122,17 @@ class _ContentViewState extends State<ContentView> {
               child: Icon(Icons.build),
             ),
             label: 'Tools',
+          ),
+          NavigationDestination(
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.layers_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.layers),
+            ),
+            label: 'Solutions',
           ),
           NavigationDestination(
             icon: Padding(

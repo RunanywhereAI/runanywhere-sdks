@@ -41,6 +41,7 @@ import com.runanywhere.runanywhereai.presentation.components.TopBarState
 import com.runanywhere.runanywhereai.presentation.lora.LoraManagerScreen
 import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
+import com.runanywhere.runanywhereai.presentation.solutions.SolutionsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
 import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
@@ -179,6 +180,9 @@ fun AppNavigation() {
                         onNavigateToLoraManager = {
                             navController.navigate(NavigationRoute.LORA_MANAGER)
                         },
+                        onNavigateToSolutions = {
+                            navController.navigate(NavigationRoute.SOLUTIONS)
+                        },
                     )
                 }
 
@@ -223,6 +227,10 @@ fun AppNavigation() {
                     )
                 }
 
+                composable(NavigationRoute.SOLUTIONS) {
+                    SolutionsScreen()
+                }
+
                 composable(NavigationRoute.SETTINGS) {
                     SettingsScreen()
                 }
@@ -248,6 +256,7 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
                 NavigationRoute.RAG,
                 NavigationRoute.BENCHMARKS,
                 NavigationRoute.LORA_MANAGER,
+                NavigationRoute.SOLUTIONS,
             ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
         route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
         else -> BottomNavTab.Chat
@@ -276,5 +285,6 @@ object NavigationRoute {
     const val BENCHMARKS = "benchmarks"
     const val BENCHMARK_DETAIL = "benchmark_detail"
     const val LORA_MANAGER = "lora_manager"
+    const val SOLUTIONS = "solutions"
     const val SETTINGS = "settings"
 }
