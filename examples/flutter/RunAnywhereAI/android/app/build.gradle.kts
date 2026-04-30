@@ -30,6 +30,15 @@ android {
         versionName = flutter.versionName
     }
 
+    packaging {
+        jniLibs {
+            pickFirsts += listOf(
+                "lib/arm64-v8a/libc++_shared.so",
+                "lib/arm64-v8a/libomp.so",
+            )
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

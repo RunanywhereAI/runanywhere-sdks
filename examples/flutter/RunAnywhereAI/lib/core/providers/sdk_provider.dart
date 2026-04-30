@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
@@ -27,7 +28,11 @@ Future<void> initializeSDK(ProgressCallback onProgress) async {
   await Onnx.register();
   await Future<void>.delayed(Duration.zero);
 
-  onProgress(0.55, 'Registering vision models...');
+  onProgress(0.55, 'Registering RAG backend...');
+  await RAGModule.register();
+  await Future<void>.delayed(Duration.zero);
+
+  onProgress(0.60, 'Registering vision models...');
   _registerVLMModels();
   await Future<void>.delayed(Duration.zero);
 
