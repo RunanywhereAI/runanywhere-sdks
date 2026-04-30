@@ -101,7 +101,7 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework } from '../types/model';
+import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
@@ -206,7 +206,8 @@ export const TTSScreen: React.FC = () => {
       const allModels = await RunAnywhere.getAvailableModels();
       // Filter by category (speech-synthesis) matching SDK's ModelCategory
       const ttsModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === 'speech-synthesis'
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
       );
       setAvailableModels(ttsModels);
 
@@ -331,7 +332,7 @@ export const TTSScreen: React.FC = () => {
 
         // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
         // and finding the correct nested model folder
-        const modelType = model.category || 'piper';
+        const modelType = 'piper';
         console.warn(
           `[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`
         );

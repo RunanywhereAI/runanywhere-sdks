@@ -55,7 +55,7 @@ export const LlamaCPP = {
   moduleId: 'llamacpp',
   moduleName: 'LlamaCPP',
   inferenceFramework: LLMFramework.LlamaCpp,
-  capabilities: [SDKComponent.LLM] as const,
+  capabilities: [SDKComponent.SDK_COMPONENT_LLM] as const,
   defaultPriority: 100,
 
   /**

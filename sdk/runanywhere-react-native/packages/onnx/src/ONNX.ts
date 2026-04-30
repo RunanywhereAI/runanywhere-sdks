@@ -56,7 +56,7 @@ export const ONNX = {
   moduleId: 'onnx',
   moduleName: 'ONNX Runtime',
   inferenceFramework: LLMFramework.ONNX,
-  capabilities: [SDKComponent.STT, SDKComponent.TTS, SDKComponent.VAD] as const,
+  capabilities: [SDKComponent.SDK_COMPONENT_STT, SDKComponent.SDK_COMPONENT_TTS, SDKComponent.SDK_COMPONENT_VAD] as const,
   defaultPriority: 100,
 
   /**

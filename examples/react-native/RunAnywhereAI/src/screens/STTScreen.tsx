@@ -48,7 +48,7 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework } from '../types/model';
+import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 import { STTMode } from '../types/voice';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
@@ -150,7 +150,8 @@ export const STTScreen: React.FC = () => {
       const allModels = await RunAnywhere.getAvailableModels();
       // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === 'speech-recognition'
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setAvailableModels(sttModels);
 
@@ -246,7 +247,7 @@ export const STTScreen: React.FC = () => {
       // and finding the correct nested model folder
       const success = await RunAnywhere.loadSTTModel(
         model.localPath,
-        model.category || 'whisper'
+        'whisper'
       );
 
       if (success) {

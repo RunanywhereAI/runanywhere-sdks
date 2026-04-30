@@ -351,7 +351,7 @@ export const VoiceAssistantScreen: React.FC = () => {
             if (model.localPath) {
               const sttSuccess = await RunAnywhere.loadSTTModel(
                 model.localPath,
-                model.category || 'whisper'
+                'whisper'
               );
               if (sttSuccess) {
                 setSTTModel({
@@ -378,7 +378,7 @@ export const VoiceAssistantScreen: React.FC = () => {
             if (model.localPath) {
               const ttsSuccess = await RunAnywhere.loadTTSModel(
                 model.localPath,
-                model.category || 'piper'
+                'piper'
               );
               if (ttsSuccess) {
                 setTTSModel({

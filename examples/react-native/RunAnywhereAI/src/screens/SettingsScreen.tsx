@@ -487,7 +487,7 @@ export const SettingsScreen: React.FC = () => {
     setIsRefreshing(true);
     try {
       // Get SDK version
-      const version = await RunAnywhere.getVersion();
+      const version = RunAnywhere.version;
       setSdkVersion(version); // Check if SDK is initialized first
 
       const isInit = await RunAnywhere.isInitialized();
@@ -854,7 +854,9 @@ export const SettingsScreen: React.FC = () => {
     const isDownloaded = downloadedModels.some((m) => m.id === model.id); // Determine framework based on format
 
     const framework =
-      model.format === 'onnx' ? LLMFramework.ONNX : LLMFramework.LlamaCpp;
+      String(model.format).toLowerCase().includes('onnx')
+        ? LLMFramework.ONNX
+        : LLMFramework.LlamaCpp;
     const frameworkName = FrameworkDisplayNames[framework] || framework; // Get model size estimate based on download size (may differ from actual on-disk size)
 
     const downloadedModel = downloadedModels.find((m) => m.id === model.id);

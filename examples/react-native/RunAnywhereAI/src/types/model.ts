@@ -28,17 +28,14 @@ export enum LLMFramework {
 }
 
 /**
- * Model category
+ * Model category — re-exported from `@runanywhere/core` (which re-exports the
+ * canonical `ModelCategory` proto enum from `@runanywhere/proto-ts`). Keep
+ * this re-export so existing example-app imports `from '../types/model'`
+ * continue to resolve, but the values are the proto canonical
+ * `MODEL_CATEGORY_*` numeric form, not the prior hand-rolled string form.
  */
-export enum ModelCategory {
-  Language = 'language',
-  Embedding = 'embedding',
-  SpeechRecognition = 'speech-recognition',
-  SpeechSynthesis = 'speech-synthesis',
-  Vision = 'vision',
-  Multimodal = 'multimodal',
-  Audio = 'audio',
-}
+import { ModelCategory } from '@runanywhere/core';
+export { ModelCategory };
 
 /**
  * Model modality for filtering

@@ -324,7 +324,7 @@ export const ChatScreen: React.FC = () => {
     try {
       const allModels = await RunAnywhere.getAvailableModels();
       const llmModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === ModelCategory.Language
+        (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
       setAvailableModels(llmModels);
       console.warn(
@@ -401,7 +401,7 @@ export const ChatScreen: React.FC = () => {
         const modelInfo = {
           id: model.id,
           name: model.name,
-          category: ModelCategory.Language,
+          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
           compatibleFrameworks:
             (model.compatibleFrameworks as unknown as LLMFramework[]) ?? [fw],
           preferredFramework: fw,
@@ -480,8 +480,14 @@ export const ChatScreen: React.FC = () => {
 
       // Stream tokens as they arrive — canonical cross-SDK path (§1 spec).
       const stream = RunAnywhere.generateStream(prompt, {
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
+        maxTokens: options.maxTokens ?? 512,
+        temperature: options.temperature ?? 0.7,
+        topP: 1.0,
+        topK: 0,
+        repetitionPenalty: 1.0,
+        stopSequences: [],
+        streamingEnabled: true,
+        preferredFramework: 0,
         systemPrompt: options.systemPrompt,
       });
 
