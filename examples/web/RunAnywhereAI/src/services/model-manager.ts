@@ -176,7 +176,12 @@ export async function ensureVADLoaded(): Promise<boolean> {
 // Register models and plug in VLM loader via RunAnywhere API
 // ---------------------------------------------------------------------------
 
-RunAnywhere.registerModels(REGISTERED_MODELS);
+// Per-entry registration matches the other 4 example apps (Swift / Kotlin /
+// Flutter / RN). The SDK does not expose a `registerModels` plural; the
+// canonical batch path is a loop over `registerModel`.
+for (const model of REGISTERED_MODELS) {
+  RunAnywhere.registerModel(model);
+}
 
 // Import the VLM worker using Vite's ?worker&url suffix so it gets compiled
 // as a standalone bundle with all dependencies resolved — no raw-source data URLs.
