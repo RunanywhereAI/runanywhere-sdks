@@ -33,6 +33,14 @@ export interface HardwareProfile {
   userAgent: string;
 }
 
+/**
+ * Canonical alias matching `HardwareProfileResult` from the generated proto
+ * type (`runanywhere-proto-ts/src/hardware_profile.ts`). Wave 3 Step 3.2:
+ * lets callers spell the type as `HardwareProfileResult` per
+ * CANONICAL_API §14, ahead of the Wave 4 type unification.
+ */
+export type HardwareProfileResult = HardwareProfile;
+
 type NavigatorWithExtras = Omit<Navigator, 'hardwareConcurrency'> & {
   deviceMemory?: number;
   hardwareConcurrency?: number;

@@ -102,3 +102,9 @@ class HardwareProfile {
     required this.accelerationMode,
   });
 }
+
+/// Canonical alias matching `HardwareProfileResult` from the generated proto
+/// type (`packages/runanywhere/lib/generated/hardware_profile.pb.dart`).
+/// Wave 3 Step 3.2: lets callers spell the type as `HardwareProfileResult`
+/// per CANONICAL_API §14, ahead of the Wave 4 type unification.
+typedef HardwareProfileResult = HardwareProfile;

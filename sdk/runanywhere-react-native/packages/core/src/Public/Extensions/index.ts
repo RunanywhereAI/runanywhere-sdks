@@ -115,6 +115,16 @@ export type {
 // Device (NPU Chip Detection)
 export { getChip } from './RunAnywhere+Device';
 
+// Hardware Profile (CANONICAL_API §14 — Wave 3 Step 3.2)
+export {
+  getProfile as getHardwareProfile,
+  getChip as getHardwareChip,
+  hasNeuralEngine as hardwareHasNeuralEngine,
+  accelerationMode as hardwareAccelerationMode,
+  Hardware,
+} from './RunAnywhere+Hardware';
+export type { HardwareProfileResult } from './RunAnywhere+Hardware';
+
 // Logging
 export { setLogLevel } from './RunAnywhere+Logging';
 

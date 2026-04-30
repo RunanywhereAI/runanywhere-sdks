@@ -37,6 +37,14 @@ data class HardwareProfile(
     val cpuCores: Int = 0,
 )
 
+/**
+ * Canonical alias matching `HardwareProfileResult` from the generated proto
+ * type (`commonMain/.../generated/runanywhere/v1/HardwareProfileResult.kt`).
+ * Wave 3 Step 3.2: lets callers spell the type as `HardwareProfileResult`
+ * per CANONICAL_API §14, ahead of the Wave 4 type unification.
+ */
+typealias HardwareProfileResult = HardwareProfile
+
 // ---------------------------------------------------------------------------
 // Hardware — namespaced capability class
 // ---------------------------------------------------------------------------

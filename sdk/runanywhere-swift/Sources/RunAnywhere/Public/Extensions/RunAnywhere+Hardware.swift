@@ -51,6 +51,12 @@ public struct HardwareProfile: Sendable {
     public let platform: String
 }
 
+/// Canonical alias matching `HardwareProfileResult` from the
+/// generated proto type (`Generated/hardware_profile.pb.swift`). Wave 3
+/// Step 3.2: lets callers spell the type as `HardwareProfileResult` per
+/// CANONICAL_API §14, ahead of the Wave 4 type unification.
+public typealias HardwareProfileResult = HardwareProfile
+
 // MARK: - Hardware Namespace
 
 public extension RunAnywhere {
