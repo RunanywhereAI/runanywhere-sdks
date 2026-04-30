@@ -351,4 +351,19 @@ rac_result_t rac_service_register_provider(int /*service_type*/,
     return RAC_SUCCESS;
 }
 
+// Symmetric unregister shim. Stale Genie .so files emitted before the
+// unified plugin registry land call this on backend teardown; without
+// the symbol, dlopen fails outright with "cannot locate symbol
+// rac_service_unregister_provider" and the entire Genie engine is
+// skipped on Android — masking unrelated logs in every example app.
+// New code must use rac_plugin_unregister().
+rac_result_t rac_service_unregister_provider(int /*service_type*/,
+                                             void* /*ops*/) {
+    RAC_LOG_WARNING(LOG_CAT,
+                    "rac_service_unregister_provider() is a deprecated shim — "
+                    "unified plugin registry has replaced per-service "
+                    "registration; caller should migrate to rac_plugin_unregister().");
+    return RAC_SUCCESS;
+}
+
 }  // extern "C"
