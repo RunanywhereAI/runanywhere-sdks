@@ -351,6 +351,15 @@ class DartBridgeModelRegistry {
   }
 
   /// Convert C++ RAC_FRAMEWORK int to public InferenceFramework
+  ///
+  /// Apple-specific frameworks (MLX=7, CoreML=8, WhisperKitCoreML=9,
+  /// MetalRT=10) are not part of the public Flutter SDK enum. They are
+  /// folded back to the registered framework family so iOS round-trips
+  /// don't lose their identity:
+  ///   * WhisperKitCoreML/CoreML/MLX/MetalRT → onnx (iOS STT/TTS pipelines
+  ///     register Whisper/VITS models with InferenceFramework.onnx; without
+  ///     this mapping they would round-trip to `unknown` and land in
+  ///     `Models/Unknown/` instead of `Models/ONNX/`).
   static public_types.InferenceFramework _frameworkFromFfi(int framework) {
     switch (framework) {
       case 0:
@@ -367,6 +376,13 @@ class DartBridgeModelRegistry {
         return public_types.InferenceFramework.builtIn;
       case 6:
         return public_types.InferenceFramework.none;
+      case 7: // RAC_FRAMEWORK_MLX
+      case 8: // RAC_FRAMEWORK_COREML
+      case 9: // RAC_FRAMEWORK_WHISPERKIT_COREML (iOS Whisper STT)
+      case 10: // RAC_FRAMEWORK_METALRT
+        return public_types.InferenceFramework.onnx;
+      case 11: // RAC_FRAMEWORK_GENIE
+        return public_types.InferenceFramework.genie;
       default:
         return public_types.InferenceFramework.unknown;
     }

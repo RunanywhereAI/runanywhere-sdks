@@ -342,7 +342,19 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
     );
-    debugPrint('✅ STT/TTS models registered via Core SDK');
+
+    // System TTS pseudo-model (matches iOS / Android registration).
+    // No download URL — the platform's built-in TTS engine (AVSpeechSynthesizer
+    // on iOS, android.speech.tts.TextToSpeech on Android) is used at runtime.
+    RunAnywhere.registerModel(
+      id: 'system-tts',
+      name: 'System TTS',
+      url: Uri.parse('about:blank'),
+      framework: InferenceFramework.systemTTS,
+      modality: ModelCategory.speechSynthesis,
+      memoryRequirement: 0,
+    );
+    debugPrint('✅ STT/TTS models registered via Core SDK (incl. system-tts)');
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---
