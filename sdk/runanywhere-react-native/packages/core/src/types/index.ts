@@ -264,20 +264,25 @@ export type {
 } from './LLMTypes';
 
 // =========================================================================
-// Tool Calling Types (RN-local)
+// Tool Calling — proto-canonical (definition / call / result / options)
+// plus RN-only `ToolExecutor` and `RegisteredTool` (function references
+// can't round-trip through proto wire format).
 // =========================================================================
 
 export type {
-  ParameterType,
   ToolParameter,
   ToolDefinition,
   ToolCall,
   ToolResult,
-  ToolExecutor,
-  RegisteredTool,
   ToolCallingOptions,
   ToolCallingResult,
-} from './ToolCallingTypes';
+} from '@runanywhere/proto-ts/tool_calling';
+export { ToolParameterType } from '@runanywhere/proto-ts/tool_calling';
+
+export type {
+  ToolExecutor,
+  RegisteredTool,
+} from '../Public/Extensions/RunAnywhere+ToolCalling';
 
 // =========================================================================
 // NPU Chip Types (RN-local — device dispatch only)

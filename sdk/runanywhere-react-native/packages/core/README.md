@@ -594,9 +594,11 @@ packages/core/
 │   │   ├── FileSystem.ts           # File ops
 │   │   └── Network/                # HTTP, telemetry
 │   ├── types/                      # TypeScript types
-│   │   ├── ToolCallingTypes.ts     # Tool calling types
-│   │   ├── StructuredOutputTypes.ts # Structured output types
-│   │   └── ...
+│   │   ├── enums.ts                # RN-only enums + proto re-exports
+│   │   ├── LLMTypes.ts             # RN-local LLM streaming primitives
+│   │   ├── models.ts               # Registry + init shapes
+│   │   └── ...                     # Tool / structured-output types
+│   │                               #   come from @runanywhere/proto-ts
 │   └── native/                     # Native module access
 ├── cpp/                            # C++ HybridObject bridges
 │   ├── HybridRunAnywhereCore.cpp   # Core native bridge
