@@ -34,7 +34,7 @@ extension LLMViewModel {
                 fullResponse += event.token
                 tokenCount += 1
                 let displayText = Self.stripThinkTags(from: fullResponse)
-                await updateMessageContent(at: messageIndex, content: displayText)
+                updateMessageContent(at: messageIndex, content: displayText)
                 NotificationCenter.default.post(
                     name: Notification.Name("MessageContentUpdated"),
                     object: nil
@@ -100,19 +100,17 @@ extension LLMViewModel {
 
     // MARK: - Message Updates
 
-    func updateMessageContent(at index: Int, content: String) async {
-        await MainActor.run {
-            guard index < self.messagesValue.count else { return }
-            let currentMessage = self.messagesValue[index]
-            let updatedMessage = Message(
-                id: currentMessage.id,
-                role: currentMessage.role,
-                content: content,
-                thinkingContent: currentMessage.thinkingContent,
-                timestamp: currentMessage.timestamp
-            )
-            self.updateMessage(at: index, with: updatedMessage)
-        }
+    func updateMessageContent(at index: Int, content: String) {
+        guard index < self.messagesValue.count else { return }
+        let currentMessage = self.messagesValue[index]
+        let updatedMessage = Message(
+            id: currentMessage.id,
+            role: currentMessage.role,
+            content: content,
+            thinkingContent: currentMessage.thinkingContent,
+            timestamp: currentMessage.timestamp
+        )
+        self.updateMessage(at: index, with: updatedMessage)
     }
 
     func updateMessageWithResult(
