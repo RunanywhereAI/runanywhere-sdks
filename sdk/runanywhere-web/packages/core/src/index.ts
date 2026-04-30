@@ -151,22 +151,14 @@ export type {
   StorageProviderCapabilities,
 } from './Infrastructure/StorageProvider';
 
-// TS-side voice pipeline orchestrator (STT -> LLM -> TTS).
-// Used by web example apps that drive orchestration on the TS side
-// before WASM voice-agent bindings are available.
-export { VoicePipeline, PipelineState } from './Public/Extensions/RunAnywhere+VoicePipeline';
-export type {
-  VoicePipelineCallbacks,
-  VoicePipelineOptions,
-  VoicePipelineTurnResult,
-} from './Public/Extensions/VoicePipelineTypes';
-
 // Voice orchestration — single canonical path:
 //   `VoiceAgentStreamAdapter` wraps the WASM proto-stream
 //   (`rac_voice_agent_set_proto_callback`) and yields an
 //   `AsyncIterable<VoiceEvent>` symmetric with iOS / Android / Flutter / RN.
-//   The TS-side compose path (`VoicePipeline`) was available until v0.20.0
-//   and has been restored to support example apps that still use it.
+//   The legacy TS-side compose orchestrator (`VoicePipeline`) was removed
+//   per CANONICAL_API.md §15; example apps inline their own STT→LLM→TTS
+//   composition directly via `ExtensionPoint.requireProvider(...)` until
+//   the Web WASM voice-agent bindings land.
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';

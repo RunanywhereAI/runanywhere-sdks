@@ -11,6 +11,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 
@@ -46,14 +47,9 @@ actual class Hardware {
     private fun buildPlatformProfile(): HardwareProfile {
         val runtime = Runtime.getRuntime()
         val cpuCores = runtime.availableProcessors()
-        val totalMemoryMB =
-            try {
-                // Use Runtime as a best-effort approximation; exact total RAM is
-                // available via ActivityManager but requires a Context.
-                runtime.maxMemory() / (1024L * 1024L)
-            } catch (e: Throwable) {
-                0L
-            }
+        // G-DV20: Report physical device RAM. Runtime.maxMemory() returns the
+        // JVM heap cap (~512 MB on Android) and is NOT a device-memory probe.
+        val totalMemoryMB = PhysicalMemoryProbe.totalPhysicalMemoryMB()
         val chipName =
             try {
                 // On Android, ro.board.platform gives the SoC name.

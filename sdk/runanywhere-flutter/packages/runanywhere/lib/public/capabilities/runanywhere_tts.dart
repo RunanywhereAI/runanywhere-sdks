@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
+import 'package:runanywhere/features/tts/system_tts_service.dart' as sys_tts;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb_models;
@@ -21,6 +22,12 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 
+/// Sentinel voice ID for the platform's built-in System TTS engine
+/// (iOS AVSpeechSynthesizer, Android android.speech.tts.TextToSpeech).
+/// Registered as a pseudo-model with no download URL; routed through
+/// [sys_tts.SystemTTSService] (flutter_tts) instead of the C++ bridge.
+const String _systemTtsVoiceId = 'system-tts';
+
 /// TTS (text-to-speech) capability surface.
 ///
 /// Access via `RunAnywhereSDK.instance.tts`. Mirrors Swift's
@@ -30,11 +37,17 @@ class RunAnywhereTTS {
   static final RunAnywhereTTS _instance = RunAnywhereTTS._();
   static RunAnywhereTTS get shared => _instance;
 
+  /// Lazy-initialized System TTS service (flutter_tts wrapper). Created on
+  /// first use of the `system-tts` pseudo-voice; cleaned up on unload.
+  sys_tts.SystemTTSService? _systemTts;
+  bool _systemTtsLoaded = false;
+
   /// True when a TTS voice is currently loaded.
-  bool get isLoaded => DartBridge.tts.isLoaded;
+  bool get isLoaded => _systemTtsLoaded || DartBridge.tts.isLoaded;
 
   /// Currently-loaded TTS voice ID, or null.
-  String? get currentVoiceId => DartBridge.tts.currentVoiceId;
+  String? get currentVoiceId =>
+      _systemTtsLoaded ? _systemTtsVoiceId : DartBridge.tts.currentVoiceId;
 
   /// Currently-loaded TTS voice as `ModelInfo`, or null.
   Future<ModelInfo?> currentVoice() async {
@@ -60,6 +73,25 @@ class RunAnywhereTTS {
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: voiceId));
 
     try {
+      // System TTS short-circuit: route to platform engine (AVSpeechSynthesizer
+      // on iOS, android.speech.tts.TextToSpeech on Android) via flutter_tts.
+      // The pseudo-model has no download URL / localPath, so it must bypass
+      // the C++ voice-load path that expects an on-disk model file.
+      if (voiceId == _systemTtsVoiceId) {
+        await _loadSystemTTS();
+
+        final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
+        TelemetryService.shared.trackModelLoad(
+          modelId: voiceId,
+          modelType: 'tts',
+          success: true,
+          loadTimeMs: loadTimeMs,
+        );
+        EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
+        logger.info('TTS voice loaded: System TTS');
+        return;
+      }
+
       final models = await RunAnywhereModels.shared.available();
       final model = models.where((m) => m.id == voiceId).firstOrNull;
 
@@ -80,9 +112,8 @@ class RunAnywhereTTS {
             'Could not resolve TTS voice path for: $voiceId');
       }
 
-      if (DartBridge.tts.isLoaded) {
-        DartBridge.tts.unload();
-      }
+      // Unload any prior voice (native OR system) before loading the next.
+      await _unloadCurrent();
 
       logger.debug('Loading TTS voice via C++ bridge: $resolvedPath');
       await DartBridge.tts.loadVoice(resolvedPath, voiceId, model.name);
@@ -129,7 +160,27 @@ class RunAnywhereTTS {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridge.tts.unload();
+    await _unloadCurrent();
+  }
+
+  /// Internal: unload whichever voice is currently active (system or native).
+  Future<void> _unloadCurrent() async {
+    if (_systemTtsLoaded) {
+      await _systemTts?.cleanup();
+      _systemTtsLoaded = false;
+    }
+    if (DartBridge.tts.isLoaded) {
+      DartBridge.tts.unload();
+    }
+  }
+
+  /// Internal: initialize / re-initialize the System TTS service. Unloads any
+  /// native voice first so the two paths never claim to be loaded at once.
+  Future<void> _loadSystemTTS() async {
+    await _unloadCurrent();
+    _systemTts ??= sys_tts.SystemTTSService();
+    await _systemTts!.initialize();
+    _systemTtsLoaded = true;
   }
 
   /// Synthesize speech from [text]. Returns proto [TTSOutput] with PCM
@@ -142,7 +193,7 @@ class RunAnywhereTTS {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!DartBridge.tts.isLoaded) {
+    if (!isLoaded) {
       throw SDKException.ttsNotAvailable(
         'No TTS voice loaded. Call loadTTSVoice() first.',
       );
@@ -153,6 +204,15 @@ class RunAnywhereTTS {
     logger.debug(
         'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
     final startTime = DateTime.now().millisecondsSinceEpoch;
+
+    // System TTS short-circuit: flutter_tts plays audio directly through the
+    // platform engine and does not expose raw PCM samples. We return an empty
+    // audio buffer with accurate timing metadata so callers can drive UI
+    // state; the actual audible output is produced by the platform engine.
+    if (_systemTtsLoaded) {
+      return _synthesizeSystemTTS(text, opts, logger, startTime);
+    }
+
     final voiceId = currentVoiceId ?? 'unknown';
 
     final modelInfo =
@@ -222,10 +282,21 @@ class RunAnywhereTTS {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!DartBridge.tts.isLoaded) {
+    if (!isLoaded) {
       throw SDKException.ttsNotAvailable('No TTS voice loaded.');
     }
     final opts = options ?? TTSOptions();
+
+    // System TTS does not expose per-chunk PCM; plays through the platform
+    // engine and returns no samples. Emit a single empty chunk after playback
+    // completes so stream consumers can terminate cleanly.
+    if (_systemTtsLoaded) {
+      final output = await synthesize(text, opts);
+      final bytes = Uint8List.fromList(output.audioData);
+      onAudioChunk?.call(bytes);
+      yield bytes;
+      return;
+    }
 
     await for (final chunk in DartBridge.tts.synthesizeStream(
       text,
@@ -249,6 +320,10 @@ class RunAnywhereTTS {
 
   /// Stop in-flight synthesis (no-op if nothing is playing).
   Future<void> stopSynthesis() async {
+    if (_systemTtsLoaded) {
+      await _systemTts?.stop();
+      return;
+    }
     DartBridge.tts.stop();
   }
 
@@ -289,5 +364,69 @@ class RunAnywhereTTS {
         .where((m) => m.category == ModelCategory.speechSynthesis)
         .map((m) => m.id)
         .toList(growable: false);
+  }
+
+  /// Internal: synthesize via the platform's System TTS engine. flutter_tts
+  /// plays audio directly (no PCM samples exposed), so we return an empty
+  /// [TTSOutput] with accurate timing metadata. Callers that auto-play PCM
+  /// should treat an empty `audioData` as "already playing via platform".
+  Future<TTSOutput> _synthesizeSystemTTS(
+    String text,
+    TTSOptions opts,
+    SDKLogger logger,
+    int startTime,
+  ) async {
+    const voiceId = _systemTtsVoiceId;
+    try {
+      final service = _systemTts;
+      if (service == null) {
+        throw SDKException.ttsNotAvailable('System TTS not initialized.');
+      }
+
+      await service.synthesize(sys_tts.TTSInput(
+        text: text,
+        voiceId: opts.hasVoice() && opts.voice.isNotEmpty
+            ? opts.voice
+            : 'system',
+        rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
+        pitch: opts.hasPitch() ? opts.pitch : 1.0,
+      ));
+
+      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
+
+      TelemetryService.shared.trackSynthesis(
+        voiceId: voiceId,
+        modelName: 'System TTS',
+        textLength: text.length,
+        audioDurationMs: latencyMs,
+        latencyMs: latencyMs,
+        sampleRate: 22050,
+        audioSizeBytes: 0,
+      );
+
+      logger.info('System TTS synthesis complete (${latencyMs}ms wall-clock)');
+
+      return TTSOutput(
+        audioData: Uint8List(0),
+        audioFormat: pb_models.AudioFormat.AUDIO_FORMAT_PCM,
+        sampleRate: 22050,
+        durationMs: Int64(latencyMs),
+        metadata: TTSSynthesisMetadata(
+          voiceId: voiceId,
+          processingTimeMs: Int64(latencyMs),
+          characterCount: text.length,
+          audioDurationMs: Int64(latencyMs),
+        ),
+        timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
+      );
+    } catch (e) {
+      TelemetryService.shared.trackError(
+        errorCode: 'synthesis_failed',
+        errorMessage: e.toString(),
+        context: {'voice_id': voiceId, 'text_length': text.length},
+      );
+      logger.error('System TTS synthesis failed: $e');
+      rethrow;
+    }
   }
 }

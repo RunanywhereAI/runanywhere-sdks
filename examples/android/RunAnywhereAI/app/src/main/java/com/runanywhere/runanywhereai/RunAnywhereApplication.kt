@@ -6,8 +6,9 @@ import android.os.Looper
 import com.runanywhere.runanywhereai.data.ModelList
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.wireString
 import com.runanywhere.sdk.storage.AndroidPlatformContext
+import ai.runanywhere.proto.v1.SDKEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -120,13 +121,13 @@ class RunAnywhereApplication : Application() {
         // to allow logging. BuildConfig.DEBUG_MODE correctly reflects debug vs release build type.
         val defaultEnvironment =
             if (BuildConfig.DEBUG_MODE) {
-                SDKEnvironment.DEVELOPMENT
+                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
             } else {
-                SDKEnvironment.PRODUCTION
+                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             }
 
         // If custom config is set, use production environment to enable the custom backend
-        val environment = if (hasCustomConfig) SDKEnvironment.PRODUCTION else defaultEnvironment
+        val environment = if (hasCustomConfig) SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION else defaultEnvironment
 
         // Initialize platform context first
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
@@ -140,11 +141,11 @@ class RunAnywhereApplication : Application() {
                     baseURL = customBaseURL!!,
                     environment = environment,
                 )
-                Timber.i("✅ SDK initialized with CUSTOM configuration (${environment.name.lowercase()})")
-            } else if (environment == SDKEnvironment.DEVELOPMENT) {
+                Timber.i("✅ SDK initialized with CUSTOM configuration (${environment.wireString})")
+            } else if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                 // DEVELOPMENT mode: Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
-                    environment = SDKEnvironment.DEVELOPMENT,
+                    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
                 )
                 Timber.i("✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
             } else {
@@ -156,17 +157,17 @@ class RunAnywhereApplication : Application() {
                 // Detect placeholder credentials and abort production initialization
                 if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
                     Timber.e(
-                        "❌ RunAnywhere.initialize with SDKEnvironment.PRODUCTION failed: " +
+                        "❌ RunAnywhere.initialize with SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION failed: " +
                             "placeholder credentials detected. Configure via Settings screen or replace placeholders.",
                     )
                     // Fall back to development mode
-                    RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+                    RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
                     Timber.i("✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
                 } else {
                     RunAnywhere.initialize(
                         apiKey = apiKey,
                         baseURL = baseURL,
-                        environment = SDKEnvironment.PRODUCTION,
+                        environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
                     )
                     Timber.i("✅ SDK initialized in PRODUCTION mode")
                 }
@@ -185,7 +186,7 @@ class RunAnywhereApplication : Application() {
             try {
                 // Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
-                    environment = SDKEnvironment.DEVELOPMENT,
+                    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
                 )
                 Timber.i("✅ SDK initialized in OFFLINE mode (local models only)")
 

@@ -50,7 +50,14 @@ import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  ToolParameterType,
+  Hardware,
+  requireDeviceInfoModule,
+  type ModelInfo,
+  type HardwareProfileResult,
+} from '@runanywhere/core';
 
 // Storage keys for API configuration
 const STORAGE_KEYS = {
@@ -144,6 +151,11 @@ export const SettingsScreen: React.FC = () => {
     useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0'); // SDK State
+
+  const [hardwareProfile, setHardwareProfile] =
+    useState<HardwareProfileResult | null>(null);
+  const [totalRAMBytes, setTotalRAMBytes] = useState<number>(0);
+  const [cpuCores, setCpuCores] = useState<number>(0);
 
   const [_capabilities, setCapabilities] = useState<number[]>([]);
   const [_backendInfoData, setBackendInfoData] = useState<
@@ -321,7 +333,7 @@ export const SettingsScreen: React.FC = () => {
         parameters: [
           {
             name: 'location',
-            type: 'string',
+            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description:
               'City name or location (e.g., "Tokyo", "New York", "London")',
             required: true,
@@ -376,7 +388,7 @@ export const SettingsScreen: React.FC = () => {
         parameters: [
           {
             name: 'expression',
-            type: 'string',
+            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
             required: true,
           },
@@ -560,6 +572,26 @@ export const SettingsScreen: React.FC = () => {
         });
       } catch (err) {
         console.warn('[Settings] Failed to get storage info:', err);
+      }
+
+      try {
+        const profile = await Hardware.getProfile();
+        console.warn('[Settings] Hardware profile:', profile);
+        setHardwareProfile(profile);
+
+        try {
+          const deviceInfo = requireDeviceInfoModule();
+          const [ram, cores] = await Promise.all([
+            deviceInfo.getTotalRAM().catch(() => 0),
+            deviceInfo.getCPUCores().catch(() => 0),
+          ]);
+          setTotalRAMBytes(ram);
+          setCpuCores(cores);
+        } catch (err) {
+          console.warn('[Settings] Failed to read device RAM/cores:', err);
+        }
+      } catch (err) {
+        console.warn('[Settings] Failed to get hardware profile:', err);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -1177,6 +1209,64 @@ export const SettingsScreen: React.FC = () => {
                         Tools allow the LLM to call external APIs and functions
             to get real-time data.          {' '}
           </Text>
+        </View>
+                {/* Hardware Info */}
+        {renderSectionHeader('Hardware')}
+        <View style={styles.section}>
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>Chip</Text>
+            <Text style={styles.settingValue}>
+              {hardwareProfile?.chip ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>Neural Engine</Text>
+            <Text
+              style={[
+                styles.apiConfigValue,
+                {
+                  color: hardwareProfile?.hasNeuralEngine
+                    ? Colors.primaryGreen
+                    : Colors.textSecondary,
+                },
+              ]}
+            >
+              {hardwareProfile
+                ? hardwareProfile.hasNeuralEngine
+                  ? 'Available'
+                  : 'Unavailable'
+                : '—'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>Acceleration</Text>
+            <Text style={styles.settingValue}>
+              {hardwareProfile?.accelerationMode ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>Memory</Text>
+            <Text style={styles.settingValue}>
+              {totalRAMBytes > 0 ? formatBytes(totalRAMBytes) : '—'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>CPU Cores</Text>
+            <Text style={styles.settingValue}>
+              {cpuCores > 0 ? String(cpuCores) : '—'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>Platform</Text>
+            <Text style={styles.settingValue}>
+              {hardwareProfile?.platform ?? '—'}
+            </Text>
+          </View>
         </View>
                 {/* Storage Overview - Matches iOS CombinedSettingsView */}
           {renderSectionHeader('Storage Overview')}

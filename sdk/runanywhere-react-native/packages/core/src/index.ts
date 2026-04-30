@@ -244,6 +244,19 @@ export {
 } from './types/NPUChip';
 
 // =============================================================================
+// Hardware Profile (CANONICAL_API §14)
+// =============================================================================
+
+export {
+  Hardware,
+  getHardwareProfile,
+  getHardwareChip,
+  hardwareHasNeuralEngine,
+  hardwareAccelerationMode,
+} from './Public/Extensions';
+export type { HardwareProfileResult } from './Public/Extensions';
+
+// =============================================================================
 // RAG Pipeline
 // =============================================================================
 

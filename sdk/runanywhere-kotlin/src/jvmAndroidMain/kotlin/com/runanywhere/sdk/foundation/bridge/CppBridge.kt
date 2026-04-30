@@ -599,9 +599,9 @@ object CppBridge {
     private fun setupSentryLogging(environment: Environment) {
         val sdkEnvironment =
             when (environment) {
-                Environment.DEVELOPMENT -> SDKEnvironment.DEVELOPMENT
-                Environment.STAGING -> SDKEnvironment.STAGING
-                Environment.PRODUCTION -> SDKEnvironment.PRODUCTION
+                Environment.DEVELOPMENT -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+                Environment.STAGING -> SDKEnvironment.SDK_ENVIRONMENT_STAGING
+                Environment.PRODUCTION -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             }
 
         try {

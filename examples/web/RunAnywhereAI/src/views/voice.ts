@@ -11,8 +11,8 @@
  *      — the fully native path, parity with mobile.
  *   2. A custom `VoiceAgentStreamTransport` — the pluggable path used
  *      here, because until the Web WASM voice-agent bindings land the
- *      sample drives the orchestration through `VoicePipeline` on the
- *      TS side.
+ *      sample composes STT → LLM (streaming) → TTS directly on the TS
+ *      side through the provider registry.
  *
  * Either way, the UI code that consumes the events is identical, which
  * is the whole point of GAP 09 Phase 19 and the v0.20 close-out.
@@ -24,15 +24,14 @@ import type { TabLifecycle } from '../app';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, ModelCategory, ensureVADLoaded } from '../services/model-manager';
 import {
-  VoicePipeline,
   VoiceAgentStreamAdapter,
   AudioCapture,
   AudioPlayback,
   SpeechActivity,
+  ExtensionPoint,
   type VoiceAgentStreamTransport,
   type VoiceEvent,
   VADEventType,
-  PipelineState as VoicePipelinePhase,
 } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
 
@@ -40,38 +39,48 @@ import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index'
 const micCapture = new AudioCapture();
 
 // ---------------------------------------------------------------------------
-// VoicePipeline-backed VoiceAgentStreamTransport
+// Inline STT → LLM → TTS transport.
 // ---------------------------------------------------------------------------
-// Bridges `VoicePipeline` (TS-side orchestrator) to the canonical
-// `VoiceAgentStreamTransport` contract from the generated codegen. Apps
-// that don't want the WASM proto-stream path still get the same
-// `AsyncIterable<VoiceEvent>` surface.
+// Composes the three provider capabilities registered by backend packages
+// (@runanywhere/web-llamacpp, @runanywhere/web-onnx) and emits proto
+// `VoiceEvent`s through the canonical `VoiceAgentStreamTransport` contract.
+// Replaces the deleted TS-side `VoicePipeline` orchestrator; the public
+// event surface (UserSaid, AssistantToken, Audio, State, Error) is
+// identical to what `VoiceAgentStreamAdapter(handle)` produces on mobile.
 //
-// When the Web WASM voice-agent bindings land, this factory is replaced
-// with `new VoiceAgentStreamAdapter(handle)` and this file stays the
-// same (state machine, UI, cancel behaviour — all unchanged).
+// When the Web WASM voice-agent bindings land, this factory is swapped for
+// `new VoiceAgentStreamAdapter(handle)` and the state machine / UI below
+// stays unchanged.
 
-interface PipelineTransportOptions {
-  readonly pipeline: VoicePipeline;
+// Proto PipelineState values (see idl/voice_events.proto) used in the
+// StateChangeEvent arm. Inlined so this file doesn't have to import the
+// proto enum just for switch labels.
+const PROTO_STATE_IDLE = 1;
+const PROTO_STATE_THINKING = 3;
+const PROTO_STATE_SPEAKING = 4;
+
+interface ComposedTransportOptions {
   readonly maxTokens: number;
   readonly temperature: number;
   readonly systemPrompt: string;
 }
 
 /**
- * Create a transport that wraps a `VoicePipeline.processTurn()` call and
- * emits proto `VoiceEvent`s through the generated stream surface.
- * Each turn is triggered by calling `feedTurn(audio)`; `cancel()` cancels
- * the current in-flight generation.
+ * Create a transport that runs one STT→LLM→TTS turn per `feedTurn(audio)`
+ * call and emits proto `VoiceEvent`s through the generated stream surface.
+ * `cancel()` aborts the current in-flight generation.
  */
-function createPipelineTransport(opts: PipelineTransportOptions): {
+function createComposedVoiceTransport(opts: ComposedTransportOptions): {
   transport: VoiceAgentStreamTransport;
   feedTurn: (audio: Float32Array) => void;
   cancel: () => void;
 } {
   let emitMessage: ((evt: VoiceEvent) => void) | null = null;
   let emitError: ((err: Error) => void) | null = null;
+  let cancelGeneration: (() => void) | null = null;
   let seq = 0;
+  let previousProtoState = PROTO_STATE_IDLE;
+
   const nowUs = (): number => Math.floor(performance.now() * 1000);
 
   const emit = (arm: Partial<VoiceEvent>): void => {
@@ -91,97 +100,93 @@ function createPipelineTransport(opts: PipelineTransportOptions): {
     });
   };
 
-  const pipelinePhaseToProto = (phase: VoicePipelinePhase): number => {
-    // Map the app-level pipeline phase to the proto PipelineState enum
-    // values used by StateChangeEvent — see idl/voice_events.proto.
-    // 0 UNSPECIFIED, 1 IDLE, 2 LISTENING, 3 THINKING, 4 SPEAKING, 5 STOPPED.
-    switch (phase) {
-      case VoicePipelinePhase.Idle: return 1;
-      case VoicePipelinePhase.Listening: return 2;
-      case VoicePipelinePhase.ProcessingSTT:
-      case VoicePipelinePhase.GeneratingResponse: return 3;
-      case VoicePipelinePhase.PlayingTTS: return 4;
-      case VoicePipelinePhase.Cooldown: return 5;
-      case VoicePipelinePhase.Error: return 0;
-      default: return 0;
-    }
+  const transition = (next: number): void => {
+    emit({ state: { previous: previousProtoState, current: next } });
+    previousProtoState = next;
   };
-
-  let previousProtoState = 0;
 
   const feedTurn = (audio: Float32Array): void => {
     emit({ vad: { type: VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE, frameOffsetUs: 0 } });
-
-    opts.pipeline
-      .processTurn(
-        audio,
-        {
-          maxTokens: opts.maxTokens,
-          temperature: opts.temperature,
-          systemPrompt: opts.systemPrompt,
-        },
-        {
-          onStateChange: (phase) => {
-            const current = pipelinePhaseToProto(phase);
-            emit({ state: { previous: previousProtoState, current } });
-            previousProtoState = current;
-          },
-          onTranscription: (text) => {
-            emit({
-              userSaid: {
-                text,
-                isFinal: true,
-                confidence: 1.0,
-                audioStartUs: 0,
-                audioEndUs: nowUs(),
-              },
-            });
-          },
-          onResponseToken: (token) => {
-            emit({ assistantToken: { text: token, isFinal: false, kind: 1 } });
-          },
-          onResponseComplete: () => {
-            emit({ assistantToken: { text: '', isFinal: true, kind: 1 } });
-          },
-          onSynthesisComplete: (audioData, sampleRate) => {
-            const pcmBytes = new Uint8Array(
-              audioData.buffer,
-              audioData.byteOffset,
-              audioData.byteLength,
-            );
-            emit({
-              audio: {
-                pcm: pcmBytes,
-                sampleRateHz: sampleRate,
-                channels: 1,
-                encoding: 1,
-              },
-            });
-          },
-          onError: (err) => {
-            emit({
-              error: {
-                code: 0,
-                message: err.message,
-                component: 'pipeline',
-                isRecoverable: false,
-              },
-            });
-            emitError?.(err);
-          },
-        },
-      )
-      .catch((err: unknown) => {
-        const e = err instanceof Error ? err : new Error(String(err));
-        emit({
-          error: { code: 0, message: e.message, component: 'pipeline', isRecoverable: false },
-        });
-        emitError?.(e);
+    void runTurn(audio).catch((err: unknown) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      emit({
+        error: { code: 0, message: e.message, component: 'pipeline', isRecoverable: false },
       });
+      emitError?.(e);
+    });
+  };
+
+  const runTurn = async (audio: Float32Array): Promise<void> => {
+    const stt = ExtensionPoint.requireProvider('stt', '@runanywhere/web-onnx');
+    const llm = ExtensionPoint.requireProvider('llm', '@runanywhere/web-llamacpp');
+    const tts = ExtensionPoint.requireProvider('tts', '@runanywhere/web-onnx');
+
+    // STT
+    transition(PROTO_STATE_THINKING);
+    const sttResult = await stt.transcribe(audio, { sampleRate: 16000 });
+    const userText = sttResult.text.trim();
+    emit({
+      userSaid: {
+        text: userText,
+        isFinal: true,
+        confidence: 1.0,
+        audioStartUs: 0,
+        audioEndUs: nowUs(),
+      },
+    });
+    if (!userText) {
+      transition(PROTO_STATE_IDLE);
+      return;
+    }
+
+    // LLM (streaming)
+    const { stream, result: llmResultPromise, cancel } = await llm.generateStream(userText, {
+      maxTokens: opts.maxTokens,
+      temperature: opts.temperature,
+      systemPrompt: opts.systemPrompt,
+    });
+    cancelGeneration = cancel;
+
+    let accumulated = '';
+    try {
+      for await (const token of stream) {
+        accumulated += token;
+        emit({ assistantToken: { text: token, isFinal: false, kind: 1 } });
+      }
+    } finally {
+      cancelGeneration = null;
+    }
+
+    const llmResult = await llmResultPromise;
+    const fullResponse = (llmResult.text || accumulated).trim();
+    emit({ assistantToken: { text: '', isFinal: true, kind: 1 } });
+
+    if (!fullResponse) {
+      transition(PROTO_STATE_IDLE);
+      return;
+    }
+
+    // TTS
+    transition(PROTO_STATE_SPEAKING);
+    const ttsResult = await tts.synthesize(fullResponse, { speed: 1.0 });
+    const pcm = new Uint8Array(
+      ttsResult.audioData.buffer,
+      ttsResult.audioData.byteOffset,
+      ttsResult.audioData.byteLength,
+    );
+    emit({
+      audio: {
+        pcm,
+        sampleRateHz: ttsResult.sampleRate,
+        channels: 1,
+        encoding: 1,
+      },
+    });
   };
 
   const cancel = (): void => {
-    opts.pipeline.cancel();
+    cancelGeneration?.();
+    cancelGeneration = null;
   };
 
   const transport: VoiceAgentStreamTransport = {
@@ -218,12 +223,6 @@ const PIPELINE_STEPS: PipelineStep[] = [
 // Minimum audio segment (samples at 16kHz) to process — ~0.5s
 const MIN_AUDIO_SAMPLES = 8000;
 
-// Proto PipelineState values (see idl/voice_events.proto) used in the
-// StateChangeEvent arm. Inlined so this file doesn't have to import the
-// proto enum just for switch labels.
-const PROTO_STATE_THINKING = 3;
-const PROTO_STATE_SPEAKING = 4;
-
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -243,18 +242,14 @@ let vadActive = false;
 /** Unsubscribe function for VAD speech activity callback. */
 let unsubscribeVAD: (() => void) | null = null;
 
-/** The VoicePipeline instance owned by this view. */
-const pipeline = new VoicePipeline();
-
 /**
- * VoiceAgentStreamAdapter bound to a VoicePipeline-backed transport. On
- * mobile (iOS/Android/Flutter/RN) this would be
+ * VoiceAgentStreamAdapter bound to an inline STT→LLM→TTS composed
+ * transport. On mobile (iOS/Android/Flutter/RN) this would be
  * `new VoiceAgentStreamAdapter(handle)`; the consumer code below is
  * identical either way. When the Web WASM voice-agent bindings land we
- * swap the transport for a handle and delete `createPipelineTransport`.
+ * swap the transport for a handle and delete `createComposedVoiceTransport`.
  */
-const { transport: pipelineTransport, feedTurn, cancel: cancelTurn } = createPipelineTransport({
-  pipeline,
+const { transport: pipelineTransport, feedTurn, cancel: cancelTurn } = createComposedVoiceTransport({
   maxTokens: 150,
   temperature: 0.7,
   systemPrompt:

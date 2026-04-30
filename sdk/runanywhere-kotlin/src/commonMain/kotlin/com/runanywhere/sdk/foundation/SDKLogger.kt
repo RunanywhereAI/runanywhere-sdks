@@ -147,18 +147,13 @@ data class LoggingConfiguration(
          */
         fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
             when (environment) {
-                SDKEnvironment.DEVELOPMENT -> development
-                SDKEnvironment.STAGING -> staging
-                SDKEnvironment.PRODUCTION -> production
+                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> development
+                SDKEnvironment.SDK_ENVIRONMENT_STAGING -> staging
+                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> production
+                SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> development
             }
     }
 }
-
-// GAP 01 Phase 3: the local `enum class SDKEnvironment` that used to live
-// here (3 unlabelled cases) has been removed. The single source of truth is
-// `com.runanywhere.sdk.public.SDKEnvironment`, which carries the
-// `cEnvironment: Int` value used by the C ABI and is driftproofed against
-// `idl/model_types.proto :: SDKEnvironment`.
 
 // =============================================================================
 // LOGGING (CENTRAL SERVICE)

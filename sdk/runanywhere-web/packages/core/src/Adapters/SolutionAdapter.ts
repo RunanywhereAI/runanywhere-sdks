@@ -150,15 +150,27 @@ export const SolutionAdapter = {
     input: SolutionRunInput,
     module: EmscriptenRunanywhereModule = runanywhereModule,
   ): SolutionHandle {
-    if ('yaml' in input && input.yaml !== undefined) {
-      return createFromYaml(input.yaml, module);
+    if (typeof input !== 'object' || input === null) {
+      throw new Error(
+        'SolutionAdapter.run expects an object — { config } | { configBytes } | { yaml }',
+      );
+    }
+
+    const { yaml, configBytes, config } = input as {
+      yaml?: string;
+      configBytes?: Uint8Array;
+      config?: SolutionConfig;
+    };
+
+    if (yaml !== undefined) {
+      return createFromYaml(yaml, module);
     }
 
     let bytes: Uint8Array;
-    if ('configBytes' in input && input.configBytes !== undefined) {
-      bytes = input.configBytes;
-    } else if ('config' in input && input.config !== undefined) {
-      bytes = SolutionConfig.encode(input.config).finish();
+    if (configBytes !== undefined) {
+      bytes = configBytes;
+    } else if (config !== undefined) {
+      bytes = SolutionConfig.encode(config).finish();
     } else {
       throw new Error(
         'SolutionAdapter.run requires exactly one of config / configBytes / yaml',

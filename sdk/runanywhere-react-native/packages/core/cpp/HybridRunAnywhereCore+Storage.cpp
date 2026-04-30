@@ -16,12 +16,24 @@ using namespace ::runanywhere::bridges;
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getStorageInfo() {
     return Promise<std::string>::async([]() {
-        // Use FileManagerBridge for accurate storage info via C++ recursive traversal
+        // Accurate device + app storage comes from FileManagerBridge (POSIX).
+        // Always works once initialize() has been called.
         auto fmInfo = FileManagerBridge::shared().getStorageInfo();
 
-        // Also get model count from registry
-        auto registryHandle = ModelRegistryBridge::shared().getHandle();
-        auto storageInfo = StorageBridge::shared().analyzeStorage(registryHandle);
+        // Model count is a best-effort lookup from the registry. If the registry
+        // isn't initialized yet (e.g. SDK.initialize() hasn't finished), fall
+        // back to 0 rather than failing the whole call — device storage still
+        // needs to render in the UI.
+        size_t modelCount = 0;
+        try {
+            auto registryHandle = ModelRegistryBridge::shared().getHandle();
+            if (registryHandle != nullptr) {
+                auto storageInfo = StorageBridge::shared().analyzeStorage(registryHandle);
+                modelCount = storageInfo.models.size();
+            }
+        } catch (...) {
+            // Registry unavailable — device storage still returned below.
+        }
 
         return buildJsonObject({
             {"totalDeviceSpace", std::to_string(fmInfo.device_total)},
@@ -32,7 +44,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getStorageInfo() {
             {"appSupportSize", std::to_string(fmInfo.temp_size)},
             {"totalAppSize", std::to_string(fmInfo.total_app_size)},
             {"totalModelsSize", std::to_string(fmInfo.models_size)},
-            {"modelCount", std::to_string(storageInfo.models.size())}
+            {"modelCount", std::to_string(modelCount)}
         });
     });
 }

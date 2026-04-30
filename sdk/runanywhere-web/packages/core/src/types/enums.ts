@@ -1,11 +1,34 @@
 /**
  * RunAnywhere Web SDK — Enums.
  *
- * These enums match the iOS Swift SDK exactly for consistency.
- * Source of truth: sdk/runanywhere-swift/Sources/RunAnywhere/Core/
+ * Wave 4.5 cleanup (CANONICAL_API.md §15): the proto-canonical wire
+ * representation of every enum below lives in `@runanywhere/proto-ts/*`
+ * and is re-exported from this file under `Proto*` aliases. The Web SDK
+ * preserves a parallel set of *string-valued ergonomic enums* because
+ *
+ *   1. The Web public API surface has historically exposed
+ *      PascalCase/kebab-case string values (e.g. `ModelCategory.Language
+ *      === 'language'`) that appear verbatim in persisted model catalog
+ *      metadata, `localStorage` entries and URL query params.
+ *   2. The generated proto-ts enums are numeric with
+ *      `SCREAMING_SNAKE_CASE` keys (proto3 convention). They are not
+ *      drop-in replacements for the string surface.
+ *
+ * For wire transport / proto round-tripping, import the `Proto*` alias
+ * below (or go directly to `@runanywhere/proto-ts/*`). For day-to-day
+ * in-process Web usage, use the ergonomic enum.
+ *
+ * ExecutionTarget has been DELETED from this file (CANONICAL §15) — the
+ * proto-ts variant is re-exported from `types/index.ts` directly and is
+ * the single source of truth.
+ *
+ * Source of truth (wire shape): idl/*.proto → @runanywhere/proto-ts.
  */
 
-// Re-export proto-ts enums under proto-prefixed aliases.
+// ---------------------------------------------------------------------------
+// Proto-canonical re-exports (wire transport). Use these when talking
+// to the commons C ABI or serialising to the wire.
+// ---------------------------------------------------------------------------
 export {
   ModelFormat as ProtoModelFormat,
   ModelCategory as ProtoModelCategory,
@@ -16,19 +39,23 @@ export {
   AudioFormat as ProtoAudioFormat,
 } from '@runanywhere/proto-ts/model_types';
 export { SDKComponent as ProtoSDKComponent } from '@runanywhere/proto-ts/sdk_events';
+export { DownloadStage as ProtoDownloadStage } from '@runanywhere/proto-ts/download_service';
 
+// ---------------------------------------------------------------------------
+// Web-ergonomic string enums. Each comments its proto counterpart.
+// ---------------------------------------------------------------------------
+
+/** Proto counterpart: `SDKEnvironment` / `ProtoSDKEnvironment`. */
 export enum SDKEnvironment {
   Development = 'development',
   Staging = 'staging',
   Production = 'production',
 }
 
-export enum ExecutionTarget {
-  OnDevice = 'onDevice',
-  Cloud = 'cloud',
-  Hybrid = 'hybrid',
-}
-
+/**
+ * Proto counterpart: `InferenceFramework` / `ProtoInferenceFramework`.
+ * Web names this `LLMFramework` for RN/Swift/Flutter label parity.
+ */
 export enum LLMFramework {
   CoreML = 'CoreML',
   TensorFlowLite = 'TFLite',
@@ -48,6 +75,7 @@ export enum LLMFramework {
   PiperTTS = 'PiperTTS',
 }
 
+/** Proto counterpart: `ModelCategory` / `ProtoModelCategory`. */
 export enum ModelCategory {
   /** Large Language Models (LLM) for text generation. */
   Language = 'language',
@@ -65,6 +93,7 @@ export enum ModelCategory {
   Audio = 'audio',
 }
 
+/** Proto counterpart: `ModelFormat` / `ProtoModelFormat`. */
 export enum ModelFormat {
   GGUF = 'gguf',
   GGML = 'ggml',
@@ -80,6 +109,10 @@ export enum ModelFormat {
   Unknown = 'unknown',
 }
 
+/**
+ * Framework modality (I/O types). No direct proto counterpart — used by
+ * Web-local model-registry helpers.
+ */
 export enum FrameworkModality {
   TextToText = 'textToText',
   VoiceToText = 'voiceToText',
@@ -89,6 +122,11 @@ export enum FrameworkModality {
   Multimodal = 'multimodal',
 }
 
+/**
+ * In-process JS state machine for a capability handle. No direct proto
+ * counterpart — `ComponentLoadState` in `voice_events.proto` covers a
+ * different axis (per-voice-component preload state).
+ */
 export enum ComponentState {
   NotInitialized = 'notInitialized',
   Initializing = 'initializing',
@@ -97,6 +135,10 @@ export enum ComponentState {
   CleaningUp = 'cleaningUp',
 }
 
+/**
+ * Proto counterpart: `SDKComponent` / `ProtoSDKComponent`
+ * (sdk_events.proto). Web uses a tighter ergonomic string surface.
+ */
 export enum SDKComponent {
   LLM = 'llm',
   STT = 'stt',
@@ -109,6 +151,7 @@ export enum SDKComponent {
   VoiceAgent = 'voice',
 }
 
+/** Proto counterpart: `RoutingPolicy` / `ProtoRoutingPolicy`. */
 export enum RoutingPolicy {
   OnDevicePreferred = 'onDevicePreferred',
   CloudPreferred = 'cloudPreferred',
@@ -120,6 +163,12 @@ export enum RoutingPolicy {
   PrivacyOptimized = 'privacyOptimized',
 }
 
+/**
+ * Hardware acceleration targets. No proto counterpart yet (G-B1 adds
+ * `hardware_profile.proto`; once that lands, merge with `AcceleratorPreference`
+ * in `@runanywhere/proto-ts/hardware_profile`). WebGPU / WASM are
+ * browser-specific extensions not present on mobile SDKs.
+ */
 export enum HardwareAcceleration {
   CPU = 'cpu',
   GPU = 'gpu',
@@ -131,12 +180,21 @@ export enum HardwareAcceleration {
   WASM = 'wasm',
 }
 
+/**
+ * Origin of a configuration value. No proto counterpart — describes
+ * where a config was loaded from (Web-local metadata).
+ */
 export enum ConfigurationSource {
   Remote = 'remote',
   Local = 'local',
   Builtin = 'builtin',
 }
 
+/**
+ * Per-model lifecycle state. No proto counterpart — describes the
+ * in-process UI state of a model entry (downloading / downloaded /
+ * loaded / error).
+ */
 export enum ModelStatus {
   Registered = 'registered',
   Downloading = 'downloading',
@@ -146,12 +204,18 @@ export enum ModelStatus {
   Error = 'error',
 }
 
+/** Proto counterpart: `DownloadStage` / `ProtoDownloadStage`. */
 export enum DownloadStage {
   Downloading = 'downloading',
   Validating = 'validating',
   Completed = 'completed',
 }
 
+/**
+ * JS `EventBus` topic category. Maps loosely onto the `category` field
+ * of proto `SDKEvent` but the proto categories are a larger set — this
+ * is the Web-local subset actually emitted by `EventBus`.
+ */
 export enum SDKEventType {
   Initialization = 'initialization',
   Configuration = 'configuration',
@@ -166,7 +230,12 @@ export enum SDKEventType {
   Network = 'network',
 }
 
-/** Hardware acceleration preference for SDK initialization. */
+/**
+ * Hardware acceleration preference passed to SDK initialization. The
+ * proto counterpart (`AccelerationPreference` / `ProtoAccelerationPreference`)
+ * covers the mobile/desktop modes; Web adds a browser-specific
+ * WebGPU-or-CPU three-way.
+ */
 export enum AccelerationPreference {
   /** Detect WebGPU and use it when available, fall back to CPU. */
   Auto = 'auto',
@@ -175,4 +244,3 @@ export enum AccelerationPreference {
   /** Always use CPU-only WASM (skip WebGPU detection entirely). */
   CPU = 'cpu',
 }
-

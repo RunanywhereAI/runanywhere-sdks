@@ -203,13 +203,27 @@ export class ModelRegistry {
 
   /**
    * Register a catalog of models. Resolves compact definitions into full
-   * ManagedModel entries.
+   * ManagedModel entries and upserts them into the catalog.
+   *
+   * Semantics: entries are appended; if an entry with the same `id` is
+   * already registered, its definition is replaced in place (status and
+   * any runtime state are reset to `Registered` because a re-register
+   * signals the caller wants the fresh definition to take effect).
+   *
+   * This is an upsert (not a wipe-and-replace) so the canonical per-entry
+   * loop pattern — `for (m of catalog) registerModel(m)` — used by all 5
+   * example apps accumulates the full catalog rather than leaving only
+   * the last entry (G-DV28).
    *
    * @returns The resolved models array (callers can use this for further checks).
    */
   registerModels(defs: CompactModelDef[]): ManagedModel[] {
     const resolved = defs.map(resolveModelDef);
-    this.models = resolved.map((m) => ({ ...m, status: ModelStatus.Registered }));
+    const byId = new Map(this.models.map((m) => [m.id, m]));
+    for (const r of resolved) {
+      byId.set(r.id, { ...r, status: ModelStatus.Registered });
+    }
+    this.models = Array.from(byId.values());
     this.notifyListeners();
     EventBus.shared.emit('model.registered', SDKEventType.Model, { count: defs.length });
     return this.getModels();

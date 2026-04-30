@@ -28,9 +28,10 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey
 
     val cppEnvironment =
         when (environment) {
-            SDKEnvironment.DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
-            SDKEnvironment.STAGING -> CppBridge.Environment.STAGING
-            SDKEnvironment.PRODUCTION -> CppBridge.Environment.PRODUCTION
+            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
+            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> CppBridge.Environment.STAGING
+            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> CppBridge.Environment.PRODUCTION
+            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> CppBridge.Environment.DEVELOPMENT
         }
 
     // Configure telemetry base URL if provided

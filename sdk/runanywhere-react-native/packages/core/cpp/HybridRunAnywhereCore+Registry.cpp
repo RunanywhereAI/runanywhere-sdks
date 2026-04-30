@@ -193,7 +193,15 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerModel(
         if (!categoryStr.empty()) {
             model.category = categoryFromString(categoryStr);
         } else {
-            model.category = static_cast<rac_model_category_t>(extractIntValue(modelJson, "category", RAC_MODEL_CATEGORY_UNKNOWN));
+            // G-DV27: TypeScript consumers pass the proto-canonical
+            // `ModelCategory` enum value (1=LANGUAGE, 2=STT, 3=TTS, ...)
+            // which is off-by-one from the RAC C ABI numbering. Route
+            // through the dedicated translator so we don't scramble
+            // categories (previous bug surfaced iOS RN badges: LLM →
+            // SPEECH-RECOGNITION, TTS → VISION).
+            model.category = categoryFromProtoInt(
+                extractIntValue(modelJson, "category", 0 /* proto UNSPECIFIED */)
+            );
         }
 
         // Handle format - could be string (TypeScript) or int

@@ -178,9 +178,26 @@ export async function ensureVADLoaded(): Promise<boolean> {
 
 // Per-entry registration matches the other 4 example apps (Swift / Kotlin /
 // Flutter / RN). The SDK does not expose a `registerModels` plural; the
-// canonical batch path is a loop over `registerModel`.
+// canonical batch path is a loop over `registerModel`. Any per-entry failure
+// is logged but must not abort the loop — each catalog entry is independent.
 for (const model of REGISTERED_MODELS) {
-  RunAnywhere.registerModel(model);
+  try {
+    RunAnywhere.registerModel(model);
+  } catch (err) {
+    console.error('[model-manager] registerModel failed', model.id, err);
+  }
+}
+
+// Visibility check for G-DV28 regression watch: if the catalog size drops
+// below what was declared, something silently dropped entries.
+{
+  const registered = RunAnywhere.availableModels();
+  if (registered.length !== REGISTERED_MODELS.length) {
+    console.warn(
+      `[model-manager] registered ${registered.length} / ${REGISTERED_MODELS.length} models`,
+      { registered: registered.map((m) => m.id), declared: REGISTERED_MODELS.map((m) => m.id) },
+    );
+  }
 }
 
 // Import the VLM worker using Vite's ?worker&url suffix so it gets compiled

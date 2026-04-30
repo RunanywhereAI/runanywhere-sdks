@@ -11,6 +11,7 @@ package com.runanywhere.sdk.foundation.logging
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.wireString
 import com.runanywhere.sdk.utils.SDKConstants
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
@@ -48,7 +49,7 @@ object SentryManager {
      */
     fun initialize(
         dsn: String? = null,
-        environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     ) {
         if (_isInitialized) {
             return
@@ -65,7 +66,7 @@ object SentryManager {
         try {
             Sentry.init { options: SentryOptions ->
                 options.dsn = sentryDSN
-                options.environment = environment.name.lowercase()
+                options.environment = environment.wireString
                 options.isEnableAutoSessionTracking = true
                 options.isAttachStacktrace = true
                 options.tracesSampleRate = 0.0 // Disable performance tracing

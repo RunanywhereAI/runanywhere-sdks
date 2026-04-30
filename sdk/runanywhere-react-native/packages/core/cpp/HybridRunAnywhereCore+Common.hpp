@@ -308,6 +308,49 @@ rac_model_category_t categoryFromString(const std::string& category) {
     return RAC_MODEL_CATEGORY_UNKNOWN;
 }
 
+/**
+ * Convert a numeric `ModelCategory` value received from TypeScript callers
+ * into the C ABI's `rac_model_category_t`.
+ *
+ * G-DV27: TypeScript consumers pass the proto-canonical `ModelCategory` enum
+ * (from `@runanywhere/proto-ts`) which uses a DIFFERENT numbering than the
+ * RAC C ABI:
+ *
+ *   proto ModelCategory      RAC rac_model_category_t
+ *   ----------------------   ---------------------------------
+ *   UNSPECIFIED         = 0  LANGUAGE                     = 0
+ *   LANGUAGE            = 1  SPEECH_RECOGNITION           = 1
+ *   SPEECH_RECOGNITION  = 2  SPEECH_SYNTHESIS             = 2
+ *   SPEECH_SYNTHESIS    = 3  VISION                       = 3
+ *   VISION              = 4  IMAGE_GENERATION             = 4
+ *   IMAGE_GENERATION    = 5  MULTIMODAL                   = 5
+ *   MULTIMODAL          = 6  AUDIO                        = 6
+ *   AUDIO               = 7  EMBEDDING                    = 7
+ *   EMBEDDING           = 8  VOICE_ACTIVITY_DETECTION     = 8
+ *   VAD                 = 9  UNKNOWN                      = 99
+ *
+ * A naive `static_cast<rac_model_category_t>(protoInt)` scrambles categories
+ * by one position (LLM → SPEECH_RECOGNITION, TTS → VISION, etc.) — the
+ * exact symptom reported by the iOS RN catalog badge bug.
+ *
+ * This translator is the single source of truth for that conversion.
+ */
+rac_model_category_t categoryFromProtoInt(int protoValue) {
+    switch (protoValue) {
+        case 1:  return RAC_MODEL_CATEGORY_LANGUAGE;                  // proto LANGUAGE
+        case 2:  return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION;        // proto SPEECH_RECOGNITION
+        case 3:  return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS;          // proto SPEECH_SYNTHESIS
+        case 4:  return RAC_MODEL_CATEGORY_VISION;                    // proto VISION
+        case 5:  return RAC_MODEL_CATEGORY_IMAGE_GENERATION;          // proto IMAGE_GENERATION
+        case 6:  return RAC_MODEL_CATEGORY_MULTIMODAL;                // proto MULTIMODAL
+        case 7:  return RAC_MODEL_CATEGORY_AUDIO;                     // proto AUDIO
+        case 8:  return RAC_MODEL_CATEGORY_EMBEDDING;                 // proto EMBEDDING
+        case 9:  return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;  // proto VAD
+        case 0:  // proto UNSPECIFIED — treat as unknown
+        default: return RAC_MODEL_CATEGORY_UNKNOWN;
+    }
+}
+
 // Convert TypeScript format string to C++ enum
 rac_model_format_t formatFromString(const std::string& format) {
     if (format == "GGUF" || format == "gguf") return RAC_MODEL_FORMAT_GGUF;

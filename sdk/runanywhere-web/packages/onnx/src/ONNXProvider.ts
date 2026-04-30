@@ -424,8 +424,9 @@ export const ONNXProvider = {
     // Register with ExtensionPoint
     ExtensionPoint.registerBackend(onnxExtension);
 
-    // Register typed providers so VoicePipeline (in core) can access
-    // STT/TTS via ExtensionPoint.getProvider() at runtime.
+    // Register typed providers so voice composers (in example apps or
+    // higher-level SDK extensions) can access STT/TTS via
+    // ExtensionPoint.getProvider() at runtime.
     ExtensionPoint.registerProvider('stt', STT);
     ExtensionPoint.registerProvider('tts', TTS);
     ExtensionPoint.registerProvider('vad', VAD);

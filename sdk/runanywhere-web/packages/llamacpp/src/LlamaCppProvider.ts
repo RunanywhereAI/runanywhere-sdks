@@ -53,8 +53,9 @@ async function _doRegister(acceleration?: 'auto' | 'webgpu' | 'cpu'): Promise<vo
   // Register with ExtensionPoint for capability lookups
   ExtensionPoint.registerBackend(llamacppExtension);
 
-  // Register typed provider so VoicePipeline (in core) can access
-  // the LLM via ExtensionPoint.getProvider('llm') at runtime.
+  // Register typed provider so voice composers (in example apps or
+  // higher-level SDK extensions) can access the LLM via
+  // ExtensionPoint.getProvider('llm') at runtime.
   ExtensionPoint.registerProvider('llm', TextGeneration);
 
   _isRegistered = true;

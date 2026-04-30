@@ -360,6 +360,9 @@ class DartBridgeModelRegistry {
   ///     register Whisper/VITS models with InferenceFramework.onnx; without
   ///     this mapping they would round-trip to `unknown` and land in
   ///     `Models/Unknown/` instead of `Models/ONNX/`).
+  ///   * SHERPA=12 → sherpa (Sherpa-ONNX STT/TTS/VAD/wakeword models; must
+  ///     be explicitly mapped so they land in `Models/Sherpa/` rather than
+  ///     `Models/Unknown/`).
   static public_types.InferenceFramework _frameworkFromFfi(int framework) {
     switch (framework) {
       case 0:
@@ -383,6 +386,8 @@ class DartBridgeModelRegistry {
         return public_types.InferenceFramework.onnx;
       case 11: // RAC_FRAMEWORK_GENIE
         return public_types.InferenceFramework.genie;
+      case 12: // RAC_FRAMEWORK_SHERPA (Sherpa-ONNX STT/TTS/VAD/wakeword)
+        return public_types.InferenceFramework.sherpa;
       default:
         return public_types.InferenceFramework.unknown;
     }

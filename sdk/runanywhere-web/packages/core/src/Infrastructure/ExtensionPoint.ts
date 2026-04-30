@@ -16,7 +16,7 @@
  *     cleanup() { ... },
  *   });
  *
- *   // In core (VoicePipeline, etc.) — runtime lookup:
+ *   // Consumer code (SDK extensions, example apps) — runtime lookup:
  *   const stt = ExtensionPoint.getExtensionForCapability(BackendCapability.STT);
  */
 
@@ -46,9 +46,9 @@ export enum BackendCapability {
  * Typed service keys for cross-package singleton access.
  *
  * Backend packages register service instances (e.g. TextGeneration, STT, TTS)
- * under these keys during their registration phase. Core code (e.g. VoicePipeline)
- * retrieves them at runtime via `ExtensionPoint.getService(ServiceKey.XXX)` instead
- * of relying on untyped globalThis keys.
+ * under these keys during their registration phase. Consumers (SDK extensions,
+ * example apps) retrieve them at runtime via `ExtensionPoint.getService(ServiceKey.XXX)`
+ * instead of relying on untyped globalThis keys.
  */
 export enum ServiceKey {
   TextGeneration = 'textGeneration',

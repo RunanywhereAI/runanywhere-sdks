@@ -10,7 +10,7 @@
  * `@runanywhere/web-onnx`) install a `VoiceAgentProvider` via
  * `setVoiceAgentProvider(...)`. Each verb delegates directly. There is no
  * TS-side compose fallback — that path was deleted in v0.20.0 alongside
- * `VoicePipeline.ts` (see CANONICAL_API.md §10 / G-F4).
+ * `RunAnywhere+VoicePipeline.ts` (see CANONICAL_API.md §10 / G-F4).
  *
  * Streaming: `streamVoiceAgent()` returns an `AsyncIterable<VoiceEvent>`
  * built on `VoiceAgentStreamAdapter`. The provider supplies either a raw
