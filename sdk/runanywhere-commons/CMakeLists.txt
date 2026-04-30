@@ -440,26 +440,46 @@ if(NOT CURL_FOUND)
         set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
         set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
     elseif(ANDROID)
-        # Android: enable HTTPS via the NDK's bundled OpenSSL headers +
-        # libssl/libcrypto from the Android system (API level 28+ ships OpenSSL
-        # 1.x compatible symbols as part of the OS; the NDK exposes them through
-        # android-ndk/toolchains/llvm/prebuilt/<host>/sysroot/).
-        # Round-1 CPP fix (Task 4 / RN G-A6): CURL_DISABLE_HTTPS removed so
-        # that rac_http_download_execute can perform real HTTPS downloads on
-        # Android without falling back to the Java HttpURLConnection path.
-        set(CURL_USE_OPENSSL OFF CACHE BOOL "" FORCE)
-        # Use Android system SSL (available via NDK since API 28; commons
-        # min SDK is 24 so we enable it unconditionally and accept that pre-28
-        # devices fall back gracefully via runtime curl error rather than link error).
-        set(CURL_USE_MBEDTLS OFF CACHE BOOL "" FORCE)
-        # Do NOT set CURL_DISABLE_HTTPS — HTTPS must remain enabled.
-        # The Android NDK provides ssl/crypto as system libraries; curl's
-        # CMake will pick up the NDK sysroot copies via find_package(OpenSSL).
-        # If find_package misses them on a particular NDK version we fall back
-        # to the BearSSL stub which still lets curl compile; curl will simply
-        # return CURLE_SSL_CONNECT_ERROR at runtime rather than crashing on
-        # HTTPS URLs.  Either outcome is better than silently stripping HTTPS
-        # from the binary as the previous CURL_DISABLE_HTTPS=ON did.
+        # Android: bundle mbedTLS via FetchContent so curl has a working TLS
+        # backend baked into the static library. The Android NDK does NOT ship
+        # OpenSSL (it was removed in NDK r19+), and the comment block in the
+        # earlier round-1 attempt that claimed "use Android system SSL via
+        # find_package(OpenSSL)" was wrong: find_package(OpenSSL) returns
+        # nothing on a stock NDK sysroot, so curl fell through to compiling
+        # WITHOUT TLS, which silently disables HTTPS at the protocol-check
+        # stage (CURLE_UNSUPPORTED_PROTOCOL = 1, exactly what AG-DV1/2/3
+        # observed in Phase 8 device testing).
+        #
+        # mbedTLS is small (~1MB), self-contained, and curl supports it via
+        # CURL_USE_MBEDTLS=ON. We FetchContent it before curl so its targets
+        # exist at curl's `find_package(MbedTLS)` lookup.
+        FetchContent_Declare(
+            mbedtls_fetched
+            GIT_REPOSITORY https://github.com/Mbed-TLS/mbedtls.git
+            GIT_TAG        v3.6.2
+            GIT_SHALLOW    TRUE
+        )
+        set(ENABLE_PROGRAMS    OFF CACHE BOOL "" FORCE)
+        set(ENABLE_TESTING     OFF CACHE BOOL "" FORCE)
+        set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
+        set(USE_STATIC_MBEDTLS_LIBRARY ON  CACHE BOOL "" FORCE)
+        set(MBEDTLS_AS_SUBPROJECT      ON  CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(mbedtls_fetched)
+        # Tell curl to use mbedTLS. Curl 7.88.1's CMake looks for `MBEDTLS::*`
+        # imported targets and `MBEDTLS_INCLUDE_DIRS` / `MBEDTLS_LIBRARIES`.
+        # mbedTLS 3.6.x exports `MbedTLS::mbedtls`, `MbedTLS::mbedx509`,
+        # `MbedTLS::mbedcrypto` — translate those into the variable names curl
+        # expects.
+        set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
+        set(CURL_USE_MBEDTLS  ON  CACHE BOOL "" FORCE)
+        if(TARGET MbedTLS::mbedtls)
+            get_target_property(_rac_mbedtls_inc MbedTLS::mbedtls INTERFACE_INCLUDE_DIRECTORIES)
+            set(MBEDTLS_INCLUDE_DIRS "${_rac_mbedtls_inc}" CACHE PATH "" FORCE)
+            set(MBEDTLS_LIBRARY      $<TARGET_FILE:MbedTLS::mbedtls>     CACHE FILEPATH "" FORCE)
+            set(MBEDX509_LIBRARY     $<TARGET_FILE:MbedTLS::mbedx509>    CACHE FILEPATH "" FORCE)
+            set(MBEDCRYPTO_LIBRARY   $<TARGET_FILE:MbedTLS::mbedcrypto>  CACHE FILEPATH "" FORCE)
+        endif()
+        # Explicitly DO NOT disable HTTPS — that's the old bug.
     endif()
     FetchContent_MakeAvailable(curl_fetched)
     # The target built by curl's CMake is `libcurl` (static).
