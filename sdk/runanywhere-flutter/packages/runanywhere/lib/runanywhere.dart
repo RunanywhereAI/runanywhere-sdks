@@ -113,8 +113,19 @@ export 'public/capabilities/runanywhere_voice_agent.dart'
 // Re-export proto types for canonical typing in consumer code (G-A7).
 export 'generated/download_service.pb.dart' show DownloadProgress;
 export 'generated/download_service.pbenum.dart' show DownloadStage;
-// Proto tool_calling types are SDK-internal; consumer-facing types are
-// the hand-rolled ones below (RunAnywhereTools.register takes them).
+// §15 type-discipline: proto tool_calling types are now the canonical
+// consumer-facing API; the hand-rolled `tool_calling_types.dart` is
+// gone. `RunAnywhereTools.register` takes proto `ToolDefinition`.
+export 'generated/tool_calling.pb.dart'
+    show
+        ToolCall,
+        ToolCallingOptions,
+        ToolCallingResult,
+        ToolDefinition,
+        ToolParameter,
+        ToolResult;
+export 'generated/tool_calling.pbenum.dart'
+    show ToolCallFormatName, ToolParameterType;
 export 'public/configuration/sdk_environment.dart';
 export 'public/events/event_bus.dart';
 export 'public/events/sdk_event.dart';
@@ -133,5 +144,8 @@ export 'public/extensions/runanywhere_structured_output.dart'
 export 'public/extensions/runanywhere_thinking_utils.dart'
     show RunAnywhereThinkingUtils, ThinkingExtractionResult;
 export 'public/runanywhere_v4.dart' show RunAnywhereSDK;
-export 'public/types/tool_calling_types.dart';
 export 'public/types/types.dart';
+// Re-export the few helpers from RunAnywhereTools that consumers use
+// (ToolExecutor typedef, ToolCallFormatNames constants).
+export 'public/capabilities/runanywhere_tools.dart'
+    show ToolCallFormatNames, ToolExecutor;

@@ -24,10 +24,10 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:fixnum/fixnum.dart';
-// Hand-rolled `DownloadProgressState` enum + `DownloadProgress` class
-// DELETED. The proto-generated `DownloadStage` + `DownloadProgress`
-// from `generated/download_service.pb.dart` are the canonical types
-// (canonical §13).
+// §15 type-discipline: hand-rolled `DownloadProgressState` enum +
+// `DownloadProgress` class are gone — `DownloadStage` +
+// `DownloadProgress` from `generated/download_service.pb.dart` are
+// the canonical proto-generated types.
 
 /// Downloads / storage-management capability surface.
 ///

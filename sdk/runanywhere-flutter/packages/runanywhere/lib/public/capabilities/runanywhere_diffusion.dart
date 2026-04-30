@@ -2,14 +2,15 @@
 //
 // Wave 2: Diffusion namespace extension. Mirrors Swift's
 // `RunAnywhere+Diffusion.swift`. Each public method now calls the
-// `rac_diffusion_*` C ABI directly. If commons returns
-// `RAC_ERROR_FEATURE_NOT_AVAILABLE` (Apple-only engine), the
-// SDKException naturally propagates — we no longer pre-empt the call.
+// `rac_diffusion_*` C ABI through `lib/native/dart_bridge_diffusion.dart`.
+// If commons returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` (Apple-only
+// engine), the SDKException naturally propagates — we no longer
+// pre-empt the call.
+//
+// §15 type-discipline: all `dart:ffi` work lives in the native bridge;
+// this capability holds no FFI types.
 
-import 'dart:ffi';
 import 'dart:typed_data';
-
-import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
@@ -20,8 +21,8 @@ import 'package:runanywhere/generated/diffusion_options.pb.dart'
         DiffusionCapabilities,
         DiffusionProgress;
 import 'package:runanywhere/internal/sdk_state.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
-import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/dart_bridge_diffusion.dart';
+import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 
 /// Diffusion (image generation) capability surface.
 ///
@@ -35,20 +36,12 @@ class RunAnywhereDiffusion {
   static final RunAnywhereDiffusion _instance = RunAnywhereDiffusion._();
   static RunAnywhereDiffusion get shared => _instance;
 
-  RacHandle? _handle;
   String? _currentModelId;
 
   // -- state ---------------------------------------------------------------
 
   /// True when a diffusion model is currently loaded.
-  bool get isLoaded {
-    final h = _handle;
-    if (h == null) return false;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(RacHandle),
-        int Function(RacHandle)>('rac_diffusion_component_is_loaded');
-    return fn(h) == RAC_TRUE;
-  }
+  bool get isLoaded => DartBridgeDiffusion.isLoaded();
 
   /// Currently-loaded diffusion model id, or null.
   String? get currentModelId => _currentModelId;
@@ -67,23 +60,10 @@ class RunAnywhereDiffusion {
     );
   }
 
-  RacHandle _ensureHandle() {
-    var h = _handle;
-    if (h != null) return h;
-    final lib = PlatformLoader.loadCommons();
-    final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
-        int Function(Pointer<RacHandle>)>('rac_diffusion_component_create');
-    final outPtr = calloc<RacHandle>();
-    try {
-      final rc = create(outPtr);
-      if (rc != RAC_SUCCESS) {
-        _throwForCode('rac_diffusion_component_create', rc);
-      }
-      h = outPtr.value;
-      _handle = h;
-      return h;
-    } finally {
-      calloc.free(outPtr);
+  void _ensureHandle() {
+    final rc = DartBridgeDiffusion.ensureHandle();
+    if (rc != 0) {
+      _throwForCode('rac_diffusion_component_create', rc);
     }
   }
 
@@ -92,23 +72,12 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final handle = _ensureHandle();
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(RacHandle, Pointer<Utf8>),
-        int Function(RacHandle, Pointer<Utf8>)>(
-      'rac_diffusion_component_load_model',
-    );
-    final idPtr = modelId.toNativeUtf8();
-    try {
-      final rc = fn(handle, idPtr);
-      if (rc != RAC_SUCCESS) {
-        _throwForCode('rac_diffusion_component_load_model', rc);
-      }
-      _currentModelId = modelId;
-    } finally {
-      calloc.free(idPtr);
+    _ensureHandle();
+    final rc = DartBridgeDiffusion.loadModel(modelId);
+    if (rc != 0) {
+      _throwForCode('rac_diffusion_component_load_model', rc);
     }
+    _currentModelId = modelId;
   }
 
   /// Unload the currently-loaded diffusion model.
@@ -116,13 +85,9 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final h = _handle;
-    if (h == null) return;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(RacHandle),
-        int Function(RacHandle)>('rac_diffusion_component_unload');
-    final rc = fn(h);
-    if (rc != RAC_SUCCESS) {
+    if (!DartBridgeDiffusion.hasHandle) return;
+    final rc = DartBridgeDiffusion.unload();
+    if (rc != 0) {
       _throwForCode('rac_diffusion_component_unload', rc);
     }
     _currentModelId = null;
@@ -136,55 +101,13 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final handle = _ensureHandle();
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(
-          RacHandle,
-          Pointer<Utf8>,
-          Pointer<Uint8>,
-          IntPtr,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        ),
-        int Function(
-          RacHandle,
-          Pointer<Utf8>,
-          Pointer<Uint8>,
-          int,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        )>('rac_diffusion_component_generate');
-
-    final promptPtr = prompt.toNativeUtf8();
+    _ensureHandle();
     final optsBytes = options?.writeToBuffer() ?? Uint8List(0);
-    final optsPtr = optsBytes.isEmpty
-        ? nullptr
-        : (calloc<Uint8>(optsBytes.length)
-          ..asTypedList(optsBytes.length).setAll(0, optsBytes));
-    final outBytesPtr = calloc<Pointer<Uint8>>();
-    final outLenPtr = calloc<IntPtr>();
-    try {
-      final rc = fn(
-        handle,
-        promptPtr,
-        optsPtr,
-        optsBytes.length,
-        outBytesPtr,
-        outLenPtr,
-      );
-      if (rc != RAC_SUCCESS) {
-        _throwForCode('rac_diffusion_component_generate', rc);
-      }
-      final len = outLenPtr.value;
-      final bytes = outBytesPtr.value.asTypedList(len);
-      return DiffusionResult.fromBuffer(bytes);
-    } finally {
-      calloc.free(promptPtr);
-      if (optsPtr != nullptr) calloc.free(optsPtr);
-      calloc.free(outBytesPtr);
-      calloc.free(outLenPtr);
+    final result = DartBridgeDiffusion.generate(prompt, optsBytes);
+    if (!result.success || result.payload == null) {
+      _throwForCode('rac_diffusion_component_generate', result.resultCode);
     }
+    return DiffusionResult.fromBuffer(result.payload!);
   }
 
   /// Stream generation progress.
@@ -214,13 +137,9 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final h = _handle;
-    if (h == null) return;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(RacHandle),
-        int Function(RacHandle)>('rac_diffusion_component_cancel');
-    final rc = fn(h);
-    if (rc != RAC_SUCCESS) {
+    if (!DartBridgeDiffusion.hasHandle) return;
+    final rc = DartBridgeDiffusion.cancel();
+    if (rc != 0) {
       _throwForCode('rac_diffusion_component_cancel', rc);
     }
   }
@@ -228,33 +147,12 @@ class RunAnywhereDiffusion {
   /// Backend capability discovery.
   DiffusionCapabilities capabilities() {
     if (!SdkState.shared.isInitialized) return DiffusionCapabilities();
-    final handle = _ensureHandle();
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(
-          RacHandle,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        ),
-        int Function(
-          RacHandle,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        )>('rac_diffusion_component_get_capabilities');
-
-    final outBytesPtr = calloc<Pointer<Uint8>>();
-    final outLenPtr = calloc<IntPtr>();
-    try {
-      final rc = fn(handle, outBytesPtr, outLenPtr);
-      if (rc != RAC_SUCCESS) {
-        _throwForCode('rac_diffusion_component_get_capabilities', rc);
-      }
-      final len = outLenPtr.value;
-      final bytes = outBytesPtr.value.asTypedList(len);
-      return DiffusionCapabilities.fromBuffer(bytes);
-    } finally {
-      calloc.free(outBytesPtr);
-      calloc.free(outLenPtr);
+    _ensureHandle();
+    final result = DartBridgeDiffusion.capabilities();
+    if (!result.success || result.payload == null) {
+      _throwForCode('rac_diffusion_component_get_capabilities',
+          result.resultCode);
     }
+    return DiffusionCapabilities.fromBuffer(result.payload!);
   }
 }

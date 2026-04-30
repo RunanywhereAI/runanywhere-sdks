@@ -5,10 +5,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi' as ffi;
 
-import 'package:runanywhere/adapters/llm_stream_adapter.dart';
-import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
@@ -18,6 +15,7 @@ import 'package:runanywhere/generated/llm_options.pb.dart'
 import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_llm_streaming.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
@@ -287,15 +285,12 @@ class RunAnywhereLLM {
       }
     }
 
-    final handle = DartBridge.llm.getHandle();
-
-    // Probe whether proto streaming is available for this handle.
-    // When the native library is built without Protobuf (e.g. simulator
-    // builds), rac_llm_set_stream_proto_callback returns
-    // RAC_ERROR_FEATURE_NOT_AVAILABLE and LLMStreamAdapter immediately
-    // emits a StateError on first listen.  We detect this by checking
-    // whether _install() succeeded via a test StreamController.
-    final protoAvailable = _probeProtoAvailability(handle);
+    // Probe whether proto streaming is available for the loaded
+    // library. When the native library is built without Protobuf
+    // (e.g. simulator builds), rac_llm_set_stream_proto_callback
+    // returns RAC_ERROR_FEATURE_NOT_AVAILABLE and we fall back to
+    // the struct-based stream path.
+    final protoAvailable = DartBridgeLLMStreaming.protoAvailable();
 
     if (!protoAvailable) {
       // Struct-based fallback: forward DartBridge.llm.generateStream tokens
@@ -309,8 +304,7 @@ class RunAnywhereLLM {
     }
 
     // Proto path — canonical production path.
-    final adapter = LLMStreamAdapter(handle);
-    final eventStream = adapter.stream();
+    final eventStream = DartBridgeLLMStreaming.protoStream();
 
     final driver = DartBridge.llm.generateStream(
       prompt,
@@ -334,47 +328,6 @@ class RunAnywhereLLM {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
-
-  /// Cached result of the proto-availability probe (null = not yet checked).
-  bool? _protoAvailableCache;
-
-  /// Probe whether rac_llm_set_stream_proto_callback is functional for
-  /// [handle].  The result is cached per-instance because the availability
-  /// is determined by the native library build flags (fixed at compile time).
-  ///
-  /// Strategy: call [LLMStreamAdapter.stream()] and subscribe; if the
-  /// adapter's _install() fails it emits a StateError synchronously as a
-  /// microtask.  We use a synchronous-looking StreamController trick: we
-  /// wrap the subscription result in a flag that is set during the first
-  /// microtask drain.
-  ///
-  /// Simpler approach used here: attempt to register the proto callback
-  /// directly via [RacNative.bindings.rac_llm_set_stream_proto_callback]
-  /// with a null function pointer (which is a no-op) and check the return
-  /// code.  RAC_SUCCESS (0) means proto is available; any other code means
-  /// it is not.  We immediately call unset to leave the handle clean.
-  bool _probeProtoAvailability(ffi.Pointer<ffi.Void> handle) {
-    if (_protoAvailableCache != null) return _protoAvailableCache!;
-
-    try {
-      final rc = RacNative.bindings.rac_llm_set_stream_proto_callback(
-        handle,
-        ffi.nullptr,
-        ffi.nullptr,
-      );
-      if (rc == 0) {
-        // Registered successfully (with null callback = no-op); unset it.
-        RacNative.bindings.rac_llm_unset_stream_proto_callback(handle);
-        _protoAvailableCache = true;
-      } else {
-        _protoAvailableCache = false;
-      }
-    } catch (_) {
-      _protoAvailableCache = false;
-    }
-
-    return _protoAvailableCache!;
-  }
 
   /// Struct-based streaming fallback used when Protobuf is not linked.
   ///

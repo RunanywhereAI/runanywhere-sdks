@@ -3,12 +3,9 @@
 // Wave 2 STT capability — aligned to Swift + proto. Returns proto STTOutput.
 
 import 'dart:async';
-import 'dart:ffi';
-import 'dart:isolate';
 import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart';
-import 'package:fixnum/fixnum.dart' hide Int32;
+import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
@@ -19,32 +16,11 @@ import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_stt.dart'
-    show racAudioFormatWav, RacSttOptionsStruct;
-import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/native/dart_bridge_stt.dart' show racAudioFormatWav;
+import 'package:runanywhere/native/dart_bridge_stt_streaming.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-
-/// Native callback type for rac_stt_component_transcribe_stream.
-/// Declared at top level so that [NativeCallable] and [lookup] can
-/// validate it as a dart:ffi native function type.
-typedef SttStreamCallback = Void Function(
-  Pointer<Void>, // text pointer (caller casts to Pointer<Utf8>)
-  Int32, // isFinal flag (1 = final, 0 = partial)
-  Pointer<Void>, // user_data (unused)
-);
-
-/// Native function signature for rac_stt_component_transcribe_stream.
-typedef SttTranscribeStreamFn = Int32 Function(
-  Pointer<Void>, // handle
-  Pointer<Void>, // audio data
-  IntPtr, // audio length (size_t on all platforms)
-  Pointer<Void>, // options struct
-  Pointer<Void>, // callback function pointer
-  Pointer<Void>, // user_data
-);
 
 /// STT (speech-to-text) capability surface.
 ///
@@ -278,126 +254,57 @@ class RunAnywhereSTT {
       ));
     }
 
-    final controller = StreamController<STTPartialResult>(sync: false);
-    final receivePort = ReceivePort();
-
-    // [SttStreamCallback] is a top-level typedef so that dart:ffi analysis
-    // accepts it in NativeCallable and lookupFunction.
-    NativeCallable<SttStreamCallback>? callable;
-
-    Future<void> runStream() async {
-      final handle = DartBridge.stt.getHandle();
-      final lib = PlatformLoader.loadCommons();
-
-      // ignore: non_native_function_type_argument_to_pointer
-      // Use DynamicLibrary.lookup + asFunction to avoid dart:ffi analyzer
-      // restrictions on lookupFunction inside async closures.
-      final fn = lib
-          .lookup<NativeFunction<SttTranscribeStreamFn>>(
-              'rac_stt_component_transcribe_stream')
-          // ignore: non_native_function_type_argument_to_pointer
-          .asFunction<int Function(Pointer<Void>, Pointer<Void>, int, Pointer<Void>, Pointer<Void>, Pointer<Void>)>();
-
-      final dataPtr = calloc<Uint8>(audio.length);
-      final optsPtr = calloc<RacSttOptionsStruct>();
-      Pointer<Utf8>? langPtr;
-
-      try {
-        dataPtr.asTypedList(audio.length).setAll(0, audio);
-
-        final opts = options ?? STTOptions();
-        final lang = opts.language.bcp47 ?? 'en';
-        langPtr = lang.toNativeUtf8();
-
-        optsPtr.ref.language = langPtr;
-        optsPtr.ref.detectLanguage =
-            opts.language == STTLanguage.STT_LANGUAGE_AUTO
-                ? RAC_TRUE
-                : RAC_FALSE;
-        optsPtr.ref.enablePunctuation =
-            (opts.hasEnablePunctuation() ? opts.enablePunctuation : true)
-                ? RAC_TRUE
-                : RAC_FALSE;
-        optsPtr.ref.enableDiarization =
-            opts.enableDiarization ? RAC_TRUE : RAC_FALSE;
-        optsPtr.ref.maxSpeakers = opts.maxSpeakers;
-        optsPtr.ref.enableTimestamps =
-            opts.enableWordTimestamps ? RAC_TRUE : RAC_FALSE;
-        optsPtr.ref.audioFormat = racAudioFormatWav;
-        optsPtr.ref.sampleRate = 16000;
-
-        // Bridge from native callback (background thread) → Dart isolate
-        // via a SendPort. The callable closes over the SendPort so the
-        // partial-text payloads land on a Dart-side ReceivePort.
-        final sendPort = receivePort.sendPort;
-        // ignore: must_be_a_native_function_type
-        callable = NativeCallable<SttStreamCallback>.isolateLocal(
-          (Pointer<Void> rawPtr, int isFinal, Pointer<Void> _) {
-            final textPtr = rawPtr.cast<Utf8>();
-            final text = textPtr == nullptr ? '' : textPtr.toDartString();
-            sendPort.send([text, isFinal == RAC_TRUE]);
-          },
-        );
-
-        receivePort.listen((dynamic msg) {
-          if (controller.isClosed) return;
-          final list = msg as List<dynamic>;
-          final text = list[0] as String;
-          final isFinal = list[1] as bool;
-          controller.add(STTPartialResult(
-            text: text,
-            isFinal: isFinal,
-            stability: isFinal ? 1.0 : 0.5,
-          ));
-          if (isFinal) {
-            unawaited(controller.close());
-            receivePort.close();
-            callable?.close();
-            callable = null;
-          }
-        });
-
-        final rc = fn(
-          handle.cast<Void>(),
-          dataPtr.cast<Void>(),
-          audio.length,
-          optsPtr.cast<Void>(),
-          callable!.nativeFunction.cast<Void>(),
-          nullptr,
-        );
-
-        if (rc != RAC_SUCCESS) {
-          if (!controller.isClosed) {
-            controller.addError(SDKException.sttNotAvailable(
-              'rac_stt_component_transcribe_stream failed: '
-              '${RacResultCode.getMessage(rc)}',
-            ));
-            await controller.close();
-          }
-          receivePort.close();
-          callable?.close();
-          callable = null;
-        }
-      } finally {
-        calloc.free(dataPtr);
-        calloc.free(optsPtr);
-        if (langPtr != null) calloc.free(langPtr);
-      }
-    }
-
-    controller.onCancel = () {
-      _isStreaming = false;
-      receivePort.close();
-      callable?.close();
-      callable = null;
-    };
+    final opts = options ?? STTOptions();
+    final streaming = DartBridgeSttStreaming.transcribeStream(
+      audio: audio,
+      options: SttStreamingOptions(
+        languageBcp47: opts.language.bcp47 ?? 'en',
+        detectLanguage: opts.language == STTLanguage.STT_LANGUAGE_AUTO,
+        enablePunctuation:
+            opts.hasEnablePunctuation() ? opts.enablePunctuation : true,
+        enableDiarization: opts.enableDiarization,
+        maxSpeakers: opts.maxSpeakers,
+        enableTimestamps: opts.enableWordTimestamps,
+      ),
+    );
 
     _isStreaming = true;
 
-    // Kick off the native call without awaiting; events flow through the
-    // listener registered above. Reset streaming flag on completion.
-    unawaited(runStream().then((_) => _isStreaming = false,
-        onError: (_) => _isStreaming = false));
+    final controller = StreamController<STTPartialResult>(sync: false);
+    final sub = streaming.stream.listen(
+      (event) {
+        if (controller.isClosed) return;
+        controller.add(STTPartialResult(
+          text: event.text,
+          isFinal: event.isFinal,
+          stability: event.isFinal ? 1.0 : 0.5,
+        ));
+        if (event.isFinal) {
+          unawaited(controller.close());
+          _isStreaming = false;
+        }
+      },
+      onError: (Object err, StackTrace stack) {
+        if (!controller.isClosed) {
+          controller.addError(err, stack);
+          unawaited(controller.close());
+        }
+        _isStreaming = false;
+      },
+      onDone: () {
+        if (!controller.isClosed) {
+          unawaited(controller.close());
+        }
+        _isStreaming = false;
+      },
+    );
+
+    controller.onCancel = () {
+      _isStreaming = false;
+      streaming.onCancel();
+      unawaited(sub.cancel());
+    };
+
     return controller.stream;
   }
 

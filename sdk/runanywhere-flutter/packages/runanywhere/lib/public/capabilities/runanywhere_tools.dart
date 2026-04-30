@@ -2,17 +2,100 @@
 //
 // runanywhere_tools.dart — v4 Tools capability (LLM function calling).
 //
+// §15 type-discipline: hand-rolled tool-calling types deleted; the
+// proto-generated `ToolDefinition` / `ToolCall` / `ToolResult` /
+// `ToolCallingOptions` / `ToolCallingResult` from
+// `generated/tool_calling.pb.dart` are the canonical types.
+//
 // Owns tool registration, manual tool execution, and the
 // tool-enabled generation loop (prompt tools into system prompt,
 // parse tool calls out of LLM output, execute, loop).
 //
 // Mirrors Swift `RunAnywhere+ToolCalling.swift`.
 
+import 'dart:convert';
+
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart' show LLMGenerationOptions;
+import 'package:runanywhere/generated/tool_calling.pb.dart'
+    show ToolCall, ToolCallingOptions, ToolCallingResult, ToolDefinition,
+        ToolParameter, ToolResult;
+import 'package:runanywhere/generated/tool_calling.pbenum.dart'
+    show ToolCallFormatName, ToolParameterType;
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
+
+/// Executor signature for a tool call.
+///
+/// Receives the JSON-decoded arguments map (parsed from
+/// `ToolCall.argumentsJson`) and returns a JSON-encodable result
+/// map. The framework re-encodes the result into
+/// `ToolResult.resultJson`.
+typedef ToolExecutor = Future<Map<String, dynamic>> Function(
+    Map<String, dynamic> args);
+
+/// Format-name string constants for `ToolCallingOptions.formatHint`.
+///
+/// The actual format logic is handled in C++ commons (single source
+/// of truth). Mirrors Swift SDK's `ToolCallFormatName` enum.
+abstract class ToolCallFormatNames {
+  /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+  /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
+  static const String defaultFormat = 'default';
+
+  /// Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+  /// Use for LFM2-Tool models
+  static const String lfm2 = 'lfm2';
+}
+
+String _formatHint(ToolCallingOptions opts) {
+  if (opts.formatHint.isNotEmpty) return opts.formatHint;
+  // The proto enum surfaces high-level format families
+  // (JSON / XML / NATIVE / PYTHONIC / OPENAI_FUNCTIONS / HERMES); the
+  // C++ commons format name registry is keyed by string values like
+  // "default" and "lfm2". We map the proto enum onto the string keys
+  // via `formatHint`. PYTHONIC ↔ "lfm2", everything else ↔ "default".
+  if (opts.format == ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC) {
+    return ToolCallFormatNames.lfm2;
+  }
+  return ToolCallFormatNames.defaultFormat;
+}
+
+String _toolDefinitionsToJson(List<ToolDefinition> tools) {
+  return jsonEncode(tools.map(_toolDefinitionToMap).toList());
+}
+
+Map<String, dynamic> _toolDefinitionToMap(ToolDefinition def) => {
+      'name': def.name,
+      'description': def.description,
+      'parameters': def.parameters.map(_toolParameterToMap).toList(),
+      if (def.category.isNotEmpty) 'category': def.category,
+    };
+
+Map<String, dynamic> _toolParameterToMap(ToolParameter param) => {
+      'name': param.name,
+      'type': _toolParameterTypeToJson(param.type),
+      'description': param.description,
+      'required': param.required,
+      if (param.enumValues.isNotEmpty) 'enumValues': param.enumValues,
+    };
+
+String _toolParameterTypeToJson(ToolParameterType type) {
+  switch (type) {
+    case ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER:
+      return 'number';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_BOOLEAN:
+      return 'boolean';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_OBJECT:
+      return 'object';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_ARRAY:
+      return 'array';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_STRING:
+    case ToolParameterType.TOOL_PARAMETER_TYPE_UNSPECIFIED:
+    default:
+      return 'string';
+  }
+}
 
 /// Tools (function calling) capability surface.
 ///
@@ -59,33 +142,41 @@ class RunAnywhereTools {
   /// Execute a tool call manually. Used when `autoExecute: false` is
   /// passed to `generateWithTools`.
   Future<ToolResult> execute(ToolCall toolCall) async {
-    final executor = _toolExecutors[toolCall.toolName];
+    final executor = _toolExecutors[toolCall.name];
     if (executor == null) {
       return ToolResult(
-        toolName: toolCall.toolName,
-        success: false,
-        error: 'Tool not found: ${toolCall.toolName}',
-        callId: toolCall.callId,
+        toolCallId: toolCall.id,
+        name: toolCall.name,
+        error: 'Tool not found: ${toolCall.name}',
       );
     }
 
+    Map<String, dynamic> args = const {};
+    if (toolCall.argumentsJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(toolCall.argumentsJson);
+        if (decoded is Map<String, dynamic>) args = decoded;
+      } catch (e) {
+        _logger.warning(
+            'Failed to decode tool arguments JSON for ${toolCall.name}: $e');
+      }
+    }
+
     try {
-      _logger.debug('Executing tool: ${toolCall.toolName}');
-      final result = await executor(toolCall.arguments);
-      _logger.debug('Tool ${toolCall.toolName} completed successfully');
+      _logger.debug('Executing tool: ${toolCall.name}');
+      final result = await executor(args);
+      _logger.debug('Tool ${toolCall.name} completed successfully');
       return ToolResult(
-        toolName: toolCall.toolName,
-        success: true,
-        result: result,
-        callId: toolCall.callId,
+        toolCallId: toolCall.id,
+        name: toolCall.name,
+        resultJson: jsonEncode(result),
       );
     } catch (e) {
-      _logger.error('Tool ${toolCall.toolName} failed: $e');
+      _logger.error('Tool ${toolCall.name} failed: $e');
       return ToolResult(
-        toolName: toolCall.toolName,
-        success: false,
+        toolCallId: toolCall.id,
+        name: toolCall.name,
         error: e.toString(),
-        callId: toolCall.callId,
       );
     }
   }
@@ -95,26 +186,26 @@ class RunAnywhereTools {
   /// Generate text with tool calling support. Drives the full loop:
   /// format tools into the system prompt, stream LLM output, parse
   /// tool calls, execute, continue until no more tool calls (or
-  /// `maxToolCalls` is reached).
+  /// `maxIterations` is reached).
   Future<ToolCallingResult> generateWithTools(
     String prompt, {
     ToolCallingOptions? options,
   }) async {
-    final opts = options ?? const ToolCallingOptions();
-    final tools = opts.tools ?? registeredTools();
-    final formatName = opts.formatName;
+    final opts = options ?? ToolCallingOptions();
+    final tools = opts.tools.isNotEmpty ? opts.tools : registeredTools();
+    final formatName = _formatHint(opts);
 
     if (tools.isEmpty) {
       final result = await RunAnywhereLLM.shared.generate(prompt);
       return ToolCallingResult(
         text: result.text,
-        toolCalls: [],
-        toolResults: [],
+        toolCalls: const [],
+        toolResults: const [],
         isComplete: true,
       );
     }
 
-    final toolsJson = toolsToJson(tools);
+    final toolsJson = _toolDefinitionsToJson(tools);
     _logger.debug('Tools JSON: $toolsJson');
     _logger.debug('Using tool call format: $formatName');
 
@@ -130,17 +221,17 @@ class RunAnywhereTools {
 
     var currentPrompt = formattedPrompt;
     var iterations = 0;
-    final maxIterations = opts.maxToolCalls;
+    final maxIterations = opts.hasMaxIterations() ? opts.maxIterations : 5;
 
     while (iterations < maxIterations) {
       iterations++;
 
       final genOptions = LLMGenerationOptions(
-        maxTokens: opts.maxTokens ?? 1024,
-        temperature: opts.temperature ?? 0.3,
+        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
+        temperature: opts.hasTemperature() ? opts.temperature : 0.3,
       );
 
-      // v2 close-out Phase G-2: generateStream now returns
+      // v2 close-out Phase G-2: generateStream returns
       // Stream<LLMStreamEvent>; accumulate token text off each event.
       final eventStream = RunAnywhereLLM.shared
           .generateStream(currentPrompt, genOptions);
@@ -168,42 +259,45 @@ class RunAnywhereTools {
           toolCalls: allToolCalls,
           toolResults: allToolResults,
           isComplete: true,
+          iterationsUsed: iterations,
         );
       }
 
       final toolCall = ToolCall(
-        toolName: parseResult.toolName!,
-        arguments: parseResult.arguments != null
-            ? dynamicMapToToolValueMap(parseResult.arguments!)
-            : {},
-        callId: parseResult.callId.toString(),
+        id: parseResult.callId.toString(),
+        name: parseResult.toolName!,
+        argumentsJson:
+            parseResult.arguments != null ? jsonEncode(parseResult.arguments) : '',
       );
       allToolCalls.add(toolCall);
 
-      _logger.info('Tool call detected: ${toolCall.toolName}');
+      _logger.info('Tool call detected: ${toolCall.name}');
 
-      if (!opts.autoExecute) {
+      final autoExecute =
+          opts.hasAutoExecute() ? opts.autoExecute : true;
+      if (!autoExecute) {
         return ToolCallingResult(
           text: parseResult.cleanText,
           toolCalls: allToolCalls,
           toolResults: allToolResults,
           isComplete: false,
+          iterationsUsed: iterations,
         );
       }
 
       final toolResult = await execute(toolCall);
       allToolResults.add(toolResult);
 
-      final resultJson = toolResult.result != null
-          ? toolResultToJsonString(toolResult.result!)
-          : '{"error": "${toolResult.error ?? 'Unknown error'}"}';
+      final resultJson = toolResult.resultJson.isNotEmpty
+          ? toolResult.resultJson
+          : '{"error": "${toolResult.error.isNotEmpty ? toolResult.error : 'Unknown error'}"}';
 
       currentPrompt = DartBridgeToolCalling.shared.buildFollowupPrompt(
         originalPrompt: prompt,
         toolsPrompt: opts.keepToolsAvailable
             ? DartBridgeToolCalling.shared.formatToolsPrompt(toolsJson)
             : null,
-        toolName: toolCall.toolName,
+        toolName: toolCall.name,
         toolResultJson: resultJson,
         keepToolsAvailable: opts.keepToolsAvailable,
       );
@@ -218,6 +312,7 @@ class RunAnywhereTools {
       toolCalls: allToolCalls,
       toolResults: allToolResults,
       isComplete: true,
+      iterationsUsed: iterations,
     );
   }
 
@@ -228,20 +323,20 @@ class RunAnywhereTools {
     ToolResult toolResult, {
     ToolCallingOptions? options,
   }) async {
-    final opts = options ?? const ToolCallingOptions();
-    final tools = opts.tools ?? registeredTools();
-    final toolsJson = toolsToJson(tools);
+    final opts = options ?? ToolCallingOptions();
+    final tools = opts.tools.isNotEmpty ? opts.tools : registeredTools();
+    final toolsJson = _toolDefinitionsToJson(tools);
 
-    final resultJson = toolResult.result != null
-        ? toolResultToJsonString(toolResult.result!)
-        : '{"error": "${toolResult.error ?? 'Unknown error'}"}';
+    final resultJson = toolResult.resultJson.isNotEmpty
+        ? toolResult.resultJson
+        : '{"error": "${toolResult.error.isNotEmpty ? toolResult.error : 'Unknown error'}"}';
 
     final followupPrompt = DartBridgeToolCalling.shared.buildFollowupPrompt(
       originalPrompt: originalPrompt,
       toolsPrompt: opts.keepToolsAvailable
           ? DartBridgeToolCalling.shared.formatToolsPrompt(toolsJson)
           : null,
-      toolName: toolResult.toolName,
+      toolName: toolResult.name,
       toolResultJson: resultJson,
       keepToolsAvailable: opts.keepToolsAvailable,
     );
@@ -255,7 +350,7 @@ class RunAnywhereTools {
   String formatToolsForPrompt([List<ToolDefinition>? tools]) {
     final toolList = tools ?? registeredTools();
     if (toolList.isEmpty) return '';
-    final toolsJson = toolsToJson(toolList);
+    final toolsJson = _toolDefinitionsToJson(toolList);
     return DartBridgeToolCalling.shared.formatToolsPrompt(toolsJson);
   }
 
@@ -266,11 +361,10 @@ class RunAnywhereTools {
       return null;
     }
     return ToolCall(
-      toolName: result.toolName!,
-      arguments: result.arguments != null
-          ? dynamicMapToToolValueMap(result.arguments!)
-          : {},
-      callId: result.callId.toString(),
+      id: result.callId.toString(),
+      name: result.toolName!,
+      argumentsJson:
+          result.arguments != null ? jsonEncode(result.arguments) : '',
     );
   }
 }

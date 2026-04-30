@@ -29,6 +29,8 @@ import 'package:runanywhere/generated/rag.pb.dart'
 import 'package:runanywhere/generated/stt_options.pb.dart' show STTOutput;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show StructuredOutputResult, JSONSchema;
+import 'package:runanywhere/generated/tool_calling.pb.dart'
+    show ToolCallingOptions, ToolCallingResult, ToolResult;
 import 'package:runanywhere/generated/vad_options.pb.dart'
     show VADResult, VADStatistics;
 import 'package:runanywhere/generated/tts_options.pb.dart' show TTSOutput;
@@ -45,7 +47,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_rag.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tools.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
@@ -83,10 +84,9 @@ extension RunAnywhereSDKFlatAliases on RunAnywhereSDK {
     String result,
   ) {
     final toolResult = ToolResult(
-      toolName: toolCallId,
-      success: true,
-      result: {'result': StringToolValue(result)},
-      callId: toolCallId,
+      toolCallId: toolCallId,
+      name: toolCallId,
+      resultJson: result,
     );
     return RunAnywhereTools.shared
         .continueWithToolResult(toolCallId, toolResult);
