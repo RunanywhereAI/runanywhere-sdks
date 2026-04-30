@@ -43,6 +43,7 @@ protoc \
     diffusion_options.proto embeddings_options.proto errors.proto \
     lora_options.proto rag.proto sdk_events.proto storage_types.proto \
     structured_output.proto stt_options.proto tts_options.proto \
-    vad_options.proto vlm_options.proto
+    vad_options.proto vlm_options.proto \
+    hardware_profile.proto
 
 echo "✓ TS proto codegen → ${TS_OUT_DIR}"

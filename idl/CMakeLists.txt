@@ -42,6 +42,8 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/tts_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/vad_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/vlm_options.proto
+    # Wave 3 Step 3.1 (RC-8) — hardware profile types for hardware namespace.
+    ${CMAKE_CURRENT_SOURCE_DIR}/hardware_profile.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

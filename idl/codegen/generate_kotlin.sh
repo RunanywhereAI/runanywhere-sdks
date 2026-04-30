@@ -38,7 +38,8 @@ if command -v wire-compiler >/dev/null 2>&1; then
         diffusion_options.proto embeddings_options.proto errors.proto \
         lora_options.proto rag.proto sdk_events.proto storage_types.proto \
         structured_output.proto stt_options.proto tts_options.proto \
-        vad_options.proto vlm_options.proto
+        vad_options.proto vlm_options.proto \
+        hardware_profile.proto
 
     # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
     # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both

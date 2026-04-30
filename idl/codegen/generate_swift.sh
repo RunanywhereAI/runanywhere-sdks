@@ -56,6 +56,8 @@ MESSAGE_PROTOS=(
     "${PROTO_DIR}/tts_options.proto"
     "${PROTO_DIR}/vad_options.proto"
     "${PROTO_DIR}/vlm_options.proto"
+    # Wave 3 Step 3.1 (RC-8) — hardware profile types for hardware namespace.
+    "${PROTO_DIR}/hardware_profile.proto"
 )
 
 protoc \
