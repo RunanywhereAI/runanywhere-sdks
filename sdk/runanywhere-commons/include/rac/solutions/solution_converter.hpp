@@ -16,9 +16,14 @@
 
 #pragma once
 
-#include "pipeline.pb.h"
 #include "rac/core/rac_error.h"
-#include "solutions.pb.h"
+
+// Forward-declare proto types to keep protobuf an implementation
+// detail (see CMakeLists.txt: protobuf::libprotobuf is PRIVATE).
+namespace runanywhere::v1 {
+class PipelineSpec;
+class SolutionConfig;
+}  // namespace runanywhere::v1
 
 namespace rac::solutions {
 

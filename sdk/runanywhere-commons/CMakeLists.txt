@@ -898,10 +898,13 @@ if(Protobuf_FOUND)
         )
         # Prefer the modern imported target when available so transitive deps
         # (absl, etc.) flow through without us listing them by hand.
+        # PRIVATE: protobuf is an implementation detail of rac_commons
+        # (Wave 5 Step 5.1 / RC-12 — solution headers forward-decl proto
+        # types; consumers must not be forced to link libprotobuf).
         if(TARGET protobuf::libprotobuf)
-            target_link_libraries(rac_commons PUBLIC protobuf::libprotobuf)
+            target_link_libraries(rac_commons PRIVATE protobuf::libprotobuf)
         else()
-            target_link_libraries(rac_commons PUBLIC ${Protobuf_LIBRARIES})
+            target_link_libraries(rac_commons PRIVATE ${Protobuf_LIBRARIES})
         endif()
         # v2 close-out: when SHARED, absl symbols must resolve at link
         # time. RAC_ABSL_LIBS comes from cmake/protobuf.cmake (or the

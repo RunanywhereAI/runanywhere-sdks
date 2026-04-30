@@ -34,8 +34,13 @@
 #include <string>
 #include <unordered_map>
 
-#include "pipeline.pb.h"
 #include "rac/graph/pipeline_node.hpp"
+
+// Forward-declare proto types to keep protobuf an implementation
+// detail (see CMakeLists.txt: protobuf::libprotobuf is PRIVATE).
+namespace runanywhere::v1 {
+class OperatorSpec;
+}  // namespace runanywhere::v1
 
 namespace rac::solutions {
 

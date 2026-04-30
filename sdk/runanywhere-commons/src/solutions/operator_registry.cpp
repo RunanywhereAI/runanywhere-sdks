@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 
+#include "pipeline.pb.h"
 #include "rac/graph/pipeline_node.hpp"
 
 namespace rac::solutions {
