@@ -346,7 +346,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // System TTS pseudo-model (matches iOS / Android registration).
     // No download URL — the platform's built-in TTS engine (AVSpeechSynthesizer
     // on iOS, android.speech.tts.TextToSpeech on Android) is used at runtime.
-    RunAnywhere.registerModel(
+    RunAnywhereSDK.instance.models.register(
       id: 'system-tts',
       name: 'System TTS',
       url: Uri.parse('about:blank'),

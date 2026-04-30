@@ -4,8 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart' show ToolDefinition, ToolParameter, ToolParameterType, ToolCallingOptions;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -80,13 +80,13 @@ class _ToolsViewState extends State<ToolsView> {
 
     // 1. Weather tool
     sdk.RunAnywhereSDK.instance.tools.register(
-      const ToolDefinition(
+      ToolDefinition(
         name: 'get_weather',
         description: 'Get current weather for a location',
         parameters: [
           ToolParameter(
             name: 'location',
-            type: ToolParameterType.string,
+            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description: 'City name or coordinates (e.g., "San Francisco, CA")',
           ),
         ],
@@ -96,13 +96,13 @@ class _ToolsViewState extends State<ToolsView> {
 
     // 2. Calculator tool
     sdk.RunAnywhereSDK.instance.tools.register(
-      const ToolDefinition(
+      ToolDefinition(
         name: 'calculate',
         description: 'Perform basic arithmetic calculations',
         parameters: [
           ToolParameter(
             name: 'expression',
-            type: ToolParameterType.string,
+            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description: 'Math expression (e.g., "2 + 2", "10 * 5")',
           ),
         ],
@@ -112,7 +112,7 @@ class _ToolsViewState extends State<ToolsView> {
 
     // 3. Time tool
     sdk.RunAnywhereSDK.instance.tools.register(
-      const ToolDefinition(
+      ToolDefinition(
         name: 'get_current_time',
         description: 'Get the current date and time',
         parameters: [],
@@ -126,15 +126,15 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   /// Weather tool executor - fetches real weather data
-  Future<Map<String, ToolValue>> _fetchWeather(
-    Map<String, ToolValue> args,
+  Future<Map<String, dynamic>> _fetchWeather(
+    Map<String, dynamic> args,
   ) async {
-    final rawLocation = args['location']?.stringValue;
+    final rawLocation = args['location'] as String?;
 
     // Require location argument - no hardcoded defaults
     if (rawLocation == null || rawLocation.isEmpty) {
       return {
-        'error': const StringToolValue('Missing required argument: location'),
+        'error': 'Missing required argument: location',
       };
     }
 
@@ -156,8 +156,8 @@ class _ToolsViewState extends State<ToolsView> {
       final results = geocodeData['results'] as List?;
       if (results == null || results.isEmpty) {
         return {
-          'error': StringToolValue('Could not find location: $location'),
-          'location': StringToolValue(location),
+          'error': 'Could not find location: $location',
+          'location': location,
         };
       }
 
@@ -184,17 +184,17 @@ class _ToolsViewState extends State<ToolsView> {
       final weatherCode = current['weather_code'] as int? ?? 0;
 
       return {
-        'location': StringToolValue(cityName),
-        'temperature': NumberToolValue(temp.toDouble()),
-        'unit': const StringToolValue('fahrenheit'),
-        'humidity': NumberToolValue(humidity.toDouble()),
-        'wind_speed_mph': NumberToolValue(windSpeed.toDouble()),
-        'condition': StringToolValue(_weatherCodeToCondition(weatherCode)),
+        'location': cityName,
+        'temperature': temp.toDouble(),
+        'unit': 'fahrenheit',
+        'humidity': humidity.toDouble(),
+        'wind_speed_mph': windSpeed.toDouble(),
+        'condition': _weatherCodeToCondition(weatherCode),
       };
     } catch (e) {
       return {
-        'error': StringToolValue('Weather fetch failed: $e'),
-        'location': StringToolValue(location),
+        'error': 'Weather fetch failed: $e',
+        'location': location,
       };
     }
   }
@@ -281,15 +281,15 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   /// Calculator tool executor
-  Future<Map<String, ToolValue>> _calculate(
-    Map<String, ToolValue> args,
+  Future<Map<String, dynamic>> _calculate(
+    Map<String, dynamic> args,
   ) async {
-    final expression = args['expression']?.stringValue;
+    final expression = args['expression'] as String?;
     
     // Require expression argument - no hardcoded defaults
     if (expression == null || expression.isEmpty) {
       return {
-        'error': const StringToolValue('Missing required argument: expression'),
+        'error': 'Missing required argument: expression',
       };
     }
 
@@ -297,13 +297,13 @@ class _ToolsViewState extends State<ToolsView> {
       // Simple expression parser for basic arithmetic
       final result = _evaluateExpression(expression);
       return {
-        'expression': StringToolValue(expression),
-        'result': NumberToolValue(result),
+        'expression': expression,
+        'result': result,
       };
     } catch (e) {
       return {
-        'error': StringToolValue('Calculation failed: $e'),
-        'expression': StringToolValue(expression),
+        'error': 'Calculation failed: $e',
+        'expression': expression,
       };
     }
   }
@@ -360,18 +360,16 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   /// Time tool executor
-  Future<Map<String, ToolValue>> _getCurrentTime(
-    Map<String, ToolValue> args,
+  Future<Map<String, dynamic>> _getCurrentTime(
+    Map<String, dynamic> args,
   ) async {
     final now = DateTime.now();
     return {
-      'date': StringToolValue(
+      'date':
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
-      ),
-      'time': StringToolValue(
+      'time':
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
-      ),
-      'timezone': StringToolValue(now.timeZoneName),
+      'timezone': now.timeZoneName,
     };
   }
 
@@ -403,26 +401,27 @@ class _ToolsViewState extends State<ToolsView> {
 
       final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
         prompt,
-        options: const ToolCallingOptions(
-          maxToolCalls: 3,
+        options: ToolCallingOptions(
+          maxIterations: 3,
           autoExecute: true,
         ),
       );
 
       // Log tool calls
       for (final toolCall in result.toolCalls) {
-        _addToLog('Tool called: ${toolCall.toolName}');
-        _addToLog('Arguments: ${toolCall.arguments}');
+        _addToLog('Tool called: ${toolCall.name}');
+        _addToLog('Arguments: ${toolCall.argumentsJson}');
       }
 
       // Log tool results
       for (final toolResult in result.toolResults) {
-        _addToLog('Tool result: ${toolResult.toolName}');
-        _addToLog('Success: ${toolResult.success}');
-        if (toolResult.result != null) {
-          _addToLog('Result: ${toolResult.result}');
+        _addToLog('Tool result: ${toolResult.name}');
+        final hasError = toolResult.error.isNotEmpty;
+        _addToLog('Success: ${!hasError}');
+        if (toolResult.resultJson.isNotEmpty) {
+          _addToLog('Result: ${toolResult.resultJson}');
         }
-        if (toolResult.error != null) {
+        if (hasError) {
           _addToLog('Error: ${toolResult.error}');
         }
       }

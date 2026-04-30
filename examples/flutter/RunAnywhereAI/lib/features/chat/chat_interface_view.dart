@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart' show ToolCallingOptions, ToolCallFormatNames;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -168,16 +167,16 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   /// Different models are trained on different tool calling formats.
   /// Returns format name string (C++ is single source of truth for valid formats).
   String _detectToolCallFormat(String? modelName) {
-    if (modelName == null) return ToolCallFormatName.defaultFormat;
+    if (modelName == null) return ToolCallFormatNames.defaultFormat;
     final name = modelName.toLowerCase();
 
     // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
     if (name.contains('lfm2') && name.contains('tool')) {
-      return ToolCallFormatName.lfm2;
+      return ToolCallFormatNames.lfm2;
     }
 
     // Default JSON format for general-purpose models
-    return ToolCallFormatName.defaultFormat;
+    return ToolCallFormatNames.defaultFormat;
   }
 
   Future<void> _generateWithToolCalling(
@@ -210,9 +209,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
         prompt,
         options: ToolCallingOptions(
-          maxToolCalls: 3,
+          maxIterations: 3,
           autoExecute: true,
-          formatName: format,
+          formatHint: format,
           maxTokens: maxTokens,
           temperature: temperature,
         ),
@@ -231,16 +230,17 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         final lastResult = result.toolResults.isNotEmpty
             ? result.toolResults.last
             : null;
-        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.toolName}');
+        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.name}');
 
+        final hasError = lastResult != null && lastResult.error.isNotEmpty;
         toolCallInfo = ToolCallInfo(
-          toolName: lastCall.toolName,
-          arguments: _formatToolValueMapToJson(lastCall.arguments),
-          result: lastResult?.result != null
-              ? _formatToolValueMapToJson(lastResult!.result!)
+          toolName: lastCall.name,
+          arguments: lastCall.argumentsJson,
+          result: (lastResult != null && lastResult.resultJson.isNotEmpty)
+              ? lastResult.resultJson
               : null,
-          success: lastResult?.success ?? false,
-          error: lastResult?.error,
+          success: lastResult != null && !hasError,
+          error: hasError ? lastResult.error : null,
         );
         debugPrint('📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
       } else {
@@ -272,37 +272,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         _isGenerating = false;
       });
     }
-  }
-
-  String _formatToolValueMapToJson(Map<String, ToolValue> map) {
-    try {
-      final jsonMap = <String, dynamic>{};
-      for (final entry in map.entries) {
-        jsonMap[entry.key] = _toolValueToJson(entry.value);
-      }
-      const encoder = JsonEncoder.withIndent('  ');
-      return encoder.convert(jsonMap);
-    } catch (e) {
-      return map.toString();
-    }
-  }
-
-  dynamic _toolValueToJson(ToolValue value) {
-    if (value is StringToolValue) return value.value;
-    if (value is NumberToolValue) return value.value;
-    if (value is BoolToolValue) return value.value;
-    if (value is NullToolValue) return null;
-    if (value is ArrayToolValue) {
-      return value.value.map(_toolValueToJson).toList();
-    }
-    if (value is ObjectToolValue) {
-      final result = <String, dynamic>{};
-      for (final entry in value.value.entries) {
-        result[entry.key] = _toolValueToJson(entry.value);
-      }
-      return result;
-    }
-    return value.toString();
   }
 
   Future<void> _generateStreaming(
