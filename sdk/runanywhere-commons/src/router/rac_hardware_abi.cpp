@@ -26,6 +26,10 @@
 #include <string>
 #include <vector>
 
+#if defined(__linux__) || defined(__ANDROID__)
+#include <unistd.h>
+#endif
+
 #include "rac/core/rac_logger.h"
 #include "rac/router/rac_hardware_profile.h"
 

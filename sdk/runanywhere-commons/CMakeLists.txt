@@ -472,12 +472,21 @@ if(NOT CURL_FOUND)
         # expects.
         set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
         set(CURL_USE_MBEDTLS  ON  CACHE BOOL "" FORCE)
+        # Disable optional probes that fail on Android NDK and pollute try_compile
+        # with MbedTLS imported targets (which don't propagate into mini-projects).
+        set(USE_LIBIDN2       OFF CACHE BOOL "" FORCE)
+        set(CURL_USE_LIBPSL   OFF CACHE BOOL "" FORCE)
         if(TARGET MbedTLS::mbedtls)
             get_target_property(_rac_mbedtls_inc MbedTLS::mbedtls INTERFACE_INCLUDE_DIRECTORIES)
             set(MBEDTLS_INCLUDE_DIRS "${_rac_mbedtls_inc}" CACHE PATH "" FORCE)
-            set(MBEDTLS_LIBRARY      $<TARGET_FILE:MbedTLS::mbedtls>     CACHE FILEPATH "" FORCE)
-            set(MBEDX509_LIBRARY     $<TARGET_FILE:MbedTLS::mbedx509>    CACHE FILEPATH "" FORCE)
-            set(MBEDCRYPTO_LIBRARY   $<TARGET_FILE:MbedTLS::mbedcrypto>  CACHE FILEPATH "" FORCE)
+            # Concrete predicted .a paths under the FetchContent build dir.
+            # These satisfy curl's FindMbedTLS module (which requires non-empty
+            # cache vars) without using generator expressions that fail to
+            # propagate into try_compile mini-projects.
+            set(_rac_mbedtls_libdir "${mbedtls_fetched_BINARY_DIR}/library")
+            set(MBEDTLS_LIBRARY    "${_rac_mbedtls_libdir}/libmbedtls.a"    CACHE FILEPATH "" FORCE)
+            set(MBEDX509_LIBRARY   "${_rac_mbedtls_libdir}/libmbedx509.a"   CACHE FILEPATH "" FORCE)
+            set(MBEDCRYPTO_LIBRARY "${_rac_mbedtls_libdir}/libmbedcrypto.a" CACHE FILEPATH "" FORCE)
         endif()
         # Explicitly DO NOT disable HTTPS — that's the old bug.
     endif()
