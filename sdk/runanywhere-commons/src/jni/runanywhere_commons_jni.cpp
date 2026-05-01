@@ -411,6 +411,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racIsInitialized(JNIEnv
 }
 
 JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpClientSetCaBundle(
+    JNIEnv* env, jclass clazz, jstring path) {
+    if (path == nullptr) {
+        return rac_http_client_set_ca_bundle(nullptr);
+    }
+    const char* path_c = env->GetStringUTFChars(path, nullptr);
+    rac_result_t rc = rac_http_client_set_ca_bundle(path_c);
+    env->ReleaseStringUTFChars(path, path_c);
+    LOGi("racHttpClientSetCaBundle called, rc=%d", (int)rc);
+    return (jint)rc;
+}
+
+JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(JNIEnv* env,
                                                                                jclass clazz,
                                                                                jobject adapter) {

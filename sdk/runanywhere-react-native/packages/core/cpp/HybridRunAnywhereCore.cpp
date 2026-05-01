@@ -5,6 +5,24 @@
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 
+// =============================================================================
+// Platform HTTP transport registration (v2 close-out Phase H6)
+//
+// On iOS, rn_register_urlsession_transport() installs a URLSession-backed
+// rac_http_transport_ops vtable so subsequent rac_http_request_* calls route
+// through Apple's URL loading system (system trust store, proxies, HTTP/2,
+// ATS) instead of the bundled libcurl.
+//
+// On Android, registration happens from Kotlin
+// (RNHttpTransportBridge.racHttpTransportRegisterOkHttp()) BEFORE the first
+// HTTP call. C++ side is a no-op.
+//
+// Both registrations are idempotent.
+// =============================================================================
+#if defined(__APPLE__)
+extern "C" void rn_register_urlsession_transport(void);
+#endif
+
 namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
@@ -43,6 +61,21 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         std::lock_guard<std::mutex> lock(initMutex_);
 
         LOGI("Initializing Core SDK...");
+
+        // 0. Register the platform HTTP transport (URLSession on iOS) BEFORE
+        // any rac_http_request_* call fires. This makes HTTP go through the
+        // system trust store / proxies / HTTP/2 instead of libcurl.
+        //
+        // Idempotent: subsequent calls are no-ops. Android's OkHttp transport
+        // is registered separately from Kotlin's RNHttpTransportBridge.
+        //
+        // Note: if the bundled librac_commons is older than commons v0.2.0
+        // (no rac_http_transport_register symbol), this call will fail to
+        // link. A rebuild of the bundled natives is required for the
+        // transport vtable to take effect.
+#if defined(__APPLE__)
+        rn_register_urlsession_transport();
+#endif
 
         // Parse config
         std::string apiKey = extractStringValue(configJson, "apiKey");

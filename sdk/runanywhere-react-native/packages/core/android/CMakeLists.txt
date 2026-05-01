@@ -48,6 +48,32 @@ set_target_properties(rac_commons PROPERTIES
 message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_commons.so")
 
 # =============================================================================
+# Detect whether the bundled librac_commons.so exports the HTTP transport
+# vtable registration API (added in commons v0.2.0+). When present, the
+# OkHttp adapter is wired in. When absent (older bundled binaries), the
+# adapter falls back to a stub so the build continues and the RN core keeps
+# using libcurl via rac_http_request_send directly.
+# =============================================================================
+set(RAC_HAS_HTTP_TRANSPORT OFF)
+find_program(RAC_NM_EXECUTABLE NAMES llvm-nm nm)
+if(RAC_NM_EXECUTABLE)
+    execute_process(
+        COMMAND ${RAC_NM_EXECUTABLE} -D --defined-only ${JNILIB_DIR}/librac_commons.so
+        OUTPUT_VARIABLE RAC_COMMONS_SYMBOLS
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(RAC_COMMONS_SYMBOLS MATCHES "rac_http_transport_register")
+        set(RAC_HAS_HTTP_TRANSPORT ON)
+        message(STATUS "[RunAnywhereCore] librac_commons.so exports rac_http_transport_register -> OkHttp adapter ENABLED")
+    else()
+        message(STATUS "[RunAnywhereCore] librac_commons.so predates rac_http_transport_register -> OkHttp adapter DISABLED (using stub)")
+    endif()
+else()
+    message(WARNING "[RunAnywhereCore] No nm available; assuming librac_commons.so predates transport vtable")
+endif()
+
+# =============================================================================
 # Source files - Core bridges only (no LLM/STT/TTS/VAD)
 # =============================================================================
 # Collect core bridge source files
@@ -56,6 +82,12 @@ file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
+    # OkHttp platform HTTP transport JNI bridge (v2 close-out Phase H6).
+    # Registers a rac_http_transport_ops vtable that routes HTTP through
+    # the duplicated Kotlin `com.runanywhere.sdk.foundation.http.OkHttpTransport`
+    # so Android consumers get the system CA store + HTTP/2 + proxies via OkHttp
+    # instead of libcurl. Copy of commons' src/jni/okhttp_transport_adapter.cpp.
+    src/main/cpp/okhttp_transport_adapter.cpp
     ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
     ${HYBRID_CORE_DOMAIN_SOURCES}
@@ -88,6 +120,9 @@ include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywherecore+autoli
 # =============================================================================
 include_directories(
     "src/main/cpp"
+    # Local stub headers (rac_http_transport.h) — carried inline until
+    # librac_commons.so is rebuilt to export the transport vtable symbols.
+    # Searched BEFORE jniLibs/include so our copy wins.
     "../cpp"
     "../cpp/bridges"
     "../cpp/third_party"
@@ -133,6 +168,13 @@ target_link_libraries(
 # Link RACommons - REQUIRED for core functionality
 target_link_libraries(${PACKAGE_NAME} rac_commons)
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
+
+# When the bundled librac_commons.so exports rac_http_transport_register
+# (commons >= v0.2.0), enable the full OkHttp adapter. Otherwise it
+# compiles as a stub that returns RAC_ERROR_INTERNAL so links succeed.
+if(RAC_HAS_HTTP_TRANSPORT)
+    target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_HAS_HTTP_TRANSPORT=1)
+endif()
 
 # Link nlohmann_json for ToolCallingBridge
 target_link_libraries(${PACKAGE_NAME} nlohmann_json::nlohmann_json)

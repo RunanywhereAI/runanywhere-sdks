@@ -48,6 +48,19 @@ if(EMSCRIPTEN)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
+# B20: Opt-in proto regeneration.
+#
+# The 23 `*.pb.cc` / `*.pb.h` pairs under `src/generated/proto/` are committed
+# so CI / release builds never need a working protoc on-path. However, the
+# canonical `.proto` sources live at repo-root `idl/*.proto`, and drift
+# between the two is a recurring problem.
+#
+# With RAC_REGENERATE_PROTO=ON, the build reruns `idl/codegen/generate_cpp.sh`
+# whenever any `idl/*.proto` file is newer than `src/generated/proto/.gen-stamp`,
+# writing fresh `.pb.{cc,h}` back into the committed tree. Dev loop only —
+# CI stays OFF so it compiles exactly what is in git.
+option(RAC_REGENERATE_PROTO "Regenerate C++ proto sources from idl/*.proto when out of date (dev only)" OFF)
+
 # =============================================================================
 # C++ CONFIGURATION
 # =============================================================================
@@ -390,6 +403,15 @@ message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 # system package (brew/apt/NDK/Xcode SDK); only fall back to
 # FetchContent on targets where libcurl isn't reliably on the
 # CMAKE_PREFIX_PATH (Windows MSVC, some CI runners).
+#
+# B03 fix: on Emscripten the WASM sandbox cannot open raw sockets, so
+# libcurl's transport layer is useless at runtime. We skip libcurl +
+# mbedTLS entirely and route the `rac_http_client_*` ABI through the
+# browser's fetch() API via `rac_http_client_emscripten.cpp` instead.
+if(EMSCRIPTEN)
+    message(STATUS "Emscripten target: skipping libcurl; using browser fetch() shim for rac_http_client")
+    set(CURL_FOUND FALSE CACHE BOOL "" FORCE)
+else()
 find_package(CURL QUIET)
 if(NOT CURL_FOUND)
     message(STATUS "System libcurl not found — bundling curl-7_88_1 via FetchContent...")
@@ -434,11 +456,6 @@ if(NOT CURL_FOUND)
     elseif(WIN32)
         set(CURL_USE_SCHANNEL ON  CACHE BOOL "" FORCE)
         set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
-    elseif(EMSCRIPTEN)
-        # WASM runtime: HTTPS flows through the browser's fetch() API via
-        # Emscripten FETCH, not libcurl. Compile curl without TLS.
-        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
-        set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
     elseif(ANDROID)
         # Android: bundle mbedTLS via FetchContent so curl has a working TLS
         # backend baked into the static library. The Android NDK does NOT ship
@@ -493,6 +510,7 @@ if(NOT CURL_FOUND)
 else()
     message(STATUS "Using system libcurl: ${CURL_LIBRARIES}")
 endif()
+endif()  # NOT EMSCRIPTEN (libcurl skipped on WASM — see rac_http_client_emscripten.cpp)
 
 # =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
@@ -631,10 +649,26 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
-    # v2 close-out Phase H — native HTTP transport (libcurl-backed).
-    # Replaces the HttpURLConnection path in CppBridgeDownload.kt.
-    src/infrastructure/http/rac_http_client_curl.cpp
+    # v2 close-out Phase H / H7 — native HTTP transport.
+    # - Native targets (macOS/iOS/Android/Windows/Linux): libcurl-backed.
+    # - Emscripten/WASM: browser fetch() shim. The WASM runtime cannot
+    #   open raw sockets so libcurl is useless there; the shim calls
+    #   `emscripten_fetch` so HTTPS is handled by the browser stack
+    #   (B03 fix — `CURL_DISABLE_HTTPS=ON` previously meant the WASM
+    #   build compiled in libcurl but with HTTPS silently disabled).
+    # H7 refactor: the emscripten shim now *also* exposes a vtable
+    # registration entry point (rac_http_transport_register_emscripten)
+    # so it participates in the same transport-router pattern Swift /
+    # Kotlin / Flutter / RN use. Its direct rac_http_request_* symbols
+    # are kept for back-compat since libcurl isn't compiled on WASM.
+    $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:src/infrastructure/http/rac_http_client_curl.cpp>
+    $<$<BOOL:${EMSCRIPTEN}>:src/infrastructure/http/rac_http_client_emscripten.cpp>
     src/infrastructure/http/rac_http_download.cpp
+    # v2 close-out Phase H2 — platform HTTP transport vtable / registry.
+    # Platform SDKs register a native-stack adapter here (Swift URLSession,
+    # Kotlin OkHttp, Web fetch, Flutter dart:io, RN fetch/JSI); when
+    # nothing is registered the libcurl / emscripten defaults above run.
+    src/infrastructure/http/rac_http_transport.cpp
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
@@ -808,6 +842,20 @@ if(ANDROID)
     target_compile_options(rac_commons PRIVATE -fvisibility=default)
 endif()
 
+# Apple: wire the curated export list (exports/RACommons.exports) into the
+# linker so the xcframework shipped via SPM only exposes the 484 curated
+# rac_* symbols. Matters for App Store symbol analysis; Android keeps the
+# default-visibility workaround above until RAC_API annotations are complete
+# (TODO v0.21 / B19). Note: target_link_options only takes effect when the
+# target is linked as a dynamic library — static-archive builds ignore it,
+# which is fine because symbol visibility only matters at final link time.
+if(APPLE)
+    set_target_properties(rac_commons PROPERTIES
+        XCODE_ATTRIBUTE_EXPORTED_SYMBOLS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")
+    target_link_options(rac_commons PRIVATE
+        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")
+endif()
+
 # libarchive - native archive extraction
 # PUBLIC on Windows because MSVC static libs don't propagate transitive deps
 if(WIN32)
@@ -826,12 +874,66 @@ endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
 # libcurl — PUBLIC so tests and SDK adapters (rac_commons_jni) pick it
-# up transitively.
-if(TARGET CURL::libcurl)
+# up transitively. Skipped on Emscripten where HTTP goes through the
+# browser's fetch() API (see rac_http_client_emscripten.cpp).
+if(EMSCRIPTEN)
+    # -sFETCH=1 links `emscripten_fetch()` + its JS glue into the
+    # final .wasm bundle. Needs to be both a compile and a link flag so
+    # the header is visible and the runtime function is exported.
+    target_compile_options(rac_commons PUBLIC "-sFETCH=1")
+    target_link_options(rac_commons PUBLIC "-sFETCH=1")
+elseif(TARGET CURL::libcurl)
     target_link_libraries(rac_commons PUBLIC CURL::libcurl)
 else()
     target_link_libraries(rac_commons PUBLIC ${CURL_LIBRARIES})
     target_include_directories(rac_commons PUBLIC ${CURL_INCLUDE_DIRS})
+endif()
+
+# =============================================================================
+# B20: Reproducible proto C++ codegen
+# =============================================================================
+# Committed `.pb.{cc,h}` pairs in `src/generated/proto/` must stay in sync with
+# `idl/*.proto`. When RAC_REGENERATE_PROTO=ON AND `protoc` is on-path, rerun
+# `idl/codegen/generate_cpp.sh` whenever any `.proto` is newer than the
+# `.gen-stamp` marker. CI / release builds leave RAC_REGENERATE_PROTO=OFF
+# (default) and use the committed files as-is — no protoc dependency.
+# =============================================================================
+
+if(RAC_REGENERATE_PROTO)
+    find_program(RAC_PROTOC_EXE protoc)
+    find_program(RAC_BASH_EXE bash)
+    if(NOT RAC_PROTOC_EXE)
+        message(WARNING "RAC_REGENERATE_PROTO=ON but protoc not found on PATH — skipping regen. Install protobuf (brew install protobuf) or unset RAC_REGENERATE_PROTO.")
+    elseif(NOT RAC_BASH_EXE)
+        message(WARNING "RAC_REGENERATE_PROTO=ON but bash not found on PATH — skipping regen.")
+    else()
+        # repo root = two levels up from sdk/runanywhere-commons/
+        get_filename_component(_RAC_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+        set(_RAC_IDL_DIR "${_RAC_REPO_ROOT}/idl")
+        set(_RAC_IDL_CODEGEN "${_RAC_IDL_DIR}/codegen/generate_cpp.sh")
+        set(_RAC_PROTO_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto")
+        set(_RAC_PROTO_STAMP "${_RAC_PROTO_OUT}/.gen-stamp")
+
+        file(GLOB _RAC_PROTO_SOURCES CONFIGURE_DEPENDS "${_RAC_IDL_DIR}/*.proto")
+
+        if(EXISTS "${_RAC_IDL_CODEGEN}" AND _RAC_PROTO_SOURCES)
+            add_custom_command(
+                OUTPUT "${_RAC_PROTO_STAMP}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${_RAC_PROTO_OUT}"
+                COMMAND "${RAC_BASH_EXE}" "${_RAC_IDL_CODEGEN}"
+                COMMAND "${CMAKE_COMMAND}" -E touch "${_RAC_PROTO_STAMP}"
+                DEPENDS ${_RAC_PROTO_SOURCES} "${_RAC_IDL_CODEGEN}"
+                WORKING_DIRECTORY "${_RAC_REPO_ROOT}"
+                COMMENT "[rac_proto_gen] Regenerating C++ proto sources from idl/*.proto"
+                VERBATIM
+            )
+            add_custom_target(rac_proto_gen DEPENDS "${_RAC_PROTO_STAMP}")
+            add_dependencies(rac_commons rac_proto_gen)
+            message(STATUS "B20: rac_proto_gen wired (idl/*.proto → ${_RAC_PROTO_OUT}); rac_commons depends on it")
+        else()
+            message(WARNING "RAC_REGENERATE_PROTO=ON but ${_RAC_IDL_CODEGEN} or idl/*.proto missing — skipping regen target")
+        endif()
+    endif()
 endif()
 
 # =============================================================================
@@ -846,6 +948,56 @@ endif()
 # =============================================================================
 
 find_package(Protobuf QUIET)
+
+# Fallback: on Android/iOS/WASM cross-compiles there is no system protobuf,
+# so find_package returns nothing, RAC_HAVE_PROTOBUF never gets defined, and
+# the full Solutions API implementation is linked OUT — only the stub that
+# returns RAC_ERROR_FEATURE_NOT_AVAILABLE ships. Vendor libprotobuf via
+# FetchContent (same pattern mbedTLS uses for Android curl TLS above) so
+# the proto-backed Solutions / Pipeline / VoiceEvent code compiles on every
+# mobile + WASM target.
+if(NOT Protobuf_FOUND)
+    if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS" OR EMSCRIPTEN)
+        include(FetchContent)
+        set(protobuf_BUILD_TESTS           OFF CACHE INTERNAL "")
+        set(protobuf_BUILD_PROTOC_BINARIES OFF CACHE INTERNAL "")
+        set(protobuf_BUILD_EXAMPLES        OFF CACHE INTERNAL "")
+        set(protobuf_INSTALL               OFF CACHE INTERNAL "")
+        set(protobuf_BUILD_SHARED_LIBS     OFF CACHE INTERNAL "")
+        # protobuf v28+ depends on abseil; "module" tells protobuf to fetch
+        # and build absl as a subproject instead of requiring it on the
+        # sysroot.
+        set(protobuf_ABSL_PROVIDER         "module" CACHE STRING   "")
+        set(ABSL_PROPAGATE_CXX_STD         ON       CACHE BOOL     "")
+        FetchContent_Declare(
+            protobuf_fetched
+            GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
+            GIT_TAG        v28.3
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(protobuf_fetched)
+        # Aliases so downstream `if(TARGET protobuf::libprotobuf)` branches
+        # pick up the vendored targets.
+        if(TARGET libprotobuf AND NOT TARGET protobuf::libprotobuf)
+            add_library(protobuf::libprotobuf ALIAS libprotobuf)
+        endif()
+        if(TARGET libprotobuf-lite AND NOT TARGET protobuf::libprotobuf-lite)
+            add_library(protobuf::libprotobuf-lite ALIAS libprotobuf-lite)
+        endif()
+        set(Protobuf_FOUND TRUE)
+        # The vendored source tree exports its include dirs via the imported
+        # target, so Protobuf_INCLUDE_DIRS is not strictly required — but
+        # the `if(Protobuf_FOUND)` block below still references it on the
+        # PRIVATE include path. Pull the absolute path off the target.
+        if(TARGET libprotobuf)
+            get_target_property(_rac_pb_inc libprotobuf INTERFACE_INCLUDE_DIRECTORIES)
+            if(_rac_pb_inc)
+                set(Protobuf_INCLUDE_DIRS "${_rac_pb_inc}")
+            endif()
+        endif()
+        message(STATUS "RunAnywhere: vendored libprotobuf v28.3 via FetchContent (absl=module)")
+    endif()
+endif()
 
 # v2 close-out: SHARED builds need absl symbols (see cmake/protobuf.cmake).
 # Find absl independently here too for standalone-commons builds that

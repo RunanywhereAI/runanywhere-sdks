@@ -103,6 +103,13 @@ public enum CppBridge {
         // This must be registered before any other C++ calls
         PlatformAdapter.register()
 
+        // Step 1.1: Register the Swift URLSession HTTP transport so
+        // every subsequent `rac_http_request_*` call flows through
+        // Apple's stack (trust store, ATS, proxies, HTTP/2). Must
+        // happen before any other bridge that might trigger HTTP —
+        // e.g. Telemetry initialization below.
+        URLSessionHttpTransport.register()
+
         // Step 1.5: Configure C++ logging based on environment
         // In production: disables C++ stderr, logs only go through Swift bridge
         // In development: C++ stderr ON for debugging

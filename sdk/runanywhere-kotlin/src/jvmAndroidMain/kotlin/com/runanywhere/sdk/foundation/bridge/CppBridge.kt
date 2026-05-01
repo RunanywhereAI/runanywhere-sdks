@@ -151,6 +151,14 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
+            // v2 close-out Phase H4: install the OkHttp HTTP transport BEFORE
+            // any network I/O happens (device registration, model assignment
+            // fetch, telemetry, auth all go through rac_http_request_*). The
+            // adapter gives us the Android system trust store + proxy +
+            // NetworkSecurityConfig for free and fixes the rc=77 SSL failure
+            // on ~5% of devices. Safe to no-op if the native lib is missing.
+            registerOkHttpTransport()
+
             // Configure logging with Sentry integration
             // Setup Sentry hooks so Logging can trigger Sentry setup/teardown
             setupSentryHooks(environment)
@@ -333,6 +341,53 @@ object CppBridge {
             versionClass.getField("RELEASE").get(null) as? String ?: "unknown"
         } catch (e: Exception) {
             System.getProperty("os.version") ?: "unknown"
+        }
+    }
+
+    /**
+     * Register the OkHttp platform HTTP transport with the C++ core.
+     *
+     * Installs `rac_http_transport_ops` so that every `rac_http_request_*`
+     * call routes through Kotlin's [com.runanywhere.sdk.foundation.http.OkHttpTransport]
+     * instead of libcurl. Gives Android / JVM consumers the system trust
+     * store + NetworkSecurityConfig + proxy + HTTP/2 for free.
+     *
+     * Guarded: skipped silently when the native library isn't loaded,
+     * since `RunAnywhereBridge.racHttpTransportRegisterOkHttp()` would
+     * throw UnsatisfiedLinkError in that case and the SDK should still
+     * boot (without inference) for non-networking use cases.
+     */
+    private fun registerOkHttpTransport() {
+        if (!_nativeLibraryLoaded) {
+            logger.debug("Skipping OkHttp transport registration: native lib not loaded")
+            return
+        }
+        try {
+            val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
+            if (rc == 0) {
+                logger.info("✅ OkHttp HTTP transport registered (system trust store + proxy)")
+            } else {
+                logger.warn("OkHttp HTTP transport registration returned rc=$rc; falling back to libcurl")
+            }
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warn("OkHttp HTTP transport symbol missing in native lib: ${e.message}")
+        } catch (e: Throwable) {
+            logger.warn("OkHttp HTTP transport registration failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Unregister the OkHttp platform HTTP transport. Best-effort — any
+     * failure is logged but does not block shutdown.
+     */
+    private fun unregisterOkHttpTransport() {
+        if (!_nativeLibraryLoaded) return
+        try {
+            RunAnywhereBridge.racHttpTransportUnregisterOkHttp()
+        } catch (_: UnsatisfiedLinkError) {
+            // Symbol not present — nothing to do.
+        } catch (e: Throwable) {
+            logger.warn("OkHttp HTTP transport unregistration failed: ${e.message}")
         }
     }
 
@@ -541,6 +596,12 @@ object CppBridge {
             CppBridgeDevice.unregister()
             CppBridgeTelemetry.unregister()
             CppBridgeEvents.unregister()
+
+            // v2 close-out Phase H4: release the OkHttp transport before the
+            // platform adapter, so any final rac_http_request_* inside shutdown
+            // (e.g. telemetry flush) still has a working HTTP path.
+            unregisterOkHttpTransport()
+
             CppBridgePlatformAdapter.unregister()
 
             // Teardown Sentry logging

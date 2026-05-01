@@ -93,6 +93,9 @@
 #include "rac_voice_agent.h"
 #include "rac_voice_event_abi.h"
 
+// Embeddings
+#include "rac_embeddings.h"
+
 // RAG (Retrieval-Augmented Generation)
 #include "rac_rag_pipeline.h"
 #include "rac_rag.h"
@@ -151,6 +154,7 @@
 #include "rac_endpoints.h"
 #include "rac_api_types.h"
 #include "rac_http_client.h"
+#include "rac_http_transport.h"
 #include "rac_http_download.h"
 #include "rac_auth_manager.h"
 #include "rac_dev_config.h"

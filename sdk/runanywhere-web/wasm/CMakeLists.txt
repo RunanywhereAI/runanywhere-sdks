@@ -243,6 +243,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_http_response_free"
     "_rac_http_download_execute"
 
+    # Platform HTTP transport registry (v2 close-out Phase H2 / H7). The
+    # WASM shim in rac_http_client_emscripten.cpp registers an
+    # emscripten_fetch()-backed adapter via this vtable so the router in
+    # rac_http_client_curl.cpp short-circuits to it. TypeScript side calls
+    # _rac_http_transport_register_emscripten() once after module load.
+    "_rac_http_transport_register"
+    "_rac_http_transport_is_registered"
+    "_rac_http_transport_register_emscripten"
+
     # Struct layout helpers used by HTTPAdapter.ts to pack/unpack
     # rac_http_request_t / rac_http_response_t / rac_http_download_request_t
     # without hard-coding offsets (safe against future field changes).

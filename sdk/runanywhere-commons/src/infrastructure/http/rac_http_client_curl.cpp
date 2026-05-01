@@ -12,9 +12,9 @@
  * refcount, which is ref-counted off the live-instance tally.
  */
 
-#include "rac/infrastructure/http/rac_http_client.h"
-
 #include <curl/curl.h>
+
+#include "rac/infrastructure/http/rac_http_client.h"
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -31,6 +31,16 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+
+// =============================================================================
+// H2 platform-transport router hook. The registry lives in
+// rac_http_transport.cpp; when an adapter is installed the entry points
+// below short-circuit and delegate instead of calling libcurl.
+// =============================================================================
+namespace rac_internal {
+bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_user_data);
+}  // namespace rac_internal
 
 namespace {
 
@@ -48,6 +58,23 @@ std::mutex& g_global_mutex() {
 size_t& g_global_refcount() {
     static size_t n = 0;
     return n;
+}
+
+// =============================================================================
+// Process-wide CA bundle path (Android needs this — bundled mbedTLS has
+// no system trust store; see rac_http_client_set_ca_bundle in the header).
+// Empty means "libcurl's built-in default" (which only works on platforms
+// whose curl build has a compiled-in or system CA store).
+// =============================================================================
+
+std::mutex& g_ca_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::string& g_ca_bundle_path() {
+    static std::string s;
+    return s;
 }
 
 rac_result_t global_init_once() {
@@ -165,7 +192,9 @@ size_t capture_header(char* ptr, size_t size, size_t nitems, void* user) {
 bool method_is_get(const char* m) {
     return m != nullptr && std::strcmp(m, "GET") == 0;
 }
-bool method_is_head(const char* m) { return m != nullptr && std::strcmp(m, "HEAD") == 0; }
+bool method_is_head(const char* m) {
+    return m != nullptr && std::strcmp(m, "HEAD") == 0;
+}
 bool method_has_body(const char* m) {
     return m != nullptr && (std::strcmp(m, "POST") == 0 || std::strcmp(m, "PUT") == 0 ||
                             std::strcmp(m, "PATCH") == 0 || std::strcmp(m, "DELETE") == 0);
@@ -206,8 +235,7 @@ rac_result_t curlcode_to_rac(CURLcode rc) {
         // without HTTPS support), `CURLE_URL_MALFORMAT` (URL parser rejected),
         // or other classes mapped to RAC_ERROR_NETWORK_ERROR.
 #ifdef __ANDROID__
-        __android_log_print(ANDROID_LOG_ERROR, "rac_http_curl",
-                            "libcurl error: code=%d (%s)",
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_curl", "libcurl error: code=%d (%s)",
                             static_cast<int>(rc), curl_easy_strerror(rc));
 #else
         RAC_LOG_ERROR(kTag, "libcurl error: code=%d (%s)", static_cast<int>(rc),
@@ -296,16 +324,14 @@ rac_result_t validate_and_setup(CURL* curl, const rac_http_request_t* req,
 
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "rac_http_curl",
-                        "validate_and_setup: url=[%s] method=[%s]",
-                        req->url, req->method);
+                        "validate_and_setup: url=[%s] method=[%s]", req->url, req->method);
 #endif
 
     curl_easy_reset(curl);
     CURLcode urlrc = curl_easy_setopt(curl, CURLOPT_URL, req->url);
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "rac_http_curl",
-                        "curl_easy_setopt(CURLOPT_URL) returned: %d (%s)",
-                        static_cast<int>(urlrc),
+                        "curl_easy_setopt(CURLOPT_URL) returned: %d (%s)", static_cast<int>(urlrc),
                         urlrc == CURLE_OK ? "OK" : curl_easy_strerror(urlrc));
 #endif
     if (urlrc != CURLE_OK) {
@@ -321,11 +347,19 @@ rac_result_t validate_and_setup(CURL* curl, const rac_http_request_t* req,
     }
 
     // Redirects.
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION,
-                     req->follow_redirects == RAC_TRUE ? 1L : 0L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, req->follow_redirects == RAC_TRUE ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
 
-    // TLS defaults — use the platform's native certificate store.
+    // TLS defaults — use the platform's native certificate store where
+    // available; on Android the caller must install a CA bundle via
+    // rac_http_client_set_ca_bundle() before the first HTTPS request.
+    {
+        std::lock_guard<std::mutex> lk(g_ca_mutex());
+        const std::string& ca = g_ca_bundle_path();
+        if (!ca.empty()) {
+            curl_easy_setopt(curl, CURLOPT_CAINFO, ca.c_str());
+        }
+    }
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
 
@@ -418,6 +452,19 @@ extern "C" rac_result_t rac_http_request_send(rac_http_client_t* c, const rac_ht
     }
     std::memset(out_resp, 0, sizeof(*out_resp));
 
+    // H2 router: if a platform HTTP transport is registered, delegate
+    // instead of calling libcurl. The adapter owns the request end-to-end
+    // and is responsible for populating `out_resp` with heap-allocated
+    // body/headers/redirected_url that free cleanly via
+    // rac_http_response_free().
+    {
+        const rac_http_transport_ops_t* ops = nullptr;
+        void* ud = nullptr;
+        if (rac_internal::get_http_transport(&ops, &ud) && ops && ops->request_send) {
+            return ops->request_send(ud, req, out_resp);
+        }
+    }
+
     curl_slist_owner hdrs_owner;
     rac_result_t setup = validate_and_setup(c->curl, req, &hdrs_owner);
     if (setup != RAC_SUCCESS) {
@@ -453,14 +500,25 @@ extern "C" rac_result_t rac_http_request_send(rac_http_client_t* c, const rac_ht
     return RAC_SUCCESS;
 }
 
-extern "C" rac_result_t rac_http_request_stream(rac_http_client_t* c,
-                                                const rac_http_request_t* req,
+extern "C" rac_result_t rac_http_request_stream(rac_http_client_t* c, const rac_http_request_t* req,
                                                 rac_http_body_chunk_fn cb, void* user_data,
                                                 rac_http_response_t* out_resp_meta) {
     if (!c || !c->curl || !req || !cb || !out_resp_meta) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
+
+    // H2 router: delegate to the platform transport when it implements
+    // streaming; otherwise fall through to libcurl. Cancellation still
+    // flows via `cb` returning RAC_FALSE (adapters must surface that as
+    // RAC_ERROR_CANCELLED per the contract).
+    {
+        const rac_http_transport_ops_t* ops = nullptr;
+        void* ud = nullptr;
+        if (rac_internal::get_http_transport(&ops, &ud) && ops && ops->request_stream) {
+            return ops->request_stream(ud, req, cb, user_data, out_resp_meta);
+        }
+    }
 
     curl_slist_owner hdrs_owner;
     rac_result_t setup = validate_and_setup(c->curl, req, &hdrs_owner);
@@ -498,8 +556,7 @@ extern "C" rac_result_t rac_http_request_stream(rac_http_client_t* c,
     return RAC_SUCCESS;
 }
 
-extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c,
-                                                const rac_http_request_t* req,
+extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_http_request_t* req,
                                                 uint64_t resume_from_byte,
                                                 rac_http_body_chunk_fn cb, void* user_data,
                                                 rac_http_response_t* out_resp_meta) {
@@ -508,6 +565,17 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c,
     }
     std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
 
+    // H2 router: delegate resume downloads to the platform transport
+    // when supported; otherwise use libcurl's CURLOPT_RESUME_FROM_LARGE
+    // path below.
+    {
+        const rac_http_transport_ops_t* ops = nullptr;
+        void* ud = nullptr;
+        if (rac_internal::get_http_transport(&ops, &ud) && ops && ops->request_resume) {
+            return ops->request_resume(ud, req, resume_from_byte, cb, user_data, out_resp_meta);
+        }
+    }
+
     curl_slist_owner hdrs_owner;
     rac_result_t setup = validate_and_setup(c->curl, req, &hdrs_owner);
     if (setup != RAC_SUCCESS) {
@@ -515,8 +583,7 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c,
     }
 
     // Set Range: bytes=N- via libcurl's native option.
-    curl_easy_setopt(c->curl, CURLOPT_RESUME_FROM_LARGE,
-                     static_cast<curl_off_t>(resume_from_byte));
+    curl_easy_setopt(c->curl, CURLOPT_RESUME_FROM_LARGE, static_cast<curl_off_t>(resume_from_byte));
 
     stream_write_ctx stream_ctx{cb, user_data, 0, 0, false};
     header_capture_ctx hdr_ctx;
@@ -540,6 +607,18 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c,
     }
     if (rc != CURLE_OK) {
         return curlcode_to_rac(rc);
+    }
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_http_client_set_ca_bundle(const char* path) {
+    std::lock_guard<std::mutex> lk(g_ca_mutex());
+    if (path == nullptr || path[0] == '\0') {
+        g_ca_bundle_path().clear();
+        RAC_LOG_INFO(kTag, "CA bundle path cleared");
+    } else {
+        g_ca_bundle_path() = path;
+        RAC_LOG_INFO(kTag, "CA bundle path set: %s", path);
     }
     return RAC_SUCCESS;
 }

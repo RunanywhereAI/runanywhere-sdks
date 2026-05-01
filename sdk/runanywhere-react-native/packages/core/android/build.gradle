@@ -439,4 +439,11 @@ dependencies {
 
     // AndroidX Security for EncryptedSharedPreferences (device identity persistence)
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
+
+    // OkHttp for the platform HTTP transport (v2 close-out Phase H6).
+    // Routes rac_http_request_* through the system trust store + HTTP/2
+    // + proxies + NetworkSecurityConfig instead of libcurl. React Native
+    // pulls OkHttp transitively but does NOT expose it to library modules,
+    // so we declare it explicitly.
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }

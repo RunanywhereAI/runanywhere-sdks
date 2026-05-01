@@ -5,10 +5,12 @@ import android.os.Handler
 import android.os.Looper
 import com.runanywhere.runanywhereai.data.ModelList
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.wireString
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 import ai.runanywhere.proto.v1.SDKEnvironment
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,9 +95,41 @@ class RunAnywhereApplication : Application() {
         super.onTerminate()
     }
 
+    /**
+     * Copies the bundled Mozilla CA bundle out of assets to the app's files
+     * directory and registers it with the native HTTP client. Required on
+     * Android because bundled mbedTLS has no system trust store.
+     *
+     * Safe to call multiple times; skips the copy if the file already exists.
+     */
+    private fun installCaBundle() {
+        try {
+            val caBundleFile = File(filesDir, "cacert.pem")
+            if (!caBundleFile.exists()) {
+                assets.open("cacert.pem").use { input ->
+                    caBundleFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                Timber.i("installCaBundle: copied assets/cacert.pem to ${caBundleFile.absolutePath}")
+            }
+            val rc = RunAnywhereBridge.racHttpClientSetCaBundle(caBundleFile.absolutePath)
+            if (rc == 0) {
+                Timber.i("installCaBundle: registered CA bundle with native HTTP client (rc=0)")
+            } else {
+                Timber.w("installCaBundle: rac_http_client_set_ca_bundle returned rc=$rc")
+            }
+        } catch (e: Throwable) {
+            Timber.e(e, "installCaBundle failed: ${e.message}")
+        }
+    }
+
     private suspend fun initializeSDK() {
         initializationError = null
         Timber.i("🎯 Starting SDK initialization...")
+
+        // Install Mozilla CA bundle BEFORE any HTTPS request. Required on Android
+        // with bundled mbedTLS; no-op on iOS/desktop where platform trust store
+        // is available.
+        installCaBundle()
         Timber.w("=======================================================")
         Timber.w("🔍 BUILD INFO - CHECK THIS FOR ANALYTICS DEBUGGING:")
         Timber.w("   BuildConfig.DEBUG = ${BuildConfig.DEBUG}")

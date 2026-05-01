@@ -86,6 +86,16 @@ object RunAnywhereBridge {
     external fun racIsInitialized(): Boolean
 
     // ========================================================================
+    // TLS CONFIGURATION (rac_http_client.h)
+    // ========================================================================
+    // Required on Android builds that use bundled mbedTLS (no system trust
+    // store). Call before the first HTTPS request — typically from the
+    // Application's onCreate after copying cacert.pem out of assets.
+
+    @JvmStatic
+    external fun racHttpClientSetCaBundle(path: String?): Int
+
+    // ========================================================================
     // PLATFORM ADAPTER (rac_platform_adapter.h)
     // ========================================================================
 
@@ -1443,6 +1453,25 @@ object RunAnywhereBridge {
         listener: NativeDownloadProgressListener?,
         outHttpStatus: IntArray?,
     ): Int
+
+    // ========================================================================
+    // PLATFORM HTTP TRANSPORT (rac_http_transport.h) — v2 close-out Phase H4
+    // ========================================================================
+    //
+    // Registers / unregisters the OkHttp-backed `rac_http_transport_ops`
+    // adapter. When registered, every `rac_http_request_*` call from
+    // native code routes through Kotlin's `OkHttpTransport` instead of
+    // libcurl — so Android consumers get the system CA trust store,
+    // NetworkSecurityConfig, user-CAs, and proxy support for free.
+    //
+    // The C++ side lives in `sdk/runanywhere-commons/src/jni/
+    // okhttp_transport_adapter.cpp`.
+
+    /** Register the OkHttp platform HTTP transport. Returns rac_result_t. */
+    @JvmStatic external fun racHttpTransportRegisterOkHttp(): Int
+
+    /** Unregister the OkHttp transport and fall back to libcurl. Returns rac_result_t. */
+    @JvmStatic external fun racHttpTransportUnregisterOkHttp(): Int
 
     // ========================================================================
     // NATIVE HTTP REQUEST (rac_http_client.h)
