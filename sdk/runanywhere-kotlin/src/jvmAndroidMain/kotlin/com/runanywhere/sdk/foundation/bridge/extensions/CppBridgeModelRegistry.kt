@@ -280,8 +280,9 @@ object CppBridgeModelRegistry {
      * deleting them so the next download attempt starts clean.
      */
     fun scanAndRestoreDownloadedModels() {
+        // Canonical schema: {base}/RunAnywhere/Models/{framework}/{modelId}/
         val baseDir = CppBridgeModelPaths.getBaseDirectory()
-        val modelsDir = File(baseDir, "models")
+        val modelsDir = File(File(baseDir, "RunAnywhere"), "Models")
 
         if (!modelsDir.exists()) {
             log(LogLevel.DEBUG, "Models directory does not exist: ${modelsDir.absolutePath}")
@@ -292,8 +293,24 @@ object CppBridgeModelRegistry {
         var restoredCount = 0
         var purgedCount = 0
 
-        val typeDirectories = listOf("llm", "stt", "tts", "vad", "embedding", "vision", "multimodal", "other")
-        for (dirName in typeDirectories) {
+        // Canonical Swift-aligned schema: {base}/RunAnywhere/Models/{framework}/{modelId}/
+        // Framework raw names mirror `rac_framework_raw_value` in model_paths.cpp.
+        val frameworkDirectories = listOf(
+            "LlamaCpp",
+            "ONNX",
+            "Sherpa",
+            "CoreML",
+            "FoundationModels",
+            "SystemTTS",
+            "FluidAudio",
+            "WhisperKitCoreML",
+            "MetalRT",
+            "Genie",
+            "BuiltIn",
+            "None",
+            "Unknown",
+        )
+        for (dirName in frameworkDirectories) {
             val typeDir = File(modelsDir, dirName)
             if (!typeDir.exists() || !typeDir.isDirectory) continue
 

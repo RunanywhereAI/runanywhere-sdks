@@ -5,8 +5,7 @@ library runanywhere;
 
 // Wave 2: Legacy hand-rolled types DELETED. The proto bindings are the
 // canonical shape; throwables flow through SDKException directly.
-export 'adapters/model_download_adapter.dart'
-    show ModelDownloadService, ModelDownloadProgress, ModelDownloadStage;
+export 'adapters/model_download_adapter.dart' show ModelDownloadService;
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'core/module/runanywhere_module.dart';
 export 'core/types/component_state.dart';
@@ -112,7 +111,7 @@ export 'public/capabilities/runanywhere_voice_agent.dart'
     show RunAnywhereVoiceAgent;
 // Re-export proto types for canonical typing in consumer code (G-A7).
 export 'generated/download_service.pb.dart' show DownloadProgress;
-export 'generated/download_service.pbenum.dart' show DownloadStage;
+export 'generated/download_service.pbenum.dart' show DownloadStage, DownloadState;
 // §15 type-discipline: proto tool_calling types are now the canonical
 // consumer-facing API; the hand-rolled `tool_calling_types.dart` is
 // gone. `RunAnywhereTools.register` takes proto `ToolDefinition`.

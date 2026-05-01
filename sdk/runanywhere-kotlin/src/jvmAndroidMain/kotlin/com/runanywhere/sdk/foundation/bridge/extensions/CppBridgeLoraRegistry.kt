@@ -24,6 +24,13 @@ object CppBridgeLoraRegistry {
         val compatibleModelIds: List<String>,
         val fileSize: Long,
         val defaultScale: Float,
+        /**
+         * Optional lowercase hex SHA-256 checksum of the adapter file.
+         * Parsed from the C++ LoRA registry JSON (`checksum_sha256` key)
+         * and forwarded to the native download runner for integrity
+         * verification.
+         */
+        val checksumSha256: String? = null,
     )
 
     fun register(entry: LoraEntry) {
@@ -76,6 +83,7 @@ object CppBridgeLoraRegistry {
                 compatibleModelIds = modelIds,
                 fileSize = obj.optLong("file_size", 0L),
                 defaultScale = obj.optDouble("default_scale", 0.0).toFloat(),
+                checksumSha256 = obj.optString("checksum_sha256", "").takeIf { it.isNotEmpty() },
             )
         } catch (e: Exception) {
             log(LogLevel.ERROR, "Failed to parse LoRA entry JSON: ${e.message}")

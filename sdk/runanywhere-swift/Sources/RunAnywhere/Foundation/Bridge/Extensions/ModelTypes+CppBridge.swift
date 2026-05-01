@@ -272,8 +272,8 @@ extension DownloadStage {
 // MARK: - DownloadState C++ Conversion
 
 extension DownloadState {
-    /// Initialize from C++ download state and progress
-    init(from cState: rac_download_state_t, cProgress: rac_download_progress_t) {
+    /// Initialize from C++ download state.
+    init(from cState: rac_download_state_t) {
         switch cState {
         case RAC_DOWNLOAD_STATE_PENDING:
             self = .pending
@@ -282,12 +282,11 @@ extension DownloadState {
         case RAC_DOWNLOAD_STATE_EXTRACTING:
             self = .extracting
         case RAC_DOWNLOAD_STATE_RETRYING:
-            self = .retrying(attempt: Int(cProgress.retry_attempt))
+            self = .retrying
         case RAC_DOWNLOAD_STATE_COMPLETED:
             self = .completed
         case RAC_DOWNLOAD_STATE_FAILED:
-            let errorMessage = cProgress.error_message.map { String(cString: $0) } ?? "Download failed"
-            self = .failed(SDKException.download(.downloadFailed, errorMessage))
+            self = .failed
         case RAC_DOWNLOAD_STATE_CANCELLED:
             self = .cancelled
         default:
@@ -301,14 +300,17 @@ extension DownloadState {
 extension DownloadProgress {
     /// Initialize from C++ download progress struct
     init(from cProgress: rac_download_progress_t) {
-        self.init(
-            stage: DownloadStage(from: cProgress.stage),
-            bytesDownloaded: cProgress.bytes_downloaded,
-            totalBytes: cProgress.total_bytes,
-            stageProgress: cProgress.stage_progress,
-            speed: cProgress.speed > 0 ? cProgress.speed : nil,
-            estimatedTimeRemaining: cProgress.estimated_time_remaining >= 0 ? cProgress.estimated_time_remaining : nil,
-            state: DownloadState(from: cProgress.state, cProgress: cProgress)
-        )
+        self.init()
+        self.stage = DownloadStage(from: cProgress.stage)
+        self.state = DownloadState(from: cProgress.state)
+        self.bytesDownloaded = cProgress.bytes_downloaded
+        self.totalBytes = cProgress.total_bytes
+        self.stageProgress = Float(cProgress.stage_progress)
+        self.overallSpeedBps = cProgress.speed > 0 ? Float(cProgress.speed) : 0
+        self.etaSeconds = cProgress.estimated_time_remaining >= 0 ? Int64(cProgress.estimated_time_remaining) : -1
+        self.retryAttempt = cProgress.retry_attempt
+        if let errMsg = cProgress.error_message.map({ String(cString: $0) }) {
+            self.errorMessage = errMsg
+        }
     }
 }

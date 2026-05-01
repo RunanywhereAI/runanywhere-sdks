@@ -22,16 +22,6 @@
 
 #import <Foundation/Foundation.h>
 
-// When the bundled RACommons.xcframework exports
-// rac_http_transport_register (commons >= v0.2.0), compile the full
-// URLSession adapter. Otherwise (older bundled xcframework), compile
-// rn_register_urlsession_transport() as a no-op so the Nitro core still
-// links and HTTP keeps flowing through libcurl via rac_http_request_send.
-//
-// Callers can opt-in explicitly via:
-//   GCC_PREPROCESSOR_DEFINITIONS = "$(inherited) RAC_HAS_HTTP_TRANSPORT=1"
-#ifdef RAC_HAS_HTTP_TRANSPORT
-
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -467,24 +457,3 @@ void rn_unregister_urlsession_transport(void) {
 }
 
 }  // extern "C"
-
-#else  // !RAC_HAS_HTTP_TRANSPORT — stub mode
-
-// -----------------------------------------------------------------------------
-// Stubs: the bundled RACommons.xcframework predates rac_http_transport_register
-// so we cannot install a vtable. The C/Swift call sites keep working; the HTTP
-// path continues to flow through libcurl via rac_http_request_send.
-// -----------------------------------------------------------------------------
-extern "C" {
-
-void rn_register_urlsession_transport(void) {
-    NSLog(@"[URLSessionHttpTransport] stub: bundled RACommons predates transport vtable - using libcurl");
-}
-
-void rn_unregister_urlsession_transport(void) {
-    // no-op in stub mode
-}
-
-}  // extern "C"
-
-#endif  // RAC_HAS_HTTP_TRANSPORT

@@ -189,23 +189,8 @@ class ModelInfo {
   }
 }
 
-/// Download progress state
-enum DownloadState {
-  notStarted,
-  downloading,
-  completed,
-  failed,
-}
-
-/// Download progress info
-class DownloadProgress {
-  final double percentage;
-  final DownloadState state;
-  final String? error;
-
-  const DownloadProgress({
-    this.percentage = 0.0,
-    this.state = DownloadState.notStarted,
-    this.error,
-  });
-}
+// Canonical `DownloadProgress` / `DownloadState` live in the SDK's
+// proto-generated types at `package:runanywhere/generated/download_service.pb.dart`
+// (re-exported from `package:runanywhere/runanywhere.dart`). The legacy
+// hand-rolled duplicates previously in this file were unused and have
+// been deleted as part of Task M8.

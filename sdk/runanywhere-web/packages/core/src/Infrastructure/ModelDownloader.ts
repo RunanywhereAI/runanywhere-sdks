@@ -12,6 +12,7 @@ import { AnalyticsEmitter } from '../services/AnalyticsEmitter';
 import type { OPFSStorage, MetadataMap } from './OPFSStorage';
 import type { LocalFileStorage } from './LocalFileStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
+import { DownloadState } from '@runanywhere/proto-ts/download_service';
 import type { ManagedModel, DownloadProgress } from './ModelRegistry';
 import type { ModelRegistry } from './ModelRegistry';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
@@ -107,13 +108,15 @@ export class ModelDownloader {
         this.registry.updateModel(modelId, { downloadProgress: overallProgress });
         this.emitDownloadProgress({
           modelId,
-          stage: DownloadStage.Downloading,
-          progress: overallProgress,
+          stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+          state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+          stageProgress: overallProgress,
           bytesDownloaded: cumulativeBytesDownloaded,
           totalBytes: cumulativeBytesExpected,
-          currentFile: model.url.split('/').pop(),
-          filesCompleted: 0,
-          filesTotal: totalFiles,
+          overallSpeedBps: 0,
+          etaSeconds: -1,
+          retryAttempt: 0,
+          errorMessage: '',
         });
       };
 
@@ -124,6 +127,15 @@ export class ModelDownloader {
         primarySize = primaryData.length;
       }
       completedFileSizes.push(primarySize);
+
+      // Integrity verification — native SDKs get inline SHA-256 via
+      // `rac_http_download_execute`'s `expected_sha256_hex`; Web bypasses
+      // the WASM HTTP client for HTTPS (browser fetch handles TLS), so we
+      // reproduce the same guarantee by recomputing the hash from the
+      // persisted bytes and deleting + throwing on mismatch.
+      if (model.checksumSha256) {
+        await this.verifyStoredFileSha256(modelId, model.checksumSha256, modelId);
+      }
 
       // Download additional files (e.g., mmproj for VLM)
       if (model.additionalFiles && model.additionalFiles.length > 0) {
@@ -141,13 +153,15 @@ export class ModelDownloader {
             this.registry.updateModel(modelId, { downloadProgress: overallProgress });
             this.emitDownloadProgress({
               modelId,
-              stage: DownloadStage.Downloading,
-              progress: overallProgress,
+              stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+              state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+              stageProgress: overallProgress,
               bytesDownloaded: cumulativeBytesDownloaded,
               totalBytes: cumulativeBytesExpected,
-              currentFile: file.filename,
-              filesCompleted: 1 + i,
-              filesTotal: totalFiles,
+              overallSpeedBps: 0,
+              etaSeconds: -1,
+              retryAttempt: 0,
+              errorMessage: '',
             });
           };
 
@@ -161,6 +175,10 @@ export class ModelDownloader {
             fileSize = streamedSize;
           }
           completedFileSizes.push(fileSize);
+
+          if (file.checksumSha256) {
+            await this.verifyStoredFileSha256(fileKey, file.checksumSha256, modelId);
+          }
         }
       }
 
@@ -169,12 +187,15 @@ export class ModelDownloader {
       // Validating stage
       this.emitDownloadProgress({
         modelId,
-        stage: DownloadStage.Validating,
-        progress: 0.95,
+        stage: DownloadStage.DOWNLOAD_STAGE_VALIDATING,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        stageProgress: 0.95,
         bytesDownloaded: totalSize,
         totalBytes: totalSize,
-        filesCompleted: totalFiles,
-        filesTotal: totalFiles,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
       });
 
       this.registry.updateModel(modelId, {
@@ -186,12 +207,15 @@ export class ModelDownloader {
       // Completed stage
       this.emitDownloadProgress({
         modelId,
-        stage: DownloadStage.Completed,
-        progress: 1,
+        stage: DownloadStage.DOWNLOAD_STAGE_COMPLETED,
+        state: DownloadState.DOWNLOAD_STATE_COMPLETED,
+        stageProgress: 1,
         bytesDownloaded: totalSize,
         totalBytes: totalSize,
-        filesCompleted: totalFiles,
-        filesTotal: totalFiles,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
       });
       EventBus.shared.emit('model.downloadCompleted', SDKEventType.Model, { modelId, sizeBytes: totalSize });
       AnalyticsEmitter.emitModelDownloadCompleted(modelId, totalSize, 0);
@@ -719,14 +743,56 @@ export class ModelDownloader {
     return `${modelId}__${filename}`;
   }
 
+  /**
+   * Recompute SHA-256 of the persisted bytes for `storageKey` and compare
+   * against `expectedHex` (lowercase hex). On mismatch, deletes the stored
+   * file from all backends (OPFS, local FS, memory cache) and throws.
+   *
+   * Matches the `RAC_HTTP_DL_CHECKSUM_FAILED` surface that the native SDKs
+   * get for free via the libcurl write-path check in
+   * `rac_http_download_execute`.
+   */
+  private async verifyStoredFileSha256(
+    storageKey: string,
+    expectedHex: string,
+    modelId: string,
+  ): Promise<void> {
+    const bytes = await this.loadFromOPFS(storageKey);
+    if (!bytes) {
+      throw new Error(
+        `SHA-256 verification requested for "${storageKey}" but no stored bytes were found`,
+      );
+    }
+
+    const digestBuffer = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+    const actualHex = Array.from(new Uint8Array(digestBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const expectedNormalized = expectedHex.toLowerCase();
+    if (actualHex !== expectedNormalized) {
+      logger.warning(
+        `SHA-256 mismatch for "${storageKey}" (modelId=${modelId}): expected=${expectedNormalized}, actual=${actualHex}. Deleting corrupted bytes.`,
+      );
+      await this.deleteFromOPFS(storageKey);
+      throw new Error(
+        `SHA-256 checksum mismatch for "${storageKey}" — expected ${expectedNormalized} but got ${actualHex}`,
+      );
+    }
+
+    logger.debug(
+      `SHA-256 verified for "${storageKey}" (modelId=${modelId}, ${bytes.length} bytes)`,
+    );
+  }
+
   /** Emit a structured download progress event via EventBus */
   private emitDownloadProgress(progress: DownloadProgress): void {
     EventBus.shared.emit('model.downloadProgress', SDKEventType.Model, {
       modelId: progress.modelId,
-      progress: progress.progress,
+      progress: progress.stageProgress,
       bytesDownloaded: progress.bytesDownloaded,
       totalBytes: progress.totalBytes,
-      stage: progress.stage as string | undefined,
+      stage: DownloadStage[progress.stage],
     });
   }
 }

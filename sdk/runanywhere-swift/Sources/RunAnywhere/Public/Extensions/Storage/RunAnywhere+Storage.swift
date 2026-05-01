@@ -123,8 +123,8 @@ public extension RunAnywhere {
     }
 
     /// Get all downloaded models
-    static func getDownloadedModels() -> [InferenceFramework: [String]] {
-        SimplifiedFileManager.shared.getDownloadedModels()
+    static func getDownloadedModels() async -> [InferenceFramework: [String]] {
+        await SimplifiedFileManager.shared.getDownloadedModels()
     }
 
     /// Check if a model is downloaded

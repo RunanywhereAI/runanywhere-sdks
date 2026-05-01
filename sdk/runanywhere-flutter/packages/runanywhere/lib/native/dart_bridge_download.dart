@@ -8,6 +8,44 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
+// ============================================================================
+// C struct — mirrors `rac_download_progress_t` from
+// include/rac/infrastructure/download/rac_download.h
+// ============================================================================
+
+/// Progress snapshot emitted by the C++ download orchestrator.
+final class RacDownloadProgress extends Struct {
+  @Int32()
+  external int stage; // rac_download_stage_t
+  @Int64()
+  external int bytesDownloaded;
+  @Int64()
+  external int totalBytes;
+  @Double()
+  external double stageProgress;
+  @Double()
+  external double overallProgress;
+  @Int32()
+  external int state; // rac_download_state_t
+  @Double()
+  external double speed;
+  @Double()
+  external double estimatedTimeRemaining;
+  @Int32()
+  external int retryAttempt;
+  @Int32()
+  external int errorCode;
+  external Pointer<Utf8> errorMessage;
+}
+
+/// Native progress callback signature — `rac_download_progress_callback_fn`.
+typedef RacDownloadProgressCallbackNative = Void Function(
+    Pointer<RacDownloadProgress>, Pointer<Void>);
+
+/// Native completion callback signature — `rac_download_complete_callback_fn`.
+typedef RacDownloadCompleteCallbackNative = Void Function(
+    Pointer<Utf8>, Int32, Pointer<Utf8>, Pointer<Void>);
+
 /// Download bridge for C++ download operations.
 /// Matches Swift's `CppBridge+Download.swift`.
 class DartBridgeDownload {
@@ -18,6 +56,139 @@ class DartBridgeDownload {
 
   /// Active download tasks
   final Map<String, _DownloadTask> _activeTasks = {};
+
+  // ===========================================================================
+  // Lazy download manager handle (one per process; destroyed at SDK shutdown).
+  // ===========================================================================
+  static Pointer<Void>? _managerHandle;
+
+  /// Lazily create (and cache) the C++ download manager instance.
+  static Pointer<Void> managerHandle() {
+    final cached = _managerHandle;
+    if (cached != null && cached != nullptr) return cached;
+
+    final lib = PlatformLoader.loadCommons();
+    final createFn = lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Pointer<Void>>),
+        int Function(Pointer<Void>,
+            Pointer<Pointer<Void>>)>('rac_download_manager_create');
+
+    final outHandle = calloc<Pointer<Void>>();
+    try {
+      final result = createFn(nullptr, outHandle);
+      if (result != RacResultCode.success) {
+        throw StateError(
+            'rac_download_manager_create failed with code $result');
+      }
+      _managerHandle = outHandle.value;
+      return _managerHandle!;
+    } finally {
+      calloc.free(outHandle);
+    }
+  }
+
+  /// Invoke `rac_download_orchestrate` — C++ drives the entire state machine
+  /// (path resolution, extraction, archive cleanup, registry update).
+  ///
+  /// `progressCallback` is the pointer from a `NativeCallable.listener`, which
+  /// marshals callbacks onto the Dart isolate. `userData` is the Dart port /
+  /// context pointer forwarded verbatim.
+  ///
+  /// Returns the C-owned `task_id` string on success, or `null` on failure.
+  /// The returned pointer must be freed with `rac_free`.
+  static String? orchestrateDownload({
+    required String modelId,
+    required String downloadUrl,
+    required int framework,
+    required int format,
+    required int archiveStructure,
+    required Pointer<NativeFunction<RacDownloadProgressCallbackNative>>
+        progressCallback,
+    required Pointer<NativeFunction<RacDownloadCompleteCallbackNative>>
+        completeCallback,
+    required Pointer<Void> userData,
+  }) {
+    final lib = PlatformLoader.loadCommons();
+    final fn = lib.lookupFunction<
+        Int32 Function(
+            Pointer<Void>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Int32,
+            Int32,
+            Int32,
+            Pointer<NativeFunction<RacDownloadProgressCallbackNative>>,
+            Pointer<NativeFunction<RacDownloadCompleteCallbackNative>>,
+            Pointer<Void>,
+            Pointer<Pointer<Utf8>>),
+        int Function(
+            Pointer<Void>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            int,
+            int,
+            int,
+            Pointer<NativeFunction<RacDownloadProgressCallbackNative>>,
+            Pointer<NativeFunction<RacDownloadCompleteCallbackNative>>,
+            Pointer<Void>,
+            Pointer<Pointer<Utf8>>)>('rac_download_orchestrate');
+
+    final handle = managerHandle();
+    final modelIdPtr = modelId.toNativeUtf8();
+    final urlPtr = downloadUrl.toNativeUtf8();
+    final taskIdPtr = calloc<Pointer<Utf8>>();
+
+    try {
+      final code = fn(
+        handle,
+        modelIdPtr,
+        urlPtr,
+        framework,
+        format,
+        archiveStructure,
+        progressCallback,
+        completeCallback,
+        userData,
+        taskIdPtr,
+      );
+
+      if (code != RacResultCode.success) {
+        _logger.error(
+          'rac_download_orchestrate failed',
+          metadata: {'code': code, 'model': modelId},
+        );
+        return null;
+      }
+      final tid = taskIdPtr.value;
+      return tid == nullptr ? null : tid.toDartString();
+    } finally {
+      calloc.free(modelIdPtr);
+      calloc.free(urlPtr);
+      calloc.free(taskIdPtr);
+    }
+  }
+
+  /// Cancel an in-flight orchestrated download by task id.
+  static bool cancelOrchestratedDownload(String taskId) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<
+          Int32 Function(Pointer<Void>, Pointer<Utf8>),
+          int Function(Pointer<Void>,
+              Pointer<Utf8>)>('rac_download_manager_cancel');
+
+      final handle = managerHandle();
+      final tidPtr = taskId.toNativeUtf8();
+      try {
+        return fn(handle, tidPtr) == RacResultCode.success;
+      } finally {
+        calloc.free(tidPtr);
+      }
+    } catch (e) {
+      _logger.debug('rac_download_manager_cancel not available: $e');
+      return false;
+    }
+  }
 
   /// Start a download via C++
   Future<String?> startDownload({

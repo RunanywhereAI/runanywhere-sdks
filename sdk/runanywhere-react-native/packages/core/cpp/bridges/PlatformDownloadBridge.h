@@ -1,9 +1,17 @@
 /**
  * PlatformDownloadBridge.h
  *
- * C callbacks for platform HTTP download progress/completion reporting.
- * Used by iOS/Android platform adapters to report async download state
- * back into the C++ bridge.
+ * C callbacks for platform HTTP download progress/completion reporting used
+ * by the RACommons platform-adapter HTTP download pipeline. iOS/Android
+ * platform adapters call these from native-side async download delegates to
+ * report progress/completion back to the `platformHttpDownloadCallback`
+ * chain in `InitBridge.cpp`.
+ *
+ * NOTE: The `SyncHttpDownload` C++ wrapper that previously lived here was
+ * the B-RN-3-001 / G-A6 workaround around libcurl HTTPS on Android. It was
+ * removed in Task M5 — `HybridRunAnywhereCore::downloadModel` now goes
+ * straight through `rac_http_download_execute`, which uses the registered
+ * platform HTTP transport (OkHttp / URLSession) wired by Task M1.2.
  */
 
 #ifndef RUNANYWHERE_PLATFORM_DOWNLOAD_BRIDGE_H
@@ -39,36 +47,6 @@ int RunAnywhereHttpDownloadReportComplete(const char* task_id,
 
 #ifdef __cplusplus
 } // extern "C"
-
-#include <atomic>
-#include <functional>
-#include <memory>
-#include <string>
-
-namespace runanywhere::platform {
-
-/**
- * Synchronous HTTP download via the platform adapter (Java HttpURLConnection on
- * Android, NSURLSession on iOS). Blocks until completion or cancel.
- *
- * Used as the canonical RN model-download transport — replaces the C++
- * `rac_http_download_execute` path which is HTTPS-disabled on Android
- * (B-RN-3-001). Returns RAC_SUCCESS or a negative error code matching
- * rac_result_t.
- *
- * @param url HTTPS URL
- * @param destinationPath Local destination path
- * @param onProgress Optional progress callback (downloaded, total)
- * @param cancelFlag Optional shared atomic — set true to cancel mid-download
- * @return 0 on success, negative error code on failure
- */
-int SyncHttpDownload(
-    const std::string& url,
-    const std::string& destinationPath,
-    const std::function<void(int64_t, int64_t)>& onProgress,
-    const std::shared_ptr<std::atomic<bool>>& cancelFlag);
-
-} // namespace runanywhere::platform
 #endif
 
 #endif // RUNANYWHERE_PLATFORM_DOWNLOAD_BRIDGE_H

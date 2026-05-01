@@ -57,6 +57,7 @@
 #include "rac/plugin/rac_primitive.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
@@ -490,6 +491,31 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     std::string msgStr = getCString(env, message);
 
     rac_log(static_cast<rac_log_level_t>(level), tagStr.c_str(), msgStr.c_str());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Model Paths (canonical Swift-aligned schema)
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsSetBaseDir(
+    JNIEnv* env, jclass clazz, jstring baseDir) {
+    std::string baseDirStr = getCString(env, baseDir);
+    rac_result_t result = rac_model_paths_set_base_dir(baseDirStr.c_str());
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetModelFolder(
+    JNIEnv* env, jclass clazz, jstring modelId, jint framework) {
+    std::string modelIdStr = getCString(env, modelId);
+    char buf[2048] = {0};
+    rac_result_t result = rac_model_paths_get_model_folder(
+        modelIdStr.c_str(), static_cast<rac_inference_framework_t>(framework), buf, sizeof(buf));
+    if (result != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
 }
 
 // =============================================================================

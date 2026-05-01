@@ -106,6 +106,29 @@ object RunAnywhereBridge {
     external fun racLog(level: Int, tag: String, message: String)
 
     // ========================================================================
+    // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
+    // Path shape: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/
+    // ========================================================================
+
+    /**
+     * Set the base directory used by C++ path utilities.
+     * Must be called once during SDK init before any model path lookups.
+     */
+    @JvmStatic
+    external fun racModelPathsSetBaseDir(baseDir: String): Int
+
+    /**
+     * Get the model folder path under the canonical schema:
+     * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
+     *
+     * @param modelId Model identifier
+     * @param framework Inference framework int matching RAC_FRAMEWORK_* values
+     * @return The model folder path, or null on error
+     */
+    @JvmStatic
+    external fun racModelPathsGetModelFolder(modelId: String, framework: Int): String?
+
+    // ========================================================================
     // LLM COMPONENT (rac_llm_component.h)
     // ========================================================================
 

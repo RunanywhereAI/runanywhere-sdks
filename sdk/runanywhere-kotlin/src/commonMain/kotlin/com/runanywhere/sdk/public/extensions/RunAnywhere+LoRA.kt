@@ -11,11 +11,11 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import kotlinx.coroutines.flow.Flow
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,6 +127,12 @@ data class LoraAdapterCatalogEntry(
     val compatibleModelIds: List<String>,
     val fileSize: Long = 0,
     val defaultScale: Float = 1.0f,
+    /**
+     * Optional lowercase hex SHA-256 checksum of the adapter file.
+     * When populated, the native download runner verifies the hash
+     * inline and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on mismatch.
+     */
+    val checksumSha256: String? = null,
 )
 
 /**

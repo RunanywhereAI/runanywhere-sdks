@@ -199,18 +199,30 @@ export interface RunAnywhereCore
 
   // ============================================================================
   // Download Service
-  // Backed by rac_http_download_execute (libcurl). Progress is delivered via
-  // the onProgress callback and cancellation is keyed on `cancelToken`.
+  // Backed by `rac_download_orchestrate` (commons) which routes through the
+  // platform HTTP transport registered by the RN core (OkHttp on Android,
+  // URLSession on iOS). Progress is delivered as a JSON-serialized
+  // `runanywhere.v1.DownloadProgress` message (field names match the proto
+  // camelCase spelling — `DownloadProgress.fromJSON(JSON.parse(json))` from
+  // `@runanywhere/proto-ts/download_service` decodes it in one step).
+  // Cancellation is keyed on `cancelToken`.
   // ============================================================================
 
   /**
-   * Download a file to `destPath` using the native libcurl-backed runner.
+   * Download a file to `destPath` using the commons download orchestrator.
    *
    * @param url Absolute HTTP/HTTPS URL to download
    * @param destPath Destination file path
    * @param cancelToken Opaque token the caller uses to cancel via cancelDownload
-   * @param onProgress Progress callback — (bytesWritten, totalBytes) =>
-   *   void. `totalBytes` is 0 when the server omitted Content-Length.
+   * @param onProgress Progress callback — receives a JSON string encoding a
+   *   `runanywhere.v1.DownloadProgress` message with all 10 fields
+   *   (modelId, stage, bytesDownloaded, totalBytes, stageProgress,
+   *   overallSpeedBps, etaSeconds, state, retryAttempt, errorMessage).
+   *   Parse with `DownloadProgress.fromJSON(JSON.parse(progressJson))`.
+   * @param expectedSha256Hex Optional lowercase hex SHA-256 checksum of
+   *   the downloaded bytes. When provided, the native runner verifies the
+   *   hash inline and rejects the promise with a
+   *   `RAC_HTTP_DL_CHECKSUM_FAILED` error on mismatch.
    * @returns Resolves when the file is fully written; rejects on error /
    *   cancellation.
    */
@@ -218,7 +230,8 @@ export interface RunAnywhereCore
     url: string,
     destPath: string,
     cancelToken: string,
-    onProgress: (bytesWritten: number, totalBytes: number) => void
+    onProgress: (progressJson: string) => void,
+    expectedSha256Hex?: string
   ): Promise<void>;
 
   /**

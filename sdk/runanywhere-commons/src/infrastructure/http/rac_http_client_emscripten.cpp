@@ -496,17 +496,61 @@ struct rac_http_client {
 };
 
 // =============================================================================
-// Public API (back-compat with B03).
+// Public API — routes through the platform transport registry so the
+// JS-side trampolines installed via `rac_http_transport_register_from_js`
+// take precedence over the built-in emscripten_fetch fallback.
 //
-// On WASM builds libcurl is skipped entirely (see CMakeLists.txt), so
-// these symbols MUST still be provided by this TU for linkers that
-// resolve the `rac_http_request_*` family against it directly. When
-// the JS side has called `rac_http_transport_register_emscripten()`,
-// the transport registry is populated but the lookup only fires from
-// `rac_http_client_curl.cpp` — which isn't compiled on WASM. Keeping
-// direct implementations here preserves B03's behaviour for existing
-// callers while the new vtable-registration symbol is additive.
+// Parity with `rac_http_client_default.cpp` (non-WASM targets): the
+// public entry points consult `rac_internal::get_http_transport()`. On
+// WASM the emscripten_fetch adapter is registered eagerly (see
+// `ra_commons_install_default_transport()` below), so even when the JS
+// layer never calls `rac_http_transport_register_from_js`, requests
+// still resolve through the emscripten_fetch vtable rather than failing
+// with RAC_ERROR_FEATURE_NOT_AVAILABLE.
 // =============================================================================
+
+namespace rac_internal {
+bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_user_data);
+}
+
+namespace {
+
+rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* out_resp) {
+    const rac_http_transport_ops_t* ops = nullptr;
+    void* ud = nullptr;
+    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
+        ops->request_send == nullptr) {
+        return emscripten_request_send(/*user_data=*/nullptr, req, out_resp);
+    }
+    return ops->request_send(ud, req, out_resp);
+}
+
+rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
+                             void* user_data, rac_http_response_t* out_resp_meta) {
+    const rac_http_transport_ops_t* ops = nullptr;
+    void* ud = nullptr;
+    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
+        ops->request_stream == nullptr) {
+        return emscripten_request_stream(/*user_data=*/nullptr, req, cb, user_data,
+                                         out_resp_meta);
+    }
+    return ops->request_stream(ud, req, cb, user_data, out_resp_meta);
+}
+
+rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
+                             rac_http_body_chunk_fn cb, void* user_data,
+                             rac_http_response_t* out_resp_meta) {
+    const rac_http_transport_ops_t* ops = nullptr;
+    void* ud = nullptr;
+    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
+        ops->request_resume == nullptr) {
+        return emscripten_request_resume(/*user_data=*/nullptr, req, resume_from_byte, cb,
+                                         user_data, out_resp_meta);
+    }
+    return ops->request_resume(ud, req, resume_from_byte, cb, user_data, out_resp_meta);
+}
+
+}  // namespace
 
 extern "C" rac_result_t rac_http_client_create(rac_http_client_t** out) {
     if (!out) {
@@ -531,7 +575,8 @@ extern "C" rac_result_t rac_http_request_send(rac_http_client_t* c, const rac_ht
     if (!c || !req || !out_resp) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    return emscripten_request_send(/*user_data=*/nullptr, req, out_resp);
+    std::memset(out_resp, 0, sizeof(*out_resp));
+    return dispatch_send(req, out_resp);
 }
 
 extern "C" rac_result_t rac_http_request_stream(rac_http_client_t* c, const rac_http_request_t* req,
@@ -540,7 +585,8 @@ extern "C" rac_result_t rac_http_request_stream(rac_http_client_t* c, const rac_
     if (!c || !req || !cb || !out_resp_meta) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    return emscripten_request_stream(/*user_data=*/nullptr, req, cb, user_data, out_resp_meta);
+    std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
+    return dispatch_stream(req, cb, user_data, out_resp_meta);
 }
 
 extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_http_request_t* req,
@@ -550,8 +596,8 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_
     if (!c || !req || !cb || !out_resp_meta) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    return emscripten_request_resume(/*user_data=*/nullptr, req, resume_from_byte, cb, user_data,
-                                     out_resp_meta);
+    std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
+    return dispatch_resume(req, resume_from_byte, cb, user_data, out_resp_meta);
 }
 
 extern "C" void rac_http_response_free(rac_http_response_t* resp) {

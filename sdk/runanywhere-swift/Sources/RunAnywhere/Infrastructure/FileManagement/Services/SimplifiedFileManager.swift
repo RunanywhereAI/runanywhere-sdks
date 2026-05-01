@@ -76,44 +76,20 @@ public class SimplifiedFileManager {
 
     // MARK: - Model Discovery
 
-    /// Get all downloaded models organized by framework
-    /// Returns: Dictionary of [framework: [modelId]]
-    public func getDownloadedModels() -> [InferenceFramework: [String]] {
+    /// Get all downloaded models organized by framework.
+    /// Syncs the registry from disk via the C++ bridge, then groups the
+    /// registered models by framework — C++ owns the filesystem walk.
+    public func getDownloadedModels() async -> [InferenceFramework: [String]] {
+        _ = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+
+        let models = await CppBridge.ModelRegistry.shared.getByFrameworks(
+            InferenceFramework.knownCases
+        )
+
         var result: [InferenceFramework: [String]] = [:]
-
-        guard let modelsURL = try? CppBridge.ModelPaths.getModelsDirectory(),
-              let contents = try? FileManager.default.contentsOfDirectory(at: modelsURL, includingPropertiesForKeys: [.isDirectoryKey]) else {
-            return result
+        for model in models {
+            result[model.framework, default: []].append(model.id)
         }
-
-        for frameworkFolder in contents {
-            // Check if it's a known framework folder
-            guard let framework = InferenceFramework.knownCases.first(where: { $0.wireString == frameworkFolder.lastPathComponent }),
-                  isDirectory(at: frameworkFolder) else {
-                continue
-            }
-
-            // Get model folders within this framework
-            let dirContents = try? FileManager.default.contentsOfDirectory(
-                at: frameworkFolder,
-                includingPropertiesForKeys: [.isDirectoryKey]
-            )
-            guard let modelFolders = dirContents else {
-                continue
-            }
-
-            var modelIds: [String] = []
-            for modelFolder in modelFolders {
-                if isDirectory(at: modelFolder) && folderExistsAndHasContents(at: modelFolder) {
-                    modelIds.append(modelFolder.lastPathComponent)
-                }
-            }
-
-            if !modelIds.isEmpty {
-                result[framework] = modelIds
-            }
-        }
-
         return result
     }
 
@@ -181,20 +157,6 @@ public class SimplifiedFileManager {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
         }
         return try Folder(path: url.path)
-    }
-
-    private func isDirectory(at url: URL) -> Bool {
-        var isDir: ObjCBool = false
-        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
-    }
-
-    private func folderExistsAndHasContents(at url: URL) -> Bool {
-        guard isDirectory(at: url),
-              let contents = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil),
-              !contents.isEmpty else {
-            return false
-        }
-        return true
     }
 }
 

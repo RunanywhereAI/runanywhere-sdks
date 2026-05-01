@@ -15,7 +15,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ArchiveStructure
 import com.runanywhere.sdk.public.extensions.Models.ArchiveType
-import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
+import ai.runanywhere.proto.v1.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.ModelArtifactType
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor

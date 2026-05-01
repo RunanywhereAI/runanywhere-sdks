@@ -177,24 +177,23 @@ public actor HTTPClientAdapter: NetworkService {
     }
 
     private func resolveToken(requiresAuth: Bool) async throws -> String {
-        if requiresAuth {
-            // Prefer OAuth token from C++ auth state.
-            if let token = CppBridge.State.accessToken, !CppBridge.State.tokenNeedsRefresh {
-                return token
-            }
-            if CppBridge.State.refreshToken != nil {
-                try await CppBridge.Auth.refreshToken()
-                if let token = CppBridge.State.accessToken {
-                    return token
-                }
-            }
-            // Fall back to API-key-only auth (production mode).
-            if let key = apiKey, !key.isEmpty {
-                return key
-            }
-            throw SDKException.authentication(.authenticationFailed, "No valid authentication token")
+        if !requiresAuth { return apiKey ?? "" }
+
+        // `rac_auth_get_valid_token` encodes the "valid → return /
+        // expired → signal refresh" handshake in one call.
+        var tokenPtr: UnsafePointer<CChar>?
+        var needsRefresh = false
+        var status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
+        if status == 1 || needsRefresh {
+            try await CppBridge.Auth.refreshToken()
+            status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
-        return apiKey ?? ""
+        if status == 0, let ptr = tokenPtr {
+            return String(cString: ptr)
+        }
+        // Fall back to API-key-only auth (production mode).
+        if let key = apiKey, !key.isEmpty { return key }
+        throw SDKException.authentication(.authenticationFailed, "No valid authentication token")
     }
 
     private func buildURL(base: URL, path: String) -> URL {

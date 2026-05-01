@@ -357,6 +357,13 @@ data class ModelFileDescriptor(
     val filename: String,
     /** Whether this file is required for the model to work */
     val isRequired: Boolean = true,
+    /**
+     * Optional lowercase hex SHA-256 checksum of the downloaded bytes.
+     * When populated, the native download runner verifies the hash
+     * inline on the write path and fails with `RAC_HTTP_DL_CHECKSUM_FAILED`
+     * if the bytes do not match.
+     */
+    val checksumSha256: String? = null,
 ) {
     /** Legacy compatibility */
     val relativePath: String get() = url.substringAfterLast('/').substringBefore('?')
@@ -465,6 +472,13 @@ data class ModelInfo(
     val thinkingPattern: ThinkingTagPattern? = null,
     // Optional metadata
     val description: String? = null,
+    /**
+     * Optional lowercase hex SHA-256 checksum of the downloaded artifact.
+     * Populated from the provider manifest (or `ModelFileDescriptor.checksumSha256`
+     * for multi-file models) and forwarded to the native download runner
+     * for inline integrity verification.
+     */
+    val checksumSha256: String? = null,
     // Tracking fields
     val source: ModelSource = ModelSource.REMOTE,
     val createdAt: Long = System.currentTimeMillis(),
@@ -494,35 +508,8 @@ data class ModelInfo(
 }
 
 // MARK: - Download Progress
-
-/**
- * Progress information for model downloads.
- */
-@Serializable
-data class DownloadProgress(
-    /** Model ID being downloaded */
-    val modelId: String,
-    /** Progress percentage (0.0 to 1.0) */
-    val progress: Float,
-    /** Bytes downloaded so far */
-    val bytesDownloaded: Long,
-    /** Total bytes to download (null if unknown) */
-    val totalBytes: Long?,
-    /** Download state */
-    val state: DownloadState,
-    /** Error message if state is ERROR */
-    val error: String? = null,
-)
-
-/**
- * State of a model download.
- */
-@Serializable
-enum class DownloadState {
-    PENDING,
-    DOWNLOADING,
-    EXTRACTING,
-    COMPLETED,
-    ERROR,
-    CANCELLED,
-}
+//
+// Canonical `DownloadProgress`, `DownloadStage`, `DownloadState` are now
+// proto-generated in `ai.runanywhere.proto.v1` (see
+// `idl/download_service.proto`). This file previously held hand-rolled
+// duplicates; import the proto types directly instead.

@@ -8,10 +8,17 @@
 
 import { EventBus } from '../Foundation/EventBus';
 import { ModelCategory, LLMFramework, ModelStatus, SDKEventType } from '../types/enums';
-import type { DownloadStage } from '../types/enums';
+import { DownloadProgress as ProtoDownloadProgress } from '@runanywhere/proto-ts/download_service';
 
 // Re-export SDK enums for convenience (consumers can import from either location)
 export { ModelCategory, LLMFramework, ModelStatus };
+
+/**
+ * Canonical `DownloadProgress` is now the proto-generated message
+ * (`runanywhere.v1.DownloadProgress` from `idl/download_service.proto`).
+ * Re-exported under the historical name for consumer ergonomics.
+ */
+export type DownloadProgress = ProtoDownloadProgress;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,6 +35,12 @@ export interface ModelFileDescriptor {
   filename: string;
   /** Optional: size in bytes (for progress estimation) */
   sizeBytes?: number;
+  /**
+   * Optional lowercase hex SHA-256 checksum of the downloaded bytes.
+   * When populated, the downloader verifies the hash after download
+   * and deletes the stored bytes on mismatch.
+   */
+  checksumSha256?: string;
 }
 
 /**
@@ -49,6 +62,16 @@ export interface ManagedModel {
   downloadProgress?: number;
   error?: string;
   sizeBytes?: number;
+
+  /**
+   * Optional lowercase hex SHA-256 checksum of the primary downloaded file.
+   * When populated, the downloader recomputes the hash after download via
+   * `crypto.subtle.digest` and deletes the stored bytes + throws if the
+   * hash does not match. This gives Web the same integrity guarantee
+   * that the native SDKs get via `rac_http_download_execute`'s inline
+   * `expected_sha256_hex` check.
+   */
+  checksumSha256?: string;
 
   /**
    * For multi-file models: additional files to download.
@@ -79,22 +102,6 @@ export interface ManagedModel {
    * on regex-on-id pattern matching.
    */
   requiresCPU?: boolean;
-}
-
-/** Structured download progress with stage information. */
-export interface DownloadProgress {
-  modelId: string;
-  stage: DownloadStage;
-  /** Overall progress 0-1 */
-  progress: number;
-  bytesDownloaded: number;
-  totalBytes: number;
-  /** Filename currently being downloaded (for multi-file models) */
-  currentFile?: string;
-  /** Number of files completed so far */
-  filesCompleted?: number;
-  /** Total number of files to download */
-  filesTotal?: number;
 }
 
 export type ModelChangeCallback = (models: ManagedModel[]) => void;

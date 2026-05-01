@@ -7,11 +7,25 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Download.swift
  */
 
+import {
+  DownloadProgress,
+  DownloadState,
+} from '@runanywhere/proto-ts/download_service';
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { EventBus } from '../Public/Events';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('DownloadService');
+
+/**
+ * Re-export the canonical proto types so consumers have a single import
+ * surface. `DownloadProgress` is the 10-field
+ * `runanywhere.v1.DownloadProgress` message; `DownloadState` is the matching
+ * enum. Field names are proto-ts camelCase (`bytesDownloaded`,
+ * `stageProgress`, etc.).
+ */
+export { DownloadProgress, DownloadState } from '@runanywhere/proto-ts/download_service';
+export { DownloadStage } from '@runanywhere/proto-ts/download_service';
 
 /**
  * Extended native module type for download service methods
@@ -28,32 +42,6 @@ interface DownloadNativeModule {
   isDownloadServiceHealthy?: () => Promise<boolean>;
   cancelDownload: (taskId: string) => Promise<boolean>;
   getDownloadProgress: (modelId: string) => Promise<string>;
-}
-
-/**
- * Download state
- */
-export enum DownloadState {
-  Idle = 'idle',
-  Queued = 'queued',
-  Downloading = 'downloading',
-  Paused = 'paused',
-  Completed = 'completed',
-  Failed = 'failed',
-  Cancelled = 'cancelled',
-}
-
-/**
- * Download progress information
- */
-export interface DownloadProgress {
-  taskId: string;
-  modelId: string;
-  bytesDownloaded: number;
-  totalBytes: number;
-  progress: number;
-  state: DownloadState;
-  error?: string;
 }
 
 /**
@@ -78,7 +66,8 @@ export interface DownloadConfiguration {
 }
 
 /**
- * Progress callback type
+ * Progress callback type — receives the full 10-field proto
+ * `runanywhere.v1.DownloadProgress` message.
  */
 export type ProgressCallback = (progress: DownloadProgress) => void;
 
@@ -111,15 +100,22 @@ class DownloadServiceImpl {
     let unsubscribe: (() => void) | null = null;
     if (onProgress) {
       unsubscribe = EventBus.onModel((event) => {
-        if (event.type === 'downloadProgress' && 'modelId' in event && event.modelId === modelId) {
-          onProgress({
-            taskId: (event as { taskId?: string }).taskId ?? taskId,
+        if (
+          event.type === 'downloadProgress' &&
+          'modelId' in event &&
+          event.modelId === modelId
+        ) {
+          const payload = event as Record<string, unknown>;
+          const progress = DownloadProgress.fromPartial({
             modelId,
-            bytesDownloaded: (event as { bytesDownloaded?: number }).bytesDownloaded ?? 0,
-            totalBytes: (event as { totalBytes?: number }).totalBytes ?? 0,
-            progress: (event as { progress?: number }).progress ?? 0,
-            state: DownloadState.Downloading,
+            bytesDownloaded:
+              typeof payload.bytesDownloaded === 'number' ? payload.bytesDownloaded : 0,
+            totalBytes: typeof payload.totalBytes === 'number' ? payload.totalBytes : 0,
+            stageProgress:
+              typeof payload.progress === 'number' ? payload.progress : 0,
+            state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
           });
+          onProgress(progress);
         }
       });
     }
@@ -261,7 +257,10 @@ class DownloadServiceImpl {
    */
   isDownloading(modelId: string): boolean {
     for (const task of this.activeTasks.values()) {
-      if (task.modelId === modelId && task.state === DownloadState.Downloading) {
+      if (
+        task.modelId === modelId &&
+        task.state === DownloadState.DOWNLOAD_STATE_DOWNLOADING
+      ) {
         return true;
       }
     }

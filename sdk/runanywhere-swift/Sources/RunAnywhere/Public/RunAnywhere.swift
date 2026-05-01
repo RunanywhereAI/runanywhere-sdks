@@ -132,7 +132,7 @@ public enum RunAnywhere {
     /// Check if currently authenticated
     /// - Returns: true if authenticated with valid token
     public static var isAuthenticated: Bool {
-        CppBridge.State.isAuthenticated
+        CppBridge.Auth.isAuthenticated
     }
 
     /// Check if device is registered with backend

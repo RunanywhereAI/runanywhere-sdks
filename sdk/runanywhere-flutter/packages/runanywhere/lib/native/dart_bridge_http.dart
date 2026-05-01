@@ -167,7 +167,6 @@ class DartBridgeHTTP {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-    bool isRetry = false,
   }) async {
     if (!_isConfigured || _baseURL == null) {
       return HTTPResult.failure('HTTP not configured');
@@ -212,31 +211,10 @@ class DartBridgeHTTP {
             (timeout ?? const Duration(seconds: 30)).inMilliseconds,
       );
 
-      if (response.statusCode == 401 && requiresAuth && !isRetry) {
-        _logger.debug('Received 401, attempting token refresh and retry...');
-
-        final authBridge = DartBridgeAuth.instance;
-        final refreshResult = await authBridge.refreshToken();
-
-        if (refreshResult.isSuccess) {
-          final newToken = authBridge.getAccessToken();
-          if (newToken != null) {
-            _accessToken = newToken;
-            _logger.info('Token refreshed, retrying request...');
-            return _request(
-              method: method,
-              endpoint: endpoint,
-              body: body,
-              headers: headers,
-              requiresAuth: requiresAuth,
-              timeout: timeout,
-              isRetry: true,
-            );
-          }
-        } else {
-          _logger.warning('Token refresh failed: ${refreshResult.error}');
-        }
-      }
+      // 401-retry is owned by the C++ `auth_manager` — no Dart-side
+      // refresh loop. Let the bearer token go stale and surface 401
+      // to the caller; callers that care about refresh invoke
+      // `DartBridgeAuth.refreshToken` directly.
 
       if (response.isSuccess) {
         return HTTPResult.success(

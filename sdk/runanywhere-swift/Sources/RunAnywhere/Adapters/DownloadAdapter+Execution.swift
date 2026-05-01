@@ -282,6 +282,7 @@ private func downloadProgressTrampoline(
 
     let scaledProgress = state.progressOffset + (fraction * state.progressScale)
     let progress = DownloadProgress(
+        modelId: state.modelId,
         stage: .downloading,
         bytesDownloaded: completed,
         totalBytes: effectiveTotal,

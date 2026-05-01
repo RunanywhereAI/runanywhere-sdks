@@ -124,6 +124,15 @@ export interface ModelInfo {
 
   /** Whether the model is available for use */
   isAvailable: boolean;
+
+  /**
+   * Optional lowercase hex SHA-256 checksum of the downloaded artifact.
+   * When populated, forwarded to the native `rac_http_download_execute`
+   * call via `expected_sha256_hex` so the libcurl write path verifies
+   * the hash inline and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on
+   * mismatch. Matches the Swift/Kotlin/Flutter contract.
+   */
+  checksumSha256?: string;
 }
 
 // ============================================================================

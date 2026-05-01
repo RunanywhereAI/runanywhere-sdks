@@ -87,6 +87,12 @@ const MODELS_DIR = 'Models';
 export interface ModelFileDescriptor {
   url: string;
   filename: string;
+  /**
+   * Optional lowercase hex SHA-256 checksum of the downloaded bytes.
+   * When populated, forwarded to `rac_http_download_execute` for inline
+   * integrity verification.
+   */
+  checksumSha256?: string;
 }
 
 /**
@@ -111,10 +117,11 @@ export const MultiFileModelCache = {
 };
 
 /**
- * Download progress information (still re-exported because
- * services/index.ts and upstream packages depend on the type shape).
+ * Raw byte-counter for file-system downloads (distinct from
+ * `runanywhere.v1.DownloadProgress` which is the model-download proto
+ * message). This type tracks a single HTTP transfer's progress.
  */
-export interface DownloadProgress {
+export interface FileByteProgress {
   bytesWritten: number;
   contentLength: number;
   progress: number;

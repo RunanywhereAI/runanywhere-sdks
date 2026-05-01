@@ -20,12 +20,12 @@ extension CppBridge {
 
         // MARK: - Complete Auth Flow
 
-        /// Authenticate with backend
+        /// Authenticate with backend.
+        /// C++ parses the response JSON, updates internal auth state, and
+        /// (when secure-storage callbacks are registered) persists tokens.
         /// - Parameter apiKey: API key for authentication
-        /// - Returns: Authentication response
         /// - Throws: SDKException on failure
-        @discardableResult
-        public static func authenticate(apiKey: String) async throws -> AuthenticationResponse {
+        public static func authenticate(apiKey: String) async throws {
             let deviceId = DeviceIdentity.persistentUUID
 
             // 1. Build request JSON via C++
@@ -47,48 +47,27 @@ extension CppBridge {
                 requiresAuth: false
             )
 
-            // 3. Parse response via Codable
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let response = try decoder.decode(AuthenticationResponse.self, from: responseData)
-
-            // 4. Store in C++ state
-            // Use our device ID if API doesn't return one (API deviceId is optional)
-            let effectiveDeviceId = response.deviceId ?? deviceId
-            let expiresAt = Date().addingTimeInterval(TimeInterval(response.expiresIn))
-            State.setAuth(
-                accessToken: response.accessToken,
-                refreshToken: response.refreshToken,
-                expiresAt: expiresAt,
-                userId: response.userId,
-                organizationId: response.organizationId,
-                deviceId: effectiveDeviceId
+            // 3. Hand raw JSON to C++: parse, update in-memory auth state,
+            //    and (with secure-storage wired) persist — one atomic call.
+            try handleAuthResponse(
+                responseData,
+                handler: rac_auth_handle_authenticate_response,
+                successMessage: "Authentication successful"
             )
-
-            // 5. Store in Keychain
-            try storeTokensInKeychain(response, deviceId: effectiveDeviceId)
-
-            logger.info("Authentication successful")
-            return response
         }
 
-        /// Refresh access token
-        /// - Returns: New access token
+        /// Refresh access token.
+        /// C++ parses the response JSON and updates internal auth state
+        /// atomically.
         /// - Throws: SDKException on failure
-        @discardableResult
-        public static func refreshToken() async throws -> String {
-            guard let refreshToken = State.refreshToken else {
+        public static func refreshToken() async throws {
+            // 1. Build refresh request JSON via C++ (reads refresh_token
+            //    and device_id from C++ auth state).
+            guard let jsonPtr = rac_auth_build_refresh_request() else {
                 throw SDKException.authentication(.invalidApiKey, "No refresh token")
             }
-
-            guard let deviceId = State.deviceId else {
-                throw SDKException.authentication(.authenticationFailed, "No device ID")
-            }
-
-            // 1. Build refresh request JSON via C++
-            guard let json = buildRefreshRequestJSON(deviceId: deviceId, refreshToken: refreshToken) else {
-                throw SDKException.general(.validationFailed, "Failed to build refresh request")
-            }
+            let json = String(cString: jsonPtr)
+            free(jsonPtr)
 
             logger.debug("Refreshing access token...")
 
@@ -99,54 +78,21 @@ extension CppBridge {
                 requiresAuth: false
             )
 
-            // 3. Parse response
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let response = try decoder.decode(AuthenticationResponse.self, from: responseData)
-
-            // 4. Store in C++ state
-            // Use our device ID if API doesn't return one (API deviceId is optional)
-            let effectiveDeviceId = response.deviceId ?? deviceId
-            let expiresAt = Date().addingTimeInterval(TimeInterval(response.expiresIn))
-            State.setAuth(
-                accessToken: response.accessToken,
-                refreshToken: response.refreshToken,
-                expiresAt: expiresAt,
-                userId: response.userId,
-                organizationId: response.organizationId,
-                deviceId: effectiveDeviceId
+            // 3. Hand raw JSON to C++: parse + state update + persist.
+            try handleAuthResponse(
+                responseData,
+                handler: rac_auth_handle_refresh_response,
+                successMessage: "Token refresh successful"
             )
-
-            // 5. Store in Keychain
-            try storeTokensInKeychain(response, deviceId: effectiveDeviceId)
-
-            logger.info("Token refresh successful")
-            return response.accessToken
-        }
-
-        /// Get valid access token (refresh if needed)
-        /// - Returns: Valid access token
-        /// - Throws: SDKException if no valid token available
-        public static func getAccessToken() async throws -> String {
-            // Check if current token is valid
-            if let token = State.accessToken, !State.tokenNeedsRefresh {
-                return token
-            }
-
-            // Try to refresh
-            if State.refreshToken != nil {
-                return try await refreshToken()
-            }
-
-            throw SDKException.authentication(.authenticationFailed, "No valid token")
         }
 
         /// Clear authentication state
         public static func clearAuth() throws {
-            // Clear C++ state
-            State.clearAuth()
+            // Clear C++ auth-manager state (no-op on secure storage unless
+            // callbacks are registered).
+            rac_auth_clear()
 
-            // Clear Keychain
+            // Clear Keychain (Swift owns the persistence side here).
             try KeychainManager.shared.delete(for: "com.runanywhere.sdk.accessToken")
             try KeychainManager.shared.delete(for: "com.runanywhere.sdk.refreshToken")
             try KeychainManager.shared.delete(for: "com.runanywhere.sdk.deviceId")
@@ -158,19 +104,38 @@ extension CppBridge {
 
         /// Check if currently authenticated
         public static var isAuthenticated: Bool {
-            State.isAuthenticated
+            rac_auth_is_authenticated()
         }
 
-        // MARK: - Keychain Storage
+        // MARK: - Shared response handling
 
-        private static func storeTokensInKeychain(_ response: AuthenticationResponse, deviceId: String) throws {
-            try KeychainManager.shared.store(response.accessToken, for: "com.runanywhere.sdk.accessToken")
-            try KeychainManager.shared.store(response.refreshToken, for: "com.runanywhere.sdk.refreshToken")
-            try KeychainManager.shared.store(deviceId, for: "com.runanywhere.sdk.deviceId")
-            if let userId = response.userId {
-                try KeychainManager.shared.store(userId, for: "com.runanywhere.sdk.userId")
+        /// Feed a raw JSON response body through a C++ auth response handler.
+        /// Throws if the handler reports a parse/state error.
+        private static func handleAuthResponse(
+            _ data: Data,
+            handler: (UnsafePointer<CChar>?) -> Int32,
+            successMessage: String
+        ) throws {
+            let status: Int32 = data.withUnsafeBytes { raw -> Int32 in
+                guard let base = raw.baseAddress?.assumingMemoryBound(to: CChar.self) else {
+                    return -1
+                }
+                // The HTTP body is raw JSON — null-terminate via a local copy
+                // so we can pass a C string to the handler.
+                let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: data.count + 1)
+                defer { buffer.deallocate() }
+                buffer.update(from: base, count: data.count)
+                buffer[data.count] = 0
+                return handler(UnsafePointer(buffer))
             }
-            try KeychainManager.shared.store(response.organizationId, for: "com.runanywhere.sdk.organizationId")
+
+            guard status == 0 else {
+                throw SDKException.authentication(
+                    .authenticationFailed,
+                    "Failed to parse auth response (status=\(status))"
+                )
+            }
+            logger.info("\(successMessage)")
         }
 
         // MARK: - JSON Building (existing methods)

@@ -50,7 +50,7 @@ Pod::Spec.new do |s|
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64-simulator/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
     ].join(" "),
-    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1",
+    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1 RAC_HAS_HTTP_TRANSPORT=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
   }

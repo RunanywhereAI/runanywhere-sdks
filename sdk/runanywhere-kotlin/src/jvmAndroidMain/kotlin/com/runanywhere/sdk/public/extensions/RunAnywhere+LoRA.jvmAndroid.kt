@@ -7,6 +7,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.DownloadStage
+import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
@@ -19,8 +22,6 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
-import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -135,6 +136,7 @@ actual fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry) {
             compatibleModelIds = entry.compatibleModelIds,
             fileSize = entry.fileSize,
             defaultScale = entry.defaultScale,
+            checksumSha256 = entry.checksumSha256,
         ),
     )
 }
@@ -159,6 +161,7 @@ private fun CppBridgeLoraRegistry.LoraEntry.toCatalogEntry() =
         compatibleModelIds = compatibleModelIds,
         fileSize = fileSize,
         defaultScale = defaultScale,
+        checksumSha256 = checksumSha256,
     )
 
 // MARK: - LoRA Adapter Downloads
@@ -205,11 +208,12 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
             loraLogger.info("LoRA adapter already downloaded: ${destFile.absolutePath}")
             trySend(
                 DownloadProgress(
-                    modelId = adapterId,
-                    progress = 1f,
-                    bytesDownloaded = destFile.length(),
-                    totalBytes = destFile.length(),
-                    state = DownloadState.COMPLETED,
+                    model_id = adapterId,
+                    stage = DownloadStage.DOWNLOAD_STAGE_COMPLETED,
+                    bytes_downloaded = destFile.length(),
+                    total_bytes = destFile.length(),
+                    stage_progress = 1f,
+                    state = DownloadState.DOWNLOAD_STATE_COMPLETED,
                 ),
             )
             close()
@@ -218,11 +222,12 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
 
         trySend(
             DownloadProgress(
-                modelId = adapterId,
-                progress = 0f,
-                bytesDownloaded = 0,
-                totalBytes = entry.fileSize,
-                state = DownloadState.PENDING,
+                model_id = adapterId,
+                stage = DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+                bytes_downloaded = 0,
+                total_bytes = entry.fileSize,
+                stage_progress = 0f,
+                state = DownloadState.DOWNLOAD_STATE_PENDING,
             ),
         )
 
@@ -245,11 +250,12 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
                     }
                 trySend(
                     DownloadProgress(
-                        modelId = adapterId,
-                        progress = progress,
-                        bytesDownloaded = bytes,
-                        totalBytes = effectiveTotal,
-                        state = DownloadState.DOWNLOADING,
+                        model_id = adapterId,
+                        stage = DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+                        bytes_downloaded = bytes,
+                        total_bytes = effectiveTotal,
+                        stage_progress = progress,
+                        state = DownloadState.DOWNLOAD_STATE_DOWNLOADING,
                     ),
                 )
                 !cancellation.get()
@@ -260,7 +266,7 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
             RunAnywhereBridge.racHttpDownloadExecute(
                 url = entry.downloadUrl,
                 destPath = tmpFile.absolutePath,
-                expectedSha256Hex = null,
+                expectedSha256Hex = entry.checksumSha256,
                 resumeFromByte = 0L,
                 timeoutMs = 120_000,
                 listener = listener,
@@ -303,11 +309,12 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
         loraLogger.info("LoRA download completed: ${destFile.absolutePath}")
         trySend(
             DownloadProgress(
-                modelId = adapterId,
-                progress = 1f,
-                bytesDownloaded = destFile.length(),
-                totalBytes = destFile.length(),
-                state = DownloadState.COMPLETED,
+                model_id = adapterId,
+                stage = DownloadStage.DOWNLOAD_STAGE_COMPLETED,
+                bytes_downloaded = destFile.length(),
+                total_bytes = destFile.length(),
+                stage_progress = 1f,
+                state = DownloadState.DOWNLOAD_STATE_COMPLETED,
             ),
         )
 

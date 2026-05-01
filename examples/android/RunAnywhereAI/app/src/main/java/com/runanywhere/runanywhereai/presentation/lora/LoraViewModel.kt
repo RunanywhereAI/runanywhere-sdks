@@ -8,7 +8,7 @@ import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
-import com.runanywhere.sdk.public.extensions.Models.DownloadState
+import ai.runanywhere.proto.v1.DownloadState
 import com.runanywhere.sdk.public.extensions.allRegisteredLoraAdapters
 import com.runanywhere.sdk.public.extensions.checkLoraCompatibility
 import com.runanywhere.sdk.public.extensions.clearLoraAdapters
@@ -198,9 +198,9 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 try {
                     RunAnywhere.downloadLoraAdapter(entry.id).collect { progress ->
-                        _uiState.update { it.copy(downloadProgress = progress.progress) }
+                        _uiState.update { it.copy(downloadProgress = progress.stage_progress) }
 
-                        if (progress.state == DownloadState.COMPLETED) {
+                        if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
                             val path = RunAnywhere.loraAdapterLocalPath(entry.id)
                             Timber.i("Downloaded LoRA adapter: ${entry.name} -> $path")
                             _uiState.update {

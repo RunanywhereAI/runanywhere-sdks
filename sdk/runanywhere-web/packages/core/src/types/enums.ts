@@ -204,12 +204,13 @@ export enum ModelStatus {
   Error = 'error',
 }
 
-/** Proto counterpart: `DownloadStage` / `ProtoDownloadStage`. */
-export enum DownloadStage {
-  Downloading = 'downloading',
-  Validating = 'validating',
-  Completed = 'completed',
-}
+/**
+ * Canonical `DownloadStage` is proto-generated (integer enum, 5 values).
+ * The Web-local string enum previously defined here has been deleted —
+ * per-SDK type unification (Task M8). Consumers that need a string form
+ * should derive it from the proto enum value.
+ */
+export { DownloadStage } from '@runanywhere/proto-ts/download_service';
 
 /**
  * JS `EventBus` topic category. Maps loosely onto the `category` field

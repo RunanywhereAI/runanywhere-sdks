@@ -6,6 +6,8 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/adapters/model_download_adapter.dart';
+import 'package:runanywhere/generated/download_service.pb.dart'
+    show DownloadProgress;
 import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
@@ -76,9 +78,8 @@ class RunAnywhereStorage {
     return '${directory.path}/runanywhere';
   }
 
-  /// Low-level download stream (internal progress type). Most callers
-  /// should prefer `RunAnywhereSDK.instance.downloads.start(id)` which
-  /// yields the public `DownloadProgress` type.
-  static Stream<ModelDownloadProgress> downloadModel(String modelId) =>
+  /// Low-level download stream. Emits proto-generated `DownloadProgress`
+  /// events driven by the C++ `rac_download_orchestrate` state machine.
+  static Stream<DownloadProgress> downloadModel(String modelId) =>
       ModelDownloadService.shared.downloadModel(modelId);
 }

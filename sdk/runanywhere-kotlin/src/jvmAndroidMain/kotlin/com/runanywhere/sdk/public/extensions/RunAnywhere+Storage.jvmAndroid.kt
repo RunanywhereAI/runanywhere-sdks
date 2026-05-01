@@ -35,7 +35,8 @@ actual suspend fun RunAnywhere.storageInfo(): StorageInfo {
 
     val baseDir = File(CppBridgeModelPaths.getBaseDirectory())
     val cacheDir = File(baseDir, "cache")
-    val modelsDir = File(baseDir, "models")
+    // Canonical model schema: {base}/RunAnywhere/Models/
+    val modelsDir = File(File(baseDir, "RunAnywhere"), "Models")
     val appSupportDir = File(baseDir, "data")
 
     val cacheSize = CppBridgeFileManager.calculateDirectorySize(cacheDir.absolutePath)

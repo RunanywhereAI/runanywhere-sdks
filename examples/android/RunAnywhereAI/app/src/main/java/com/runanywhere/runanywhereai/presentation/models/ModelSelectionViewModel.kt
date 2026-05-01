@@ -271,7 +271,7 @@ class ModelSelectionViewModel(
                         }
                     }
                     .collect { progress ->
-                        val percent = (progress.progress * 100).toInt()
+                        val percent = (progress.stage_progress * 100).toInt()
                         Timber.d("📥 Download progress: $percent%")
                         _uiState.update {
                             it.copy(loadingProgress = "Downloading... $percent%")

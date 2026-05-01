@@ -5,6 +5,7 @@
  * Matches iOS: RunAnywhere+ModelManagement.swift and RunAnywhere+ModelAssignments.swift
  */
 
+import { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
@@ -525,14 +526,12 @@ function generateModelId(url: string): string {
 // ============================================================================
 
 /**
- * Download progress information
+ * Re-export the canonical proto `DownloadProgress` shape so existing
+ * consumers of this module keep a single import surface. The shape is the
+ * full 10-field `runanywhere.v1.DownloadProgress` message from
+ * `@runanywhere/proto-ts/download_service`.
  */
-export interface DownloadProgress {
-  modelId: string;
-  bytesDownloaded: number;
-  totalBytes: number;
-  progress: number;
-}
+export { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 
 function urlExtension(url: string): string {
   const lower = url.toLowerCase();
@@ -560,9 +559,15 @@ function buildCancelToken(modelId: string, suffix?: string): string {
 /**
  * Download a model.
  *
- * Transport is owned by native C++ (libcurl via rac_http_download_execute);
- * react-native-fs is only used for filesystem path resolution and existence
- * checks. Cancellation is routed through the native cancel-token registry.
+ * Transport is owned by native C++ (`rac_http_download_execute`, which
+ * routes through the registered platform HTTP transport — OkHttp on Android,
+ * URLSession on iOS). `react-native-fs` is only used for filesystem path
+ * resolution and existence checks. Cancellation is routed through the
+ * native cancel-token registry.
+ *
+ * Per-tick progress is delivered as a JSON-encoded
+ * `runanywhere.v1.DownloadProgress` from the native side; we decode it with
+ * `DownloadProgress.fromJSON` from `@runanywhere/proto-ts`.
  */
 export async function downloadModel(
   modelId: string,
@@ -591,21 +596,45 @@ export async function downloadModel(
   activeDownloads.add(modelId);
   let lastLoggedProgress = -1;
 
-  const emit = (bytesWritten: number, totalBytes: number, scaleOffset = 0, scale = 1) => {
-    const raw = totalBytes > 0 ? bytesWritten / totalBytes : 0;
-    const progress = scaleOffset + raw * scale;
-    const pct = Math.round(progress * 100);
+  /**
+   * Decode the native progress JSON and forward a well-formed
+   * `DownloadProgress` to the caller. `scaleOffset`/`scale` collapse
+   * per-file progress into the [0,1] range spanning the full multi-file
+   * download.
+   */
+  const emit = (progressJson: string, scaleOffset = 0, scale = 1) => {
+    let raw: DownloadProgress;
+    try {
+      raw = DownloadProgress.fromJSON(JSON.parse(progressJson));
+    } catch (err) {
+      logger.warning(`Failed to decode DownloadProgress JSON: ${err}`);
+      return;
+    }
+
+    const bytesDownloaded = raw.bytesDownloaded ?? 0;
+    const totalBytes = raw.totalBytes || modelInfo.downloadSize || 0;
+    const stageProgress = totalBytes > 0 ? bytesDownloaded / totalBytes : raw.stageProgress ?? 0;
+    const overallProgress = scaleOffset + stageProgress * scale;
+
+    const pct = Math.round(overallProgress * 100);
     if (pct - lastLoggedProgress >= 10) {
       logger.debug(`Download progress: ${pct}%`);
       lastLoggedProgress = pct;
     }
+
     if (onProgress) {
-      onProgress({
-        modelId,
-        bytesDownloaded: bytesWritten,
-        totalBytes: totalBytes || modelInfo.downloadSize || 0,
-        progress,
-      });
+      // Forward the full 10-field shape, overriding the fields we can
+      // derive on the JS side (modelId is authoritative here; stageProgress
+      // is rescaled for multi-file downloads).
+      onProgress(
+        DownloadProgress.fromPartial({
+          ...raw,
+          modelId,
+          bytesDownloaded,
+          totalBytes,
+          stageProgress: overallProgress,
+        })
+      );
     }
   };
 
@@ -646,7 +675,8 @@ export async function downloadModel(
           fileDescriptor.url,
           fileDestination,
           token,
-          (bytesWritten, totalBytes) => emit(bytesWritten, totalBytes, offset, scale),
+          (progressJson: string) => emit(progressJson, offset, scale),
+          fileDescriptor.checksumSha256,
         );
 
         logger.info(`Completed file ${index + 1}/${fileCount}: ${fileDescriptor.filename}`);
@@ -702,7 +732,8 @@ export async function downloadModel(
       modelInfo.downloadURL,
       destPath,
       buildCancelToken(modelId),
-      (bytesWritten, totalBytes) => emit(bytesWritten, totalBytes),
+      (progressJson: string) => emit(progressJson),
+      modelInfo.checksumSha256,
     );
 
     let finalPath = destPath;

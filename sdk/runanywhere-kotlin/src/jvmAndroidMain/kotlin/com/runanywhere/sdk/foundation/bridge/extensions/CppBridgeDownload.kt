@@ -188,7 +188,12 @@ object CppBridgeDownload {
         val url: String,
         val destinationPath: String,
         val modelId: String,
-        val modelType: Int,
+        /**
+         * Inference framework for this download (int matching
+         * [CppBridgeModelRegistry.Framework]). Used to compute the final
+         * `{base}/RunAnywhere/Models/{framework}/{modelId}/` path.
+         */
+        val framework: Int,
         @Volatile var status: Int = DownloadStatus.QUEUED,
         @Volatile var error: Int = DownloadError.NONE,
         @Volatile var totalBytes: Long = -1L,
@@ -259,10 +264,11 @@ object CppBridgeDownload {
     fun startDownload(
         url: String,
         modelId: String,
-        modelType: Int,
+        /** Inference framework int (see [CppBridgeModelRegistry.Framework]). */
+        framework: Int,
         priority: Int = DownloadPriority.NORMAL,
         expectedChecksum: String? = null,
-    ): String? = startDownloadCallback(url, modelId, modelType, priority, expectedChecksum)
+    ): String? = startDownloadCallback(url, modelId, framework, priority, expectedChecksum)
 
     fun cancelDownload(downloadId: String): Boolean = cancelDownloadCallback(downloadId)
 
@@ -323,7 +329,7 @@ object CppBridgeDownload {
     fun startDownloadCallback(
         url: String,
         modelId: String,
-        modelType: Int,
+        framework: Int,
         priority: Int,
         expectedChecksum: String?,
     ): String? {
@@ -377,7 +383,7 @@ object CppBridgeDownload {
                     url = url,
                     destinationPath = tempPath,
                     modelId = modelId,
-                    modelType = modelType,
+                    framework = framework,
                     priority = priority,
                     expectedChecksum = expectedChecksum,
                 )
@@ -630,11 +636,11 @@ object CppBridgeDownload {
             CppBridgeModelPaths.moveDownloadToFinal(
                 task.destinationPath,
                 task.modelId,
-                task.modelType,
+                task.framework,
             )
 
         if (moved) {
-            val finalPath = CppBridgeModelPaths.getModelPath(task.modelId, task.modelType)
+            val finalPath = CppBridgeModelPaths.getModelPath(task.modelId, task.framework)
             CppBridgeModelRegistry.updateDownloadStatus(task.modelId, finalPath)
             safeInvoke {
                 downloadListener?.onDownloadCompleted(task.downloadId, task.modelId, finalPath, fileSize)

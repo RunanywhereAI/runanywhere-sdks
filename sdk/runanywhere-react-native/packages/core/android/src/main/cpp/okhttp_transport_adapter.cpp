@@ -1,12 +1,8 @@
 // RN Android copy of commons/src/jni/okhttp_transport_adapter.cpp (Phase H6).
 //
-// When RAC_HAS_HTTP_TRANSPORT is defined, the bundled librac_commons.so is
-// new enough to expose the rac_http_transport_register() ABI; the full adapter
-// below is compiled and wired into the vtable. When not defined, this file
-// degrades to no-op JNI stubs that return RAC_ERROR_INTERNAL so the build
-// keeps linking and RN falls back to libcurl via rac_http_request_send.
-
-#ifdef RAC_HAS_HTTP_TRANSPORT
+// The bundled librac_commons.so (post-Stage-5) always exports
+// rac_http_transport_register, so the full OkHttp adapter is compiled
+// unconditionally and wired into the vtable.
 
 /**
  * OkHttp Platform HTTP Transport Adapter (v2 close-out Phase H4)
@@ -566,39 +562,3 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportUnregis
 }
 
 }  // extern "C"
-
-#else  // !RAC_HAS_HTTP_TRANSPORT — stub mode
-
-// -----------------------------------------------------------------------------
-// Stubs: the bundled librac_commons.so predates rac_http_transport_register,
-// so the adapter can't install a vtable. We still need to resolve the two JNI
-// symbols referenced by RunAnywhereBridge.kt; they return an error code so the
-// Kotlin side logs a warning and continues using libcurl through the default
-// rac_http_request_* path.
-// -----------------------------------------------------------------------------
-#include <jni.h>
-
-#ifndef RAC_ERROR_INTERNAL
-#define RAC_ERROR_INTERNAL (-100)
-#endif
-
-extern "C" {
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegisterOkHttp(
-    JNIEnv* /*env*/, jclass /*clazz*/) {
-    // RAC_ERROR_INTERNAL — adapter unavailable; the Kotlin caller logs and
-    // carries on with libcurl.
-    return static_cast<jint>(RAC_ERROR_INTERNAL);
-}
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportUnregisterOkHttp(
-    JNIEnv* /*env*/, jclass /*clazz*/) {
-    // No-op — nothing was registered.
-    return 0;
-}
-
-}  // extern "C"
-
-#endif  // RAC_HAS_HTTP_TRANSPORT

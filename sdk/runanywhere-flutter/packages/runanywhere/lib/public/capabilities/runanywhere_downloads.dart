@@ -24,10 +24,10 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:fixnum/fixnum.dart';
-// §15 type-discipline: hand-rolled `DownloadProgressState` enum +
-// `DownloadProgress` class are gone — `DownloadStage` +
-// `DownloadProgress` from `generated/download_service.pb.dart` are
-// the canonical proto-generated types.
+// §15 type-discipline: `DownloadStage` + `DownloadProgress` from
+// `generated/download_service.pb.dart` are the canonical
+// proto-generated types. `ModelDownloadService` now yields
+// `DownloadProgress` directly — no mapping needed.
 
 /// Downloads / storage-management capability surface.
 ///
@@ -50,23 +50,16 @@ class RunAnywhereDownloads {
 
     await for (final progress
         in ModelDownloadService.shared.downloadModel(modelId)) {
-      yield DownloadProgress(
-        modelId: modelId,
-        bytesDownloaded: Int64(progress.bytesDownloaded),
-        totalBytes: Int64(progress.totalBytes),
-        stage: _mapDownloadStage(progress.stage),
-        stageProgress: progress.overallProgress,
-        errorMessage: progress.error,
-      );
+      yield progress;
 
-      if (progress.stage == ModelDownloadStage.downloading) {
-        final pct = (progress.overallProgress * 100).toStringAsFixed(1);
-        if (progress.bytesDownloaded % (1024 * 1024) < 10000) {
+      if (progress.stage == DownloadStage.DOWNLOAD_STAGE_DOWNLOADING) {
+        final pct = (progress.stageProgress * 100).toStringAsFixed(1);
+        if (progress.bytesDownloaded.toInt() % (1024 * 1024) < 10000) {
           logger.debug('Download progress: $pct%');
         }
-      } else if (progress.stage == ModelDownloadStage.extracting) {
+      } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
         logger.info('Extracting model...');
-      } else if (progress.stage == ModelDownloadStage.completed) {
+      } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
         final downloadTimeMs =
             DateTime.now().millisecondsSinceEpoch - startTime;
         logger.info('✅ Download completed for model: $modelId');
@@ -74,17 +67,17 @@ class RunAnywhereDownloads {
           modelId: modelId,
           success: true,
           downloadTimeMs: downloadTimeMs,
-          sizeBytes: progress.totalBytes,
+          sizeBytes: progress.totalBytes.toInt(),
         );
-      } else if (progress.stage == ModelDownloadStage.failed) {
-        logger.error('❌ Download failed: ${progress.error}');
+      } else if (progress.errorMessage.isNotEmpty) {
+        logger.error('❌ Download failed: ${progress.errorMessage}');
         TelemetryService.shared.trackModelDownload(
           modelId: modelId,
           success: false,
         );
         TelemetryService.shared.trackError(
           errorCode: 'download_failed',
-          errorMessage: progress.error ?? 'Unknown error',
+          errorMessage: progress.errorMessage,
           context: {'model_id': modelId},
         );
       }
@@ -227,22 +220,6 @@ class RunAnywhereDownloads {
   }
 
   // -- private helpers ------------------------------------------------------
-
-  DownloadStage _mapDownloadStage(ModelDownloadStage stage) {
-    switch (stage) {
-      case ModelDownloadStage.downloading:
-        return DownloadStage.DOWNLOAD_STAGE_DOWNLOADING;
-      case ModelDownloadStage.extracting:
-        return DownloadStage.DOWNLOAD_STAGE_EXTRACTING;
-      case ModelDownloadStage.verifying:
-        return DownloadStage.DOWNLOAD_STAGE_VALIDATING;
-      case ModelDownloadStage.completed:
-        return DownloadStage.DOWNLOAD_STAGE_COMPLETED;
-      case ModelDownloadStage.failed:
-      case ModelDownloadStage.cancelled:
-        return DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED;
-    }
-  }
 
   Future<DeviceStorageInfo> _getDeviceStorageInfo() async {
     try {

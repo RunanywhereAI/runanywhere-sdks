@@ -119,7 +119,8 @@ public:
     const std::string& url,
     const std::string& destPath,
     const std::string& cancelToken,
-    const std::function<void(double, double)>& onProgress) override;
+    const std::function<void(const std::string&)>& onProgress,
+    const std::optional<std::string>& expectedSha256Hex) override;
   std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) override;
 
   // ============================================================================

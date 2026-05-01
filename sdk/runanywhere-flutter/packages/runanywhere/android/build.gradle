@@ -29,6 +29,12 @@ buildscript {
     }
 }
 
+// Repositories for module-level dependencies (OkHttp, kotlin-stdlib)
+repositories {
+    google()
+    mavenCentral()
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
@@ -103,6 +109,12 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    // OkHttp backs the platform HTTP transport. Routes `rac_http_request_*`
+    // through the system trust store + HTTP/2 + proxies + NetworkSecurityConfig
+    // instead of libcurl (deleted in Stage 5). Version must match the Kotlin
+    // SDK and React Native core.
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }
 
 // =============================================================================

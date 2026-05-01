@@ -32,7 +32,6 @@ import {
 } from '../Foundation/Initialization';
 import type { ModelInfo, SDKInitOptions } from '../types';
 import type { DownloadProgress as ProtoDownloadProgress } from '@runanywhere/proto-ts/download_service';
-import { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
 
 // Import extensions
 import * as TextGeneration from './Extensions/RunAnywhere+TextGeneration';
@@ -814,20 +813,11 @@ export const RunAnywhere = {
         };
 
         // Kick off the underlying download with a callback to push progress.
+        // `Models.downloadModel` now delivers a full `runanywhere.v1.
+        // DownloadProgress` message (10 fields) so we can forward it
+        // verbatim — no field remapping needed.
         Models.downloadModel(modelId, (p) => {
-          const protoProgress: ProtoDownloadProgress = {
-            modelId: p.modelId,
-            bytesDownloaded: p.bytesDownloaded,
-            totalBytes: p.totalBytes,
-            stageProgress: p.progress,
-            stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
-            state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
-            overallSpeedBps: 0,
-            etaSeconds: -1,
-            retryAttempt: 0,
-            errorMessage: '',
-          };
-          push(protoProgress);
+          push(p as ProtoDownloadProgress);
         }).then(() => {
           done = true;
           if (resolver) {

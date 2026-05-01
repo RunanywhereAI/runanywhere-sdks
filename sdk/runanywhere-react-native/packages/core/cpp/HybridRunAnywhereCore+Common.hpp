@@ -425,12 +425,20 @@ struct NativeHttpResult {
 // Execute a blocking HTTP request via rac_http_client_*. Throws std::runtime_error
 // on transport-level failure (DNS / TLS / timeout). 4xx/5xx responses are
 // returned through NativeHttpResult so callers can decide how to handle them.
+//
+// `expectedChecksumHex`, when non-empty, is forwarded to the native client as
+// `rac_http_request_t::expected_checksum_hex` so the write path can verify the
+// SHA-256 of the response body inline. Matches the Kotlin/Swift/Flutter wiring
+// for model downloads, although in RN this helper is used for generic HTTP
+// (auth, catalog fetch); public model downloads go through the Nitro
+// `downloadModel` path which owns its own checksum plumbing.
 NativeHttpResult performNativeHttpRequest(
     const std::string& method,
     const std::string& url,
     const std::vector<std::pair<std::string, std::string>>& headers,
     const std::string& body,
-    int32_t timeoutMs
+    int32_t timeoutMs,
+    const std::string& expectedChecksumHex = {}
 ) {
     rac_http_client_t* client = nullptr;
     rac_result_t createResult = rac_http_client_create(&client);
@@ -454,7 +462,8 @@ NativeHttpResult performNativeHttpRequest(
     req.body_len = body.size();
     req.timeout_ms = timeoutMs > 0 ? timeoutMs : 30000;
     req.follow_redirects = RAC_TRUE;
-    req.expected_checksum_hex = nullptr;
+    req.expected_checksum_hex = expectedChecksumHex.empty() ? nullptr
+                                                             : expectedChecksumHex.c_str();
 
     rac_http_response_t resp{};
     rac_result_t sendResult = rac_http_request_send(client, &req, &resp);

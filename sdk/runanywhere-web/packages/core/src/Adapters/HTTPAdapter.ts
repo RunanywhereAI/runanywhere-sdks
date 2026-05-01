@@ -119,6 +119,8 @@ export interface HTTPModule {
   _rac_wasm_offsetof_http_request_follow_redirects?(): number;
   _rac_wasm_offsetof_http_request_expected_checksum_hex?(): number;
   _rac_wasm_offsetof_http_response_status?(): number;
+  _rac_wasm_offsetof_http_response_headers?(): number;
+  _rac_wasm_offsetof_http_response_header_count?(): number;
   _rac_wasm_offsetof_http_response_body_bytes?(): number;
   _rac_wasm_offsetof_http_response_body_len?(): number;
   _rac_wasm_offsetof_http_response_redirected_url?(): number;

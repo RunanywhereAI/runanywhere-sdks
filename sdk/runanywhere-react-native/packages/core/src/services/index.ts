@@ -16,7 +16,7 @@ export {
   FileSystem,
   MultiFileModelCache,
   type ModelFileDescriptor,
-  type DownloadProgress as FSDownloadProgress,
+  type FileByteProgress,
 } from './FileSystem';
 
 // Download Service - Native-based download (delegates to native commons)

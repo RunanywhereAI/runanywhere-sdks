@@ -429,11 +429,17 @@ class ModelFileDescriptor {
   /// the URL from the parent model's downloadURL.
   final Uri? url;
 
+  /// Optional lowercase hex SHA-256 checksum of the downloaded bytes.
+  /// When populated, the native download runner verifies the hash
+  /// inline and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on mismatch.
+  final String? checksumSha256;
+
   const ModelFileDescriptor({
     required this.relativePath,
     required this.destinationPath,
     this.isRequired = true,
     this.url,
+    this.checksumSha256,
   });
 
   Map<String, dynamic> toJson() => {
@@ -441,6 +447,7 @@ class ModelFileDescriptor {
         'destinationPath': destinationPath,
         'isRequired': isRequired,
         if (url != null) 'url': url.toString(),
+        if (checksumSha256 != null) 'checksumSha256': checksumSha256,
       };
 
   factory ModelFileDescriptor.fromJson(Map<String, dynamic> json) {
@@ -449,6 +456,7 @@ class ModelFileDescriptor {
       destinationPath: json['destinationPath'] as String,
       isRequired: json['isRequired'] as bool? ?? true,
       url: json['url'] != null ? Uri.parse(json['url'] as String) : null,
+      checksumSha256: json['checksumSha256'] as String?,
     );
   }
 }
@@ -720,6 +728,12 @@ class ModelInfo {
   // Optional metadata
   final String? description;
 
+  /// Optional lowercase hex SHA-256 checksum of the downloaded artifact.
+  /// When populated, the native download runner
+  /// (`rac_http_download_execute`) verifies the hash inline on the write
+  /// path and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on mismatch.
+  final String? checksumSha256;
+
   // Tracking fields
   final ModelSource source;
   final DateTime createdAt;
@@ -739,6 +753,7 @@ class ModelInfo {
     bool supportsThinking = false,
     ThinkingTagPattern? thinkingPattern,
     this.description,
+    this.checksumSha256,
     ModelSource? source,
     DateTime? createdAt,
     DateTime? updatedAt,
