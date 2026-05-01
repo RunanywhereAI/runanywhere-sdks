@@ -53,9 +53,19 @@ public enum URLSessionHttpTransport {
         return URLSession(configuration: config)
     }()
 
+    /// Caller-provided override for the streaming session. When non-nil,
+    /// `request_stream` / `request_resume` use this session instead of
+    /// building a per-call one. Hosts that want a `.background(...)`
+    /// session (handled by their `AppDelegate`
+    /// `handleEventsForBackgroundURLSession`) or custom retry/backoff
+    /// plug it in here via ``register(streamingSession:)``.
+    fileprivate static let streamingSessionOverride =
+        OSAllocatedUnfairLock<URLSession?>(initialState: nil)
+
     /// Streaming-task coordinator. One instance per streaming call;
     /// bridges `URLSessionDataDelegate` callbacks back to the C chunk
-    /// callback. Keyed by `URLSessionTask.taskIdentifier`.
+    /// callback. Keyed by `URLSessionTask.taskIdentifier`. Also used
+    /// by ``cancelAllStreams()`` for explicit teardown.
     fileprivate static let streamRegistry = StreamRegistry()
 
     /// Static vtable handed to `rac_http_transport_register`. It must
@@ -109,7 +119,40 @@ public enum URLSessionHttpTransport {
         }
         guard wasRegistered else { return }
         _ = rac_http_transport_register(nil, nil)
+        cancelAllStreams()
+        streamingSessionOverride.withLock { $0 = nil }
         logger.info("URLSession HTTP transport unregistered")
+    }
+
+    /// Install a custom `URLSession` for streaming downloads (model
+    /// GGUFs, resume). Passing `nil` restores the built-in per-call
+    /// session. Hosts that need a true iOS background session —
+    /// `URLSessionConfiguration.background(withIdentifier:)` — should
+    /// supply one here and wire `handleEventsForBackgroundURLSession`
+    /// in their `AppDelegate`, since that hook can only live in the
+    /// application layer.
+    ///
+    /// The override is consulted per call; there is no ownership
+    /// transfer. Thread-safe.
+    public static func register(streamingSession session: URLSession?) {
+        streamingSessionOverride.withLock { $0 = session }
+        if let session = session {
+            let identifier = session.configuration.identifier ?? "<default-config>"
+            logger.info("Streaming session override installed (config=\(identifier))")
+        } else {
+            logger.info("Streaming session override cleared")
+        }
+    }
+
+    /// Cancel every in-flight streaming / resume task. Each pending
+    /// chunk-callback returns to its caller with `RAC_ERROR_CANCELLED`
+    /// (because `URLSessionTask.cancel()` surfaces as an
+    /// `NSURLErrorCancelled` which ``RequestExecutor.mapTransportError``
+    /// maps accordingly). Complements the per-callback
+    /// `return RAC_FALSE` cancel contract — use this when the SDK is
+    /// tearing down and there is no callback on the stack to signal.
+    public static func cancelAllStreams() {
+        streamRegistry.cancelAll()
     }
 }
 
@@ -376,34 +419,61 @@ private enum RequestExecutor {
         let urlRequest = snapshot.makeURLRequest(additionalRangeFromByte: resumeFromByte)
         let startTime = DispatchTime.now()
 
-        // Dedicated session per streaming call so the delegate lifetime is
-        // bounded and there are no stray retain cycles with the shared
-        // session.
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = snapshot.timeoutMs > 0
-            ? TimeInterval(snapshot.timeoutMs) / 1000.0
-            : 60
-        config.timeoutIntervalForResource = max(config.timeoutIntervalForRequest, 600)
-        config.urlCache = nil
-        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-
-        let delegate = StreamDelegate(chunkFn: chunkFn, chunkUserData: chunkUserData)
-        let session = URLSession(
-            configuration: config,
-            delegate: delegate,
-            delegateQueue: nil
+        let delegate = StreamDelegate(
+            chunkFn: chunkFn,
+            chunkUserData: chunkUserData,
+            resumeFromByte: resumeFromByte
         )
 
+        // Prefer a host-provided streaming session (useful for apps
+        // that need `.background(...)` or custom retry policy); fall
+        // back to a per-call session tuned for multi-GB transfers.
+        let override = URLSessionHttpTransport.streamingSessionOverride.withLock { $0 }
+        let (session, ownsSession): (URLSession, Bool)
+        if let override = override {
+            session = override
+            ownsSession = false
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = snapshot.timeoutMs > 0
+                ? TimeInterval(snapshot.timeoutMs) / 1000.0
+                : 60
+            // Resource timeout covers the whole transfer; a 10 GB GGUF
+            // over a slow cellular link can legitimately run for hours.
+            config.timeoutIntervalForResource = 24 * 60 * 60
+            config.urlCache = nil
+            config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            // Streaming downloads benefit from NSURLSession queuing a
+            // retry when connectivity returns rather than failing fast.
+            config.waitsForConnectivity = true
+            session = URLSession(
+                configuration: config,
+                delegate: delegate,
+                delegateQueue: nil
+            )
+            ownsSession = true
+        }
+
         let task = session.dataTask(with: urlRequest)
+        if !ownsSession {
+            // Host-provided sessions carry their own delegate. Bind the
+            // callbacks directly onto the task via the task-delegate
+            // API introduced in iOS 15 / macOS 12.
+            task.delegate = delegate
+        }
         delegate.taskIdentifier = task.taskIdentifier
+        delegate.task = task
         URLSessionHttpTransport.streamRegistry.insert(taskId: task.taskIdentifier, delegate: delegate)
 
         task.resume()
         delegate.completion.wait()
 
-        // Tear down the per-call session so URLSession releases the
-        // delegate reference and flushes any pending sockets.
-        session.finishTasksAndInvalidate()
+        // Tear down per-call sessions so URLSession releases the
+        // delegate reference and flushes pending sockets. Host-owned
+        // sessions are left untouched.
+        if ownsSession {
+            session.finishTasksAndInvalidate()
+        }
         URLSessionHttpTransport.streamRegistry.remove(taskId: task.taskIdentifier)
 
         let elapsedMs = elapsedMilliseconds(since: startTime)
@@ -420,11 +490,23 @@ private enum RequestExecutor {
             return RAC_ERROR_NETWORK_ERROR
         }
 
-        let headers = ResponseWriter.extractHeaders(from: httpResponse)
+        var headers = ResponseWriter.extractHeaders(from: httpResponse)
         let finalURL = httpResponse.url?.absoluteString
         let redirected = (finalURL != nil && finalURL != snapshot.url.absoluteString)
             ? finalURL
             : nil
+
+        // Range-honored disclosure: when the caller asked for a partial
+        // (`resumeFromByte > 0`) but the server answered with 200 (full
+        // file) instead of 206, the C++ download manager needs to know
+        // so it can truncate the destination before replaying bytes.
+        // libcurl surfaces this by reporting the HTTP status directly;
+        // we mirror that and add an explicit marker header to save the
+        // caller a second status-code check.
+        if resumeFromByte > 0 {
+            let honored = (httpResponse.statusCode == 206)
+            headers.append((name: "X-RAC-Range-Honored", value: honored ? "true" : "false"))
+        }
 
         // Streaming responses never populate body_bytes (per the
         // `rac_http_request_stream` contract).
@@ -467,6 +549,9 @@ private enum RequestExecutor {
 /// Lightweight thread-safe map from task identifier → delegate. Used
 /// only to keep a strong reference to the delegate while URLSession is
 /// firing callbacks; lookups during teardown remove the entry.
+/// `cancelAll` iterates all live streams and drives
+/// `URLSessionTask.cancel()` — the authoritative cancel path that
+/// doesn't require a chunk callback to be on the stack.
 private final class StreamRegistry: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock<[Int: StreamDelegate]>(initialState: [:])
 
@@ -477,6 +562,17 @@ private final class StreamRegistry: @unchecked Sendable {
     func remove(taskId: Int) {
         lock.withLock { _ = $0.removeValue(forKey: taskId) }
     }
+
+    func cancelAll() {
+        // Snapshot under the lock, drive cancel() outside — the cancel
+        // callback races back through didCompleteWithError on the
+        // delegate queue and attempts to `remove(taskId:)`.
+        let snapshot = lock.withLock { Array($0.values) }
+        for delegate in snapshot {
+            delegate.cancelled = true
+            delegate.task?.cancel()
+        }
+    }
 }
 
 /// URLSession delegate that proxies `didReceive data` into the C chunk
@@ -486,12 +582,18 @@ private final class StreamDelegate: NSObject, URLSessionDataDelegate, @unchecked
 
     private let chunkFn: rac_http_body_chunk_fn
     private let chunkUserData: UnsafeMutableRawPointer?
+    private let resumeFromByte: UInt64
     let completion = DispatchSemaphore(value: 0)
 
     // Populated on the delegate queue; read on the caller thread after
     // `completion` is signalled — no explicit lock needed because the
     // semaphore establishes the happens-before edge.
     var taskIdentifier: Int = 0
+    // Retained weakly-ish — URLSessionTask holds `self` as delegate in
+    // the host-session path, so storing the task here would create a
+    // cycle until teardown. We only use it for explicit cancel, which
+    // tolerates a nil after completion.
+    weak var task: URLSessionTask?
     var response: HTTPURLResponse?
     var totalBytesReceived: UInt64 = 0
     var contentLength: UInt64 = 0
@@ -500,10 +602,12 @@ private final class StreamDelegate: NSObject, URLSessionDataDelegate, @unchecked
 
     init(
         chunkFn: @escaping rac_http_body_chunk_fn,
-        chunkUserData: UnsafeMutableRawPointer?
+        chunkUserData: UnsafeMutableRawPointer?,
+        resumeFromByte: UInt64 = 0
     ) {
         self.chunkFn = chunkFn
         self.chunkUserData = chunkUserData
+        self.resumeFromByte = resumeFromByte
     }
 
     func urlSession(
@@ -516,6 +620,19 @@ private final class StreamDelegate: NSObject, URLSessionDataDelegate, @unchecked
             self.response = httpResponse
             if httpResponse.expectedContentLength > 0 {
                 self.contentLength = UInt64(httpResponse.expectedContentLength)
+            }
+            // Resume accounting: when the server actually honored the
+            // Range (206), `expectedContentLength` is only the *remaining*
+            // bytes — add the resume offset so the chunk callback sees a
+            // monotonic `total_written` that tracks absolute file
+            // position. For 200 responses the server ignored the range
+            // and is replaying the full file, so we leave the counter
+            // at 0 (the caller will truncate).
+            if httpResponse.statusCode == 206 && resumeFromByte > 0 {
+                self.totalBytesReceived = resumeFromByte
+                if self.contentLength > 0 {
+                    self.contentLength &+= resumeFromByte
+                }
             }
         }
         completionHandler(.allow)

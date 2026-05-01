@@ -675,7 +675,10 @@ rac_result_t rac_download_orchestrate_multi(
         bool is_required;
     };
 
-    bool launch_failed = false;
+    // Stage 2 refactor: there's no synchronous "failed to launch" path
+    // anymore — spawning the worker thread itself is the only thing that
+    // can fail before the request runs, and that throws. Failures are
+    // now observed via `barrier->any_required_failed`.
     for (size_t i = 0; i < file_count; ++i) {
         const rac_model_file_descriptor_t& file = files[i];
 
@@ -751,7 +754,7 @@ rac_result_t rac_download_orchestrate_multi(
         barrier->cv.wait(lk, [&barrier] { return barrier->pending == 0; });
     }
 
-    bool any_failed = launch_failed || barrier->any_required_failed;
+    bool any_failed = barrier->any_required_failed;
 
     if (any_failed) {
         rac_download_manager_mark_failed(dm_handle, task_id, RAC_ERROR_DOWNLOAD_FAILED,

@@ -214,6 +214,14 @@ export type {
   DownloadProgressHandler,
 } from './Adapters/HTTPAdapter';
 
+// Stage 3d — JS-side HTTP transport. Provides the scaffolding for
+// `fetch()`-backed routing registered via the commons transport vtable.
+// HTTPAdapter.setDefaultModule auto-installs this when the module exposes
+// `_rac_http_transport_register_from_js`; export is available for tests
+// and for callers that want direct lifecycle control.
+export { FetchHttpTransport } from './Adapters/FetchHttpTransport';
+export type { FetchHttpTransportModule } from './Adapters/FetchHttpTransport';
+
 // Model registry refresh (T4.9) — wraps the commons
 // `rac_model_registry_refresh` C ABI so the web surface is symmetric with
 // Swift / Kotlin / RN / Flutter. Backend packages install their Emscripten

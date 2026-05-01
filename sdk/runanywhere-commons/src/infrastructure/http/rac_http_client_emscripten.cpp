@@ -331,6 +331,91 @@ const rac_http_transport_ops_t kEmscriptenOps = {
     /*.destroy        =*/ nullptr,
 };
 
+// =============================================================================
+// JS-side adapter (Stage 3d)
+//
+// Instead of the C++ calling `emscripten_fetch` (which then calls JS
+// `fetch()` under the hood — one extra hop + ASYNCIFY requirement), the
+// JS layer can register its own `fetch()`-backed implementation via
+// `rac_http_transport_register_from_js(...)`. JS passes in three
+// function-table indices (obtained via `Module.addFunction(fn, sig)`)
+// that match the rac_http_transport_ops_t signatures, and we fan them
+// out through a trampoline struct stored at file scope.
+//
+// Advantages:
+//   - One less C++ ↔ JS hop per request.
+//   - Works without `-sASYNCIFY=1` (the JS side handles its own promise
+//     plumbing end-to-end).
+//   - JS-side can plug in retry logic, caching, service workers, etc.
+//
+// Fallback: if JS never calls `rac_http_transport_register_from_js`,
+// the existing `rac_http_transport_register_emscripten()` path (above)
+// continues to work unchanged.
+// =============================================================================
+
+struct JsTransportState {
+    // Function-table indices. Emscripten's addFunction installs the
+    // JS function at a table slot and returns the index; calling through
+    // the resulting function pointer invokes the JS function with the
+    // proper argument marshaling (see the sig-string contract in
+    // FetchHttpTransport.ts).
+    rac_result_t (*request_send)(void*, const rac_http_request_t*,
+                                 rac_http_response_t*) = nullptr;
+    rac_result_t (*request_stream)(void*, const rac_http_request_t*,
+                                   rac_http_body_chunk_fn, void*,
+                                   rac_http_response_t*) = nullptr;
+    rac_result_t (*request_resume)(void*, const rac_http_request_t*, uint64_t,
+                                   rac_http_body_chunk_fn, void*,
+                                   rac_http_response_t*) = nullptr;
+};
+
+// File-scope so the registered vtable still sees the JS function
+// pointers after rac_http_transport_register_from_js returns.
+JsTransportState& js_transport_state() {
+    static JsTransportState s;
+    return s;
+}
+
+rac_result_t js_request_send(void* user_data, const rac_http_request_t* req,
+                             rac_http_response_t* out_resp) {
+    auto& s = js_transport_state();
+    if (s.request_send != nullptr) {
+        return s.request_send(user_data, req, out_resp);
+    }
+    // Fallback to the native emscripten_fetch path.
+    return emscripten_request_send(user_data, req, out_resp);
+}
+
+rac_result_t js_request_stream(void* user_data, const rac_http_request_t* req,
+                               rac_http_body_chunk_fn cb, void* cb_user_data,
+                               rac_http_response_t* out_resp_meta) {
+    auto& s = js_transport_state();
+    if (s.request_stream != nullptr) {
+        return s.request_stream(user_data, req, cb, cb_user_data, out_resp_meta);
+    }
+    return emscripten_request_stream(user_data, req, cb, cb_user_data, out_resp_meta);
+}
+
+rac_result_t js_request_resume(void* user_data, const rac_http_request_t* req,
+                               uint64_t resume_from_byte, rac_http_body_chunk_fn cb,
+                               void* cb_user_data, rac_http_response_t* out_resp_meta) {
+    auto& s = js_transport_state();
+    if (s.request_resume != nullptr) {
+        return s.request_resume(user_data, req, resume_from_byte, cb, cb_user_data,
+                                out_resp_meta);
+    }
+    return emscripten_request_resume(user_data, req, resume_from_byte, cb, cb_user_data,
+                                     out_resp_meta);
+}
+
+const rac_http_transport_ops_t kJsOps = {
+    /*.request_send   =*/ js_request_send,
+    /*.request_stream =*/ js_request_stream,
+    /*.request_resume =*/ js_request_resume,
+    /*.init           =*/ nullptr,
+    /*.destroy        =*/ nullptr,
+};
+
 }  // namespace
 
 // =============================================================================
@@ -349,6 +434,54 @@ const rac_http_transport_ops_t kEmscriptenOps = {
 extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
     RAC_LOG_INFO(kTag, "Registering emscripten_fetch HTTP transport");
     return rac_http_transport_register(&kEmscriptenOps, /*user_data=*/nullptr);
+}
+
+// =============================================================================
+// JS-side registration (Stage 3d). Takes three function-table indices
+// (obtained from `Module.addFunction(fn, sig)` on the JS side) that match
+// `rac_http_transport_ops_t.request_send` / `_stream` / `_resume`. Any of
+// them may be null — the corresponding op falls back to emscripten_fetch.
+//
+// The JS side should call this AFTER WASM module load. Registration
+// installs the JS-fanout vtable into the transport registry, so the
+// libcurl router (or direct rac_http_request_* calls) dispatches to JS
+// for every subsequent HTTP request. This avoids the emscripten_fetch
+// ASYNCIFY requirement and lets the JS side plug in retry / caching /
+// service-worker routing.
+//
+// Pass all three pointers as 0 to unregister and fall back to pure
+// emscripten_fetch. The JS function-table indices remain owned by the JS
+// side (i.e. JS is responsible for the matching `removeFunction`).
+// =============================================================================
+
+extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
+    rac_result_t (*request_send_fp)(void*, const rac_http_request_t*,
+                                    rac_http_response_t*),
+    rac_result_t (*request_stream_fp)(void*, const rac_http_request_t*,
+                                      rac_http_body_chunk_fn, void*,
+                                      rac_http_response_t*),
+    rac_result_t (*request_resume_fp)(void*, const rac_http_request_t*, uint64_t,
+                                      rac_http_body_chunk_fn, void*,
+                                      rac_http_response_t*)) {
+    auto& s = js_transport_state();
+    s.request_send = request_send_fp;
+    s.request_stream = request_stream_fp;
+    s.request_resume = request_resume_fp;
+
+    // If all three were cleared, unregister (emscripten_fetch fallback
+    // remains reachable via rac_http_transport_register_emscripten()).
+    if (request_send_fp == nullptr && request_stream_fp == nullptr &&
+        request_resume_fp == nullptr) {
+        RAC_LOG_INFO(kTag, "JS HTTP transport unregistered");
+        return rac_http_transport_register(/*ops=*/nullptr, /*user_data=*/nullptr);
+    }
+
+    RAC_LOG_INFO(kTag,
+                 "Registering JS HTTP transport (send=%s, stream=%s, resume=%s)",
+                 request_send_fp ? "JS" : "emscripten_fetch",
+                 request_stream_fp ? "JS" : "emscripten_fetch",
+                 request_resume_fp ? "JS" : "emscripten_fetch");
+    return rac_http_transport_register(&kJsOps, /*user_data=*/nullptr);
 }
 
 // =============================================================================

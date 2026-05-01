@@ -157,6 +157,27 @@ export interface EmscriptenRunanywhereModule {
   _rac_solution_close_input(handle: number): number;
   _rac_solution_destroy(handle: number): void;
 
+  // -----------------------------------------------------------------------------
+  // HTTP transport registry (Stage 3d — JS-side fetch adapter)
+  // -----------------------------------------------------------------------------
+  // The JS layer installs function-table indices (from `addFunction`) for the
+  // transport vtable so HTTP requests route through `window.fetch()` directly
+  // instead of bouncing through `emscripten_fetch`. See
+  // `sdk/runanywhere-web/packages/core/src/Adapters/FetchHttpTransport.ts`
+  // for the scaffold and `sdk/runanywhere-commons/src/infrastructure/http/
+  // rac_http_client_emscripten.cpp` for the C side.
+  //
+  // Pass 0 for any slot to fall back to the emscripten_fetch adapter for
+  // that op; all-zero unregisters and restores the libcurl/emscripten_fetch
+  // default. Optional at type level: older WASM builds without the Stage 3d
+  // export will simply be missing this symbol — callers check with
+  // `typeof mod._rac_http_transport_register_from_js === 'function'`.
+  _rac_http_transport_register_from_js?(
+    requestSendPtr: number,
+    requestStreamPtr: number,
+    requestResumePtr: number,
+  ): number;
+
   // =============================================================================
   // Emscripten runtime helpers
   // =============================================================================

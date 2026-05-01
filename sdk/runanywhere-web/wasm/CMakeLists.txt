@@ -251,6 +251,10 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_http_transport_register"
     "_rac_http_transport_is_registered"
     "_rac_http_transport_register_emscripten"
+    # Stage 3d: JS-side adapter registration. JS provides function-table
+    # indices (from Module.addFunction) that implement the transport
+    # vtable directly in JS. See FetchHttpTransport.ts.
+    "_rac_http_transport_register_from_js"
 
     # Struct layout helpers used by HTTPAdapter.ts to pack/unpack
     # rac_http_request_t / rac_http_response_t / rac_http_download_request_t
