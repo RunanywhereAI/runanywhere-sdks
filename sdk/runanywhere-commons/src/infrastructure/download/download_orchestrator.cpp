@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "core/internal/platform_compat.h"
@@ -36,6 +37,7 @@
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "../http/rac_http_internal.h"
 
 static const char* LOG_TAG = "DownloadOrchestrator";
 
@@ -352,16 +354,23 @@ struct shared_ctx_holder {
 
 /**
  * HTTP progress callback — forwards to download manager which recalculates overall progress.
+ *
+ * Adapts the `rac_http_download_progress_fn` signature (uint64 / rac_bool_t return) to
+ * the existing `orchestrate_context` / download-manager progress API. Returning RAC_TRUE
+ * keeps the transfer going — the orchestrator currently never cancels from inside
+ * progress itself (download-manager observes cancellation separately).
  */
-static void orchestrate_http_progress(int64_t bytes_downloaded, int64_t total_bytes,
-                                      void* callback_user_data) {
+static rac_bool_t orchestrate_http_progress(uint64_t bytes_downloaded, uint64_t total_bytes,
+                                            void* callback_user_data) {
     auto* holder = static_cast<shared_ctx_holder*>(callback_user_data);
     if (!holder || !holder->ctx || !holder->ctx->dm_handle)
-        return;
+        return RAC_TRUE;
 
     auto& ctx = holder->ctx;
-    rac_download_manager_update_progress(ctx->dm_handle, ctx->task_id.c_str(), bytes_downloaded,
-                                         total_bytes);
+    rac_download_manager_update_progress(ctx->dm_handle, ctx->task_id.c_str(),
+                                         static_cast<int64_t>(bytes_downloaded),
+                                         static_cast<int64_t>(total_bytes));
+    return RAC_TRUE;
 }
 
 /**
@@ -558,24 +567,56 @@ rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle, c
     // Wrap in holder for C callback void* — callback takes ownership and deletes holder
     auto* holder = new shared_ctx_holder{ctx};
 
-    // 6. Start HTTP download via platform adapter
-    char* http_task_id = nullptr;
-    rac_result_t http_result =
-        rac_http_download(download_url, download_dest.c_str(), orchestrate_http_progress,
-                          orchestrate_http_complete, holder, &http_task_id);
+    // 6. Start HTTP download via the internal C++ facade (Stage 2 refactor).
+    //
+    // Previously this invoked the platform adapter's async `rac_http_download`
+    // callback, which returned immediately and delivered the completion on a
+    // platform-owned thread. The facade is synchronous, so we spawn a worker
+    // thread that drives the transfer via `rac::http::execute_stream` and then
+    // invokes `orchestrate_http_complete` — preserving the exact external
+    // contract (function returns immediately, completion callback fires later
+    // on a background thread).
+    std::thread([ctx, holder, download_url_str = std::string(download_url),
+                 download_dest_str = download_dest]() {
+        rac_http_download_request_t dl_req{};
+        dl_req.url = download_url_str.c_str();
+        dl_req.destination_path = download_dest_str.c_str();
+        dl_req.timeout_ms = 0;  // library default — matches old platform-adapter behaviour
+        dl_req.follow_redirects = RAC_TRUE;
+        dl_req.resume_from_byte = 0;
+        dl_req.expected_sha256_hex = nullptr;
 
-    if (http_result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_TAG, "Failed to start HTTP download for: %s", model_id);
-        rac_download_manager_mark_failed(dm_handle, task_id, http_result,
-                                         "Failed to start HTTP download");
-        delete holder;  // Safe — ctx shared_ptr ref still alive until scope exit
-        rac_free(task_id);
-        return http_result;
-    }
+        int32_t http_status = 0;
+        rac_http_download_status_t status = rac::http::execute_stream(
+            dl_req, orchestrate_http_progress, holder, &http_status);
 
-    if (http_task_id) {
-        rac_free(http_task_id);  // We track via download manager task_id instead
-    }
+        // Map the download status back to rac_result_t for the existing
+        // completion-callback signature. Anything non-OK maps to a download
+        // failure; the specific sub-code (cancel/timeout/etc.) is still
+        // available via the download manager's failure path.
+        rac_result_t rc = RAC_SUCCESS;
+        if (status != RAC_HTTP_DL_OK) {
+            switch (status) {
+                case RAC_HTTP_DL_CANCELLED:
+                    rc = RAC_ERROR_CANCELLED;
+                    break;
+                case RAC_HTTP_DL_TIMEOUT:
+                    rc = RAC_ERROR_TIMEOUT;
+                    break;
+                case RAC_HTTP_DL_INVALID_URL:
+                    rc = RAC_ERROR_INVALID_ARGUMENT;
+                    break;
+                default:
+                    rc = RAC_ERROR_DOWNLOAD_FAILED;
+                    break;
+            }
+        }
+
+        // Deliver the completion event on this worker thread — same threading
+        // contract as the old platform-adapter callback (invoked from a
+        // non-caller thread). orchestrate_http_complete deletes the holder.
+        orchestrate_http_complete(rc, download_dest_str.c_str(), holder);
+    }).detach();
 
     *out_task_id = task_id;
 
@@ -671,51 +712,37 @@ rac_result_t rac_download_orchestrate_multi(
 
         auto* file_holder = new multi_file_holder{barrier, file.is_required == RAC_TRUE};
 
-        auto file_complete = [](rac_result_t result, const char* /*path*/, void* ud) {
-            auto* holder = static_cast<multi_file_holder*>(ud);
-            if (!holder)
-                return;
+        // Stage 2 HTTP refactor: replace the async platform adapter with the
+        // synchronous C++ facade driven on a detached worker thread. The
+        // completion bookkeeping (barrier decrement, required-failed flag)
+        // stays identical so the outer wait loop still works unchanged.
+        std::thread([file_holder, file_url, dest_path]() {
+            rac_http_download_request_t dl_req{};
+            dl_req.url = file_url.c_str();
+            dl_req.destination_path = dest_path.c_str();
+            dl_req.timeout_ms = 0;
+            dl_req.follow_redirects = RAC_TRUE;
+            dl_req.resume_from_byte = 0;
+            dl_req.expected_sha256_hex = nullptr;
 
-            auto b = holder->barrier;
-            bool required = holder->is_required;
-            delete holder;
+            int32_t http_status = 0;
+            rac_http_download_status_t status = rac::http::execute_stream(
+                dl_req, nullptr /* no per-file progress */, nullptr, &http_status);
+
+            // Emulate the old `file_complete` callback inline.
+            auto b = file_holder->barrier;
+            bool required = file_holder->is_required;
+            delete file_holder;
 
             std::lock_guard<std::mutex> lk(b->mtx);
-            if (result != RAC_SUCCESS && required) {
+            if (status != RAC_HTTP_DL_OK && required) {
                 b->any_required_failed = true;
             }
             b->pending--;
             b->cv.notify_all();
-        };
+        }).detach();
 
-        char* http_task_id = nullptr;
-        rac_result_t http_result = rac_http_download(file_url.c_str(), dest_path.c_str(),
-                                                     nullptr /* no per-file progress */,
-                                                     file_complete, file_holder, &http_task_id);
-
-        if (http_task_id)
-            rac_free(http_task_id);
-
-        if (http_result != RAC_SUCCESS) {
-            // Download never started — callback won't fire, so clean up manually
-            delete file_holder;
-            {
-                std::lock_guard<std::mutex> lk(barrier->mtx);
-                barrier->pending--;  // undo the pre-increment
-            }
-
-            if (file.is_required == RAC_TRUE) {
-                RAC_LOG_ERROR(LOG_TAG, "Required file download failed to start: %s",
-                              file.relative_path);
-                launch_failed = true;
-                break;
-            }
-            RAC_LOG_WARNING(LOG_TAG, "Optional file download failed to start: %s",
-                            file.relative_path);
-            continue;
-        }
-
-        // Download started — async callback owns file_holder
+        // Download started — detached thread owns file_holder
     }
 
     // Wait for all in-flight downloads to complete before reporting final status

@@ -49,6 +49,7 @@
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_download.h"
+#include "../infrastructure/http/rac_http_internal.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -5938,9 +5939,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
         }
     }
 
+    // Route through the internal C++ streaming facade (Stage 2 refactor).
+    // Under the hood this still calls rac_http_download_execute, but
+    // going through the facade centralises where libcurl can be swapped
+    // out for the registered platform transport (Stage 5 deletion).
     int32_t http_status = 0;
-    rac_http_download_status_t status = rac_http_download_execute(
-        &req, listener ? jni_download_progress_cb : nullptr, &ctx, &http_status);
+    rac_http_download_status_t status = rac::http::execute_stream(
+        req, listener ? jni_download_progress_cb : nullptr, &ctx, &http_status);
 
     if (outHttpStatus) {
         jint tmp = static_cast<jint>(http_status);
@@ -6092,17 +6097,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
     req.timeout_ms      = timeoutMs > 0 ? timeoutMs : 0;
     req.follow_redirects = followRedirects == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
 
-    rac_http_client_t* client = nullptr;
-    rac_result_t crc = rac_http_client_create(&client);
-    if (crc != RAC_SUCCESS || !client) {
-        env->ReleaseStringUTFChars(jMethod, method);
-        env->ReleaseStringUTFChars(jUrl, url);
-        return build_native_http_response(env, -1, nullptr, 0, nullptr, 0,
-                                          "Failed to create HTTP client");
-    }
-
+    // Route through the internal C++ HTTP facade (Stage 2 refactor).
+    // The facade owns the rac_http_client_t lifecycle internally and
+    // routes the send through the registered platform transport when
+    // one is installed, else falls back to libcurl.
     rac_http_response_t resp{};
-    rac_result_t rc = rac_http_request_send(client, &req, &resp);
+    rac_result_t rc = rac::http::execute(req, resp);
 
     jobject result = nullptr;
     if (rc != RAC_SUCCESS) {
@@ -6123,7 +6123,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
     }
 
     rac_http_response_free(&resp);
-    rac_http_client_destroy(client);
 
     env->ReleaseStringUTFChars(jMethod, method);
     env->ReleaseStringUTFChars(jUrl, url);

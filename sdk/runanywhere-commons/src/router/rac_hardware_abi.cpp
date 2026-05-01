@@ -26,6 +26,13 @@
 #include <string>
 #include <vector>
 
+#if defined(__linux__) || defined(__ANDROID__)
+#include <unistd.h>  // sysconf / _SC_NPROCESSORS_ONLN
+#endif
+#if defined(__APPLE__)
+#include <sys/sysctl.h>  // sysctlbyname
+#endif
+
 #include "rac/core/rac_logger.h"
 #include "rac/router/rac_hardware_profile.h"
 

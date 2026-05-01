@@ -7,16 +7,14 @@
 
 #include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
-#include <condition_variable>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
-#include <mutex>
 #include <string>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "../../infrastructure/http/rac_http_internal.h"
 
 // Platform-specific file existence check
 #ifdef _WIN32
@@ -225,53 +223,43 @@ rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
 
     RAC_LOG_INFO("Diffusion.Tokenizer", "Downloading %s from %s", filename, url);
 
-    struct download_context {
-        std::mutex mutex;
-        std::condition_variable cv;
-        bool completed = false;
-        rac_result_t result = RAC_ERROR_DOWNLOAD_FAILED;
-    };
+    // Stage 2 HTTP refactor: route through the internal C++ facade.
+    // The facade does a synchronous streaming download + disk write,
+    // replacing the previous async-callback+cv pattern. Routing happens
+    // through the platform transport when one is registered (Swift /
+    // Kotlin / Flutter / RN / Web), otherwise libcurl.
+    rac_http_download_request_t dl_req{};
+    dl_req.url = url;
+    dl_req.destination_path = output_path;
+    dl_req.timeout_ms = 0;              // library default (same as old async path)
+    dl_req.follow_redirects = RAC_TRUE; // HuggingFace serves via redirects
+    dl_req.resume_from_byte = 0;
+    dl_req.expected_sha256_hex = nullptr;
 
-    auto progress_cb = [](int64_t /*downloaded*/, int64_t /*total*/, void* /*user_data*/) {};
+    int32_t http_status = 0;
+    rac_http_download_status_t status =
+        rac::http::execute_stream(dl_req, nullptr /* no progress reporting needed */,
+                                  nullptr /* no user data */, &http_status);
 
-    auto complete_cb = [](rac_result_t result, const char* /*downloaded_path*/, void* user_data) {
-        auto* ctx = static_cast<download_context*>(user_data);
-        if (!ctx) {
-            return;
+    if (status != RAC_HTTP_DL_OK) {
+        RAC_LOG_ERROR("Diffusion.Tokenizer",
+                      "HTTP download failed: status=%d http=%d url=%s",
+                      static_cast<int>(status), static_cast<int>(http_status), url);
+        // Map the rac_http_download_status_t back to an rac_result_t so the
+        // caller contract (return type is rac_result_t) stays intact.
+        switch (status) {
+            case RAC_HTTP_DL_CANCELLED:
+                return RAC_ERROR_CANCELLED;
+            case RAC_HTTP_DL_TIMEOUT:
+                return RAC_ERROR_TIMEOUT;
+            case RAC_HTTP_DL_INVALID_URL:
+                return RAC_ERROR_INVALID_ARGUMENT;
+            default:
+                return RAC_ERROR_DOWNLOAD_FAILED;
         }
-        {
-            std::lock_guard<std::mutex> lock(ctx->mutex);
-            ctx->result = result;
-            ctx->completed = true;
-        }
-        ctx->cv.notify_one();
-    };
-
-    download_context ctx;
-    char* task_id = nullptr;
-
-    rac_result_t start_result =
-        rac_http_download(url, output_path, progress_cb, complete_cb, &ctx, &task_id);
-    if (start_result != RAC_SUCCESS) {
-        if (task_id) {
-            rac_free(task_id);
-        }
-        RAC_LOG_ERROR("Diffusion.Tokenizer", "HTTP download start failed: %d", start_result);
-        return start_result;
     }
 
-    std::unique_lock<std::mutex> lock(ctx.mutex);
-    ctx.cv.wait(lock, [&ctx]() { return ctx.completed; });
-
-    if (task_id) {
-        rac_free(task_id);
-    }
-
-    if (ctx.result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("Diffusion.Tokenizer", "HTTP download failed: %d", ctx.result);
-    }
-
-    return ctx.result;
+    return RAC_SUCCESS;
 }
 
 // =============================================================================
