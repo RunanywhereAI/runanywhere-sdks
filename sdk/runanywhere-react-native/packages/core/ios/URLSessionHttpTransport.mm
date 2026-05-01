@@ -22,6 +22,9 @@
 
 #import <Foundation/Foundation.h>
 
+#include <mach/clock.h>
+#include <mach/mach.h>
+
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
