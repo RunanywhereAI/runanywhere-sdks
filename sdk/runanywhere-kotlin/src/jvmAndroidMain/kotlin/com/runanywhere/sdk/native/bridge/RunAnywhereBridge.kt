@@ -86,16 +86,6 @@ object RunAnywhereBridge {
     external fun racIsInitialized(): Boolean
 
     // ========================================================================
-    // TLS CONFIGURATION (rac_http_client.h)
-    // ========================================================================
-    // Required on Android builds that use bundled mbedTLS (no system trust
-    // store). Call before the first HTTPS request — typically from the
-    // Application's onCreate after copying cacert.pem out of assets.
-
-    @JvmStatic
-    external fun racHttpClientSetCaBundle(path: String?): Int
-
-    // ========================================================================
     // PLATFORM ADAPTER (rac_platform_adapter.h)
     // ========================================================================
 

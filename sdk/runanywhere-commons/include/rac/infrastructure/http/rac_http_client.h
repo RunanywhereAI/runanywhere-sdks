@@ -212,27 +212,6 @@ RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_htt
 RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
 // =============================================================================
-// TLS CONFIGURATION
-// =============================================================================
-
-/**
- * @brief Set the CA bundle path used for HTTPS verification.
- *
- * Required on Android builds that use bundled mbedTLS (no system trust
- * store). iOS / Windows / Linux pick up their platform trust stores
- * automatically; this setter is a no-op but still accepted.
- *
- * Pass NULL or empty string to clear. The path is copied internally;
- * caller retains ownership. Thread-safe; may be called at any time,
- * though typically invoked once at SDK init before the first HTTPS
- * request.
- *
- * @return RAC_SUCCESS always (even if the path points to a nonexistent
- *         file — libcurl will surface that at request time).
- */
-RAC_API rac_result_t rac_http_client_set_ca_bundle(const char* path);
-
-// =============================================================================
 // RESULT CODES
 // =============================================================================
 // Phase H consumers only need to check against RAC_SUCCESS; the other
@@ -245,7 +224,8 @@ RAC_API rac_result_t rac_http_client_set_ca_bundle(const char* path);
 //   RAC_ERROR_NETWORK_ERROR         — DNS / connect / TLS failure
 //   RAC_ERROR_TIMEOUT               — timeout_ms exceeded
 //   RAC_ERROR_CANCELLED             — chunk callback returned RAC_FALSE
-//   RAC_ERROR_INTERNAL              — libcurl internal error
+//   RAC_ERROR_FEATURE_NOT_AVAILABLE — no platform transport registered
+//   RAC_ERROR_INTERNAL              — adapter internal error
 // =============================================================================
 
 #ifdef __cplusplus

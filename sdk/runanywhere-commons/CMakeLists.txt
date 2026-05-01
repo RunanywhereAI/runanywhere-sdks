@@ -397,120 +397,19 @@ endif()
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 
 # =============================================================================
-# libcurl (v2 close-out Phase H — HTTP transport into commons)
+# HTTP transport (v2 close-out Phase H, Stage S5 — libcurl removed)
 # =============================================================================
-# Used by src/infrastructure/http/rac_http_client_curl.cpp. Prefer the
-# system package (brew/apt/NDK/Xcode SDK); only fall back to
-# FetchContent on targets where libcurl isn't reliably on the
-# CMAKE_PREFIX_PATH (Windows MSVC, some CI runners).
+# The native `rac_http_client_*` C ABI no longer bundles libcurl or any
+# TLS backend. Every SDK registers a platform HTTP transport adapter
+# via `rac_http_transport_register` during init (OkHttp on Android,
+# URLSession on Apple, dart:io on Flutter, emscripten_fetch / JS fetch
+# on WASM, JSI fetch on RN). The default client implementation in
+# `src/infrastructure/http/rac_http_client_default.cpp` dispatches
+# every public call through the registered vtable.
 #
-# B03 fix: on Emscripten the WASM sandbox cannot open raw sockets, so
-# libcurl's transport layer is useless at runtime. We skip libcurl +
-# mbedTLS entirely and route the `rac_http_client_*` ABI through the
-# browser's fetch() API via `rac_http_client_emscripten.cpp` instead.
-if(EMSCRIPTEN)
-    message(STATUS "Emscripten target: skipping libcurl; using browser fetch() shim for rac_http_client")
-    set(CURL_FOUND FALSE CACHE BOOL "" FORCE)
-else()
-find_package(CURL QUIET)
-if(NOT CURL_FOUND)
-    message(STATUS "System libcurl not found — bundling curl-7_88_1 via FetchContent...")
-    if(NOT DEFINED CURL_FETCH_VERSION)
-        set(CURL_FETCH_VERSION "curl-7_88_1")
-    endif()
-    FetchContent_Declare(
-        curl_fetched
-        GIT_REPOSITORY https://github.com/curl/curl.git
-        GIT_TAG        ${CURL_FETCH_VERSION}
-        GIT_SHALLOW    TRUE
-    )
-    set(BUILD_CURL_EXE      OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
-    set(CURL_ENABLE_EXPORT_TARGET OFF CACHE BOOL "" FORCE)
-    set(CURL_STATICLIB      ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_LDAP   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_LDAPS  ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_RTSP   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_DICT   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_FILE   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_FTP    ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_GOPHER ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_IMAP   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_MQTT   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_POP3   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_SMB    ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_SMTP   ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_TELNET ON  CACHE BOOL "" FORCE)
-    set(CURL_DISABLE_TFTP   ON  CACHE BOOL "" FORCE)
-    set(BUILD_TESTING       OFF CACHE BOOL "" FORCE)
-    # Pick a TLS backend sensibly per platform when bundling. Apple/Windows
-    # use the native provider so we don't pull OpenSSL into the iOS
-    # xcframework or the Windows DLL. `CURL_USE_SECTRANSP` / `CURL_USE_SCHANNEL`
-    # are the curl 7.86+ variable names; the pre-7.86 `CMAKE_USE_*` names
-    # are no longer honoured by curl 7.88.1. Explicitly disable OpenSSL so
-    # curl's CMake doesn't fall through to `find_package(OpenSSL REQUIRED)`
-    # which has no valid target on the iOS sysroot.
-    if(APPLE)
-        set(CURL_USE_SECTRANSP ON  CACHE BOOL "" FORCE)
-        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
-    elseif(WIN32)
-        set(CURL_USE_SCHANNEL ON  CACHE BOOL "" FORCE)
-        set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
-    elseif(ANDROID)
-        # Android: bundle mbedTLS via FetchContent so curl has a working TLS
-        # backend baked into the static library. The Android NDK does NOT ship
-        # OpenSSL (it was removed in NDK r19+), and the comment block in the
-        # earlier round-1 attempt that claimed "use Android system SSL via
-        # find_package(OpenSSL)" was wrong: find_package(OpenSSL) returns
-        # nothing on a stock NDK sysroot, so curl fell through to compiling
-        # WITHOUT TLS, which silently disables HTTPS at the protocol-check
-        # stage (CURLE_UNSUPPORTED_PROTOCOL = 1, exactly what AG-DV1/2/3
-        # observed in Phase 8 device testing).
-        #
-        # mbedTLS is small (~1MB), self-contained, and curl supports it via
-        # CURL_USE_MBEDTLS=ON. We FetchContent it before curl so its targets
-        # exist at curl's `find_package(MbedTLS)` lookup.
-        FetchContent_Declare(
-            mbedtls_fetched
-            GIT_REPOSITORY https://github.com/Mbed-TLS/mbedtls.git
-            GIT_TAG        v3.6.2
-            GIT_SHALLOW    TRUE
-        )
-        set(ENABLE_PROGRAMS    OFF CACHE BOOL "" FORCE)
-        set(ENABLE_TESTING     OFF CACHE BOOL "" FORCE)
-        set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
-        set(USE_STATIC_MBEDTLS_LIBRARY ON  CACHE BOOL "" FORCE)
-        set(MBEDTLS_AS_SUBPROJECT      ON  CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(mbedtls_fetched)
-        # Tell curl to use mbedTLS. Curl 7.88.1's CMake looks for `MBEDTLS::*`
-        # imported targets and `MBEDTLS_INCLUDE_DIRS` / `MBEDTLS_LIBRARIES`.
-        # mbedTLS 3.6.x exports `MbedTLS::mbedtls`, `MbedTLS::mbedx509`,
-        # `MbedTLS::mbedcrypto` — translate those into the variable names curl
-        # expects.
-        set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
-        set(CURL_USE_MBEDTLS  ON  CACHE BOOL "" FORCE)
-        if(TARGET MbedTLS::mbedtls)
-            get_target_property(_rac_mbedtls_inc MbedTLS::mbedtls INTERFACE_INCLUDE_DIRECTORIES)
-            set(MBEDTLS_INCLUDE_DIRS "${_rac_mbedtls_inc}" CACHE PATH "" FORCE)
-            set(MBEDTLS_LIBRARY      $<TARGET_FILE:MbedTLS::mbedtls>     CACHE FILEPATH "" FORCE)
-            set(MBEDX509_LIBRARY     $<TARGET_FILE:MbedTLS::mbedx509>    CACHE FILEPATH "" FORCE)
-            set(MBEDCRYPTO_LIBRARY   $<TARGET_FILE:MbedTLS::mbedcrypto>  CACHE FILEPATH "" FORCE)
-        endif()
-        # Explicitly DO NOT disable HTTPS — that's the old bug.
-    endif()
-    FetchContent_MakeAvailable(curl_fetched)
-    # The target built by curl's CMake is `libcurl` (static).
-    if(TARGET libcurl AND NOT TARGET CURL::libcurl)
-        add_library(CURL::libcurl ALIAS libcurl)
-    elseif(TARGET libcurl_static AND NOT TARGET CURL::libcurl)
-        add_library(CURL::libcurl ALIAS libcurl_static)
-    endif()
-    set(CURL_FOUND TRUE CACHE BOOL "" FORCE)
-    message(STATUS "Bundled libcurl ready (${CURL_FETCH_VERSION})")
-else()
-    message(STATUS "Using system libcurl: ${CURL_LIBRARIES}")
-endif()
-endif()  # NOT EMSCRIPTEN (libcurl skipped on WASM — see rac_http_client_emscripten.cpp)
+# No CURL FetchContent. No mbedTLS. No CA bundle. TLS trust comes from
+# whatever stack the adapter uses (the OS system store on every native
+# target, the browser on WASM).
 
 # =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
@@ -649,19 +548,18 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
-    # v2 close-out Phase H / H7 — native HTTP transport.
-    # - Native targets (macOS/iOS/Android/Windows/Linux): libcurl-backed.
-    # - Emscripten/WASM: browser fetch() shim. The WASM runtime cannot
-    #   open raw sockets so libcurl is useless there; the shim calls
-    #   `emscripten_fetch` so HTTPS is handled by the browser stack
-    #   (B03 fix — `CURL_DISABLE_HTTPS=ON` previously meant the WASM
-    #   build compiled in libcurl but with HTTPS silently disabled).
-    # H7 refactor: the emscripten shim now *also* exposes a vtable
-    # registration entry point (rac_http_transport_register_emscripten)
-    # so it participates in the same transport-router pattern Swift /
-    # Kotlin / Flutter / RN use. Its direct rac_http_request_* symbols
-    # are kept for back-compat since libcurl isn't compiled on WASM.
-    $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:src/infrastructure/http/rac_http_client_curl.cpp>
+    # v2 close-out Phase H / H7 / S5 — native HTTP transport.
+    # - Native targets (macOS/iOS/Android/Windows/Linux): the default
+    #   client in rac_http_client_default.cpp dispatches every request
+    #   through the platform transport vtable registered by the owning
+    #   SDK (OkHttp, URLSession, dart:io, ...). libcurl + mbedTLS were
+    #   deleted in S5; every SDK MUST register an adapter during init.
+    # - Emscripten/WASM: the emscripten_fetch shim provides both the
+    #   `rac_http_transport_register_emscripten` / `_from_js` entry
+    #   points AND direct implementations of the public C ABI (it's
+    #   the only HTTP surface in the WASM build — no library-level
+    #   adapter yet needs to handle the "no adapter registered" case).
+    $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:src/infrastructure/http/rac_http_client_default.cpp>
     $<$<BOOL:${EMSCRIPTEN}>:src/infrastructure/http/rac_http_client_emscripten.cpp>
     src/infrastructure/http/rac_http_download.cpp
     # v2 close-out Phase H2 — platform HTTP transport vtable / registry.
@@ -878,20 +776,17 @@ else()
 endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
-# libcurl — PUBLIC so tests and SDK adapters (rac_commons_jni) pick it
-# up transitively. Skipped on Emscripten where HTTP goes through the
-# browser's fetch() API (see rac_http_client_emscripten.cpp).
+# HTTP transport — S5: libcurl deleted. On Emscripten we still link
+# the `-sFETCH=1` runtime glue so emscripten_fetch is available inside
+# `rac_http_client_emscripten.cpp`. On every other target the default
+# client dispatches through the platform transport vtable and needs
+# no extra link dependencies here.
 if(EMSCRIPTEN)
     # -sFETCH=1 links `emscripten_fetch()` + its JS glue into the
     # final .wasm bundle. Needs to be both a compile and a link flag so
     # the header is visible and the runtime function is exported.
     target_compile_options(rac_commons PUBLIC "-sFETCH=1")
     target_link_options(rac_commons PUBLIC "-sFETCH=1")
-elseif(TARGET CURL::libcurl)
-    target_link_libraries(rac_commons PUBLIC CURL::libcurl)
-else()
-    target_link_libraries(rac_commons PUBLIC ${CURL_LIBRARIES})
-    target_include_directories(rac_commons PUBLIC ${CURL_INCLUDE_DIRS})
 endif()
 
 # =============================================================================
