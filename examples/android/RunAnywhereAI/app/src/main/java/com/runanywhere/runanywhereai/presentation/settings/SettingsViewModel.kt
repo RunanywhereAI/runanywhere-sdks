@@ -346,17 +346,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clean temporary files
+     * Clean temporary files: app cache dir, the SDK's downloads scratch directory,
+     * and any leftover *.tmp_archive files in the models tree. Does NOT touch the
+     * inference KV cache (clearCache() is a separate operation) and does NOT touch
+     * the GGUF model blobs themselves.
      */
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Timber.d("Cleaning temp files (via clearing cache)...")
-                // Clean temp files by clearing cache
-                RunAnywhere.clearCache()
-                Timber.d("Temp files cleaned successfully")
+                val context = getApplication<Application>()
+                Timber.d("Cleaning temp files in ${context.filesDir}...")
 
-                // Refresh storage data after cleaning
+                val downloadsDir = java.io.File(context.filesDir, "runanywhere/data/downloads")
+                if (downloadsDir.exists()) {
+                    downloadsDir.listFiles()?.forEach { it.deleteRecursively() }
+                }
+
+                context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+
+                val modelsRoot = java.io.File(context.filesDir, "runanywhere/models")
+                if (modelsRoot.exists()) {
+                    modelsRoot.walkTopDown()
+                        .filter { it.isFile && it.name.endsWith(".tmp_archive") }
+                        .forEach { it.delete() }
+                }
+
+                Timber.d("Temp files cleaned successfully")
                 loadStorageData()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to clean temp files")

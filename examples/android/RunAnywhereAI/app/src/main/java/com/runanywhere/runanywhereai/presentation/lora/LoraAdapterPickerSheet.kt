@@ -143,8 +143,22 @@ fun LoraAdapterPickerSheet(
                                 loraViewModel.loadAdapter(path, scale)
                             },
                             onRemove = {
-                                val path = loraViewModel.localPath(entry) ?: return@CatalogAdapterRow
-                                loraViewModel.unloadAdapter(path)
+                                // Use the SAME path the SDK reported for the loaded adapter (mirrors
+                                // the X-icon path in Active Adapters above). Falling back to the
+                                // catalog's localPath can fail with -1 if the SDK normalised the path
+                                // (e.g. trailing slashes / symlinks) when the adapter was loaded.
+                                val catalogPath = loraViewModel.localPath(entry)
+                                val loadedPath =
+                                    state.loadedAdapters.firstOrNull { loaded ->
+                                        catalogPath != null && loaded.adapter_path == catalogPath
+                                    }?.adapter_path
+                                        ?: state.loadedAdapters.firstOrNull { loaded ->
+                                            loaded.adapter_path.endsWith("/${entry.filename}") ||
+                                                loaded.adapter_path.substringAfterLast("/") == entry.filename
+                                        }?.adapter_path
+                                if (loadedPath != null) {
+                                    loraViewModel.unloadAdapter(loadedPath)
+                                }
                             },
                         )
                     }
