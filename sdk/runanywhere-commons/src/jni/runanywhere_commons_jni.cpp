@@ -4327,18 +4327,70 @@ static std::string buildVlmResultJson(const std::string& text, const rac_vlm_res
     return j.dump();
 }
 
+// Helper: Map proto VLMImageFormat enum value (runanywhere.v1.VLMImageFormat) to
+// the C ABI rac_vlm_image_format_t. The proto enum is the cross-SDK union
+// (FILE_PATH=7, RAW_RGB=4, RAW_RGBA=5, BASE64=6, JPEG=1, PNG=2, WEBP=3) while the
+// C ABI exposes only three values (FILE_PATH=0, RGB_PIXELS=1, BASE64=2). The
+// Kotlin SDK forwards proto values directly across JNI; this function performs
+// the translation Swift's RAVLMImageFormat → RAC_VLM_IMAGE_FORMAT_* does on iOS.
+// Returns false if the proto value has no C ABI equivalent.
+static bool mapProtoVlmFormatToC(jint protoFormat, rac_vlm_image_format_t& out) {
+    // Proto enum values from runanywhere.v1.VLMImageFormat (vlm_options.proto).
+    constexpr jint PROTO_UNSPECIFIED = 0;
+    constexpr jint PROTO_JPEG = 1;
+    constexpr jint PROTO_PNG = 2;
+    constexpr jint PROTO_WEBP = 3;
+    constexpr jint PROTO_RAW_RGB = 4;
+    constexpr jint PROTO_RAW_RGBA = 5;
+    constexpr jint PROTO_BASE64 = 6;
+    constexpr jint PROTO_FILE_PATH = 7;
+
+    switch (protoFormat) {
+        case PROTO_FILE_PATH:
+            out = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
+            return true;
+        case PROTO_RAW_RGB:
+        case PROTO_RAW_RGBA:
+            out = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
+            return true;
+        case PROTO_BASE64:
+            out = RAC_VLM_IMAGE_FORMAT_BASE64;
+            return true;
+        case PROTO_UNSPECIFIED:
+        case PROTO_JPEG:
+        case PROTO_PNG:
+        case PROTO_WEBP:
+        default:
+            // No C ABI mapping for encoded container hints today — the C ABI
+            // expects raw pixels, file path, or base64. Caller will treat as
+            // an invalid input.
+            return false;
+    }
+}
+
 // Helper: Populate rac_vlm_image_t from JNI parameters
 static void fillVlmImage(rac_vlm_image_t& image, jint imageFormat, const std::string& imagePath,
                          JNIEnv* env, jbyteArray imageData, const std::string& imageBase64,
                          jint imageWidth, jint imageHeight, const uint8_t*& pixelDataOut) {
     memset(&image, 0, sizeof(image));
-    image.format = static_cast<rac_vlm_image_format_t>(imageFormat);
+
+    rac_vlm_image_format_t cFormat = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
+    if (!mapProtoVlmFormatToC(imageFormat, cFormat)) {
+        LOGe("fillVlmImage: unrecognized proto VLMImageFormat value %d "
+             "(expected FILE_PATH=7, RAW_RGB=4, RAW_RGBA=5, or BASE64=6)",
+             imageFormat);
+        // Leave image zeroed — callers will surface RAC_ERROR_INVALID_INPUT.
+        return;
+    }
+    image.format = cFormat;
     image.width = static_cast<uint32_t>(imageWidth);
     image.height = static_cast<uint32_t>(imageHeight);
 
     switch (image.format) {
         case RAC_VLM_IMAGE_FORMAT_FILE_PATH:
             image.file_path = imagePath.empty() ? nullptr : imagePath.c_str();
+            LOGi("fillVlmImage: FILE_PATH '%s'",
+                 image.file_path ? image.file_path : "(null)");
             break;
         case RAC_VLM_IMAGE_FORMAT_RGB_PIXELS:
             if (imageData != nullptr) {
@@ -4351,12 +4403,19 @@ static void fillVlmImage(rac_vlm_image_t& image, jint imageFormat, const std::st
                 image.pixel_data = buf;
                 image.data_size = static_cast<size_t>(len);
                 pixelDataOut = buf;
+                LOGi("fillVlmImage: RGB_PIXELS %ux%u (%zu bytes)", image.width, image.height,
+                     image.data_size);
+            } else {
+                LOGe("fillVlmImage: RGB_PIXELS but imageData is null");
             }
             break;
         case RAC_VLM_IMAGE_FORMAT_BASE64:
             image.base64_data = imageBase64.empty() ? nullptr : imageBase64.c_str();
             if (image.base64_data) {
                 image.data_size = imageBase64.length();
+                LOGi("fillVlmImage: BASE64 (%zu bytes)", image.data_size);
+            } else {
+                LOGe("fillVlmImage: BASE64 but imageBase64 is empty");
             }
             break;
     }
