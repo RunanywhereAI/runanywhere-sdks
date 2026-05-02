@@ -1065,6 +1065,12 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
+    // Read the on-disk path BEFORE removing the registry entry so the lookup still works.
+    val localPath = CppBridgeModelRegistry.get(modelId)?.localPath
+    if (!localPath.isNullOrEmpty()) {
+        runCatching { File(localPath).deleteRecursively() }
+            .onFailure { modelsLogger.warning("Failed to delete $modelId at $localPath: ${it.message}") }
+    }
     CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId)
     CppBridgeModelRegistry.remove(modelId)
 }
