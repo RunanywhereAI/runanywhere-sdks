@@ -5942,6 +5942,44 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
 }
 
 // =============================================================================
+// JNI FUNCTIONS - TLS trust store (CA bundle path for libcurl/mbedTLS).
+// =============================================================================
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpSetCaBundlePath(
+    JNIEnv* env, jclass /*clazz*/, jstring jPath) {
+    if (jPath == nullptr) {
+        rac_http_set_ca_bundle_path(nullptr);
+        return;
+    }
+    const char* path = env->GetStringUTFChars(jPath, nullptr);
+    if (path == nullptr) {
+        return;
+    }
+    rac_http_set_ca_bundle_path(path);
+    env->ReleaseStringUTFChars(jPath, path);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpGetCaBundlePath(
+    JNIEnv* env, jclass /*clazz*/) {
+    const char* path = rac_http_get_ca_bundle_path();
+    return path ? env->NewStringUTF(path) : nullptr;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpSetSkipTlsVerification(
+    JNIEnv* /*env*/, jclass /*clazz*/, jboolean jSkip) {
+    rac_http_set_skip_tls_verification(jSkip == JNI_TRUE ? RAC_TRUE : RAC_FALSE);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpGetSkipTlsVerification(
+    JNIEnv* /*env*/, jclass /*clazz*/) {
+    return rac_http_get_skip_tls_verification() == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+}
+
+// =============================================================================
 // JNI FUNCTIONS - Native HTTP request/response (v2.1 quick-wins, T3.5)
 // =============================================================================
 //

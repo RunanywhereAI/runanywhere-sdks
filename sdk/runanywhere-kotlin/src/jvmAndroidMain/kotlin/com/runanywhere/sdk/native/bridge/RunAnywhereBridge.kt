@@ -96,6 +96,30 @@ object RunAnywhereBridge {
     external fun racGetPlatformAdapter(): Any?
 
     // ========================================================================
+    // TLS TRUST STORE (rac_http_client.h)
+    // ========================================================================
+    // Android's NDK libcurl uses mbedTLS, which has no built-in CA store.
+    // The host MUST register a path to a PEM file (Mozilla's cacert.pem
+    // is bundled in the SDK's android assets) before any HTTPS request.
+
+    @JvmStatic
+    external fun racHttpSetCaBundlePath(path: String?)
+
+    @JvmStatic
+    external fun racHttpGetCaBundlePath(): String?
+
+    /**
+     * Toggle libcurl TLS peer/host verification at runtime. Debug-build escape
+     * hatch on Android while the bundled `cacert.pem` is being made
+     * mbedTLS-compatible. Release builds MUST leave this off.
+     */
+    @JvmStatic
+    external fun racHttpSetSkipTlsVerification(skip: Boolean)
+
+    @JvmStatic
+    external fun racHttpGetSkipTlsVerification(): Boolean
+
+    // ========================================================================
     // LOGGING (rac_logger.h)
     // ========================================================================
 

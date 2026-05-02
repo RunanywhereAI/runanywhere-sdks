@@ -212,6 +212,54 @@ RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_htt
 RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
 // =============================================================================
+// TLS TRUST STORE
+// =============================================================================
+
+/**
+ * @brief Register a path to a PEM-encoded CA bundle used to verify HTTPS peers.
+ *
+ * Required on Android — the NDK's libcurl is linked against mbedTLS, which has
+ * no built-in trust store, so HTTPS verification fails (curl error 77) unless
+ * the host supplies a CA bundle. The host SDK copies a bundled `cacert.pem`
+ * (Mozilla's trust store) onto the filesystem and registers its absolute path
+ * here before issuing any HTTPS request.
+ *
+ * Pass NULL to clear the override and fall back to libcurl's compiled-in
+ * defaults (works on macOS/iOS where Secure Transport / OpenSSL provides a
+ * trust store).
+ *
+ * Thread-safe; safe to call multiple times.
+ */
+RAC_API void rac_http_set_ca_bundle_path(const char* path);
+
+/**
+ * @brief Returns the currently registered CA bundle path, or NULL.
+ * The pointer is owned by the http subsystem; do not free.
+ */
+RAC_API const char* rac_http_get_ca_bundle_path(void);
+
+/**
+ * @brief Toggle TLS peer/host verification at runtime.
+ *
+ * When `skip == RAC_TRUE`, libcurl is configured with
+ * `CURLOPT_SSL_VERIFYPEER=0` and `CURLOPT_SSL_VERIFYHOST=0` for every
+ * subsequent request, bypassing the trust store entirely. Intended as a
+ * debug-build escape hatch for Android, where mbedTLS rejects some legacy
+ * roots in the bundled Mozilla `cacert.pem` and trips CURLE_SSL_CACERT_BADFILE.
+ *
+ * Release builds MUST leave this off and rely on a working CA bundle.
+ *
+ * Thread-safe; safe to call multiple times.
+ */
+RAC_API void rac_http_set_skip_tls_verification(rac_bool_t skip);
+
+/**
+ * @brief Returns RAC_TRUE iff TLS verification is currently disabled via
+ * `rac_http_set_skip_tls_verification`.
+ */
+RAC_API rac_bool_t rac_http_get_skip_tls_verification(void);
+
+// =============================================================================
 // RESULT CODES
 // =============================================================================
 // Phase H consumers only need to check against RAC_SUCCESS; the other

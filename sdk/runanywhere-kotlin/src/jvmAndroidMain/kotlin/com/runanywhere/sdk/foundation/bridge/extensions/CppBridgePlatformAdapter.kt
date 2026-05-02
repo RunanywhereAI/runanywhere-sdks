@@ -56,6 +56,90 @@ object CppBridgePlatformAdapter {
     private var platformStorage: PlatformSecureStorage? = null
 
     /**
+     * Absolute path to a PEM-encoded CA bundle. mbedTLS-backed libcurl on
+     * Android needs this; the host SDK populates it during platform init,
+     * and [register] pushes it to the native side once the JNI library is
+     * loaded.
+     */
+    @Volatile
+    private var caBundlePath: String? = null
+
+    /**
+     * Cached value for the runtime skip-TLS-verification flag. Pushed to
+     * native after [register]; pre-register callers cache it here.
+     */
+    @Volatile
+    private var skipTlsVerification: Boolean = false
+
+    /**
+     * Cache the CA bundle path that the native libcurl will use for HTTPS
+     * verification. On Android the host should call this with the absolute
+     * path of an extracted `cacert.pem` (e.g. `${filesDir}/cacert.pem`)
+     * before SDK initialization. Calling after [register] also re-pushes
+     * the path to the native side.
+     */
+    fun setCaBundlePath(path: String?) {
+        synchronized(lock) {
+            caBundlePath = path
+            if (isRegistered) {
+                pushCaBundlePathToNative(path)
+            }
+        }
+    }
+
+    fun getCaBundlePath(): String? = caBundlePath
+
+    private fun pushCaBundlePathToNative(path: String?) {
+        try {
+            RunAnywhereBridge.racHttpSetCaBundlePath(path)
+            logCallback(
+                LogLevel.INFO,
+                TAG,
+                if (path != null) "Registered CA bundle path with native HTTP: $path" else "Cleared CA bundle path",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            logCallback(LogLevel.ERROR, TAG, "Failed to push CA bundle path: native library not loaded (${e.message})")
+        } catch (e: Exception) {
+            logCallback(LogLevel.ERROR, TAG, "Failed to push CA bundle path: ${e.message}")
+        }
+    }
+
+    /**
+     * Toggle the native runtime skip-TLS-verification flag. Cached locally
+     * before the JNI library is loaded; pushed to native immediately when
+     * already registered. Intended for debug builds on Android only.
+     */
+    fun setSkipTlsVerification(skip: Boolean) {
+        synchronized(lock) {
+            skipTlsVerification = skip
+            if (isRegistered) {
+                pushSkipTlsVerificationToNative(skip)
+            }
+        }
+    }
+
+    fun getSkipTlsVerification(): Boolean = skipTlsVerification
+
+    private fun pushSkipTlsVerificationToNative(skip: Boolean) {
+        try {
+            RunAnywhereBridge.racHttpSetSkipTlsVerification(skip)
+            logCallback(
+                LogLevel.INFO,
+                TAG,
+                "Pushed skip-TLS-verification flag to native HTTP: $skip",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            logCallback(
+                LogLevel.ERROR,
+                TAG,
+                "Failed to push skip-TLS-verification flag: native library not loaded (${e.message})",
+            )
+        } catch (e: Exception) {
+            logCallback(LogLevel.ERROR, TAG, "Failed to push skip-TLS-verification flag: ${e.message}")
+        }
+    }
+
+    /**
      * Tag for logging.
      */
     private const val TAG = "CppBridge"
@@ -121,6 +205,17 @@ object CppBridgePlatformAdapter {
             }
 
             isRegistered = true
+
+            // Push any pre-cached CA bundle path to the native HTTP transport
+            // now that the JNI library is loaded and the adapter is in place.
+            caBundlePath?.let { pushCaBundlePathToNative(it) }
+
+            // Push the skip-TLS-verification flag whenever it differs from the
+            // native default (false). Always pushing on true keeps debug-build
+            // semantics deterministic regardless of native library load order.
+            if (skipTlsVerification) {
+                pushSkipTlsVerificationToNative(true)
+            }
         }
     }
 

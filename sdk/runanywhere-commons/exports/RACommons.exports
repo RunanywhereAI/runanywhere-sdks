@@ -83,6 +83,12 @@ _rac_find_model_path_after_extraction
 _rac_http_download
 _rac_http_download_cancel
 
+# HTTP TLS trust store (libcurl/mbedTLS CA bundle path)
+_rac_http_set_ca_bundle_path
+_rac_http_get_ca_bundle_path
+_rac_http_set_skip_tls_verification
+_rac_http_get_skip_tls_verification
+
 # File Manager
 _rac_file_manager_cache_size
 _rac_file_manager_calculate_dir_size

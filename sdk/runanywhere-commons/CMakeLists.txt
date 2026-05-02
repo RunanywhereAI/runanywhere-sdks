@@ -392,9 +392,13 @@ message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 # CMAKE_PREFIX_PATH (Windows MSVC, some CI runners).
 find_package(CURL QUIET)
 if(NOT CURL_FOUND)
-    message(STATUS "System libcurl not found — bundling curl-7_88_1 via FetchContent...")
+    message(STATUS "System libcurl not found — bundling curl via FetchContent...")
     if(NOT DEFINED CURL_FETCH_VERSION)
-        set(CURL_FETCH_VERSION "curl-7_88_1")
+        # 8.10.1 fixes the mbedTLS init-order bug in 8.5.0 (mbedtls_ssl_setup
+        # was called before mbedtls_ssl_conf_rng, which triggers
+        # MBEDTLS_ERR_SSL_NO_RNG / "ssl_init failed" against mbedTLS 3.6+).
+        # Fix landed in curl 8.6.0; staying on a stable patch release.
+        set(CURL_FETCH_VERSION "curl-8_10_1")
     endif()
     FetchContent_Declare(
         curl_fetched
@@ -841,6 +845,17 @@ if(TARGET CURL::libcurl)
 else()
     target_link_libraries(rac_commons PUBLIC ${CURL_LIBRARIES})
     target_include_directories(rac_commons PUBLIC ${CURL_INCLUDE_DIRS})
+endif()
+
+# Android: rac_http_client_curl.cpp calls psa_crypto_init() because curl
+# 7.88.1's mbedtls vtls layer doesn't, and mbedTLS 3.6+ requires PSA to
+# be initialized before any TLS handshake. Expose mbedTLS public headers
+# to our TUs so <psa/crypto.h> resolves.
+if(ANDROID AND TARGET MbedTLS::mbedcrypto)
+    get_target_property(_rac_psa_inc MbedTLS::mbedcrypto INTERFACE_INCLUDE_DIRECTORIES)
+    if(_rac_psa_inc)
+        target_include_directories(rac_commons PRIVATE ${_rac_psa_inc})
+    endif()
 endif()
 
 # =============================================================================

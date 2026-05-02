@@ -18,8 +18,10 @@
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <psa/crypto.h>
 #endif
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -35,6 +37,30 @@
 namespace {
 
 constexpr const char* kTag = "rac_http_client";
+
+// =============================================================================
+// CA bundle path — registered by the host SDK during init. mbedTLS (Android)
+// has no built-in trust store, so HTTPS fails with CURLE_PEER_FAILED_VERIFICATION
+// unless we point libcurl at a PEM file the host ships with the app.
+// =============================================================================
+
+std::mutex& g_ca_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::string& g_ca_path() {
+    static std::string s;
+    return s;
+}
+
+// Runtime toggle to bypass TLS peer/host verification. Used as a debug-build
+// escape hatch on Android while the mbedTLS-compatible CA bundle is sorted
+// out — release builds must leave this false.
+std::atomic<bool>& g_skip_verify() {
+    static std::atomic<bool> v{false};
+    return v;
+}
 
 // =============================================================================
 // Process-wide libcurl init/cleanup is ref-counted off live instances.
@@ -58,6 +84,19 @@ rac_result_t global_init_once() {
             RAC_LOG_ERROR(kTag, "curl_global_init failed: %d", static_cast<int>(rc));
             return RAC_ERROR_INTERNAL;
         }
+#ifdef __ANDROID__
+        // curl 7.88.1's mbedtls vtls layer does not call psa_crypto_init(),
+        // but mbedTLS 3.6+ needs PSA initialized for TLS handshakes. Without
+        // this, the handshake aborts with CURLE_SSL_CONNECT_ERROR.
+        psa_status_t pst = psa_crypto_init();
+        if (pst != PSA_SUCCESS) {
+            __android_log_print(ANDROID_LOG_ERROR, "rac_http_curl",
+                                "psa_crypto_init failed: %d", static_cast<int>(pst));
+        } else {
+            __android_log_print(ANDROID_LOG_INFO, "rac_http_curl",
+                                "PSA crypto initialized for mbedTLS");
+        }
+#endif
     }
     ++g_global_refcount();
     return RAC_SUCCESS;
@@ -278,6 +317,45 @@ void fill_response_meta(CURL* curl, header_capture_ctx* hdrs, rac_http_response_
 }
 
 // =============================================================================
+// Verbose / debug callback. mbedTLS speaks via CURLINFO_TEXT, which is the
+// only place its real handshake error surfaces (the top-level
+// CURLE_SSL_CONNECT_ERROR is ambiguous). Enabled on Android-debug builds
+// only — gated by FLAG_DEBUGGABLE via NDEBUG.
+// =============================================================================
+
+#if defined(__ANDROID__) && (!defined(NDEBUG) || defined(RAC_HTTP_VERBOSE_ANDROID))
+int verbose_cb(CURL* /*h*/, curl_infotype type, char* data, size_t size, void* /*userp*/) {
+    const char* prefix = nullptr;
+    switch (type) {
+        case CURLINFO_TEXT:          prefix = "info"; break;
+        case CURLINFO_HEADER_OUT:    prefix = "send"; break;
+        case CURLINFO_HEADER_IN:     prefix = "recv"; break;
+        case CURLINFO_SSL_DATA_OUT:  prefix = "ssl-out"; break;
+        case CURLINFO_SSL_DATA_IN:   prefix = "ssl-in"; break;
+        default:                     return 0;  // skip DATA_OUT / DATA_IN bodies
+    }
+    // Cap log line at 1024 bytes; trim trailing CRLF for readability.
+    size_t n = std::min(size, static_cast<size_t>(1024));
+    std::string s(data, n);
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
+        s.pop_back();
+    }
+    if (s.empty()) {
+        return 0;
+    }
+    // Skip raw SSL byte payload spam — we only want decoded text/headers.
+    if (type == CURLINFO_SSL_DATA_OUT || type == CURLINFO_SSL_DATA_IN) {
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_verbose",
+                            "[%s] %zu bytes", prefix, size);
+    } else {
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_verbose",
+                            "[%s] %s", prefix, s.c_str());
+    }
+    return 0;
+}
+#endif
+
+// =============================================================================
 // Shared request setup.
 // =============================================================================
 
@@ -311,6 +389,20 @@ rac_result_t validate_and_setup(CURL* curl, const rac_http_request_t* req,
     if (urlrc != CURLE_OK) {
         return curlcode_to_rac(urlrc);
     }
+#if defined(__ANDROID__) && (!defined(NDEBUG) || defined(RAC_HTTP_VERBOSE_ANDROID))
+    // Verbose handshake diagnostics. Off in Release (NDEBUG) by default;
+    // opt-in via -DRAC_HTTP_VERBOSE_ANDROID. mbedTLS error codes surface
+    // via CURLINFO_TEXT — without this the top-level libcurl error is
+    // useless for diagnosing TLS failures.
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, verbose_cb);
+#endif
+#ifdef __ANDROID__
+    // Many Android devices have IPv4-only routing but DNS still returns AAAA records.
+    // NDK libcurl tries IPv6 first and fast-fails with CURLE_SSL_CONNECT_ERROR.
+    // Force IPv4 resolution to avoid this.
+    curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+#endif
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);  // multi-thread safe
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "RunAnywhere-SDK-Commons/1.0");
@@ -325,9 +417,53 @@ rac_result_t validate_and_setup(CURL* curl, const rac_http_request_t* req,
                      req->follow_redirects == RAC_TRUE ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
 
-    // TLS defaults — use the platform's native certificate store.
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    // TLS trust store. Android's NDK libcurl uses mbedTLS, which has no
+    // compiled-in CA store; the host SDK must register a PEM file path via
+    // rac_http_set_ca_bundle_path() before any HTTPS request. macOS/iOS
+    // builds use Secure Transport / OpenSSL and work without a path.
+    //
+    // Runtime escape hatch: if the host has called
+    // rac_http_set_skip_tls_verification(RAC_TRUE), bypass verification
+    // entirely for every request. Logged once to avoid flooding.
+    if (g_skip_verify().load(std::memory_order_relaxed)) {
+        static std::once_flag s_skip_log_once;
+        std::call_once(s_skip_log_once, []() {
+            RAC_LOG_WARNING(kTag,
+                            "TLS verification disabled at runtime "
+                            "(rac_http_set_skip_tls_verification=true). "
+                            "Do NOT use this in release builds.");
+        });
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    } else {
+    std::string ca_path_copy;
+    {
+        std::lock_guard<std::mutex> lk(g_ca_mutex());
+        ca_path_copy = g_ca_path();
+    }
+    if (!ca_path_copy.empty()) {
+        curl_easy_setopt(curl, CURLOPT_CAINFO, ca_path_copy.c_str());
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    } else {
+#if defined(__ANDROID__) && defined(NDEBUG)
+        RAC_LOG_ERROR(kTag,
+                      "No CA bundle path registered — HTTPS will fail. "
+                      "Call rac_http_set_ca_bundle_path() during SDK init.");
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+#elif defined(__ANDROID__)
+        RAC_LOG_WARNING(kTag,
+                        "No CA bundle path registered — disabling TLS verification (debug build only). "
+                        "Call rac_http_set_ca_bundle_path() to enable verification.");
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+#else
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+#endif
+    }
+    }  // !g_skip_verify
 
     // Method.
     if (method_is_get(req->method)) {
@@ -542,6 +678,33 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c,
         return curlcode_to_rac(rc);
     }
     return RAC_SUCCESS;
+}
+
+extern "C" void rac_http_set_ca_bundle_path(const char* path) {
+    std::lock_guard<std::mutex> lk(g_ca_mutex());
+    if (path && *path) {
+        g_ca_path() = path;
+        RAC_LOG_INFO(kTag, "CA bundle path registered: %s", path);
+    } else {
+        g_ca_path().clear();
+        RAC_LOG_INFO(kTag, "CA bundle path cleared");
+    }
+}
+
+extern "C" const char* rac_http_get_ca_bundle_path(void) {
+    std::lock_guard<std::mutex> lk(g_ca_mutex());
+    const std::string& p = g_ca_path();
+    return p.empty() ? nullptr : p.c_str();
+}
+
+extern "C" void rac_http_set_skip_tls_verification(rac_bool_t skip) {
+    const bool v = (skip == RAC_TRUE);
+    g_skip_verify().store(v, std::memory_order_relaxed);
+    RAC_LOG_INFO(kTag, "TLS verification skip flag set to %s", v ? "true" : "false");
+}
+
+extern "C" rac_bool_t rac_http_get_skip_tls_verification(void) {
+    return g_skip_verify().load(std::memory_order_relaxed) ? RAC_TRUE : RAC_FALSE;
 }
 
 extern "C" void rac_http_response_free(rac_http_response_t* resp) {

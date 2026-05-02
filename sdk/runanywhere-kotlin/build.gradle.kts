@@ -258,6 +258,22 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+    // KMP maps src/androidMain → AGP "main"; declare assets explicitly so the
+    // bundled Mozilla CA bundle (cacert.pem) ends up inside the AAR for any
+    // consuming app.
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs("src/androidMain/assets")
+        }
+    }
+
+    androidResources {
+        // Ship cacert.pem uncompressed so AssetManager.openFd() works as well
+        // as plain stream reads.
+        @Suppress("UnstableApiUsage")
+        noCompress.add("pem")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
