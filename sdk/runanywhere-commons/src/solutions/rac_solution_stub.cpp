@@ -22,10 +22,20 @@
 // rac_solution.cpp wins at link time.
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/solutions/rac_solution.h"
 
 #ifndef RAC_HAVE_PROTOBUF
+
+namespace {
+constexpr const char* kStubReason =
+    "Solutions runtime unavailable: rac_commons was built without Protobuf "
+    "support, so the SolutionRunner / PipelineExecutor TUs were not "
+    "compiled. Rebuild rac_commons with a Protobuf toolchain visible to "
+    "find_package(Protobuf) (and matching the target ABI for cross-compiles "
+    "such as Android NDK) to enable rac_solution_*.";
+}
 
 extern "C" {
 
@@ -33,12 +43,16 @@ RAC_API rac_result_t rac_solution_create_from_proto(const void*            /*pro
                                                     size_t                 /*len*/,
                                                     rac_solution_handle_t* out_handle) {
     if (out_handle) *out_handle = nullptr;
+    RAC_LOG_ERROR("RAC_SOLUTION", "%s", kStubReason);
+    rac_error_set_details(kStubReason);
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
 RAC_API rac_result_t rac_solution_create_from_yaml(const char*            /*yaml_text*/,
                                                    rac_solution_handle_t* out_handle) {
     if (out_handle) *out_handle = nullptr;
+    RAC_LOG_ERROR("RAC_SOLUTION", "%s", kStubReason);
+    rac_error_set_details(kStubReason);
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 

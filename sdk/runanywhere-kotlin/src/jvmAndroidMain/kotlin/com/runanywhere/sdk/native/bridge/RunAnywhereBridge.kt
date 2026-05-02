@@ -1317,6 +1317,15 @@ object RunAnywhereBridge {
     /** Cancel, join, and destroy the solution. Always safe; null handle is a no-op. */
     @JvmStatic external fun racSolutionDestroy(handle: Long)
 
+    /** Returns the thread-local detail string set by the most recent rac_* call
+     *  via `rac_error_set_details()`, or null. Lets callers surface the actual
+     *  reason for a 0L handle from create_from_* without breaking the C ABI. */
+    @JvmStatic external fun racErrorGetLastDetails(): String?
+
+    /** Returns the static, human-readable name for an rac_result_t code
+     *  (e.g. "Feature not available" for -801). Mirrors `rac_error_message()`. */
+    @JvmStatic external fun racErrorMessage(code: Int): String?
+
     // ========================================================================
     // RAG PIPELINE (rac/features/rag/rac_rag.h) — Round 1 G-A4
     // ========================================================================

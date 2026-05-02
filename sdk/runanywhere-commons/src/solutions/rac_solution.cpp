@@ -9,6 +9,7 @@
 
 #include "pipeline.pb.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/solutions/config_loader.hpp"
 #include "rac/solutions/solution_runner.hpp"
@@ -69,13 +70,23 @@ extern "C" {
 RAC_API rac_result_t rac_solution_create_from_proto(const void*            proto_bytes,
                                                     size_t                 len,
                                                     rac_solution_handle_t* out_handle) {
-    if (!out_handle) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_handle) {
+        RAC_LOG_ERROR("RAC_SOLUTION",
+                      "rac_solution_create_from_proto: out_handle is null");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
     *out_handle = nullptr;
 
     runanywhere::v1::SolutionConfig config;
     rac_result_t st = rac::solutions::load_solution_from_proto_bytes(
         proto_bytes, len, &config);
-    if (st != RAC_SUCCESS) return st;
+    if (st != RAC_SUCCESS) {
+        RAC_LOG_ERROR("RAC_SOLUTION",
+                      "rac_solution_create_from_proto: failed to decode "
+                      "SolutionConfig (rc=%d, details=%s)",
+                      st, rac_error_get_details() ? rac_error_get_details() : "");
+        return st;
+    }
 
     auto runner = std::make_unique<SolutionRunner>(config);
     *out_handle = runner.release();
@@ -84,15 +95,30 @@ RAC_API rac_result_t rac_solution_create_from_proto(const void*            proto
 
 RAC_API rac_result_t rac_solution_create_from_yaml(const char*            yaml_text,
                                                    rac_solution_handle_t* out_handle) {
-    if (!out_handle) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_handle) {
+        RAC_LOG_ERROR("RAC_SOLUTION",
+                      "rac_solution_create_from_yaml: out_handle is null");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
     *out_handle = nullptr;
-    if (!yaml_text) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!yaml_text) {
+        RAC_LOG_ERROR("RAC_SOLUTION",
+                      "rac_solution_create_from_yaml: yaml_text is null");
+        rac_error_set_details("rac_solution_create_from_yaml: yaml_text is null");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     const std::string yaml(yaml_text);
     if (yaml_looks_like_pipeline_spec(yaml)) {
         runanywhere::v1::PipelineSpec spec;
         rac_result_t st = rac::solutions::load_pipeline_from_yaml(yaml, &spec);
-        if (st != RAC_SUCCESS) return st;
+        if (st != RAC_SUCCESS) {
+            RAC_LOG_ERROR("RAC_SOLUTION",
+                          "rac_solution_create_from_yaml: pipeline YAML parse "
+                          "failed (rc=%d, details=%s)",
+                          st, rac_error_get_details() ? rac_error_get_details() : "");
+            return st;
+        }
         auto runner = std::make_unique<SolutionRunner>(std::move(spec));
         *out_handle = runner.release();
         return RAC_SUCCESS;
@@ -100,7 +126,13 @@ RAC_API rac_result_t rac_solution_create_from_yaml(const char*            yaml_t
 
     runanywhere::v1::SolutionConfig config;
     rac_result_t st = rac::solutions::load_solution_from_yaml(yaml, &config);
-    if (st != RAC_SUCCESS) return st;
+    if (st != RAC_SUCCESS) {
+        RAC_LOG_ERROR("RAC_SOLUTION",
+                      "rac_solution_create_from_yaml: solution YAML parse "
+                      "failed (rc=%d, details=%s)",
+                      st, rac_error_get_details() ? rac_error_get_details() : "");
+        return st;
+    }
     auto runner = std::make_unique<SolutionRunner>(config);
     *out_handle = runner.release();
     return RAC_SUCCESS;

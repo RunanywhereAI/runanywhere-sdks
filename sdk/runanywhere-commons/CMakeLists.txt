@@ -869,17 +869,29 @@ endif()
 # fall back to the FEATURE_NOT_AVAILABLE path declared in the header.
 # =============================================================================
 
-find_package(Protobuf QUIET)
+# Skip the second find_package on Android: the root cmake/protobuf.cmake
+# already FetchContent-bundled v34.1 and populated Protobuf_FOUND +
+# Protobuf_INCLUDE_DIRS + the protobuf::libprotobuf imported target in the
+# global cache. Re-running module-mode FindProtobuf here would overwrite
+# those with a "not found" result on the bare NDK sysroot.
+if(NOT (ANDROID AND Protobuf_FOUND))
+    find_package(Protobuf QUIET)
+endif()
 
 # v2 close-out: SHARED builds need absl symbols (see cmake/protobuf.cmake).
 # Find absl independently here too for standalone-commons builds that
 # bypass the root CMake.
-if(NOT DEFINED RAC_ABSL_LIBS)
-    find_package(absl QUIET CONFIG)
-    if(absl_FOUND)
+if(NOT DEFINED RAC_ABSL_LIBS OR RAC_ABSL_LIBS STREQUAL "")
+    if(ANDROID AND TARGET absl::log)
+        # FetchContent-bundled (root cmake/protobuf.cmake on Android).
         set(RAC_ABSL_LIBS absl::log absl::log_internal_check_op absl::hash absl::strings absl::status)
     else()
-        set(RAC_ABSL_LIBS "")
+        find_package(absl QUIET CONFIG)
+        if(absl_FOUND)
+            set(RAC_ABSL_LIBS absl::log absl::log_internal_check_op absl::hash absl::strings absl::status)
+        else()
+            set(RAC_ABSL_LIBS "")
+        endif()
     endif()
 endif()
 if(Protobuf_FOUND)

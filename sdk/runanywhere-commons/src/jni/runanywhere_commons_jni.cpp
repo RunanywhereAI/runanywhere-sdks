@@ -5819,7 +5819,10 @@ JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge
     env->ReleaseByteArrayElements(configBytes, bytes, JNI_ABORT);
 
     if (result != RAC_SUCCESS) {
-        LOGe("racSolutionCreateFromProto failed: %d", result);
+        const char* msg     = rac_error_message(result);
+        const char* details = rac_error_get_details();
+        LOGe("racSolutionCreateFromProto failed: rc=%d (%s) details=%s",
+             result, msg ? msg : "", details ? details : "");
         return 0L;
     }
     return reinterpret_cast<jlong>(handle);
@@ -5839,10 +5842,38 @@ JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge
     env->ReleaseStringUTFChars(yamlText, utf);
 
     if (result != RAC_SUCCESS) {
-        LOGe("racSolutionCreateFromYaml failed: %d", result);
+        const char* msg     = rac_error_message(result);
+        const char* details = rac_error_get_details();
+        LOGe("racSolutionCreateFromYaml failed: rc=%d (%s) details=%s",
+             result, msg ? msg : "", details ? details : "");
         return 0L;
     }
     return reinterpret_cast<jlong>(handle);
+}
+
+// Returns the thread-local last-error details string set via
+// `rac_error_set_details()` from the most recent rac_* call on this thread,
+// or null if no details were set. Lets Kotlin surface the actual reason for
+// a 0L handle from racSolutionCreateFromYaml / racSolutionCreateFromProto
+// without having to add a new return-by-out-param C ABI.
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racErrorGetLastDetails(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    const char* details = rac_error_get_details();
+    if (details == nullptr) return nullptr;
+    return env->NewStringUTF(details);
+}
+
+// Returns the static, human-readable name for an rac_result_t code (e.g.
+// "Feature not available" for -801). Useful when mapping a non-zero rc
+// returned via racSolutionStart/Stop/etc. into an actionable Kotlin
+// exception message without duplicating the message table on the JVM side.
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racErrorMessage(
+    JNIEnv* env, jclass clazz, jint code) {
+    (void)clazz;
+    const char* msg = rac_error_message(static_cast<rac_result_t>(code));
+    if (msg == nullptr) return nullptr;
+    return env->NewStringUTF(msg);
 }
 
 JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStart(

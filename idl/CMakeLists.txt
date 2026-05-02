@@ -16,6 +16,19 @@ if(NOT Protobuf_FOUND)
     return()
 endif()
 
+# Android: the bundled libprotobuf is v34.1 (FetchContent in cmake/protobuf.cmake)
+# but the host protoc on most dev machines is older. protobuf_generate_cpp
+# regenerates .pb.{h,cc} at build time using the host protoc, and the
+# resulting code fails the strict `#if PROTOBUF_VERSION` runtime check baked
+# into v34.1's headers. rac_idl has no Android consumers (commons already
+# pulls the pre-generated .pb.cc files from src/generated/proto via the
+# Protobuf_FOUND block in sdk/runanywhere-commons/CMakeLists.txt), so skip
+# the target entirely on Android cross-builds.
+if(ANDROID)
+    message(STATUS "idl/: skipping rac_idl on Android — host protoc / runtime version mismatch, no Android consumers")
+    return()
+endif()
+
 set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/model_types.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/voice_events.proto

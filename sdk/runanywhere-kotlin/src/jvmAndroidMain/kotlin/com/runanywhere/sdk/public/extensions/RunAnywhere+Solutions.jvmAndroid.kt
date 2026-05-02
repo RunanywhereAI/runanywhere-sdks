@@ -112,7 +112,7 @@ actual class Solutions internal actual constructor() {
             ensureNativeReady()
             val handle = RunAnywhereBridge.racSolutionCreateFromYaml(yaml)
             if (handle == 0L) {
-                throw SDKException.operation("rac_solution_create_from_yaml returned a null handle")
+                throw SDKException.operation(buildCreateFailureMessage("yaml"))
             }
             SolutionHandle(handle)
         }
@@ -122,10 +122,24 @@ actual class Solutions internal actual constructor() {
             ensureNativeReady()
             val handle = RunAnywhereBridge.racSolutionCreateFromProto(configBytes)
             if (handle == 0L) {
-                throw SDKException.operation("rac_solution_create_from_proto returned a null handle")
+                throw SDKException.operation(buildCreateFailureMessage("proto"))
             }
             SolutionHandle(handle)
         }
+
+    /// The C ABI set a thread-local details string before returning the
+    /// failure code that the JNI thunk swallowed into a 0L handle. Pull
+    /// it back out so users see the real reason (e.g. the stub's
+    /// "Solutions runtime unavailable: rac_commons was built without
+    /// Protobuf support" diagnostic) instead of an opaque "null handle"
+    /// message.
+    private fun buildCreateFailureMessage(kind: String): String {
+        val details = runCatching { RunAnywhereBridge.racErrorGetLastDetails() }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+        val base = "rac_solution_create_from_$kind returned a null handle"
+        return if (details != null) "$base: $details" else base
+    }
 
     actual suspend fun run(config: SolutionConfig): SolutionHandle =
         run(config.encode())

@@ -28,20 +28,24 @@ import com.runanywhere.sdk.public.extensions.solutions
 import kotlinx.coroutines.launch
 
 /**
- * Wave 3 Step 3.3 (G-E6): demo for `RunAnywhere.solutions.run(yaml = ...)`.
+ * Demo for `RunAnywhere.solutions.run(yaml = ...)`.
  *
- * Embeds the canonical voice_agent.yaml + rag.yaml from
- * sdk/runanywhere-commons/examples/solutions/ as inline string constants
- * — no asset-bundling churn — and exposes one button per solution.
+ * The YAMLs below intentionally reference models that match the example
+ * app's curated catalog so the create-from-yaml call exercises the real
+ * SDK code path. The Voice Agent demo still references whisper-base /
+ * kokoro / silero-v5 since the voice pipeline has no on-device-only
+ * fallback for STT/TTS/VAD; the screen surfaces a clean diagnostic when
+ * those aren't downloaded (or when rac_commons was built without
+ * Protobuf, in which case the C ABI returns FEATURE_NOT_AVAILABLE).
  *
  * On click, creates the solution, starts the scheduler, and immediately
- * destroys the handle. Each lifecycle transition is appended to a simple
+ * destroys the handle. Each lifecycle transition is appended to a
  * scrolling log so the demo stays readable without wiring up streaming
  * output yet.
  */
 private val VOICE_AGENT_YAML = """
 voice_agent:
-  llm_model_id: "qwen3-4b-q4_k_m"
+  llm_model_id: "lfm2-350m-q4_k_m"
   stt_model_id: "whisper-base"
   tts_model_id: "kokoro"
   vad_model_id: "silero-v5"
@@ -63,15 +67,14 @@ voice_agent:
 
 private val RAG_YAML = """
 rag:
-  embed_model_id: "bge-small-en-v1.5"
-  rerank_model_id: "bge-reranker-v2-m3"
-  llm_model_id: "qwen3-4b-q4_k_m"
+  embed_model_id: "all-minilm-l6-v2"
+  llm_model_id: "lfm2-350m-q4_k_m"
 
   vector_store: "usearch"
-  vector_store_path: "/tmp/ra-rag.usearch"
+  vector_store_path: "/data/local/tmp/ra-rag.usearch"
 
-  retrieve_k: 24
-  rerank_top: 6
+  retrieve_k: 8
+  rerank_top: 4
 
   bm25_k1: 1.2
   bm25_b: 0.75
