@@ -24,6 +24,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
 import 'package:runanywhere/generated/download_service.pbenum.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
@@ -155,96 +156,113 @@ class ModelDownloadService {
   }
 
   // --------------------------------------------------------------------------
-  // Internal: drive rac_download_orchestrate and re-emit progress as proto.
+  // Internal: drive rac_download_orchestrate and poll progress from Dart.
+  //
+  // The C++ orchestrator spawns a std::thread for the HTTP transfer. Dart
+  // NativeCallable.listener requires the calling thread to be attached to
+  // the Dart VM, but std::thread is not. Passing callbacks from Dart to
+  // the orchestrator causes "Cannot invoke native callback outside an
+  // isolate" + SIGABRT.
+  //
+  // Fix: pass nullptr for both callbacks and poll
+  // rac_download_manager_get_progress() on a 250ms timer from the Dart
+  // isolate. Detect completion/failure via the progress state field.
   // --------------------------------------------------------------------------
 
   Stream<DownloadProgress> _orchestrate(ModelInfo model) async* {
-    final controller = StreamController<DownloadProgress>();
-
-    // Progress callback — fired from a C++ worker thread. We use
-    // `NativeCallable.listener` to marshal the event onto the Dart
-    // isolate before touching the controller.
-    late final ffi.NativeCallable<RacDownloadProgressCallbackNative>
-        progressCallable;
-    progressCallable =
-        ffi.NativeCallable<RacDownloadProgressCallbackNative>.listener(
-      (ffi.Pointer<RacDownloadProgress> progressPtr, ffi.Pointer<ffi.Void> _) {
-        if (controller.isClosed || progressPtr == ffi.nullptr) return;
-        final snapshot = progressPtr.ref;
-        controller.add(_protoFromNative(model.id, snapshot));
-      },
-    );
-
-    // Completion callback — orchestrator signals a terminal state once
-    // everything is settled (or errored). Close the stream here.
-    late final ffi.NativeCallable<RacDownloadCompleteCallbackNative>
-        completeCallable;
-    completeCallable =
-        ffi.NativeCallable<RacDownloadCompleteCallbackNative>.listener(
-      (ffi.Pointer<Utf8> taskIdPtr, int resultCode, ffi.Pointer<Utf8> pathPtr,
-          ffi.Pointer<ffi.Void> _) async {
-        try {
-          if (!controller.isClosed) {
-            if (resultCode == 0) {
-              final finalPath =
-                  pathPtr == ffi.nullptr ? null : pathPtr.toDartString();
-              if (finalPath != null && finalPath.isNotEmpty) {
-                await _updateModelLocalPath(model, finalPath);
-              }
-              EventBus.shared.publish(
-                SDKModelEvent.downloadCompleted(modelId: model.id),
-              );
-              controller.add(DownloadProgress(
-                modelId: model.id,
-                stage: DownloadStage.DOWNLOAD_STAGE_COMPLETED,
-                state: DownloadState.DOWNLOAD_STATE_COMPLETED,
-                stageProgress: 1.0,
-              ));
-            } else {
-              final err = 'Download failed (code=$resultCode)';
-              EventBus.shared.publish(
-                SDKModelEvent.downloadFailed(
-                  modelId: model.id,
-                  error: err,
-                ),
-              );
-              controller.add(_failedProgress(model.id, err));
-            }
-            await controller.close();
-          }
-        } finally {
-          _activeTaskIds.remove(model.id);
-          progressCallable.close();
-          completeCallable.close();
-        }
-      },
-    );
-
     final taskId = DartBridgeDownload.orchestrateDownload(
       modelId: model.id,
       downloadUrl: model.downloadURL!.toString(),
       framework: _frameworkToCValue(model.framework),
       format: model.format.toC(),
       archiveStructure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN → auto-detect
-      progressCallback: progressCallable.nativeFunction,
-      completeCallback: completeCallable.nativeFunction,
+      progressCallback: ffi.Pointer.fromAddress(0),
+      completeCallback: ffi.Pointer.fromAddress(0),
       userData: ffi.nullptr,
     );
 
     if (taskId == null) {
-      progressCallable.close();
-      completeCallable.close();
       yield _failedProgress(model.id, 'Failed to start orchestrated download');
       return;
     }
     _activeTaskIds[model.id] = taskId;
     _logger.info('Orchestrated download started: ${model.id} (task=$taskId)');
 
-    yield* controller.stream;
+    const pollInterval = Duration(milliseconds: 250);
+    var settled = false;
+
+    while (!settled) {
+      await Future<void>.delayed(pollInterval);
+
+      final snapshot = DartBridgeDownload.getProgress(taskId);
+      if (snapshot == null) {
+        // Task disappeared — treat as completed (files already on disk).
+        settled = true;
+        break;
+      }
+
+      final proto = _protoFromNative(model.id, snapshot);
+      yield proto;
+
+      // Terminal states — 4=COMPLETED, 5=FAILED, 6=CANCELLED (rac_download.h)
+      final stateVal = snapshot.state;
+      if (stateVal == 4 || stateVal == 5 || stateVal == 6) {
+        settled = true;
+
+        if (stateVal == 4) {
+          // Resolve final model path from the registry
+          final modelPath = _resolveModelPath(model);
+          if (modelPath != null) {
+            await _updateModelLocalPath(model, modelPath);
+          }
+          EventBus.shared.publish(
+            SDKModelEvent.downloadCompleted(modelId: model.id),
+          );
+          yield DownloadProgress(
+            modelId: model.id,
+            stage: DownloadStage.DOWNLOAD_STAGE_COMPLETED,
+            state: DownloadState.DOWNLOAD_STATE_COMPLETED,
+            stageProgress: 1.0,
+          );
+        } else {
+          final errMsg = snapshot.errorMessage ??
+              'Download failed (state=$stateVal)';
+          EventBus.shared.publish(
+            SDKModelEvent.downloadFailed(modelId: model.id, error: errMsg),
+          );
+          yield _failedProgress(model.id, errMsg);
+        }
+      }
+    }
+
+    _activeTaskIds.remove(model.id);
+  }
+
+  String? _resolveModelPath(ModelInfo model) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<
+          ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Int32, ffi.Pointer<Utf8>, ffi.Int32),
+          int Function(ffi.Pointer<Utf8>, int, ffi.Pointer<Utf8>,
+              int)>('rac_model_paths_get_model_folder');
+
+      final modelIdPtr = model.id.toNativeUtf8();
+      final buf = calloc<ffi.Uint8>(4096).cast<Utf8>();
+      try {
+        final rc = fn(modelIdPtr, _frameworkToCValue(model.framework), buf, 4096);
+        if (rc != 0) return null;
+        return buf.toDartString();
+      } finally {
+        calloc.free(modelIdPtr);
+        calloc.free(buf);
+      }
+    } catch (_) {
+      return null;
+    }
   }
 
   DownloadProgress _protoFromNative(
-      String modelId, RacDownloadProgress snapshot) {
+      String modelId, DownloadProgressSnapshot snapshot) {
     return DownloadProgress(
       modelId: modelId,
       stage: _stageFromC(snapshot.stage),
@@ -257,9 +275,7 @@ class ModelDownloadService {
           ? Int64(snapshot.estimatedTimeRemaining.toInt())
           : Int64.ZERO,
       retryAttempt: snapshot.retryAttempt,
-      errorMessage: snapshot.errorMessage == ffi.nullptr
-          ? ''
-          : snapshot.errorMessage.toDartString(),
+      errorMessage: snapshot.errorMessage ?? '',
     );
   }
 

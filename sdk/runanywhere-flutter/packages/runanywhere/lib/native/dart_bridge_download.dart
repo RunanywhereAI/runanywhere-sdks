@@ -38,6 +38,35 @@ final class RacDownloadProgress extends Struct {
   external Pointer<Utf8> errorMessage;
 }
 
+/// Dart-side copy of a native progress snapshot (safe after native memory is freed).
+class DownloadProgressSnapshot {
+  final int stage;
+  final int bytesDownloaded;
+  final int totalBytes;
+  final double stageProgress;
+  final double overallProgress;
+  final int state;
+  final double speed;
+  final double estimatedTimeRemaining;
+  final int retryAttempt;
+  final int errorCode;
+  final String? errorMessage;
+
+  const DownloadProgressSnapshot({
+    required this.stage,
+    required this.bytesDownloaded,
+    required this.totalBytes,
+    required this.stageProgress,
+    required this.overallProgress,
+    required this.state,
+    required this.speed,
+    required this.estimatedTimeRemaining,
+    required this.retryAttempt,
+    required this.errorCode,
+    this.errorMessage,
+  });
+}
+
 /// Native progress callback signature — `rac_download_progress_callback_fn`.
 typedef RacDownloadProgressCallbackNative = Void Function(
     Pointer<RacDownloadProgress>, Pointer<Void>);
@@ -165,6 +194,49 @@ class DartBridgeDownload {
       calloc.free(modelIdPtr);
       calloc.free(urlPtr);
       calloc.free(taskIdPtr);
+    }
+  }
+
+  /// Poll progress for a running download task.
+  /// Returns null if the task doesn't exist or the symbol isn't available.
+  static DownloadProgressSnapshot? getProgress(String taskId) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<
+          Int32 Function(Pointer<Void>, Pointer<Utf8>,
+              Pointer<RacDownloadProgress>),
+          int Function(Pointer<Void>, Pointer<Utf8>,
+              Pointer<RacDownloadProgress>)>('rac_download_manager_get_progress');
+
+      final handle = managerHandle();
+      final tidPtr = taskId.toNativeUtf8();
+      final progressPtr = calloc<RacDownloadProgress>();
+      try {
+        final code = fn(handle, tidPtr, progressPtr);
+        if (code != RacResultCode.success) return null;
+        final ref = progressPtr.ref;
+        return DownloadProgressSnapshot(
+          stage: ref.stage,
+          bytesDownloaded: ref.bytesDownloaded,
+          totalBytes: ref.totalBytes,
+          stageProgress: ref.stageProgress,
+          overallProgress: ref.overallProgress,
+          state: ref.state,
+          speed: ref.speed,
+          estimatedTimeRemaining: ref.estimatedTimeRemaining,
+          retryAttempt: ref.retryAttempt,
+          errorCode: ref.errorCode,
+          errorMessage: ref.errorMessage != nullptr
+              ? ref.errorMessage.toDartString()
+              : null,
+        );
+      } finally {
+        calloc.free(tidPtr);
+        calloc.free(progressPtr);
+      }
+    } catch (e) {
+      _logger.debug('rac_download_manager_get_progress not available: $e');
+      return null;
     }
   }
 

@@ -62,6 +62,8 @@ export interface LlamaCppModule {
   stringToUTF8: (str: string, outPtr: number, maxBytesToWrite: number) => void;
   lengthBytesUTF8: (str: string) => number;
   HEAPU8?: Uint8Array;
+  HEAP32?: Int32Array;
+  HEAPU32?: Uint32Array;
   HEAPF32?: Float32Array;
 
   // Core

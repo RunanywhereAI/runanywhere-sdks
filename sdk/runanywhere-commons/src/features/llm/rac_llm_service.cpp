@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -90,26 +91,24 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     }
 
     rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
-    const char* model_path = model_id;
+    std::string model_path_owned;
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
         const char* reg_path = model_info->local_path ? model_info->local_path : model_id;
-        // Registry local_path is often the model directory; LlamaCPP needs the path to the .gguf
-        // file. If model_id is already a path to a .gguf file (e.g. from path lookup), use it for
-        // loading.
         if (strstr(model_id, ".gguf") != nullptr) {
-            model_path = model_id;
+            model_path_owned = model_id;
         } else {
-            model_path = reg_path;
+            model_path_owned = reg_path;
         }
         ALOGD("Found in registry: id=%s, framework=%d, local_path=%s",
               model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-              model_path ? model_path : "NULL");
+              model_path_owned.c_str());
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
                      model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path ? model_path : "NULL");
+                     model_path_owned.c_str());
     } else {
+        model_path_owned = model_id;
         ALOGD("NOT found in registry (result=%d), default framework=%d", result,
               static_cast<int>(framework));
         RAC_LOG_WARNING(LOG_CAT,
@@ -143,7 +142,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
 
     // Allocate backend impl via the plugin's create adapter.
     void* impl = nullptr;
-    result = vt->llm_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    result = vt->llm_ops->create(model_path_owned.c_str(), /*config_json=*/nullptr, &impl);
     if (result != RAC_SUCCESS || !impl) {
         RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;

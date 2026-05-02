@@ -123,6 +123,9 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
           style={styles.button}
           onPress={onSelectModel}
           activeOpacity={0.8}
+          accessible={true}
+          accessibilityLabel="Select a Model"
+          accessibilityRole="button"
         >
           <Icon name="add-circle" size={20} color={Colors.textWhite} />
           <Text style={styles.buttonText}>Select a Model</Text>

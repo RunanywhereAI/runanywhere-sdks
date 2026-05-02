@@ -39,17 +39,24 @@ Pod::Spec.new do |s|
     "cpp/bridges/**/*.{cpp,hpp}",
   ]
 
+  # Build header search paths: include the Headers root (for qualified includes
+  # like "rac/core/rac_types.h") plus every subdirectory (for flat includes
+  # like "rac_types.h").  Computed dynamically so new xcframework subdirectories
+  # are picked up automatically.
+  rac_headers_root = "ios/Binaries/RACommons.xcframework/ios-arm64/Headers"
+  rac_header_dirs = Dir.glob(File.join(__dir__, rac_headers_root, "**", "*.h"))
+                       .map { |f| File.dirname(f) }
+                       .uniq
+                       .map { |d| "$(PODS_TARGET_SRCROOT)/" + d.sub(__dir__ + "/", "") }
+
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
-    "HEADER_SEARCH_PATHS" => [
+    "HEADER_SEARCH_PATHS" => ([
       "$(PODS_TARGET_SRCROOT)/cpp",
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
       "$(PODS_TARGET_SRCROOT)/cpp/third_party",
       "$(PODS_ROOT)/Headers/Public",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64-simulator/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
-    ].join(" "),
+    ] + rac_header_dirs).join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1 RAC_HAS_HTTP_TRANSPORT=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",

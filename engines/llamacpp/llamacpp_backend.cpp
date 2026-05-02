@@ -15,6 +15,20 @@
 #include <string>
 #include <vector>
 
+#include <sys/stat.h>
+#include <dirent.h>
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LLMCPP_ALOG(...) __android_log_print(ANDROID_LOG_INFO, "LLM.LlamaCpp.Native", __VA_ARGS__)
+#else
+#define LLMCPP_ALOG(...) ((void)0)
+#endif
+
 #include "rac/core/rac_logger.h"
 
 // =============================================================================
@@ -249,7 +263,40 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
         unload_model_internal();
     }
 
+    LLMCPP_ALOG("load_model called with path: %s", model_path.c_str());
     RAC_LOG_INFO("LLM.LlamaCpp", "Loading model from: %s", model_path.c_str());
+
+    // If model_path is a directory, resolve the first .gguf file inside it.
+    // The download orchestrator stores models in a directory named after the
+    // model ID; the actual GGUF file is inside that directory.
+    std::string resolved_path = model_path;
+    {
+        struct stat st;
+        if (stat(model_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+            RAC_LOG_INFO("LLM.LlamaCpp", "Path is a directory, scanning for .gguf file");
+            DIR* dir = opendir(model_path.c_str());
+            if (dir) {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != nullptr) {
+                    std::string name(entry->d_name);
+                    if (name.size() > 5 &&
+                        name.compare(name.size() - 5, 5, ".gguf") == 0) {
+                        resolved_path = model_path + "/" + name;
+                        RAC_LOG_INFO("LLM.LlamaCpp", "Resolved GGUF file: %s",
+                                     resolved_path.c_str());
+                        break;
+                    }
+                }
+                closedir(dir);
+            }
+            if (resolved_path == model_path) {
+                RAC_LOG_ERROR("LLM.LlamaCpp",
+                              "No .gguf file found in directory: %s",
+                              model_path.c_str());
+                return false;
+            }
+        }
+    }
 
     int user_context_size = 0;
     if (config.contains("context_size")) {
@@ -260,16 +307,16 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     }
 
     model_config_ = config;
-    model_path_ = model_path;
+    model_path_ = resolved_path;
 
     llama_model_params model_params = llama_model_default_params();
 
-#ifdef __EMSCRIPTEN__
-    // CRITICAL: Disable mmap for WebAssembly builds.
-    // Emscripten's mmap goes through a JS trampoline (_mmap_js).
-    // JSPI can only suspend WASM frames, not JS frames, so mmap
-    // during model loading causes "trying to suspend JS frames".
-    // With mmap disabled, llama.cpp falls back to fread (pure WASM).
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    // Disable mmap for WebAssembly and Android builds.
+    // Emscripten: mmap goes through a JS trampoline that JSPI cannot suspend.
+    // Android: mmap can fail on scoped/adopted storage paths and certain
+    // SELinux-restricted app-private directories, causing silent nullptr
+    // returns from llama_model_load_from_file.
     model_params.use_mmap = false;
 #endif
 
@@ -322,7 +369,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
                  margin_mib, n_ctx_min, n_devices);
 
     llama_params_fit_status fit_status = llama_params_fit(
-        model_path.c_str(), &model_params, &ctx_params, tensor_split.data(),
+        resolved_path.c_str(), &model_params, &ctx_params, tensor_split.data(),
         tensor_buft_overrides.data(), margins.data(), n_ctx_min, GGML_LOG_LEVEL_INFO);
 
     switch (fit_status) {
@@ -348,7 +395,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
             RAC_LOG_ERROR("LLM.LlamaCpp",
                           "llama_params_fit ERROR for model: %s. "
                           "Falling back to conservative CPU-only defaults.",
-                          model_path.c_str());
+                          resolved_path.c_str());
             model_params.n_gpu_layers = 0;
             if (user_context_size > 0 && user_context_size > 2048) {
                 RAC_LOG_INFO("LLM.LlamaCpp",
@@ -400,12 +447,20 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     }
 #endif
 
+#if TARGET_OS_SIMULATOR
+    if (model_params.n_gpu_layers != 0) {
+        RAC_LOG_INFO("LLM.LlamaCpp",
+                     "iOS Simulator detected: forcing n_gpu_layers=0 (Metal produces incorrect "
+                     "results for some architectures on the simulator)");
+        model_params.n_gpu_layers = 0;
+    }
+#endif
     RAC_LOG_INFO("LLM.LlamaCpp", "Loading model with n_gpu_layers=%d", model_params.n_gpu_layers);
 
-    model_ = llama_model_load_from_file(model_path.c_str(), model_params);
+    model_ = llama_model_load_from_file(resolved_path.c_str(), model_params);
 
     if (!model_) {
-        RAC_LOG_ERROR("LLM.LlamaCpp", "Failed to load model from: %s", model_path.c_str());
+        RAC_LOG_ERROR("LLM.LlamaCpp", "Failed to load model from: %s", resolved_path.c_str());
         return false;
     }
 
@@ -513,6 +568,17 @@ std::string LlamaCppTextGeneration::build_prompt(const TextGenerationRequest& re
     if (!request.messages.empty()) {
         messages = request.messages;
     } else if (!request.prompt.empty()) {
+        // If the prompt already contains chat template tokens (e.g. <|im_start|>,
+        // [INST], <|begin_of_text|>), it was pre-formatted by the caller — pass
+        // it through verbatim to avoid double-applying the template.
+        if (request.prompt.find("<|im_start|>") != std::string::npos ||
+            request.prompt.find("<|begin_of_text|>") != std::string::npos ||
+            request.prompt.find("[INST]") != std::string::npos) {
+            RAC_LOG_INFO("LLM.LlamaCpp",
+                         "Prompt already contains chat template tokens, using as-is (len=%zu)",
+                         request.prompt.length());
+            return request.prompt;
+        }
         messages.push_back({"user", request.prompt});
         RAC_LOG_INFO("LLM.LlamaCpp", "Converted prompt to user message for chat template");
     } else {
@@ -521,9 +587,6 @@ std::string LlamaCppTextGeneration::build_prompt(const TextGenerationRequest& re
     }
 
     std::string formatted = apply_chat_template(messages, request.system_prompt, true);
-    RAC_LOG_INFO("LLM.LlamaCpp", "Applied chat template, formatted prompt length: %zu",
-                 formatted.length());
-
     return formatted;
 }
 
@@ -711,6 +774,8 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     std::string prompt = build_prompt(request);
     RAC_LOG_INFO("LLM.LlamaCpp", "Generating with prompt length: %zu", prompt.length());
 
+    llama_memory_clear(llama_get_memory(context_), true);
+
     const auto tokens_list = common_tokenize(context_, prompt, true, true);
 
     const int n_ctx = llama_n_ctx(context_);
@@ -861,7 +926,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             break;
         }
 
-        const std::string new_token_chars = common_token_to_piece(context_, new_token_id);
+        const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);
 
         // Only scan newly appended bytes — scanner state persists from prior iterations
         const size_t scan_start = partial_utf8_buffer.size();
@@ -1200,7 +1265,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
             break;
         }
 
-        const std::string new_token_chars = common_token_to_piece(context_, new_token_id);
+        const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);
         const size_t old_partial_size = partial_utf8_buffer.size();
         partial_utf8_buffer.append(new_token_chars);
 

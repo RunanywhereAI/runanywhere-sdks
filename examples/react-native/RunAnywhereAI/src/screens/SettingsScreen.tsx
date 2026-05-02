@@ -680,7 +680,11 @@ export const SettingsScreen: React.FC = () => {
       setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
       try {
-        for await (const progress of RunAnywhere.downloadModel(model.id)) {
+        // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
+        const dlIter = RunAnywhere.downloadModel(model.id)[Symbol.asyncIterator]();
+        let dlResult = await dlIter.next();
+        while (!dlResult.done) {
+          const progress = dlResult.value;
           console.warn(
             `[Settings] Download progress for ${model.id}: ${((progress.stageProgress ?? 0) * 100).toFixed(1)}%`
           );
@@ -688,6 +692,7 @@ export const SettingsScreen: React.FC = () => {
             ...prev,
             [model.id]: progress.stageProgress ?? 0,
           }));
+          dlResult = await dlIter.next();
         } // Download complete
 
         setDownloadingModels((prev) => {

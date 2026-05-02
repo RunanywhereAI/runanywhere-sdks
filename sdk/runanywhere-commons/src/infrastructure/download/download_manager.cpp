@@ -98,17 +98,58 @@ static double calculate_overall_progress(rac_download_stage_t stage, double stag
     return start + (stage_progress * (end - start));
 }
 
+// Reentrancy guard — prevents crashes when a progress/complete callback
+// synchronously re-enters the download manager on the same thread (observed
+// on Flutter where Dart's NativeCallable trampoline path can, under certain
+// dispatcher configurations, invoke another C API before returning).
+static thread_local int g_in_notify_depth = 0;
+
 static void notify_progress(download_task_internal& task) {
-    if (task.progress_callback) {
-        task.progress_callback(&task.progress, task.user_data);
+    if (!task.progress_callback) {
+        return;
     }
+    if (g_in_notify_depth > 0) {
+        // Reentrant call — skip to avoid recursion / UB across the C ABI.
+        return;
+    }
+    // Snapshot the progress struct on the stack so the callback sees a stable
+    // POD copy even if an async listener (e.g. Flutter NativeCallable.listener)
+    // reads the pointer after this function returns. The pointer is only safe
+    // for the duration of the synchronous call — async consumers must copy.
+    rac_download_progress_t snapshot = task.progress;
+    // Null the error_message pointer in the snapshot — its backing std::string
+    // lives in the task and may be mutated after we release the lock.
+    snapshot.error_message = nullptr;
+
+    rac_download_progress_callback_fn cb = task.progress_callback;
+    void* ud = task.user_data;
+
+    ++g_in_notify_depth;
+    cb(&snapshot, ud);
+    --g_in_notify_depth;
 }
 
 static void notify_complete(download_task_internal& task, rac_result_t result,
                             const char* final_path) {
-    if (task.complete_callback) {
-        task.complete_callback(task.task_id.c_str(), result, final_path, task.user_data);
+    if (!task.complete_callback) {
+        return;
     }
+    if (g_in_notify_depth > 0) {
+        // Reentrant call — skip to avoid recursion / UB across the C ABI.
+        return;
+    }
+    // Snapshot the inputs so nothing points into task storage that might be
+    // mutated/destroyed before an async listener reads them.
+    std::string task_id_copy = task.task_id;
+    std::string final_path_copy = final_path ? final_path : std::string();
+    const char* final_path_cstr = final_path ? final_path_copy.c_str() : nullptr;
+
+    rac_download_complete_callback_fn cb = task.complete_callback;
+    void* ud = task.user_data;
+
+    ++g_in_notify_depth;
+    cb(task_id_copy.c_str(), result, final_path_cstr, ud);
+    --g_in_notify_depth;
 }
 
 // =============================================================================
@@ -179,7 +220,7 @@ rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle, co
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
+    std::unique_lock<std::mutex> lock(handle->mutex);
 
     if (handle->is_paused) {
         RAC_LOG_WARNING("DownloadManager", "Download manager is paused");
@@ -208,9 +249,20 @@ rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle, co
 
     RAC_LOG_INFO("DownloadManager", "Started download task");
 
-    // Notify initial progress
+    // Snapshot what notify_progress needs, then release the lock before
+    // invoking a potentially cross-language callback.
     download_task_internal& stored_task = handle->tasks[task_id];
-    notify_progress(stored_task);
+    rac_download_progress_callback_fn cb = stored_task.progress_callback;
+    void* ud = stored_task.user_data;
+    rac_download_progress_t snapshot = stored_task.progress;
+    snapshot.error_message = nullptr;
+    lock.unlock();
+
+    if (cb && g_in_notify_depth == 0) {
+        ++g_in_notify_depth;
+        cb(&snapshot, ud);
+        --g_in_notify_depth;
+    }
 
     // Note: Actual HTTP download is triggered by platform adapter
     // This function just creates the tracking state
@@ -353,7 +405,12 @@ rac_result_t rac_download_manager_update_progress(rac_download_manager_handle_t 
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
+    // Hold the lock only while mutating shared state. The progress callback
+    // must NOT run under the lock — it may post across a language boundary
+    // (Flutter's NativeCallable listener, Kotlin JNI trampoline, etc.) and
+    // any cross-language dispatcher blocking inside the callback would pin
+    // the mutex and stall all other task updates.
+    std::unique_lock<std::mutex> lock(handle->mutex);
 
     auto it = handle->tasks.find(task_id);
     if (it == handle->tasks.end()) {
@@ -392,7 +449,19 @@ rac_result_t rac_download_manager_update_progress(rac_download_manager_handle_t 
         }
     }
 
-    notify_progress(task);
+    // Snapshot just the fields notify_progress() needs, then release the
+    // lock before invoking the (possibly cross-language) callback.
+    rac_download_progress_callback_fn cb = task.progress_callback;
+    void* ud = task.user_data;
+    rac_download_progress_t progress_snapshot = task.progress;
+    progress_snapshot.error_message = nullptr;  // std::string backing is not safe after unlock
+    lock.unlock();
+
+    if (cb && g_in_notify_depth == 0) {
+        ++g_in_notify_depth;
+        cb(&progress_snapshot, ud);
+        --g_in_notify_depth;
+    }
 
     return RAC_SUCCESS;
 }

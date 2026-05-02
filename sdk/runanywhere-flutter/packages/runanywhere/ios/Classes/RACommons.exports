@@ -347,28 +347,24 @@ _rac_set_error
 _rac_set_last_error
 _rac_set_platform_adapter
 _rac_shutdown
-_rac_state_clear_auth
-_rac_state_get_access_token
+# F3: rac_state_* auth symbols removed (now owned by rac_auth_manager).
+# Deleted: _rac_state_clear_auth, _rac_state_get_access_token,
+# _rac_state_get_organization_id, _rac_state_get_refresh_token,
+# _rac_state_get_token_expires_at, _rac_state_get_user_id,
+# _rac_state_is_authenticated, _rac_state_on_auth_changed,
+# _rac_state_set_auth, _rac_state_token_needs_refresh.
 _rac_state_get_api_key
 _rac_state_get_base_url
 _rac_state_get_device_id
 _rac_state_get_environment
 _rac_state_get_instance
-_rac_state_get_organization_id
-_rac_state_get_refresh_token
-_rac_state_get_token_expires_at
-_rac_state_get_user_id
 _rac_state_initialize
-_rac_state_is_authenticated
 _rac_state_is_device_registered
 _rac_state_is_initialized
-_rac_state_on_auth_changed
 _rac_state_reset
-_rac_state_set_auth
 _rac_state_set_device_registered
 _rac_state_set_persistence_callbacks
 _rac_state_shutdown
-_rac_state_token_needs_refresh
 _rac_storage_analyzer_analyze
 _rac_storage_analyzer_calculate_size
 _rac_storage_analyzer_check_available

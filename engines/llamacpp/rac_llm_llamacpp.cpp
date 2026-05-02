@@ -13,6 +13,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LLAMA_ALOG(...) __android_log_print(ANDROID_LOG_INFO, "LLM.LlamaCpp.JNI", __VA_ARGS__)
+#else
+#define LLAMA_ALOG(...) ((void)0)
+#endif
 #include <string>
 
 #include "rac/core/rac_error.h"
@@ -60,7 +67,9 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
     }
 
     // Initialize backend
+    LLAMA_ALOG("rac_llm_llamacpp_create: initializing backend for %s", model_path);
     if (!handle->backend->initialize(init_config)) {
+        LLAMA_ALOG("rac_llm_llamacpp_create: backend init FAILED");
         delete handle;
         rac_error_set_details("Failed to initialize LlamaCPP backend");
         return RAC_ERROR_BACKEND_INIT_FAILED;
@@ -69,6 +78,7 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
     // Get text generation component
     handle->text_gen = handle->backend->get_text_generation();
     if (!handle->text_gen) {
+        LLAMA_ALOG("rac_llm_llamacpp_create: get_text_generation FAILED");
         delete handle;
         rac_error_set_details("Failed to get text generation component");
         return RAC_ERROR_BACKEND_INIT_FAILED;
@@ -89,11 +99,14 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
     }
 
     // Load model
+    LLAMA_ALOG("rac_llm_llamacpp_create: calling load_model(%s)", model_path);
     if (!handle->text_gen->load_model(model_path, model_config)) {
+        LLAMA_ALOG("rac_llm_llamacpp_create: load_model FAILED");
         delete handle;
         rac_error_set_details("Failed to load model");
         return RAC_ERROR_MODEL_LOAD_FAILED;
     }
+    LLAMA_ALOG("rac_llm_llamacpp_create: load_model SUCCESS");
 
     *out_handle = static_cast<rac_handle_t>(handle);
 

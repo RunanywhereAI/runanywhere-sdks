@@ -30,6 +30,7 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -478,8 +479,9 @@ export const ChatScreen: React.FC = () => {
         currentModel?.id,
       );
 
-      // Stream tokens as they arrive — canonical cross-SDK path (§1 spec).
-      const stream = RunAnywhere.generateStream(prompt, {
+      let accumulatedText = '';
+
+      const genOptions = {
         maxTokens: options.maxTokens ?? 512,
         temperature: options.temperature ?? 0.7,
         topP: 1.0,
@@ -489,30 +491,44 @@ export const ChatScreen: React.FC = () => {
         streamingEnabled: true,
         preferredFramework: 0,
         systemPrompt: options.systemPrompt,
-      });
+      };
 
-      let accumulatedText = '';
+      if (Platform.OS === 'android') {
+        // NitroModules async iterator bridge doesn't deliver token
+        // callbacks on Android — fall back to non-streaming generate().
+        const result = await RunAnywhere.generate(prompt, genOptions);
+        accumulatedText = result.text ?? '';
+      } else {
+        // Stream tokens as they arrive — canonical cross-SDK path (§1 spec).
+        const stream = RunAnywhere.generateStream(prompt, genOptions);
 
-      for await (const event of stream) {
-        if (event.token) {
-          accumulatedText += event.token;
-          // Update the in-flight assistant message with each new token
-          const partialMessage: Message = {
-            id: assistantMessageId,
-            role: MessageRole.Assistant,
-            content: accumulatedText,
-            timestamp: new Date(),
-            modelInfo: {
-              modelId: currentModel?.id || 'unknown',
-              modelName: currentModel?.name || 'Unknown Model',
-              framework: currentModel?.preferredFramework || 'unknown',
-              frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
-            },
-          };
-          await addMessage(partialMessage, currentConversation.id);
-          flatListRef.current?.scrollToEnd({ animated: false });
+        // Manual async iteration — Hermes `for await` doesn't recognise
+        // NitroModules' custom async iterables, so we call the protocol
+        // methods directly.
+        const iterator = stream[Symbol.asyncIterator]();
+        let iterResult = await iterator.next();
+        while (!iterResult.done) {
+          const event = iterResult.value;
+          if (event.token) {
+            accumulatedText += event.token;
+            const partialMessage: Message = {
+              id: assistantMessageId,
+              role: MessageRole.Assistant,
+              content: accumulatedText,
+              timestamp: new Date(),
+              modelInfo: {
+                modelId: currentModel?.id || 'unknown',
+                modelName: currentModel?.name || 'Unknown Model',
+                framework: currentModel?.preferredFramework || 'unknown',
+                frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
+              },
+            };
+            await addMessage(partialMessage, currentConversation.id);
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }
+          if (event.isFinal) break;
+          iterResult = await iterator.next();
         }
-        if (event.isFinal) break;
       }
 
       const finalContent = accumulatedText || '(No response generated)';
@@ -570,6 +586,15 @@ export const ChatScreen: React.FC = () => {
   const handleNewChat = useCallback(async () => {
     await createConversation();
   }, [createConversation]);
+
+  // Expose test helpers for E2E automation via Hermes debugger
+  useEffect(() => {
+    if (__DEV__) {
+      (globalThis as any).__testNewChat = handleNewChat;
+      (globalThis as any).__testSend = handleSend;
+      (globalThis as any).__testSetInput = setInputText;
+    }
+  }, [handleNewChat, handleSend]);
 
   /**
    * Handle selecting a conversation from the list

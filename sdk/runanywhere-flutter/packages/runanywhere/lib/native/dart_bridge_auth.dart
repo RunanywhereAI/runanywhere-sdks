@@ -13,7 +13,6 @@ import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
-import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
@@ -305,16 +304,15 @@ class DartBridgeAuth {
     return getAccessToken() ?? cachedToken;
   }
 
-  /// Clear all auth state
+  /// Clear all auth state (in-memory + persisted via the secure-storage
+  /// vtable installed at `rac_auth_init`). Delegates fully to the native
+  /// auth manager — matches Swift `CppBridge.State.clearAuth`.
   Future<void> clearAuth() async {
     try {
       final lib = PlatformLoader.loadCommons();
       final clearFn =
           lib.lookupFunction<Void Function(), void Function()>('rac_auth_clear');
       clearFn();
-
-      // Also clear via state bridge
-      await DartBridgeState.instance.clearAuth();
     } catch (e) {
       _logger.debug('rac_auth_clear not available: $e');
     }

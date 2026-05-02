@@ -187,6 +187,27 @@ export const SolutionAdapter = {
   },
 };
 
+/**
+ * Return a live Uint32Array view of the module's WASM heap.
+ *
+ * Emscripten only puts `HEAPU32` on the Module object when it is listed
+ * in `-sEXPORTED_RUNTIME_METHODS`. If the backend WASM was compiled
+ * without that flag we derive the view from `HEAPU8.buffer` (HEAPU8 is
+ * always exported).
+ */
+function heapU32(m: EmscriptenRunanywhereModule): Uint32Array {
+  if (m.HEAPU32) return m.HEAPU32;
+
+  // Fallback: derive from HEAPU8's underlying ArrayBuffer.
+  if (m.HEAPU8) return new Uint32Array(m.HEAPU8.buffer);
+
+  throw new Error(
+    'RunAnywhere WASM module is missing HEAPU8/HEAPU32. ' +
+    'Ensure a backend (e.g. LlamaCPP) has been registered via ' +
+    'setRunanywhereModule() before calling RunAnywhere.solutions.run().',
+  );
+}
+
 function createFromProto(
   bytes: Uint8Array,
   module: EmscriptenRunanywhereModule,
@@ -198,7 +219,7 @@ function createFromProto(
   const outHandlePtr = m._malloc(4);
   try {
     m.HEAPU8.set(bytes, bytesPtr);
-    m.HEAPU32[outHandlePtr >>> 2] = 0;
+    heapU32(m)[outHandlePtr >>> 2] = 0;
 
     const rc = m._rac_solution_create_from_proto(
       bytesPtr,
@@ -207,7 +228,7 @@ function createFromProto(
     );
     assertOk('create_from_proto', rc);
 
-    const handle = m.HEAPU32[outHandlePtr >>> 2];
+    const handle = heapU32(m)[outHandlePtr >>> 2];
     if (!handle) {
       throw new Error(
         'rac_solution_create_from_proto returned RAC_SUCCESS with a null handle',
@@ -231,12 +252,12 @@ function createFromYaml(
   const outHandlePtr = m._malloc(4);
   try {
     m.stringToUTF8(yaml, yamlPtr, yamlLen);
-    m.HEAPU32[outHandlePtr >>> 2] = 0;
+    heapU32(m)[outHandlePtr >>> 2] = 0;
 
     const rc = m._rac_solution_create_from_yaml(yamlPtr, outHandlePtr);
     assertOk('create_from_yaml', rc);
 
-    const handle = m.HEAPU32[outHandlePtr >>> 2];
+    const handle = heapU32(m)[outHandlePtr >>> 2];
     if (!handle) {
       throw new Error(
         'rac_solution_create_from_yaml returned RAC_SUCCESS with a null handle',

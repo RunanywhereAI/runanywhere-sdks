@@ -103,6 +103,17 @@ const char* rac_auth_get_access_token(void) {
     return g_auth_state.access_token;
 }
 
+const char* rac_auth_get_refresh_token(void) {
+    if (!g_auth_state.refresh_token || g_auth_state.refresh_token[0] == '\0') {
+        return nullptr;
+    }
+    return g_auth_state.refresh_token;
+}
+
+int64_t rac_auth_get_token_expires_at(void) {
+    return g_auth_state.token_expires_at;
+}
+
 const char* rac_auth_get_device_id(void) {
     return g_auth_state.device_id;
 }

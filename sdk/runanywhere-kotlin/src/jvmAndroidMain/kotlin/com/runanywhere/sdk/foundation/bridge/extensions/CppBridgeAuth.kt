@@ -48,9 +48,29 @@ object CppBridgeAuth {
     private const val ENDPOINT_REFRESH = "/api/v1/auth/sdk/refresh"
     private const val REQUEST_TIMEOUT_MS = 30_000
 
-    /** Initialize native auth state. Idempotent. */
-    init {
-        RunAnywhereBridge.racAuthInit()
+    @Volatile private var initialized: Boolean = false
+
+    /**
+     * Initialize the native auth manager with a secure-storage vtable backed
+     * by the platform adapter's secureGet/secureSet/secureDelete callbacks.
+     *
+     * Must be called AFTER [CppBridgePlatformAdapter.register] has wired up
+     * the secure-storage delegate, otherwise rac_auth_save_tokens /
+     * rac_auth_clear fall back to in-memory-only and tokens are lost across
+     * process restarts. Idempotent.
+     *
+     * Called from [com.runanywhere.sdk.foundation.bridge.CppBridge.initialize]
+     * during Phase 1.
+     */
+    fun initialize() {
+        if (initialized) return
+        synchronized(this) {
+            if (initialized) return
+            RunAnywhereBridge.racAuthInit()
+            com.runanywhere.sdk.foundation.SDKLogger(TAG)
+                .info("Native auth manager initialized with secure storage vtable")
+            initialized = true
+        }
     }
 
     val accessToken: String? get() = RunAnywhereBridge.racAuthGetAccessToken()

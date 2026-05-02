@@ -184,6 +184,37 @@ export class ModelDownloader {
 
       const totalSize = completedFileSizes.reduce((a, b) => a + b, 0);
 
+      // Extracting stage — observability hook for archive unpacking that happens
+      // downstream of core downloads (e.g. ONNXProvider's extractTarGz for
+      // sherpa .tar.gz model bundles). Even when no extraction is needed
+      // (single-file GGUF etc.), we emit EXTRACTING so observers see the
+      // complete DOWNLOADING → EXTRACTING → VALIDATING → COMPLETED sequence
+      // that mirrors native SDKs' rac_extract_archive_native hook.
+      this.emitDownloadProgress({
+        modelId,
+        stage: DownloadStage.DOWNLOAD_STAGE_EXTRACTING,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        stageProgress: 0,
+        bytesDownloaded: totalSize,
+        totalBytes: totalSize,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
+      });
+      this.emitDownloadProgress({
+        modelId,
+        stage: DownloadStage.DOWNLOAD_STAGE_EXTRACTING,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        stageProgress: 1,
+        bytesDownloaded: totalSize,
+        totalBytes: totalSize,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
+      });
+
       // Validating stage
       this.emitDownloadProgress({
         modelId,

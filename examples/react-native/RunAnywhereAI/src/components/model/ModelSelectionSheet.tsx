@@ -18,6 +18,7 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
   SafeAreaView,
@@ -417,6 +418,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   }, [visible, loadData]);
 
+
   // B-RN-Sheet-Routing: clear stale lists when context changes so we don't
   // briefly render the previous tab's models while loadData is in flight.
   useEffect(() => {
@@ -513,6 +515,12 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    (globalThis as any).__testModels = availableModels;
+    (globalThis as any).__testOnModelSelected = onModelSelected;
+  }, [availableModels]);
+
   /**
    * Handle model download with real-time progress
    * Supports multiple concurrent downloads
@@ -524,9 +532,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
     try {
-      // Use real download API — iterate over streaming DownloadProgress events.
-      for await (const progress of RunAnywhere.downloadModel(model.id)) {
-        // Update progress for this specific model
+      // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
+      const dlIter = RunAnywhere.downloadModel(model.id)[Symbol.asyncIterator]();
+      let dlResult = await dlIter.next();
+      while (!dlResult.done) {
+        const progress = dlResult.value;
         setDownloadingModels((prev) => ({
           ...prev,
           [model.id]: progress.stageProgress ?? 0,
@@ -534,6 +544,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         console.warn(
           `[Download] ${model.id}: ${Math.round((progress.stageProgress ?? 0) * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
         );
+        dlResult = await dlIter.next();
       }
 
       // Refresh models after download
@@ -887,16 +898,19 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <ActivityIndicator size="small" color={Colors.primaryBlue} />
             </View>
           ) : canSelect ? (
-            <TouchableOpacity
+            <Pressable
               style={[
                 styles.selectButton,
                 (isLoadingModel || isSelected) && styles.buttonDisabled,
               ]}
               onPress={() => handleSelectModel(model)}
               disabled={isLoadingModel || isSelected}
+              accessible={true}
+              accessibilityLabel={`Select ${model.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.selectButtonText}>Select</Text>
-            </TouchableOpacity>
+            </Pressable>
           ) : (
             // B-RN-3-002: Removed `disabled={isLoadingModel}` — concurrent
             // downloads are supported (each model has its own progress entry
@@ -907,6 +921,9 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               style={styles.downloadButton}
               onPress={() => handleDownloadModel(model)}
               disabled={downloadingModels[model.id] !== undefined}
+              accessible={true}
+              accessibilityLabel={`Download ${model.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.downloadButtonText}>Download</Text>
             </TouchableOpacity>

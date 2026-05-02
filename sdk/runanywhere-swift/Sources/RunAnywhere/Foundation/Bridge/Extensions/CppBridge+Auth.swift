@@ -86,19 +86,13 @@ extension CppBridge {
             )
         }
 
-        /// Clear authentication state
+        /// Clear authentication state (in-memory + Keychain)
+        ///
+        /// Delegates to rac_auth_clear which wipes the in-memory auth state
+        /// and (because CppBridge.State.initialize wired up the Keychain
+        /// secure-storage vtable) also deletes the persisted tokens.
         public static func clearAuth() throws {
-            // Clear C++ auth-manager state (no-op on secure storage unless
-            // callbacks are registered).
             rac_auth_clear()
-
-            // Clear Keychain (Swift owns the persistence side here).
-            try KeychainManager.shared.delete(for: "com.runanywhere.sdk.accessToken")
-            try KeychainManager.shared.delete(for: "com.runanywhere.sdk.refreshToken")
-            try KeychainManager.shared.delete(for: "com.runanywhere.sdk.deviceId")
-            try KeychainManager.shared.delete(for: "com.runanywhere.sdk.userId")
-            try KeychainManager.shared.delete(for: "com.runanywhere.sdk.organizationId")
-
             logger.info("Authentication cleared")
         }
 

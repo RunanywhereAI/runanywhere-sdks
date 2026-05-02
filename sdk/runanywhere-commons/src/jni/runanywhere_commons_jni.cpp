@@ -5202,29 +5202,145 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetSto
 // JNI FUNCTIONS - Auth Manager (rac_auth_*)
 // =============================================================================
 //
-// v2.1 quick-wins Item 4 / GAP 08 #2. 16 thunks wrapping rac_auth_manager.h
-// so the Kotlin CppBridgeAuth can delegate state + token logic to native
-// instead of duplicating it. The HTTP transport stays in Kotlin (no JNI
-// httpPost helper); native owns request building + response parsing +
-// state via rac_auth_build_*_request and rac_auth_handle_*_response.
+// F3 fix: racAuthInit now installs a rac_secure_storage_t vtable backed by
+// the existing platform-adapter secure-storage callbacks (secureGet/
+// secureSet/secureDelete on CppBridgePlatformAdapter, which delegate to
+// AndroidSecureStorage under the hood). Without this wiring,
+// rac_auth_save_tokens / rac_auth_clear were no-ops and tokens were lost
+// on every process restart.
 //
-// Storage callbacks (rac_secure_storage_t) are wired through the existing
-// g_jvm pattern via a Kotlin KeyStoreBridge object — see
-// nativeAuthInitWithCallbacks for the wiring. Pass nullptr for in-memory-only
-// auth (development / unit tests).
+// Previous behavior passed `nullptr` and commented about a "v2.1-2
+// follow-up that adds the KeyStoreBridge". The follow-up is this function.
 //
-// All thunks here are JvmStatic on RunAnywhereBridge (jclass receiver), not
-// instance methods (jobject) — matches the racLog / racConfigureLogging
-// pattern at the top of this file rather than the nativeFooBar pattern at
-// the bottom.
+// All thunks here are JvmStatic on RunAnywhereBridge (jclass receiver).
+
+// =============================================================================
+// rac_secure_storage_t adapter over the JNI platform adapter
+// =============================================================================
+//
+// The rac_platform_adapter_t secure-storage callbacks (jni_secure_*_callback
+// above) use base64-encoded bytes via the Kotlin secureGet/secureSet/
+// secureDelete instance methods. rac_auth_manager expects plain C strings
+// with a `int (*retrieve)(key, buf, buf_size, ctx)` signature that writes
+// a NUL-terminated value into the provided buffer and returns the length.
+//
+// These shims call the platform adapter's JNI methods directly (NOT the
+// base64 wrappers) so we pass plain strings end-to-end between the auth
+// manager and the Kotlin PlatformSecureStorage delegate.
+
+static int auth_storage_store(const char* key, const char* value, void* /*ctx*/) {
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
+        return -1;
+    }
+    jstring jKey = env->NewStringUTF(key ? key : "");
+    // Auth-manager values are already base64-safe (random bytes from JWTs);
+    // the platform adapter's secureSet takes base64, so we base64 the value
+    // here. We'd pay the same cost either way; doing it here keeps the
+    // existing rac_platform_adapter_t contract unchanged.
+    jclass base64Class = env->FindClass("android/util/Base64");
+    jboolean ok = JNI_FALSE;
+    if (base64Class != nullptr) {
+        jmethodID encodeToString = env->GetStaticMethodID(
+            base64Class, "encodeToString", "([BI)Ljava/lang/String;");
+        size_t len = value ? strlen(value) : 0;
+        jbyteArray raw = env->NewByteArray(static_cast<jsize>(len));
+        if (raw != nullptr) {
+            env->SetByteArrayRegion(
+                raw, 0, static_cast<jsize>(len),
+                reinterpret_cast<const jbyte*>(value ? value : ""));
+            jstring encoded = static_cast<jstring>(
+                env->CallStaticObjectMethod(base64Class, encodeToString, raw, /*NO_WRAP=*/2));
+            if (encoded != nullptr) {
+                ok = env->CallBooleanMethod(g_platform_adapter, g_method_secure_set, jKey, encoded);
+                env->DeleteLocalRef(encoded);
+            }
+            env->DeleteLocalRef(raw);
+        }
+        env->DeleteLocalRef(base64Class);
+    }
+    env->DeleteLocalRef(jKey);
+    return ok ? 0 : -1;
+}
+
+static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer_size,
+                                 void* /*ctx*/) {
+    if (out_value == nullptr || buffer_size == 0) return -1;
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
+        return -1;
+    }
+
+    jstring jKey = env->NewStringUTF(key ? key : "");
+    jstring encodedJ = static_cast<jstring>(
+        env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
+    env->DeleteLocalRef(jKey);
+    if (encodedJ == nullptr) return -1;
+
+    // Decode the base64 payload back to bytes
+    jclass base64Class = env->FindClass("android/util/Base64");
+    int written = -1;
+    if (base64Class != nullptr) {
+        jmethodID decode =
+            env->GetStaticMethodID(base64Class, "decode", "(Ljava/lang/String;I)[B");
+        jbyteArray raw = static_cast<jbyteArray>(
+            env->CallStaticObjectMethod(base64Class, decode, encodedJ, /*NO_WRAP=*/2));
+        if (raw != nullptr) {
+            jsize len = env->GetArrayLength(raw);
+            if (static_cast<size_t>(len) + 1 <= buffer_size) {
+                env->GetByteArrayRegion(raw, 0, len, reinterpret_cast<jbyte*>(out_value));
+                out_value[len] = '\0';
+                written = static_cast<int>(len);
+            }
+            env->DeleteLocalRef(raw);
+        }
+        env->DeleteLocalRef(base64Class);
+    }
+    env->DeleteLocalRef(encodedJ);
+    return written;
+}
+
+static int auth_storage_delete(const char* key, void* /*ctx*/) {
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
+        return -1;
+    }
+    jstring jKey = env->NewStringUTF(key ? key : "");
+    jboolean ok = env->CallBooleanMethod(g_platform_adapter, g_method_secure_delete, jKey);
+    env->DeleteLocalRef(jKey);
+    return ok ? 0 : -1;
+}
 
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthInit(
     JNIEnv* /*env*/, jclass /*cls*/) {
-    // No-storage-callbacks variant: in-memory only. Production callers
-    // should use racAuthInitWithCallbacks once that's wired (v2.1-2 PR
-    // adds the KeyStoreBridge bridge).
-    rac_auth_init(nullptr);
+    // Require the platform adapter to have been registered first so our
+    // storage vtable has somewhere to delegate. If the Kotlin SDK forgot to
+    // register it, fall back to in-memory only rather than crash.
+    if (g_platform_adapter == nullptr) {
+        RAC_LOG_WARNING(JNI_LOG_TAG,
+            "racAuthInit called before platform adapter registered — "
+            "tokens will NOT persist across process restart");
+        rac_auth_init(nullptr);
+        return;
+    }
+
+    rac_secure_storage_t storage = {};
+    storage.store = auth_storage_store;
+    storage.retrieve = auth_storage_retrieve;
+    storage.delete_key = auth_storage_delete;
+    storage.context = nullptr;
+    rac_auth_init(&storage);
+
+    // Restore any previously persisted tokens into the in-memory auth state.
+    if (rac_auth_load_stored_tokens() == 0) {
+        RAC_LOG_INFO(JNI_LOG_TAG, "rac_auth_init: restored tokens from secure storage");
+    } else {
+        RAC_LOG_DEBUG(JNI_LOG_TAG, "rac_auth_init: no persisted tokens (first launch or cleared)");
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -6205,9 +6321,50 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareSetAccelerat
 // JNI FUNCTIONS - Structured Output (Task 2 — CPP-blocked G-A4 round-1 fix)
 // Kotlin's racStructuredOutputExtractJson(text, schemaJson) declared in
 // RunAnywhereBridge.kt — now wired to the C implementation.
+//
+// Signature contract (RunAnywhereBridge.kt:1599):
+//   external fun racStructuredOutputExtractJson(text: String, schemaJson: String?): ByteArray?
+//
+// The returned ByteArray is a serialized `runanywhere.v1.StructuredOutputResult`
+// proto (see idl/structured_output.proto). We hand-encode the wire bytes
+// directly so this JNI translation unit does not need to link libprotobuf
+// (mirrors the same strategy used by rac_llm_stream.cpp on Android —
+// libprotobuf adds ~12 MB per APK).
+//
+// Fields encoded for the success path:
+//   1 (bytes)  parsed_json := extracted JSON UTF-8 bytes
+//   3 (string) raw_text    := original input text (for debug / fallback)
+// The `validation` sub-message (field 2) is omitted — callers that need
+// validation should round-trip through rac_structured_output_validate.
 // =============================================================================
 
-JNIEXPORT jstring JNICALL
+namespace {
+
+inline void proto_wire_varint(std::vector<uint8_t>& out, uint64_t value) {
+    while (value >= 0x80u) {
+        out.push_back(static_cast<uint8_t>(value | 0x80u));
+        value >>= 7;
+    }
+    out.push_back(static_cast<uint8_t>(value));
+}
+
+inline void proto_wire_tag(std::vector<uint8_t>& out, uint32_t field_number,
+                           uint32_t wire_type) {
+    proto_wire_varint(out, (static_cast<uint64_t>(field_number) << 3) | wire_type);
+}
+
+// Encode a length-delimited (wire type 2) field: tag + length + raw bytes.
+inline void proto_wire_len_delim(std::vector<uint8_t>& out, uint32_t field_number,
+                                 const void* data, size_t len) {
+    proto_wire_tag(out, field_number, /*wire_type=*/2);
+    proto_wire_varint(out, static_cast<uint64_t>(len));
+    const auto* p = static_cast<const uint8_t*>(data);
+    out.insert(out.end(), p, p + len);
+}
+
+}  // namespace
+
+JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputExtractJson(
     JNIEnv* env, jclass clazz, jstring jText, jstring jSchemaJson) {
     if (jText == nullptr) return nullptr;
@@ -6224,8 +6381,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputExtr
         return nullptr;
     }
 
-    jstring jResult = env->NewStringUTF(out_json);
+    // Build the StructuredOutputResult proto wire bytes.
+    // Layout: field 1 (parsed_json, bytes) + field 3 (raw_text, string).
+    std::vector<uint8_t> wire;
+    wire.reserve(out_len + text.size() + 16);  // tags + two length varints headroom
+    proto_wire_len_delim(wire, /*field=*/1, out_json, out_len);
+    if (!text.empty()) {
+        proto_wire_len_delim(wire, /*field=*/3, text.data(), text.size());
+    }
+
     rac_free(out_json);
+
+    jbyteArray jResult = env->NewByteArray(static_cast<jsize>(wire.size()));
+    if (jResult == nullptr) {
+        LOGe("racStructuredOutputExtractJson: NewByteArray failed (size=%zu)", wire.size());
+        return nullptr;
+    }
+    env->SetByteArrayRegion(jResult, 0, static_cast<jsize>(wire.size()),
+                            reinterpret_cast<const jbyte*>(wire.data()));
     return jResult;
 }
 

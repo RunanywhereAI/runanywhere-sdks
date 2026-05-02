@@ -181,6 +181,16 @@ final class LLMViewModel {
             object: nil
         )
 
+        // Sync model state immediately from shared state to avoid race condition
+        // where the model was loaded before this ViewModel was initialized
+        // (i.e. the "ModelLoaded" notification was missed).
+        if let currentModel = ModelListViewModel.shared.currentModel {
+            isModelLoaded = true
+            loadedModelName = currentModel.name
+            loadedModelSupportsThinking = currentModel.supportsThinking
+            selectedFramework = currentModel.framework
+        }
+
         // Defer state-modifying operations to avoid "Publishing changes within view updates" warning
         // These are deferred because init() may be called during view body evaluation
         Task { @MainActor in
@@ -250,11 +260,12 @@ final class LLMViewModel {
     private func executeGeneration(prompt: String, messageIndex: Int) async {
         do {
             try await ensureModelIsLoaded()
+
             let options = getGenerationOptions()
-            // Build a ChatML-formatted prompt from the full conversation history.
-            // LFM2 / Qwen models require the chatml template; sending raw text
-            // causes the model to emit control/reserved tokens instead of text.
-            let chatMLPrompt = buildChatMLPrompt(systemPrompt: options.systemPrompt)
+            // Send the raw user prompt and let C++ apply_chat_template handle
+            // formatting via the model's embedded GGUF template. The system
+            // prompt is passed separately in options so the C++ layer can
+            // place it correctly.
             let effectiveOptions = LLMGenerationOptions(
                 maxTokens: options.maxTokens,
                 temperature: options.temperature,
@@ -263,9 +274,9 @@ final class LLMViewModel {
                 streamingEnabled: options.streamingEnabled,
                 preferredFramework: options.preferredFramework,
                 structuredOutput: options.structuredOutput,
-                systemPrompt: nil   // Already embedded in chatMLPrompt
+                systemPrompt: options.systemPrompt
             )
-            try await performGeneration(prompt: chatMLPrompt, options: effectiveOptions, messageIndex: messageIndex)
+            try await performGeneration(prompt: prompt, options: effectiveOptions, messageIndex: messageIndex)
         } catch {
             await handleGenerationError(error, at: messageIndex)
         }

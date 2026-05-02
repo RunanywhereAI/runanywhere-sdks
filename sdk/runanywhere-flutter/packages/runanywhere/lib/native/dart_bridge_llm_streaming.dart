@@ -35,7 +35,12 @@ class DartBridgeLLMStreaming {
       );
       if (rc == 0) {
         RacNative.bindings.rac_llm_unset_stream_proto_callback(handle);
-        _protoCache = true;
+        // Probe by registering a real callback, triggering a minimal
+        // generation, and decoding the first event. Until that round-trip
+        // is implemented, fall back to struct path to avoid malformed-varint
+        // crashes when the C++ binary's hand-encoded wire format disagrees
+        // with the Dart proto descriptor.
+        _protoCache = false;
       } else {
         _protoCache = false;
       }

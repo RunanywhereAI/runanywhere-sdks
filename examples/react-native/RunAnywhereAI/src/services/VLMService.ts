@@ -89,9 +89,12 @@ export class VLMService {
         topK: 0,
       });
 
-      // Consume the async iterator and fire callback
-      for await (const token of response.stream) {
-        onToken(token);
+      // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
+      const iter = response.stream[Symbol.asyncIterator]();
+      let result = await iter.next();
+      while (!result.done) {
+        onToken(result.value);
+        result = await iter.next();
       }
     } catch (error) {
       console.error('[VLMService] Description error:', error);

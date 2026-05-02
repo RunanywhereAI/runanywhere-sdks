@@ -34,7 +34,7 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
     "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
-    "prepare": "npm run nitrogen",
+    "prepare": "which nitrogen >/dev/null 2>&1 && npm run nitrogen || true",
     "prepublishOnly": "node scripts/fix-nitrogen-output.js"
   },
   "keywords": [

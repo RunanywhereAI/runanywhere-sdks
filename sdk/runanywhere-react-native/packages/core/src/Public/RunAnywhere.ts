@@ -98,6 +98,90 @@ export class Conversation {
 }
 
 // ============================================================================
+// Download Model — Streaming AsyncGenerator
+// ============================================================================
+
+/**
+ * Download a model and stream `DownloadProgress` events.
+ *
+ * Written as `async function*` rather than an object literal with a
+ * `[Symbol.asyncIterator]` method because Babel compiles
+ * `Object.defineProperty(obj, Symbol.asyncIterator, fn)` to
+ * `_defineProperty2.default(...)` which Hermes does not recognise as
+ * async-iterable. Generators compile to code Hermes natively supports.
+ *
+ * Cancellation: breaking out of the `for await` loop triggers the
+ * generator's `return()` path, which fires the `finally` block and
+ * issues `Models.cancelDownload(modelId)` against the native cancel-token
+ * registry.
+ */
+async function* downloadModel(
+  modelId: string
+): AsyncGenerator<ProtoDownloadProgress, void, void> {
+  const queue: ProtoDownloadProgress[] = [];
+  let resolver: ((p: ProtoDownloadProgress | null) => void) | null = null;
+  let finished = false;
+  let dlError: Error | null = null;
+
+  const push = (progress: ProtoDownloadProgress): void => {
+    if (resolver) {
+      const r = resolver;
+      resolver = null;
+      r(progress);
+    } else {
+      queue.push(progress);
+    }
+  };
+
+  // Kick off the underlying download; `Models.downloadModel` delivers a
+  // full `runanywhere.v1.DownloadProgress` message per tick.
+  const downloadPromise = Models.downloadModel(modelId, (p) => {
+    push(p as ProtoDownloadProgress);
+  })
+    .then(() => {
+      finished = true;
+      if (resolver) {
+        const r = resolver;
+        resolver = null;
+        r(null);
+      }
+    })
+    .catch((err: unknown) => {
+      dlError = err instanceof Error ? err : new Error(String(err));
+      finished = true;
+      if (resolver) {
+        const r = resolver;
+        resolver = null;
+        r(null);
+      }
+    });
+
+  try {
+    while (!finished || queue.length > 0) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+        continue;
+      }
+      if (finished) break;
+      const next = await new Promise<ProtoDownloadProgress | null>((r) => {
+        resolver = r;
+      });
+      if (next !== null) {
+        yield next;
+      }
+    }
+    if (dlError) throw dlError;
+  } finally {
+    if (!finished) {
+      // Consumer broke out early — signal cancel and let the download
+      // promise settle so we don't leak the task.
+      void Models.cancelDownload(modelId);
+      await downloadPromise.catch(() => undefined);
+    }
+  }
+}
+
+// ============================================================================
 // RunAnywhere SDK
 // ============================================================================
 
@@ -786,74 +870,21 @@ export const RunAnywhere = {
   /**
    * Download a model and stream `DownloadProgress` events.
    *
-   * Returns an `AsyncIterable<DownloadProgress>` per canonical spec §13.
+   * Returns an `AsyncGenerator<DownloadProgress>` per canonical spec §13.
    * Each yielded value is a proto `DownloadProgress` object with `modelId`,
    * `bytesDownloaded`, `totalBytes`, and a 0-1 `progress` field.
    *
    * The actual download is delegated to the native C++ transport
    * (`rac_http_download_execute`). Callers can break out of the for-await
    * at any time; cancellation is performed via `cancelDownload(modelId)`.
+   *
+   * Implemented as an `async function*` (not an object with
+   * `[Symbol.asyncIterator]`) because Babel compiles the latter through
+   * `Object.defineProperty(obj, Symbol.asyncIterator, fn)`, which Hermes
+   * does not recognise as async-iterable. Generators are emitted as a
+   * native form Hermes supports.
    */
-  downloadModel(modelId: string): AsyncIterable<ProtoDownloadProgress> {
-    return {
-      [Symbol.asyncIterator](): AsyncIterator<ProtoDownloadProgress> {
-        const queue: ProtoDownloadProgress[] = [];
-        let done = false;
-        let dlError: Error | null = null;
-        let resolver: ((v: IteratorResult<ProtoDownloadProgress>) => void) | null = null;
-
-        const push = (progress: ProtoDownloadProgress): void => {
-          if (resolver) {
-            const res = resolver;
-            resolver = null;
-            res({ value: progress, done: false });
-          } else {
-            queue.push(progress);
-          }
-        };
-
-        // Kick off the underlying download with a callback to push progress.
-        // `Models.downloadModel` now delivers a full `runanywhere.v1.
-        // DownloadProgress` message (10 fields) so we can forward it
-        // verbatim — no field remapping needed.
-        Models.downloadModel(modelId, (p) => {
-          push(p as ProtoDownloadProgress);
-        }).then(() => {
-          done = true;
-          if (resolver) {
-            resolver({ value: undefined as unknown as ProtoDownloadProgress, done: true });
-            resolver = null;
-          }
-        }).catch((err: unknown) => {
-          dlError = err instanceof Error ? err : new Error(String(err));
-          done = true;
-          if (resolver) {
-            resolver({ value: undefined as unknown as ProtoDownloadProgress, done: true });
-            resolver = null;
-          }
-        });
-
-        return {
-          async next(): Promise<IteratorResult<ProtoDownloadProgress>> {
-            if (queue.length > 0) {
-              return { value: queue.shift()!, done: false };
-            }
-            if (done) {
-              if (dlError) throw dlError;
-              return { value: undefined as unknown as ProtoDownloadProgress, done: true };
-            }
-            return new Promise<IteratorResult<ProtoDownloadProgress>>((resolve) => {
-              resolver = resolve;
-            });
-          },
-          async return(): Promise<IteratorResult<ProtoDownloadProgress>> {
-            void Models.cancelDownload(modelId);
-            return { value: undefined as unknown as ProtoDownloadProgress, done: true };
-          },
-        };
-      },
-    };
-  },
+  downloadModel: downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
   deleteAllModels: Models.deleteAllModels,

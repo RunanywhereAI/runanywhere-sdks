@@ -129,6 +129,18 @@ RAC_API bool rac_auth_needs_refresh(void);
 RAC_API const char* rac_auth_get_access_token(void);
 
 /**
+ * @brief Get current refresh token
+ * @return Refresh token string, or NULL if not set
+ */
+RAC_API const char* rac_auth_get_refresh_token(void);
+
+/**
+ * @brief Get token expiry timestamp
+ * @return Unix timestamp (seconds) when token expires, or 0 if not set
+ */
+RAC_API int64_t rac_auth_get_token_expires_at(void);
+
+/**
  * @brief Get current device ID
  * @return Device ID string, or NULL if not set
  */

@@ -157,6 +157,11 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       debugPrint(
           '💡 Models registered, user can now download and select models');
+
+      // ── E2E auto-test (Android only) — uncomment to run ──────────
+      // if (Platform.isAndroid) {
+      //   unawaited(_runE2EAutoTest());
+      // }
     } catch (e) {
       stopwatch.stop();
       debugPrint(
@@ -164,6 +169,115 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       setState(() {
         _initializationError = e;
       });
+    }
+  }
+
+  /// E2E auto-test: download → load → generate (non-streaming) → generateStream
+  Future<void> _runE2EAutoTest() async {
+    const testModelId = 'lfm2-350m-q4_k_m';
+    debugPrint('');
+    debugPrint('═══════════════════════════════════════════');
+    debugPrint('  E2E AUTO-TEST  (Flutter Android)');
+    debugPrint('═══════════════════════════════════════════');
+
+    try {
+      // ── Step 1: Download ─────────────────────────────────────────
+      debugPrint('▶ Step 1: downloading $testModelId …');
+      final sw = Stopwatch()..start();
+      final progressStream =
+          RunAnywhereSDK.instance.downloads.start(testModelId);
+
+      double lastPct = 0;
+      await for (final p in progressStream) {
+        final pct = (p.stageProgress * 100).clamp(0.0, 100.0);
+        if (pct - lastPct >= 10 || pct >= 100) {
+          debugPrint('   download: ${pct.toStringAsFixed(0)}%');
+          lastPct = pct;
+        }
+        if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
+        if (p.stage == DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+            p.errorMessage.isNotEmpty) {
+          throw Exception('download failed: ${p.errorMessage}');
+        }
+      }
+      sw.stop();
+      debugPrint('✅ Download done in ${sw.elapsedMilliseconds}ms');
+
+      // Let the download adapter finalize (path update, registry sync)
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await ModelManager.shared.refresh();
+
+      // Re-run discovery so the SDK sees the downloaded file
+      final models = await RunAnywhereSDK.instance.models.available();
+      final dlModel = models.where((m) => m.id == testModelId).firstOrNull;
+      debugPrint('   model localPath after download: ${dlModel?.localPath}');
+
+      // ── Step 2: Load ─────────────────────────────────────────────
+      debugPrint('▶ Step 2: loading $testModelId …');
+      sw
+        ..reset()
+        ..start();
+      await RunAnywhereSDK.instance.llm.load(testModelId);
+      sw.stop();
+      debugPrint('✅ Model loaded in ${sw.elapsedMilliseconds}ms');
+
+      // ── Step 3: Non-streaming generate ───────────────────────────
+      debugPrint('▶ Step 3: non-streaming generate …');
+      sw
+        ..reset()
+        ..start();
+      final genOpts = LLMGenerationOptions(
+        maxTokens: 64,
+        temperature: 0.7,
+        systemPrompt: 'You are a helpful assistant.',
+      );
+      final result =
+          await RunAnywhereSDK.instance.llm.generate('Hello!', genOpts);
+      sw.stop();
+      debugPrint('✅ generate() => "${result.text.substring(0, result.text.length.clamp(0, 120))}"');
+      debugPrint('   tokens=${result.tokensGenerated}  t/s=${result.tokensPerSecond.toStringAsFixed(1)}  time=${sw.elapsedMilliseconds}ms');
+
+      // ── Step 4: Streaming generate ───────────────────────────────
+      debugPrint('▶ Step 4: streaming generateStream …');
+      sw
+        ..reset()
+        ..start();
+      final streamOpts = LLMGenerationOptions(
+        maxTokens: 64,
+        temperature: 0.7,
+        systemPrompt: 'You are a helpful assistant.',
+      );
+      final stream = RunAnywhereSDK.instance.llm
+          .generateStream('What is 2+2?', streamOpts);
+      final buf = StringBuffer();
+      int tokenCount = 0;
+      await for (final event in stream) {
+        if (event.isFinal) {
+          if (event.errorMessage.isNotEmpty) {
+            throw Exception('stream error: ${event.errorMessage}');
+          }
+          break;
+        }
+        if (event.token.isNotEmpty) {
+          buf.write(event.token);
+          tokenCount++;
+        }
+      }
+      sw.stop();
+      debugPrint('✅ generateStream() => "$buf"');
+      debugPrint('   tokens=$tokenCount  time=${sw.elapsedMilliseconds}ms');
+
+      // ── Done ─────────────────────────────────────────────────────
+      debugPrint('');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('  ALL E2E TESTS PASSED  ✓');
+      debugPrint('═══════════════════════════════════════════');
+    } catch (e, st) {
+      debugPrint('');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('  E2E TEST FAILED: $e');
+      debugPrint('  $st');
+      debugPrint('═══════════════════════════════════════════');
     }
   }
 

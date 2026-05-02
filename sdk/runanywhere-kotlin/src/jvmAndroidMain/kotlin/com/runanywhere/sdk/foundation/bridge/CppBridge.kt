@@ -151,6 +151,14 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
+            // F3 fix: initialize the native auth manager with a secure-storage
+            // vtable backed by the platform adapter secureGet/secureSet/
+            // secureDelete callbacks. Must happen AFTER the adapter is
+            // registered (the JNI-side vtable delegates to it) and BEFORE any
+            // auth operation. Without this, tokens are lost on every process
+            // restart because rac_auth_save_tokens / rac_auth_clear are no-ops.
+            CppBridgeAuth.initialize()
+
             // v2 close-out Phase H4: install the OkHttp HTTP transport BEFORE
             // any network I/O happens (device registration, model assignment
             // fetch, telemetry, auth all go through rac_http_request_*). The

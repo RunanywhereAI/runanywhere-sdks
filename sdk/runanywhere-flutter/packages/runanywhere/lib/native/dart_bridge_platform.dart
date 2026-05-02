@@ -140,11 +140,11 @@ class DartBridgePlatform {
         _exceptionalReturnInt32,
       );
 
-      // Clock - returns int64, use 0 as exceptional return
-      adapter.ref.nowMs = Pointer.fromFunction<RacNowMsCallbackNative>(
-        _platformNowMsCallback,
-        _exceptionalReturnInt64,
-      );
+      // Clock — leave null so C++ falls back to std::chrono.
+      // Pointer.fromFunction is not thread-safe and rac_get_current_time_ms
+      // is called from C++ worker threads (download orchestrator, OkHttp
+      // transport) that are not attached to the Dart VM isolate.
+      adapter.ref.nowMs = nullptr;
 
       // Memory info callback
       adapter.ref.getMemoryInfo =
@@ -159,17 +159,11 @@ class DartBridgePlatform {
         _platformTrackErrorCallback,
       );
 
-      // Optional callbacks (handled by Dart directly)
-      adapter.ref.httpDownload =
-          Pointer.fromFunction<RacHttpDownloadCallbackNative>(
-        _platformHttpDownloadCallback,
-        _exceptionalReturnInt32,
-      ).cast<Void>();
-      adapter.ref.httpDownloadCancel =
-          Pointer.fromFunction<RacHttpDownloadCancelCallbackNative>(
-        _platformHttpDownloadCancelCallback,
-        _exceptionalReturnInt32,
-      ).cast<Void>();
+      // HTTP download callbacks — disabled because OkHttp transport vtable
+      // handles all HTTP. Pointer.fromFunction trampolines are not safe to
+      // call from the C++ worker thread spawned by the download orchestrator.
+      adapter.ref.httpDownload = nullptr;
+      adapter.ref.httpDownloadCancel = nullptr;
       adapter.ref.extractArchive = nullptr;
       adapter.ref.userData = nullptr;
 
