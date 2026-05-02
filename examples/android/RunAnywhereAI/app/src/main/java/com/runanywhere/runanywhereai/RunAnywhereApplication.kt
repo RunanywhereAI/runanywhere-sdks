@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import com.runanywhere.runanywhereai.data.ModelList
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.storage.AndroidPlatformContext
@@ -66,6 +67,8 @@ class RunAnywhereApplication : Application() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+
+        CppBridgeDownload.downloadProvider = HttpUrlConnectionDownloadProvider()
 
         Timber.i("App launched, initializing SDK...")
 
