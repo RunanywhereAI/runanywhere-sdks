@@ -65,6 +65,7 @@ endif()
 # Source files
 set(JNI_SOURCES
     runanywhere_commons_jni.cpp
+    rac_rag_jni.cpp
 )
 
 # Create shared library
@@ -83,6 +84,12 @@ target_link_libraries(runanywhere_commons_jni
     nlohmann_json::nlohmann_json
     ${JNI_LIBRARIES}
 )
+
+# rac_rag_jni.cpp uses a hand-rolled proto3 wire-format encoder/decoder
+# (mirrors src/features/llm/rac_llm_stream.cpp) so it does NOT depend on
+# libprotobuf at link time. Required because Android cross-compiles do not
+# discover Protobuf via find_package, and rac_proto_adapters.cpp (which
+# WOULD give us typed adapters) is gated on RAC_HAVE_PROTOBUF.
 
 # Android-specific settings
 if(ANDROID)
