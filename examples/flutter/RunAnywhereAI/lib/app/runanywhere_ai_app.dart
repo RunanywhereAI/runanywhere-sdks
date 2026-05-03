@@ -6,11 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart';
-// Lifecycle + model-registration calls below route through
-// `RunAnywhereSDK.instance` (v4 canonical API).
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
-import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
@@ -29,21 +26,13 @@ class RunAnywhereAIApp extends StatefulWidget {
 }
 
 class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
-  bool _isSDKInitialized = false;
-  Object? _initializationError;
-  String _initializationStatus = 'Initializing...';
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    // Defer SDK initialization until after the first frame renders
-    // This prevents blocking the main thread during app startup
-    // and allows the loading screen to display smoothly
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Eagerly resolve every bundled native library at startup so the
-      // 16KB-page-size warning fires once on cold-start (if at all),
-      // never mid-session when the user taps Send/Generate (B-FL-2-003 +
-      // B-FL-14-001).
       _eagerLoadNativeLibraries();
       unawaited(_initializeSDK());
     });
@@ -87,16 +76,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     final stopwatch = Stopwatch()..start();
 
     try {
-      setState(() {
-        _initializationStatus = 'Initializing SDK...';
-      });
-
       debugPrint('🎯 Initializing SDK...');
 
-      // Yield to allow UI to render before heavy work
-      await Future<void>.delayed(Duration.zero);
-
-      // Check for custom API configuration (stored via Settings screen)
       final customApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
       final customBaseURL =
           await KeychainHelper.loadString(KeychainKeys.baseURL);
@@ -110,7 +91,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('🔧 Found custom API configuration');
         debugPrint('   Base URL: $normalizedURL');
 
-        // Custom configuration mode - use stored API key and base URL
         await RunAnywhereSDK.instance.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
@@ -122,22 +102,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
       }
 
-      // Yield to allow UI to update between heavy operations
-      await Future<void>.delayed(Duration.zero);
-
-      setState(() {
-        _initializationStatus = 'Registering modules...';
-      });
-
-      // Register modules and models (matching iOS pattern)
       await _registerModulesAndModels();
-
-      // Yield before model discovery
-      await Future<void>.delayed(Duration.zero);
-
-      setState(() {
-        _initializationStatus = 'Discovering models...';
-      });
 
       stopwatch.stop();
       debugPrint(
@@ -146,29 +111,22 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           '🎯 SDK Status: ${RunAnywhereSDK.instance.isActive ? "Active" : "Inactive"}');
       debugPrint(
           '🔧 Environment: ${RunAnywhereSDK.instance.environment?.description ?? "Unknown"}');
-      debugPrint('📱 Services will initialize on first API call');
 
-      // Refresh model manager state (runs model discovery)
       await ModelManager.shared.refresh();
-
-      setState(() {
-        _isSDKInitialized = true;
-      });
 
       debugPrint(
           '💡 Models registered, user can now download and select models');
-
-      // ── E2E auto-test (Android only) — uncomment to run ──────────
-      // if (Platform.isAndroid) {
-      //   unawaited(_runE2EAutoTest());
-      // }
     } catch (e) {
       stopwatch.stop();
       debugPrint(
           '❌ SDK initialization failed after ${stopwatch.elapsedMilliseconds}ms: $e');
-      setState(() {
-        _initializationError = e;
-      });
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('SDK init error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 10),
+        ),
+      );
     }
   }
 
@@ -523,6 +481,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         ChangeNotifierProvider.value(value: ModelManager.shared),
       ],
       child: MaterialApp(
+        scaffoldMessengerKey: _messengerKey,
         title: 'RunAnywhere AI',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -557,139 +516,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 
   Widget _buildHome() {
-    if (_isSDKInitialized) {
-      return const ContentView();
-    } else if (_initializationError != null) {
-      return _InitializationErrorView(
-        error: _initializationError!,
-        onRetry: () => unawaited(_initializeSDK()),
-      );
-    } else {
-      return _InitializationLoadingView(status: _initializationStatus);
-    }
-  }
-}
-
-/// Loading view shown during SDK initialization
-class _InitializationLoadingView extends StatefulWidget {
-  final String status;
-
-  const _InitializationLoadingView({required this.status});
-
-  @override
-  State<_InitializationLoadingView> createState() =>
-      _InitializationLoadingViewState();
-}
-
-class _InitializationLoadingViewState extends State<_InitializationLoadingView>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    );
-    unawaited(_controller.repeat(reverse: true));
-
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Animated brain icon (matching iOS)
-            ScaleTransition(
-              scale: _scaleAnimation,
-              child: const Icon(
-                Icons.psychology,
-                size: AppSpacing.iconHuge,
-                color: AppColors.primaryPurple,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xLarge),
-            const CircularProgressIndicator(),
-            const SizedBox(height: AppSpacing.large),
-            Text(
-              widget.status,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.smallMedium),
-            Text(
-              'RunAnywhere AI',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary(context),
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Error view shown when SDK initialization fails
-class _InitializationErrorView extends StatelessWidget {
-  final Object error;
-  final VoidCallback onRetry;
-
-  const _InitializationErrorView({
-    required this.error,
-    required this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xLarge),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: AppSpacing.iconXLarge,
-                color: AppColors.primaryRed,
-              ),
-              const SizedBox(height: AppSpacing.large),
-              Text(
-                'Initialization Failed',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.smallMedium),
-              Text(
-                error.toString(),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary(context),
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xLarge),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return const ContentView();
   }
 }

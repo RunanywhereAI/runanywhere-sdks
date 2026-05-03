@@ -14,6 +14,7 @@
 //   await ra.llm.load('llama-3-8b');
 //   final response = await ra.llm.chat('Hello!');
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:runanywhere/data/network/telemetry_service.dart';
@@ -173,8 +174,12 @@ class RunAnywhereSDK {
   /// Initialize with fully-resolved [SDKInitParams].
   ///
   /// Mirrors Swift `RunAnywhere.performCoreInit()` two-phase flow:
-  /// - Phase 1: `DartBridge.initialize()` (sync, ~1-5ms)
-  /// - Phase 2: async service bridges, device registration, auth
+  /// - Phase 1: Core init (sync, ~1-5ms) + local service setup (async,
+  ///   no network) — completes before this method returns.
+  /// - Phase 2: Device registration + authentication — fired in the
+  ///   background (fire-and-forget), matching the iOS `Task.detached`
+  ///   pattern. Network failures are non-critical; offline inference
+  ///   still works.
   Future<void> initializeWithParams(SDKInitParams params) async {
     if (SdkState.shared.isInitialized) return;
 
@@ -189,7 +194,7 @@ class RunAnywhereSDK {
       DartBridge.initialize(params.environment);
       logger.debug('DartBridge initialized with platform adapter');
 
-      // --- Phase 2: Services init (async) ---
+      // --- Local service setup (async, no network) ---
       await DartBridge.initializeServices(
         apiKey: params.apiKey,
         baseURL: params.baseURL.toString(),
@@ -205,9 +210,6 @@ class RunAnywhereSDK {
         environment: params.environment,
       );
 
-      await registerDeviceIfNeeded(params, logger);
-      await authenticateWithBackend(params, logger);
-
       logger.debug('Initializing model registry...');
       await DartBridgeModelRegistry.instance.initialize();
 
@@ -222,6 +224,11 @@ class RunAnywhereSDK {
         environment: params.environment.name,
         success: true,
       );
+
+      // --- Phase 2: Background services (network, fire-and-forget) ---
+      // Matches iOS Task.detached { completeServicesInitialization() }.
+      // Failures are non-critical; offline inference still works.
+      unawaited(_completeBackgroundServices(params, logger));
     } catch (e) {
       logger.error('❌ SDK initialization failed: $e');
       SdkState.shared.reset();
@@ -237,6 +244,22 @@ class RunAnywhereSDK {
       );
 
       rethrow;
+    }
+  }
+
+  /// Phase 2 background services — device registration + authentication.
+  /// Runs after [initializeWithParams] returns. Failures are logged but
+  /// never surface to the caller.
+  Future<void> _completeBackgroundServices(
+    SDKInitParams params,
+    SDKLogger logger,
+  ) async {
+    try {
+      await registerDeviceIfNeeded(params, logger);
+      await authenticateWithBackend(params, logger);
+      logger.debug('Background services completed');
+    } catch (e) {
+      logger.warning('Background services failed (non-critical): $e');
     }
   }
 

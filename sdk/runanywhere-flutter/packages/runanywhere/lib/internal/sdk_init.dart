@@ -6,6 +6,8 @@
 // Moved out of the old static `RunAnywhere` god-class during Phase C
 // of the v2 close-out. These helpers are NOT part of the public API.
 
+import 'dart:async';
+
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
@@ -25,8 +27,12 @@ Future<void> registerDeviceIfNeeded(
       environment: params.environment,
       baseURL: params.baseURL.toString(),
     );
-    await DartBridgeDevice.instance.registerIfNeeded();
+    await DartBridgeDevice.instance
+        .registerIfNeeded()
+        .timeout(const Duration(seconds: 10));
     logger.debug('Device registration check completed');
+  } on TimeoutException {
+    logger.warning('Device registration timed out (non-critical)');
   } catch (e) {
     logger.warning('Device registration failed (non-critical): $e');
   }
@@ -48,10 +54,12 @@ Future<void> authenticateWithBackend(
     final deviceId = await DartBridgeDevice.instance.getDeviceId();
     logger.debug('Authenticating with device ID: $deviceId');
 
-    final result = await DartBridgeAuth.instance.authenticate(
-      apiKey: params.apiKey,
-      deviceId: deviceId,
-    );
+    final result = await DartBridgeAuth.instance
+        .authenticate(
+          apiKey: params.apiKey,
+          deviceId: deviceId,
+        )
+        .timeout(const Duration(seconds: 10));
 
     if (result.isSuccess) {
       logger.info('Authenticated for ${params.environment.description}');
@@ -64,6 +72,11 @@ Future<void> authenticateWithBackend(
         metadata: {'environment': params.environment.name},
       );
     }
+  } on TimeoutException {
+    logger.warning(
+      'Authentication timed out (non-critical, offline inference still works)',
+      metadata: {'environment': params.environment.name},
+    );
   } catch (e) {
     logger.warning(
       'Authentication error: $e',
