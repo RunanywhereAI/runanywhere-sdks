@@ -22,835 +22,520 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use the latest Swift 6 APIs always.
 - Do not use NSLock as it is outdated.
 
+---
+
 ## Repository Overview
 
-This repository contains cross-platform SDKs for the RunAnywhere on-device AI platform. The platform provides intelligent routing between on-device and cloud AI models to optimize for cost and privacy.
+Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~51K LOC) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
+
+**Current version**: `0.19.13` (canonical source: `sdk/runanywhere-commons/VERSION`)
 
 ### SDK Implementations
-- **Kotlin Multiplatform SDK** (`sdk/runanywhere-kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
-- **Android SDK** (`sdk/runanywhere-android/`) - Kotlin-based SDK for Android
-- **iOS SDK** (`sdk/runanywhere-swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
-- **Web SDK** (`sdk/runanywhere-web/`) - TypeScript/WASM SDK for browsers via Emscripten
+| SDK | Path | Bridge Mechanism | Platforms |
+|-----|------|-----------------|-----------|
+| Swift | `sdk/runanywhere-swift/` | XCFramework + CRACommons module map | iOS 17+, macOS 14+ |
+| Kotlin Multiplatform | `sdk/runanywhere-kotlin/` | JNI (`librunanywhere_jni.so`) | Android (min 24), JVM 17 |
+| Flutter | `sdk/runanywhere-flutter/` | Dart FFI (`ffi` package) | iOS, Android |
+| React Native | `sdk/runanywhere-react-native/` | NitroModules (JSI HybridObject) | iOS 15.1+, Android arm64 |
+| Web | `sdk/runanywhere-web/` | Emscripten WASM + TypeScript | Browsers (Chrome, Safari, Firefox) |
+
+### Native Core
+| Directory | Contents |
+|-----------|----------|
+| `sdk/runanywhere-commons/` | C/C++ core library — all AI logic, plugin registry, event system |
+| `engines/` | 8 backend plugins: llamacpp, sherpa, onnx, whispercpp, whisperkit_coreml, metalrt, genie, diffusion-coreml |
+| `runtimes/` | 4 runtime adapters: cpu (always), onnxrt, coreml, metal |
+| `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 
 ### Example Applications
-- **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
-- **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
-- **Web Demo** (`examples/web/RunAnywhereAI/`) - Sample web app demonstrating SDK usage
+| App | Path | Build System |
+|-----|------|-------------|
+| Android | `examples/android/RunAnywhereAI/` | Gradle/Compose |
+| iOS | `examples/ios/RunAnywhereAI/` | SwiftUI + SPM |
+| Flutter | `examples/flutter/RunAnywhereAI/` | Flutter + Dart FFI |
+| React Native | `examples/react-native/RunAnywhereAI/` | RN 0.83 + NitroModules |
+| Web | `examples/web/RunAnywhereAI/` | Vanilla TS + Vite |
 
-## Common Development Commands
+### Playground
+`Playground/` contains 6 standalone demo projects (not part of any build system): YapRun (iOS dictation app), swift-starter-app, on-device-browser-agent, android-use-agent, linux-voice-assistant, openclaw-hybrid-assistant.
 
-### Kotlin Multiplatform SDK Development
+---
 
-```bash
-# Navigate to Kotlin SDK
-cd sdk/runanywhere-kotlin/
+## Cross-Platform Architecture
 
-# Build Commands (using scripts/sdk.sh)
-./scripts/sdk.sh build            # Build all platforms (JVM and Android)
-./scripts/sdk.sh build-all        # Same as 'build' - builds all targets
-./scripts/sdk.sh build-all --clean # Clean before building (removes build directories)
-./scripts/sdk.sh build-all --deep-clean # Deep clean including Gradle caches
-./scripts/sdk.sh build-all --no-clean   # Build without any cleanup (default)
+```
+                          idl/*.proto
+                              │
+                    idl/codegen/generate_all.sh
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+   *.pb.swift          Wire Kotlin        ts-proto / protoc-gen-dart
+   (committed)          (committed)            (committed)
 
-# Individual Platform Builds
-./scripts/sdk.sh jvm              # Build JVM JAR only
-./scripts/sdk.sh android          # Build Android AAR only
-./scripts/sdk.sh common           # Compile common module only
-
-# Testing
-./scripts/sdk.sh test             # Run all tests
-./scripts/sdk.sh test-jvm         # Run JVM tests
-./scripts/sdk.sh test-android     # Run Android tests
-
-# Publishing
-./scripts/sdk.sh publish          # Publish to Maven Local (~/.m2/repository)
-./scripts/sdk.sh publish-local    # Same as 'publish'
-
-# Cleanup Options
-./scripts/sdk.sh clean            # Clean build directories
-./scripts/sdk.sh deep-clean       # Clean build dirs and Gradle caches
-
-# Help and Info
-./scripts/sdk.sh help             # Show all available commands
-./scripts/sdk.sh --help           # Same as 'help'
-
-# Direct Gradle Commands (Alternative)
-./gradlew build                   # Build all targets
-./gradlew jvmJar                  # Build JVM JAR
-./gradlew assembleDebug           # Build Android Debug AAR
-./gradlew assembleRelease         # Build Android Release AAR
-./gradlew clean                   # Clean build directories
-./gradlew publishToMavenLocal     # Publish to local Maven
+Platform SDKs (thin bridges — supply platform services, call C ABI)
+  ┌──────────┬──────────┬──────────┬──────────┬──────────┐
+  │  Swift   │  Kotlin  │ Flutter  │React Nat.│   Web    │
+  │XCFramewk │   JNI    │ Dart FFI │NitroMods │  WASM    │
+  └────┬─────┴────┬─────┴────┬─────┴────┬─────┴────┬─────┘
+       │          │          │          │          │
+       └──────────┴──────────┴──────┬───┴──────────┘
+                                    │ rac_* C API
+                    ┌───────────────▼───────────────┐
+                    │      runanywhere-commons       │
+                    │  Component Layer (lifecycle)   │
+                    │  Service Layer (routing)       │
+                    │  Plugin Registry + Router      │
+                    └───────────────┬───────────────┘
+                                    │ rac_engine_vtable_t (v3)
+          ┌─────────────┬───────────┼───────────┬─────────────┐
+          ▼             ▼           ▼           ▼             ▼
+      llamacpp      sherpa-onnx  metalrt    platform     whispercpp
+     (LLM,VLM)    (STT,TTS,VAD) (Apple)  (Apple FM)      (STT)
 ```
 
-#### Build Script Features
+### Key Architectural Patterns
 
-The `scripts/sdk.sh` script provides:
-- **Automatic cleanup options**: `--clean`, `--deep-clean`, `--no-clean` flags
-- **Build verification**: Checks for successful JAR and AAR creation
-- **Error handling**: Continues building other targets if one fails
-- **Progress indicators**: Clear output showing build status
-- **Flexible commands**: Support for multiple build scenarios
+**Platform Adapter IoC**: `rac_platform_adapter_t` is a flat C struct of function pointers populated by each SDK before calling `rac_init()`. C++ never calls platform APIs directly — all file I/O, HTTP, Keychain, logging, and memory queries pass through this struct.
 
-#### Build Output Locations
+**Two-Phase SDK Initialization**: All SDKs follow the same pattern: Phase 1 (synchronous — register platform adapter, load native libs, configure logging) then Phase 2 (async — authenticate, register device, fetch model assignments, discover downloaded models).
 
-After a successful build:
-- **JVM JAR**: `build/libs/RunAnywhereKotlinSDK-jvm-0.1.0.jar`
-- **Android AAR**: `build/outputs/aar/RunAnywhereKotlinSDK-debug.aar`
-- **Maven Local**: `~/.m2/repository/com/runanywhere/sdk/`
+**Plugin ABI v3**: Every backend publishes a `rac_engine_vtable_t` with 8 primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `rerank_ops`, `vlm_ops`, `diffusion_ops`). NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 3u` — version mismatch causes immediate rejection.
 
-### Android SDK Development
+**Static vs Dynamic Plugins**: iOS and WASM force `RAC_STATIC_PLUGINS=ON` (no `dlopen`). Android/Linux/macOS default to dynamic loading via `rac_registry_load_plugin()`. Static registration uses `RAC_STATIC_PLUGIN_REGISTER(name)` macro with `-force_load` / `--whole-archive` linker flags.
+
+**Streaming Fan-Out**: C++ allows only one proto-byte callback per component handle. Each SDK implements a `HandleFanOut` that multiplexes one C callback to multiple subscribers (Swift `AsyncStream`, Kotlin `Flow`, Dart `StreamController`, TS `AsyncIterable`).
+
+**Proto Types Are Canonical**: All structured types (environments, model formats, error codes, voice events, LLM stream events) are defined in `idl/*.proto` and code-generated per SDK. Never hand-write enum values — use the generated types and typealiases.
+
+---
+
+## Building the Native Core
+
+The root `CMakeLists.txt` is the single entry point for all native builds. Version is read from `sdk/runanywhere-commons/VERSION`.
+
+### CMake Presets (`CMakePresets.json`)
 
 ```bash
-# Navigate to Android SDK
-cd sdk/runanywhere-android/
+# macOS (development)
+cmake --preset macos-debug && cmake --build build/macos-debug
+ctest --preset macos-debug
 
-# Build the SDK
-./gradlew build
+# macOS release
+cmake --preset macos-release && cmake --build build/macos-release
 
-# Run lint checks
-./gradlew lint
+# Linux (with sanitizer)
+cmake --preset linux-asan && cmake --build build/linux-asan
 
-# Run tests
-./gradlew test
+# iOS (device + simulator)
+cmake --preset ios-device && cmake --build build/ios-device --config Release
+cmake --preset ios-simulator && cmake --build build/ios-simulator --config Release
 
-# Clean build
-./gradlew clean
+# Android (requires ANDROID_NDK_HOME)
+cmake --preset android-arm64 && cmake --build build/android-arm64
 
-# Build release AAR
-./gradlew assembleRelease
+# WASM (requires EMSDK)
+cmake --preset wasm && cmake --build build/wasm
 ```
 
-### iOS SDK Development
+### Cross-Platform Build Scripts (in `scripts/`)
 
 ```bash
-# Navigate to iOS SDK
-cd sdk/runanywhere-swift/
+# iOS: Build XCFrameworks for all slices → sdk/runanywhere-swift/Binaries/
+./scripts/build-core-xcframework.sh
+# Also syncs XCFrameworks into React Native and Flutter SDK plugin dirs
 
-# Build the SDK
+# Android: Build .so for all ABIs → copies into all SDK jniLibs/ dirs
+./scripts/build-core-android.sh
+
+# WASM: Build racommons-llamacpp.wasm → sdk/runanywhere-web/packages/llamacpp/wasm/
+./scripts/build-core-wasm.sh
+
+# Version bump across all manifests
+./scripts/sync-versions.sh <version>
+
+# Update Package.swift checksums after building release zips
+./scripts/sync-checksums.sh <zip_dir>
+
+# Full IDL codegen (requires protoc toolchain — see scripts/setup-toolchain.sh)
+./idl/codegen/generate_all.sh
+```
+
+### Native Build Outputs
+
+| Platform | Output | Consumed by |
+|----------|--------|------------|
+| iOS | `sdk/runanywhere-swift/Binaries/*.xcframework` | Swift SPM, Flutter iOS, RN iOS |
+| Android | `*/jniLibs/{abi}/*.so` | Kotlin, Flutter Android, RN Android |
+| WASM | `sdk/runanywhere-web/packages/llamacpp/wasm/*.wasm` | Web SDK |
+| macOS/Linux | `build/<preset>/librac_commons.a` or `.so` | Local dev/testing |
+
+---
+
+## SDK Development Commands
+
+### C++ Core (`sdk/runanywhere-commons/`)
+
+See `sdk/runanywhere-commons/CLAUDE.md` for detailed architecture and C++ conventions.
+
+```bash
+# Build with backends + tests
+cmake -B build -DRAC_BUILD_TESTS=ON -DRAC_BUILD_BACKENDS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
+
+# Lint C++
+./scripts/lint-cpp.sh          # Check formatting
+./scripts/lint-cpp.sh --fix    # Auto-fix
+```
+
+### Swift SDK (`sdk/runanywhere-swift/`)
+
+```bash
+# Build (requires XCFrameworks in sdk/runanywhere-swift/Binaries/)
 swift build
 
 # Run tests
 swift test
 
-# Run tests with coverage
-swift test --enable-code-coverage
+# Build for specific platform
+xcodebuild build -scheme RunAnywhere -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
 
 # Run SwiftLint
 swiftlint
-
-# Build for specific platform
-xcodebuild build -scheme RunAnywhere -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
-### Android Example App
+### Kotlin SDK (`sdk/runanywhere-kotlin/`)
 
 ```bash
-# Navigate to Android example
-cd examples/android/RunAnywhereAI/
+cd sdk/runanywhere-kotlin/
 
-# Build the app
-./gradlew build
+# Build all (JVM + Android)
+./scripts/sdk.sh build
 
-# Run lint
-./gradlew :app:lint
+# Individual targets
+./scripts/sdk.sh jvm           # JVM JAR
+./scripts/sdk.sh android       # Android AAR
 
-# Install on device/emulator
-./gradlew installDebug
+# Test
+./scripts/sdk.sh test          # All tests
+./scripts/sdk.sh test-jvm      # JVM only
 
-# Run tests
-./gradlew test
+# Publish to Maven Local
+./scripts/sdk.sh publish
+
+# Direct Gradle
+./gradlew assembleDebug        # Android debug AAR
+./gradlew jvmJar               # JVM JAR
+./gradlew publishToMavenLocal
 ```
 
-### iOS Example App
+Build outputs: `build/libs/RunAnywhereKotlinSDK-jvm-*.jar`, `build/outputs/aar/RunAnywhereKotlinSDK-*.aar`
 
-To get logs for sample app and sdk use this in another terminal:
+Backend modules at `modules/runanywhere-core-llamacpp/` and `modules/runanywhere-core-onnx/`.
+
+### Flutter SDK (`sdk/runanywhere-flutter/`)
+
+Managed by Melos. Four packages: `runanywhere` (core), `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_genie`.
+
 ```bash
+cd sdk/runanywhere-flutter/
+melos bootstrap         # Install deps across all packages
+melos run analyze       # Dart analysis
+```
+
+### React Native SDK (`sdk/runanywhere-react-native/`)
+
+Managed by Yarn Berry 3.6.1. Three packages: `@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/onnx`.
+
+```bash
+cd sdk/runanywhere-react-native/
+yarn install
+yarn typecheck          # Primary verification gate
+```
+
+NitroModules specs in `packages/core/src/specs/*.nitro.ts`. After spec changes, run `nitrogen` to regenerate C++ bridge code, then `scripts/fix-nitrogen-output.js`.
+
+### Web SDK (`sdk/runanywhere-web/`)
+
+Three npm packages: `@runanywhere/web` (core TS), `@runanywhere/web-llamacpp` (WASM), `@runanywhere/web-onnx` (Sherpa WASM).
+
+```bash
+cd sdk/runanywhere-web/
+
+# Build WASM (requires Emscripten SDK)
+./wasm/scripts/build.sh --llamacpp --vlm       # CPU variant
+./wasm/scripts/build.sh --llamacpp --webgpu     # WebGPU variant
+./wasm/scripts/build-sherpa-onnx.sh             # Sherpa-ONNX WASM
+
+# Build TypeScript
+npm run build:ts
+
+# Type-check
+npm run typecheck
+```
+
+WASM outputs: `packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}`, `packages/onnx/wasm/sherpa/sherpa-onnx.wasm`
+
+### IDL Codegen
+
+```bash
+# Install toolchain (protoc, protoc-gen-swift, wire-compiler, ts-proto, etc.)
+./scripts/setup-toolchain.sh
+
+# Regenerate all language bindings
+./idl/codegen/generate_all.sh
+
+# Individual languages
+./idl/codegen/generate_swift.sh
+./idl/codegen/generate_kotlin.sh
+./idl/codegen/generate_dart.sh
+./idl/codegen/generate_ts.sh
+./idl/codegen/generate_cpp.sh
+```
+
+Generated files are committed. CI `idl-drift-check.yml` fails if they're out of sync.
+
+---
+
+## Example App Commands
+
+### iOS Example
+
+```bash
+cd examples/ios/RunAnywhereAI/
+
+# Build and run on simulator (recommended)
+./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro" --build-sdk
+
+# Build and run on device
+./scripts/build_and_run_ios_sample.sh device
+
+# macOS target
+./scripts/build_and_run_ios_sample.sh mac
+
+# CI verification
+./scripts/verify.sh     # Checks XCFrameworks exist, resolves packages, xcodebuild
+./scripts/smoke.sh      # Greps source for SDK API calls (no compilation)
+
+# SDK logs (in separate terminal)
 log stream --predicate 'subsystem CONTAINS "com.runanywhere"' --info --debug
 ```
 
-For physical device:
+Requires 4 XCFrameworks in `sdk/runanywhere-swift/Binaries/`: `RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`.
+
+### Android Example
+
 ```bash
-idevicesyslog | grep "com.runanywhere"
+cd examples/android/RunAnywhereAI/
+
+./gradlew :app:assembleDebug   # Build
+./gradlew :app:installDebug    # Install on device/emulator
+./gradlew detekt               # Static analysis
+./gradlew ktlintCheck          # Lint
+./scripts/verify.sh            # Full build gate
 ```
 
-#### Quick Build & Run (Recommended)
+Uses local project references via `settings.gradle.kts` to SDK modules.
+
+### Flutter Example
+
 ```bash
-# Navigate to iOS example
-cd examples/ios/RunAnywhereAI/
+cd examples/flutter/RunAnywhereAI/
 
-# Build and run on simulator (handles dependencies automatically)
-./scripts/build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
-
-# Build and run on connected device
-./scripts/build_and_run.sh device
-
-# Clean build artifacts
-./scripts/clean_build_and_run.sh
+flutter pub get
+flutter run
+flutter run -d "iPhone 16 Pro"
+./scripts/verify.sh            # pub get + analyze + APK build
+RUN_IOS=1 ./scripts/verify.sh  # Also builds iOS
 ```
 
-#### Manual Setup
+### React Native Example
+
 ```bash
-# Install CocoaPods dependencies (required for TensorFlow Lite and ZIPFoundation)
-pod install
+cd examples/react-native/RunAnywhereAI/
 
-# Fix Xcode 16 sandbox issues (required after pod install)
-./fix_pods_sandbox.sh
-
-# After pod install, always open the .xcworkspace file
-open RunAnywhereAI.xcworkspace
-
-# Run SwiftLint
-./swiftlint.sh
-
-# Verify model download URLs
-./scripts/verify_urls.sh
+yarn install
+yarn start          # Metro bundler
+yarn ios            # iOS simulator
+yarn android        # Android device
+yarn typecheck      # Primary verification gate
+./scripts/verify.sh # typecheck + optional builds
 ```
 
-#### Known Issues - Xcode 16 Sandbox
-**Error**: `Sandbox: rsync deny(1) file-write-create`
-**Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
+**Hermes caveat**: Does not support `for await...of` with NitroModules async iterables. Use manual `iterator.next()` loops.
 
-### Web SDK Development
+### Web Example
 
 ```bash
-# Navigate to Web SDK
-cd sdk/runanywhere-web/
-
-# First-time setup (installs emsdk, npm deps, builds WASM + TypeScript)
-./scripts/build-web.sh --setup
-
-# Build WASM + TypeScript (all backends, default)
-./scripts/build-web.sh
-
-# Build WASM with specific backends
-./scripts/build-web.sh --build-wasm --llamacpp --onnx
-./scripts/build-web.sh --build-wasm --all-backends
-./scripts/build-web.sh --build-wasm --llamacpp --vlm --webgpu
-
-# Build TypeScript only (after WASM is already built)
-./scripts/build-web.sh --build-ts
-
-# Build sherpa-onnx WASM module (TTS/VAD)
-./scripts/build-web.sh --build-sherpa
-
-# Debug build with assertions
-./scripts/build-web.sh --debug --llamacpp
-
-# Clean all build artifacts
-./scripts/build-web.sh --clean
-
-# Direct npm commands (alternative)
-npm run build:wasm            # WASM build (core only, no backends)
-npm run build:ts              # TypeScript compilation
-npm run build                 # TypeScript only (default)
-npm run dev                   # TypeScript watch mode
-npm run typecheck             # Type-check without emitting
-npm run clean                 # Remove all build outputs
-```
-
-#### Build Output Locations
-
-After a successful build:
-- **WASM module**: `packages/core/wasm/racommons.wasm` + `racommons.js`
-- **WebGPU variant**: `packages/core/wasm/racommons-webgpu.wasm` (when --webgpu is used)
-- **Sherpa-ONNX**: `packages/core/wasm/sherpa/sherpa-onnx.wasm`
-- **TypeScript**: `packages/core/dist/`
-
-#### Prerequisites
-
-- **Emscripten SDK**: v5.0.0+ (installed automatically by `--setup`)
-- **CMake**: 3.22+
-- **Node.js**: 18+
-
-### Web Example App
-
-```bash
-# Navigate to web example
 cd examples/web/RunAnywhereAI/
 
-# Install dependencies and run dev server
 npm install
-npm run dev
+npm run dev          # Vite dev server at port 5173
+npm run build        # Production build
 ```
 
-### Pre-commit Hooks
+Requires WASM pre-built. `SharedArrayBuffer` needs cross-origin isolation headers (COOP + COEP).
+
+---
+
+## Version Management
+
+Canonical version: `sdk/runanywhere-commons/VERSION` (single-line file, e.g. `0.19.13`).
 
 ```bash
-# Run all pre-commit checks
-pre-commit run --all-files
-
-# Run specific checks
-pre-commit run android-sdk-lint --all-files
-pre-commit run ios-sdk-swiftlint --all-files
+# Bump everywhere: VERSION, Package.swift, gradle.properties, package.json, pubspec.yaml
+./scripts/sync-versions.sh 0.20.0
 ```
 
-## Architecture Overview
+Release lifecycle: `sync-versions.sh` → PR with `release:minor` label → merge → `auto-tag.yml` pushes `v0.20.0` tag → `release.yml` builds all artifacts and creates draft GitHub Release.
 
-### Kotlin Multiplatform SDK Architecture
+---
 
-The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native platforms:
+## CI/CD Workflows (`.github/workflows/`)
 
-1. **Common Module** (`commonMain/`) - Platform-agnostic business logic
-   - Core services and interfaces
-   - Data models and repositories
-   - Network and authentication logic
-   - Model management abstractions
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `pr-build.yml` | PR to main, push to main/feat branch | Parallel native builds (macOS/Linux/iOS/Android) + per-SDK typecheck |
+| `release.yml` | Tag `v*.*.*` or manual | Full artifact build matrix, SDK packaging, consumer validation, draft Release |
+| `auto-tag.yml` | PR merged to main with `release:*` label | Computes next semver, pushes git tag |
+| `idl-drift-check.yml` | Changes to `idl/` or generated files | Regenerates protos, fails if `git diff` is non-empty |
+| `streaming-perf.yml` | Changes to `tests/streaming/` or voice agent | Cross-SDK streaming parity + performance tests |
+| `legacy-files-blocklist.yml` | All PRs/pushes | Prevents 5 specific deleted files from being re-introduced |
+| `secret-scan.yml` | PRs and pushes to main | Incremental gitleaks scan on diff range |
 
-2. **Platform-Specific Implementations**:
-   - **JVM** (`jvmMain/`) - Desktop/server JVM consumers
-   - **Android** (`androidMain/`) - Android-specific implementations with Room DB
-   - **Native** (`nativeMain/`) - Linux, macOS, Windows support
+---
 
-3. **Key Components**:
-   - `RunAnywhere.kt` - Main SDK entry point (platform-specific implementations)
-   - `Services.kt` - Service container and dependency injection
-   - `STTComponent` - Speech-to-text with Whisper integration
-   - `VADComponent` - Voice activity detection
-   - `LLMComponent` - Large language model inference
-   - `TTSComponent` - Text-to-speech synthesis
-   - `VLMComponent` - Vision-language model inference
-   - `VoiceAgentComponent` - Complete voice AI pipeline orchestration
-   - `SpeakerDiarizationComponent` - Multi-speaker identification
-   - `WakeWordComponent` - Wake word detection
-   - `ModelManager` - Model downloading and lifecycle
-   - `ConfigurationService` - Environment-specific configuration
+## Cross-SDK Streaming Parity Tests (`tests/streaming/`)
 
-### Design Patterns
+C++ "golden producer" binaries generate deterministic fixture files. Equivalent Swift, Kotlin, Dart, and TypeScript tests read the same fixtures and verify wire-format parity.
 
-1. **Repository Pattern**: Data access abstraction with platform-specific implementations
-2. **Service Container**: Centralized dependency injection
-3. **Event Bus**: Reactive communication between components
-4. **Provider Pattern**: Platform-specific service providers (STT, VAD)
-
-### Platform Requirements
-
-**Kotlin Multiplatform SDK:**
-- Kotlin: 2.1.21 (upgraded from 2.0.21 to fix compiler issues)
-- Gradle: 8.11.1
-- JVM Target: 17
-- Android Min SDK: 24
-- Android Target SDK: 36
-
-**iOS SDK:**
-- iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
-- Swift: 5.9+
-- Xcode: 15.0+
-
-## Maven Coordinates
-
-For JVM consumers (Kotlin/Java applications, server-side, custom integrations):
-```kotlin
-dependencies {
-    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
-}
+```bash
+# Build and run parity tests
+cmake -B build -DRAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --target parity_test_cpp perf_producer cancel_producer
+ctest --test-dir build -R parity
 ```
 
-Location after local publish: `~/.m2/repository/com/runanywhere/sdk/`
+Test categories: voice agent parity (`golden_events.txt`), LLM streaming parity (`llm_golden_events.txt`), perf bench (p50 decode < 1ms assertion), cancel parity (interrupt at index 500).
 
-Note: The IntelliJ plugin demo (formerly at `examples/intellij-plugin-demo/`) was removed in commit `52f8b2fd`. The JVM target of the Kotlin SDK is example-less by design; consumers integrate directly via the Maven coordinate above.
+---
 
-## CI/CD Pipeline
+## Key Architectural Decisions
 
-GitHub Actions workflows are configured for automated testing and building:
+### iOS SDK is Source of Truth
+When implementing features in any other SDK (especially Kotlin KMP), always check the iOS Swift implementation first. Copy logic exactly, adapting only for language syntax, not business logic.
 
-- **Path-based triggers**: Workflows only run when relevant files change
-- **Platform-specific runners**: Ubuntu for Android, macOS for iOS
-- **Artifact uploads**: Build outputs and test results are preserved
-- **Lint enforcement**: Lint errors fail the build
+### All Business Logic in C++ or commonMain
+Platform-specific code should only handle: native library loading, platform adapter registration, audio capture/playback, secure storage, and UI. All AI inference, model management, event routing, and pipeline orchestration live in C++ (`runanywhere-commons`) or Kotlin `commonMain`.
 
-Workflows are located in `.github/workflows/`:
-- `android-sdk.yml` - Android SDK CI
-- `ios-sdk.yml` - iOS SDK CI
-- `android-app.yml` - Android example app CI
-- `ios-app.yml` - iOS example app CI
-- `web-sdk-release.yml` - Web SDK release
+### Backend Registration Pattern
+All SDKs follow the same pattern:
+1. Load the backend native library
+2. Call `rac_backend_*_register()` (which registers the engine's vtable with the plugin registry)
+3. The router scores registered plugins by priority + runtime + format compatibility
+4. On inference, the highest-scoring plugin's vtable ops are invoked
+
+Backend priorities: metalrt=120 (highest, Apple-only), llamacpp=100, sherpa=90. Pinned engine matches get +10000.
+
+### HTTP Transport is Platform-Provided
+libcurl was removed. Each SDK registers a `rac_http_transport_ops_t` vtable: Swift uses URLSession, Kotlin/Flutter/RN use OkHttp (Android) or URLSession (iOS), Web uses `emscripten_fetch`.
+
+### Proto-Generated Types Replace Hand-Written Enums
+All cross-platform types are defined in `idl/*.proto`. SDKs use typealiases to the generated types (e.g., `typealias SDKEnvironment = RASDKEnvironment` in Swift, `typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment` in Kotlin). Never add enum values by hand — modify the `.proto` file and regenerate.
+
+---
+
+## Platform Requirements
+
+| Platform | Min Version | Build Tool | Key Versions |
+|----------|------------|------------|--------------|
+| iOS | 17.0 | Xcode 15+ | Swift 5.9+ |
+| macOS | 14.0 | Xcode 15+ | Swift 5.9+ |
+| Android | API 24 | AGP 8.11.2 | Kotlin 2.1.21, NDK 27.0.12077973 |
+| JVM | 17 | Gradle 8.13 | Kotlin 2.1.21 |
+| Flutter | 3.10+ | Melos | Dart 3.0+ |
+| React Native | 0.83.1 | Yarn Berry 3.6.1 | NitroModules, Hermes |
+| Web | Chrome 86+ | Vite | Emscripten 5.0+, Node 18+ |
+| C++ Core | N/A | CMake 3.22+ | C++20, Ninja |
+
+---
 
 ## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
 
-### 🚨 MANDATORY: iOS as Source of Truth
+### iOS as Source of Truth
 **NEVER make assumptions when implementing KMP code. ALWAYS refer to the iOS implementation as the definitive source of truth.**
 
-#### Core Principles:
-1. **iOS First**: When encountering missing logic, unimplemented features, or unclear requirements in KMP, ALWAYS:
-   - Check the corresponding iOS implementation
-   - Copy the iOS logic exactly (head-to-head translation)
-   - Adapt only for Kotlin syntax, not business logic
+1. **iOS First**: When encountering missing logic or unclear requirements in KMP, check the corresponding iOS implementation, copy the logic exactly, adapt only for Kotlin syntax.
 
-2. **commonMain First**: ALL business logic, protocols, interfaces, and structures MUST be defined in `commonMain/`:
-   - Interfaces and abstract classes
-   - Data models and enums
-   - Business logic and algorithms
-   - Service contracts and protocols
-   - Component definitions
-   - Even platform-specific service interfaces
+2. **commonMain First**: ALL business logic, interfaces, data models, and enums MUST be in `commonMain/`. Platform-specific modules (`androidMain`, `jvmMain`) only contain platform service implementations.
 
-3. **Platform Implementation Naming Convention**: Platform-specific implementations MUST use clear prefixes:
-   - `AndroidTTSService.kt` (not just `TTSService.kt`)
-   - `JvmTTSService.kt` (not just `TTSServiceImpl.kt`)
-   - `IosTTSService.kt` (for any iOS-specific bridges)
-   - `WindowsTTSService.kt`, `LinuxTTSService.kt`, etc.
+3. **Platform Naming Convention**: Platform-specific implementations MUST use prefixes: `AndroidTTSService.kt`, `JvmTTSService.kt`, `IosTTSService.kt`.
 
-#### Implementation Process:
-```kotlin
-// Step 1: Check iOS implementation (e.g., TTSService.swift)
-// Step 2: Define interface in commonMain matching iOS exactly
-// commonMain/kotlin/com/runanywhere/sdk/services/tts/TTSService.kt
-interface TTSService {
-    // Match iOS protocol exactly
-    suspend fun synthesize(text: String, options: TTSOptions): ByteArray
-    val availableVoices: List<String>
-}
-
-// Step 3: Implement platform-specific versions with clear names
-// androidMain/kotlin/com/runanywhere/sdk/services/tts/AndroidTTSService.kt
-class AndroidTTSService : TTSService {
-    // Android-specific implementation
-}
-
-// jvmMain/kotlin/com/runanywhere/sdk/services/tts/JvmTTSService.kt
-class JvmTTSService : TTSService {
-    // JVM-specific implementation
-}
-```
-
-#### Common Mistakes to AVOID:
-❌ **DON'T** invent your own logic when something is unclear
-❌ **DON'T** put business logic in platform-specific modules
-❌ **DON'T** name platform files generically (e.g., `TTSServiceImpl.kt`)
-❌ **DON'T** assume behavior - check iOS implementation
-
-#### Correct Approach:
-✅ **DO** check iOS implementation for every feature
-✅ **DO** keep all logic in commonMain
-✅ **DO** use platform prefixes for all platform files
-✅ **DO** translate iOS logic exactly, adapting only syntax
-
-#### Example: When you see incomplete KMP code:
-```kotlin
-// KMP has this incomplete method:
-fun processAudio(data: ByteArray): String {
-    // TODO: implement
-    return ""
-}
-
-// WRONG approach:
-fun processAudio(data: ByteArray): String {
-    // Making assumptions about what it should do
-    return data.toString()
-}
-
-// CORRECT approach:
-// 1. Find iOS AudioProcessor.swift
-// 2. Find processAudio method
-// 3. Copy exact logic:
-fun processAudio(data: ByteArray): String {
-    // Exact translation of iOS logic
-    val rms = calculateRMS(data)  // If iOS does this
-    val normalized = normalizeAudio(data, rms)  // If iOS does this
-    return encodeToBase64(normalized)  // If iOS does this
-}
-```
-
-### KMP Best Practices
-
-The Kotlin Multiplatform SDK has been aligned with iOS architecture patterns while leveraging Kotlin's strengths. These best practices ensure consistency, maintainability, and cross-platform compatibility.
-
-### Architecture Patterns
-
-#### Component-Based Architecture
-Follow the iOS component pattern but adapted to KMP idioms:
-
-```kotlin
-// Base component with lifecycle management
-abstract class BaseComponent<TService : Any>(
-    protected val configuration: ComponentConfiguration,
-    serviceContainer: ServiceContainer? = null
-) : Component {
-
-    // Component state tracking
-    override var state: ComponentState = ComponentState.NOT_INITIALIZED
-        protected set
-
-    // Service creation (platform-specific via providers)
-    protected abstract suspend fun createService(): TService
-
-    // Lifecycle methods
-    suspend fun initialize() { /* ... */ }
-    override suspend fun cleanup() { /* ... */ }
-    override suspend fun healthCheck(): ComponentHealth { /* ... */ }
-}
-```
-
-#### Event-Driven Architecture
-Use **Flow** instead of AsyncSequence for reactive streams:
-
-```kotlin
-// Central event bus with typed events
-object EventBus {
-    private val _componentEvents = MutableSharedFlow<ComponentEvent>()
-    val componentEvents: SharedFlow<ComponentEvent> = _componentEvents.asSharedFlow()
-
-    fun publish(event: ComponentEvent) {
-        _componentEvents.tryEmit(event)
-    }
-}
-
-// Usage: Listen to component state changes
-EventBus.componentEvents
-    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
-    .collect { event ->
-        println("Component ${event.component} is ready")
-    }
-```
-
-#### Service Container Pattern
-Centralized dependency injection with lazy initialization:
-
-```kotlin
-class ServiceContainer {
-    companion object {
-        val shared = ServiceContainer()
-    }
-
-    // Platform abstractions via expect/actual
-    private val fileSystem by lazy { createFileSystem() }
-    private val httpClient by lazy { createHttpClient() }
-
-    // Service dependencies
-    val modelManager: ModelManager by lazy {
-        ModelManager(fileSystem, downloadService)
-    }
-
-    // Platform-specific initialization
-    fun initialize(platformContext: PlatformContext) {
-        platformContext.initialize()
-    }
-}
-```
-
-### Code Organization
-
-#### commonMain Structure
-Keep all business logic, interfaces, and data models in `commonMain/`:
+### KMP Source Set Hierarchy
 
 ```
-commonMain/
-├── components/          # Component implementations
-│   ├── base/           # Base component classes
-│   ├── stt/            # Speech-to-text components
-│   ├── vad/            # Voice activity detection
-│   ├── llm/            # LLM inference components
-│   ├── tts/            # Text-to-speech components
-│   └── speakerdiarization/  # Speaker diarization
-├── data/               # Data layer
-│   ├── models/         # Data classes and enums
-│   ├── network/        # Network services
-│   └── repositories/   # Repository interfaces
-├── events/             # Event definitions
-├── foundation/         # Core infrastructure
-│   ├── ServiceContainer.kt
-│   └── SDKLogger.kt
-├── models/             # Model management
-│   ├── ModelManager.kt
-│   └── ModelDownloader.kt
-├── memory/             # Memory management
-└── generation/         # Text generation services
+commonMain           (~80 hand-written .kt + ~190 Wire-generated proto files)
+    └── jvmAndroidMain    (~62 files — JNI bridge, CppBridge*, OkHttp)
+            ├── androidMain   (~19 files — AudioRecord, EncryptedSharedPreferences)
+            └── jvmMain       (~16 files — javax.sound, file-based crypto)
 ```
 
-#### Platform-Specific Structure
-Use `expect/actual` **only** for platform-specific implementations:
+Manually configured (no `applyDefaultHierarchyTemplate`). Use `expect/actual` only for truly platform-specific code.
 
-```kotlin
-// commonMain - Interface only
-expect class PlatformContext {
-    fun initialize()
-}
+### Cross-SDK Alignment
 
-expect fun createFileSystem(): FileSystem
-expect fun createHttpClient(): HttpClient
+| Concern | iOS Swift | Kotlin KMP | Flutter | React Native | Web |
+|---------|-----------|-----------|---------|-------------|-----|
+| Entry point | `enum RunAnywhere` | `object RunAnywhere` | `RunAnywhereSDK.instance` | `RunAnywhere` object | `RunAnywhere` object |
+| Two-phase init | `initialize()` + `completeServicesInitialization()` | Same | Same | Same | Same |
+| Bridge layer | `CppBridge` enum + extensions | `CppBridge` object + extensions | `DartBridge` + `DartBridge*.dart` | `HybridRunAnywhereCore` (Nitro) | `LlamaCppBridge` + `SherpaONNXBridge` |
+| Streaming | `AsyncStream` | `Flow` | `Stream` (via `StreamController`) | `AsyncIterable` (manual iteration) | `AsyncIterable` |
+| Events | `EventBus` (Combine) | `EventBus` (SharedFlow) | `EventBus` (rxdart) | `EventBus` (NativeEventEmitter) | `EventBus` (custom pub/sub) |
+| Error type | `SDKException` (proto-backed) | `SDKException` (proto-backed) | `SDKException` | `SDKException` | `SDKException` |
+| Secure storage | Keychain | EncryptedSharedPrefs (Android), AES files (JVM) | flutter_secure_storage + cache | Keychain (iOS), EncryptedSharedPrefs (Android) | localStorage |
+| HTTP transport | URLSession | OkHttp | OkHttp (Android), URLSession (iOS) | OkHttp (Android), URLSession (iOS) | emscripten_fetch / fetch() |
 
-// androidMain - Android implementation
-actual class PlatformContext(private val context: Context) {
-    actual fun initialize() {
-        // Android-specific setup
-    }
-}
+---
 
-actual fun createFileSystem(): FileSystem = AndroidFileSystem()
+## Non-Obvious Configuration Details
+
+**`Package.swift:43`** — `let useLocalNatives = true` is hard-coded for local dev. External SPM consumers need `false`. Scripts toggle this.
+
+**`Package.swift:186-191`** — Three `.grpc.swift` files are excluded from compilation. They require iOS 18 / macOS 15, above the SDK's minimums. In-process C callback path replaces gRPC.
+
+**`gradle.properties`** — `runanywhere.useLocalNatives=true` means local `.so` files. CI overrides with `-Prunanywhere.useLocalNatives=false` to download from GitHub Releases.
+
+**Two NDK versions** — `racNdkVersion=27.0.12077973` for Kotlin/RN/Commons, `racFlutterNdkVersion=25.2.9519653` for Flutter (Flutter ships its own NDK pin).
+
+**Flutter xcframework workaround** — `build-core-xcframework.sh` strips `rac_plugin_entry_whisperkit_coreml.o` from Flutter's copy of the commons archive because Flutter uses `-all_load` which would drag in an unresolvable symbol.
+
+**Web cross-origin isolation** — `SharedArrayBuffer` requires COOP/COEP headers. Safari needs `coi-serviceworker.js` polyfill.
+
+**Web VLM Worker crash recovery** — If `rac_vlm_component_process` causes WASM OOM (`"memory access out of bounds"`), the Worker auto-recovers by creating a fresh WASM instance on the next `process()` call.
+
+**Web Qwen2-VL WebGPU workaround** — Qwen2-VL models produce NaN logits on WebGPU due to f16 M-RoPE overflow. VLM Worker forces CPU WASM for Qwen2-VL even when WebGPU is active.
+
+**Web struct offsets** — TypeScript never hard-codes C struct field offsets. `wasm_exports.cpp` exposes `EMSCRIPTEN_KEEPALIVE` offset functions; the `Offsets` proxy reads them at runtime from the WASM module.
+
+---
+
+## Pre-commit Hooks
+
+```bash
+pre-commit run --all-files        # Run all checks
+pre-commit run ios-sdk-swiftlint --all-files  # SwiftLint only
 ```
 
-#### Module Separation Principles
+Configured hooks: gitleaks (secrets), trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files (1000 KB max), check-merge-conflict, object file detection, SwiftLint (SDK + example app), periphery (unused code detection).
 
-**Core SDK vs Feature Modules:**
-- Core SDK (`commonMain`): Essential services, base components
-- Feature modules: Optional capabilities (WhisperKit, external AI providers)
-- Plugin architecture: `ModuleRegistry` for runtime registration
+---
 
-```kotlin
-// Plugin registration pattern
-object ModuleRegistry {
-    fun registerSTT(provider: STTServiceProvider) {
-        sttProviders.add(provider)
-    }
+## Active Issues (`thoughts/shared/issues/`)
 
-    fun sttProvider(modelId: String? = null): STTServiceProvider? {
-        return sttProviders.firstOrNull { it.canHandle(modelId) }
-    }
-}
+On `feat/v2-architecture` branch, 5 tracked regressions relative to `main`:
+- **001/002/005** (HIGH): Swift, Kotlin, and Web SDKs collapsed backends into monolithic artifacts, losing per-backend selective linking.
+- **003** (MEDIUM): React Native backend packages are TypeScript-only, missing native plumbing.
+- **004** (LOW): Flutter is currently a symlink to main branch.
 
-// External module registration
-// In WhisperKit module:
-ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
-```
-
-### API Design
-
-#### Kotlin Idioms for iOS Patterns
-
-**Flow for Reactive Streams:**
-```kotlin
-// Instead of AsyncSequence, use Flow
-fun transcribeStream(audioFlow: Flow<ByteArray>): Flow<TranscriptionUpdate> {
-    return audioFlow.map { audioData ->
-        // Process audio chunk
-        TranscriptionUpdate(text = processAudio(audioData), isFinal = false)
-    }
-}
-```
-
-**Coroutines for Async Operations:**
-```kotlin
-// Instead of async/await, use suspend functions
-suspend fun loadModel(modelId: String): ModelLoadResult {
-    return withContext(Dispatchers.IO) {
-        modelRepository.loadModel(modelId)
-    }
-}
-```
-
-#### Structured Error Handling
-
-Use **sealed classes** for type-safe error handling:
-
-```kotlin
-sealed class SDKError : Exception() {
-    data class InvalidApiKey(override val message: String) : SDKError()
-    data class NetworkError(override val cause: Throwable?) : SDKError()
-    data class ComponentNotReady(override val message: String) : SDKError()
-    data class InvalidState(override val message: String) : SDKError()
-
-    // Result wrapper for operations
-    sealed class Result<out T> {
-        data class Success<T>(val value: T) : Result<T>()
-        data class Failure(val error: SDKError) : Result<Nothing>()
-    }
-}
-```
-
-#### Strong Typing with Data Classes
-
-**Always use structured types instead of strings:**
-```kotlin
-// Component configuration
-data class STTConfiguration(
-    val modelId: String,
-    val language: Language = Language.EN,
-    val enableVAD: Boolean = true,
-    val audioFormat: AudioFormat = AudioFormat.PCM_16BIT
-) : ComponentConfiguration {
-    override fun validate() {
-        require(modelId.isNotBlank()) { "Model ID cannot be blank" }
-    }
-}
-
-// Enum for type safety
-enum class Language(val code: String) {
-    EN("en"), ES("es"), FR("fr"), DE("de"), JA("ja")
-}
-
-enum class AudioFormat { PCM_16BIT, PCM_24BIT, FLAC, MP3 }
-```
-
-### Integration Patterns
-
-#### ModuleRegistry for Plugin Architecture
-
-**Provider Pattern with Type Safety:**
-```kotlin
-interface STTServiceProvider {
-    suspend fun createSTTService(configuration: STTConfiguration): STTService
-    fun canHandle(modelId: String?): Boolean
-    val name: String
-}
-
-// Registration in app initialization:
-ModuleRegistry.registerSTT(WhisperSTTProvider())
-ModuleRegistry.registerLLM(LlamaProvider())
-```
-
-#### EventBus for Component Communication
-
-**Centralized Event System:**
-```kotlin
-// Component publishes events
-eventBus.publish(ComponentInitializationEvent.ComponentReady(
-    component = SDKComponent.STT,
-    modelId = "whisper-base"
-))
-
-// Other components subscribe to events
-EventBus.componentEvents
-    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
-    .filter { it.component == SDKComponent.STT }
-    .collect { handleSTTReady(it) }
-```
-
-#### Provider Pattern for Extensibility
-
-**Service Creation with Fallbacks:**
-```kotlin
-class STTComponent(configuration: STTConfiguration) : BaseComponent<STTService>(configuration) {
-
-    override suspend fun createService(): STTService {
-        // Try external providers first
-        val provider = ModuleRegistry.sttProvider(configuration.modelId)
-
-        return provider?.createSTTService(configuration)
-            ?: throw SDKError.ComponentNotAvailable("No STT provider available for model: ${configuration.modelId}")
-    }
-}
-```
-
-### Performance Best Practices
-
-#### Memory Management
-
-**Component Lifecycle:**
-```kotlin
-abstract class BaseComponent<TService : Any> {
-
-    override suspend fun cleanup() {
-        // Proper resource cleanup
-        performCleanup()
-        service = null
-        serviceContainer = null // Allow GC
-        currentStage = null
-    }
-
-    protected open suspend fun performCleanup() {
-        // Override for component-specific cleanup
-    }
-}
-```
-
-**Service Container Memory Management:**
-```kotlin
-class ServiceContainer {
-    // Use lazy initialization to avoid memory pressure
-    val modelManager: ModelManager by lazy {
-        ModelManager(fileSystem, downloadService)
-    }
-
-    suspend fun cleanup() {
-        // Cleanup components in reverse dependency order
-        sttComponent.cleanup()
-        vadComponent.cleanup()
-    }
-}
-```
-
-#### Platform-Specific Optimizations
-
-**Android optimizations in `androidMain`:**
-```kotlin
-actual fun createFileSystem(): FileSystem = AndroidFileSystem().apply {
-    // Configure for Android-specific optimizations
-    enableFileWatcher = false // Reduce battery usage
-    cacheStrategy = CacheStrategy.MEMORY_FIRST
-}
-```
-
-**JVM optimizations in `jvmMain`:**
-```kotlin
-actual fun createHttpClient(): HttpClient = HttpClient {
-    engine {
-        // JVM-specific HTTP client configuration
-        threadsCount = 4
-        pipelining = true
-    }
-}
-```
-
-### Testing Patterns
-
-#### Component Testing
-```kotlin
-class STTComponentTest {
-    @Test
-    fun `should initialize successfully with valid configuration`() = runTest {
-        val config = STTConfiguration(modelId = "whisper-base")
-        val component = STTComponent(config)
-
-        component.initialize()
-
-        assertEquals(ComponentState.READY, component.state)
-        assertTrue(component.isReady)
-    }
-
-    @Test
-    fun `should emit events during initialization`() = runTest {
-        val events = mutableListOf<ComponentEvent>()
-        val job = launch {
-            EventBus.componentEvents.collect { events.add(it) }
-        }
-
-        val component = STTComponent(STTConfiguration(modelId = "whisper-base"))
-        component.initialize()
-
-        assertTrue(events.any { it is ComponentInitializationEvent.ComponentReady })
-        job.cancel()
-    }
-}
-```
-
-#### Mock Providers for Testing
-```kotlin
-class MockSTTProvider : STTServiceProvider {
-    override val name = "MockSTT"
-
-    override suspend fun createSTTService(configuration: STTConfiguration): STTService {
-        return MockSTTService()
-    }
-
-    override fun canHandle(modelId: String?): Boolean = true
-}
-
-// In test setup:
-ModuleRegistry.clear()
-ModuleRegistry.registerSTT(MockSTTProvider())
-```
-
-### Common Patterns Summary
-
-1. **Business Logic in commonMain**: Keep all core logic platform-agnostic
-2. **expect/actual for Platform APIs**: Only use for truly platform-specific code
-3. **Flow over AsyncSequence**: Use Kotlin's reactive streams
-4. **Coroutines over async/await**: Leverage structured concurrency
-5. **Sealed Classes for Errors**: Type-safe error handling
-6. **Data Classes for Models**: Strong typing throughout
-7. **ModuleRegistry for Plugins**: Extensible architecture
-8. **EventBus for Communication**: Decoupled component communication
-9. **Service Container for DI**: Centralized dependency management
-10. **Component Lifecycle**: Proper initialization and cleanup
-
-These patterns ensure the Kotlin Multiplatform SDK maintains architectural consistency with the iOS implementation while leveraging Kotlin's strengths for cross-platform development.
-
-## Development Notes
-
-- The Kotlin Multiplatform SDK is the primary SDK implementation
-- Use `./scripts/sdk.sh` for all SDK operations - it handles configuration and build complexity
-- Configuration files (`dev.json`, `staging.json`, `prod.json`) are git-ignored - use example files as templates
-- Both SDKs focus on privacy-first, on-device AI with intelligent routing
-- Cost optimization is a key feature with real-time tracking
-- Pre-commit hooks are configured for code quality enforcement
+Live state document: `thoughts/shared/plans/sdk_current_state.md`
