@@ -108,7 +108,7 @@ public extension CppBridge {
             )
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.network(.httpError, "Failed to fetch model assignments: \(result)")
+                throw SDKException.network(.httpError, "Failed to fetch model assignments: \(result)")
             }
 
             defer {
@@ -202,26 +202,7 @@ public extension CppBridge {
         // MARK: - Private Helpers
 
         private static func categoryToCType(_ category: ModelCategory) -> rac_model_category_t {
-            switch category {
-            case .language:
-                return RAC_MODEL_CATEGORY_LANGUAGE
-            case .speechRecognition:
-                return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
-            case .speechSynthesis:
-                return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-            case .vision:
-                return RAC_MODEL_CATEGORY_VISION
-            case .imageGeneration:
-                return RAC_MODEL_CATEGORY_IMAGE_GENERATION
-            case .multimodal:
-                return RAC_MODEL_CATEGORY_MULTIMODAL
-            case .audio:
-                return RAC_MODEL_CATEGORY_AUDIO
-            case .embedding:
-                return RAC_MODEL_CATEGORY_EMBEDDING
-            case .voiceActivityDetection:
-                return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-            }
+            category.toC()
         }
     }
 }

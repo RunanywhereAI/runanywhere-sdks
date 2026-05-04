@@ -175,7 +175,7 @@ RunAnywhere.registerTool(
     ],
   },
   async (args) => {
-    // Your tool implementation
+    // Example app/tool code may call fetch; SDK internals use native C++ HTTP.
     const response = await fetch(`https://api.weather.com?q=${args.location}`);
     const data = await response.json();
     return { temperature: data.temp, condition: data.condition };
@@ -594,9 +594,11 @@ packages/core/
 │   │   ├── FileSystem.ts           # File ops
 │   │   └── Network/                # HTTP, telemetry
 │   ├── types/                      # TypeScript types
-│   │   ├── ToolCallingTypes.ts     # Tool calling types
-│   │   ├── StructuredOutputTypes.ts # Structured output types
-│   │   └── ...
+│   │   ├── enums.ts                # RN-only enums + proto re-exports
+│   │   ├── LLMTypes.ts             # RN-local LLM streaming primitives
+│   │   ├── models.ts               # Registry + init shapes
+│   │   └── ...                     # Tool / structured-output types
+│   │                               #   come from @runanywhere/proto-ts
 │   └── native/                     # Native module access
 ├── cpp/                            # C++ HybridObject bridges
 │   ├── HybridRunAnywhereCore.cpp   # Core native bridge

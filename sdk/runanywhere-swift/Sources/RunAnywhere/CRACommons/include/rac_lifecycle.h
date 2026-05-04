@@ -46,7 +46,8 @@ typedef enum rac_resource_type {
     RAC_RESOURCE_TYPE_TTS_VOICE = 2,
     RAC_RESOURCE_TYPE_VAD_MODEL = 3,
     RAC_RESOURCE_TYPE_DIARIZATION_MODEL = 4,
-    RAC_RESOURCE_TYPE_DIFFUSION_MODEL = 5
+    RAC_RESOURCE_TYPE_VLM_MODEL = 5,      /**< Vision Language Model */
+    RAC_RESOURCE_TYPE_DIFFUSION_MODEL = 6 /**< Diffusion/Image Generation Model */
 } rac_resource_type_t;
 
 /**
@@ -232,6 +233,25 @@ RAC_API rac_handle_t rac_lifecycle_get_service(rac_handle_t handle);
  * @return RAC_SUCCESS or RAC_ERROR_NOT_INITIALIZED if not loaded
  */
 RAC_API rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* out_service);
+
+/**
+ * @brief Acquire (pin) the current service, preventing unload while held.
+ *
+ * Increments an internal refcount. The caller MUST call rac_lifecycle_release_service()
+ * when done. Unload/destroy will block until all acquired references are released.
+ *
+ * @param handle Lifecycle manager handle
+ * @param out_service Output: Service handle (pinned)
+ * @return RAC_SUCCESS or RAC_ERROR_NOT_INITIALIZED if not loaded
+ */
+RAC_API rac_result_t rac_lifecycle_acquire_service(rac_handle_t handle, rac_handle_t* out_service);
+
+/**
+ * @brief Release a previously acquired service reference.
+ *
+ * @param handle Lifecycle manager handle
+ */
+RAC_API void rac_lifecycle_release_service(rac_handle_t handle);
 
 /**
  * @brief Track an operation error

@@ -36,7 +36,7 @@ public class SimplifiedFileManager {
 
     public init() throws {
         guard let documentsFolder = Folder.documents else {
-            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
+            throw SDKException.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
         try createDirectoryStructure()
@@ -44,7 +44,7 @@ public class SimplifiedFileManager {
 
     private func createDirectoryStructure() throws {
         guard CppBridge.FileManager.createDirectoryStructure() else {
-            throw SDKError.fileManagement(.directoryCreationFailed, "Failed to create directory structure via C++ bridge")
+            throw SDKException.fileManagement(.directoryCreationFailed, "Failed to create directory structure via C++ bridge")
         }
     }
 
@@ -69,51 +69,27 @@ public class SimplifiedFileManager {
     /// Delete a model folder and all its contents
     public func deleteModel(modelId: String, framework: InferenceFramework) throws {
         guard CppBridge.FileManager.deleteModel(modelId: modelId, framework: framework) else {
-            throw SDKError.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
+            throw SDKException.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
         }
-        logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
+        logger.info("Deleted model: \(modelId) from \(framework.wireString)")
     }
 
     // MARK: - Model Discovery
 
-    /// Get all downloaded models organized by framework
-    /// Returns: Dictionary of [framework: [modelId]]
-    public func getDownloadedModels() -> [InferenceFramework: [String]] {
+    /// Get all downloaded models organized by framework.
+    /// Syncs the registry from disk via the C++ bridge, then groups the
+    /// registered models by framework — C++ owns the filesystem walk.
+    public func getDownloadedModels() async -> [InferenceFramework: [String]] {
+        _ = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+
+        let models = await CppBridge.ModelRegistry.shared.getByFrameworks(
+            InferenceFramework.knownCases
+        )
+
         var result: [InferenceFramework: [String]] = [:]
-
-        guard let modelsURL = try? CppBridge.ModelPaths.getModelsDirectory(),
-              let contents = try? FileManager.default.contentsOfDirectory(at: modelsURL, includingPropertiesForKeys: [.isDirectoryKey]) else {
-            return result
+        for model in models {
+            result[model.framework, default: []].append(model.id)
         }
-
-        for frameworkFolder in contents {
-            // Check if it's a known framework folder
-            guard let framework = InferenceFramework.allCases.first(where: { $0.rawValue == frameworkFolder.lastPathComponent }),
-                  isDirectory(at: frameworkFolder) else {
-                continue
-            }
-
-            // Get model folders within this framework
-            let dirContents = try? FileManager.default.contentsOfDirectory(
-                at: frameworkFolder,
-                includingPropertiesForKeys: [.isDirectoryKey]
-            )
-            guard let modelFolders = dirContents else {
-                continue
-            }
-
-            var modelIds: [String] = []
-            for modelFolder in modelFolders {
-                if isDirectory(at: modelFolder) && folderExistsAndHasContents(at: modelFolder) {
-                    modelIds.append(modelFolder.lastPathComponent)
-                }
-            }
-
-            if !modelIds.isEmpty {
-                result[framework] = modelIds
-            }
-        }
-
         return result
     }
 
@@ -150,7 +126,7 @@ public class SimplifiedFileManager {
 
     public func clearCache() throws {
         guard CppBridge.FileManager.clearCache() else {
-            throw SDKError.fileManagement(.deleteFailed, "Failed to clear cache")
+            throw SDKException.fileManagement(.deleteFailed, "Failed to clear cache")
         }
         logger.info("Cleared cache")
     }
@@ -159,7 +135,7 @@ public class SimplifiedFileManager {
 
     public func cleanTempFiles() throws {
         guard CppBridge.FileManager.clearTemp() else {
-            throw SDKError.fileManagement(.deleteFailed, "Failed to clean temp files")
+            throw SDKException.fileManagement(.deleteFailed, "Failed to clean temp files")
         }
         logger.info("Cleaned temp files")
     }
@@ -181,20 +157,6 @@ public class SimplifiedFileManager {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
         }
         return try Folder(path: url.path)
-    }
-
-    private func isDirectory(at url: URL) -> Bool {
-        var isDir: ObjCBool = false
-        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
-    }
-
-    private func folderExistsAndHasContents(at url: URL) -> Bool {
-        guard isDirectory(at: url),
-              let contents = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil),
-              !contents.isEmpty else {
-            return false
-        }
-        return true
     }
 }
 

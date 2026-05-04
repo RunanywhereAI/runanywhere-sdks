@@ -10,7 +10,7 @@
 
 import { EventDestination, type SDKEvent } from './SDKEvent';
 import { EventBus } from '../../Public/Events/EventBus';
-import type { AnySDKEvent } from '../../types/events';
+import type { AnySDKEvent } from '../../Public/Events/SDKEventTypes';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('EventPublisher');

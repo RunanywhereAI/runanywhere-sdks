@@ -358,7 +358,7 @@ private struct StoredModelRow: View {
                         .font(AppTypography.subheadlineMedium)
 
                     HStack(spacing: AppSpacing.smallMedium) {
-                        Text(model.format.rawValue.uppercased())
+                        Text(model.format.wireString.uppercased())
                             .font(AppTypography.caption2)
                             .padding(.horizontal, AppSpacing.small)
                             .padding(.vertical, AppSpacing.xxSmall)
@@ -417,31 +417,9 @@ private struct StoredModelRow: View {
                     HStack {
                         Text("Format:")
                             .font(AppTypography.caption2Medium)
-                        Text(model.format.rawValue.uppercased())
+                        Text(model.format.wireString.uppercased())
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
-                    }
-
-                    if let framework = model.framework {
-                        HStack {
-                            Text("Framework:")
-                                .font(AppTypography.caption2Medium)
-                            Text(framework.displayName)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-
-                    // Description
-                    if let description = model.description {
-                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                            Text("Description:")
-                                .font(AppTypography.caption2Medium)
-                            Text(description)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
                     }
 
                     Divider()

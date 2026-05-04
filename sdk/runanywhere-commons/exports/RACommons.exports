@@ -36,6 +36,8 @@ _rac_analytics_events_has_callback
 # Platform Adapter
 _rac_get_platform_adapter
 _rac_set_platform_adapter
+_rac_platform_services_is_available
+_rac_platform_services_register_availability_callback
 
 # Archive Utilities
 _rac_archive_type_extension
@@ -96,6 +98,9 @@ _rac_file_manager_delete_model
 _rac_file_manager_get_storage_info
 _rac_file_manager_model_folder_exists
 _rac_file_manager_models_storage_used
+
+# Device Manager
+_rac_device_set_callbacks
 
 # Events
 _rac_event_category_name
@@ -205,12 +210,18 @@ _rac_module_list
 _rac_module_register
 _rac_module_unregister
 _rac_modules_for_capability
-_rac_service_create
-_rac_service_list_providers
-_rac_service_register_provider
-_rac_service_unregister_provider
+# v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_* /
+# rac_plugin_route / rac_plugin_list from rac/plugin/* and rac/router/*.
 
 # LLM Component
+# LLM Thinking (<think>...</think> parsing, GAP 08 #6 / v3 Phase A11).
+# Consumed by Swift (CppBridge+LLMThinking), Kotlin (CppBridgeLlmThinking),
+# Dart (LlmThinking), RN (HybridRunAnywhereCore::llmExtractThinking), Web
+# (LlmThinking.ts via ccall).
+_rac_llm_extract_thinking
+_rac_llm_split_thinking_tokens
+_rac_llm_strip_thinking
+
 _rac_llm_component_cancel
 _rac_llm_component_cleanup
 _rac_llm_component_configure
@@ -425,6 +436,11 @@ _rac_voice_agent_load_tts_voice
 _rac_voice_agent_process_stream
 _rac_voice_agent_process_voice_turn
 _rac_voice_agent_result_free
+# GAP 09 Phase 15 / v3 Phase A4 — proto-byte streaming ABI.
+# Consumed by Swift CppBridge (via CRACommons), Kotlin
+# (VoiceAgentStreamAdapter JNI thunks), Dart (RacNative FFI),
+# RN (HybridVoiceAgent C++), and Web (VoiceAgentStreamAdapter TS).
+_rac_voice_agent_set_proto_callback
 _rac_voice_agent_synthesize_speech
 _rac_voice_agent_transcribe
 
@@ -553,3 +569,112 @@ _rac_image_normalize
 _rac_image_resize
 _rac_image_resize_max
 _rac_image_to_chw
+
+# Hardware Profile ABI (round-1 CPP fix — G-C6 / Task 1)
+_rac_hardware_profile_get
+_rac_hardware_profile_free
+_rac_hardware_get_accelerators
+_rac_hardware_set_accelerator_preference
+
+# VAD Component Statistics (round-1 CPP fix — G-C6 / Task 3)
+_rac_vad_component_get_statistics
+
+# Model Registry Fetch Assignments (round-1 CPP fix — Task 5)
+_rac_model_registry_fetch_assignments
+
+# Speaker Diarization stubs (§8)
+_rac_speaker_diarization_init
+_rac_speaker_diarization_process
+_rac_speaker_diarization_destroy
+
+# Wake Word stubs (§9)
+_rac_wake_word_init
+_rac_wake_word_process
+_rac_wake_word_destroy
+
+# Shared proto buffer ABI
+_rac_proto_buffer_init
+_rac_proto_buffer_copy
+_rac_proto_buffer_set_error
+_rac_proto_buffer_free
+_rac_proto_buffer_copy_to_raw
+_rac_proto_buffer_free_data
+
+# SDK event stream proto ABI
+_rac_sdk_event_subscribe
+_rac_sdk_event_unsubscribe
+_rac_sdk_event_publish_proto
+_rac_sdk_event_poll
+_rac_sdk_event_publish_failure
+_rac_sdk_event_clear_queue
+
+# Model registry and lifecycle proto ABI
+_rac_model_registry_discover_downloaded
+_rac_discovery_result_free
+_rac_model_registry_refresh
+_rac_model_registry_register_proto
+_rac_model_registry_update_proto
+_rac_model_registry_get_proto
+_rac_model_registry_list_proto
+_rac_model_registry_query_proto
+_rac_model_registry_list_downloaded_proto
+_rac_model_registry_remove_proto
+_rac_model_registry_proto_free
+_rac_model_lifecycle_load_proto
+_rac_model_lifecycle_unload_proto
+_rac_model_lifecycle_current_model_proto
+_rac_component_lifecycle_snapshot_proto
+_rac_model_lifecycle_reset
+
+# Download and storage generated-proto ABI
+_rac_download_set_progress_proto_callback
+_rac_download_plan_proto
+_rac_download_start_proto
+_rac_download_cancel_proto
+_rac_download_resume_proto
+_rac_download_progress_poll_proto
+_rac_storage_analyzer_create
+_rac_storage_analyzer_destroy
+_rac_storage_analyzer_info_proto
+_rac_storage_analyzer_availability_proto
+_rac_storage_analyzer_delete_plan_proto
+_rac_storage_analyzer_delete_proto
+
+# LLM and speech generated-proto ABI
+_rac_llm_set_stream_proto_callback
+_rac_llm_unset_stream_proto_callback
+_rac_llm_generate_proto
+_rac_llm_generate_stream_proto
+_rac_llm_cancel_proto
+_rac_stt_component_transcribe_proto
+_rac_stt_component_transcribe_stream_proto
+_rac_tts_component_list_voices_proto
+_rac_tts_component_synthesize_proto
+_rac_tts_component_synthesize_stream_proto
+_rac_vad_component_configure_proto
+_rac_vad_component_process_proto
+_rac_vad_component_get_statistics_proto
+_rac_vad_component_set_activity_proto_callback
+_rac_voice_agent_initialize_proto
+_rac_voice_agent_component_states_proto
+_rac_voice_agent_process_voice_turn_proto
+
+# Advanced modality generated-proto ABI
+_rac_vlm_process_proto
+_rac_vlm_process_stream_proto
+_rac_vlm_cancel_proto
+_rac_embeddings_embed_batch_proto
+_rac_rag_session_create_proto
+_rac_rag_session_destroy_proto
+_rac_rag_ingest_proto
+_rac_rag_query_proto
+_rac_rag_clear_proto
+_rac_rag_stats_proto
+_rac_lora_register_proto
+_rac_lora_compatibility_proto
+_rac_lora_load_proto
+_rac_lora_remove_proto
+_rac_lora_clear_proto
+_rac_diffusion_generate_proto
+_rac_diffusion_generate_with_progress_proto
+_rac_diffusion_cancel_proto

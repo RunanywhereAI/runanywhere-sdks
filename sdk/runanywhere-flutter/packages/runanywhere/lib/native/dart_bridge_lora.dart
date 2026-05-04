@@ -13,12 +13,14 @@ import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-
+import 'package:fixnum/fixnum.dart' as fixnum;
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/public/types/lora_types.dart';
 
 // =============================================================================
 // FFI Struct: rac_lora_entry_t
@@ -82,27 +84,23 @@ class DartBridgeLora {
   /// Context is recreated internally and KV cache is cleared.
   /// Throws on failure.
   void loadAdapter(String adapterPath, double scale) {
-    final handle = DartBridgeLLM.shared.getHandle();
+    loadAdapterProto(LoRAAdapterConfig(adapterPath: adapterPath, scale: scale));
+  }
 
-    final pathPtr = adapterPath.toNativeUtf8();
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Float),
-          int Function(RacHandle, Pointer<Utf8>, double)>(
-        'rac_llm_component_load_lora',
-      );
-
-      final result = fn(handle, pathPtr, scale);
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to load LoRA adapter: ${RacResultCode.getMessage(result)}',
-        );
-      }
-      _logger.info('LoRA adapter loaded: $adapterPath (scale=$scale)');
-    } finally {
-      calloc.free(pathPtr);
+  LoRAAdapterInfo loadAdapterProto(LoRAAdapterConfig config) {
+    final fn = RacNative.bindings.rac_lora_load_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_lora_load_proto is unavailable');
     }
+    final info = DartBridgeProtoUtils.callRequestWithHandle<LoRAAdapterInfo>(
+      handle: DartBridgeLLM.shared.getHandle(),
+      request: config,
+      invoke: fn,
+      decode: LoRAAdapterInfo.fromBuffer,
+      symbol: 'rac_lora_load_proto',
+    );
+    _logger.info('LoRA adapter loaded: ${info.adapterPath}');
+    return info;
   }
 
   /// Remove a specific LoRA adapter by path.
@@ -110,27 +108,23 @@ class DartBridgeLora {
   /// KV cache is cleared automatically.
   /// Throws on failure.
   void removeAdapter(String adapterPath) {
-    final handle = DartBridgeLLM.shared.getHandle();
+    removeAdapterProto(LoRAAdapterConfig(adapterPath: adapterPath));
+  }
 
-    final pathPtr = adapterPath.toNativeUtf8();
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>)>(
-        'rac_llm_component_remove_lora',
-      );
-
-      final result = fn(handle, pathPtr);
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to remove LoRA adapter: ${RacResultCode.getMessage(result)}',
-        );
-      }
-      _logger.info('LoRA adapter removed: $adapterPath');
-    } finally {
-      calloc.free(pathPtr);
+  LoRAAdapterInfo removeAdapterProto(LoRAAdapterConfig config) {
+    final fn = RacNative.bindings.rac_lora_remove_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_lora_remove_proto is unavailable');
     }
+    final info = DartBridgeProtoUtils.callRequestWithHandle<LoRAAdapterInfo>(
+      handle: DartBridgeLLM.shared.getHandle(),
+      request: config,
+      invoke: fn,
+      decode: LoRAAdapterInfo.fromBuffer,
+      symbol: 'rac_lora_remove_proto',
+    );
+    _logger.info('LoRA adapter removed: ${info.adapterPath}');
+    return info;
   }
 
   /// Remove all LoRA adapters.
@@ -138,22 +132,20 @@ class DartBridgeLora {
   /// KV cache is cleared automatically.
   /// Throws on failure.
   void clearAdapters() {
-    final handle = DartBridgeLLM.shared.getHandle();
-
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(RacHandle),
-        int Function(RacHandle)>(
-      'rac_llm_component_clear_lora',
-    );
-
-    final result = fn(handle);
-    if (result != RAC_SUCCESS) {
-      throw StateError(
-        'Failed to clear LoRA adapters: ${RacResultCode.getMessage(result)}',
-      );
-    }
+    clearAdaptersProto();
     _logger.info('All LoRA adapters cleared');
+  }
+
+  LoRAAdapterInfo clearAdaptersProto() {
+    final fn = RacNative.bindings.rac_lora_clear_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_lora_clear_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<LoRAAdapterInfo>(
+      invoke: (out) => fn(DartBridgeLLM.shared.getHandle(), out),
+      decode: LoRAAdapterInfo.fromBuffer,
+      symbol: 'rac_lora_clear_proto',
+    );
   }
 
   /// Get info about currently loaded LoRA adapters.
@@ -183,8 +175,7 @@ class DartBridgeLora {
       final jsonStr = jsonPtr.toDartString();
 
       // Free the C-allocated JSON string
-      final freeFn = lib.lookupFunction<
-          Void Function(Pointer<Void>),
+      final freeFn = lib.lookupFunction<Void Function(Pointer<Void>),
           void Function(Pointer<Void>)>('rac_free');
       freeFn(jsonPtr.cast());
 
@@ -196,44 +187,21 @@ class DartBridgeLora {
 
   /// Check if the current backend supports LoRA adapters.
   LoraCompatibilityResult checkCompatibility(String loraPath) {
-    final handle = DartBridgeLLM.shared.getHandle();
+    return checkCompatibilityProto(LoRAAdapterConfig(adapterPath: loraPath));
+  }
 
-    final pathPtr = loraPath.toNativeUtf8();
-    final outErrorPtr = calloc<Pointer<Utf8>>();
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Pointer<Utf8>>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Pointer<Utf8>>)>(
-        'rac_llm_component_check_lora_compat',
-      );
-
-      final result = fn(handle, pathPtr, outErrorPtr);
-
-      if (result == RAC_SUCCESS) {
-        return const LoraCompatibilityResult(isCompatible: true);
-      }
-
-      // Read error message
-      String? errorMsg;
-      final errorPtr = outErrorPtr.value;
-      if (errorPtr != nullptr) {
-        errorMsg = errorPtr.toDartString();
-        // Free the C-allocated error string
-        final freeFn = lib.lookupFunction<
-            Void Function(Pointer<Void>),
-            void Function(Pointer<Void>)>('rac_free');
-        freeFn(errorPtr.cast());
-      }
-
-      return LoraCompatibilityResult(
-        isCompatible: false,
-        error: errorMsg,
-      );
-    } finally {
-      calloc.free(pathPtr);
-      calloc.free(outErrorPtr);
+  LoraCompatibilityResult checkCompatibilityProto(LoRAAdapterConfig config) {
+    final fn = RacNative.bindings.rac_lora_compatibility_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_lora_compatibility_proto is unavailable');
     }
+    return DartBridgeProtoUtils.callRequestWithHandle<LoraCompatibilityResult>(
+      handle: DartBridgeLLM.shared.getHandle(),
+      request: config,
+      invoke: fn,
+      decode: LoraCompatibilityResult.fromBuffer,
+      symbol: 'rac_lora_compatibility_proto',
+    );
   }
 
   // MARK: - Private Helpers
@@ -244,7 +212,7 @@ class DartBridgeLora {
       return list.map((item) {
         final map = item as Map<String, dynamic>;
         return LoRAAdapterInfo(
-          path: (map['path'] as String?) ?? '',
+          adapterPath: (map['path'] as String?) ?? '',
           scale: ((map['scale'] as num?) ?? 1.0).toDouble(),
           applied: (map['applied'] as bool?) ?? false,
         );
@@ -280,10 +248,31 @@ class DartBridgeLoraRegistry {
   /// Entry is deep-copied internally by C++.
   /// Throws on failure.
   void register(LoraAdapterCatalogEntry entry) {
+    registerProto(entry);
+  }
+
+  LoraAdapterCatalogEntry registerProto(LoraAdapterCatalogEntry entry) {
+    final registry = RacNative.bindings.rac_get_lora_registry?.call();
+    final fn = RacNative.bindings.rac_lora_register_proto;
+    if (registry == null || registry == nullptr || fn == null) {
+      throw UnsupportedError('LoRA registry proto ABI is unavailable');
+    }
+    final result =
+        DartBridgeProtoUtils.callRequestWithHandle<LoraAdapterCatalogEntry>(
+      handle: registry,
+      request: entry,
+      invoke: fn,
+      decode: LoraAdapterCatalogEntry.fromBuffer,
+      symbol: 'rac_lora_register_proto',
+    );
+    _logger.info('LoRA adapter registered: ${result.id}');
+    return result;
+  }
+
+  void registerLegacy(LoraAdapterCatalogEntry entry) {
     final lib = PlatformLoader.loadCommons();
 
-    final strdupFn = lib.lookupFunction<
-        Pointer<Utf8> Function(Pointer<Utf8>),
+    final strdupFn = lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>),
         Pointer<Utf8> Function(Pointer<Utf8>)>('rac_strdup');
 
     final registerFn = lib.lookupFunction<
@@ -297,11 +286,11 @@ class DartBridgeLoraRegistry {
     final idDart = entry.id.toNativeUtf8();
     final nameDart = entry.name.toNativeUtf8();
     final descDart = entry.description.toNativeUtf8();
-    final urlDart = entry.downloadUrl.toNativeUtf8();
+    final urlDart = entry.url.toNativeUtf8();
     final filenameDart = entry.filename.toNativeUtf8();
 
     // Allocate compatible model IDs array
-    final compatCount = entry.compatibleModelIds.length;
+    final compatCount = entry.compatibleModels.length;
     final compatArrayPtr = calloc<Pointer<Utf8>>(compatCount);
     final compatDartPtrs = <Pointer<Utf8>>[];
 
@@ -315,14 +304,14 @@ class DartBridgeLoraRegistry {
 
       // Fill compatible model IDs
       for (int i = 0; i < compatCount; i++) {
-        final dartPtr = entry.compatibleModelIds[i].toNativeUtf8();
+        final dartPtr = entry.compatibleModels[i].toNativeUtf8();
         compatDartPtrs.add(dartPtr);
         compatArrayPtr[i] = strdupFn(dartPtr);
       }
       entryPtr.ref.compatibleModelIds = compatArrayPtr;
       entryPtr.ref.compatibleModelCount = compatCount;
-      entryPtr.ref.fileSize = entry.fileSize;
-      entryPtr.ref.defaultScale = entry.defaultScale;
+      entryPtr.ref.fileSize = entry.sizeBytes.toInt();
+      entryPtr.ref.defaultScale = 1.0;
 
       final result = registerFn(entryPtr);
       if (result != RAC_SUCCESS) {
@@ -346,8 +335,7 @@ class DartBridgeLoraRegistry {
       // But we used calloc for the struct itself, so we need to free the
       // strdup'd strings individually. C deep-copied on register, so the
       // strdup'd pointers in the struct need to be freed.
-      final cFreeFn = lib.lookupFunction<
-          Void Function(Pointer<Void>),
+      final cFreeFn = lib.lookupFunction<Void Function(Pointer<Void>),
           void Function(Pointer<Void>)>('free');
 
       // Free strdup'd strings inside the struct
@@ -409,9 +397,9 @@ class DartBridgeLoraRegistry {
     final lib = PlatformLoader.loadCommons();
 
     // Use the registry handle to call get_all
-    final getRegistryFn = lib.lookupFunction<
-        Pointer<Void> Function(),
-        Pointer<Void> Function()>('rac_get_lora_registry');
+    final getRegistryFn =
+        lib.lookupFunction<Pointer<Void> Function(), Pointer<Void> Function()>(
+            'rac_get_lora_registry');
 
     final registry = getRegistryFn();
     if (registry == nullptr) return [];
@@ -453,8 +441,8 @@ class DartBridgeLoraRegistry {
 
     final freeFn = lib.lookupFunction<
         Void Function(Pointer<Pointer<RacLoraEntryCStruct>>, IntPtr),
-        void Function(
-            Pointer<Pointer<RacLoraEntryCStruct>>, int)>('rac_lora_entry_array_free');
+        void Function(Pointer<Pointer<RacLoraEntryCStruct>>,
+            int)>('rac_lora_entry_array_free');
 
     try {
       final results = <LoraAdapterCatalogEntry>[];
@@ -481,15 +469,13 @@ class DartBridgeLoraRegistry {
           description: entry.description != nullptr
               ? entry.description.toDartString()
               : '',
-          downloadUrl: entry.downloadUrl != nullptr
+          url: entry.downloadUrl != nullptr
               ? entry.downloadUrl.toDartString()
               : '',
-          filename: entry.filename != nullptr
-              ? entry.filename.toDartString()
-              : '',
-          compatibleModelIds: compatIds,
-          fileSize: entry.fileSize,
-          defaultScale: entry.defaultScale,
+          filename:
+              entry.filename != nullptr ? entry.filename.toDartString() : '',
+          compatibleModels: compatIds,
+          sizeBytes: fixnum.Int64(entry.fileSize),
         ));
       }
       return results;

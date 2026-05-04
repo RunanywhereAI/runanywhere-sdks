@@ -52,7 +52,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   // Voice settings
   double _speechRate = 1.0;
-  final double _pitch = 1.0;
 
   // Model state
   LLMFramework? _selectedFramework;
@@ -138,12 +137,13 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       debugPrint('🔄 Loading TTS voice: ${model.name}');
 
       // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSVoice(model.id);
+      await sdk.RunAnywhereSDK.instance.tts.loadVoice(model.id);
 
       setState(() {
-        _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
+        _selectedFramework = model.preferredFramework;
         _selectedModelName = model.name;
-        _isSystemTTS = model.preferredFramework == LLMFramework.systemTTS;
+        _isSystemTTS = model.preferredFramework ==
+            LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
         _isGenerating = false;
       });
 
@@ -154,6 +154,16 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         _errorMessage = 'Failed to load model: $e';
         _isGenerating = false;
       });
+      // B-FL-12-002: surface TTS load failures via SnackBar in addition to the
+      // inline error text.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('TTS load failed: $e'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 
@@ -176,37 +186,40 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      // Check if TTS voice is loaded via SDK (matches Swift: RunAnywhere.isTTSVoiceLoaded)
-      if (!sdk.RunAnywhere.isTTSVoiceLoaded) {
+      if (!sdk.RunAnywhereSDK.instance.tts.isLoaded) {
         throw Exception(
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      // Call SDK TTS synthesis API (matches Swift: RunAnywhere.synthesize(_:))
-      final result = await sdk.RunAnywhere.synthesize(
+      final result = await sdk.RunAnywhereSDK.instance.tts.synthesize(
         _textController.text,
-        rate: _speechRate,
-        pitch: _pitch,
-        volume: 1.0,
+        sdk.TTSOptions(
+          speakingRate: _speechRate,
+          pitch: 1.0,
+          volume: 1.0,
+        ),
       );
 
+      // Wave 2: TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
+      final samples =
+          Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
-          '✅ TTS synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+          '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = result.samples.isNotEmpty;
-        _duration = result.durationSeconds;
+        _hasAudio = samples.isNotEmpty;
+        _duration = result.durationMs.toInt() / 1000.0;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),
-          audioSize: result.samples.length * 4, // 4 bytes per float sample
+          audioSize: samples.length * 4, // 4 bytes per float sample
           sampleRate: result.sampleRate,
         );
       });
 
       // Auto-play if audio was generated
-      if (result.samples.isNotEmpty) {
-        await _playFloatAudio(result.samples, result.sampleRate);
+      if (samples.isNotEmpty) {
+        await _playFloatAudio(samples, result.sampleRate);
       }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
@@ -444,23 +457,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
-          
-          /* Pitch slider - Commented out for now as it is not implemented in the current TTS models. Once supported, we can have this back.
-          const SizedBox(height: AppSpacing.mediumLarge),
-
-          _buildSliderRow(
-            label: 'Pitch',
-            value: _pitch,
-            min: 0.5,
-            max: 2.0,
-            color: AppColors.primaryPurple,
-            onChanged: (value) {
-              setState(() {
-                _pitch = value;
-              });
-            },
-          ),
-          */
         ],
       ),
     );

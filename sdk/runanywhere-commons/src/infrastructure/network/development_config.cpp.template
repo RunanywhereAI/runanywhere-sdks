@@ -12,7 +12,10 @@
  * - Contact team lead for access to development credentials
  */
 
+#include <algorithm>
+#include <cctype>
 #include <cstring>
+#include <string>
 
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
@@ -40,6 +43,66 @@ constexpr const char* BUILD_TOKEN = "YOUR_BUILD_TOKEN";
 // Set to nullptr if not using Sentry
 constexpr const char* SENTRY_DSN = nullptr;
 
+std::string trim(const char* value) {
+    if (!value) {
+        return {};
+    }
+
+    std::string out(value);
+    auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+    out.erase(out.begin(), std::find_if(out.begin(), out.end(), [&](char c) {
+                  return !is_space(static_cast<unsigned char>(c));
+              }));
+    out.erase(std::find_if(out.rbegin(), out.rend(), [&](char c) {
+                  return !is_space(static_cast<unsigned char>(c));
+              }).base(),
+              out.end());
+    return out;
+}
+
+std::string lowercase(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+bool looks_like_placeholder(const char* value) {
+    std::string normalized = lowercase(trim(value));
+    if (normalized.empty()) {
+        return true;
+    }
+
+    return normalized.find("your_") != std::string::npos ||
+           normalized.find("<your") != std::string::npos ||
+           normalized.find("replace_me") != std::string::npos ||
+           normalized.find("placeholder") != std::string::npos;
+}
+
+bool is_usable_http_url(const char* value) {
+    std::string url = trim(value);
+    if (looks_like_placeholder(url.c_str())) {
+        return false;
+    }
+
+    std::string normalized = lowercase(url);
+    bool has_scheme =
+        normalized.rfind("https://", 0) == 0 || normalized.rfind("http://", 0) == 0;
+    if (!has_scheme) {
+        return false;
+    }
+
+    size_t scheme_end = url.find("://");
+    if (scheme_end == std::string::npos) {
+        return false;
+    }
+
+    size_t host_start = scheme_end + 3;
+    size_t host_end = url.find_first_of("/?#", host_start);
+    std::string host = url.substr(host_start, host_end - host_start);
+    return !host.empty() && host.find_first_of(" \t\r\n<>") == std::string::npos;
+}
+
 }  // anonymous namespace
 
 // =============================================================================
@@ -49,8 +112,7 @@ constexpr const char* SENTRY_DSN = nullptr;
 extern "C" {
 
 bool rac_dev_config_is_available(void) {
-    return SUPABASE_URL != nullptr && SUPABASE_ANON_KEY != nullptr &&
-           std::strlen(SUPABASE_URL) > 0 && std::strlen(SUPABASE_ANON_KEY) > 0;
+    return rac_dev_config_has_supabase();
 }
 
 const char* rac_dev_config_get_supabase_url(void) {
@@ -70,11 +132,11 @@ const char* rac_dev_config_get_sentry_dsn(void) {
 }
 
 bool rac_dev_config_has_supabase(void) {
-    return rac_dev_config_is_available();
+    return is_usable_http_url(SUPABASE_URL) && !looks_like_placeholder(SUPABASE_ANON_KEY);
 }
 
 bool rac_dev_config_has_build_token(void) {
-    return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+    return !looks_like_placeholder(BUILD_TOKEN);
 }
 
 }  // extern "C"

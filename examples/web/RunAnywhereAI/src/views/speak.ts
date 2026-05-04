@@ -4,6 +4,7 @@
  */
 
 import type { TabLifecycle } from '../app';
+import { SDKErrorCode, SDKException, type AudioPlayback } from '@runanywhere/web';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 
@@ -21,7 +22,7 @@ const SURPRISE_TEXTS = [
 ];
 
 let ttsIsSpeaking = false;
-let ttsPlayback: import('../../../../../sdk/runanywhere-web/packages/core/src/Infrastructure/AudioPlayback').AudioPlayback | null = null;
+let ttsPlayback: AudioPlayback | null = null;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -131,21 +132,27 @@ async function handleSpeak(): Promise<void> {
   try {
     const ttsModel = await ModelManager.ensureLoaded(ModelCategory.SpeechSynthesis);
     if (!ttsModel) {
-      throw new Error('No TTS model available. Tap the model button (top right) to download one.');
+      throw new SDKException(
+        SDKErrorCode.ModelNotLoaded,
+        'No TTS model available. Tap the model button (top right) to download one.',
+      );
     }
 
     statusEl.textContent = 'Synthesizing speech...';
     const speed = parseFloat(speedSlider.value);
 
     const { AudioPlayback } = await import(
-      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+      '@runanywhere/web'
     );
     const { TTS } = await import(
-      '../../../../../sdk/runanywhere-web/packages/onnx/src/index'
+      '@runanywhere/web-onnx'
     );
 
     if (!TTS.isVoiceLoaded) {
-      throw new Error('TTS voice not loaded. Select and load a model first.');
+      throw new SDKException(
+        SDKErrorCode.ModelNotLoaded,
+        'TTS voice not loaded. Select and load a model first.',
+      );
     }
 
     const result = await TTS.synthesize(text, { speed });

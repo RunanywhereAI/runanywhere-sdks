@@ -16,8 +16,44 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_primitive.h"
+#include "rac/router/rac_route.h"
+#include "rac/router/rac_routing_hints.h"
+
+// B-AK-17-003: mirror JNI.RAG and use __android_log_print directly so the
+// embeddings creation path is always visible in logcat — the platform
+// adapter logging is silent for these categories on Android per
+// AK-17-phase6-final-v2.log observations.
+#ifdef __ANDROID__
+#include <android/log.h>
+#define EMBED_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "Embeddings.Service", __VA_ARGS__)
+#define EMBED_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "Embeddings.Service", __VA_ARGS__)
+#else
+#define EMBED_LOGI(...) RAC_LOG_INFO("Embeddings.Service", __VA_ARGS__)
+#define EMBED_LOGE(...) RAC_LOG_ERROR("Embeddings.Service", __VA_ARGS__)
+#endif
 
 static const char* LOG_CAT = "Embeddings.Service";
+
+// Phase 2.6 (engine independence refactor): identity stringify of the
+// framework enum to the plugin's metadata.name. Kept identical to the
+// matching helpers in rac_stt_service.cpp / rac_tts_service.cpp /
+// rac_llm_service.cpp; if this drifts, move to a shared header in
+// rac/router/.
+static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
+    switch (fw) {
+        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
+        case RAC_FRAMEWORK_ONNX:               return "onnx";
+        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
+        case RAC_FRAMEWORK_METALRT:            return "metalrt";
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:         return "platform";
+        case RAC_FRAMEWORK_COREML:             return "platform";
+        default:                               return nullptr;
+    }
+}
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -33,6 +69,7 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
 
     *out_handle = nullptr;
 
+    EMBED_LOGI("Creating embeddings service for: %s", model_id);
     RAC_LOG_INFO(LOG_CAT, "Creating embeddings service for: %s", model_id);
 
     // Query model registry to get framework
@@ -69,29 +106,51 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
                         result, static_cast<int>(framework));
     }
 
-    // Build service request
-    rac_service_request_t request = {};
-    request.identifier = model_id;
-    request.capability = RAC_CAPABILITY_EMBEDDINGS;
-    request.framework = framework;
-    request.model_path = model_path;
-    request.config_json = config_json;
+    // v3 Phase B8: route through the plugin registry. Unlike other
+    // primitives, embeddings consumer PRESERVES the config_json
+    // parameter — the ONNX embeddings provider parses it for dim,
+    // pooling, and tokenizer fields (see
+    // onnx_embedding_provider constructor).
+    rac_routing_hints_t hints = {};
+    hints.preferred_engine_name = framework_to_plugin_name(framework);
 
-    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s, has_config=%s",
-                 static_cast<int>(request.framework),
-                 request.model_path ? request.model_path : "NULL", config_json ? "yes" : "no");
-
-    // Service registry returns an rac_embeddings_service_t* with vtable already set
-    result = rac_service_create(RAC_CAPABILITY_EMBEDDINGS, &request, out_handle);
-
+    const rac_engine_vtable_t* vt = nullptr;
+    result = rac_plugin_route(RAC_PRIMITIVE_EMBED,
+                              /*format=*/0, &hints, &vt);
     if (model_info) {
         rac_model_info_free(model_info);
+        model_info = nullptr;
+    }
+    if (result != RAC_SUCCESS || !vt || !vt->embedding_ops || !vt->embedding_ops->create) {
+        EMBED_LOGE("rac_plugin_route failed: result=%d vt=%p emb_ops=%p create=%p hint='%s'",
+                   result, (void*)vt,
+                   vt ? (void*)vt->embedding_ops : nullptr,
+                   (vt && vt->embedding_ops) ? (void*)vt->embedding_ops->create : nullptr,
+                   hints.preferred_engine_name ? hints.preferred_engine_name : "(null)");
+        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    }
+    EMBED_LOGI("Routed to plugin: %s (model_path=%s)", vt->metadata.name, model_path);
+    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
+
+    void* impl = nullptr;
+    result = vt->embedding_ops->create(model_path, config_json, &impl);
+    if (result != RAC_SUCCESS || !impl) {
+        EMBED_LOGE("Plugin create failed: result=%d impl=%p", result, impl);
+        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
     }
 
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);
-        return result;
+    auto* service =
+        static_cast<rac_embeddings_service_t*>(malloc(sizeof(rac_embeddings_service_t)));
+    if (!service) {
+        if (vt->embedding_ops->destroy) vt->embedding_ops->destroy(impl);
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
+    service->ops = vt->embedding_ops;
+    service->impl = impl;
+    service->model_id = strdup(model_id);
+    *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "Embeddings service created");
     return RAC_SUCCESS;

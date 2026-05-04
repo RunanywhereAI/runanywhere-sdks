@@ -254,7 +254,7 @@ export interface FileSystemModule {
   downloadModel(
     fileName: string,
     url: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
   ): Promise<boolean>;
   getModelPath(fileName: string): Promise<string>;
   modelExists(fileName: string): Promise<boolean>;
@@ -278,14 +278,46 @@ export function requireFileSystemModule(): FileSystemModule {
     downloadModel: async (
       fileName: string,
       url: string,
-      onProgress?: (progress: number) => void
+      onProgress?: (progress: number) => void,
     ): Promise<boolean> => {
       try {
-        await FileSystem.downloadModel(fileName, url, (progress: { progress: number }) => {
-          if (onProgress) {
-            onProgress(progress.progress);
-          }
-        });
+        const native = requireNativeCoreModule();
+        const folder = FileSystem.getModelFolder(fileName);
+        await FileSystem.ensureDirectory(folder);
+        const destPath = `${folder}/${fileName}`;
+        const cancelToken = `fs-module::${fileName}::${Date.now()}`;
+        // Native side (Task M5) delivers a JSON-encoded
+        // `runanywhere.v1.DownloadProgress` with all 10 fields. This thin
+        // adapter only exposes a normalised 0..1 float for back-compat with
+        // the `FileSystemModule.downloadModel` contract — consumers that
+        // need the full shape should use the top-level
+        // `RunAnywhere.downloadModel` entry point instead.
+        await native.downloadModel(
+          url,
+          destPath,
+          cancelToken,
+          (progressJson: string) => {
+            if (!onProgress) return;
+            try {
+              const raw = JSON.parse(progressJson) as {
+                bytesDownloaded?: number;
+                totalBytes?: number;
+                stageProgress?: number;
+              };
+              const total = raw.totalBytes ?? 0;
+              const written = raw.bytesDownloaded ?? 0;
+              onProgress(
+                typeof raw.stageProgress === 'number'
+                  ? raw.stageProgress
+                  : total > 0
+                    ? written / total
+                    : 0
+              );
+            } catch {
+              // Ignore malformed progress events.
+            }
+          },
+        );
         return true;
       } catch (error) {
         SDKLogger.download.logError(error as Error, 'Download failed');

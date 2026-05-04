@@ -646,7 +646,6 @@ packages/core/src/
 │   ├── ModelRegistry.ts             # Model metadata store
 │   ├── DownloadService.ts           # Model downloads
 │   ├── FileSystem.ts                # File operations
-│   ├── SystemTTSService.ts          # Platform TTS
 │   └── Network/
 │       ├── HTTPService.ts           # HTTP client
 │       ├── TelemetryService.ts      # Analytics

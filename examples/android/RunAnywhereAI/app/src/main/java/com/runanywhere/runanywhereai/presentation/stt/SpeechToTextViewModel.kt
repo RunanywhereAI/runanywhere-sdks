@@ -10,9 +10,10 @@ import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.ModelEvent
-import com.runanywhere.sdk.public.extensions.STT.STTOptions
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
+import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.STTOptions
 import com.runanywhere.sdk.public.extensions.currentSTTModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.isSTTModelLoadedSync
@@ -178,8 +179,8 @@ class SpeechToTextViewModel : ViewModel() {
                 // Listen for model events with STT category
                 EventBus.events.collect { event ->
                     // Filter for model events with STT category
-                    if (event is ModelEvent && event.category == EventCategory.STT) {
-                        handleModelEvent(event)
+                    if (event.category == EVENT_CATEGORY_STT) {
+                        event.model?.let { handleModelEvent(it) }
                     }
                 }
             }
@@ -190,20 +191,20 @@ class SpeechToTextViewModel : ViewModel() {
      * iOS Reference: handleSDKEvent() in STTViewModel.swift
      */
     private fun handleModelEvent(event: ModelEvent) {
-        when (event.eventType) {
-            ModelEvent.ModelEventType.LOADED -> {
-                Timber.i("STT model loaded: ${event.modelId}")
+        when (event.kind) {
+            ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED -> {
+                Timber.i("STT model loaded: ${event.model_id}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
-                        selectedModelId = event.modelId,
-                        selectedModelName = it.selectedModelName ?: event.modelId,
+                        selectedModelId = event.model_id,
+                        selectedModelName = it.selectedModelName ?: event.model_id,
                         isProcessing = false,
                     )
                 }
             }
-            ModelEvent.ModelEventType.UNLOADED -> {
-                Timber.i("STT model unloaded: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED -> {
+                Timber.i("STT model unloaded: ${event.model_id}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,
@@ -213,16 +214,16 @@ class SpeechToTextViewModel : ViewModel() {
                     )
                 }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
-                Timber.i("STT model download started: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED -> {
+                Timber.i("STT model download started: ${event.model_id}")
                 _uiState.update { it.copy(isProcessing = true) }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                Timber.i("STT model download completed: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED -> {
+                Timber.i("STT model download completed: ${event.model_id}")
                 _uiState.update { it.copy(isProcessing = false) }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                Timber.e("STT model download failed: ${event.modelId} - ${event.error}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED -> {
+                Timber.e("STT model download failed: ${event.model_id} - ${event.error}")
                 _uiState.update {
                     it.copy(
                         errorMessage = "Download failed: ${event.error}",
@@ -453,25 +454,27 @@ class SpeechToTextViewModel : ViewModel() {
                             // Transcribe in background
                             withContext(Dispatchers.IO) {
                                 try {
-                                    val options = STTOptions(language = _uiState.value.language)
-                                    val result =
-                                        RunAnywhere.transcribeStream(
-                                            audioData = chunkData,
-                                            options = options,
-                                        ) { partial ->
-                                            // Update UI with partial result (non-suspend callback)
-                                            if (partial.transcript.isNotBlank()) {
-                                                val newText = lastTranscription + " " + partial.transcript
-                                                // Use launch since we're in a non-suspend callback
-                                                viewModelScope.launch(Dispatchers.Main) {
-                                                    handleSTTStreamText(newText.trim())
-                                                }
+                                    val options = STTOptions(language = com.runanywhere.sdk.foundation.protoext.sttLanguageFromBcp47(_uiState.value.language))
+                                    var finalText = ""
+                                    RunAnywhere.transcribeStream(
+                                        audioData = chunkData,
+                                        options = options,
+                                    ).collect { partial ->
+                                        // Update UI with partial result
+                                        if (partial.text.isNotBlank()) {
+                                            val newText = lastTranscription + " " + partial.text
+                                            withContext(Dispatchers.Main) {
+                                                handleSTTStreamText(newText.trim())
                                             }
+                                            finalText = partial.text
                                         }
+                                    }
                                     // Update with final result
-                                    lastTranscription = (lastTranscription + " " + result.text).trim()
-                                    withContext(Dispatchers.Main) {
-                                        handleSTTStreamText(lastTranscription)
+                                    if (finalText.isNotBlank()) {
+                                        lastTranscription = (lastTranscription + " " + finalText).trim()
+                                        withContext(Dispatchers.Main) {
+                                            handleSTTStreamText(lastTranscription)
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     Timber.w("Chunk transcription error: ${e.message}")

@@ -1,47 +1,37 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-// Path to the SDK package (symlinked via node_modules)
-const sdkPath = path.resolve(__dirname, '../../../sdk/runanywhere-react-native');
-const sdkPackagesPath = path.join(sdkPath, 'packages');
-const sdkCorePath = path.join(sdkPackagesPath, 'core');
-const sdkLlamaPath = path.join(sdkPackagesPath, 'llamacpp');
-const sdkOnnxPath = path.join(sdkPackagesPath, 'onnx');
-
-// Genie package — consumed from npm (@runanywhere/genie)
-const geniePkgPath = path.resolve(__dirname, 'node_modules/@runanywhere/genie');
+// Yarn workspace root (where node_modules with all hoisted deps lives)
+const workspaceRoot = path.resolve(__dirname, '../../../');
 
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
  *
+ * Yarn workspace setup: deps are hoisted to repo root. Metro must:
+ *   1. Watch all workspace folders so source changes hot-reload.
+ *   2. Look up modules in the root node_modules (where yarn hoists them).
+ *
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
-  watchFolders: [sdkPackagesPath, geniePkgPath],
+  // Watch source for all workspace packages so edits trigger reload.
+  watchFolders: [workspaceRoot],
   resolver: {
-    // Ensure Metro resolves SDK packages from the workspace (symlinks can be flaky)
-    extraNodeModules: {
-      '@runanywhere/core': sdkCorePath,
-      '@runanywhere/llamacpp': sdkLlamaPath,
-      '@runanywhere/onnx': sdkOnnxPath,
-      '@runanywhere/genie': geniePkgPath,
-      // Force single instances of shared peer dependencies (avoid version conflicts)
-      'react-native': path.resolve(__dirname, 'node_modules/react-native'),
-      'react-native-nitro-modules': path.resolve(__dirname, 'node_modules/react-native-nitro-modules'),
-      'react': path.resolve(__dirname, 'node_modules/react'),
-    },
-    // Allow Metro to resolve modules from the SDK and genie package
+    // Search node_modules first locally (in case of nohoist), then at workspace root.
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
-      path.resolve(sdkPath, 'node_modules'),
+      path.resolve(workspaceRoot, 'node_modules'),
     ],
-    // Don't hoist packages from the SDK - ensure local node_modules takes precedence
+    // Single instance enforcement for shared peer deps (RN forbids duplicates).
+    extraNodeModules: {
+      'react-native': path.resolve(workspaceRoot, 'node_modules/react-native'),
+      'react-native-nitro-modules': path.resolve(workspaceRoot, 'node_modules/react-native-nitro-modules'),
+      'react': path.resolve(workspaceRoot, 'node_modules/react'),
+    },
+    // Standard hierarchical lookup; yarn workspace symlinks resolve cleanly.
     disableHierarchicalLookup: false,
-    // Ensure symlinks are followed
     unstable_enableSymlinks: true,
-    // Prefer .js/.json over .ts/.tsx for compiled packages
-    sourceExts: ['js', 'json', 'ts', 'tsx'],
   },
 };
 

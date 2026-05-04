@@ -42,23 +42,6 @@ import kotlinx.coroutines.sync.withLock
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * SDK environment configuration.
- */
-enum class SDKEnvironment(
-    val cEnvironment: Int,
-) {
-    DEVELOPMENT(0),
-    STAGING(1),
-    PRODUCTION(2),
-    ;
-
-    companion object {
-        fun fromCEnvironment(cEnvironment: Int): SDKEnvironment =
-            entries.find { it.cEnvironment == cEnvironment } ?: DEVELOPMENT
-    }
-}
-
-/**
  * The RunAnywhere SDK - Single entry point for on-device AI
  *
  * This object mirrors the iOS RunAnywhere enum pattern, providing:
@@ -71,7 +54,7 @@ enum class SDKEnvironment(
  * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadTTSVoice()
  * - LLM: RunAnywhere.chat(), RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
- * - VoiceAgent: RunAnywhere.startVoiceSession()
+ * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
  *
  * All AI component logic (LLM, STT, TTS, VAD) is delegated to the C++ runanywhere-commons
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).
@@ -169,7 +152,7 @@ object RunAnywhere {
      * RunAnywhere.initialize()
      *
      * // Production mode
-     * RunAnywhere.initialize(environment = SDKEnvironment.PRODUCTION)
+     * RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION)
      * ```
      *
      * @param apiKey API key (optional for development, required for production/staging)
@@ -179,7 +162,7 @@ object RunAnywhere {
     fun initialize(
         apiKey: String? = null,
         baseURL: String? = null,
-        environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     ) {
         synchronized(lock) {
             if (_isInitialized) {
@@ -196,9 +179,10 @@ object RunAnywhere {
                 // Set log level based on environment
                 val logLevel =
                     when (environment) {
-                        SDKEnvironment.DEVELOPMENT -> LogLevel.DEBUG
-                        SDKEnvironment.STAGING -> LogLevel.INFO
-                        SDKEnvironment.PRODUCTION -> LogLevel.WARNING
+                        SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
+                        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
+                        SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
+                        SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.DEBUG
                     }
                 SDKLogger.setLevel(logLevel)
 
@@ -210,7 +194,7 @@ object RunAnywhere {
                 _isInitialized = true
 
                 val initDurationMs = System.currentTimeMillis() - initStartTime
-                logger.info("✅ Phase 1 complete in ${initDurationMs}ms (${environment.name})")
+                logger.info("✅ Phase 1 complete in ${initDurationMs}ms (${environment.wireString})")
             } catch (error: Exception) {
                 logger.error("❌ Initialization failed: ${error.message}")
                 _currentEnvironment = null
@@ -224,7 +208,7 @@ object RunAnywhere {
      * Initialize SDK for development mode (convenience method)
      */
     fun initializeForDevelopment(apiKey: String? = null) {
-        initialize(apiKey = apiKey, environment = SDKEnvironment.DEVELOPMENT)
+        initialize(apiKey = apiKey, environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -252,7 +236,7 @@ object RunAnywhere {
                 throw IllegalStateException("SDK must be initialized before completing services initialization")
             }
 
-            logger.info("Initializing services for ${_currentEnvironment?.name} mode...")
+            logger.info("Initializing services for ${_currentEnvironment?.wireString} mode...")
 
             try {
                 // Initialize CppBridge services (Phase 2)
@@ -261,7 +245,7 @@ object RunAnywhere {
                 // Mark Phase 2 complete
                 _areServicesReady = true
 
-                logger.info("✅ Services initialized for ${_currentEnvironment?.name} mode")
+                logger.info("✅ Services initialized for ${_currentEnvironment?.wireString} mode")
             } catch (e: Exception) {
                 logger.error("Services initialization failed: ${e.message}")
                 throw e

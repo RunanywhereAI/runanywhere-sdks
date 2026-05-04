@@ -1,0 +1,23 @@
+# RunAnywhere Solution — retrieval-augmented generation.
+#
+# Mirrors the Query → Embed → Retrieve → ContextBuild → LLM DAG T4.6
+# landed. SolutionRunner expands this into a PipelineSpec (see
+# solution_converter.cpp::expand_rag) and compiles it into a
+# GraphScheduler graph.
+
+rag:
+  embed_model_id: "bge-small-en-v1.5"
+  rerank_model_id: "bge-reranker-v2-m3"
+  llm_model_id: "qwen3-4b-q4_k_m"
+
+  vector_store: "usearch"
+  vector_store_path: "/tmp/ra-rag.usearch"
+
+  retrieve_k: 24
+  rerank_top: 6
+
+  bm25_k1: 1.2
+  bm25_b: 0.75
+  rrf_k: 60
+
+  prompt_template: "Use the context below to answer.\n\nContext:\n{{context}}\n\nQuestion: {{query}}"

@@ -4,6 +4,12 @@
 //
 //  SDK state management bridge extension for C++ interop.
 //
+//  Non-auth state (environment, API key, base URL, device ID, device
+//  registration flag) lives in rac_sdk_state. Auth state (tokens,
+//  user/org IDs, expiry, refresh-window math, persistence) lives in
+//  rac_auth_manager — this file exposes auth accessors by delegating
+//  to rac_auth_* directly so there's a single source of truth.
+//
 
 import CRACommons
 import Foundation
@@ -13,10 +19,11 @@ import Foundation
 extension CppBridge {
 
     /// SDK State bridge - centralized state management in C++
-    /// C++ owns runtime state; Swift handles persistence (Keychain)
+    /// C++ owns runtime state; Swift handles persistence via the
+    /// rac_secure_storage_t vtable installed here.
     public enum State {
 
-        private static var persistenceRegistered = false
+        private static var authStorageInstalled = false
 
         // MARK: - Initialization
 
@@ -70,11 +77,9 @@ extension CppBridge {
                 }
             }
 
-            // Register Keychain persistence callbacks
-            registerPersistenceCallbacks()
-
-            // Load any stored tokens from Keychain into C++ state
-            loadStoredAuth()
+            // Install Keychain-backed secure storage into the auth manager and
+            // restore any previously persisted tokens.
+            installAuthSecureStorage()
 
             SDKLogger(category: "CppBridge.State").debug("C++ state initialized")
         }
@@ -87,12 +92,14 @@ extension CppBridge {
         /// Reset state (for testing)
         public static func reset() {
             rac_state_reset()
+            rac_auth_reset()
         }
 
         /// Shutdown state manager
         public static func shutdown() {
             rac_state_shutdown()
-            persistenceRegistered = false
+            rac_auth_reset()
+            authStorageInstalled = false
         }
 
         // MARK: - Environment Queries
@@ -123,98 +130,39 @@ extension CppBridge {
             return str.isEmpty ? nil : str
         }
 
-        // MARK: - Auth State
+        // MARK: - Auth State (delegated to rac_auth_manager)
 
-        /// Set authentication state after successful HTTP auth
-        /// - Parameters:
-        ///   - accessToken: Access token
-        ///   - refreshToken: Refresh token
-        ///   - expiresAt: Token expiry date
-        ///   - userId: User ID (nullable)
-        ///   - organizationId: Organization ID
-        ///   - deviceId: Device ID from response
-        public static func setAuth(
-            accessToken: String,
-            refreshToken: String,
-            expiresAt: Date,
-            userId: String?,
-            organizationId: String,
-            deviceId: String
-        ) {
-            let expiresAtUnix = Int64(expiresAt.timeIntervalSince1970)
-
-            accessToken.withCString { access in
-                refreshToken.withCString { refresh in
-                    organizationId.withCString { org in
-                        deviceId.withCString { did in
-                            var authData = rac_auth_data_t(
-                                access_token: access,
-                                refresh_token: refresh,
-                                expires_at_unix: expiresAtUnix,
-                                user_id: nil,
-                                organization_id: org,
-                                device_id: did
-                            )
-
-                            if let userId = userId {
-                                userId.withCString { user in
-                                    authData.user_id = user
-                                    _ = rac_state_set_auth(&authData)
-                                }
-                            } else {
-                                _ = rac_state_set_auth(&authData)
-                            }
-                        }
-                    }
-                }
-            }
-
-            SDKLogger(category: "CppBridge.State").debug("Auth state set in C++")
-        }
-
-        /// Get access token from C++ state
+        /// Get access token from the auth manager
         public static var accessToken: String? {
-            guard let ptr = rac_state_get_access_token() else { return nil }
-            return String(cString: ptr)
-        }
-
-        /// Get refresh token from C++ state
-        public static var refreshToken: String? {
-            guard let ptr = rac_state_get_refresh_token() else { return nil }
+            guard let ptr = rac_auth_get_access_token() else { return nil }
             return String(cString: ptr)
         }
 
         /// Check if authenticated (valid non-expired token)
         public static var isAuthenticated: Bool {
-            rac_state_is_authenticated()
+            rac_auth_is_authenticated()
         }
 
         /// Check if token needs refresh
         public static var tokenNeedsRefresh: Bool {
-            rac_state_token_needs_refresh()
+            rac_auth_needs_refresh()
         }
 
-        /// Get token expiry timestamp
-        public static var tokenExpiresAt: Date? {
-            let unix = rac_state_get_token_expires_at()
-            return unix > 0 ? Date(timeIntervalSince1970: TimeInterval(unix)) : nil
-        }
-
-        /// Get user ID from C++ state
+        /// Get user ID from the auth manager
         public static var userId: String? {
-            guard let ptr = rac_state_get_user_id() else { return nil }
+            guard let ptr = rac_auth_get_user_id() else { return nil }
             return String(cString: ptr)
         }
 
-        /// Get organization ID from C++ state
+        /// Get organization ID from the auth manager
         public static var organizationId: String? {
-            guard let ptr = rac_state_get_organization_id() else { return nil }
+            guard let ptr = rac_auth_get_organization_id() else { return nil }
             return String(cString: ptr)
         }
 
-        /// Clear authentication state
+        /// Clear authentication state (in-memory + persisted)
         public static func clearAuth() {
-            rac_state_clear_auth()
+            rac_auth_clear()
             SDKLogger(category: "CppBridge.State").debug("Auth state cleared")
         }
 
@@ -232,138 +180,94 @@ extension CppBridge {
 
         // MARK: - Persistence (Keychain Integration)
 
-        /// Register Keychain persistence callbacks with C++
-        private static func registerPersistenceCallbacks() {
-            guard !persistenceRegistered else { return }
+        /// Install Keychain-backed secure storage into the rac_auth_manager.
+        ///
+        /// Registers the vtable, then calls rac_auth_load_stored_tokens to
+        /// restore any tokens persisted from a previous launch. Without this
+        /// wiring, rac_auth_save_tokens / rac_auth_clear are no-ops and
+        /// tokens are lost on every process restart.
+        private static func installAuthSecureStorage() {
+            guard !authStorageInstalled else { return }
 
-            rac_state_set_persistence_callbacks(
-                keychainPersistCallback,
-                keychainLoadCallback,
-                nil
+            var storage = rac_secure_storage_t(
+                store: authSecureStorageStore,
+                retrieve: authSecureStorageRetrieve,
+                delete_key: authSecureStorageDelete,
+                context: nil
             )
 
-            persistenceRegistered = true
-        }
+            rac_auth_init(&storage)
 
-        /// Load stored auth from Keychain into C++ state
-        private static func loadStoredAuth() {
-            // Load tokens from Keychain (use retrieveIfExists to avoid logging errors for missing items)
-            // retrieveIfExists returns String? and can throw
-            let accessToken: String?
-            let refreshToken: String?
+            // Restore any previously persisted tokens.
+            _ = rac_auth_load_stored_tokens()
 
-            do {
-                accessToken = try KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.accessToken")
-                refreshToken = try KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.refreshToken")
-            } catch {
-                // Keychain error (not just missing item) - log but don't fail
-                SDKLogger(category: "CppBridge.State").debug("Keychain error loading auth: \(error.localizedDescription)")
-                return
-            }
-
-            guard let accessToken = accessToken,
-                  let refreshToken = refreshToken else {
-                // No stored auth tokens found - this is normal on first launch
-                SDKLogger(category: "CppBridge.State").debug("No stored auth data found in Keychain (expected on first launch)")
-                return
-            }
-
-            // Load additional fields (optional - these may not exist)
-            let userId = try? KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.userId")
-            let orgId = try? KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.organizationId")
-            let deviceIdStored = try? KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.deviceId")
-
-            // Set in C++ state (use a far-future expiry for loaded tokens - they'll be refreshed if needed)
-            accessToken.withCString { access in
-                refreshToken.withCString { refresh in
-                    (orgId ?? "").withCString { org in
-                        (deviceIdStored ?? DeviceIdentity.persistentUUID).withCString { did in
-                            var authData = rac_auth_data_t(
-                                access_token: access,
-                                refresh_token: refresh,
-                                expires_at_unix: 0, // Unknown - will check via API
-                                user_id: nil,
-                                organization_id: org,
-                                device_id: did
-                            )
-
-                            if let userId = userId {
-                                userId.withCString { user in
-                                    authData.user_id = user
-                                    _ = rac_state_set_auth(&authData)
-                                }
-                            } else {
-                                _ = rac_state_set_auth(&authData)
-                            }
-                        }
-                    }
-                }
-            }
-
-            SDKLogger(category: "CppBridge.State").debug("Loaded stored auth from Keychain")
+            authStorageInstalled = true
+            SDKLogger(category: "CppBridge.State").debug("Keychain secure storage installed into rac_auth_manager")
         }
     }
 }
 
-// MARK: - Keychain Persistence Callbacks
+// MARK: - C-callable secure storage shims for rac_auth_manager
+//
+// These top-level `@convention(c)` functions are the vtable slots passed to
+// rac_auth_init. They must be non-capturing (no self / state) so Swift can
+// emit them as plain C function pointers. All state lives in the global
+// KeychainManager.shared.
 
-/// C callback for persisting state to Keychain
-private func keychainPersistCallback(
+private func authSecureStorageStore(
     key: UnsafePointer<CChar>?,
     value: UnsafePointer<CChar>?,
-    userData _: UnsafeMutableRawPointer?
-) {
-    guard let key = key else { return }
-    let keyString = String(cString: key)
-
-    // Map C++ keys to Keychain keys
-    let keychainKey: String
-    switch keyString {
-    case "access_token":
-        keychainKey = "com.runanywhere.sdk.accessToken"
-    case "refresh_token":
-        keychainKey = "com.runanywhere.sdk.refreshToken"
-    default:
-        return // Ignore unknown keys
-    }
-
-    if let value = value {
-        // Store value
-        let valueString = String(cString: value)
-        try? KeychainManager.shared.store(valueString, for: keychainKey)
-    } else {
-        // Delete value
-        try? KeychainManager.shared.delete(for: keychainKey)
+    context _: UnsafeMutableRawPointer?
+) -> Int32 {
+    guard let key = key, let value = value else { return -1 }
+    let keyStr = String(cString: key)
+    let valueStr = String(cString: value)
+    do {
+        try KeychainManager.shared.store(valueStr, for: keyStr)
+        return 0
+    } catch {
+        return -1
     }
 }
 
-/// C callback for loading state from Keychain
-private func keychainLoadCallback(
+private func authSecureStorageRetrieve(
     key: UnsafePointer<CChar>?,
-    userData _: UnsafeMutableRawPointer?
-) -> UnsafePointer<CChar>? {
-    guard let key = key else { return nil }
-    let keyString = String(cString: key)
-
-    // Map C++ keys to Keychain keys
-    let keychainKey: String
-    switch keyString {
-    case "access_token":
-        keychainKey = "com.runanywhere.sdk.accessToken"
-    case "refresh_token":
-        keychainKey = "com.runanywhere.sdk.refreshToken"
-    default:
-        return nil
+    outValue: UnsafeMutablePointer<CChar>?,
+    bufferSize: Int,
+    context _: UnsafeMutableRawPointer?
+) -> Int32 {
+    guard let key = key, let outValue = outValue, bufferSize > 0 else { return -1 }
+    let keyStr = String(cString: key)
+    do {
+        guard let value = try KeychainManager.shared.retrieveIfExists(for: keyStr),
+              !value.isEmpty else {
+            return -1
+        }
+        // Copy UTF-8 bytes + trailing NUL into the caller-provided buffer.
+        let utf8 = value.utf8CString  // includes trailing NUL
+        if utf8.count > bufferSize { return -1 }
+        utf8.withUnsafeBufferPointer { src in
+            if let base = src.baseAddress {
+                outValue.update(from: base, count: utf8.count)
+            }
+        }
+        // Per header contract: return length excluding NUL terminator.
+        return Int32(utf8.count - 1)
+    } catch {
+        return -1
     }
+}
 
-    // Load from Keychain
-    // Note: This returns a pointer that C++ should NOT free
-    // The Swift string's memory is managed by Swift
-    guard (try? KeychainManager.shared.retrieve(for: keychainKey)) != nil else {
-        return nil
+private func authSecureStorageDelete(
+    key: UnsafePointer<CChar>?,
+    context _: UnsafeMutableRawPointer?
+) -> Int32 {
+    guard let key = key else { return -1 }
+    let keyStr = String(cString: key)
+    do {
+        try KeychainManager.shared.delete(for: keyStr)
+        return 0
+    } catch {
+        return -1
     }
-
-    // This is a workaround - we return a static buffer
-    // In practice, C++ should call this during init only
-    return nil // For now, we load manually via loadStoredAuth()
 }

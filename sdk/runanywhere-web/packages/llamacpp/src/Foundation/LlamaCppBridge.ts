@@ -17,8 +17,20 @@
  * package (@runanywhere/web) is pure TypeScript.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, SDKEnvironment, RunAnywhere } from '@runanywhere/web';
-import type { AccelerationMode } from '@runanywhere/web';
+import {
+  SDKException,
+  SDKErrorCode,
+  SDKLogger,
+  EventBus,
+  SDKEventType,
+  SDKEnvironment,
+  RunAnywhere,
+  HTTPAdapter,
+  ModelRegistryAdapter,
+  clearRunanywhereModule,
+  setRunanywhereModule,
+} from '@runanywhere/web';
+import type { AccelerationMode, EmscriptenRunanywhereModule } from '@runanywhere/web';
 import { getDeviceInfo } from '@runanywhere/web';
 import { PlatformAdapter } from './PlatformAdapter';
 import { AnalyticsEventsBridge } from './AnalyticsEventsBridge';
@@ -50,6 +62,8 @@ export interface LlamaCppModule {
   stringToUTF8: (str: string, outPtr: number, maxBytesToWrite: number) => void;
   lengthBytesUTF8: (str: string) => number;
   HEAPU8?: Uint8Array;
+  HEAP32?: Int32Array;
+  HEAPU32?: Uint32Array;
   HEAPF32?: Float32Array;
 
   // Core
@@ -203,7 +217,7 @@ export class LlamaCppBridge {
 
   get module(): LlamaCppModule {
     if (!this._module) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMNotLoaded,
         'LlamaCpp WASM not loaded. Call LlamaCPP.register() first.',
       );
@@ -233,6 +247,64 @@ export class LlamaCppBridge {
     }
   }
 
+  /**
+   * Switch the acceleration mode by tearing down the current WASM module and
+   * re-loading the variant for the requested mode. Keeps the singleton
+   * instance so that callers holding a reference to `LlamaCppBridge.shared`
+   * (e.g. ExtensionPoint, telemetry) keep working — only the underlying
+   * Emscripten module is replaced.
+   *
+   * Used by Qwen models that crash on WebGPU due to a llama.cpp Flash
+   * Attention cross-backend issue (see B-WEB-4-001). The CPU build does
+   * not auto-disable FA at load time and runs Qwen correctly.
+   *
+   * No-op if the bridge is already in the requested mode.
+   */
+  async switchToAcceleration(mode: 'webgpu' | 'cpu'): Promise<void> {
+    if (this._accelerationMode === mode && this._loaded) return;
+
+    if (this._loading) {
+      await this._loading;
+      if (this._accelerationMode === mode) return;
+    }
+
+    logger.info(`Switching LlamaCpp acceleration mode: ${this._accelerationMode} → ${mode}`);
+
+    // Tear down the current WASM module while keeping the singleton wrapper.
+    if (this._analyticsEventsBridge) {
+      try { this._analyticsEventsBridge.cleanup(); } catch { /* ignore */ }
+      this._analyticsEventsBridge = null;
+    }
+    if (this._telemetryService) {
+      try { this._telemetryService.shutdown(); } catch { /* ignore */ }
+      this._telemetryService = null;
+    }
+    if (this._module && this._loaded) {
+      try { this._module._rac_shutdown(); } catch { /* ignore */ }
+    }
+    if (this._platformAdapter) {
+      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
+      this._platformAdapter = null;
+    }
+
+    HTTPAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+    clearRunanywhereModule();
+
+    this._module = null;
+    this._loaded = false;
+    this._loading = null;
+    this._accelerationMode = 'cpu';
+
+    // Re-load with the explicit acceleration mode (no auto-detect / no fallback).
+    this._loading = this._doLoad(mode);
+    try {
+      await this._loading;
+    } finally {
+      this._loading = null;
+    }
+  }
+
   private async _doLoad(acceleration: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
     logger.info('Loading LlamaCpp WASM module...');
 
@@ -249,11 +321,14 @@ export class LlamaCppBridge {
 
       logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
 
-      // Persist the resolved URL so VLMWorkerBridge (and others) can read it
+      // Persist the resolved URL so VLMWorkerBridge (and others) can read it.
+      // Keep WebGPU and CPU URLs separate so a CPU fallback after a WebGPU
+      // failure does not reuse the WebGPU glue URL.
       if (useWebGPU) {
         this.webgpuWasmUrl = moduleUrl;
+      } else {
+        this.wasmUrl = moduleUrl;
       }
-      this.wasmUrl = moduleUrl;
 
       // Dynamic import of Emscripten glue JS
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
@@ -303,6 +378,16 @@ export class LlamaCppBridge {
         (eventType, dataPtr) => this._telemetryService?.trackAnalyticsEvent(eventType, dataPtr),
       );
 
+      // Publish this module as the default HTTP transport (T3.13) so
+      // core's ModelDownloader can route through the commons libcurl
+      // C ABI without taking a hard dependency on this backend package.
+      const coreModule = this._module! as unknown as EmscriptenRunanywhereModule;
+      setRunanywhereModule(coreModule);
+      HTTPAdapter.setDefaultModule(this._module! as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
+      ModelRegistryAdapter.setDefaultModule(
+        this._module! as unknown as Parameters<typeof ModelRegistryAdapter.setDefaultModule>[0],
+      );
+
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
 
@@ -324,7 +409,7 @@ export class LlamaCppBridge {
       this._loaded = false;
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load LlamaCpp WASM: ${message}`);
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMLoadFailed,
         `Failed to load LlamaCpp WASM module: ${message}`,
       );
@@ -593,7 +678,7 @@ export class LlamaCppBridge {
     if (result !== 0) {
       const errMsgPtr = this.module._rac_error_message(result);
       const errMsg = this.readString(errMsgPtr);
-      throw new SDKError(SDKErrorCode.BackendError, `${operation}: ${errMsg}`);
+      throw new SDKException(SDKErrorCode.BackendError, `${operation}: ${errMsg}`);
     }
   }
 
@@ -608,7 +693,7 @@ export class LlamaCppBridge {
     args: unknown[],
     opts?: { async?: boolean },
   ): T {
-    if (!this._module) throw new SDKError(SDKErrorCode.WASMNotLoaded, 'LlamaCpp WASM not loaded');
+    if (!this._module) throw new SDKException(SDKErrorCode.WASMNotLoaded, 'LlamaCpp WASM not loaded');
     return this._module.ccall(funcName, returnType, argTypes, args, opts) as T;
   }
 
@@ -663,6 +748,10 @@ export class LlamaCppBridge {
       }
       this._platformAdapter = null;
     }
+
+    HTTPAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+    clearRunanywhereModule();
 
     this._module = null;
     this._loaded = false;

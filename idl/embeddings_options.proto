@@ -1,0 +1,195 @@
+// RunAnywhere v2 IDL — Embeddings configuration, options, vector, and result.
+//
+// Embeddings are sparsely defined cross-SDK; this proto canonicalizes the C
+// ABI as the source of truth. The hand-rolled prior art (and its drift):
+//   - C ABI   sdk/runanywhere-commons/include/rac/features/embeddings/rac_embeddings_types.h:58
+//             (rac_embeddings_config_t), :92 (rac_embeddings_options_t),
+//             :116 (rac_embedding_vector_t), :127 (rac_embeddings_result_t)
+//   - Web     sdk/runanywhere-web/packages/llamacpp/src/Extensions/EmbeddingsTypes.ts:14
+//             (EmbeddingVector), :21 (EmbeddingsResult), :32 (EmbeddingsOptions)
+//             — only SDK with first-class embeddings types pre-IDL.
+//   - Swift   no first-class Embedding* types pre-IDL; embeddings exposed only
+//             via RAGConfiguration.embeddingModelPath / embeddingDimension /
+//             embeddingConfigJSON in
+//             sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RAGTypes.swift.
+//   - Kotlin  same — embeddings surfaced via RAGConfiguration in
+//             sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RAG/RAGTypes.kt.
+//   - Dart    same — embeddings surfaced via RAGConfiguration in
+//             sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/rag_types.dart.
+//   - RN      same — embeddings surfaced via RAGConfiguration in
+//             sdk/runanywhere-react-native/packages/core/src/types/RAGTypes.ts.
+//
+// Drift table (pre-IDL):
+//   ┌──────────────────────────┬────────┬────────┬───────┬───────┬───────┬───────┐
+//   │ Field                    │ Swift  │ Kotlin │ Dart  │ RN    │ Web   │ C ABI │
+//   ├──────────────────────────┼────────┼────────┼───────┼───────┼───────┼───────┤
+//   │ EmbeddingsConfiguration  │   ✗    │   ✗    │   ✗   │   ✗   │   ✗   │   ✓   │
+//   │ EmbeddingsOptions        │   ✗    │   ✗    │   ✗   │   ✗   │   ✓   │   ✓   │
+//   │ EmbeddingVector          │   ✗    │   ✗    │   ✗   │   ✗   │   ✓   │   ✓   │
+//   │ EmbeddingsResult         │   ✗    │   ✗    │   ✗   │   ✗   │   ✓   │   ✓   │
+//   │ vector source text       │   —    │   —    │   —   │   —   │   ✗   │   ✗   │
+//   │ vector L2 norm           │   —    │   —    │   —   │   —   │   ✗   │   ✗   │
+//   │ batch size override      │   —    │   —    │   —   │   —   │   ✗   │   ✗   │
+//   └──────────────────────────┴────────┴────────┴───────┴───────┴───────┴───────┘
+// Note: rac_embeddings_config_t carries (model_id, preferred_framework,
+// max_tokens, normalize, pooling). The canonical IDL config keeps the
+// transport-portable fields (model_id, embedding_dimension, max_sequence_length,
+// normalize). Backend selection (preferred_framework) and pooling strategy are
+// out of scope for the wire schema and remain backend-side concerns; pooling
+// in particular is a tokenizer/model property that's resolved at load time
+// from the model's config.json (see onnx_embedding_provider).
+//
+// Service interface: sdk/runanywhere-commons/src/features/embeddings/rac_embeddings_service.cpp
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "EmbeddingsOptionsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
+// ---------------------------------------------------------------------------
+enum EmbeddingsNormalizeMode {
+    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0;
+    EMBEDDINGS_NORMALIZE_MODE_NONE        = 1;
+    EMBEDDINGS_NORMALIZE_MODE_L2          = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
+// ---------------------------------------------------------------------------
+enum EmbeddingsPoolingStrategy {
+    EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0;
+    EMBEDDINGS_POOLING_STRATEGY_MEAN        = 1;
+    EMBEDDINGS_POOLING_STRATEGY_CLS         = 2;
+    EMBEDDINGS_POOLING_STRATEGY_LAST        = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Component-level configuration applied at service creation. Mirrors the
+// transport-portable subset of rac_embeddings_config_t. Backend selection
+// (preferred_framework) and pooling strategy live outside the wire schema.
+// ---------------------------------------------------------------------------
+message EmbeddingsConfiguration {
+    // Model identifier (registry id or local path). Required.
+    string        model_id              = 1;
+
+    // Output vector dimension. Must match the loaded model's hidden size
+    // (e.g. 384 for all-MiniLM-L6-v2, 768 for bge-base, 1024 for bge-large).
+    int32         embedding_dimension   = 2;
+
+    // Maximum tokens per input. Truncation/sliding window is backend-decided
+    // when an input exceeds this length. C ABI default: 512.
+    int32         max_sequence_length   = 3;
+
+    // Default L2 normalization for produced vectors. When unset the backend
+    // applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
+    optional bool normalize             = 4;
+
+    // Preferred framework for the component. Absent = auto.
+    optional InferenceFramework preferred_framework = 5;
+
+    // C ABI name for max_sequence_length. 0 = use max_sequence_length or
+    // backend default.
+    int32         max_tokens            = 6;
+
+    // Exact C ABI normalization/pooling modes for backends that need more
+    // than the bool normalize flag.
+    EmbeddingsNormalizeMode normalize_mode = 7;
+    EmbeddingsPoolingStrategy pooling      = 8;
+
+    // Backend-specific JSON config (e.g. tokenizer/vocab companion paths).
+    optional string config_json         = 9;
+}
+
+// ---------------------------------------------------------------------------
+// Per-call generation options. Overrides for a single embed / embed_batch
+// invocation; any field left unset falls back to the configuration default.
+// ---------------------------------------------------------------------------
+message EmbeddingsOptions {
+    // Apply L2 normalization to the produced vectors. Required so the wire
+    // form is unambiguous on the most common knob; backends may still defer
+    // to model defaults at load time.
+    bool          normalize  = 1;
+
+    // Truncate inputs longer than max_sequence_length instead of erroring.
+    // Unset = backend default (currently truncate-on-overflow for ONNX,
+    // sliding-window for llama.cpp).
+    optional bool truncate   = 2;
+
+    // Override batch size for embed_batch. Unset = backend chooses
+    // (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
+    optional int32 batch_size = 3;
+
+    // Exact C ABI per-call overrides. UNSPECIFIED = use component config.
+    EmbeddingsNormalizeMode normalize_mode = 4;
+    EmbeddingsPoolingStrategy pooling      = 5;
+    int32 n_threads                        = 6;  // 0 = auto
+}
+
+// ---------------------------------------------------------------------------
+// A single embedding produced for one input text. The C ABI ships dense
+// floats with an associated dimension; we additionally carry the source text
+// (helps multi-input batch consumers correlate vectors with inputs without
+// holding the request side-by-side) and an optional pre-computed L2 norm
+// (lets clients short-circuit cosine-similarity when both sides know the
+// vectors are already unit-normalized).
+// ---------------------------------------------------------------------------
+message EmbeddingVector {
+    // Dense float vector. Length equals EmbeddingsResult.dimension.
+    repeated float values = 1;
+
+    // L2 norm of `values`. Optional — populated when the backend computes
+    // it (typically when normalize=false and the consumer wants to score
+    // similarity without recomputing).
+    optional float  norm   = 2;
+
+    // Source text that produced this vector. Optional — preserved for
+    // multi-input batches where the caller wants to correlate without
+    // tracking ordering separately.
+    optional string text   = 3;
+
+    // Vector dimension for consumers that need per-vector sizing without
+    // inspecting EmbeddingsResult.dimension.
+    int32 dimension        = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Request envelope for service-handle APIs. One text = embed, multiple texts =
+// embed_batch.
+// ---------------------------------------------------------------------------
+message EmbeddingsRequest {
+    repeated string texts = 1;
+    optional EmbeddingsOptions options = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Result of an embed / embed_batch call. Mirrors rac_embeddings_result_t
+// (which is array-of-vectors + dimension + processing_time_ms +
+// total_tokens). `dimension` is duplicated at the result level so consumers
+// can size buffers without inspecting an arbitrary vector first.
+// ---------------------------------------------------------------------------
+message EmbeddingsResult {
+    // One vector per input text, in input order.
+    repeated EmbeddingVector vectors            = 1;
+
+    // Vector dimension. Duplicated from each EmbeddingVector for O(1)
+    // sizing on the consumer side.
+    int32                    dimension          = 2;
+
+    // Total wall-clock time for the embed / embed_batch call, in ms.
+    int64                    processing_time_ms = 3;
+
+    // Total tokens consumed across all inputs (post-truncation).
+    int32                    tokens_used        = 4;
+}

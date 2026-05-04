@@ -70,31 +70,46 @@ class FrameworkRow extends StatelessWidget {
 
   IconData get _frameworkIcon {
     switch (framework) {
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Icons.apple;
-      case LLMFramework.mediaPipe:
-        return Icons.psychology;
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return Icons.memory;
-      case LLMFramework.whisperKit:
-        return Icons.mic;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return Icons.developer_board;
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SHERPA:
+        return Icons.mic;
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return Icons.volume_up;
+      case LLMFramework.INFERENCE_FRAMEWORK_GENIE:
+        return Icons.bolt;
+      case LLMFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+        return Icons.audiotrack;
+      case LLMFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+        return Icons.phone_android;
+      case LLMFramework.INFERENCE_FRAMEWORK_NONE:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
+        return Icons.psychology;
       default:
-        return Icons.memory;
+        return Icons.psychology;
     }
   }
 
   Color get _frameworkColor {
     switch (framework) {
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.black;
-      case LLMFramework.mediaPipe:
-        return AppColors.statusBlue;
-      case LLMFramework.whisperKit:
+      case LLMFramework.INFERENCE_FRAMEWORK_GENIE:
         return AppColors.statusGreen;
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
+      case LLMFramework.INFERENCE_FRAMEWORK_SHERPA:
+        return AppColors.statusBlue;
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+      case LLMFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+      case LLMFramework.INFERENCE_FRAMEWORK_NONE:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
+        return AppColors.statusGray;
       default:
         return AppColors.statusGray;
     }
@@ -102,18 +117,25 @@ class FrameworkRow extends StatelessWidget {
 
   String get _frameworkDescription {
     switch (framework) {
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return "Apple's pre-installed system models";
-      case LLMFramework.mediaPipe:
-        return "Google's cross-platform ML framework";
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return 'Fast C++ inference for GGUF models';
-      case LLMFramework.whisperKit:
-        return 'OpenAI Whisper for speech recognition';
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return 'Microsoft ONNX inference runtime';
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SHERPA:
+        return 'OpenAI Whisper for speech recognition';
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return 'Built-in system text-to-speech';
+      case LLMFramework.INFERENCE_FRAMEWORK_GENIE:
+        return 'Qualcomm Genie NPU inference';
+      case LLMFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+        return 'FluidAudio audio inference';
+      case LLMFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+        return 'Built-in platform model';
+      case LLMFramework.INFERENCE_FRAMEWORK_NONE:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
+        return 'Machine learning framework';
       default:
         return 'Machine learning framework';
     }
@@ -263,8 +285,8 @@ class _ModelRowState extends State<ModelRow> {
   }
 
   Widget _buildDownloadStatus(BuildContext context) {
-    if (widget.model.downloadURL != null) {
-      if (widget.model.localPath == null) {
+    if (widget.model.downloadUrl.isNotEmpty) {
+      if (widget.model.localPath.isEmpty) {
         if (_isDownloading) {
           return Row(
             children: [
@@ -311,7 +333,7 @@ class _ModelRowState extends State<ModelRow> {
   }
 
   Widget _buildActionButton(BuildContext context) {
-    if (widget.model.downloadURL != null && widget.model.localPath == null) {
+    if (widget.model.downloadUrl.isNotEmpty && widget.model.localPath.isEmpty) {
       // Model needs to be downloaded
       if (_isDownloading) {
         return Column(
@@ -347,7 +369,7 @@ class _ModelRowState extends State<ModelRow> {
           ),
         );
       }
-    } else if (widget.model.localPath != null) {
+    } else if (widget.model.localPath.isNotEmpty) {
       // Model is downloaded
       if (widget.isSelected) {
         return Row(
@@ -395,26 +417,28 @@ class _ModelRowState extends State<ModelRow> {
     try {
       debugPrint('📥 Starting download for model: ${widget.model.name}');
 
-      // Start the actual download using SDK
-      final progressStream = sdk.RunAnywhere.downloadModel(widget.model.id);
+      final progressStream =
+          sdk.RunAnywhereSDK.instance.downloads.start(widget.model.id);
 
-      // Listen to real download progress
+      // Listen to real download progress (sdk.DownloadProgress proto type)
       await for (final progress in progressStream) {
         if (!mounted) return;
 
-        final progressValue = progress.percentage;
+        final progressValue = progress.stageProgress.clamp(0.0, 1.0);
 
         setState(() {
           _downloadProgress = progressValue;
         });
 
-        // Check if completed or failed
-        if (progress.state.isCompleted) {
+        // Check if completed or failed using canonical DownloadStage
+        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.state.isFailed) {
+        } else if (progress.stage ==
+                sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+            progress.errorMessage.isNotEmpty) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
-          throw Exception('Download failed');
+          throw Exception('Download failed: ${progress.errorMessage}');
         }
       }
 

@@ -181,6 +181,16 @@ final class LLMViewModel {
             object: nil
         )
 
+        // Sync model state immediately from shared state to avoid race condition
+        // where the model was loaded before this ViewModel was initialized
+        // (i.e. the "ModelLoaded" notification was missed).
+        if let currentModel = ModelListViewModel.shared.currentModel {
+            isModelLoaded = true
+            loadedModelName = currentModel.name
+            loadedModelSupportsThinking = currentModel.supportsThinking
+            selectedFramework = currentModel.framework
+        }
+
         // Defer state-modifying operations to avoid "Publishing changes within view updates" warning
         // These are deferred because init() may be called during view body evaluation
         Task { @MainActor in
@@ -240,7 +250,7 @@ final class LLMViewModel {
             conversationStore.addMessage(userMessage, to: conversation)
         }
 
-        // Create placeholder assistant message
+        // Append an empty assistant message slot that streaming tokens are written into.
         let assistantMessage = Message(role: .assistant, content: "")
         messages.append(assistantMessage)
 
@@ -250,9 +260,23 @@ final class LLMViewModel {
     private func executeGeneration(prompt: String, messageIndex: Int) async {
         do {
             try await ensureModelIsLoaded()
+
             let options = getGenerationOptions()
-            let effectivePrompt = applyThinkingModePrefix(to: prompt)
-            try await performGeneration(prompt: effectivePrompt, options: options, messageIndex: messageIndex)
+            // Send the raw user prompt and let C++ apply_chat_template handle
+            // formatting via the model's embedded GGUF template. The system
+            // prompt is passed separately in options so the C++ layer can
+            // place it correctly.
+            let effectiveOptions = LLMGenerationOptions(
+                maxTokens: options.maxTokens,
+                temperature: options.temperature,
+                topP: options.topP,
+                stopSequences: options.stopSequences,
+                streamingEnabled: options.streamingEnabled,
+                preferredFramework: options.preferredFramework,
+                structuredOutput: options.structuredOutput,
+                systemPrompt: options.systemPrompt
+            )
+            try await performGeneration(prompt: prompt, options: effectiveOptions, messageIndex: messageIndex)
         } catch {
             await handleGenerationError(error, at: messageIndex)
         }
@@ -260,10 +284,39 @@ final class LLMViewModel {
         await finalizeGeneration(at: messageIndex)
     }
 
-    private func applyThinkingModePrefix(to prompt: String) -> String {
-        guard loadedModelSupportsThinking else { return prompt }
-        let thinkingModeEnabled = SettingsViewModel.shared.thinkingModeEnabled
-        return thinkingModeEnabled ? prompt : "/no_think\n\(prompt)"
+    // Formats the current conversation as a ChatML string for instruction-tuned models
+    // (LFM2, Qwen, and any other model using the im_start/im_end template).
+    // Reads `messages`, which already contains the latest user turn and a trailing
+    // empty assistant placeholder added by prepareMessagesForSending(); the placeholder
+    // is excluded — we close with <|im_start|>assistant to trigger generation.
+    private func buildChatMLPrompt(systemPrompt: String?) -> String {
+        var parts: [String] = []
+        if let system = systemPrompt, !system.isEmpty {
+            parts.append("<|im_start|>system\n\(system)<|im_end|>")
+        }
+        // Drop the trailing empty assistant placeholder.
+        let conversationMessages = messages.dropLast()
+        let isThinkingModel = loadedModelSupportsThinking
+        let thinkingDisablePrefix: String = {
+            guard isThinkingModel else { return "" }
+            return SettingsViewModel.shared.thinkingModeEnabled ? "" : "/no_think\n"
+        }()
+        for (index, msg) in conversationMessages.enumerated() {
+            switch msg.role {
+            case .system:
+                break   // System prompt is included above via the options parameter
+            case .user:
+                let isLast = index == conversationMessages.index(before: conversationMessages.endIndex)
+                let content = isLast ? (thinkingDisablePrefix + msg.content) : msg.content
+                parts.append("<|im_start|>user\n\(content)<|im_end|>")
+            case .assistant:
+                if !msg.content.isEmpty {
+                    parts.append("<|im_start|>assistant\n\(msg.content)<|im_end|>")
+                }
+            }
+        }
+        parts.append("<|im_start|>assistant")
+        return parts.joined(separator: "\n")
     }
 
     private func performGeneration(
@@ -340,7 +393,7 @@ final class LLMViewModel {
         isLoadingLoRA = true
         error = nil
         do {
-            try await RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path: path, scale: scale))
+            try await RunAnywhere.lora.load(LoRAAdapterConfig(path: path, scale: scale))
             await refreshLoraAdapters()
             logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
         } catch {
@@ -352,7 +405,7 @@ final class LLMViewModel {
 
     func removeLoraAdapter(path: String) async {
         do {
-            try await RunAnywhere.removeLoraAdapter(path)
+            try await RunAnywhere.lora.remove(path)
             await refreshLoraAdapters()
         } catch {
             logger.error("Failed to remove LoRA adapter: \(error)")
@@ -362,7 +415,7 @@ final class LLMViewModel {
 
     func clearLoraAdapters() async {
         do {
-            try await RunAnywhere.clearLoraAdapters()
+            try await RunAnywhere.lora.clear()
             loraAdapters = []
         } catch {
             logger.error("Failed to clear LoRA adapters: \(error)")
@@ -372,7 +425,7 @@ final class LLMViewModel {
 
     func refreshLoraAdapters() async {
         do {
-            loraAdapters = try await RunAnywhere.getLoadedLoraAdapters()
+            loraAdapters = try await RunAnywhere.lora.getLoaded()
         } catch {
             logger.error("Failed to refresh LoRA adapters: \(error)")
         }
@@ -381,12 +434,27 @@ final class LLMViewModel {
     // MARK: - LoRA Adapter Catalog & Download
 
     /// Refreshes the list of available adapters for the currently loaded model from the SDK registry.
+    ///
+    /// `adaptersForModel` returns `[LoRAAdapterInfo]` keyed by adapter path/id.
+    /// We cross-reference the app's local catalog (`LoRAAdapterCatalog.adapters`) to
+    /// reconstruct the full `LoraAdapterCatalogEntry` (which carries download URL, filename, etc.)
+    /// needed by the download/install flow.
     func refreshAvailableAdapters() async {
         guard let modelId = ModelListViewModel.shared.currentModel?.id else {
             availableAdapters = []
             return
         }
-        availableAdapters = await RunAnywhere.loraAdaptersForModel(modelId)
+        let registeredAdapters = await RunAnywhere.lora.adaptersForModel(modelId)
+        let registeredIds = Set(registeredAdapters.map(\.path))
+        // Return catalog entries whose id appears in the registered set, preserving catalog order.
+        availableAdapters = LoRAAdapterCatalog.adapters.filter { registeredIds.contains($0.id) }
+        // If the registry returned adapters that aren't in our local catalog, fall back to
+        // showing the full catalog so the user can still browse and download.
+        if availableAdapters.isEmpty && !registeredAdapters.isEmpty {
+            availableAdapters = LoRAAdapterCatalog.adapters.filter { entry in
+                LoRAAdapterCatalog.adapters.contains { $0.id == entry.id }
+            }
+        }
         syncDownloadedAdapterPaths()
     }
 
@@ -443,6 +511,9 @@ final class LLMViewModel {
             }
         }
 
+        // SAMPLE_HTTP_CARVE_OUT: LoRA adapters are demo-owned external files,
+        // not SDK-managed model artifacts. Keep this local until the SDK
+        // exposes a public arbitrary-URL download helper.
         let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
 
         // Validate GGUF magic bytes before saving
@@ -514,9 +585,7 @@ final class LLMViewModel {
     }()
 
     logger.info(
-        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), "
-        + "maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), "
-        + "systemPrompt=\(systemPromptInfo)"
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
     )
 
     return LLMGenerationOptions(
@@ -546,8 +615,7 @@ final class LLMViewModel {
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
         logger.info(
-            "Settings applied - Temperature: \(temperature), "
-            + "MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
+            "Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
         )
     }
 

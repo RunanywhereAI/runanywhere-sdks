@@ -7,7 +7,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkSce
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
-import com.runanywhere.sdk.public.extensions.STT.STTOptions
+import ai.runanywhere.proto.v1.STTOptions
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribeWithOptions
 import com.runanywhere.sdk.public.extensions.unloadSTTModel
@@ -64,7 +64,7 @@ class STTBenchmarkProvider : BenchmarkScenarioProvider {
                 loadTimeMs = loadTimeMs,
                 memoryDeltaBytes = memBefore - memAfter,
                 audioLengthSeconds = audioDuration,
-                realTimeFactor = result.metadata.realTimeFactor,
+                realTimeFactor = (result.metadata?.real_time_factor ?: 0f).toDouble(),
             )
         } finally {
             withContext(NonCancellable) {

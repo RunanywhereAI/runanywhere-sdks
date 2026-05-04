@@ -13,6 +13,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -196,6 +197,21 @@ RAC_API rac_result_t rac_rag_pipeline_create_standalone(const rac_rag_config_t* 
                                                         rac_rag_pipeline_t** out_pipeline);
 
 /**
+ * @brief Create a RAG session from serialized runanywhere.v1.RAGConfiguration bytes.
+ *
+ * The returned handle is a rac_rag_pipeline_t* carried as rac_handle_t for
+ * uniform frontend FFI. Destroy it with rac_rag_session_destroy_proto().
+ */
+RAC_API rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
+                                                  size_t config_proto_size,
+                                                  rac_handle_t* out_session);
+
+/**
+ * @brief Destroy a RAG session created by rac_rag_session_create_proto().
+ */
+RAC_API void rac_rag_session_destroy_proto(rac_handle_t session);
+
+/**
  * @brief Add a document to the RAG pipeline
  *
  * Document will be split into chunks, embedded, and indexed.
@@ -207,6 +223,18 @@ RAC_API rac_result_t rac_rag_pipeline_create_standalone(const rac_rag_config_t* 
  */
 RAC_API rac_result_t rac_rag_add_document(rac_rag_pipeline_t* pipeline, const char* document_text,
                                           const char* metadata_json);
+
+/**
+ * @brief Ingest one document from serialized runanywhere.v1.RAGDocument bytes.
+ *
+ * RAGDocument.text is the document body. RAGDocument.id, metadata_json, and
+ * metadata are persisted as ingestion metadata. out_stats receives
+ * runanywhere.v1.RAGStatistics.
+ */
+RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session,
+                                          const uint8_t* document_proto_bytes,
+                                          size_t document_proto_size,
+                                          rac_proto_buffer_t* out_stats);
 
 /**
  * @brief Add multiple documents in batch
@@ -237,12 +265,60 @@ RAC_API rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_q
                                    rac_rag_result_t* out_result);
 
 /**
+ * @brief Query a RAG session from serialized runanywhere.v1.RAGQueryOptions bytes.
+ *
+ * out_result receives serialized runanywhere.v1.RAGResult bytes.
+ */
+RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session,
+                                         const uint8_t* query_proto_bytes,
+                                         size_t query_proto_size,
+                                         rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Streaming token callback fired by `rac_rag_pipeline_query`.
+ *
+ * Return RAC_TRUE to keep generating, RAC_FALSE to request cancellation.
+ * The pointer is valid only for the duration of the call — copy if needed.
+ */
+typedef rac_bool_t (*rac_rag_token_callback_fn)(const char* token, void* user_data);
+
+/**
+ * @brief Streaming RAG query — runs the pipeline as a GraphScheduler DAG and
+ *        emits LLM tokens to `callback` as soon as each one is generated.
+ *
+ * Internally constructs a typed `Embed → Retrieve → ContextAssembly → LLM`
+ * graph (GAP 05 / T4.6), feeds the question in, and joins the scheduler
+ * after the LLM stream terminates. The final assembled answer is also
+ * written into `out_result` for callers that want both the streaming hook
+ * and the aggregate result. Pass `out_result = NULL` if you only care about
+ * the streamed tokens.
+ *
+ * @param pipeline   RAG pipeline handle
+ * @param query      Query parameters
+ * @param callback   Token callback (can be NULL)
+ * @param user_data  Opaque pointer forwarded to `callback`
+ * @param out_result Aggregate result (caller must `rac_rag_result_free`).
+ *                   Can be NULL.
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+RAC_API rac_result_t rac_rag_pipeline_query(rac_rag_pipeline_t* pipeline,
+                                            const rac_rag_query_t* query,
+                                            rac_rag_token_callback_fn callback, void* user_data,
+                                            rac_rag_result_t* out_result);
+
+/**
  * @brief Clear all documents from the pipeline
  *
  * @param pipeline RAG pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
 RAC_API rac_result_t rac_rag_clear_documents(rac_rag_pipeline_t* pipeline);
+
+/**
+ * @brief Clear a RAG session and return serialized runanywhere.v1.RAGStatistics.
+ */
+RAC_API rac_result_t rac_rag_clear_proto(rac_handle_t session,
+                                         rac_proto_buffer_t* out_stats);
 
 /**
  * @brief Get number of indexed documents
@@ -260,6 +336,12 @@ RAC_API size_t rac_rag_get_document_count(rac_rag_pipeline_t* pipeline);
  * @return RAC_SUCCESS on success, error code otherwise
  */
 RAC_API rac_result_t rac_rag_get_statistics(rac_rag_pipeline_t* pipeline, char** out_stats_json);
+
+/**
+ * @brief Return serialized runanywhere.v1.RAGStatistics for a RAG session.
+ */
+RAC_API rac_result_t rac_rag_stats_proto(rac_handle_t session,
+                                         rac_proto_buffer_t* out_stats);
 
 /**
  * @brief Free RAG result resources

@@ -101,9 +101,9 @@ rac_whisperkit_coreml_stt_set_callbacks(const rac_whisperkit_coreml_stt_callback
 RAC_API const rac_whisperkit_coreml_stt_callbacks_t* rac_whisperkit_coreml_stt_get_callbacks(void);
 
 /**
- * Checks if Swift callbacks are registered.
+ * Checks if the required Swift callbacks are registered.
  *
- * @return RAC_TRUE if callbacks are available
+ * @return RAC_TRUE if create/can_handle/transcribe callbacks are available
  */
 RAC_API rac_bool_t rac_whisperkit_coreml_stt_is_available(void);
 

@@ -44,7 +44,7 @@ runanywhere-flutter/
 │       ├── ios/                  # RABackendONNX.xcframework + onnxruntime
 │       └── android/              # librac_backend_onnx.so + ONNX Runtime
 │
-├── melos.yaml                    # Multi-package management
+├── pubspec.yaml                  # Dart workspace + Melos management
 ├── scripts/                      # Build scripts
 └── analysis_options.yaml         # Shared lint rules
 ```
@@ -187,11 +187,17 @@ native/
 
 ## 4. Core Components & Responsibilities
 
-### 4.1 RunAnywhere (Public API)
+### 4.1 RunAnywhereSDK (Public API)
 
-**Purpose**: Single entry point for all SDK operations as a static class.
+**Purpose**: Lifecycle singleton + capability dispatcher. The v4 entry
+point is `RunAnywhereSDK.instance`; each capability (LLM/STT/TTS/VLM/
+Voice/Models/Downloads/Tools/RAG) is a property on it, implemented by
+its own class under `lib/public/capabilities/`.
 
-**Location**: `lib/public/runanywhere.dart`
+**Location**: `lib/public/runanywhere_v4.dart` (singleton),
+`lib/public/capabilities/*.dart` (capability surfaces), and
+`lib/internal/sdk_state.dart` + `lib/internal/sdk_init.dart` (shared
+package-internal state + initialization helpers).
 
 **Key Responsibilities**:
 - SDK initialization with environment configuration
@@ -591,14 +597,15 @@ Libraries come from `runanywhere-commons`:
 
 ### 9.3 Melos Workflow
 
-Multi-package management via melos:
+Multi-package management via Melos. The workspace and Melos config live in the
+root `pubspec.yaml`, which is required by Melos 7 and Dart workspaces:
 
 ```bash
 melos bootstrap     # Install all package dependencies
-melos analyze       # Run flutter analyze on all packages
-melos format        # Run dart format on all packages
-melos test          # Run tests on all packages
-melos clean         # Clean all packages
+melos run analyze   # Run flutter analyze --no-pub on all packages
+melos run format    # Run dart format on all packages
+melos run test      # Run tests on all packages
+melos run clean     # Clean all packages
 ```
 
 ---

@@ -65,6 +65,12 @@ endif()
 # Source files
 set(JNI_SOURCES
     runanywhere_commons_jni.cpp
+    # H4: OkHttp-backed rac_http_transport_ops adapter. Routes
+    # rac_http_request_* calls through Kotlin's
+    # `com.runanywhere.sdk.foundation.http.OkHttpTransport` so Android
+    # consumers get the system trust store + NetworkSecurityConfig +
+    # proxy support for free. Fixes rc=77 SSL errors permanently.
+    okhttp_transport_adapter.cpp
 )
 
 # Create shared library
@@ -97,7 +103,9 @@ if(ANDROID)
     )
 
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(runanywhere_commons_jni PRIVATE -Wl,-z,max-page-size=16384)
+    target_link_options(runanywhere_commons_jni PRIVATE
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
 endif()
 
 # Set output name to match what Kotlin expects

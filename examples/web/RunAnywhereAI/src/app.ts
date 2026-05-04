@@ -10,7 +10,9 @@ import { initVisionTab } from './views/vision';
 import { initVoiceTab } from './views/voice';
 import { initTranscribeTab } from './views/transcribe';
 import { initSpeakTab } from './views/speak';
+import { initDocumentsTab } from './views/documents';
 import { initStorageTab } from './views/storage';
+import { initSolutionsTab } from './views/solutions';
 import { initSettingsTab } from './views/settings';
 import { ModelManager, ModelCategory } from './services/model-manager';
 
@@ -65,9 +67,19 @@ const TABS: TabDef[] = [
     icon: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
   },
   {
+    id: 'documents',
+    label: 'Docs',
+    icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+  },
+  {
     id: 'storage',
     label: 'Storage',
     icon: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  },
+  {
+    id: 'solutions',
+    label: 'Solutions',
+    icon: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
   },
   {
     id: 'settings',
@@ -126,7 +138,9 @@ export function buildAppShell(): void {
   tabLifecycles[2] = initVoiceTab(document.getElementById('tab-voice')!);
   tabLifecycles[3] = initTranscribeTab(document.getElementById('tab-transcribe')!);
   tabLifecycles[4] = initSpeakTab(document.getElementById('tab-speak')!);
-  tabLifecycles[5] = initStorageTab(document.getElementById('tab-storage')!);
+  tabLifecycles[5] = initDocumentsTab(document.getElementById('tab-documents')!);
+  tabLifecycles[6] = initStorageTab(document.getElementById('tab-storage')!);
+  tabLifecycles[7] = initSolutionsTab(document.getElementById('tab-solutions')!);
   initSettingsTab(document.getElementById('tab-settings')!);
 
   // Activate default tab
@@ -144,7 +158,9 @@ const TAB_MODEL_CATEGORY: Record<string, ModelCategory | null> = {
   voice: ModelCategory.Language,        // voice agent uses LLM + STT + TTS
   transcribe: ModelCategory.SpeechRecognition,
   speak: ModelCategory.SpeechSynthesis,
+  documents: ModelCategory.Language,    // RAG demo uses Embeddings + LLM
   storage: null,
+  solutions: null,
   settings: null,
 };
 

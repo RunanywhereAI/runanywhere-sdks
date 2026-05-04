@@ -1,0 +1,272 @@
+// RunAnywhere v2 IDL — LLM generation options + result.
+//
+// Phase 3 of v2 IDL Exhaustiveness migration. These two messages were
+// hand-rolled in 5 SDKs:
+//   - Swift  Public/Extensions/LLM/LLMTypes.swift (LLMGenerationOptions, LLMGenerationResult)
+//   - Kotlin commonMain/.../LLMOptions.kt
+//   - Dart   lib/public/types/llm_options.dart
+//   - RN     core/src/types/llm.ts
+//   - Web    packages/core/src/llm/types.ts
+//
+// Generating from a single proto definition removes ~1,500 LOC of duplicated
+// shape definitions and locks the field names + types across all 5 SDKs.
+//
+// ABI note: LLMGenerationOptions is the user-facing knobs struct. The
+// existing rac_llm_options_t C ABI struct (Foundation/Bridge/) is the C-side
+// counterpart; codegen does NOT replace that — Swift's withCOptions() bridge
+// closure still flows fields one-by-one into the C struct.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+import "structured_output.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LLMOptionsProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Options for a single text generation invocation.
+//
+// Field names match Swift LLMGenerationOptions exactly; consumers may treat
+// proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
+// represents optional reference fields explicitly via `optional` keyword).
+// ---------------------------------------------------------------------------
+message LLMGenerationOptions {
+    // Maximum number of tokens to generate. 0 (default) = unset → engine
+    // default (typically 100).
+    int32  max_tokens          = 1;
+
+    // Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
+    float  temperature         = 2;
+
+    // Nucleus sampling (top-p). 1.0 = no nucleus truncation.
+    float  top_p               = 3;
+
+    // Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
+    int32  top_k               = 4;
+
+    // Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
+    float  repetition_penalty  = 5;
+
+    // Stop sequences. Generation halts when any of these strings appears in
+    // the output stream.
+    repeated string stop_sequences = 6;
+
+    // Whether to stream tokens vs return result at end (Swift field).
+    bool   streaming_enabled   = 7;
+
+    // Preferred inference framework. UNSPECIFIED = pick automatically.
+    InferenceFramework preferred_framework = 8;
+
+    // System prompt to define AI behavior and formatting rules.
+    optional string system_prompt = 9;
+
+    // Optional structured-output mode (JSON schema). Engine returns text
+    // that conforms to this schema. Swift wraps this in a StructuredOutputConfig
+    // struct with the Generatable.Type — proto carries just the schema string.
+    optional string json_schema = 10;
+
+    // Optional thinking-tag pattern for extracting reasoning content from
+    // models like Qwen3 / LFM2 that emit <think>...</think> blocks.
+    optional ThinkingTagPattern thinking_pattern = 11;
+
+    // Routing hint: where this generation should run (on-device, cloud, or
+    // SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+    optional ExecutionTarget execution_target = 12;
+
+    // Optional structured-output configuration. Detailed message lives in
+    // structured_output.proto so the schema/format details aren't duplicated
+    // here. When set, supersedes the simpler `json_schema` string above.
+    optional StructuredOutputOptions structured_output = 13;
+
+    // Enable per-token/cost dashboard tracking for SDKs that surface live
+    // generation telemetry. No-op for backends without a telemetry sink.
+    bool enable_real_time_tracking = 14;
+}
+
+// ---------------------------------------------------------------------------
+// Result of a single text generation. Same fields as the Swift
+// LLMGenerationResult plus the fields RN/Web carry that Swift derives from
+// the rac_llm_stream_result_t C struct.
+// ---------------------------------------------------------------------------
+message LLMGenerationResult {
+    // Generated text (with thinking content removed if extracted).
+    string text                = 1;
+
+    // Optional thinking/reasoning content extracted from the response.
+    optional string thinking_content = 2;
+
+    // Number of input/prompt tokens (from tokenizer).
+    int32  input_tokens        = 3;
+
+    // Number of tokens used (output / completion tokens).
+    int32  tokens_generated    = 4;
+
+    // Model used for generation.
+    string model_used          = 5;
+
+    // Total wall-clock generation time in milliseconds.
+    double generation_time_ms  = 6;
+
+    // Time-to-first-token in milliseconds (only set in streaming mode).
+    optional double ttft_ms    = 7;
+
+    // Tokens-per-second throughput.
+    double tokens_per_second   = 8;
+
+    // Framework that actually performed the generation. Optional because
+    // some C ABI paths don't surface it.
+    optional string framework  = 9;
+
+    // Reason the generation stopped: "stop", "length", "cancelled", "error".
+    // Empty = unset.
+    string finish_reason       = 10;
+
+    // Number of tokens used for thinking/reasoning. 0 = not applicable.
+    int32  thinking_tokens     = 11;
+
+    // Number of tokens in the actual response content (vs thinking).
+    int32  response_tokens     = 12;
+
+    // Optional JSON output (when structured-output mode was requested).
+    // Empty = no structured output.
+    optional string json_output = 13;
+
+    // Optional aggregated performance metrics. Web SDK surfaces this as a
+    // separate object alongside the result; consumers may ignore it if they
+    // already use the per-field timings above.
+    optional PerformanceMetrics performance = 14;
+
+    // Where the generation actually ran (on-device, cloud, etc.). Useful
+    // when execution_target was AUTO and the SDK picked the route.
+    optional ExecutionTarget executed_on = 15;
+
+    // Structured-output validation details, when a structured-output request
+    // was used. Mirrors the Swift/RN validation payload.
+    optional StructuredOutputValidation structured_output_validation = 16;
+
+    // Total tokens consumed (prompt + completion). Some C ABI paths expose
+    // this directly; consumers may also compute it from the per-field counts.
+    int32 total_tokens = 17;
+
+    // Backend error text for result-producing APIs that return a terminal
+    // result envelope instead of throwing through the host language.
+    optional string error_message = 18;
+}
+
+// ---------------------------------------------------------------------------
+// Lightweight LLM configuration used at component-init time (Swift
+// LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
+// — this is the "load the model" knob set, not the per-call sampling knobs.
+// ---------------------------------------------------------------------------
+message LLMConfiguration {
+    // Model context window length in tokens. 0 = use model default.
+    int32  context_length      = 1;
+
+    // Default sampling temperature applied when a per-call value is unset.
+    float  temperature         = 2;
+
+    // Default max output tokens applied when a per-call value is unset.
+    int32  max_tokens          = 3;
+
+    // Default system prompt baked into the component. Empty = no default.
+    optional string system_prompt = 4;
+
+    // Whether streaming generation is enabled by default for this component.
+    bool   streaming           = 5;
+
+    // Model identifier/path resolved by the component loader. Present in the
+    // C ABI rac_llm_config_t and needed for generated-proto service handles.
+    optional string model_id   = 6;
+
+    // Preferred inference framework for this component. UNSPECIFIED / absent
+    // means "auto".
+    optional InferenceFramework preferred_framework = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Per-prompt generation hints (Swift GenerationHints in LLMTypes.swift:550).
+// Carried alongside a prompt as a "soft" override of LLMConfiguration
+// defaults when the engine has no explicit LLMGenerationOptions to use.
+// ---------------------------------------------------------------------------
+message GenerationHints {
+    // Suggested sampling temperature.
+    float  temperature         = 1;
+
+    // Suggested max output tokens.
+    int32  max_tokens          = 2;
+
+    // Suggested role to use for the system prompt (e.g. "system", "developer").
+    // Empty = engine default ("system").
+    optional string system_role = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Pattern used to extract a model's "thinking" / reasoning block from its
+// raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
+// Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
+// ---------------------------------------------------------------------------
+message ThinkingTagPattern {
+    // Opening tag string. Default if empty: "<think>".
+    string opening_tag         = 1;
+
+    // Closing tag string. Default if empty: "</think>".
+    string closing_tag         = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
+// once per token in streaming mode.
+// ---------------------------------------------------------------------------
+message StreamToken {
+    // Decoded text fragment for this token.
+    string text                = 1;
+
+    // Wall-clock timestamp (ms since Unix epoch) the token was produced.
+    int64  timestamp_ms        = 2;
+
+    // Sequence index within the current generation (0-based).
+    int32  index               = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Aggregated performance metrics for a generation (Web SDK
+// PerformanceMetrics in types/models.ts:57). Higher-level summary that
+// rolls up the timing fields scattered across LLMGenerationResult.
+// ---------------------------------------------------------------------------
+message PerformanceMetrics {
+    // Total latency from request to last token, in milliseconds.
+    int64  latency_ms                  = 1;
+
+    // Peak memory used by the inference engine, in bytes.
+    int64  memory_bytes                = 2;
+
+    // Decode throughput in tokens/second.
+    float  throughput_tokens_per_sec   = 3;
+
+    // Prompt (input) token count.
+    int32  prompt_tokens               = 4;
+
+    // Completion (output) token count.
+    int32  completion_tokens           = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Routing destination for a generation (Web SDK ExecutionTarget in
+// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
+// ---------------------------------------------------------------------------
+enum ExecutionTarget {
+    EXECUTION_TARGET_UNSPECIFIED = 0;
+    EXECUTION_TARGET_ON_DEVICE   = 1;
+    EXECUTION_TARGET_CLOUD       = 2;
+    // Let the SDK decide based on policy (cost, latency, privacy, etc.).
+    EXECUTION_TARGET_AUTO        = 3;
+}

@@ -87,7 +87,7 @@ struct ComponentModelInfo: Codable, Sendable {
         self.id = model.id
         self.name = model.name
         self.framework = model.framework.displayName
-        self.category = model.category.rawValue
+        self.category = String(describing: model.category)
     }
 }
 

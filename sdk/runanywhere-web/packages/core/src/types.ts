@@ -1,148 +1,43 @@
 /**
  * RunAnywhere Web SDK - Public API Type Definitions
  *
- * Single entry point for all public-facing types. Re-exports from types/enums
- * and types/models, and adds chat/generation/IRunAnywhere interfaces for
- * full TypeScript parity with the React Native SDK.
+ * Wave 2: this barrel re-exports proto-ts canonical types directly. The
+ * legacy hand-rolled type files have been deleted; the single source of
+ * truth for cross-SDK shapes is `@runanywhere/proto-ts/*`.
  */
 
 import type { DownloadProgress } from './Infrastructure/ModelRegistry';
 
 export type { DownloadProgress };
 
-// Re-export all enums and models (existing types)
-export {
-  AccelerationPreference,
-  ComponentState,
-  ConfigurationSource,
-  DownloadStage,
-  ExecutionTarget,
-  FrameworkModality,
-  HardwareAcceleration,
-  LLMFramework,
-  ModelCategory,
-  ModelFormat,
-  ModelStatus,
-  RoutingPolicy,
-  SDKComponent,
-  SDKEnvironment,
-  SDKEventType,
-} from './types/enums';
+// All public types live under types/index.ts (proto-ts re-exports + Web-only
+// ergonomic shapes for browser I/O).
+export * from './types/index';
 
-export type {
-  DeviceInfoData,
-  GenerationOptions,
-  GenerationResult,
-  ModelInfoMetadata,
-  PerformanceMetrics,
-  SDKInitOptions,
-  STTAlternative,
-  STTOptions,
-  STTResult,
-  STTSegment,
-  StorageInfo,
-  StoredModel,
-  ThinkingTagPattern,
-  TTSConfiguration,
-  TTSResult,
-  VADConfiguration,
-} from './types/models';
-
-// LLM Types (rich generation types, backend-agnostic)
-export type {
-  LLMGenerationOptions,
-  LLMGenerationResult,
-  LLMStreamingResult,
-  LLMStreamingMetrics,
-  LLMTokenCallback,
-  LLMStreamCompleteCallback,
-  LLMStreamErrorCallback,
-} from './types/LLMTypes';
-
-// VLM Types (backend-agnostic image/generation types)
-export { VLMImageFormat } from './types/VLMTypes';
-export type {
-  VLMImage,
-  VLMGenerationOptions,
-  VLMGenerationResult,
-  VLMStreamingResult,
-} from './types/VLMTypes';
-
-// STT Types (backend-agnostic result/streaming types)
-export type {
-  STTTranscriptionResult,
-  STTWord,
-  STTTranscribeOptions,
-  STTStreamCallback,
-  STTStreamingSession,
-} from './types/STTTypes';
-
-// TTS Types (backend-agnostic synthesis result/options)
-export type {
-  TTSSynthesisResult,
-  TTSSynthesizeOptions,
-} from './types/TTSTypes';
-
-// VAD Types (backend-agnostic activity/segment types)
-export { SpeechActivity } from './types/VADTypes';
-export type {
-  SpeechActivityCallback,
-  SpeechSegment,
-} from './types/VADTypes';
-
-// ---------------------------------------------------------------------------
-// Aliases for spec/README convenience (match React Native naming where used)
-// ---------------------------------------------------------------------------
-
+import type { SDKInitOptions } from './types/models';
+import type { CompactModelDef, ManagedModel } from './Infrastructure/ModelManager';
 import type {
-  SDKInitOptions,
-  GenerationOptions,
-  STTOptions,
-  STTResult,
-  TTSConfiguration,
-} from './types/models';
-import type { ModelCategory } from './types/enums';
+  STTTranscribeOptions,
+  STTTranscriptionResult,
+  TTSSynthesizeOptions,
+} from './types/index';
 
 /** Convenience alias for {@link SDKInitOptions}. */
 export type InitializeOptions = SDKInitOptions;
 
-/** Convenience alias for {@link GenerationOptions}. */
-export type GenerateOptions = GenerationOptions;
+/** Convenience alias for {@link STTTranscribeOptions}. */
+export type TranscribeOptions = STTTranscribeOptions;
 
-export type TranscribeOptions = STTOptions;
+/** Convenience alias for {@link STTTranscriptionResult}. */
+export type TranscribeResult = STTTranscriptionResult;
 
-export type TranscribeResult = STTResult;
+/** Convenience alias for {@link TTSSynthesizeOptions}. */
+export type SynthesisOptions = TTSSynthesizeOptions;
 
-export type SynthesisOptions = TTSConfiguration;
 
-
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-/** How the model artifact is packaged (public API). */
-export enum ModelArtifactType {
-  SingleFile = 'single_file',
-  TarGzArchive = 'tar_gz_archive',
-  Directory = 'directory',
-}
-
-/** Descriptor for a model (id, url, memory, modality). Used in catalog/API. */
-export interface ModelDescriptor {
-  /** Unique model identifier used to reference this model in SDK calls. */
-  id: string;
-  /** Human-readable display name. */
-  name: string;
-  /** Direct download URL for the model artifact. */
-  url: string;
-  /** Approximate memory requirement in bytes. */
-  memoryRequirement: number;
-  /** Model category / modality. */
-  modality?: ModelCategory;
-  /** How the model artifact is packaged. Defaults to SingleFile. */
-  artifactType?: ModelArtifactType;
-}
+export type { ChatMessage } from '@runanywhere/proto-ts/chat';
+export { MessageRole } from '@runanywhere/proto-ts/chat';
+export { ModelArtifactType } from '@runanywhere/proto-ts/model_types';
 
 
 /**
@@ -152,7 +47,19 @@ export interface ModelDescriptor {
 export interface IRunAnywhere {
   initialize(options: SDKInitOptions): Promise<void>;
   readonly isInitialized: boolean;
+  registerModel(model: CompactModelDef): void;
+  unregisterModel(modelId: string): void;
+  availableModels(): ManagedModel[];
+  getModel(modelId: string): ManagedModel | undefined;
   downloadModel(modelId: string, onProgress?: (p: DownloadProgress) => void): Promise<void>;
+  cancelDownload(modelId: string): boolean;
+  deleteModel(modelId: string): Promise<void>;
+  deleteAllModels(): Promise<void>;
+  refreshModelRegistry(options?: {
+    includeRemoteCatalog?: boolean;
+    rescanLocal?: boolean;
+    pruneOrphans?: boolean;
+  }): boolean;
   loadModel(modelId: string): Promise<boolean>;
   unloadAll(): Promise<void>;
   shutdown(): void;

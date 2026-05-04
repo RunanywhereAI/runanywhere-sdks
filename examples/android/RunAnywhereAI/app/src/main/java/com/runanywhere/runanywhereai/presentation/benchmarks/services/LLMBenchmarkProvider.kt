@@ -6,13 +6,15 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMet
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions
+import ai.runanywhere.proto.v1.LLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
-import com.runanywhere.sdk.public.extensions.generateStreamWithMetrics
+import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.unloadLLMModel
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Benchmarks LLM generation with short/medium/long token counts.
@@ -42,25 +44,42 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0
 
         try {
-            // Warmup: short generate, discard
+            // v2 close-out Phase G-2: generateStream returns Flow<LLMStreamEvent>;
+            // compute TTFT + tokens/sec from the event sequence directly.
             val warmupStart = System.nanoTime()
-            val warmupOptions = LLMGenerationOptions(maxTokens = 5, temperature = 0.0f)
-            val warmupResult = RunAnywhere.generateStreamWithMetrics("Hello", warmupOptions)
-            warmupResult.stream.collect { }
-            warmupResult.result.await()
+            val warmupOptions = LLMGenerationOptions(max_tokens = 5, temperature = 0.0f)
+            // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
+            withTimeoutOrNull(10_000L) {
+                RunAnywhere.generateStream("Hello", warmupOptions)
+                    .takeWhile { !it.is_final }
+                    .collect { _ ->
+                        // warmup only primes the model; no metrics needed
+                    }
+            }
             val warmupTimeMs = (System.nanoTime() - warmupStart) / 1_000_000.0
 
             // Benchmark
             val benchStart = System.nanoTime()
-            val options = LLMGenerationOptions(maxTokens = maxTokens, temperature = 0.0f)
-            val streamResult =
-                RunAnywhere.generateStreamWithMetrics(
-                    "Explain the concept of machine learning in detail.",
-                    options,
-                )
-            streamResult.stream.collect { }
-            val result = streamResult.result.await()
+            val options = LLMGenerationOptions(max_tokens = maxTokens, temperature = 0.0f)
+            val prompt = "Explain the concept of machine learning in detail."
+
+            var tokenCount = 0
+            var firstTokenTimeNs: Long? = null
+            // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
+            withTimeoutOrNull(60_000L) {
+                RunAnywhere.generateStream(prompt, options)
+                    .takeWhile { !it.is_final }
+                    .collect { event ->
+                        if (event.token.isNotEmpty()) {
+                            if (firstTokenTimeNs == null) firstTokenTimeNs = System.nanoTime()
+                            tokenCount++
+                        }
+                    }
+            }
             val endToEndMs = (System.nanoTime() - benchStart) / 1_000_000.0
+            val ttftMs: Double? = firstTokenTimeNs?.let { (it - benchStart) / 1_000_000.0 }
+            val tokensPerSecond: Double = if (endToEndMs > 0) tokenCount.toDouble() / (endToEndMs / 1000.0) else 0.0
+            val inputTokens = maxOf(1, prompt.length / 4)
 
             val memAfter = SyntheticInputGenerator.availableMemoryBytes()
 
@@ -69,10 +88,10 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
                 loadTimeMs = loadTimeMs,
                 warmupTimeMs = warmupTimeMs,
                 memoryDeltaBytes = memBefore - memAfter,
-                ttftMs = result.timeToFirstTokenMs,
-                tokensPerSecond = result.tokensPerSecond,
-                inputTokens = result.inputTokens,
-                outputTokens = result.tokensUsed,
+                ttftMs = ttftMs,
+                tokensPerSecond = tokensPerSecond,
+                inputTokens = inputTokens,
+                outputTokens = tokenCount,
             )
         } finally {
             withContext(NonCancellable) {

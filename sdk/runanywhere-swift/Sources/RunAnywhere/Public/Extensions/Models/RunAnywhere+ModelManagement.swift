@@ -8,7 +8,7 @@ extension RunAnywhere {
     /// - Parameter modelId: The model identifier
     public static func loadModel(_ modelId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -16,32 +16,41 @@ extension RunAnywhere {
         // Resolve model ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
-            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
+            throw SDKException.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
+        }
+
+        try validateLLMModelCanLoad(modelInfo)
+
+        var request = RAModelLoadRequest()
+        request.modelID = modelId
+        request.category = modelInfo.category
+        request.framework = modelInfo.framework
+
+        let result = await loadModel(request)
+        guard result.success else {
+            let message = result.errorMessage.isEmpty
+                ? "Failed to load model '\(modelId)'"
+                : result.errorMessage
+            throw SDKException.llm(.modelLoadFailed, message)
+        }
+    }
+
+    private static func validateLLMModelCanLoad(_ modelInfo: ModelInfo) throws {
+        if modelInfo.framework == .foundationModels,
+           let reason = SystemFoundationModels.unavailableReason {
+            throw SDKException.llm(.serviceNotAvailable, reason)
         }
 
         // Handle built-in models (Foundation Models, System TTS) - no file path needed
         // These are platform services that don't require downloaded model files
         if modelInfo.isBuiltIn {
-            // For built-in models, just pass the model ID to C++
-            // The service registry will route to the correct platform provider
-            try await CppBridge.LLM.shared.loadModel(modelId, modelId: modelId, modelName: modelInfo.name)
             return
         }
 
         // For downloaded models, verify they exist and resolve the file path
         guard modelInfo.localPath != nil else {
-            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
+            throw SDKException.llm(.modelNotFound, "Model '\(modelInfo.id)' is not downloaded")
         }
-
-        // Log model info for debugging
-        let logger = SDKLogger(category: "ModelManagement")
-        let localName = modelInfo.localPath?.lastPathComponent ?? "nil"
-        logger.info("Loading model: id=\(modelId), framework=\(modelInfo.framework), format=\(modelInfo.format), localPath=\(localName)")
-
-        // Resolve actual model file path
-        let modelPath = try resolveModelFilePath(for: modelInfo)
-        logger.info("Resolved model path: \(modelPath.lastPathComponent)")
-        try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
     // MARK: - Private: Model Path Resolution
@@ -194,7 +203,7 @@ extension RunAnywhere {
         }
 
         // Find files with the expected extension in model folder
-        let expectedExtension = model.format.rawValue.lowercased()
+        let expectedExtension = model.format.wireString.lowercased()
         if let modelFile = findModelFile(in: modelFolder, extensions: [expectedExtension, "gguf", "bin"]) {
             logger.info("Found model file: \(modelFile.lastPathComponent)")
             return modelFile
@@ -239,19 +248,44 @@ extension RunAnywhere {
         return modelFiles.first
     }
 
+    /// Load an LLM model by ID — canonical §3 name (`loadLLMModel`).
+    ///
+    /// Delegates to `loadModel(_:)` for actual resolution and loading.
+    public static func loadLLMModel(_ modelId: String) async throws {
+        try await loadModel(modelId)
+    }
+
+    /// Unload the currently loaded LLM model — canonical §3 name (`unloadLLMModel`).
+    ///
+    /// Delegates to `unloadModel()`.
+    public static func unloadLLMModel() async throws {
+        try await unloadModel()
+    }
+
+    /// Whether an LLM model is currently loaded — canonical §3 name (`isLLMModelLoaded`).
+    public static var isLLMModelLoaded: Bool {
+        get async { await isModelLoaded }
+    }
+
     /// Unload the currently loaded LLM model
     public static func unloadModel() async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
+        var request = RAModelUnloadRequest()
+        request.category = .language
+        _ = await unloadModel(request)
         await CppBridge.LLM.shared.unload()
     }
 
     /// Check if an LLM model is loaded
     public static var isModelLoaded: Bool {
         get async {
-            await CppBridge.LLM.shared.isLoaded
+            if let snapshot = componentLifecycleSnapshot(.llm) {
+                return snapshot.state == .ready
+            }
+            return await CppBridge.LLM.shared.isLoaded
         }
     }
 
@@ -264,7 +298,12 @@ extension RunAnywhere {
     /// - Note: Returns `false` if no model is loaded
     public static var supportsLLMStreaming: Bool {
         get async {
-            true  // C++ layer supports streaming
+            guard await isModelLoaded else { return false }
+            if let currentModel = await currentLLMModel,
+               currentModel.framework == .foundationModels {
+                return false
+            }
+            return true
         }
     }
 
@@ -273,7 +312,7 @@ extension RunAnywhere {
     /// - Parameter modelId: The model identifier (e.g., "whisper-base")
     public static func loadSTTModel(_ modelId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Early guard: skip if this exact model is already loaded
@@ -288,10 +327,10 @@ extension RunAnywhere {
         // Resolve model ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
-            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
+            throw SDKException.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
         guard modelInfo.localPath != nil else {
-            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
+            throw SDKException.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
         // Resolve actual model path
@@ -312,7 +351,7 @@ extension RunAnywhere {
     /// - Parameter voiceId: The voice identifier
     public static func loadTTSModel(_ voiceId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Early guard: skip if this exact voice is already loaded
@@ -327,7 +366,7 @@ extension RunAnywhere {
         // Resolve voice ID to local file path
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
+            throw SDKException.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
         }
 
         // Handle built-in voices (System TTS) - no file path needed
@@ -339,7 +378,7 @@ extension RunAnywhere {
         }
 
         guard modelInfo.localPath != nil else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
+            throw SDKException.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
         // Resolve actual model path
@@ -354,7 +393,7 @@ extension RunAnywhere {
     /// - Parameter modelId: The model identifier (e.g., "silero-vad")
     public static func loadVADModel(_ modelId: String) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Early guard: skip if this exact model is already loaded
@@ -368,10 +407,10 @@ extension RunAnywhere {
 
         let allModels = try await availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
-            throw SDKError.vad(.modelNotFound, "VAD model '\(modelId)' not found in registry")
+            throw SDKException.vad(.modelNotFound, "VAD model '\(modelId)' not found in registry")
         }
         guard modelInfo.localPath != nil else {
-            throw SDKError.vad(.modelNotFound, "VAD model '\(modelId)' is not downloaded")
+            throw SDKException.vad(.modelNotFound, "VAD model '\(modelId)' is not downloaded")
         }
 
         let modelPath = try resolveModelFilePath(for: modelInfo)
@@ -388,7 +427,7 @@ extension RunAnywhere {
     /// Get available models
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
-        guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
+        guard isInitialized else { throw SDKException.general(.notInitialized, "SDK not initialized") }
         // Ensure services are initialized (including Platform backend registration)
         try await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.getAll()
@@ -398,6 +437,12 @@ extension RunAnywhere {
     /// - Returns: Currently loaded model ID if any
     public static func getCurrentModelId() async -> String? {
         guard isInitialized else { return nil }
+        var request = RACurrentModelRequest()
+        request.category = .language
+        let result = currentModel(request)
+        if !result.modelID.isEmpty {
+            return result.modelID
+        }
         return await CppBridge.LLM.shared.currentModelId
     }
 
@@ -451,6 +496,11 @@ extension RunAnywhere {
         }
     }
 
+    /// Unload the current TTS voice/model — canonical §5 name (`unloadTTSModel`).
+    public static func unloadTTSModel() async {
+        await CppBridge.TTS.shared.unload()
+    }
+
     /// Whether a VAD model is loaded (vs. built-in energy VAD)
     public static var isVADModelLoaded: Bool {
         get async {
@@ -485,5 +535,29 @@ extension RunAnywhere {
         try? await ensureServicesReady()
         let result = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
         return result.discoveredCount
+    }
+
+    /// Refresh the model registry — T4.9.
+    ///
+    /// Routes through the unified C ABI `rac_model_registry_refresh` so the
+    /// same semantics run on every platform (Swift / Kotlin / RN / Flutter /
+    /// Web).
+    ///
+    /// - Parameters:
+    ///   - includeRemoteCatalog: fetch model assignments from the backend.
+    ///   - rescanLocal: rescan on-disk model folders and link downloads.
+    ///   - pruneOrphans: clear `localPath` on models whose file is missing.
+    public static func refreshModelRegistry(
+        includeRemoteCatalog: Bool = true,
+        rescanLocal: Bool = true,
+        pruneOrphans: Bool = false
+    ) async {
+        guard isInitialized else { return }
+        try? await ensureServicesReady()
+        await CppBridge.ModelRegistry.shared.refresh(
+            includeRemoteCatalog: includeRemoteCatalog,
+            rescanLocal: rescanLocal,
+            pruneOrphans: pruneOrphans
+        )
     }
 }

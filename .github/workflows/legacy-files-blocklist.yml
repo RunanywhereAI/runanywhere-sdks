@@ -1,0 +1,38 @@
+name: Legacy file blocklist
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - feat/v2-architecture
+
+jobs:
+  legacy-files-blocklist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if removed legacy files reappear
+        shell: bash
+        run: |
+          set -euo pipefail
+          blocked=(
+            "sdk/runanywhere-react-native/packages/core/src/Features/VoiceSession/VoiceSessionHandle.ts"
+            "sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+VoiceSession.ts"
+            "sdk/runanywhere-react-native/scripts/build-react-native.sh"
+            "sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+VoiceAgent.ts"
+            "sdk/runanywhere-web/scripts/build-web.sh"
+          )
+
+          found=0
+          for path in "${blocked[@]}"; do
+            if [[ -e "$path" ]]; then
+              echo "Blocked legacy file reintroduced: $path"
+              found=1
+            fi
+          done
+
+          if [[ "$found" -ne 0 ]]; then
+            exit 1
+          fi

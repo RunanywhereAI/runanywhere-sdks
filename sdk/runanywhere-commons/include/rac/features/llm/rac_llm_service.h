@@ -13,6 +13,8 @@
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "rac/features/llm/rac_llm_stream.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,6 +97,26 @@ typedef struct rac_llm_service_ops {
 
     /** Clear all KV cache state (optional, NULL if not supported) */
     rac_result_t (*clear_context)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new service instance.
+     *
+     * v3 (RAC_PLUGIN_API_VERSION=3u): replaces the legacy
+     * rac_service_provider_t::create callback from the deleted
+     * service_registry.cpp. Called by commons rac_llm_create() after
+     * rac_plugin_route picks this plugin; the returned impl is passed
+     * to every other ops method (initialize, generate, ..., destroy).
+     *
+     * @param model_id    Model ID or filesystem path. Caller-owned; copy if retaining.
+     * @param config_json Optional JSON config (NULL = backend defaults). Plugins
+     *                    that don't understand config_json MUST ignore it and
+     *                    succeed with defaults.
+     * @param out_impl    Receives heap-allocated backend handle.
+     *                    NULL on failure.
+     *
+     * @return RAC_SUCCESS on success; out_impl is NULL on failure.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_llm_service_ops_t;
 
 /**
@@ -227,6 +249,43 @@ RAC_API void rac_llm_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_llm_result_free(rac_llm_result_t* result);
+
+// =============================================================================
+// GENERATED-PROTO LLM ABI - lifecycle-owned model state
+// =============================================================================
+
+/**
+ * @brief Generate text from serialized runanywhere.v1.LLMGenerateRequest bytes.
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto() and returns
+ * serialized runanywhere.v1.LLMGenerationResult bytes in out_result. Thinking
+ * blocks, token splits, and structured JSON extraction are normalized by the
+ * C++ commons layer before the result crosses the ABI.
+ */
+RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
+                                            size_t request_proto_size,
+                                            rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Stream text generation from serialized runanywhere.v1.LLMGenerateRequest bytes.
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto(). The
+ * callback receives one serialized runanywhere.v1.LLMStreamEvent per token and
+ * exactly one terminal event with is_final=true.
+ */
+RAC_API rac_result_t rac_llm_generate_stream_proto(
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_llm_stream_proto_callback_fn callback,
+    void* user_data);
+
+/**
+ * @brief Cancel the lifecycle-owned LLM generation, if one is active.
+ *
+ * Returns a serialized runanywhere.v1.SDKEvent carrying CancellationEvent in
+ * out_event and publishes the same event on the canonical SDKEvent stream.
+ */
+RAC_API rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event);
 
 // =============================================================================
 // ADAPTIVE CONTEXT API - For RAG and similar pipelines

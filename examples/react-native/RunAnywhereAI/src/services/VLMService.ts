@@ -5,6 +5,7 @@ import {
   cancelVLMGeneration,
 } from '@runanywhere/llamacpp';
 import { VLMImageFormat, type VLMImage } from '@runanywhere/core';
+import { VLMModelFamily } from '@runanywhere/proto-ts/vlm_options';
 
 export class VLMService {
   private _isLoaded: boolean = false;
@@ -71,19 +72,36 @@ export class VLMService {
     }
 
     const image: VLMImage = {
-      format: VLMImageFormat.FilePath,
+      format: VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
       filePath: imagePath,
+      width: 0,
+      height: 0,
     };
 
     // eslint-disable-next-line no-console -- demo VLM inference diagnostic
     console.log(`[VLMService] Processing image: ${imagePath}`);
 
     try {
-      const response = await processImageStream(image, prompt, { maxTokens });
+      const response = await processImageStream(image, prompt, {
+        prompt,
+        maxTokens,
+        temperature: 0.7,
+        topP: 0.9,
+        topK: 0,
+        stopSequences: [],
+        streamingEnabled: true,
+        maxImageSize: 0,
+        nThreads: 0,
+        useGpu: true,
+        modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
+      });
 
-      // Consume the async iterator and fire callback
-      for await (const token of response.stream) {
-        onToken(token);
+      // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
+      const iter = response.stream[Symbol.asyncIterator]();
+      let result = await iter.next();
+      while (!result.done) {
+        onToken(result.value);
+        result = await iter.next();
       }
     } catch (error) {
       console.error('[VLMService] Description error:', error);

@@ -88,6 +88,17 @@ typedef struct rac_vlm_service_ops {
      * @param impl Backend implementation handle
      */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new VLM service instance.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     *
+     * For VLM, `config_json` MAY include an "mmproj_path" key that the
+     * adapter passes to the backend's 2-path create function (e.g.
+     * rac_vlm_llamacpp_create(model_path, mmproj_path, config, out_handle)).
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_vlm_service_ops_t;
 
 /**

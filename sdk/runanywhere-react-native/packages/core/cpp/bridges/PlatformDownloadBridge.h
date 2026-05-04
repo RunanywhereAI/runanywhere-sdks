@@ -1,9 +1,17 @@
 /**
  * PlatformDownloadBridge.h
  *
- * C callbacks for platform HTTP download progress/completion reporting.
- * Used by iOS/Android platform adapters to report async download state
- * back into the C++ bridge.
+ * C callbacks for platform HTTP download progress/completion reporting used
+ * by the RACommons platform-adapter HTTP download pipeline. iOS/Android
+ * platform adapters call these from native-side async download delegates to
+ * report progress/completion back to the `platformHttpDownloadCallback`
+ * chain in `InitBridge.cpp`.
+ *
+ * NOTE: The `SyncHttpDownload` C++ wrapper that previously lived here was
+ * the B-RN-3-001 / G-A6 workaround around libcurl HTTPS on Android. It was
+ * removed in Task M5 — `HybridRunAnywhereCore::downloadModel` now goes
+ * straight through `rac_http_download_execute`, which uses the registered
+ * platform HTTP transport (OkHttp / URLSession) wired by Task M1.2.
  */
 
 #ifndef RUNANYWHERE_PLATFORM_DOWNLOAD_BRIDGE_H

@@ -14,6 +14,7 @@
 import { ONNXProvider } from './ONNXProvider';
 import {
   LLMFramework,
+  SDKComponent,
   SDKLogger,
 } from '@runanywhere/core';
 
@@ -55,7 +56,7 @@ export const ONNX = {
   moduleId: 'onnx',
   moduleName: 'ONNX Runtime',
   inferenceFramework: LLMFramework.ONNX,
-  capabilities: ['stt', 'tts', 'vad'] as const,
+  capabilities: [SDKComponent.SDK_COMPONENT_STT, SDKComponent.SDK_COMPONENT_TTS, SDKComponent.SDK_COMPONENT_VAD] as const,
   defaultPriority: 100,
 
   /**

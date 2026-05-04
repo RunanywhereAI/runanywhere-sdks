@@ -193,7 +193,8 @@ android {
                     jniLibs.srcDirs = [commonsDistDir]
                     logger.lifecycle("[RunAnywhereCore] Using LOCAL native libraries from: $commonsDistDir")
                 } else {
-                    logger.warn("[RunAnywhereCore] Local commons dist not found at: $commonsDistDir")
+                    jniLibs.srcDirs = [jniLibsDir]
+                    logger.lifecycle("[RunAnywhereCore] Using staged LOCAL native libraries from: $jniLibsDir")
                 }
             } else {
                 jniLibs.srcDirs = [jniLibsDir]
@@ -223,6 +224,12 @@ task downloadNativeLibs {
         if (useLocalBuild) {
             logger.lifecycle("[RunAnywhereCore] Skipping download - using local build mode")
             return
+        }
+
+        fileTree(dir: jniLibsDir, include: "**/libc++_shared.so").files.each { staleStdlib ->
+            if (staleStdlib.delete()) {
+                logger.lifecycle("[RunAnywhereCore] Removed bundled libc++_shared.so: ${staleStdlib}")
+            }
         }
 
         // Check if libs are already bundled for ALL requested ABIs (npm install case)
@@ -432,4 +439,11 @@ dependencies {
 
     // AndroidX Security for EncryptedSharedPreferences (device identity persistence)
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
+
+    // OkHttp for the platform HTTP transport (v2 close-out Phase H6).
+    // Routes rac_http_request_* through the system trust store + HTTP/2
+    // + proxies + NetworkSecurityConfig instead of libcurl. React Native
+    // pulls OkHttp transitively but does NOT expose it to library modules,
+    // so we declare it explicitly.
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }

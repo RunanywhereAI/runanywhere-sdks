@@ -4,12 +4,76 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/dart_bridge_download.dart';
+import 'package:runanywhere/generated/model_types.pb.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart' as model_enum;
+import 'package:runanywhere/native/dart_bridge_model_registry.dart'
+    hide ModelInfo;
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
+
+base class RacResolvedModelFileStruct extends Struct {
+  external Pointer<Utf8> relativePath;
+  external Pointer<Utf8> path;
+
+  @Int32()
+  external int role;
+
+  @Int32()
+  external int isRequired;
+
+  @Int32()
+  external int exists;
+}
+
+base class RacModelPathResolutionStruct extends Struct {
+  external Pointer<Utf8> rootPath;
+  external Pointer<Utf8> primaryModelPath;
+  external Pointer<Utf8> mmprojPath;
+  external Pointer<Utf8> tokenizerPath;
+  external Pointer<Utf8> configPath;
+
+  external Pointer<RacResolvedModelFileStruct> files;
+  @Size()
+  external int fileCount;
+
+  external Pointer<Pointer<Utf8>> missingRequiredFiles;
+  @Size()
+  external int missingRequiredFileCount;
+
+  @Int32()
+  external int isDirectoryBased;
+
+  @Int32()
+  external int isComplete;
+
+  @Int32()
+  external int checksumValidated;
+
+  @Int32()
+  external int checksumMatched;
+}
+
+class ModelPathResolution {
+  final String? rootPath;
+  final String? primaryModelPath;
+  final String? mmprojPath;
+  final String? tokenizerPath;
+  final String? configPath;
+  final bool isDirectoryBased;
+  final bool isComplete;
+
+  const ModelPathResolution({
+    required this.rootPath,
+    required this.primaryModelPath,
+    required this.mmprojPath,
+    required this.tokenizerPath,
+    required this.configPath,
+    required this.isDirectoryBased,
+    required this.isComplete,
+  });
+}
 
 /// Model path utilities bridge.
 /// Wraps C++ rac_model_paths.h functions.
@@ -91,8 +155,7 @@ class DartBridgeModelPaths {
 
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
-        final result =
-            getDir(_frameworkToCValue(framework), buffer, _pathBufferSize);
+        final result = getDir(framework.toC(), buffer, _pathBufferSize);
         if (result == RacResultCode.success) {
           return buffer.toDartString();
         }
@@ -119,8 +182,8 @@ class DartBridgeModelPaths {
       final modelIdPtr = modelId.toNativeUtf8();
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
-        final result = getFolder(
-            modelIdPtr, _frameworkToCValue(framework), buffer, _pathBufferSize);
+        final result =
+            getFolder(modelIdPtr, framework.toC(), buffer, _pathBufferSize);
         if (result == RacResultCode.success) {
           return buffer.toDartString();
         }
@@ -164,21 +227,70 @@ class DartBridgeModelPaths {
   // MARK: - Model File Resolution
 
   /// Resolve the actual model file path for loading.
-  /// Delegates to C++ rac_find_model_path_after_extraction() which handles
-  /// all model types: ONNX directories, LlamaCpp .gguf files, nested structures.
+  /// Delegates to C++ rac_model_paths_resolve_artifact() which handles model
+  /// artifact roots, primary model selection, and companion file discovery.
   Future<String?> resolveModelFilePath(ModelInfo model) async {
-    final modelFolder = getModelFolder(model.id, model.framework);
-    if (modelFolder == null) return null;
+    return resolveArtifact(model)?.primaryModelPath;
+  }
 
-    // Use C++ to find the actual model path (handles all frameworks/formats)
-    final resolved = DartBridgeDownload.findModelPathAfterExtraction(
-      extractedDir: modelFolder,
-      structure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN - auto-detect
-      framework: _frameworkToCValue(model.framework),
-      format: model.format.toC(),
-    );
+  /// Resolve primary and companion paths for a downloaded model artifact.
+  ModelPathResolution? resolveArtifact(ModelInfo model) {
+    final artifactRoot = model.localPath.isNotEmpty
+        ? model.localPath
+        : getModelFolder(model.id, model.framework);
+    if (artifactRoot == null || artifactRoot.isEmpty) return null;
 
-    return resolved ?? modelFolder;
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final resolveFn = lib.lookupFunction<
+          Int32 Function(
+            Pointer<RacModelInfoCStruct>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Pointer<RacModelPathResolutionStruct>,
+          ),
+          int Function(
+            Pointer<RacModelInfoCStruct>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Pointer<RacModelPathResolutionStruct>,
+          )>('rac_model_paths_resolve_artifact');
+      final freeResolutionFn = lib.lookupFunction<
+          Void Function(Pointer<RacModelPathResolutionStruct>),
+          void Function(Pointer<RacModelPathResolutionStruct>)>(
+        'rac_model_path_resolution_free',
+      );
+
+      return _withCModelInfo(model, (modelPtr) {
+        final rootPtr = artifactRoot.toNativeUtf8();
+        final checksumPtr = model.checksumSha256.isEmpty
+            ? nullptr
+            : model.checksumSha256.toNativeUtf8();
+        final resolutionPtr = calloc<RacModelPathResolutionStruct>();
+        try {
+          final result =
+              resolveFn(modelPtr, rootPtr, checksumPtr, resolutionPtr);
+          if (result != RacResultCode.success) {
+            _logger.debug(
+              'rac_model_paths_resolve_artifact failed: '
+              'code=$result model=${model.id}',
+            );
+            return null;
+          }
+          return _copyResolution(resolutionPtr.ref);
+        } finally {
+          freeResolutionFn(resolutionPtr);
+          calloc.free(rootPtr);
+          if (checksumPtr != nullptr) {
+            calloc.free(checksumPtr);
+          }
+          calloc.free(resolutionPtr);
+        }
+      });
+    } catch (e) {
+      _logger.debug('rac_model_paths_resolve_artifact error: $e');
+      return null;
+    }
   }
 
   // MARK: - Path Analysis
@@ -226,28 +338,162 @@ class DartBridgeModelPaths {
       return false;
     }
   }
-}
 
-/// Convert InferenceFramework to C++ RAC_FRAMEWORK int
-int _frameworkToCValue(InferenceFramework framework) {
-  switch (framework) {
-    case InferenceFramework.onnx:
-      return 0; // RAC_FRAMEWORK_ONNX
-    case InferenceFramework.llamaCpp:
-      return 1; // RAC_FRAMEWORK_LLAMACPP
-    case InferenceFramework.foundationModels:
-      return 2; // RAC_FRAMEWORK_FOUNDATION_MODELS
-    case InferenceFramework.systemTTS:
-      return 3; // RAC_FRAMEWORK_SYSTEM_TTS
-    case InferenceFramework.fluidAudio:
-      return 4; // RAC_FRAMEWORK_FLUID_AUDIO
-    case InferenceFramework.builtIn:
-      return 5; // RAC_FRAMEWORK_BUILTIN
-    case InferenceFramework.none:
-      return 6; // RAC_FRAMEWORK_NONE
-    case InferenceFramework.genie:
-      return 11; // RAC_FRAMEWORK_GENIE
-    case InferenceFramework.unknown:
-      return 99;
+  T? _withCModelInfo<T>(
+    ModelInfo model,
+    T? Function(Pointer<RacModelInfoCStruct>) body,
+  ) {
+    final lib = PlatformLoader.loadCommons();
+    final allocFn = lib.lookupFunction<Pointer<RacModelInfoCStruct> Function(),
+        Pointer<RacModelInfoCStruct> Function()>('rac_model_info_alloc');
+    final freeFn = lib.lookupFunction<
+        Void Function(Pointer<RacModelInfoCStruct>),
+        void Function(Pointer<RacModelInfoCStruct>)>('rac_model_info_free');
+    final strdupFn = lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>),
+        Pointer<Utf8> Function(Pointer<Utf8>)>('rac_strdup');
+
+    final modelPtr = allocFn();
+    if (modelPtr == nullptr) return null;
+
+    final idPtr = model.id.toNativeUtf8();
+    final namePtr = model.name.toNativeUtf8();
+    final downloadUrlPtr =
+        model.downloadUrl.isEmpty ? null : model.downloadUrl.toNativeUtf8();
+    final localPathPtr =
+        model.localPath.isEmpty ? null : model.localPath.toNativeUtf8();
+    final descriptionPtr =
+        model.description.isEmpty ? null : model.description.toNativeUtf8();
+
+    try {
+      modelPtr.ref
+        ..id = strdupFn(idPtr)
+        ..name = strdupFn(namePtr)
+        ..category = model.category.toC()
+        ..format = model.format.toC()
+        ..framework = model.framework.toC()
+        ..downloadUrl =
+            downloadUrlPtr == null ? nullptr : strdupFn(downloadUrlPtr)
+        ..localPath = localPathPtr == null ? nullptr : strdupFn(localPathPtr)
+        ..downloadSize = model.downloadSizeBytes.toInt()
+        ..memoryRequired = model.memoryRequiredBytes.toInt()
+        ..contextLength = model.contextLength
+        ..supportsThinking = model.supportsThinking ? RAC_TRUE : RAC_FALSE
+        ..supportsLora = model.supportsLora ? RAC_TRUE : RAC_FALSE
+        ..description =
+            descriptionPtr == null ? nullptr : strdupFn(descriptionPtr)
+        ..source = model.source.toC();
+
+      _fillArtifactInfo(modelPtr.ref.artifactInfo, model);
+      return body(modelPtr);
+    } finally {
+      calloc.free(idPtr);
+      calloc.free(namePtr);
+      if (downloadUrlPtr != null) calloc.free(downloadUrlPtr);
+      if (localPathPtr != null) calloc.free(localPathPtr);
+      if (descriptionPtr != null) calloc.free(descriptionPtr);
+      freeFn(modelPtr);
+    }
   }
+
+  void _fillArtifactInfo(
+    RacArtifactInfoStruct artifact,
+    ModelInfo model,
+  ) {
+    artifact
+      ..kind = _artifactKind(model)
+      ..archiveType = _archiveType(model)
+      ..archiveStructure = _archiveStructure(model)
+      ..expectedFiles = nullptr
+      ..fileDescriptors = nullptr
+      ..fileDescriptorCount = 0
+      ..strategyId = nullptr;
+  }
+
+  int _artifactKind(ModelInfo model) {
+    if (model.hasBuiltIn() && model.builtIn) return RacArtifactKind.builtIn;
+    if (model.hasCustomStrategyId() && model.customStrategyId.isNotEmpty) {
+      return RacArtifactKind.custom;
+    }
+    if (model.hasMultiFile()) return RacArtifactKind.multiFile;
+    if (model.hasArchive()) return RacArtifactKind.archive;
+
+    switch (model.artifactType) {
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+        return RacArtifactKind.archive;
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY:
+        return RacArtifactKind.multiFile;
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM:
+        return RacArtifactKind.custom;
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE:
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED:
+      default:
+        return RacArtifactKind.singleFile;
+    }
+  }
+
+  int _archiveType(ModelInfo model) {
+    final archiveType = model.hasArchive()
+        ? model.archive.type
+        : _archiveTypeFromArtifactType(model.artifactType);
+    switch (archiveType) {
+      case model_enum.ArchiveType.ARCHIVE_TYPE_ZIP:
+        return 0;
+      case model_enum.ArchiveType.ARCHIVE_TYPE_TAR_BZ2:
+        return 1;
+      case model_enum.ArchiveType.ARCHIVE_TYPE_TAR_GZ:
+        return 2;
+      case model_enum.ArchiveType.ARCHIVE_TYPE_TAR_XZ:
+        return 3;
+      case model_enum.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED:
+      default:
+        return -1;
+    }
+  }
+
+  model_enum.ArchiveType _archiveTypeFromArtifactType(
+    model_enum.ModelArtifactType artifactType,
+  ) {
+    switch (artifactType) {
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+        return model_enum.ArchiveType.ARCHIVE_TYPE_TAR_GZ;
+      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+        return model_enum.ArchiveType.ARCHIVE_TYPE_ZIP;
+      default:
+        return model_enum.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED;
+    }
+  }
+
+  int _archiveStructure(ModelInfo model) {
+    final structure = model.hasArchive()
+        ? model.archive.structure
+        : model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN;
+    switch (structure) {
+      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED:
+        return 0;
+      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED:
+        return 1;
+      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY:
+        return 2;
+      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED:
+      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN:
+      default:
+        return 99;
+    }
+  }
+
+  ModelPathResolution _copyResolution(RacModelPathResolutionStruct resolution) {
+    return ModelPathResolution(
+      rootPath: _stringOrNull(resolution.rootPath),
+      primaryModelPath: _stringOrNull(resolution.primaryModelPath),
+      mmprojPath: _stringOrNull(resolution.mmprojPath),
+      tokenizerPath: _stringOrNull(resolution.tokenizerPath),
+      configPath: _stringOrNull(resolution.configPath),
+      isDirectoryBased: resolution.isDirectoryBased == RAC_TRUE,
+      isComplete: resolution.isComplete == RAC_TRUE,
+    );
+  }
+
+  String? _stringOrNull(Pointer<Utf8> value) =>
+      value == nullptr ? null : value.toDartString();
 }

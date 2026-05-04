@@ -21,6 +21,8 @@ node_modules/
 # Bundle artifacts
 *.jsbundle
 *.hbc
+.bundle/
+vendor/bundle/
 
 # iOS
 ios/Pods/

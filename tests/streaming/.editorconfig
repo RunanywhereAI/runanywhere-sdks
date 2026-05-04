@@ -1,0 +1,10 @@
+# EditorConfig for tests/streaming — consumed by ktlint via Kotlin SDK jvmTest srcDir
+root = false
+
+[*.{kt,kts}]
+# File-naming convention disabled: snake_case test files are intentional
+ktlint_standard_filename = disabled
+# Package-name underscore disabled: test packages mirror directory structure
+ktlint_standard_package-name = disabled
+# Max line length relaxed for long proto-field assertion strings
+max_line_length = 250

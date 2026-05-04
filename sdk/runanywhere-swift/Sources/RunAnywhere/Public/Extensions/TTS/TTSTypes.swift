@@ -9,163 +9,13 @@
 import CRACommons
 import Foundation
 
-// MARK: - TTS Configuration
-
-/// Configuration for TTS component
-public struct TTSConfiguration: ComponentConfiguration, Sendable {
-
-    // MARK: - ComponentConfiguration
-
-    /// Component type
-    public var componentType: SDKComponent { .tts }
-
-    /// Model ID (voice identifier for TTS)
-    public let modelId: String?
-
-    /// Preferred framework (uses default extension implementation)
-    public var preferredFramework: InferenceFramework? { nil }
-
-    // MARK: - TTS-Specific Properties
-
-    /// Voice identifier to use for synthesis
-    public let voice: String
-
-    /// Language for synthesis (BCP-47 format, e.g., "en-US")
-    public let language: String
-
-    /// Speaking rate (0.5 to 2.0, 1.0 is normal)
-    public let speakingRate: Float
-
-    /// Speech pitch (0.5 to 2.0, 1.0 is normal)
-    public let pitch: Float
-
-    /// Speech volume (0.0 to 1.0)
-    public let volume: Float
-
-    /// Audio format for output
-    public let audioFormat: AudioFormat
-
-    /// Whether to use neural/premium voice if available
-    public let useNeuralVoice: Bool
-
-    /// Whether to enable SSML markup support
-    public let enableSSML: Bool
-
-    // MARK: - Initialization
-
-    public init(
-        voice: String = "com.apple.ttsbundle.siri_female_en-US_compact",
-        language: String = "en-US",
-        speakingRate: Float = 1.0,
-        pitch: Float = 1.0,
-        volume: Float = 1.0,
-        audioFormat: AudioFormat = .pcm,
-        useNeuralVoice: Bool = true,
-        enableSSML: Bool = false
-    ) {
-        self.voice = voice
-        self.language = language
-        self.speakingRate = speakingRate
-        self.pitch = pitch
-        self.volume = volume
-        self.audioFormat = audioFormat
-        self.useNeuralVoice = useNeuralVoice
-        self.enableSSML = enableSSML
-        self.modelId = nil
-    }
-
-    // MARK: - Validation
-
-    public func validate() throws {
-        guard speakingRate >= 0.5 && speakingRate <= 2.0 else {
-            throw SDKError.tts(.invalidSpeakingRate, "Invalid speaking rate: \(speakingRate). Must be between 0.5 and 2.0.")
-        }
-        guard pitch >= 0.5 && pitch <= 2.0 else {
-            throw SDKError.tts(.invalidPitch, "Invalid pitch: \(pitch). Must be between 0.5 and 2.0.")
-        }
-        guard volume >= 0.0 && volume <= 1.0 else {
-            throw SDKError.tts(.invalidVolume, "Invalid volume: \(volume). Must be between 0.0 and 1.0.")
-        }
-    }
-}
-
-// MARK: - TTSConfiguration Builder
-
-extension TTSConfiguration {
-
-    /// Create configuration with builder pattern
-    public static func builder(voice: String = "com.apple.ttsbundle.siri_female_en-US_compact") -> Builder {
-        Builder(voice: voice)
-    }
-
-    public class Builder {
-        private var voice: String
-        private var language: String = "en-US"
-        private var speakingRate: Float = 1.0
-        private var pitch: Float = 1.0
-        private var volume: Float = 1.0
-        private var audioFormat: AudioFormat = .pcm
-        private var useNeuralVoice: Bool = true
-        private var enableSSML: Bool = false
-
-        init(voice: String) {
-            self.voice = voice
-        }
-
-        public func voice(_ voice: String) -> Builder {
-            self.voice = voice
-            return self
-        }
-
-        public func language(_ language: String) -> Builder {
-            self.language = language
-            return self
-        }
-
-        public func speakingRate(_ rate: Float) -> Builder {
-            self.speakingRate = rate
-            return self
-        }
-
-        public func pitch(_ pitch: Float) -> Builder {
-            self.pitch = pitch
-            return self
-        }
-
-        public func volume(_ volume: Float) -> Builder {
-            self.volume = volume
-            return self
-        }
-
-        public func audioFormat(_ format: AudioFormat) -> Builder {
-            self.audioFormat = format
-            return self
-        }
-
-        public func useNeuralVoice(_ enabled: Bool) -> Builder {
-            self.useNeuralVoice = enabled
-            return self
-        }
-
-        public func enableSSML(_ enabled: Bool) -> Builder {
-            self.enableSSML = enabled
-            return self
-        }
-
-        public func build() -> TTSConfiguration {
-            TTSConfiguration(
-                voice: voice,
-                language: language,
-                speakingRate: speakingRate,
-                pitch: pitch,
-                volume: volume,
-                audioFormat: audioFormat,
-                useNeuralVoice: useNeuralVoice,
-                enableSSML: enableSSML
-            )
-        }
-    }
-}
+// NOTE (§15 / Wave 4.1, 2026-04-30): The previously-declared
+// `TTSConfiguration` struct + its `Builder` + the `TTSOptions.from(configuration:)`
+// convenience + the `toRATTSConfiguration()` extension were removed here
+// (~160 LOC). They had zero external consumers in SDK or example apps and
+// duplicated the proto-canonical `RATTSConfiguration` declared in
+// `Generated/tts_options.pb.swift`. Consumers that need a configuration
+// surface should use `RATTSConfiguration` directly.
 
 // MARK: - TTS Options
 
@@ -214,20 +64,6 @@ public struct TTSOptions: Sendable {
         self.audioFormat = audioFormat
         self.sampleRate = sampleRate
         self.useSSML = useSSML
-    }
-
-    /// Create options from TTSConfiguration
-    public static func from(configuration: TTSConfiguration) -> TTSOptions {
-        TTSOptions(
-            voice: configuration.voice,
-            language: configuration.language,
-            rate: configuration.speakingRate,
-            pitch: configuration.pitch,
-            volume: configuration.volume,
-            audioFormat: configuration.audioFormat,
-            sampleRate: configuration.audioFormat == .pcm ? Int(RAC_TTS_DEFAULT_SAMPLE_RATE) : Int(RAC_TTS_CD_QUALITY_SAMPLE_RATE),
-            useSSML: configuration.enableSSML
-        )
     }
 
     /// Default options
@@ -359,6 +195,33 @@ public struct TTSOutput: ComponentOutput, Sendable {
             timestamp: Date(timeIntervalSince1970: TimeInterval(cOutput.timestamp_ms) / 1000.0)
         )
     }
+
+    /// Initialize from the generated-proto C++ TTS output.
+    public init(from proto: RATTSOutput) {
+        let phonemes: [TTSPhonemeTimestamp]? = proto.phonemeTimestamps.isEmpty ? nil : proto.phonemeTimestamps.map {
+            TTSPhonemeTimestamp(
+                phoneme: $0.phoneme,
+                startTime: TimeInterval($0.startMs) / 1000.0,
+                endTime: TimeInterval($0.endMs) / 1000.0
+            )
+        }
+        let metadata = TTSSynthesisMetadata(
+            voice: proto.hasMetadata ? proto.metadata.voiceID : "",
+            language: proto.hasMetadata ? proto.metadata.languageCode : "",
+            processingTime: proto.hasMetadata ? TimeInterval(proto.metadata.processingTimeMs) / 1000.0 : 0,
+            characterCount: proto.hasMetadata ? Int(proto.metadata.characterCount) : 0
+        )
+        self.init(
+            audioData: proto.audioData,
+            format: proto.audioFormat,
+            duration: TimeInterval(proto.durationMs) / 1000.0,
+            phonemeTimestamps: phonemes,
+            metadata: metadata,
+            timestamp: proto.timestampMs > 0
+                ? Date(timeIntervalSince1970: TimeInterval(proto.timestampMs) / 1000.0)
+                : Date()
+        )
+    }
 }
 
 // MARK: - Supporting Types
@@ -459,5 +322,88 @@ public struct TTSSpeakResult: Sendable {
         self.audioSizeBytes = output.audioSizeBytes
         self.metadata = output.metadata
         self.timestamp = output.timestamp
+    }
+
+    internal init(from proto: RATTSSpeakResult) {
+        self.duration = TimeInterval(proto.durationMs) / 1000.0
+        self.format = proto.audioFormat
+        self.audioSizeBytes = Int(proto.audioSizeBytes)
+        self.metadata = TTSSynthesisMetadata(
+            voice: proto.hasMetadata ? proto.metadata.voiceID : "",
+            language: proto.hasMetadata ? proto.metadata.languageCode : "",
+            processingTime: proto.hasMetadata ? TimeInterval(proto.metadata.processingTimeMs) / 1000.0 : 0,
+            characterCount: proto.hasMetadata ? Int(proto.metadata.characterCount) : 0
+        )
+        self.timestamp = proto.timestampMs > 0
+            ? Date(timeIntervalSince1970: TimeInterval(proto.timestampMs) / 1000.0)
+            : Date()
+    }
+}
+
+// MARK: - Phase C1: Generated Proto Bridges
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/tts_options.pb.swift`:
+//   • RATTSConfiguration   (modelID, voice, languageCode, speakingRate, pitch,
+//                            volume, audioFormat, sampleRate, enableNeuralVoice,
+//                            enableSsml)
+//   • RATTSOptions         (voice, languageCode, speakingRate, pitch, volume,
+//                            enableSsml, audioFormat)
+//   • RATTSOutput          (audioData, audioFormat, sampleRate, durationMs,
+//                            phonemeTimestamps, metadata, timestampMs)
+//   • RATTSPhonemeTimestamp (phoneme, startMs, endMs)
+//   • RATTSSynthesisMetadata(voiceID, languageCode, processingTimeMs,
+//                             characterCount, audioDurationMs)
+//   • RATTSSpeakResult     (audioFormat, sampleRate, durationMs, audioSizeBytes,
+//                            metadata, timestampMs)
+//   • RATTSVoiceInfo       (id, displayName, languageCode, gender, description_p)
+//   • RATTSVoiceGender enum (.unspecified/.male/.female/.neutral)
+//
+// Hand-rolled types are KEPT because they:
+//   1. expose ComponentConfiguration / Builder / validate() that the proto
+//      structs intentionally omit,
+//   2. expose `withCOptions` C bridges and `init(from cOutput: rac_tts_output_t)`,
+//   3. use Swift idiomatic units (TimeInterval seconds, Date timestamps) where
+//      the proto wire uses Int64 ms.
+
+extension TTSOptions {
+    /// Convert to canonical generated proto `RATTSOptions`. Notes:
+    /// `rate` → `speakingRate`; `useSSML` → `enableSsml`. `sampleRate` is on
+    /// RATTSConfiguration in the proto schema, not here.
+    public func toRATTSOptions() -> RATTSOptions {
+        var proto = RATTSOptions()
+        if let v = voice { proto.voice = v }
+        proto.languageCode = language
+        proto.speakingRate = rate
+        proto.pitch = pitch
+        proto.volume = volume
+        proto.enableSsml = useSSML
+        proto.audioFormat = audioFormat
+        return proto
+    }
+}
+
+extension TTSPhonemeTimestamp {
+    /// Convert to canonical generated proto `RATTSPhonemeTimestamp`. Notes:
+    /// startTime/endTime (TimeInterval seconds) → startMs/endMs (Int64 ms).
+    public func toRATTSPhonemeTimestamp() -> RATTSPhonemeTimestamp {
+        var proto = RATTSPhonemeTimestamp()
+        proto.phoneme = phoneme
+        proto.startMs = Int64(startTime * 1000)
+        proto.endMs = Int64(endTime * 1000)
+        return proto
+    }
+}
+
+extension TTSSynthesisMetadata {
+    /// Convert to canonical generated proto `RATTSSynthesisMetadata`. Notes:
+    /// `voice` → `voiceID`; `language` → `languageCode`; processingTime
+    /// (TimeInterval seconds) → processingTimeMs (Int64 ms).
+    public func toRATTSSynthesisMetadata() -> RATTSSynthesisMetadata {
+        var proto = RATTSSynthesisMetadata()
+        proto.voiceID = voice
+        proto.languageCode = language
+        proto.processingTimeMs = Int64(processingTime * 1000)
+        proto.characterCount = Int32(characterCount)
+        return proto
     }
 }

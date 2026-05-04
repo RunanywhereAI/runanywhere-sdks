@@ -1,16 +1,6 @@
 /// Public Types
 ///
-/// Exports all public types for the RunAnywhere SDK.
+/// §15 type-discipline: every hand-rolled public type has been deleted in
+/// favour of the proto-generated canonical equivalents in `generated/*.pb.dart`,
+/// which are re-exported from `runanywhere.dart`.
 library types;
-
-export 'capability_types.dart';
-export 'configuration_types.dart';
-export 'download_types.dart';
-export 'generation_types.dart';
-export 'lora_types.dart';
-export 'message_types.dart';
-export 'rag_types.dart';
-export 'structured_output_types.dart';
-export 'tool_calling_types.dart';
-export 'vlm_types.dart';
-export 'voice_agent_types.dart';

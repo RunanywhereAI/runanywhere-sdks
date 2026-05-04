@@ -1,129 +1,11 @@
-// Model Types (mirroring iOS model types)
-//
-// Contains model-related enums and data classes.
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
-/// LLM Framework enumeration
-enum LLMFramework {
-  llamaCpp,
-  foundationModels,
-  mediaPipe,
-  onnxRuntime,
-  systemTTS,
-  whisperKit,
-  genie,
-  unknown;
+typedef ModelInfo = sdk.ModelInfo;
+typedef ModelCategory = sdk.ModelCategory;
+typedef ModelFormat = sdk.ModelFormat;
+typedef LLMFramework = sdk.InferenceFramework;
 
-  String get displayName {
-    switch (this) {
-      case LLMFramework.llamaCpp:
-        return 'LLaMA.cpp';
-      case LLMFramework.foundationModels:
-        return 'Foundation Models';
-      case LLMFramework.mediaPipe:
-        return 'MediaPipe';
-      case LLMFramework.onnxRuntime:
-        return 'ONNX Runtime';
-      case LLMFramework.systemTTS:
-        return 'System TTS';
-      case LLMFramework.whisperKit:
-        return 'WhisperKit';
-      case LLMFramework.genie:
-        return 'Genie NPU';
-      case LLMFramework.unknown:
-        return 'Unknown';
-    }
-  }
-
-  String get rawValue {
-    switch (this) {
-      case LLMFramework.llamaCpp:
-        return 'llama.cpp';
-      case LLMFramework.foundationModels:
-        return 'foundation_models';
-      case LLMFramework.mediaPipe:
-        return 'mediapipe';
-      case LLMFramework.onnxRuntime:
-        return 'onnx_runtime';
-      case LLMFramework.systemTTS:
-        return 'system_tts';
-      case LLMFramework.whisperKit:
-        return 'whisperkit';
-      case LLMFramework.genie:
-        return 'genie';
-      case LLMFramework.unknown:
-        return 'unknown';
-    }
-  }
-}
-
-/// Model category enumeration
-/// Matches SDK ModelCategory for proper conversion
-enum ModelCategory {
-  language,
-  multimodal,
-  speechRecognition,
-  speechSynthesis,
-  vision,
-  imageGeneration,
-  audio,
-  embedding,
-  unknown;
-
-  String get displayName {
-    switch (this) {
-      case ModelCategory.language:
-        return 'Language';
-      case ModelCategory.multimodal:
-        return 'Multimodal';
-      case ModelCategory.speechRecognition:
-        return 'Speech Recognition';
-      case ModelCategory.speechSynthesis:
-        return 'Speech Synthesis';
-      case ModelCategory.vision:
-        return 'Vision';
-      case ModelCategory.imageGeneration:
-        return 'Image Generation';
-      case ModelCategory.audio:
-        return 'Audio';
-      case ModelCategory.embedding:
-        return 'Embedding';
-      case ModelCategory.unknown:
-        return 'Unknown';
-    }
-  }
-}
-
-/// Model format enumeration
-enum ModelFormat {
-  gguf,
-  ggml,
-  coreml,
-  onnx,
-  tflite,
-  bin,
-  unknown;
-
-  String get rawValue {
-    switch (this) {
-      case ModelFormat.gguf:
-        return 'gguf';
-      case ModelFormat.ggml:
-        return 'ggml';
-      case ModelFormat.coreml:
-        return 'coreml';
-      case ModelFormat.onnx:
-        return 'onnx';
-      case ModelFormat.tflite:
-        return 'tflite';
-      case ModelFormat.bin:
-        return 'bin';
-      case ModelFormat.unknown:
-        return 'unknown';
-    }
-  }
-}
-
-/// Model selection context
+/// Model selection context is app UI state, not an SDK data contract.
 enum ModelSelectionContext {
   llm,
   stt,
@@ -155,100 +37,134 @@ enum ModelSelectionContext {
   Set<ModelCategory> get relevantCategories {
     switch (this) {
       case ModelSelectionContext.llm:
-        return {ModelCategory.language, ModelCategory.multimodal};
+        return {
+          sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        };
       case ModelSelectionContext.stt:
-        return {ModelCategory.speechRecognition};
+        return {sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION};
       case ModelSelectionContext.tts:
-        return {ModelCategory.speechSynthesis};
+        return {sdk.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS};
       case ModelSelectionContext.voice:
         return {
-          ModelCategory.language,
-          ModelCategory.multimodal,
-          ModelCategory.speechRecognition,
-          ModelCategory.speechSynthesis,
+          sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+          sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+          sdk.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+          sdk.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
         };
       case ModelSelectionContext.vlm:
-        return {ModelCategory.vision, ModelCategory.multimodal};
+        return {
+          sdk.ModelCategory.MODEL_CATEGORY_VISION,
+          sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        };
       case ModelSelectionContext.ragEmbedding:
-        return {ModelCategory.embedding};
+        return {sdk.ModelCategory.MODEL_CATEGORY_EMBEDDING};
       case ModelSelectionContext.ragLLM:
-        return {ModelCategory.language};
+        return {sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE};
     }
   }
 }
 
-/// Model info class
-class ModelInfo {
-  final String id;
-  final String name;
-  final ModelCategory category;
-  final ModelFormat format;
-  final String? downloadURL;
-  final String? localPath;
-  final int? memoryRequired;
-  final List<LLMFramework> compatibleFrameworks;
-  final LLMFramework? preferredFramework;
-  final bool supportsThinking;
-
-  const ModelInfo({
-    required this.id,
-    required this.name,
-    this.category = ModelCategory.language,
-    this.format = ModelFormat.unknown,
-    this.downloadURL,
-    this.localPath,
-    this.memoryRequired,
-    this.compatibleFrameworks = const [],
-    this.preferredFramework,
-    this.supportsThinking = false,
-  });
-
-  bool get isDownloaded => localPath != null;
-
-  ModelInfo copyWith({
-    String? id,
-    String? name,
-    ModelCategory? category,
-    ModelFormat? format,
-    String? downloadURL,
-    String? localPath,
-    int? memoryRequired,
-    List<LLMFramework>? compatibleFrameworks,
-    LLMFramework? preferredFramework,
-    bool? supportsThinking,
-  }) {
-    return ModelInfo(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      category: category ?? this.category,
-      format: format ?? this.format,
-      downloadURL: downloadURL ?? this.downloadURL,
-      localPath: localPath ?? this.localPath,
-      memoryRequired: memoryRequired ?? this.memoryRequired,
-      compatibleFrameworks: compatibleFrameworks ?? this.compatibleFrameworks,
-      preferredFramework: preferredFramework ?? this.preferredFramework,
-      supportsThinking: supportsThinking ?? this.supportsThinking,
-    );
+extension ModelCategoryDisplay on ModelCategory {
+  String get displayName {
+    switch (this) {
+      case sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE:
+        return 'Language';
+      case sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+        return 'Multimodal';
+      case sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+        return 'Speech Recognition';
+      case sdk.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+        return 'Speech Synthesis';
+      case sdk.ModelCategory.MODEL_CATEGORY_VISION:
+        return 'Vision';
+      case sdk.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION:
+        return 'Image Generation';
+      case sdk.ModelCategory.MODEL_CATEGORY_AUDIO:
+        return 'Audio';
+      case sdk.ModelCategory.MODEL_CATEGORY_EMBEDDING:
+        return 'Embedding';
+      case sdk.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+        return 'Voice Activity Detection';
+      default:
+        return 'Unknown';
+    }
   }
 }
 
-/// Download progress state
-enum DownloadState {
-  notStarted,
-  downloading,
-  completed,
-  failed,
+extension InferenceFrameworkDisplay on LLMFramework {
+  String get displayName {
+    switch (this) {
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+        return 'llama.cpp';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+        return 'ONNX';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+        return 'Sherpa-ONNX';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+        return 'Foundation Models';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+        return 'System TTS';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
+        return 'Genie';
+      default:
+        return 'Unknown';
+    }
+  }
 }
 
-/// Download progress info
-class DownloadProgress {
-  final double percentage;
-  final DownloadState state;
-  final String? error;
+extension ModelFormatDisplay on ModelFormat {
+  String get rawValue {
+    switch (this) {
+      case sdk.ModelFormat.MODEL_FORMAT_GGUF:
+        return 'gguf';
+      case sdk.ModelFormat.MODEL_FORMAT_GGML:
+        return 'ggml';
+      case sdk.ModelFormat.MODEL_FORMAT_ONNX:
+        return 'onnx';
+      case sdk.ModelFormat.MODEL_FORMAT_ORT:
+        return 'ort';
+      case sdk.ModelFormat.MODEL_FORMAT_BIN:
+        return 'bin';
+      case sdk.ModelFormat.MODEL_FORMAT_COREML:
+        return 'coreml';
+      case sdk.ModelFormat.MODEL_FORMAT_MLMODEL:
+        return 'mlmodel';
+      case sdk.ModelFormat.MODEL_FORMAT_MLPACKAGE:
+        return 'mlpackage';
+      case sdk.ModelFormat.MODEL_FORMAT_TFLITE:
+        return 'tflite';
+      case sdk.ModelFormat.MODEL_FORMAT_SAFETENSORS:
+        return 'safetensors';
+      case sdk.ModelFormat.MODEL_FORMAT_QNN_CONTEXT:
+        return 'qnn_context';
+      case sdk.ModelFormat.MODEL_FORMAT_ZIP:
+        return 'zip';
+      case sdk.ModelFormat.MODEL_FORMAT_FOLDER:
+        return 'folder';
+      case sdk.ModelFormat.MODEL_FORMAT_PROPRIETARY:
+        return 'proprietary';
+      default:
+        return 'unknown';
+    }
+  }
+}
 
-  const DownloadProgress({
-    this.percentage = 0.0,
-    this.state = DownloadState.notStarted,
-    this.error,
-  });
+extension ExampleModelInfoView on ModelInfo {
+  int? get memoryRequired =>
+      hasDownloadSizeBytes() && downloadSizeBytes.toInt() > 0
+          ? downloadSizeBytes.toInt()
+          : null;
+
+  List<LLMFramework> get compatibleFrameworks => [framework];
+
+  LLMFramework get preferredFramework => framework;
+
+  bool get isDownloaded =>
+      localPath.isNotEmpty ||
+      framework ==
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+      framework == sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
+      builtIn;
 }

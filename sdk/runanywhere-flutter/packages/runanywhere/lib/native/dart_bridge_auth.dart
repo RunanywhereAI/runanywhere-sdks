@@ -4,15 +4,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
-import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
@@ -91,6 +91,12 @@ class DartBridgeAuth {
       // Load stored tokens
       await instance._loadStoredTokens();
 
+      // Wire token refresh hooks into the shared HTTP client so any
+      // request with `requiresAuth: true` can pick up / refresh tokens
+      // without a direct dependency on this bridge.
+      HTTPClientAdapter.shared.setTokenResolver(instance._resolveToken);
+      HTTPClientAdapter.shared.setRefreshCallback(instance._refreshForAdapter);
+
       _isInitialized = true;
       _logger.debug('Auth manager initialized');
     } catch (e, stack) {
@@ -136,21 +142,21 @@ class DartBridgeAuth {
         return AuthResult.failure('Failed to build auth request');
       }
 
-      // Make HTTP request
       final endpoint = _getAuthEndpoint();
       final baseURL = _baseURL ?? _getDefaultBaseURL();
-      final url = Uri.parse('$baseURL$endpoint');
+      final url = '$baseURL$endpoint';
 
       _logger.debug('Auth POST to: $url');
       _logger.debug('Auth body: $requestJson');
 
-      final response = await http.post(
-        url,
-        headers: {
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'POST',
+        url: url,
+        headers: const {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: requestJson,
+        body: Uint8List.fromList(utf8.encode(requestJson)),
       );
 
       _logger.debug('Auth response status: ${response.statusCode}');
@@ -234,17 +240,19 @@ class DartBridgeAuth {
 
       _logger.debug('Refreshing token for device: $deviceId');
 
-      // Make HTTP request
       final endpoint = _getRefreshEndpoint();
       final baseURL = _baseURL ?? _getDefaultBaseURL();
-      final url = Uri.parse('$baseURL$endpoint');
+      final url = '$baseURL$endpoint';
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      final response = await http.post(url, headers: headers, body: requestJson);
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'POST',
+        url: url,
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: Uint8List.fromList(utf8.encode(requestJson)),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final authData = _parseAuthResponse(response.body);
@@ -296,16 +304,15 @@ class DartBridgeAuth {
     return getAccessToken() ?? cachedToken;
   }
 
-  /// Clear all auth state
+  /// Clear all auth state (in-memory + persisted via the secure-storage
+  /// vtable installed at `rac_auth_init`). Delegates fully to the native
+  /// auth manager — matches Swift `CppBridge.State.clearAuth`.
   Future<void> clearAuth() async {
     try {
       final lib = PlatformLoader.loadCommons();
       final clearFn =
           lib.lookupFunction<Void Function(), void Function()>('rac_auth_clear');
       clearFn();
-
-      // Also clear via state bridge
-      await DartBridgeState.instance.clearAuth();
     } catch (e) {
       _logger.debug('rac_auth_clear not available: $e');
     }
@@ -400,15 +407,63 @@ class DartBridgeAuth {
   }
 
   // ============================================================================
+  // HTTP Client Integration
+  // ============================================================================
+
+  /// Token resolver consumed by [HTTPClientAdapter] to attach a valid
+  /// bearer on `requiresAuth: true` requests. Returns null when no
+  /// token is available (adapter falls back to API key).
+  Future<String?> _resolveToken({required bool requiresAuth}) async {
+    if (!requiresAuth) return null;
+
+    final current = getAccessToken();
+    if (current != null && current.isNotEmpty && !needsRefresh()) {
+      return current;
+    }
+
+    if (isAuthenticated()) {
+      final result = await refreshToken();
+      if (result.isSuccess) {
+        final fresh = getAccessToken();
+        if (fresh != null && fresh.isNotEmpty) return fresh;
+      }
+    }
+
+    // Last-resort cached access token (may still be stale; the server
+    // will reject it and the 401 retry path will refresh again).
+    return _secureCache['com.runanywhere.sdk.accessToken'];
+  }
+
+  /// Adapter-facing refresh hook. Returns the new access token, or
+  /// null if the refresh attempt failed.
+  Future<String?> _refreshForAdapter() async {
+    final result = await refreshToken();
+    if (!result.isSuccess) return null;
+    return getAccessToken();
+  }
+
+  // ============================================================================
   // Internal Helpers
   // ============================================================================
 
   /// Build authenticate request JSON via C++
+  ///
+  /// Populates all 6 fields of `rac_sdk_config_t` to match the C ABI exactly.
+  /// Previously only 3 fields were populated, causing C to read wild memory
+  /// at offsets 16-47 and segfault in `rac_auth_request_to_json`.
   String? _buildAuthenticateRequestJSON({
     required String apiKey,
     required String deviceId,
     String? buildToken,
   }) {
+    final platformPtr =
+        (Platform.isAndroid ? 'android' : 'ios').toNativeUtf8();
+    final sdkVersionPtr = SDKConstants.version.toNativeUtf8();
+    final apiKeyPtr = apiKey.toNativeUtf8();
+    final deviceIdPtr = deviceId.toNativeUtf8();
+    final baseUrlPtr =
+        (_baseURL ?? _getDefaultBaseURL()).toNativeUtf8();
+
     try {
       final lib = PlatformLoader.loadCommons();
       final buildRequest = lib.lookupFunction<
@@ -417,14 +472,13 @@ class DartBridgeAuth {
               Pointer<RacSdkConfigStruct>)>('rac_auth_build_authenticate_request');
 
       final config = calloc<RacSdkConfigStruct>();
-      final apiKeyPtr = apiKey.toNativeUtf8();
-      final deviceIdPtr = deviceId.toNativeUtf8();
-      final buildTokenPtr = buildToken?.toNativeUtf8() ?? nullptr;
-
       try {
+        config.ref.environment = _environment.index;
         config.ref.apiKey = apiKeyPtr;
+        config.ref.baseUrl = baseUrlPtr;
         config.ref.deviceId = deviceIdPtr;
-        config.ref.buildToken = buildTokenPtr.cast<Utf8>();
+        config.ref.platform = platformPtr;
+        config.ref.sdkVersion = sdkVersionPtr;
 
         final result = buildRequest(config);
         if (result == nullptr) return null;
@@ -438,9 +492,6 @@ class DartBridgeAuth {
 
         return json;
       } finally {
-        calloc.free(apiKeyPtr);
-        calloc.free(deviceIdPtr);
-        if (buildTokenPtr != nullptr) calloc.free(buildTokenPtr);
         calloc.free(config);
       }
     } catch (e) {
@@ -456,6 +507,12 @@ class DartBridgeAuth {
       };
       _logger.debug('Auth request JSON: $json');
       return jsonEncode(json);
+    } finally {
+      calloc.free(apiKeyPtr);
+      calloc.free(deviceIdPtr);
+      calloc.free(baseUrlPtr);
+      calloc.free(platformPtr);
+      calloc.free(sdkVersionPtr);
     }
   }
 
@@ -860,11 +917,33 @@ base class RacSecureStorageCallbacksStruct extends Struct {
   external Pointer<Void> context;
 }
 
-/// SDK config struct for auth requests
+/// SDK config struct for auth requests.
+///
+/// MUST exactly match the C ABI defined in
+/// `sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h`:
+///
+/// ```c
+/// typedef struct {
+///     rac_environment_t environment;  // int32 (rac_environment_t is enum)
+///     const char* api_key;
+///     const char* base_url;
+///     const char* device_id;
+///     const char* platform;
+///     const char* sdk_version;
+/// } rac_sdk_config_t;
+/// ```
+///
+/// Previous 3-field layout (apiKey/deviceId/buildToken) caused the C side
+/// to read wild memory at offsets 16-47, segfaulting in
+/// `rac_auth_request_to_json` -> `json_escape_string`.
 base class RacSdkConfigStruct extends Struct {
+  @Int32()
+  external int environment;
   external Pointer<Utf8> apiKey;
+  external Pointer<Utf8> baseUrl;
   external Pointer<Utf8> deviceId;
-  external Pointer<Utf8> buildToken;
+  external Pointer<Utf8> platform;
+  external Pointer<Utf8> sdkVersion;
 }
 
 // =============================================================================

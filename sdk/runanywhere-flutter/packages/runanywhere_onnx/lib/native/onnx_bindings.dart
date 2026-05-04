@@ -66,6 +66,7 @@ class OnnxBindings {
 
       // Try different naming conventions for the backend library
       final libraryNames = [
+        'librac_backend_onnx.so',
         'librac_backend_onnx_jni.so',
         'librunanywhere_onnx.so',
       ];
@@ -129,7 +130,7 @@ class OnnxBindings {
     if (_register == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _register!();
+    return _register();
   }
 
   /// Unregister the ONNX backend from C++ registry.
@@ -137,7 +138,7 @@ class OnnxBindings {
     if (_unregister == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregister!();
+    return _unregister();
   }
 }
 

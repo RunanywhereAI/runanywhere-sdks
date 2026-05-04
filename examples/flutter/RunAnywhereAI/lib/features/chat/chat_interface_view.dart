@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/public/runanywhere_tool_calling.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart'
+    show ToolCallingOptions, ToolCallFormatNames;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
@@ -77,9 +77,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
   }
 
-  /// Sync model state from SDK (matches Swift pattern)
+  /// Sync model state from SDK (v4.0 API).
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.currentLLMModel();
+    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -91,7 +91,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   bool get _canSend =>
       _controller.text.isNotEmpty &&
       !_isGenerating &&
-      sdk.RunAnywhere.isModelLoaded;
+      sdk.RunAnywhereSDK.instance.llm.isLoaded;
 
   Future<void> _sendMessage() async {
     if (!_canSend) return;
@@ -123,11 +123,18 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
+      // B-FL-4-002 / B-FL-5-001: fall back to a sane default system
+      // prompt when the user hasn't customised one. Without it, smaller
+      // 0.5-1B models tend to ramble or echo the prompt verbatim.
       final systemPromptRaw =
           prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
-      final systemPrompt = systemPromptRaw.isNotEmpty ? systemPromptRaw : null;
+      const defaultSystemPrompt =
+          'You are a helpful, concise assistant. Keep replies brief unless asked otherwise.';
+      final systemPrompt =
+          systemPromptRaw.isNotEmpty ? systemPromptRaw : defaultSystemPrompt;
 
-      debugPrint('[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+      debugPrint(
+          '[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)');
 
       // Check if tool calling is enabled and has registered tools
       final toolSettings = ToolSettingsViewModel.shared;
@@ -162,16 +169,16 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   /// Different models are trained on different tool calling formats.
   /// Returns format name string (C++ is single source of truth for valid formats).
   String _detectToolCallFormat(String? modelName) {
-    if (modelName == null) return ToolCallFormatName.defaultFormat;
+    if (modelName == null) return ToolCallFormatNames.defaultFormat;
     final name = modelName.toLowerCase();
 
     // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
     if (name.contains('lfm2') && name.contains('tool')) {
-      return ToolCallFormatName.lfm2;
+      return ToolCallFormatNames.lfm2;
     }
 
     // Default JSON format for general-purpose models
-    return ToolCallFormatName.defaultFormat;
+    return ToolCallFormatNames.defaultFormat;
   }
 
   Future<void> _generateWithToolCalling(
@@ -184,7 +191,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
     // Auto-detect the tool calling format based on the loaded model
     final format = _detectToolCallFormat(modelName);
-    debugPrint('Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
+    debugPrint(
+        'Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
 
     // Add empty assistant message
     final assistantMessage = ChatMessage(
@@ -201,12 +209,12 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final messageIndex = _messages.length - 1;
 
     try {
-      final result = await RunAnywhereTools.generateWithTools(
+      final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
         prompt,
         options: ToolCallingOptions(
-          maxToolCalls: 3,
+          maxIterations: 3,
           autoExecute: true,
-          formatName: format,
+          formatHint: format,
           maxTokens: maxTokens,
           temperature: temperature,
         ),
@@ -219,24 +227,26 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       // Create ToolCallInfo from the result if tools were called
       ToolCallInfo? toolCallInfo;
-      debugPrint('📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
+      debugPrint(
+          '📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
-        final lastResult = result.toolResults.isNotEmpty
-            ? result.toolResults.last
-            : null;
-        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.toolName}');
+        final lastResult =
+            result.toolResults.isNotEmpty ? result.toolResults.last : null;
+        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.name}');
 
+        final hasError = lastResult != null && lastResult.error.isNotEmpty;
         toolCallInfo = ToolCallInfo(
-          toolName: lastCall.toolName,
-          arguments: _formatToolValueMapToJson(lastCall.arguments),
-          result: lastResult?.result != null
-              ? _formatToolValueMapToJson(lastResult!.result!)
+          toolName: lastCall.name,
+          arguments: lastCall.argumentsJson,
+          result: (lastResult != null && lastResult.resultJson.isNotEmpty)
+              ? lastResult.resultJson
               : null,
-          success: lastResult?.success ?? false,
-          error: lastResult?.error,
+          success: lastResult != null && !hasError,
+          error: hasError ? lastResult.error : null,
         );
-        debugPrint('📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
+        debugPrint(
+            '📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
       } else {
         debugPrint('📊 No tool calls in result - badge will NOT show');
       }
@@ -268,37 +278,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     }
   }
 
-  String _formatToolValueMapToJson(Map<String, ToolValue> map) {
-    try {
-      final jsonMap = <String, dynamic>{};
-      for (final entry in map.entries) {
-        jsonMap[entry.key] = _toolValueToJson(entry.value);
-      }
-      const encoder = JsonEncoder.withIndent('  ');
-      return encoder.convert(jsonMap);
-    } catch (e) {
-      return map.toString();
-    }
-  }
-
-  dynamic _toolValueToJson(ToolValue value) {
-    if (value is StringToolValue) return value.value;
-    if (value is NumberToolValue) return value.value;
-    if (value is BoolToolValue) return value.value;
-    if (value is NullToolValue) return null;
-    if (value is ArrayToolValue) {
-      return value.value.map(_toolValueToJson).toList();
-    }
-    if (value is ObjectToolValue) {
-      final result = <String, dynamic>{};
-      for (final entry in value.value.entries) {
-        result[entry.key] = _toolValueToJson(entry.value);
-      }
-      return result;
-    }
-    return value.toString();
-  }
-
   Future<void> _generateStreaming(
     String prompt,
     sdk.LLMGenerationOptions options,
@@ -322,10 +301,21 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final contentBuffer = StringBuffer();
 
     try {
-      final streamingResult =
-          await sdk.RunAnywhere.generateStream(prompt, options: options);
+      // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
+      // collect token text off each non-terminal event.
+      final eventStream =
+          sdk.RunAnywhereSDK.instance.llm.generateStream(prompt, options);
 
-      await for (final token in streamingResult.stream) {
+      await for (final event in eventStream) {
+        if (event.isFinal) {
+          if (event.errorMessage.isNotEmpty) {
+            throw Exception(event.errorMessage);
+          }
+          break;
+        }
+        final token = event.token;
+        if (token.isEmpty) continue;
+
         if (_timeToFirstToken == null && _generationStartTime != null) {
           _timeToFirstToken =
               DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -388,7 +378,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final modelName = _loadedModelName;
 
     try {
-      final result = await sdk.RunAnywhere.generate(prompt, options: options);
+      final result =
+          await sdk.RunAnywhereSDK.instance.llm.generate(prompt, options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -396,7 +387,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           : 0.0;
 
       // Extract token counts from SDK result
-      final outputTokens = result.tokensUsed;
+      final outputTokens = result.tokensGenerated;
       final tokensPerSecond = result.tokensPerSecond;
 
       final analytics = MessageAnalytics(
@@ -454,7 +445,12 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat'),
-      actions: [
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _showConversationHistory,
+            tooltip: 'Conversation history',
+          ),
           IconButton(
             icon: const Icon(Icons.article_outlined),
             onPressed: () {
@@ -532,29 +528,30 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     ));
   }
 
-  /// Map SDK InferenceFramework enum to app framework enum
-  LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) {
-    if (framework == null) return LLMFramework.unknown;
-    switch (framework) {
-      case sdk.InferenceFramework.llamaCpp:
-        return LLMFramework.llamaCpp;
-      case sdk.InferenceFramework.foundationModels:
-        return LLMFramework.foundationModels;
-      case sdk.InferenceFramework.onnx:
-        return LLMFramework.onnxRuntime;
-      case sdk.InferenceFramework.systemTTS:
-        return LLMFramework.systemTTS;
-      case sdk.InferenceFramework.genie:
-        return LLMFramework.genie;
-      default:
-        return LLMFramework.unknown;
-    }
+  /// Show conversation history bottom sheet driven by ConversationStore.
+  void _showConversationHistory() {
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => _ConversationListSheet(
+        store: ConversationStore.shared,
+        onNewChat: () {
+          Navigator.of(sheetContext).pop();
+          _clearChat();
+        },
+      ),
+    ));
   }
+
+  /// Map SDK InferenceFramework to LLMFramework (identity — both are the same type).
+  LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) =>
+      framework ?? LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 
   Widget _buildModelStatusBanner() {
     // Use local state synced from SDK (matches Swift pattern)
     LLMFramework? framework;
-    if (sdk.RunAnywhere.isModelLoaded && _loadedFramework != null) {
+    if (sdk.RunAnywhereSDK.instance.llm.isLoaded && _loadedFramework != null) {
       framework = _mapInferenceFramework(_loadedFramework);
     }
 
@@ -645,10 +642,26 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 
+  /// Heuristic check for small models (<= ~500M params) where tool
+  /// calling tends to be unreliable. Used by the tool-calling reliability
+  /// banner (B-FL-6-003).
+  bool _isLikelySmallModel(String? name) {
+    if (name == null) return false;
+    final n = name.toLowerCase();
+    return n.contains('0.3b') ||
+        n.contains('0.5b') ||
+        n.contains('0.6b') ||
+        n.contains('350m') ||
+        n.contains('360m') ||
+        n.contains('500m');
+  }
+
   Widget _buildInputArea() {
     final toolSettings = ToolSettingsViewModel.shared;
     final showToolBadge = toolSettings.toolCallingEnabled &&
         toolSettings.registeredTools.isNotEmpty;
+    final showSmallModelWarning = toolSettings.toolCallingEnabled &&
+        _isLikelySmallModel(_loadedModelName);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
@@ -667,6 +680,35 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Tool-calling reliability banner for small models (B-FL-6-003).
+            if (showSmallModelWarning) ...[
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.smallMedium),
+                margin: const EdgeInsets.only(bottom: AppSpacing.smallMedium),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                  border: Border.all(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: AppColors.primaryOrange),
+                    const SizedBox(width: AppSpacing.smallMedium),
+                    Expanded(
+                      child: Text(
+                        'For reliable tool calling, use a 1.2B+ instruct-tuned model.',
+                        style: AppTypography.caption(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Tool calling badge (matches iOS)
             if (showToolBadge) ...[
               ToolCallingBadge(toolCount: toolSettings.registeredTools.length),
@@ -684,8 +726,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                        borderRadius: BorderRadius.circular(
+                            AppSpacing.cornerRadiusBubble),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.large,
@@ -718,9 +760,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 }
-
-/// Message role enum
-enum MessageRole { system, user, assistant }
 
 /// Chat message model
 class ChatMessage {
@@ -805,47 +844,53 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 widget.message.thinkingContent!.isNotEmpty)
               _buildThinkingSection(),
 
-            // Main message bubble
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.mediumLarge),
-              decoration: BoxDecoration(
-                gradient: isUser
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.userBubbleGradientStart,
-                          AppColors.userBubbleGradientEnd,
-                        ],
+            // Main message bubble. Long-press an assistant bubble to
+            // open an analytics sheet (B-FL-9-001).
+            GestureDetector(
+              onLongPress: !isUser && widget.message.analytics != null
+                  ? () => _showAnalyticsSheet(context)
+                  : null,
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+                decoration: BoxDecoration(
+                  gradient: isUser
+                      ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.userBubbleGradientStart,
+                            AppColors.userBubbleGradientEnd,
+                          ],
+                        )
+                      : null,
+                  color: isUser ? null : AppColors.backgroundGray5(context),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.shadowLight,
+                      blurRadius: AppSpacing.shadowSmall,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: isUser
+                    ? Text(
+                        widget.message.content,
+                        style: AppTypography.body(context).copyWith(
+                          color: AppColors.textWhite,
+                        ),
                       )
-                    : null,
-                color: isUser ? null : AppColors.backgroundGray5(context),
-                borderRadius:
-                    BorderRadius.circular(AppSpacing.cornerRadiusBubble),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.shadowLight,
-                    blurRadius: AppSpacing.shadowSmall,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: isUser
-                  ? Text(
-                      widget.message.content,
-                      style: AppTypography.body(context).copyWith(
-                        color: AppColors.textWhite,
-                      ),
-                    )
-                  : MarkdownBody(
-                      data: widget.message.content,
-                      styleSheet: MarkdownStyleSheet(
-                        p: AppTypography.body(context),
-                        code: AppTypography.monospaced.copyWith(
-                          backgroundColor: AppColors.backgroundGray6(context),
+                    : MarkdownBody(
+                        data: widget.message.content,
+                        styleSheet: MarkdownStyleSheet(
+                          p: AppTypography.body(context),
+                          code: AppTypography.monospaced.copyWith(
+                            backgroundColor: AppColors.backgroundGray6(context),
+                          ),
                         ),
                       ),
-                    ),
+              ),
             ),
 
             // Analytics summary (if present)
@@ -873,6 +918,53 @@ class _MessageBubbleState extends State<_MessageBubble> {
       ),
     );
   }
+
+  /// Show a bottom sheet of message analytics (B-FL-9-001).
+  void _showAnalyticsSheet(BuildContext context) {
+    final analytics = widget.message.analytics;
+    if (analytics == null) return;
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: false,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Generation analytics', style: AppTypography.title3(context)),
+            const SizedBox(height: AppSpacing.mediumLarge),
+            if (analytics.modelName != null)
+              _analyticsRow('Model', analytics.modelName!),
+            if (analytics.timeToFirstToken != null)
+              _analyticsRow('Time to first token',
+                  '${analytics.timeToFirstToken!.toStringAsFixed(2)} s'),
+            if (analytics.totalGenerationTime != null)
+              _analyticsRow('Total time',
+                  '${analytics.totalGenerationTime!.toStringAsFixed(2)} s'),
+            if (analytics.outputTokens > 0)
+              _analyticsRow('Output tokens', '${analytics.outputTokens}'),
+            if (analytics.tokensPerSecond != null)
+              _analyticsRow('Throughput',
+                  '${analytics.tokensPerSecond!.toStringAsFixed(1)} tok/s'),
+            if (analytics.wasThinkingMode)
+              _analyticsRow('Thinking mode', 'Yes'),
+          ],
+        ),
+      ),
+    ));
+  }
+
+  Widget _analyticsRow(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(value, style: AppTypography.body(context)),
+          ],
+        ),
+      );
 
   Widget _buildThinkingSection() {
     return Container(
@@ -963,6 +1055,105 @@ class _MessageBubbleState extends State<_MessageBubble> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet listing past conversations from [ConversationStore].
+///
+/// Provides a "New chat" FAB and per-row delete affordance. Tapping a
+/// row currently just dismisses the sheet (full message restoration is
+/// out of scope for this screen — ChatInterfaceView is in-memory only).
+class _ConversationListSheet extends StatefulWidget {
+  final ConversationStore store;
+  final VoidCallback onNewChat;
+
+  const _ConversationListSheet({
+    required this.store,
+    required this.onNewChat,
+  });
+
+  @override
+  State<_ConversationListSheet> createState() => _ConversationListSheetState();
+}
+
+class _ConversationListSheetState extends State<_ConversationListSheet> {
+  @override
+  void initState() {
+    super.initState();
+    widget.store.addListener(_onStoreChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conversations = widget.store.conversations;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Conversations'),
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+        body: conversations.isEmpty
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text(
+                    'No conversations yet.\nStart chatting to build history.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            : ListView.builder(
+                controller: scrollController,
+                itemCount: conversations.length,
+                itemBuilder: (context, index) {
+                  final conv = conversations[index];
+                  return ListTile(
+                    title: Text(
+                      conv.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      conv.lastMessagePreview,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Delete conversation',
+                      onPressed: () => widget.store.deleteConversation(conv),
+                    ),
+                  );
+                },
+              ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: widget.onNewChat,
+          icon: const Icon(Icons.add),
+          label: const Text('New chat'),
+        ),
       ),
     );
   }

@@ -43,11 +43,18 @@ extension CppBridge {
             let result = rac_voice_agent_create(llm, stt, tts, vad, &newHandle)
 
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKError.voiceAgent(.initializationFailed, "Failed to create voice agent: \(result)")
+                throw SDKException.voiceAgent(.initializationFailed, "Failed to create voice agent: \(result)")
             }
 
             self.handle = handle
             logger.info("Voice agent created")
+            return handle
+        }
+
+        func requireExistingHandle() throws -> rac_voice_agent_handle_t {
+            guard let handle else {
+                throw SDKException.voiceAgent(.notInitialized, "Voice agent not initialized")
+            }
             return handle
         }
 

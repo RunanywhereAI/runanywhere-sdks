@@ -32,18 +32,24 @@ public extension RunAnywhere {
         prompt: String,
         options: DiffusionGenerationOptions? = nil
     ) async throws -> DiffusionResult {
+        let opts = (options ?? DiffusionGenerationOptions(prompt: prompt)).toRADiffusionGenerationOptions()
+        let result = try await generateImage(options: opts)
+        return DiffusionResult(from: result)
+    }
+
+    /// Generate an image through the generated-proto C++ diffusion ABI.
+    static func generateImage(options: RADiffusionGenerationOptions) async throws -> RADiffusionResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
         guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "No diffusion model loaded. Call loadDiffusionModel first.")
+            throw SDKException.diffusion(.notInitialized, "No diffusion model loaded. Call loadDiffusionModel first.")
         }
 
-        let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-        return try await CppBridge.Diffusion.shared.generate(options: opts)
+        return try await CppBridge.Diffusion.shared.generate(options: options)
     }
 
     /// Generate an image with progress reporting
@@ -68,13 +74,13 @@ public extension RunAnywhere {
         options: DiffusionGenerationOptions? = nil
     ) async throws -> AsyncThrowingStream<DiffusionProgress, Error> {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
         guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "No diffusion model loaded")
+            throw SDKException.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
         var opts = options ?? DiffusionGenerationOptions(prompt: prompt)
@@ -138,29 +144,84 @@ public extension RunAnywhere {
         onProgress: @escaping (DiffusionProgress) -> Bool
     ) async throws -> DiffusionResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
         guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "No diffusion model loaded")
+            throw SDKException.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
-        let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-        return try await CppBridge.Diffusion.shared.generateWithProgress(options: opts, onProgress: onProgress)
+        let opts = (options ?? DiffusionGenerationOptions(prompt: prompt)).toRADiffusionGenerationOptions()
+        let result = try await generateImage(options: opts) { progress in
+            onProgress(DiffusionProgress(from: progress))
+        }
+        return DiffusionResult(from: result)
+    }
+
+    /// Generate an image with proto progress through the generated C++ diffusion ABI.
+    static func generateImage(
+        options: RADiffusionGenerationOptions,
+        onProgress: @escaping (RADiffusionProgress) -> Bool
+    ) async throws -> RADiffusionResult {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+
+        try await ensureServicesReady()
+
+        guard await CppBridge.Diffusion.shared.isLoaded else {
+            throw SDKException.diffusion(.notInitialized, "No diffusion model loaded")
+        }
+
+        return try await CppBridge.Diffusion.shared.generateWithProgress(options: options, onProgress: onProgress)
     }
 
     /// Cancel ongoing image generation
     static func cancelImageGeneration() async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        await CppBridge.Diffusion.shared.cancel()
+        do {
+            try await CppBridge.Diffusion.shared.cancelProto()
+        } catch {
+            await CppBridge.Diffusion.shared.cancel()
+        }
     }
 
-    /// Load a diffusion model
+    /// Load a diffusion model from a `DiffusionConfig` (CANONICAL_API §8).
+    ///
+    /// `DiffusionConfig` is a typealias for `DiffusionConfiguration`. The `modelId`
+    /// field on the config is used as both the path (development convenience) and
+    /// the registry identifier when a local path is not separately specified.
+    ///
+    /// - Parameter config: `DiffusionConfig` (= `DiffusionConfiguration`) carrying
+    ///                     model ID, variant, and generation settings.
+    static func loadDiffusionModel(config: DiffusionConfig) async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
+
+        let modelId = config.modelId ?? "diffusion"
+        // Resolve local path from registry if available
+        let allModels = try await availableModels()
+        let localPath: String
+        if let modelInfo = allModels.first(where: { $0.id == modelId }),
+           let resolved = modelInfo.localPath {
+            localPath = resolved.path
+        } else {
+            // Fall back to treating modelId as a direct path.
+            localPath = modelId
+        }
+
+        try await CppBridge.Diffusion.shared.configure(config)
+        try await CppBridge.Diffusion.shared.loadModel(localPath, modelId: modelId, modelName: modelId)
+    }
+
+    /// Load a diffusion model with explicit decomposed parameters (advanced/internal).
     ///
     /// Expects a CoreML model directory containing .mlmodelc files
     /// (Unet.mlmodelc, TextEncoder.mlmodelc, etc.).
@@ -179,7 +240,7 @@ public extension RunAnywhere {
         configuration: DiffusionConfiguration? = nil
     ) async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -201,7 +262,7 @@ public extension RunAnywhere {
     /// Unload the current diffusion model
     static func unloadDiffusionModel() async throws {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         await CppBridge.Diffusion.shared.unload()
@@ -225,7 +286,7 @@ public extension RunAnywhere {
     /// Get diffusion service capabilities
     static func getDiffusionCapabilities() async throws -> DiffusionCapabilities {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         return await CppBridge.Diffusion.shared.getCapabilities()

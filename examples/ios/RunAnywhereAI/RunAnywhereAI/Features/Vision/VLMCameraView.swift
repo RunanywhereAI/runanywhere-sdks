@@ -33,7 +33,7 @@ struct VLMCameraView: View {
         }
         .navigationTitle("Vision AI")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayModeCompat(.inline)
         #endif
         .toolbar { toolbarContent }
         #if os(iOS)

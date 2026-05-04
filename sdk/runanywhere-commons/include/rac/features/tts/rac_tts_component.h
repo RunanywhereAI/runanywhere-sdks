@@ -15,6 +15,7 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/tts/rac_tts_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -150,6 +151,72 @@ RAC_API rac_result_t rac_tts_component_get_metrics(rac_handle_t handle,
  * @param handle Component handle
  */
 RAC_API void rac_tts_component_destroy(rac_handle_t handle);
+
+/**
+ * @brief Get supported languages for the loaded TTS voice as a JSON array string.
+ *
+ * Forwards to the underlying service/backend. Returns RAC_ERROR_BACKEND_NOT_READY
+ * if no voice is loaded, or RAC_ERROR_NOT_SUPPORTED if the backend cannot enumerate.
+ *
+ * @param handle    Component handle
+ * @param out_json  Output: malloc'd JSON string (e.g. "[\"en\",\"de\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_tts_component_get_supported_languages(rac_handle_t handle,
+                                                               char** out_json);
+
+// =============================================================================
+// GENERATED-PROTO C ABI
+// =============================================================================
+
+/**
+ * @brief Callback fired for serialized runanywhere.v1.TTSVoiceInfo bytes.
+ *
+ * The byte buffer is valid only for the duration of the callback.
+ */
+typedef void (*rac_tts_proto_voice_callback_fn)(const uint8_t* voice_proto_bytes,
+                                                 size_t voice_proto_size,
+                                                 void* user_data);
+
+/**
+ * @brief Callback fired for serialized runanywhere.v1.TTSOutput stream chunks.
+ *
+ * The byte buffer is valid only for the duration of the callback.
+ */
+typedef void (*rac_tts_proto_chunk_callback_fn)(const uint8_t* output_proto_bytes,
+                                                 size_t output_proto_size,
+                                                 void* user_data);
+
+/**
+ * @brief Enumerate voices as serialized runanywhere.v1.TTSVoiceInfo messages.
+ */
+RAC_API rac_result_t rac_tts_component_list_voices_proto(
+    rac_handle_t handle,
+    rac_tts_proto_voice_callback_fn callback,
+    void* user_data);
+
+/**
+ * @brief Synthesize text using serialized runanywhere.v1.TTSOptions bytes.
+ *
+ * Returns serialized runanywhere.v1.TTSOutput bytes in out_result.
+ */
+RAC_API rac_result_t rac_tts_component_synthesize_proto(
+    rac_handle_t handle,
+    const char* text,
+    const uint8_t* options_proto_bytes,
+    size_t options_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Stream synthesized audio chunks as serialized runanywhere.v1.TTSOutput bytes.
+ */
+RAC_API rac_result_t rac_tts_component_synthesize_stream_proto(
+    rac_handle_t handle,
+    const char* text,
+    const uint8_t* options_proto_bytes,
+    size_t options_proto_size,
+    rac_tts_proto_chunk_callback_fn callback,
+    void* user_data);
 
 #ifdef __cplusplus
 }

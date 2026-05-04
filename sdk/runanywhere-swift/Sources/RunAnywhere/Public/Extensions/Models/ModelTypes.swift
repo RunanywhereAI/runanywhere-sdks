@@ -2,235 +2,466 @@
 //  ModelTypes.swift
 //  RunAnywhere SDK
 //
-//  Public types for model management.
-//  These are thin wrappers over C++ types in rac_model_types.h
-//  Business logic (format support, capability checks) is in C++.
+//  Public types for model management. Thin wrappers over C++ types in
+//  rac_model_types.h. Business logic (format support, capability checks)
+//  lives in C++.
+//
+//  GAP 01 Phase 2: enums below are typealiases for the IDL-generated
+//  `RAModelSource`, `RAModelFormat`, `RAModelCategory`,
+//  `RAInferenceFramework`, `RAArchiveType`, `RAArchiveStructure`
+//  (idl/model_types.proto). Hand-written case sets were removed; extensions
+//  preserve the public API surface: rawValue-style JSON encoding, display
+//  names, analytics keys, C-bridge converters, and the
+//  `requiresContextLength` / `supportsThinking` semantics previously on
+//  `ModelCategory`.
 //
 
 import CRACommons
 import Foundation
+import SwiftProtobuf
 
-// MARK: - Model Source
+// MARK: - Typealiases to proto-generated enums
 
-/// Source of model data (where the model info came from)
-public enum ModelSource: String, Codable, Sendable {
-    /// Model info came from remote API (backend model catalog)
-    case remote
+public typealias ModelSource = RAModelSource
+public typealias ModelFormat = RAModelFormat
+public typealias ModelCategory = RAModelCategory
+public typealias InferenceFramework = RAInferenceFramework
+public typealias ArchiveType = RAArchiveType
+public typealias ArchiveStructure = RAArchiveStructure
 
-    /// Model info was provided locally via SDK input (addModel calls)
-    case local
+// MARK: - ModelSource
+//
+// Note: `SwiftProtobuf.Enum` already refines `Sendable`, so no extra
+// `@unchecked Sendable` is required on the typealiased enums.
+
+extension RAModelSource: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw.lowercased() {
+        case "remote": self = .remote
+        case "local":  self = .local
+        default:       self = .unspecified
+        }
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.wireString)
+    }
 }
 
-// MARK: - Model Format
-
-/// Model formats supported
-public enum ModelFormat: String, CaseIterable, Codable, Sendable {
-    case onnx
-    case ort
-    case gguf
-    case bin
-    case coreml
-    case unknown
+public extension RAModelSource {
+    /// Canonical lowercase wire string (JSON compat).
+    var wireString: String {
+        switch self {
+        case .remote:       return "remote"
+        case .local:        return "local"
+        default:            return "unspecified"
+        }
+    }
 }
 
-// MARK: - Model Category
+// MARK: - ModelFormat
 
-/// Defines the category/type of a model based on its input/output modality
-public enum ModelCategory: String, CaseIterable, Codable, Sendable {
-    case language = "language"              // Text-to-text models (LLMs)
-    case speechRecognition = "speech-recognition"  // Voice-to-text models (ASR)
-    case speechSynthesis = "speech-synthesis"      // Text-to-voice models (TTS)
-    case vision = "vision"                  // Image understanding models
-    case imageGeneration = "image-generation"      // Text-to-image models
-    case multimodal = "multimodal"          // Models that handle multiple modalities
-    case voiceActivityDetection = "voice-activity-detection"  // VAD models (Silero, etc.)
-    case audio = "audio"                    // Audio processing (diarization, etc.)
-    case embedding = "embedding"            // Embedding models (RAG, semantic search)
+extension RAModelFormat: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAModelFormat.fromWireString(raw) ?? .unknown
+    }
 
-    /// Whether this category typically requires context length
-    /// Note: C++ equivalent is rac_model_category_requires_context_length()
-    public var requiresContextLength: Bool {
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.wireString)
+    }
+}
+
+public extension RAModelFormat {
+    /// Canonical lowercase wire string (JSON compat).
+    var wireString: String {
+        switch self {
+        case .gguf:         return "gguf"
+        case .ggml:         return "ggml"
+        case .onnx:         return "onnx"
+        case .ort:          return "ort"
+        case .bin:          return "bin"
+        case .coreml:       return "coreml"
+        case .mlmodel:      return "mlmodel"
+        case .mlpackage:    return "mlpackage"
+        case .tflite:       return "tflite"
+        case .safetensors:  return "safetensors"
+        case .qnnContext:   return "qnn_context"
+        case .zip:          return "zip"
+        case .folder:       return "folder"
+        case .proprietary:  return "proprietary"
+        case .unknown:      return "unknown"
+        default:            return "unknown"
+        }
+    }
+
+    static func fromWireString(_ s: String) -> RAModelFormat? {
+        switch s.lowercased() {
+        case "gguf":                return .gguf
+        case "ggml":                return .ggml
+        case "onnx":                return .onnx
+        case "ort":                 return .ort
+        case "bin":                 return .bin
+        case "coreml":              return .coreml
+        case "mlmodel":             return .mlmodel
+        case "mlpackage":           return .mlpackage
+        case "tflite":              return .tflite
+        case "safetensors":         return .safetensors
+        case "qnn_context":         return .qnnContext
+        case "zip":                 return .zip
+        case "folder":              return .folder
+        case "proprietary":         return .proprietary
+        case "", "unknown":         return .unknown
+        default:                    return nil
+        }
+    }
+}
+
+// MARK: - ModelCategory
+
+extension RAModelCategory: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAModelCategory.fromWireString(raw) ?? .unspecified
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.wireString)
+    }
+}
+
+public extension RAModelCategory {
+    /// Canonical kebab-case wire string (JSON compat).
+    var wireString: String {
+        switch self {
+        case .language:                 return "language"
+        case .speechRecognition:        return "speech-recognition"
+        case .speechSynthesis:          return "speech-synthesis"
+        case .vision:                   return "vision"
+        case .imageGeneration:          return "image-generation"
+        case .multimodal:               return "multimodal"
+        case .audio:                    return "audio"
+        case .embedding:                return "embedding"
+        case .voiceActivityDetection:   return "voice-activity-detection"
+        default:                        return "unspecified"
+        }
+    }
+
+    static func fromWireString(_ s: String) -> RAModelCategory? {
+        switch s.lowercased() {
+        case "language":                    return .language
+        case "speech-recognition":          return .speechRecognition
+        case "speech-synthesis":            return .speechSynthesis
+        case "vision":                      return .vision
+        case "image-generation":            return .imageGeneration
+        case "multimodal":                  return .multimodal
+        case "audio":                       return .audio
+        case "embedding":                   return .embedding
+        case "voice-activity-detection":    return .voiceActivityDetection
+        default:                            return nil
+        }
+    }
+
+    /// Whether this category typically requires a context length.
+    /// Matches `rac_model_category_requires_context_length()` on the C side.
+    var requiresContextLength: Bool {
         switch self {
         case .language, .multimodal:
             return true
-        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .vision, .imageGeneration, .audio, .embedding:
+        default:
             return false
         }
     }
 
-    /// Whether this category typically supports thinking/reasoning
-    /// Note: C++ equivalent is rac_model_category_supports_thinking()
-    public var supportsThinking: Bool {
+    /// Whether this category typically supports thinking/reasoning.
+    /// Matches `rac_model_category_supports_thinking()` on the C side.
+    var supportsThinking: Bool {
         switch self {
         case .language, .multimodal:
             return true
-        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .vision, .imageGeneration, .audio, .embedding:
+        default:
             return false
         }
     }
 }
 
-// MARK: - Inference Framework
+// MARK: - InferenceFramework
 
-/// Supported inference frameworks/runtimes for executing models
-public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
-    // Model-based frameworks
-    case onnx = "ONNX"
-    case llamaCpp = "LlamaCpp"
-    case foundationModels = "FoundationModels"
-    case systemTTS = "SystemTTS"
-    case fluidAudio = "FluidAudio"
-    case coreml = "CoreML"        // Core ML (Apple Neural Engine) for diffusion models
-    case mlx = "MLX"              // MLX (Apple Silicon VLM via MLX C++)
-    case whisperKitCoreML = "WhisperKitCoreML" // WhisperKit CoreML (Apple Neural Engine) for STT
-    case metalrt = "MetalRT"      // MetalRT (custom Metal GPU kernels, Apple only)
-
-    // Special cases
-    case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
-    case none = "None"            // For services that don't use a model
-    case unknown = "Unknown"      // For unknown/unspecified frameworks
-
-    /// Human-readable display name for the framework
-    public var displayName: String {
-        switch self {
-        case .onnx: return "ONNX Runtime"
-        case .llamaCpp: return "llama.cpp"
-        case .foundationModels: return "Foundation Models"
-        case .systemTTS: return "System TTS"
-        case .fluidAudio: return "FluidAudio"
-        case .coreml: return "Core ML"
-        case .mlx: return "MLX"
-        case .whisperKitCoreML: return "WhisperKit CoreML"
-        case .metalrt: return "MetalRT"
-        case .builtIn: return "Built-in"
-        case .none: return "None"
-        case .unknown: return "Unknown"
+extension RAInferenceFramework: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        if let parsed = RAInferenceFramework(caseInsensitive: raw) {
+            self = parsed
+        } else {
+            self = .unknown
         }
     }
 
-    /// Snake_case key for analytics/telemetry
-    public var analyticsKey: String {
-        switch self {
-        case .onnx: return "onnx"
-        case .llamaCpp: return "llama_cpp"
-        case .foundationModels: return "foundation_models"
-        case .systemTTS: return "system_tts"
-        case .fluidAudio: return "fluid_audio"
-        case .coreml: return "coreml"
-        case .mlx: return "mlx"
-        case .whisperKitCoreML: return "whisperkit_coreml"
-        case .metalrt: return "metalrt"
-        case .builtIn: return "built_in"
-        case .none: return "none"
-        case .unknown: return "unknown"
-        }
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.wireString)
     }
 }
 
-// MARK: - InferenceFramework C++ Bridge
+public extension RAInferenceFramework {
+    /// Canonical PascalCase wire string matching the original Swift raw values
+    /// used in existing JSON payloads.
+    var wireString: String {
+        switch self {
+        case .onnx:                return "ONNX"
+        case .sherpa:              return "Sherpa"
+        case .llamaCpp:            return "LlamaCpp"
+        case .foundationModels:    return "FoundationModels"
+        case .systemTts:           return "SystemTTS"
+        case .fluidAudio:          return "FluidAudio"
+        case .coreml:              return "CoreML"
+        case .mlx:                 return "MLX"
+        case .whisperkitCoreml:    return "WhisperKitCoreML"
+        case .metalrt:             return "MetalRT"
+        case .genie:               return "Genie"
+        case .tflite:              return "TFLite"
+        case .executorch:          return "ExecuTorch"
+        case .mediapipe:           return "MediaPipe"
+        case .mlc:                 return "MLC"
+        case .picoLlm:             return "PicoLLM"
+        case .piperTts:            return "PiperTTS"
+        case .whisperkit:          return "WhisperKit"
+        case .openaiWhisper:       return "OpenAIWhisper"
+        case .swiftTransformers:   return "SwiftTransformers"
+        case .builtIn:             return "BuiltIn"
+        case .none:                return "None"
+        case .unknown:             return "Unknown"
+        default:                   return "Unknown"
+        }
+    }
 
-public extension InferenceFramework {
-    /// Convert Swift InferenceFramework to C rac_inference_framework_t
+    /// Human-readable display name.
+    var displayName: String {
+        switch self {
+        case .onnx:                return "ONNX Runtime"
+        case .sherpa:              return "Sherpa-ONNX"
+        case .llamaCpp:            return "llama.cpp"
+        case .foundationModels:    return "Foundation Models"
+        case .systemTts:           return "System TTS"
+        case .fluidAudio:          return "FluidAudio"
+        case .coreml:              return "Core ML"
+        case .mlx:                 return "MLX"
+        case .whisperkitCoreml:    return "WhisperKit CoreML"
+        case .metalrt:             return "MetalRT"
+        case .genie:               return "Genie"
+        case .tflite:              return "TFLite"
+        case .executorch:          return "ExecuTorch"
+        case .mediapipe:           return "MediaPipe"
+        case .mlc:                 return "MLC"
+        case .picoLlm:             return "PicoLLM"
+        case .piperTts:            return "Piper TTS"
+        case .whisperkit:          return "WhisperKit"
+        case .openaiWhisper:       return "OpenAI Whisper"
+        case .swiftTransformers:   return "Swift Transformers"
+        case .builtIn:             return "Built-in"
+        case .none:                return "None"
+        case .unknown:             return "Unknown"
+        default:                   return "Unknown"
+        }
+    }
+
+    /// Snake_case key for analytics/telemetry.
+    var analyticsKey: String {
+        switch self {
+        case .onnx:                return "onnx"
+        case .sherpa:              return "sherpa"
+        case .llamaCpp:            return "llama_cpp"
+        case .foundationModels:    return "foundation_models"
+        case .systemTts:           return "system_tts"
+        case .fluidAudio:          return "fluid_audio"
+        case .coreml:              return "coreml"
+        case .mlx:                 return "mlx"
+        case .whisperkitCoreml:    return "whisperkit_coreml"
+        case .metalrt:             return "metalrt"
+        case .genie:               return "genie"
+        case .tflite:              return "tflite"
+        case .executorch:          return "executorch"
+        case .mediapipe:           return "mediapipe"
+        case .mlc:                 return "mlc"
+        case .picoLlm:             return "pico_llm"
+        case .piperTts:            return "piper_tts"
+        case .whisperkit:          return "whisperkit"
+        case .openaiWhisper:       return "openai_whisper"
+        case .swiftTransformers:   return "swift_transformers"
+        case .builtIn:             return "built_in"
+        case .none:                return "none"
+        case .unknown:             return "unknown"
+        default:                   return "unknown"
+        }
+    }
+
+    /// Convert Swift InferenceFramework to C rac_inference_framework_t.
     func toCFramework() -> rac_inference_framework_t {
         switch self {
-        case .onnx: return RAC_FRAMEWORK_ONNX
-        case .llamaCpp: return RAC_FRAMEWORK_LLAMACPP
-        case .foundationModels: return RAC_FRAMEWORK_FOUNDATION_MODELS
-        case .systemTTS: return RAC_FRAMEWORK_SYSTEM_TTS
-        case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
-        case .coreml: return RAC_FRAMEWORK_COREML
-        case .mlx: return RAC_FRAMEWORK_MLX
-        case .whisperKitCoreML: return RAC_FRAMEWORK_WHISPERKIT_COREML
-        case .metalrt: return RAC_FRAMEWORK_METALRT
-        case .builtIn: return RAC_FRAMEWORK_BUILTIN
-        case .none: return RAC_FRAMEWORK_NONE
-        case .unknown: return RAC_FRAMEWORK_UNKNOWN
+        case .onnx:                return RAC_FRAMEWORK_ONNX
+        case .sherpa:              return RAC_FRAMEWORK_SHERPA
+        case .llamaCpp:            return RAC_FRAMEWORK_LLAMACPP
+        case .foundationModels:    return RAC_FRAMEWORK_FOUNDATION_MODELS
+        case .systemTts:           return RAC_FRAMEWORK_SYSTEM_TTS
+        case .fluidAudio:          return RAC_FRAMEWORK_FLUID_AUDIO
+        case .coreml:              return RAC_FRAMEWORK_COREML
+        case .mlx:                 return RAC_FRAMEWORK_MLX
+        case .whisperkitCoreml:    return RAC_FRAMEWORK_WHISPERKIT_COREML
+        case .metalrt:             return RAC_FRAMEWORK_METALRT
+        case .genie:               return RAC_FRAMEWORK_GENIE
+        case .builtIn:             return RAC_FRAMEWORK_BUILTIN
+        case .none:                return RAC_FRAMEWORK_NONE
+        default:                   return RAC_FRAMEWORK_UNKNOWN
         }
     }
 
-    /// Create Swift InferenceFramework from C rac_inference_framework_t
-    static func fromCFramework(_ cFramework: rac_inference_framework_t) -> InferenceFramework {
+    /// Create Swift InferenceFramework from C rac_inference_framework_t.
+    static func fromCFramework(_ cFramework: rac_inference_framework_t) -> RAInferenceFramework {
         switch cFramework {
-        case RAC_FRAMEWORK_ONNX: return .onnx
-        case RAC_FRAMEWORK_LLAMACPP: return .llamaCpp
-        case RAC_FRAMEWORK_FOUNDATION_MODELS: return .foundationModels
-        case RAC_FRAMEWORK_SYSTEM_TTS: return .systemTTS
-        case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
-        case RAC_FRAMEWORK_COREML: return .coreml
-        case RAC_FRAMEWORK_MLX: return .mlx
-        case RAC_FRAMEWORK_WHISPERKIT_COREML: return .whisperKitCoreML
-        case RAC_FRAMEWORK_METALRT: return .metalrt
-        case RAC_FRAMEWORK_BUILTIN: return .builtIn
-        case RAC_FRAMEWORK_NONE: return .none
-        default: return .unknown
+        case RAC_FRAMEWORK_ONNX:                return .onnx
+        case RAC_FRAMEWORK_SHERPA:              return .sherpa
+        case RAC_FRAMEWORK_LLAMACPP:            return .llamaCpp
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:   return .foundationModels
+        case RAC_FRAMEWORK_SYSTEM_TTS:          return .systemTts
+        case RAC_FRAMEWORK_FLUID_AUDIO:         return .fluidAudio
+        case RAC_FRAMEWORK_COREML:              return .coreml
+        case RAC_FRAMEWORK_MLX:                 return .mlx
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:   return .whisperkitCoreml
+        case RAC_FRAMEWORK_METALRT:             return .metalrt
+        case RAC_FRAMEWORK_GENIE:               return .genie
+        case RAC_FRAMEWORK_BUILTIN:             return .builtIn
+        case RAC_FRAMEWORK_NONE:                return .none
+        default:                                return .unknown
         }
     }
 
-    /// Initialize from a string, matching case-insensitively.
+    /// Initialize from a string matching case-insensitively against wire names,
+    /// display names, and analytics keys.
     init?(caseInsensitive string: String) {
-        let lowercased = string.lowercased()
-
-        if let exact = InferenceFramework(rawValue: string) {
-            self = exact
-            return
+        let lowered = string.lowercased()
+        for c in RAInferenceFramework.knownCases {
+            if c.wireString.lowercased() == lowered
+                || c.analyticsKey == lowered
+                || c.displayName.lowercased() == lowered {
+                self = c
+                return
+            }
         }
-
-        if let framework = InferenceFramework.allCases.first(where: { $0.rawValue.lowercased() == lowercased }) {
-            self = framework
-            return
-        }
-
-        if let framework = InferenceFramework.allCases.first(where: { $0.analyticsKey == lowercased }) {
-            self = framework
-            return
-        }
-
         return nil
+    }
+
+    /// All known concrete cases (excludes `.UNRECOGNIZED` and `.unspecified`).
+    static var knownCases: [RAInferenceFramework] {
+        [
+            .onnx, .sherpa, .llamaCpp, .foundationModels, .systemTts, .fluidAudio,
+            .coreml, .mlx, .whisperkitCoreml, .metalrt, .genie,
+            .tflite, .executorch, .mediapipe, .mlc, .picoLlm,
+            .piperTts, .whisperkit, .openaiWhisper, .swiftTransformers,
+            .builtIn, .none, .unknown,
+        ]
+    }
+
+    // MARK: - Pre-IDL case-name aliases
+    //
+    // The hand-written `InferenceFramework` enum used `.systemTTS` and
+    // `.whisperKitCoreML` (UK-TLA camel-case). Proto conversion normalizes to
+    // `.systemTts` and `.whisperkitCoreml`. Aliases below keep every existing
+    // call site compiling with zero edits.
+
+    static var systemTTS: RAInferenceFramework        { .systemTts }
+    static var whisperKitCoreML: RAInferenceFramework { .whisperkitCoreml }
+    static var picoLLM: RAInferenceFramework          { .picoLlm }
+    static var piperTTS: RAInferenceFramework         { .piperTts }
+    static var openAIWhisper: RAInferenceFramework    { .openaiWhisper }
+    static var execuTorch: RAInferenceFramework       { .executorch }
+    static var mediaPipe: RAInferenceFramework        { .mediapipe }
+}
+
+// MARK: - ArchiveType
+
+extension RAArchiveType: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw.lowercased() {
+        case "zip":              self = .zip
+        case "tar.bz2", "tbz2":  self = .tarBz2
+        case "tar.gz",  "tgz":   self = .tarGz
+        case "tar.xz",  "txz":   self = .tarXz
+        default:                 self = .unspecified
+        }
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.fileExtension)
     }
 }
 
-// MARK: - Archive Types
-
-/// Supported archive formats for model packaging
-public enum ArchiveType: String, CaseIterable, Codable, Sendable {
-    case zip = "zip"
-    case tarBz2 = "tar.bz2"
-    case tarGz = "tar.gz"
-    case tarXz = "tar.xz"
-
-    /// File extension for this archive type
-    public var fileExtension: String {
-        rawValue
+public extension RAArchiveType {
+    /// File extension used in URLs (preserved from hand-written enum raw values).
+    var fileExtension: String {
+        switch self {
+        case .zip:     return "zip"
+        case .tarBz2:  return "tar.bz2"
+        case .tarGz:   return "tar.gz"
+        case .tarXz:   return "tar.xz"
+        default:       return ""
+        }
     }
 
-    /// Detect archive type from URL
-    /// Note: C++ equivalent is rac_archive_type_from_path()
-    public static func from(url: URL) -> ArchiveType? {
+    /// Short uppercase form used in UI labels (e.g. "ZIP", "TAR.BZ2").
+    var displayName: String { fileExtension.uppercased() }
+
+    /// Detect archive type from URL suffix.
+    static func from(url: URL) -> RAArchiveType? {
         let path = url.path.lowercased()
-        if path.hasSuffix(".tar.bz2") || path.hasSuffix(".tbz2") {
-            return .tarBz2
-        } else if path.hasSuffix(".tar.gz") || path.hasSuffix(".tgz") {
-            return .tarGz
-        } else if path.hasSuffix(".tar.xz") || path.hasSuffix(".txz") {
-            return .tarXz
-        } else if path.hasSuffix(".zip") {
-            return .zip
-        }
+        if path.hasSuffix(".tar.bz2") || path.hasSuffix(".tbz2") { return .tarBz2 }
+        if path.hasSuffix(".tar.gz")  || path.hasSuffix(".tgz")  { return .tarGz }
+        if path.hasSuffix(".tar.xz")  || path.hasSuffix(".txz")  { return .tarXz }
+        if path.hasSuffix(".zip")                                 { return .zip }
         return nil
     }
 }
 
-/// Describes the internal structure of an archive after extraction
-public enum ArchiveStructure: String, Codable, Sendable, Equatable {
-    case singleFileNested
-    case directoryBased
-    case nestedDirectory
-    case unknown
+// MARK: - ArchiveStructure
+
+extension RAArchiveStructure: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw {
+        case "singleFileNested":    self = .singleFileNested
+        case "directoryBased":      self = .directoryBased
+        case "nestedDirectory":     self = .nestedDirectory
+        case "unknown":             self = .unknown
+        default:                    self = .unspecified
+        }
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.wireString)
+    }
 }
 
-// MARK: - Expected Model Files
+public extension RAArchiveStructure {
+    var wireString: String {
+        switch self {
+        case .singleFileNested: return "singleFileNested"
+        case .directoryBased:   return "directoryBased"
+        case .nestedDirectory:  return "nestedDirectory"
+        case .unknown:          return "unknown"
+        default:                return "unspecified"
+        }
+    }
+}
 
-/// Describes what files are expected after model extraction/download
+// MARK: - Expected Model Files (unchanged — Swift-only domain type)
+
+/// Describes what files are expected after model extraction/download.
 public struct ExpectedModelFiles: Codable, Sendable, Equatable {
     public let requiredPatterns: [String]
     public let optionalPatterns: [String]
@@ -249,13 +480,13 @@ public struct ExpectedModelFiles: Codable, Sendable, Equatable {
     public static let none = ExpectedModelFiles()
 }
 
-/// Describes a file that needs to be downloaded as part of a multi-file model
+/// Describes a file that needs to be downloaded as part of a multi-file model.
 public struct ModelFileDescriptor: Codable, Sendable, Equatable {
-    /// Full URL to download this file from
+    /// Full URL to download this file from.
     public let url: URL
-    /// Filename to save as (e.g., "model.gguf" or "mmproj.gguf")
+    /// Filename to save as (e.g., "model.gguf" or "mmproj.gguf").
     public let filename: String
-    /// Whether this file is required for the model to work
+    /// Whether this file is required for the model to work.
     public let isRequired: Bool
 
     public init(url: URL, filename: String, isRequired: Bool = true) {
@@ -269,7 +500,7 @@ public struct ModelFileDescriptor: Codable, Sendable, Equatable {
     public var destinationPath: String { filename }
 }
 
-// MARK: - Model Artifact Type
+// MARK: - Model Artifact Type (unchanged — Swift-only sugar over IDL artifact oneof)
 
 /// Describes how a model is packaged and what processing is needed after download.
 public enum ModelArtifactType: Codable, Sendable, Equatable {
@@ -303,7 +534,7 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
         case .singleFile:
             return "Single File"
         case .archive(let type, _, _):
-            return "\(type.rawValue.uppercased()) Archive"
+            return "\(type.displayName) Archive"
         case .multiFile(let files):
             return "Multi-File (\(files.count) files)"
         case .custom(let strategyId):
@@ -313,8 +544,8 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
         }
     }
 
-    /// Infer artifact type from download URL
-    /// Note: C++ equivalent is rac_artifact_infer_from_url()
+    /// Infer artifact type from download URL.
+    /// Note: C++ equivalent is `rac_artifact_infer_from_url()`.
     public static func infer(from url: URL?, format _: ModelFormat) -> ModelArtifactType {
         guard let url = url else {
             return .singleFile(expectedFiles: .none)
@@ -329,28 +560,28 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
 // MARK: - ModelArtifactType Codable
 
 extension ModelArtifactType {
-    private enum CodingKeys: String, CodingKey {
+    fileprivate enum ArtifactCodingKeys: String, CodingKey {
         case type, archiveType, structure, expectedFiles, files, strategyId
     }
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
+    public init(from decoder: Swift.Decoder) throws {
+        let container = try decoder.container(keyedBy: ArtifactCodingKeys.self)
+        let type = try container.decode(String.self, forKey: ArtifactCodingKeys.type)
 
         switch type {
         case "singleFile":
-            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: .expectedFiles) ?? .none
+            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: ArtifactCodingKeys.expectedFiles) ?? .none
             self = .singleFile(expectedFiles: expected)
         case "archive":
-            let archiveType = try container.decode(ArchiveType.self, forKey: .archiveType)
-            let structure = try container.decode(ArchiveStructure.self, forKey: .structure)
-            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: .expectedFiles) ?? .none
+            let archiveType = try container.decode(ArchiveType.self, forKey: ArtifactCodingKeys.archiveType)
+            let structure = try container.decode(ArchiveStructure.self, forKey: ArtifactCodingKeys.structure)
+            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: ArtifactCodingKeys.expectedFiles) ?? .none
             self = .archive(archiveType, structure: structure, expectedFiles: expected)
         case "multiFile":
-            let files = try container.decode([ModelFileDescriptor].self, forKey: .files)
+            let files = try container.decode([ModelFileDescriptor].self, forKey: ArtifactCodingKeys.files)
             self = .multiFile(files)
         case "custom":
-            let strategyId = try container.decode(String.self, forKey: .strategyId)
+            let strategyId = try container.decode(String.self, forKey: ArtifactCodingKeys.strategyId)
             self = .custom(strategyId: strategyId)
         case "builtIn":
             self = .builtIn
@@ -359,37 +590,37 @@ extension ModelArtifactType {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.container(keyedBy: ArtifactCodingKeys.self)
 
         switch self {
         case .singleFile(let expected):
-            try container.encode("singleFile", forKey: .type)
+            try container.encode("singleFile", forKey: ArtifactCodingKeys.type)
             if expected != .none {
-                try container.encode(expected, forKey: .expectedFiles)
+                try container.encode(expected, forKey: ArtifactCodingKeys.expectedFiles)
             }
         case .archive(let archiveType, let structure, let expected):
-            try container.encode("archive", forKey: .type)
-            try container.encode(archiveType, forKey: .archiveType)
-            try container.encode(structure, forKey: .structure)
+            try container.encode("archive", forKey: ArtifactCodingKeys.type)
+            try container.encode(archiveType, forKey: ArtifactCodingKeys.archiveType)
+            try container.encode(structure, forKey: ArtifactCodingKeys.structure)
             if expected != .none {
-                try container.encode(expected, forKey: .expectedFiles)
+                try container.encode(expected, forKey: ArtifactCodingKeys.expectedFiles)
             }
         case .multiFile(let files):
-            try container.encode("multiFile", forKey: .type)
-            try container.encode(files, forKey: .files)
+            try container.encode("multiFile", forKey: ArtifactCodingKeys.type)
+            try container.encode(files, forKey: ArtifactCodingKeys.files)
         case .custom(let strategyId):
-            try container.encode("custom", forKey: .type)
-            try container.encode(strategyId, forKey: .strategyId)
+            try container.encode("custom", forKey: ArtifactCodingKeys.type)
+            try container.encode(strategyId, forKey: ArtifactCodingKeys.strategyId)
         case .builtIn:
-            try container.encode("builtIn", forKey: .type)
+            try container.encode("builtIn", forKey: ArtifactCodingKeys.type)
         }
     }
 }
 
-// MARK: - Model Info
+// MARK: - Model Info (unchanged — uses typealiased enums above)
 
-/// Information about a model - in-memory entity
+/// Information about a model - in-memory entity.
 public struct ModelInfo: Codable, Sendable, Identifiable {
     // Essential identifiers
     public let id: String
@@ -425,7 +656,7 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
 
     // MARK: - Computed Properties
 
-    /// Whether this model is downloaded and available locally
+    /// Whether this model is downloaded and available locally.
     public var isDownloaded: Bool {
         guard let localPath = localPath else { return false }
 
@@ -442,12 +673,12 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         return exists
     }
 
-    /// Whether this model is available for use
+    /// Whether this model is available for use.
     public var isAvailable: Bool {
         isDownloaded
     }
 
-    /// Whether this is a built-in platform model
+    /// Whether this is a built-in platform model.
     public var isBuiltIn: Bool {
         if artifactType == .builtIn {
             return true
@@ -455,7 +686,7 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         if let localPath = localPath, localPath.scheme == "builtin" {
             return true
         }
-        return framework == .foundationModels || framework == .systemTTS
+        return framework == .foundationModels || framework == .systemTts
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -511,5 +742,196 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         self.source = source
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Model Info Proto Helpers
+
+public extension ModelInfo {
+    /// Convert the public Swift model metadata wrapper to the canonical
+    /// generated `ModelInfo` proto used by the native registry byte ABI.
+    var proto: RAModelInfo {
+        var proto = RAModelInfo()
+        proto.id = id
+        proto.name = name
+        proto.category = category
+        proto.format = format
+        proto.framework = framework
+        proto.downloadURL = downloadURL?.absoluteString ?? ""
+        proto.localPath = localPath.map(Self.registryPathString(from:)) ?? ""
+        proto.downloadSizeBytes = downloadSize ?? 0
+        proto.contextLength = Int32(contextLength ?? 0)
+        proto.supportsThinking = supportsThinking
+        proto.description_p = description ?? ""
+        proto.source = source
+        proto.createdAtUnixMs = Self.unixMilliseconds(from: createdAt)
+        proto.updatedAtUnixMs = Self.unixMilliseconds(from: updatedAt)
+        proto.apply(artifactType)
+        return proto
+    }
+
+    /// Initialize from generated `ModelInfo` proto bytes decoded from the
+    /// native registry.
+    init(proto: RAModelInfo) {
+        self.init(
+            id: proto.id,
+            name: proto.name,
+            category: proto.category,
+            format: proto.format,
+            framework: proto.framework,
+            downloadURL: proto.downloadURL.isEmpty ? nil : URL(string: proto.downloadURL),
+            localPath: Self.registryURL(from: proto.localPath),
+            artifactType: ModelArtifactType(proto: proto),
+            downloadSize: proto.downloadSizeBytes > 0 ? proto.downloadSizeBytes : nil,
+            contextLength: proto.contextLength > 0 ? Int(proto.contextLength) : nil,
+            supportsThinking: proto.supportsThinking,
+            description: proto.description_p.isEmpty ? nil : proto.description_p,
+            source: proto.source,
+            createdAt: Self.date(fromUnixMillisecondsOrSeconds: proto.createdAtUnixMs),
+            updatedAt: Self.date(fromUnixMillisecondsOrSeconds: proto.updatedAtUnixMs)
+        )
+    }
+
+    private static func registryPathString(from url: URL) -> String {
+        url.isFileURL ? url.path : url.absoluteString
+    }
+
+    private static func registryURL(from value: String) -> URL? {
+        guard !value.isEmpty else { return nil }
+        if value.hasPrefix("/") {
+            return URL(fileURLWithPath: value)
+        }
+        if let url = URL(string: value), url.scheme != nil {
+            return url
+        }
+        return URL(fileURLWithPath: value)
+    }
+
+    private static func unixMilliseconds(from date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1_000).rounded())
+    }
+
+    private static func date(fromUnixMillisecondsOrSeconds value: Int64) -> Date {
+        guard value != 0 else { return Date(timeIntervalSince1970: 0) }
+        let absolute = value < 0 ? -value : value
+        let seconds = absolute > 10_000_000_000 ? Double(value) / 1_000 : Double(value)
+        return Date(timeIntervalSince1970: seconds)
+    }
+}
+
+public extension RAModelInfo {
+    /// Convert generated registry proto metadata into the public Swift wrapper.
+    var modelInfo: ModelInfo {
+        ModelInfo(proto: self)
+    }
+}
+
+private extension RAModelInfo {
+    mutating func apply(_ artifactType: ModelArtifactType) {
+        switch artifactType {
+        case .singleFile(let expectedFiles):
+            var artifact = RASingleFileArtifact()
+            artifact.requiredPatterns = expectedFiles.requiredPatterns
+            artifact.optionalPatterns = expectedFiles.optionalPatterns
+            singleFile = artifact
+            self.artifactType = .singleFile
+
+        case .archive(let archiveType, let structure, let expectedFiles):
+            var artifact = RAArchiveArtifact()
+            artifact.type = archiveType
+            artifact.structure = structure
+            artifact.requiredPatterns = expectedFiles.requiredPatterns
+            artifact.optionalPatterns = expectedFiles.optionalPatterns
+            archive = artifact
+            switch archiveType {
+            case .zip:
+                self.artifactType = .zipArchive
+            case .tarGz:
+                self.artifactType = .tarGzArchive
+            default:
+                self.artifactType = .unspecified
+            }
+
+        case .multiFile(let files):
+            var artifact = RAMultiFileArtifact()
+            artifact.files = files.map { file in
+                var descriptor = RAModelFileDescriptor()
+                descriptor.url = file.url.absoluteString
+                descriptor.filename = file.filename
+                descriptor.isRequired = file.isRequired
+                return descriptor
+            }
+            multiFile = artifact
+            self.artifactType = .directory
+
+        case .custom(let strategyId):
+            customStrategyID = strategyId
+            self.artifactType = .custom
+
+        case .builtIn:
+            builtIn = true
+        }
+    }
+}
+
+private extension ModelArtifactType {
+    init(proto: RAModelInfo) {
+        switch proto.artifact {
+        case .singleFile(let artifact):
+            self = .singleFile(
+                expectedFiles: ExpectedModelFiles(
+                    requiredPatterns: artifact.requiredPatterns,
+                    optionalPatterns: artifact.optionalPatterns
+                )
+            )
+
+        case .archive(let artifact):
+            let archiveType = artifact.type == .unspecified ? ArchiveType.zip : artifact.type
+            let structure = artifact.structure == .unspecified ? ArchiveStructure.unknown : artifact.structure
+            self = .archive(
+                archiveType,
+                structure: structure,
+                expectedFiles: ExpectedModelFiles(
+                    requiredPatterns: artifact.requiredPatterns,
+                    optionalPatterns: artifact.optionalPatterns
+                )
+            )
+
+        case .multiFile(let artifact):
+            self = .multiFile(
+                artifact.files.compactMap { descriptor in
+                    guard let url = URL(string: descriptor.url) else { return nil }
+                    return ModelFileDescriptor(
+                        url: url,
+                        filename: descriptor.filename,
+                        isRequired: descriptor.isRequired
+                    )
+                }
+            )
+
+        case .customStrategyID(let strategyId):
+            self = .custom(strategyId: strategyId)
+
+        case .builtIn(let isBuiltIn):
+            self = isBuiltIn ? .builtIn : .singleFile()
+
+        case nil:
+            self = Self.fromArtifactType(proto.artifactType)
+        }
+    }
+
+    static func fromArtifactType(_ artifactType: RAModelArtifactType) -> ModelArtifactType {
+        switch artifactType {
+        case .zipArchive:
+            return .archive(.zip, structure: .unknown)
+        case .tarGzArchive:
+            return .archive(.tarGz, structure: .unknown)
+        case .directory:
+            return .multiFile([])
+        case .custom:
+            return .custom(strategyId: "")
+        default:
+            return .singleFile()
+        }
     }
 }

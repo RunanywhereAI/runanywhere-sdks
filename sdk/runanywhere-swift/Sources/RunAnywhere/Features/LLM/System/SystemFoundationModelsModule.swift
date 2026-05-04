@@ -11,6 +11,9 @@
 
 import CRACommons
 import Foundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 // MARK: - System Foundation Models Module
 
@@ -56,15 +59,28 @@ public enum SystemFoundationModels: RunAnywhereModule {
 
     /// Check if Foundation Models is available on this device
     public static var isAvailable: Bool {
+        unavailableReason == nil
+    }
+
+    /// Human-readable reason Foundation Models cannot be used on this runtime.
+    public static var unavailableReason: String? {
+        #if targetEnvironment(simulator)
+        return "Apple Foundation Models are not available in iOS Simulator. Use a downloaded llama.cpp model instead."
+        #else
         guard #available(iOS 26.0, macOS 26.0, *) else {
-            return false
+            return "Apple Foundation Models require iOS 26.0 or macOS 26.0."
         }
-        return true
+        #if canImport(FoundationModels)
+        return foundationModelsRuntimeUnavailableReason()
+        #else
+        return "FoundationModels framework is not available in this build."
+        #endif
+        #endif
     }
 
     /// Check if this module can handle the given model ID
     public static func canHandle(modelId: String?) -> Bool {
-        guard #available(iOS 26.0, macOS 26.0, *) else {
+        guard isAvailable else {
             return false
         }
 
@@ -89,4 +105,24 @@ public enum SystemFoundationModels: RunAnywhereModule {
         try await service.initialize(modelPath: "built-in")
         return service
     }
+
+    #if canImport(FoundationModels)
+    @available(iOS 26.0, macOS 26.0, *)
+    private static func foundationModelsRuntimeUnavailableReason() -> String? {
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            return nil
+        case .unavailable(.deviceNotEligible):
+            return "This device is not eligible for Apple Intelligence."
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return "Apple Intelligence is not enabled in Settings."
+        case .unavailable(.modelNotReady):
+            return "Apple Foundation Models are not ready on this device."
+        case .unavailable(let other):
+            return "Apple Foundation Models are unavailable: \(String(describing: other))."
+        @unknown default:
+            return "Apple Foundation Models availability is unknown on this OS version."
+        }
+    }
+    #endif
 }

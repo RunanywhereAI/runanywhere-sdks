@@ -28,8 +28,8 @@
  */
 
 import {
-  RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter,
-  AudioFileLoader,
+  RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter,
+  AudioFileLoader, STTLanguage,
 } from '@runanywhere/web';
 import type { STTTranscriptionResult, STTTranscribeOptions, STTStreamingSession } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
@@ -43,6 +43,53 @@ const logger = new SDKLogger('STT');
 /** Matches RAC_FRAMEWORK_ONNX in rac_model_types.h */
 const RAC_FRAMEWORK_ONNX = 0;
 
+function toSTTLanguage(value: unknown): STTLanguage {
+  if (typeof value === 'number') return value as STTLanguage;
+  const normalized = typeof value === 'string'
+    ? value.toLowerCase().split(/[-_]/)[0]
+    : '';
+  switch (normalized) {
+    case 'en': return STTLanguage.STT_LANGUAGE_EN;
+    case 'es': return STTLanguage.STT_LANGUAGE_ES;
+    case 'fr': return STTLanguage.STT_LANGUAGE_FR;
+    case 'de': return STTLanguage.STT_LANGUAGE_DE;
+    case 'zh': return STTLanguage.STT_LANGUAGE_ZH;
+    case 'ja': return STTLanguage.STT_LANGUAGE_JA;
+    case 'ko': return STTLanguage.STT_LANGUAGE_KO;
+    case 'it': return STTLanguage.STT_LANGUAGE_IT;
+    case 'pt': return STTLanguage.STT_LANGUAGE_PT;
+    case 'ar': return STTLanguage.STT_LANGUAGE_AR;
+    case 'ru': return STTLanguage.STT_LANGUAGE_RU;
+    case 'hi': return STTLanguage.STT_LANGUAGE_HI;
+    case 'auto': return STTLanguage.STT_LANGUAGE_AUTO;
+    default: return STTLanguage.STT_LANGUAGE_UNSPECIFIED;
+  }
+}
+
+function buildSTTOutput(
+  rawResult: Record<string, unknown>,
+  options: STTTranscribeOptions,
+  modelId: string,
+  processingTimeMs: number,
+  audioLengthMs: number,
+): STTTranscriptionResult {
+  return {
+    text: String(rawResult.text ?? '').trim(),
+    language: toSTTLanguage(rawResult.lang ?? options.language),
+    confidence: typeof rawResult.confidence === 'number' ? rawResult.confidence : 0,
+    words: [],
+    alternatives: [],
+    timestampMs: Date.now(),
+    durationMs: audioLengthMs,
+    metadata: {
+      modelId,
+      processingTimeMs,
+      audioLengthMs,
+      realTimeFactor: processingTimeMs > 0 ? audioLengthMs / processingTimeMs : 0,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // STT Types (re-exported for backward compatibility)
 // ---------------------------------------------------------------------------
@@ -55,7 +102,7 @@ export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerF
 // ---------------------------------------------------------------------------
 
 function requireSherpa(): SherpaONNXBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return SherpaONNXBridge.shared;
 }
 
@@ -190,8 +237,29 @@ class STTImpl {
    * Load an STT model via sherpa-onnx.
    * Model files must already be written to sherpa-onnx virtual FS
    * (use SherpaONNXBridge.shared.downloadAndWrite() or .writeFile()).
+   *
+   * Currently the bundled `sherpa-onnx.wasm` only includes Whisper, Zipformer,
+   * and Paraformer. Calling with other model types (SenseVoice, Moonshine, etc.)
+   * will throw `BackendNotAvailable` with a descriptive message rather than
+   * silently failing inside sherpa-onnx.
    */
   async loadModel(config: STTModelConfig): Promise<void> {
+    // Phase 4d: validate the requested STT model type up-front. The current
+    // sherpa-onnx WASM build only ships Whisper / Zipformer / Paraformer
+    // recognizers — other STTModelType values would silently fail at
+    // SherpaOnnx*Recognizer creation with an opaque error.
+    if (
+      config.type !== STTModelType.Whisper &&
+      config.type !== STTModelType.Zipformer &&
+      config.type !== STTModelType.Paraformer
+    ) {
+      throw SDKException.backendNotAvailable(
+        `STT.${config.type}`,
+        `The bundled sherpa-onnx WASM only supports Whisper, Zipformer, and ` +
+        `Paraformer. Received: ${config.type}.`,
+      );
+    }
+
     const sherpa = requireSherpa();
     await sherpa.ensureLoaded();
     const m = sherpa.module;
@@ -217,7 +285,7 @@ class STTImpl {
         freeConfig(configStruct, m);
 
         if (this._onlineRecognizerHandle === 0) {
-          throw new SDKError(SDKErrorCode.ModelLoadFailed,
+          throw new SDKException(SDKErrorCode.ModelLoadFailed,
             `Failed to create online recognizer for ${config.modelId}`);
         }
       } else {
@@ -230,7 +298,7 @@ class STTImpl {
         freeConfig(configStruct, m);
 
         if (this._offlineRecognizerHandle === 0) {
-          throw new SDKError(SDKErrorCode.ModelLoadFailed,
+          throw new SDKException(SDKErrorCode.ModelLoadFailed,
             `Failed to create offline recognizer for ${config.modelId}`);
         }
       }
@@ -277,16 +345,16 @@ class STTImpl {
     audioSamples: Float32Array,
     options: STTTranscribeOptions = {},
   ): Promise<STTTranscriptionResult> {
-    const sherpa = requireSherpa();
-    const m = sherpa.module;
-
     if (this._offlineRecognizerHandle === 0) {
       if (this._onlineRecognizerHandle !== 0) {
         // Streaming model: process all at once via online recognizer
         return this._transcribeViaOnline(audioSamples, options);
       }
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
     }
+
+    const sherpa = requireSherpa();
+    const m = sherpa.module;
 
     const startMs = performance.now();
     const sampleRate = options.sampleRate ?? 16000;
@@ -296,7 +364,7 @@ class STTImpl {
     // Create stream
     const stream = m._SherpaOnnxCreateOfflineStream(this._offlineRecognizerHandle);
     if (stream === 0) {
-      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create offline stream');
+      throw new SDKException(SDKErrorCode.GenerationFailed, 'Failed to create offline stream');
     }
 
     // Copy audio to WASM memory
@@ -317,25 +385,24 @@ class STTImpl {
 
       const result = JSON.parse(jsonStr || '{}');
       const processingTimeMs = Math.round(performance.now() - startMs);
-
-      const transcription: STTTranscriptionResult = {
-        text: (result.text ?? '').trim(),
-        confidence: result.confidence ?? 0,
-        detectedLanguage: result.lang,
+      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const transcription = buildSTTOutput(
+        result,
+        options,
+        this._currentModelId,
         processingTimeMs,
-      };
+        audioDurationMs,
+      );
 
       EventBus.shared.emit('stt.transcribed', SDKEventType.Voice, {
         text: transcription.text,
         confidence: transcription.confidence,
       });
-      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
       const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
-      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
       AnalyticsEmitter.emitSTTTranscriptionCompleted(
         crypto.randomUUID(), this._currentModelId, transcription.text,
         transcription.confidence, processingTimeMs, audioDurationMs,
-        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+        audioSamples.length * 4, wordCount, transcription.metadata?.realTimeFactor ?? 0, '', sampleRate, RAC_FRAMEWORK_ONNX,
       );
 
       return transcription;
@@ -356,7 +423,7 @@ class STTImpl {
 
     const stream = m._SherpaOnnxCreateOnlineStream(this._onlineRecognizerHandle);
     if (stream === 0) {
-      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create online stream');
+      throw new SDKException(SDKErrorCode.GenerationFailed, 'Failed to create online stream');
     }
 
     const audioPtr = m._malloc(audioSamples.length * 4);
@@ -376,20 +443,19 @@ class STTImpl {
 
       const result = JSON.parse(jsonStr || '{}');
       const processingTimeMs = Math.round(performance.now() - startMs);
-
-      const transcription = {
-        text: (result.text ?? '').trim(),
-        confidence: result.confidence ?? 0,
-        processingTimeMs,
-      };
-
       const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const transcription = buildSTTOutput(
+        result,
+        options,
+        this._currentModelId,
+        processingTimeMs,
+        audioDurationMs,
+      );
       const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
-      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
       AnalyticsEmitter.emitSTTTranscriptionCompleted(
         crypto.randomUUID(), this._currentModelId, transcription.text,
         transcription.confidence, processingTimeMs, audioDurationMs,
-        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+        audioSamples.length * 4, wordCount, transcription.metadata?.realTimeFactor ?? 0, '', sampleRate, RAC_FRAMEWORK_ONNX,
       );
 
       return transcription;
@@ -405,7 +471,7 @@ class STTImpl {
    */
   createStreamingSession(options: STTTranscribeOptions = {}): STTStreamingSession {
     if (this._onlineRecognizerHandle === 0) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.ModelNotLoaded,
         'No streaming STT model loaded. Use a zipformer model.',
       );
@@ -425,6 +491,10 @@ class STTImpl {
     file: File,
     options: STTTranscribeOptions = {},
   ): Promise<STTTranscriptionResult> {
+    if (!this.isModelLoaded) {
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
+    }
+
     const targetRate = options.sampleRate ?? 16000;
     const { samples, sampleRate } = await AudioFileLoader.toFloat32Array(file, targetRate);
     return this.transcribe(samples, { ...options, sampleRate });
@@ -473,7 +543,7 @@ class STTStreamingSessionImpl implements STTStreamingSession {
     const m = SherpaONNXBridge.shared.module;
     this._stream = m._SherpaOnnxCreateOnlineStream(recognizer);
     if (this._stream === 0) {
-      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create streaming session');
+      throw new SDKException(SDKErrorCode.GenerationFailed, 'Failed to create streaming session');
     }
   }
 

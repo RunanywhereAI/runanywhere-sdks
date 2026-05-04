@@ -1,139 +1,170 @@
 // ignore_for_file: avoid_classes_with_only_static_members
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/sdk_events.pb.dart' as event_pb;
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/native/platform_loader.dart';
 
-/// Events bridge for C++ event routing.
-/// Matches Swift's `CppBridge+Events.swift`.
+/// Native bridge for the stable SDKEvent proto-byte stream.
 class DartBridgeEvents {
   DartBridgeEvents._();
 
   static final _logger = SDKLogger('DartBridge.Events');
   static final DartBridgeEvents instance = DartBridgeEvents._();
 
+  static final _eventController =
+      StreamController<event_pb.SDKEvent>.broadcast();
+
   static bool _isRegistered = false;
+  static int _subscriptionId = 0;
 
-  /// Event stream controller for SDK events
-  static final _eventController = StreamController<SDKEvent>.broadcast();
+  static Stream<event_pb.SDKEvent> get eventStream => _eventController.stream;
 
-  /// Stream of SDK events from C++
-  static Stream<SDKEvent> get eventStream => _eventController.stream;
-
-  /// Register events callback with C++
+  /// Subscribe to the commons process-wide SDKEvent stream.
   static void register() {
     if (_isRegistered) return;
 
     try {
-      final lib = PlatformLoader.load();
-
-      // Look up event registration function
-      final registerCallback = lib.lookupFunction<
-          Int32 Function(Pointer<NativeFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>>),
-          int Function(Pointer<NativeFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>>)>(
-        'rac_events_register_callback',
-      );
-
-      // Register the callback
-      final callbackPtr = Pointer.fromFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>(
-        _eventsCallback,
-      );
-
-      final result = registerCallback(callbackPtr);
-      if (result != RacResultCode.success) {
-        _logger.warning('Failed to register events callback', metadata: {'code': result});
+      final subscribe = RacNative.bindings.rac_sdk_event_subscribe;
+      if (subscribe == null) {
+        _logger.warning('SDKEvent proto subscription ABI is unavailable');
+        _isRegistered = true;
+        return;
       }
 
+      final callback = Pointer.fromFunction<RacSdkEventCallbackNative>(
+        _sdkEventCallback,
+      );
+      _subscriptionId = subscribe(callback, nullptr);
       _isRegistered = true;
-      _logger.debug('Events callback registered');
+      _logger.debug('SDKEvent proto callback registered');
     } catch (e) {
-      _logger.debug('Events registration not available: $e');
-      _isRegistered = true; // Mark as registered to avoid retry
+      _logger.warning('SDKEvent proto registration failed: $e');
+      _isRegistered = true;
     }
   }
 
-  /// Unregister events callback
   static void unregister() {
     if (!_isRegistered) return;
 
     try {
-      final lib = PlatformLoader.load();
-      final unregisterCallback = lib.lookupFunction<
-          Void Function(),
-          void Function()>('rac_events_unregister_callback');
-
-      unregisterCallback();
-      _isRegistered = false;
-      _logger.debug('Events callback unregistered');
+      final unsubscribe = RacNative.bindings.rac_sdk_event_unsubscribe;
+      if (unsubscribe != null && _subscriptionId != 0) {
+        unsubscribe(_subscriptionId);
+      }
     } catch (e) {
-      _logger.debug('Events unregistration not available: $e');
+      _logger.debug('SDKEvent proto unregistration failed: $e');
+    } finally {
+      _subscriptionId = 0;
+      _isRegistered = false;
     }
   }
 
-  /// Emit an event to subscribers
-  void emit(SDKEvent event) {
+  StreamSubscription<event_pb.SDKEvent> subscribe(
+    void Function(event_pb.SDKEvent event) onEvent, {
+    bool Function(event_pb.SDKEvent event)? where,
+  }) {
+    final stream = where == null ? eventStream : eventStream.where(where);
+    return stream.listen(onEvent);
+  }
+
+  void emit(event_pb.SDKEvent event) {
     _eventController.add(event);
   }
 
-  /// Subscribe to events of a specific type
-  StreamSubscription<SDKEvent> subscribe(
-    void Function(SDKEvent event) onEvent, {
-    String? eventType,
-  }) {
-    if (eventType != null) {
-      return eventStream
-          .where((e) => e.type == eventType)
-          .listen(onEvent);
+  Future<bool> publish(event_pb.SDKEvent event) async {
+    final publish = RacNative.bindings.rac_sdk_event_publish_proto;
+    if (publish == null) return false;
+    return _withProtoBytes(event, (bytes, size) {
+      return publish(bytes, size) == RacResultCode.success;
+    });
+  }
+
+  Future<event_pb.SDKEvent?> poll() async {
+    final poll = RacNative.bindings.rac_sdk_event_poll;
+    if (poll == null) return null;
+
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = poll(out);
+      if (code != RacResultCode.success || out.ref.data == nullptr) {
+        return null;
+      }
+      final bytes =
+          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      return event_pb.SDKEvent.fromBuffer(bytes);
+    } catch (e) {
+      _logger.debug('rac_sdk_event_poll error: $e');
+      return null;
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(out);
     }
-    return eventStream.listen(onEvent);
+  }
+
+  Future<bool> publishFailure({
+    required int errorCode,
+    required String message,
+    required String component,
+    required String operation,
+    bool recoverable = false,
+  }) async {
+    final publishFailure = RacNative.bindings.rac_sdk_event_publish_failure;
+    if (publishFailure == null) return false;
+
+    final messagePtr = message.toNativeUtf8();
+    final componentPtr = component.toNativeUtf8();
+    final operationPtr = operation.toNativeUtf8();
+    try {
+      return publishFailure(
+            errorCode,
+            messagePtr,
+            componentPtr,
+            operationPtr,
+            recoverable ? 1 : 0,
+          ) ==
+          RacResultCode.success;
+    } finally {
+      calloc.free(messagePtr);
+      calloc.free(componentPtr);
+      calloc.free(operationPtr);
+    }
+  }
+
+  bool _withProtoBytes(
+    event_pb.SDKEvent event,
+    bool Function(Pointer<Uint8> bytes, int size) body,
+  ) {
+    final bytes = event.writeToBuffer();
+    final ptr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    try {
+      if (bytes.isNotEmpty) {
+        ptr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      return body(ptr, bytes.length);
+    } finally {
+      calloc.free(ptr);
+    }
   }
 }
 
-/// Events callback from C++
-void _eventsCallback(Pointer<Utf8> eventJson, Pointer<Void> userData) {
-  if (eventJson == nullptr) return;
+void _sdkEventCallback(
+  Pointer<Uint8> protoBytes,
+  int protoSize,
+  Pointer<Void> userData,
+) {
+  if (protoBytes == nullptr) return;
 
   try {
-    final jsonString = eventJson.toDartString();
-    final data = jsonDecode(jsonString) as Map<String, dynamic>;
-
-    final event = SDKEvent(
-      type: data['type'] as String? ?? 'unknown',
-      data: data['data'] as Map<String, dynamic>? ?? {},
-      timestamp: DateTime.fromMillisecondsSinceEpoch(
-        data['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
-
-    DartBridgeEvents.instance.emit(event);
+    final bytes = protoBytes.asTypedList(protoSize).toList(growable: false);
+    DartBridgeEvents.instance.emit(event_pb.SDKEvent.fromBuffer(bytes));
   } catch (e) {
-    SDKLogger('DartBridge.Events').warning('Failed to parse event: $e');
+    SDKLogger('DartBridge.Events').warning('Failed to decode SDKEvent: $e');
   }
-}
-
-/// SDK event from C++ or Dart
-class SDKEvent {
-  final String type;
-  final Map<String, dynamic> data;
-  final DateTime timestamp;
-
-  SDKEvent({
-    required this.type,
-    required this.data,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
-
-  Map<String, dynamic> toJson() => {
-        'type': type,
-        'data': data,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      };
-
-  @override
-  String toString() => 'SDKEvent($type, $data)';
 }

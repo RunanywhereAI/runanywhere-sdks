@@ -3,31 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * ModelPaths extension for CppBridge.
- * Provides model path utilities for C++ core.
  *
- * Follows iOS CppBridge+ModelPaths.swift architecture.
+ * This is a THIN Kotlin shim. All path shapes are computed by the C++ core
+ * via `rac_model_paths_*`. The canonical schema is Swift-aligned:
+ *   `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
+ *
+ * The previous Kotlin-local schema (`{base_dir}/models/{typeName}/{modelId}`)
+ * has been removed. Any on-disk artifacts under `{base_dir}/models/` are
+ * deleted on first init — users re-download.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
 
 /**
- * Model paths bridge that provides model path utilities for C++ core.
- *
- * The C++ core needs model path utilities for:
- * - Getting and setting the base directory for model storage
- * - Getting the models directory path
- * - Getting specific model file paths
- * - Managing model file locations across platforms
+ * Model paths bridge. Computes paths by delegating to the C++ core via JNI
+ * so all platforms (Swift, Kotlin, Web, RN, Flutter) agree on the layout.
  *
  * Usage:
- * - Called during Phase 2 initialization in [CppBridge.initializeServices]
- * - Must be registered after [CppBridgePlatformAdapter] is registered
- *
- * Thread Safety:
- * - Registration is thread-safe via synchronized block
- * - All callbacks are thread-safe
+ * - Set [pathProvider] (Android supplies `context.filesDir`, JVM falls back
+ *   to `~/.runanywhere`) before calling [getBaseDirectory] or any model
+ *   lookup. The provider is used to compute the base dir which is then
+ *   pushed into the C++ core via `racModelPathsSetBaseDir`.
  */
 object CppBridgeModelPaths {
     /**
@@ -51,39 +50,18 @@ object CppBridgeModelPaths {
     }
 
     /**
-     * Model subdirectory names.
+     * Well-known subdirectory names under the base.
+     * NOTE: Per-model layout is `{base}/RunAnywhere/Models/{framework}/{modelId}/`,
+     * computed by the C++ core. These constants are only for base-dir-adjacent
+     * directories (downloads staging, cache).
      */
     object ModelDirectory {
-        /** LLM models directory */
-        const val LLM = "llm"
-
-        /** STT models directory */
-        const val STT = "stt"
-
-        /** TTS models directory */
-        const val TTS = "tts"
-
-        /** VAD models directory */
-        const val VAD = "vad"
-
-        /** Embedding models directory */
-        const val EMBEDDING = "embedding"
-
-        /** Vision/VLM models directory */
-        const val VISION = "vision"
-
-        /** Multimodal models directory */
-        const val MULTIMODAL = "multimodal"
-
-        /** Downloaded models directory */
+        /** Downloaded models staging directory */
         const val DOWNLOADS = "downloads"
 
         /** Cache directory */
         const val CACHE = "cache"
     }
-
-    @Volatile
-    private var isRegistered: Boolean = false
 
     @Volatile
     private var baseDirectory: String? = null
@@ -95,10 +73,11 @@ object CppBridgeModelPaths {
      */
     private const val TAG = "CppBridgeModelPaths"
 
-    /**
-     * Default models directory name.
-     */
-    private const val DEFAULT_MODELS_DIR = "models"
+    /** Legacy schema directory that we nuke on first init (no migration). */
+    private const val LEGACY_MODELS_DIR = "models"
+
+    @Volatile
+    private var legacyCleanupDone: Boolean = false
 
     /**
      * Optional listener for path change events.
@@ -202,42 +181,6 @@ object CppBridgeModelPaths {
         fun isPathWritable(path: String): Boolean
     }
 
-    /**
-     * Register the model paths callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // Initialize base directory if not set
-            if (baseDirectory == null) {
-                initializeDefaultBaseDirectory()
-            }
-
-            // Register the model paths callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetModelPathsCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Model paths callbacks registered. Base dir: $baseDirectory",
-            )
-        }
-    }
-
-    /**
-     * Check if the model paths callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
-
     // ========================================================================
     // MODEL PATH CALLBACKS
     // ========================================================================
@@ -261,7 +204,9 @@ object CppBridgeModelPaths {
     /**
      * Set the base directory callback.
      *
-     * Sets the base directory for model storage.
+     * Sets the base directory for model storage AND pushes it into the C++
+     * core via `rac_model_paths_set_base_dir` so the canonical path utilities
+     * are usable.
      *
      * @param path The base directory path
      * @return true if set successfully, false otherwise
@@ -318,6 +263,30 @@ object CppBridgeModelPaths {
                         "Base directory set: $path",
                     )
 
+                    // Push into C++ so rac_model_paths_get_model_folder can work.
+                    // Swallow any linkage failure here: JNI may not be loaded yet
+                    // in pure-JVM test contexts.
+                    try {
+                        val rc = RunAnywhereBridge.racModelPathsSetBaseDir(path)
+                        if (rc != 0) {
+                            CppBridgePlatformAdapter.logCallback(
+                                CppBridgePlatformAdapter.LogLevel.WARN,
+                                TAG,
+                                "racModelPathsSetBaseDir returned $rc",
+                            )
+                        }
+                    } catch (t: Throwable) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "racModelPathsSetBaseDir unavailable: ${t.message}",
+                        )
+                    }
+
+                    // One-time cleanup of legacy `{base}/models/` directory.
+                    // No migration — user re-downloads what they need.
+                    cleanupLegacyModelsDirLocked(path)
+
                     true
                 } catch (e: Exception) {
                     CppBridgePlatformAdapter.logCallback(
@@ -346,24 +315,46 @@ object CppBridgeModelPaths {
     }
 
     /**
-     * Get the models directory callback.
-     *
-     * Returns the directory for storing models.
-     *
-     * @return The models directory path
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
+     * Delete the legacy `{base}/models/` directory that was used by the old
+     * Kotlin-local path schema. Called at most once per process. No migration.
+     * Caller must hold [lock].
      */
-    @JvmStatic
-    fun getModelsDirectoryCallback(): String {
-        val base = getBaseDirCallback()
-        return File(base, DEFAULT_MODELS_DIR).absolutePath
+    private fun cleanupLegacyModelsDirLocked(basePath: String) {
+        if (legacyCleanupDone) return
+        legacyCleanupDone = true
+        try {
+            val legacy = File(basePath, LEGACY_MODELS_DIR)
+            if (legacy.exists() && legacy.isDirectory) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Detected legacy model directory ${legacy.absolutePath}; " +
+                        "deleting. Re-download any models you need.",
+                )
+                val deleted = legacy.deleteRecursively()
+                if (!deleted) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "Legacy directory cleanup failed for ${legacy.absolutePath}",
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.ERROR,
+                TAG,
+                "Legacy cleanup error: ${e.message}",
+            )
+        }
     }
 
     /**
      * Get a model path callback.
      *
-     * Returns the path for a specific model by ID.
+     * Returns the path for a specific model by ID under the canonical schema,
+     * assuming `RAC_FRAMEWORK_UNKNOWN` (no framework hint). Callers that know
+     * the framework should use [getModelPath(modelId, framework)] directly.
      *
      * @param modelId The model ID
      * @return The model file path
@@ -372,25 +363,8 @@ object CppBridgeModelPaths {
      */
     @JvmStatic
     fun getModelPathCallback(modelId: String): String {
-        val modelsDir = getModelsDirectoryCallback()
-        return File(modelsDir, modelId).absolutePath
-    }
-
-    /**
-     * Get model path by type callback.
-     *
-     * Returns the path for a model of a specific type.
-     *
-     * @param modelId The model ID
-     * @param modelType The model type (see [CppBridgeModelRegistry.ModelType])
-     * @return The model file path
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun getModelPathByTypeCallback(modelId: String, modelType: Int): String {
-        val typeDir = getModelTypeDirectory(modelType)
-        return File(typeDir, modelId).absolutePath
+        // Default to UNKNOWN framework when caller has no framework info.
+        return getModelPath(modelId, CppBridgeModelRegistry.Framework.UNKNOWN)
     }
 
     /**
@@ -458,51 +432,6 @@ object CppBridgeModelPaths {
     }
 
     /**
-     * Create model directory callback.
-     *
-     * Creates the directory for a specific model type.
-     *
-     * @param modelType The model type (see [CppBridgeModelRegistry.ModelType])
-     * @return true if directory exists or was created, false otherwise
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun createModelDirectoryCallback(modelType: Int): Boolean {
-        return try {
-            val dirPath = getModelTypeDirectory(modelType)
-            val dir = File(dirPath)
-
-            if (dir.exists()) {
-                true
-            } else {
-                val created = dir.mkdirs()
-                if (created) {
-                    CppBridgePlatformAdapter.logCallback(
-                        CppBridgePlatformAdapter.LogLevel.DEBUG,
-                        TAG,
-                        "Created model directory: $dirPath",
-                    )
-
-                    try {
-                        pathListener?.onDirectoryCreated(dirPath)
-                    } catch (e: Exception) {
-                        // Ignore listener errors
-                    }
-                }
-                created
-            }
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.ERROR,
-                TAG,
-                "Failed to create model directory: ${e.message}",
-            )
-            false
-        }
-    }
-
-    /**
      * Delete model file callback.
      *
      * @param modelId The model ID
@@ -519,7 +448,12 @@ object CppBridgeModelPaths {
             if (!file.exists()) {
                 true
             } else {
-                val deleted = file.delete()
+                val deleted =
+                    if (file.isDirectory) {
+                        file.deleteRecursively()
+                    } else {
+                        file.delete()
+                    }
                 if (deleted) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
@@ -574,114 +508,6 @@ object CppBridgeModelPaths {
     }
 
     // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the model paths callbacks with C++ core.
-     *
-     * Registers [getBaseDirCallback], [setBaseDirCallback],
-     * [getModelsDirectoryCallback], [getModelPathCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_model_paths_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetModelPathsCallbacks()
-
-    /**
-     * Native method to unset the model paths callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_model_paths_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetModelPathsCallbacks()
-
-    /**
-     * Native method to get the base directory from C++ core.
-     *
-     * @return The base directory path from C++
-     *
-     * C API: rac_model_paths_get_base_dir()
-     */
-    @JvmStatic
-    external fun nativeGetBaseDir(): String?
-
-    /**
-     * Native method to set the base directory in C++ core.
-     *
-     * @param path The base directory path
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_model_paths_set_base_dir(path)
-     */
-    @JvmStatic
-    external fun nativeSetBaseDir(path: String): Int
-
-    /**
-     * Native method to get the models directory from C++ core.
-     *
-     * @return The models directory path
-     *
-     * C API: rac_model_paths_get_models_directory()
-     */
-    @JvmStatic
-    external fun nativeGetModelsDirectory(): String?
-
-    /**
-     * Native method to get a model path from C++ core.
-     *
-     * @param modelId The model ID
-     * @return The model file path
-     *
-     * C API: rac_model_paths_get_model_path(model_id)
-     */
-    @JvmStatic
-    external fun nativeGetModelPath(modelId: String): String?
-
-    /**
-     * Native method to resolve a model path from C++ core.
-     *
-     * Resolves relative paths and validates the model exists.
-     *
-     * @param modelId The model ID
-     * @param modelType The model type
-     * @return The resolved model path, or null if not found
-     *
-     * C API: rac_model_paths_resolve(model_id, type)
-     */
-    @JvmStatic
-    external fun nativeResolvePath(modelId: String, modelType: Int): String?
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the model paths callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetModelPathsCallbacks()
-
-            pathListener = null
-            isRegistered = false
-        }
-    }
-
-    // ========================================================================
     // UTILITY FUNCTIONS
     // ========================================================================
 
@@ -705,34 +531,67 @@ object CppBridgeModelPaths {
     }
 
     /**
-     * Get the models directory.
-     *
-     * @return The models directory path
-     */
-    fun getModelsDirectory(): String {
-        return getModelsDirectoryCallback()
-    }
-
-    /**
-     * Get the path for a specific model.
+     * Get the path for a specific model (framework = UNKNOWN).
      *
      * @param modelId The model ID
-     * @return The model file path
+     * @return The model folder path
      */
     fun getModelPath(modelId: String): String {
         return getModelPathCallback(modelId)
     }
 
     /**
-     * Get the path for a model of a specific type.
+     * Get the canonical path for a model of a specific inference framework.
+     *
+     * Delegates to the C++ core (`rac_model_paths_get_model_folder`) so all
+     * platforms share one schema: `{base}/RunAnywhere/Models/{framework}/{modelId}/`
      *
      * @param modelId The model ID
-     * @param modelType The model type (see [CppBridgeModelRegistry.ModelType])
-     * @return The model file path
+     * @param framework The inference framework int (see [CppBridgeModelRegistry.Framework])
+     * @return The model folder path
      */
-    fun getModelPath(modelId: String, modelType: Int): String {
-        return getModelPathByTypeCallback(modelId, modelType)
+    fun getModelPath(modelId: String, framework: Int): String {
+        // Ensure base dir is materialised both locally and in C++ before the call.
+        val base = getBaseDirCallback()
+        val jniPath =
+            try {
+                RunAnywhereBridge.racModelPathsGetModelFolder(modelId, framework)
+            } catch (t: Throwable) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "racModelPathsGetModelFolder unavailable: ${t.message}",
+                )
+                null
+            }
+        if (jniPath != null) return jniPath
+
+        // JNI not available (e.g. pure JVM unit tests). Fall back to a local
+        // computation that still uses the canonical schema.
+        val frameworkName = frameworkRawValue(framework)
+        return File(File(File(base, "RunAnywhere"), "Models"), "$frameworkName${File.separator}$modelId").absolutePath
     }
+
+    /**
+     * Local mirror of `rac_framework_raw_value` for the JVM-only fallback path.
+     * Keep in sync with C++ `rac_framework_raw_value` (model_paths.cpp).
+     */
+    private fun frameworkRawValue(framework: Int): String =
+        when (framework) {
+            CppBridgeModelRegistry.Framework.ONNX -> "ONNX"
+            CppBridgeModelRegistry.Framework.SHERPA -> "Sherpa"
+            CppBridgeModelRegistry.Framework.LLAMACPP -> "LlamaCpp"
+            CppBridgeModelRegistry.Framework.COREML -> "CoreML"
+            CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> "FoundationModels"
+            CppBridgeModelRegistry.Framework.SYSTEM_TTS -> "SystemTTS"
+            CppBridgeModelRegistry.Framework.FLUID_AUDIO -> "FluidAudio"
+            CppBridgeModelRegistry.Framework.WHISPERKIT_COREML -> "WhisperKitCoreML"
+            CppBridgeModelRegistry.Framework.METALRT -> "MetalRT"
+            CppBridgeModelRegistry.Framework.GENIE -> "Genie"
+            CppBridgeModelRegistry.Framework.BUILTIN -> "BuiltIn"
+            CppBridgeModelRegistry.Framework.NONE -> "None"
+            else -> "Unknown"
+        }
 
     /**
      * Get the downloads directory.
@@ -770,16 +629,6 @@ object CppBridgeModelPaths {
      */
     fun getModelFileSize(modelId: String): Long {
         return getModelFileSizeCallback(modelId)
-    }
-
-    /**
-     * Create the directory for a specific model type.
-     *
-     * @param modelType The model type (see [CppBridgeModelRegistry.ModelType])
-     * @return true if directory exists or was created
-     */
-    fun createModelDirectory(modelType: Int): Boolean {
-        return createModelDirectoryCallback(modelType)
     }
 
     /**
@@ -822,57 +671,6 @@ object CppBridgeModelPaths {
     }
 
     /**
-     * Ensure all model directories exist.
-     *
-     * Creates the base directory, models directory, and all type-specific directories.
-     *
-     * @return true if all directories exist or were created
-     */
-    fun ensureDirectoriesExist(): Boolean {
-        return try {
-            // Create base directory
-            val base = File(getBaseDirCallback())
-            if (!base.exists() && !base.mkdirs()) {
-                return false
-            }
-
-            // Create models directory
-            val modelsDir = File(getModelsDirectoryCallback())
-            if (!modelsDir.exists() && !modelsDir.mkdirs()) {
-                return false
-            }
-
-            // Create downloads directory
-            val downloadsDir = File(getDownloadsDirectoryCallback())
-            if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
-                return false
-            }
-
-            // Create type-specific directories
-            for (type in listOf(
-                CppBridgeModelRegistry.ModelType.LLM,
-                CppBridgeModelRegistry.ModelType.STT,
-                CppBridgeModelRegistry.ModelType.TTS,
-                CppBridgeModelRegistry.ModelType.VAD,
-                CppBridgeModelRegistry.ModelType.EMBEDDING,
-                CppBridgeModelRegistry.ModelCategory.VISION,
-                CppBridgeModelRegistry.ModelCategory.MULTIMODAL,
-            )) {
-                createModelDirectoryCallback(type)
-            }
-
-            true
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.ERROR,
-                TAG,
-                "Failed to ensure directories exist: ${e.message}",
-            )
-            false
-        }
-    }
-
-    /**
      * Get the temporary file path for a download.
      *
      * @param modelId The model ID
@@ -884,14 +682,18 @@ object CppBridgeModelPaths {
     }
 
     /**
-     * Move a downloaded file to its final location.
+     * Move a downloaded file to its final location under the canonical
+     * schema: `{base}/RunAnywhere/Models/{framework}/{modelId}/{modelId}.<ext>`
+     *
+     * For directory-based frameworks (ONNX/Sherpa) the file is placed inside
+     * the model folder preserving its original filename.
      *
      * @param tempPath The temporary file path
      * @param modelId The model ID
-     * @param modelType The model type
+     * @param framework Inference framework int
      * @return true if moved successfully
      */
-    fun moveDownloadToFinal(tempPath: String, modelId: String, modelType: Int): Boolean {
+    fun moveDownloadToFinal(tempPath: String, modelId: String, framework: Int): Boolean {
         return try {
             val tempFile = File(tempPath)
             if (!tempFile.exists()) {
@@ -903,11 +705,18 @@ object CppBridgeModelPaths {
                 return false
             }
 
-            // Ensure target directory exists
-            createModelDirectoryCallback(modelType)
+            // Ensure target model folder exists
+            val modelFolder = File(getModelPath(modelId, framework))
+            if (!modelFolder.exists() && !modelFolder.mkdirs()) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Failed to create model folder: ${modelFolder.absolutePath}",
+                )
+                return false
+            }
 
-            val finalPath = getModelPathByTypeCallback(modelId, modelType)
-            val finalFile = File(finalPath)
+            val finalFile = File(modelFolder, modelId)
 
             // Delete existing file/directory if present
             if (finalFile.exists()) {
@@ -938,11 +747,11 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Moved model to final location: $finalPath",
+                "Moved model to final location: ${finalFile.absolutePath}",
             )
 
             try {
-                pathListener?.onModelFileAdded(modelId, finalPath)
+                pathListener?.onModelFileAdded(modelId, finalFile.absolutePath)
             } catch (e: Exception) {
                 // Ignore listener errors
             }
@@ -956,25 +765,6 @@ object CppBridgeModelPaths {
             )
             false
         }
-    }
-
-    /**
-     * Get the directory path for a specific model type.
-     */
-    private fun getModelTypeDirectory(modelType: Int): String {
-        val modelsDir = getModelsDirectoryCallback()
-        val typeName =
-            when (modelType) {
-                CppBridgeModelRegistry.ModelType.LLM -> ModelDirectory.LLM
-                CppBridgeModelRegistry.ModelType.STT -> ModelDirectory.STT
-                CppBridgeModelRegistry.ModelType.TTS -> ModelDirectory.TTS
-                CppBridgeModelRegistry.ModelType.VAD -> ModelDirectory.VAD
-                CppBridgeModelRegistry.ModelType.EMBEDDING -> ModelDirectory.EMBEDDING
-                CppBridgeModelRegistry.ModelCategory.VISION -> ModelDirectory.VISION
-                CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelDirectory.MULTIMODAL
-                else -> "other"
-            }
-        return File(modelsDir, typeName).absolutePath
     }
 
     /**
@@ -1014,6 +804,25 @@ object CppBridgeModelPaths {
                         "Failed to create default base directory: ${e.message}",
                     )
                 }
+
+                // Push base dir into C++ core and run legacy cleanup.
+                try {
+                    val rc = RunAnywhereBridge.racModelPathsSetBaseDir(basePath)
+                    if (rc != 0) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "racModelPathsSetBaseDir (default) returned $rc",
+                        )
+                    }
+                } catch (t: Throwable) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.WARN,
+                        TAG,
+                        "racModelPathsSetBaseDir (default) unavailable: ${t.message}",
+                    )
+                }
+                cleanupLegacyModelsDirLocked(basePath)
             }
         }
 

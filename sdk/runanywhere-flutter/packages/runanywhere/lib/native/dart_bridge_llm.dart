@@ -16,10 +16,18 @@ library dart_bridge_llm;
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:isolate'; // Keep for non-streaming generation
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/features/llm/llm_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationResult;
+import 'package:runanywhere/generated/llm_service.pb.dart'
+    show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -153,7 +161,8 @@ class DartBridgeLLM {
 
     try {
       _logger.debug('Calling rac_llm_component_load_model with handle=$handle');
-      final result = NativeFunctions.llmLoadModel(handle, pathPtr, idPtr, namePtr);
+      final result =
+          NativeFunctions.llmLoadModel(handle, pathPtr, idPtr, namePtr);
       _logger.debug(
           'rac_llm_component_load_model returned: $result (${RacResultCode.getMessage(result)})');
 
@@ -201,6 +210,129 @@ class DartBridgeLLM {
 
   // MARK: - Generation
 
+  /// Generate text using the lifecycle-owned generated-proto LLM ABI.
+  LLMGenerationResult generateProto(LLMGenerateRequest request) {
+    if (!isLoaded) {
+      throw StateError('No LLM model loaded. Call loadModel() first.');
+    }
+
+    final fn = RacNative.bindings.rac_llm_generate_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_llm_generate_proto is unavailable');
+    }
+
+    return DartBridgeProtoUtils.callRequest<LLMGenerationResult>(
+      request: request,
+      invoke: fn,
+      decode: LLMGenerationResult.fromBuffer,
+      symbol: 'rac_llm_generate_proto',
+    );
+  }
+
+  /// Stream text generation using the lifecycle-owned generated-proto LLM ABI.
+  Stream<LLMStreamEvent> generateStreamProto(LLMGenerateRequest request) {
+    if (!isLoaded) {
+      return Stream<LLMStreamEvent>.error(
+        StateError('No LLM model loaded. Call loadModel() first.'),
+      );
+    }
+
+    final fn = RacNative.bindings.rac_llm_generate_stream_proto;
+    if (fn == null) {
+      return Stream<LLMStreamEvent>.error(
+        UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
+      );
+    }
+
+    final controller = StreamController<LLMStreamEvent>(sync: false);
+    NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
+    var sawTerminalEvent = false;
+
+    Future<void> run() async {
+      final bytes = request.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
+
+      try {
+        callback = NativeCallable<RacLlmStreamProtoCallbackNative>.listener((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+            return;
+          }
+
+          try {
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            final event = LLMStreamEvent.fromBuffer(copy);
+            sawTerminalEvent = sawTerminalEvent || event.isFinal;
+            controller.add(event);
+            if (event.isFinal) {
+              unawaited(controller.close());
+            }
+          } catch (e, st) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+        });
+
+        final rc = fn(
+          requestPtr,
+          bytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_llm_generate_stream_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+          await controller.close();
+        } else if (!sawTerminalEvent && !controller.isClosed) {
+          await controller.close();
+        }
+      } catch (e, st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          await controller.close();
+        }
+      } finally {
+        calloc.free(requestPtr);
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      cancelProto();
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
+    return controller.stream;
+  }
+
+  /// Cancel lifecycle-owned LLM generation.
+  sdk_events_pb.SDKEvent? cancelProto() {
+    final fn = RacNative.bindings.rac_llm_cancel_proto;
+    if (fn == null) {
+      cancel();
+      return null;
+    }
+
+    try {
+      return DartBridgeProtoUtils.callOut<sdk_events_pb.SDKEvent>(
+        invoke: fn,
+        decode: sdk_events_pb.SDKEvent.fromBuffer,
+        symbol: 'rac_llm_cancel_proto',
+      );
+    } catch (e) {
+      _logger.error('Failed to cancel lifecycle-owned generation: $e');
+      return null;
+    }
+  }
+
   /// Generate text from a prompt.
   ///
   /// [prompt] - Input prompt.
@@ -237,10 +369,12 @@ class DartBridgeLLM {
     final tokens = maxTokens;
     final temp = temperature;
 
-    _logger.debug('[PARAMS] generate: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+    _logger.debug(
+        '[PARAMS] generate: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
 
     final result = await Isolate.run(() {
-      return _generateInIsolate(handleAddress, prompt, tokens, temp, systemPrompt);
+      return _generateInIsolate(
+          handleAddress, prompt, tokens, temp, systemPrompt);
     });
 
     if (result.error != null) {
@@ -285,7 +419,8 @@ class DartBridgeLLM {
     // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
 
-    _logger.debug('[PARAMS] generateStream: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+    _logger.debug(
+        '[PARAMS] generateStream: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
 
     // Start streaming generation in a background isolate
     unawaited(_startBackgroundStreaming(
@@ -317,11 +452,11 @@ class DartBridgeLLM {
   ) async {
     // Create a ReceivePort to receive tokens from the background isolate
     final receivePort = ReceivePort();
-    
+
     // Listen for messages from the background isolate
     receivePort.listen((message) {
       if (controller.isClosed) return;
-      
+
       if (message is String) {
         // It's a token
         controller.add(message);
@@ -373,7 +508,7 @@ class DartBridgeLLM {
     String? systemPrompt,
     bool streamingEnabled = false,
   }) {
-    LLMConfiguration(
+    LLMComponentConfig(
       contextLength: contextLength,
       maxTokens: maxTokens,
       temperature: temperature,
@@ -480,7 +615,7 @@ SendPort? _isolateSendPort;
 void _streamingIsolateEntry(_StreamingIsolateParams params) {
   // Store the SendPort for callbacks to use
   _isolateSendPort = params.sendPort;
-  
+
   final handle = Pointer<Void>.fromAddress(params.handleAddress);
   final promptPtr = params.prompt.toNativeUtf8();
   final optionsPtr = calloc<RacLlmOptionsStruct>();
@@ -510,10 +645,11 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
         Pointer.fromFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>(
             _isolateTokenCallback, 1);
     final completeCallbackPtr = Pointer.fromFunction<
-        Void Function(
-            Pointer<RacLlmResultStruct>, Pointer<Void>)>(_isolateCompleteCallback);
+        Void Function(Pointer<RacLlmResultStruct>,
+            Pointer<Void>)>(_isolateCompleteCallback);
     final errorCallbackPtr = Pointer.fromFunction<
-        Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>(_isolateErrorCallback);
+        Void Function(
+            Int32, Pointer<Utf8>, Pointer<Void>)>(_isolateErrorCallback);
 
     final generateStreamFn = lib.lookupFunction<
         Int32 Function(
@@ -596,8 +732,10 @@ void _isolateCompleteCallback(
 @pragma('vm:entry-point')
 void _isolateErrorCallback(
     int errorCode, Pointer<Utf8> errorMsg, Pointer<Void> userData) {
-  final message = errorMsg != nullptr ? errorMsg.toDartString() : 'Unknown error';
-  _isolateSendPort?.send(_StreamingMessage(error: 'Generation error ($errorCode): $message'));
+  final message =
+      errorMsg != nullptr ? errorMsg.toDartString() : 'Unknown error';
+  _isolateSendPort?.send(
+      _StreamingMessage(error: 'Generation error ($errorCode): $message'));
 }
 
 // =============================================================================

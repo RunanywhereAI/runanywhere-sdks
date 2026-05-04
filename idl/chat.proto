@@ -1,0 +1,81 @@
+// RunAnywhere v2 IDL — chat conversation primitives.
+//
+// Phase 3 of v2 IDL Exhaustiveness migration. ChatMessage + MessageRole were
+// duplicated across:
+//   - Swift  ChatMessage.swift / MessageRole.swift (TBD location)
+//   - Kotlin commonMain/.../ChatMessage.kt
+//   - Dart   lib/public/types/message_types.dart (MessageRole)
+//   - RN     core/src/types/chat.ts
+//   - Web    packages/core/src/chat/types.ts
+//
+// Generating from a single proto removes ~200 LOC and locks the role enum
+// across all 5 SDKs.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "tool_calling.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "ChatProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Conversational role of a ChatMessage.
+// ---------------------------------------------------------------------------
+enum MessageRole {
+    MESSAGE_ROLE_UNSPECIFIED = 0;
+    MESSAGE_ROLE_USER        = 1;
+    MESSAGE_ROLE_ASSISTANT   = 2;
+    MESSAGE_ROLE_SYSTEM      = 3;
+    // Tool-result messages injected back into the conversation after a
+    // tool call has been executed. Required for OpenAI-style tool flows.
+    MESSAGE_ROLE_TOOL        = 4;
+}
+
+// ---------------------------------------------------------------------------
+// A single message in a chat conversation.
+// ---------------------------------------------------------------------------
+message ChatMessage {
+    // Unique identifier for the message (caller-supplied or generated).
+    // Empty = unset (proto3 scalar default).
+    string id                  = 1;
+
+    // Role (user / assistant / system / tool).
+    MessageRole role           = 2;
+
+    // Message text content. May be empty for messages that only carry tool
+    // calls (assistant role) or tool results (tool role).
+    string content             = 3;
+
+    // Wall-clock timestamp the message was authored, in microseconds since
+    // Unix epoch. 0 = unset; consumers may stamp at receive-time.
+    int64  timestamp_us        = 4;
+
+    // Optional human-readable display name. Used by some chat UIs to
+    // distinguish multiple users in a multi-party conversation.
+    optional string name       = 5;
+
+    // Optional tool calls embedded in this assistant message. Each entry is
+    // a JSON-encoded ToolCall (see tool_calling.proto) — kept as a string
+    // here to avoid a circular import; consumers parse on demand.
+    repeated string tool_calls_json = 6;
+
+    // Optional tool-call ID this message is responding to (only set when
+    // role == MESSAGE_ROLE_TOOL).
+    optional string tool_call_id = 7;
+
+    // Typed tool calls embedded in this assistant message. Supersedes
+    // tool_calls_json for generated-proto callers while keeping the legacy
+    // JSON string list available.
+    repeated ToolCall tool_calls = 8;
+
+    // Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
+    optional ToolResult tool_result = 9;
+}

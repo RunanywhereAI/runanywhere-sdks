@@ -8,12 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -136,13 +137,18 @@ fun ModelSelectionBottomSheet(
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         dragHandle = null,
+        // G-DV31 fix: include status bar in window insets so the "Cancel"
+        // header button is NOT rendered under the edge-to-edge status bar.
+        // Without this the sheet overlaps the status bar on Pixel 6a (top
+        // cutout y<132px), making Cancel physically unreachable — users
+        // perceive this as touch input being dropped after the sheet opens.
+        contentWindowInsets = { WindowInsets.systemBars },
     ) {
         Box {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
                         .verticalScroll(rememberScrollState()),
             ) {
                 SheetHeader(title = uiState.context.title, onCancel = onDismiss)

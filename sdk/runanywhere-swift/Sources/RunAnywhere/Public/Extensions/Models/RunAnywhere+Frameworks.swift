@@ -26,6 +26,13 @@ public extension RunAnywhere {
         return Array(frameworks).sorted { $0.displayName < $1.displayName }
     }
 
+    /// Get all registered frameworks for a specific capability — canonical §13 name.
+    /// - Parameter capability: The capability/component type to filter by
+    /// - Returns: Array of frameworks that provide the specified capability
+    static func getFrameworksForCapability(_ capability: SDKComponent) async -> [InferenceFramework] {
+        await getFrameworks(for: capability)
+    }
+
     /// Get all registered frameworks for a specific capability
     /// - Parameter capability: The capability/component type to filter by
     /// - Returns: Array of frameworks that provide the specified capability
@@ -46,14 +53,16 @@ public extension RunAnywhere {
             relevantCategories = [.speechSynthesis]
         case .vad:
             relevantCategories = [.audio]
-        case .voice:
+        case .voiceAgent:
             relevantCategories = [.language, .speechRecognition, .speechSynthesis]
-        case .embedding:
+        case .embeddings:
             relevantCategories = [.embedding]
         case .diffusion:
             relevantCategories = [.imageGeneration]
         case .rag:
             relevantCategories = [.language]
+        case .wakeword, .speakerDiarization, .unspecified, .UNRECOGNIZED:
+            relevantCategories = []
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

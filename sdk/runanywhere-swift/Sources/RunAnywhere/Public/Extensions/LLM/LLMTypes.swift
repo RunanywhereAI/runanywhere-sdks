@@ -9,141 +9,12 @@
 import CRACommons
 import Foundation
 
-// MARK: - LLM Configuration
-
-/// Configuration for LLM component
-public struct LLMConfiguration: ComponentConfiguration, Sendable {
-
-    // MARK: - ComponentConfiguration
-
-    /// Component type
-    public var componentType: SDKComponent { .llm }
-
-    /// Model ID (optional - uses default if not specified)
-    public let modelId: String?
-
-    /// Preferred framework for generation
-    public let preferredFramework: InferenceFramework?
-
-    // MARK: - Model Parameters
-
-    /// Context length (max tokens the model can handle)
-    public let contextLength: Int
-
-    // MARK: - Default Generation Parameters
-
-    /// Temperature for sampling (0.0 - 2.0)
-    public let temperature: Double
-
-    /// Maximum tokens to generate
-    public let maxTokens: Int
-
-    /// System prompt for generation
-    public let systemPrompt: String?
-
-    /// Enable streaming mode
-    public let streamingEnabled: Bool
-
-    // MARK: - Initialization
-
-    public init(
-        modelId: String? = nil,
-        contextLength: Int = 2048,
-        temperature: Double = 0.7,
-        maxTokens: Int = 100,
-        systemPrompt: String? = nil,
-        streamingEnabled: Bool = true,
-        preferredFramework: InferenceFramework? = nil
-    ) {
-        self.modelId = modelId
-        self.contextLength = contextLength
-        self.temperature = temperature
-        self.maxTokens = maxTokens
-        self.systemPrompt = systemPrompt
-        self.streamingEnabled = streamingEnabled
-        self.preferredFramework = preferredFramework
-    }
-
-    // MARK: - Validation
-
-    public func validate() throws {
-        guard contextLength > 0 && contextLength <= 32768 else {
-            throw SDKError.general(.validationFailed, "Context length must be between 1 and 32768")
-        }
-        guard temperature >= 0 && temperature <= 2.0 else {
-            throw SDKError.general(.validationFailed, "Temperature must be between 0 and 2.0")
-        }
-        guard maxTokens > 0 && maxTokens <= contextLength else {
-            throw SDKError.general(.validationFailed, "Max tokens must be between 1 and context length")
-        }
-    }
-}
-
-// MARK: - LLMConfiguration Builder
-
-extension LLMConfiguration {
-
-    /// Create configuration with builder pattern
-    public static func builder(modelId: String? = nil) -> Builder {
-        Builder(modelId: modelId)
-    }
-
-    public class Builder {
-        private var modelId: String?
-        private var contextLength: Int = 2048
-        private var temperature: Double = 0.7
-        private var maxTokens: Int = 100
-        private var systemPrompt: String?
-        private var streamingEnabled: Bool = true
-        private var preferredFramework: InferenceFramework?
-
-        init(modelId: String?) {
-            self.modelId = modelId
-        }
-
-        public func contextLength(_ length: Int) -> Builder {
-            self.contextLength = length
-            return self
-        }
-
-        public func temperature(_ temp: Double) -> Builder {
-            self.temperature = temp
-            return self
-        }
-
-        public func maxTokens(_ tokens: Int) -> Builder {
-            self.maxTokens = tokens
-            return self
-        }
-
-        public func systemPrompt(_ prompt: String?) -> Builder {
-            self.systemPrompt = prompt
-            return self
-        }
-
-        public func streamingEnabled(_ enabled: Bool) -> Builder {
-            self.streamingEnabled = enabled
-            return self
-        }
-
-        public func preferredFramework(_ framework: InferenceFramework?) -> Builder {
-            self.preferredFramework = framework
-            return self
-        }
-
-        public func build() -> LLMConfiguration {
-            LLMConfiguration(
-                modelId: modelId,
-                contextLength: contextLength,
-                temperature: temperature,
-                maxTokens: maxTokens,
-                systemPrompt: systemPrompt,
-                streamingEnabled: streamingEnabled,
-                preferredFramework: preferredFramework
-            )
-        }
-    }
-}
+// NOTE (§15 / Wave 4.1, 2026-04-30): The previously-declared
+// `LLMConfiguration` struct + its `Builder` were removed here (140 LOC).
+// They had zero external consumers in SDK or example apps and duplicated
+// the proto-canonical `RALLMConfiguration` declared in
+// `Generated/llm_options.pb.swift`. Consumers that need a configuration
+// surface should use `RALLMConfiguration` directly.
 
 // MARK: - LLM Generation Options
 
@@ -215,6 +86,22 @@ public struct LLMGenerationOptions: Sendable {
             cOptions.system_prompt = nil
             return try body(&cOptions)
         }
+    }
+
+    /// Convert to the generated-proto request owned by the C++ LLM service.
+    public func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
+        var request = RALLMGenerateRequest()
+        request.prompt = prompt
+        request.maxTokens = Int32(maxTokens)
+        request.temperature = temperature
+        request.topP = topP
+        request.stopSequences = stopSequences
+        request.streamingEnabled = streamingEnabled
+        request.preferredFramework = preferredFramework?.wireString ?? ""
+        if let systemPrompt {
+            request.systemPrompt = systemPrompt
+        }
+        return request
     }
 }
 
@@ -327,27 +214,34 @@ public struct LLMGenerationResult: Sendable {
             responseTokens: Int(metrics.response_tokens)
         )
     }
+
+    /// Initialize from the generated-proto C++ LLM result.
+    public init(from proto: RALLMGenerationResult) {
+        self.init(
+            text: proto.text,
+            thinkingContent: proto.hasThinkingContent ? proto.thinkingContent : nil,
+            inputTokens: Int(proto.inputTokens),
+            tokensUsed: Int(proto.tokensGenerated),
+            modelUsed: proto.modelUsed,
+            latencyMs: proto.generationTimeMs,
+            framework: proto.hasFramework ? proto.framework : nil,
+            tokensPerSecond: proto.tokensPerSecond,
+            timeToFirstTokenMs: proto.hasTtftMs ? proto.ttftMs : nil,
+            structuredOutputValidation: nil,
+            thinkingTokens: proto.thinkingTokens > 0 ? Int(proto.thinkingTokens) : nil,
+            responseTokens: proto.responseTokens > 0 ? Int(proto.responseTokens) : Int(proto.tokensGenerated)
+        )
+    }
 }
 
 // MARK: - LLM Streaming Result
-
-/// Container for streaming generation with metrics
-public struct LLMStreamingResult: Sendable {
-
-    /// Stream of tokens as they are generated
-    public let stream: AsyncThrowingStream<String, Error>
-
-    /// Task that completes with final generation result including metrics
-    public let result: Task<LLMGenerationResult, Error>
-
-    public init(
-        stream: AsyncThrowingStream<String, Error>,
-        result: Task<LLMGenerationResult, Error>
-    ) {
-        self.stream = stream
-        self.result = result
-    }
-}
+//
+// v2 close-out Phase G-2: the `LLMStreamingResult` struct (stream +
+// metrics task) was DELETED. Callers now consume
+// `AsyncStream<RALLMStreamEvent>` returned by
+// `RunAnywhere.generateStream(...)` directly. Metrics can be computed
+// from the terminal event (is_final=true) which carries finish_reason,
+// timing, and any error_message.
 
 // MARK: - Thinking Tag Pattern
 
@@ -434,7 +328,7 @@ public struct LoRAAdapterInfo: Sendable {
 }
 
 /// Catalog entry for a LoRA adapter registered with the SDK.
-/// Register adapters at app startup via RunAnywhere.registerLoraAdapter(_:).
+/// Register adapters at app startup via `RunAnywhere.lora.register(_:)`.
 public struct LoraAdapterCatalogEntry: Sendable {
 
     /// Unique adapter identifier
@@ -640,5 +534,91 @@ public actor StreamAccumulator {
                 completionContinuation = continuation
             }
         }
+    }
+}
+
+// MARK: - Phase C1: Generated Proto Bridges (LoRA + Structured Output)
+//
+// Canonical wire types live in `Sources/RunAnywhere/Generated/lora_options.pb.swift`
+// and `Sources/RunAnywhere/Generated/structured_output.pb.swift`:
+//   • RALoRAAdapterConfig         (adapterPath, scale, adapterID)
+//   • RALoRAAdapterInfo           (adapterID, adapterPath, scale, applied,
+//                                   errorMessage)
+//   • RALoraAdapterCatalogEntry   (id, name, description_p, url, filename,
+//                                   compatibleModels, sizeBytes, author)
+//   • RALoraCompatibilityResult   (isCompatible, errorMessage,
+//                                   baseModelRequired)
+//   • RAStructuredOutputValidation (isValid, containsJson, errorMessage)
+//
+// Hand-rolled types are KEPT because they:
+//   1. expose `init(from cEntry: rac_lora_entry_t)` C bridges,
+//   2. use Swift idiomatic field names (path vs adapterPath, error vs
+//      errorMessage, downloadURL: URL vs url: String, fileSize Int64 vs
+//      sizeBytes Int64, adapterDescription String vs description_p,
+//      compatibleModelIds vs compatibleModels),
+//   3. carry `defaultScale` (not on proto schema) and use `URL` types.
+
+extension LoRAAdapterConfig {
+    /// Convert to canonical generated proto `RALoRAAdapterConfig`.
+    /// Field rename: path → adapterPath.
+    public func toRALoRAAdapterConfig() -> RALoRAAdapterConfig {
+        var proto = RALoRAAdapterConfig()
+        proto.adapterPath = path
+        proto.scale = scale
+        return proto
+    }
+}
+
+extension LoRAAdapterInfo {
+    /// Convert to canonical generated proto `RALoRAAdapterInfo`.
+    /// Field rename: path → adapterPath.
+    public func toRALoRAAdapterInfo() -> RALoRAAdapterInfo {
+        var proto = RALoRAAdapterInfo()
+        proto.adapterPath = path
+        proto.scale = scale
+        proto.applied = applied
+        return proto
+    }
+}
+
+extension LoraAdapterCatalogEntry {
+    /// Convert to canonical generated proto `RALoraAdapterCatalogEntry`.
+    /// Field renames: adapterDescription → description_p; downloadURL.absoluteString → url;
+    /// compatibleModelIds → compatibleModels; fileSize → sizeBytes.
+    /// Pre-IDL `defaultScale` is dropped (proto schema has no equivalent field).
+    public func toRALoraAdapterCatalogEntry() -> RALoraAdapterCatalogEntry {
+        var proto = RALoraAdapterCatalogEntry()
+        proto.id = id
+        proto.name = name
+        proto.description_p = adapterDescription
+        proto.url = downloadURL.absoluteString
+        proto.filename = filename
+        proto.compatibleModels = compatibleModelIds
+        proto.sizeBytes = fileSize
+        return proto
+    }
+}
+
+extension LoraCompatibilityResult {
+    /// Convert to canonical generated proto `RALoraCompatibilityResult`.
+    /// Field rename: error → errorMessage.
+    public func toRALoraCompatibilityResult() -> RALoraCompatibilityResult {
+        var proto = RALoraCompatibilityResult()
+        proto.isCompatible = isCompatible
+        if let err = error { proto.errorMessage = err }
+        return proto
+    }
+}
+
+extension StructuredOutputValidation {
+    /// Convert to canonical generated proto `RAStructuredOutputValidation`.
+    /// Field renames: error (String?) → errorMessage (String, defaults "");
+    /// containsJSON → containsJson (proto3 camelCase).
+    public func toRAStructuredOutputValidation() -> RAStructuredOutputValidation {
+        var proto = RAStructuredOutputValidation()
+        proto.isValid = isValid
+        proto.containsJson = containsJSON
+        if let err = error { proto.errorMessage = err }
+        return proto
     }
 }

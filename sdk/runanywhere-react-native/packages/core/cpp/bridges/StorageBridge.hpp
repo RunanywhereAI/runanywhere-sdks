@@ -131,6 +131,11 @@ public:
     bool isInitialized() const { return handle_ != nullptr; }
 
     /**
+     * Get the underlying analyzer handle for proto-byte bridge calls.
+     */
+    rac_storage_analyzer_handle_t getHandle() const { return handle_; }
+
+    /**
      * Analyze overall storage
      *
      * @param registryHandle Model registry handle for model enumeration

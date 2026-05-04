@@ -19,9 +19,10 @@ extension CppBridge {
         /// Convert Swift environment to C++ type
         public static func toC(_ env: SDKEnvironment) -> rac_environment_t {
             switch env {
-            case .development: return RAC_ENV_DEVELOPMENT
-            case .staging: return RAC_ENV_STAGING
-            case .production: return RAC_ENV_PRODUCTION
+            case .development:   return RAC_ENV_DEVELOPMENT
+            case .staging:       return RAC_ENV_STAGING
+            case .production:    return RAC_ENV_PRODUCTION
+            default:             return RAC_ENV_DEVELOPMENT
             }
         }
 
@@ -90,11 +91,33 @@ extension CppBridge {
             return String(cString: ptr)
         }
 
+        /// True when the development Supabase config is present and not a template placeholder.
+        public static var hasUsableSupabaseConfig: Bool {
+            guard let urlString = supabaseURL,
+                  let apiKey = supabaseKey,
+                  isUsableHTTPURL(urlString),
+                  isUsableCredential(apiKey) else {
+                return false
+            }
+            return true
+        }
+
+        /// True when development device registration has all required values.
+        public static var hasUsableDevelopmentRegistrationConfig: Bool {
+            hasUsableSupabaseConfig && hasUsableBuildToken
+        }
+
         /// Get build token for development mode
         public static var buildToken: String? {
             guard rac_dev_config_has_build_token() else { return nil }
             guard let ptr = rac_dev_config_get_build_token() else { return nil }
-            return String(cString: ptr)
+            let token = String(cString: ptr)
+            return isUsableCredential(token) ? token : nil
+        }
+
+        /// True when the development build token is present and not a placeholder.
+        public static var hasUsableBuildToken: Bool {
+            buildToken != nil
         }
 
         /// Get Sentry DSN for crash reporting (optional)
@@ -107,12 +130,50 @@ extension CppBridge {
         /// - Returns: true if configured successfully, false if config not available
         @discardableResult
         public static func configureHTTP() async -> Bool {
-            guard let urlString = supabaseURL,
-                  let url = URL(string: urlString),
-                  let apiKey = supabaseKey else {
+            guard hasUsableSupabaseConfig,
+                  let rawURLString = supabaseURL,
+                  let rawAPIKey = supabaseKey else {
+                return false
+            }
+
+            let urlString = rawURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+            let apiKey = rawAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard let url = URL(string: urlString) else {
                 return false
             }
             await CppBridge.HTTP.shared.configure(baseURL: url, apiKey: apiKey)
+            return true
+        }
+
+        static func looksLikePlaceholder(_ value: String?) -> Bool {
+            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return true
+            }
+            return value.range(
+                of: "YOUR_|<your|REPLACE_ME|PLACEHOLDER",
+                options: [.regularExpression, .caseInsensitive]
+            ) != nil
+        }
+
+        static func isUsableCredential(_ value: String?) -> Bool {
+            !looksLikePlaceholder(value)
+        }
+
+        static func isUsableHTTPURL(_ value: String?) -> Bool {
+            guard let value else { return false }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !looksLikePlaceholder(trimmed),
+                  let url = URL(string: trimmed),
+                  let scheme = url.scheme?.lowercased(),
+                  ["http", "https"].contains(scheme),
+                  let host = url.host,
+                  !host.isEmpty,
+                  host.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+                  !host.contains("<"),
+                  !host.contains(">") else {
+                return false
+            }
             return true
         }
     }

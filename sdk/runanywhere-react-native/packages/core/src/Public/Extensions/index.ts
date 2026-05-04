@@ -13,7 +13,12 @@ export {
   generate,
   generateStream,
   cancelGeneration,
+  // Thinking token utilities (§3)
+  extractThinkingTokens,
+  stripThinkingTokens,
+  splitThinkingAndResponse,
 } from './RunAnywhere+TextGeneration';
+export type { ThinkingExtractionResult } from './RunAnywhere+TextGeneration';
 
 // Speech-to-Text
 export {
@@ -24,10 +29,13 @@ export {
   transcribeSimple,
   transcribeBuffer,
   transcribeStream,
+  transcribeStreamAsync,
   transcribeFile,
-  startStreamingSTT,
-  stopStreamingSTT,
+  // Streaming audio ingestion (§4)
+  processStreamingAudio,
+  stopStreamingTranscription,
   isStreamingSTT,
+  currentSTTModel,
 } from './RunAnywhere+STT';
 
 // Text-to-Speech
@@ -44,7 +52,6 @@ export {
   isSpeaking,
   stopSpeaking,
   availableTTSVoices,
-  getTTSVoices,
   getTTSVoiceInfo,
   stopSynthesis,
   cancelTTS,
@@ -59,15 +66,21 @@ export {
   isVADModelLoaded,
   unloadVADModel,
   detectSpeech,
+  detectVoiceActivity,
   processVAD,
   startVAD,
   stopVAD,
   resetVAD,
   setVADSpeechActivityCallback,
   setVADAudioBufferCallback,
+  // VAD statistics callback (§6)
+  setVADStatisticsCallback,
+  // VAD streaming (§6)
+  streamVAD,
   cleanupVAD,
   getVADState,
 } from './RunAnywhere+VAD';
+export type { VADStatisticsCallback } from './RunAnywhere+VAD';
 
 // Voice Agent
 export {
@@ -83,40 +96,63 @@ export {
   cleanupVoiceAgent,
 } from './RunAnywhere+VoiceAgent';
 
-// Voice Session
-export {
-  startVoiceSession,
-  startVoiceSessionWithCallback,
-  createVoiceSession,
-  DEFAULT_VOICE_SESSION_CONFIG,
-} from './RunAnywhere+VoiceSession';
-export type {
-  VoiceSessionConfig,
-  VoiceSessionEvent,
-  VoiceSessionEventCallback
-} from './RunAnywhere+VoiceSession';
+// v3.1: Voice Session exports DELETED. Use VoiceAgentStreamAdapter from
+// the package root (`@runanywhere/core`) for streaming voice events.
 
 // Structured Output
 export {
   generateStructured,
   generateStructuredStream,
+  extractStructuredOutput,
   generate as generateStructuredType,
   extractEntities,
   classify,
 } from './RunAnywhere+StructuredOutput';
 export type {
   StreamToken,
-  StructuredOutputStreamResult
 } from './RunAnywhere+StructuredOutput';
 
 // Device (NPU Chip Detection)
 export { getChip } from './RunAnywhere+Device';
 
+// Hardware Profile (CANONICAL_API §14 — Wave 3 Step 3.2)
+export {
+  getProfile as getHardwareProfile,
+  getChip as getHardwareChip,
+  hasNeuralEngine as hardwareHasNeuralEngine,
+  accelerationMode as hardwareAccelerationMode,
+  Hardware,
+} from './RunAnywhere+Hardware';
+export type { HardwareProfileResult } from './RunAnywhere+Hardware';
+
 // Logging
 export { setLogLevel } from './RunAnywhere+Logging';
 
+// Canonical SDK event stream
+export {
+  pollSDKEvent,
+  publishSDKEvent,
+  publishSDKFailure,
+  subscribeSDKEvents,
+} from './RunAnywhere+Events';
+
+// Canonical model/component lifecycle
+export {
+  getComponentLifecycleSnapshot,
+  getCurrentModel,
+  loadModelLifecycle,
+  unloadModelLifecycle,
+} from './RunAnywhere+Lifecycle';
+
 // Storage
-export { getStorageInfo, clearCache } from './RunAnywhere+Storage';
+export {
+  checkStorageAvailability,
+  clearCache,
+  deleteStorage,
+  getStorageInfo,
+  getStorageInfoProto,
+  planStorageDelete,
+} from './RunAnywhere+Storage';
 
 // Models
 export {
@@ -128,8 +164,10 @@ export {
   downloadModel,
   cancelDownload,
   deleteModel,
+  deleteAllModels,
   registerModel,
   registerMultiFileModel,
+  refreshModelRegistry,
 } from './RunAnywhere+Models';
 
 // Audio Utilities
@@ -155,7 +193,8 @@ export type {
 } from './RunAnywhere+Audio';
 
 // Re-export Audio as namespace for RunAnywhere.Audio access
-export * as Audio from './RunAnywhere+Audio';
+import * as Audio from './RunAnywhere+Audio';
+export { Audio };
 
 // Tool Calling
 export {
@@ -165,7 +204,6 @@ export {
   clearTools,
   parseToolCall,
   executeTool,
-  formatToolsForPrompt,
   formatToolsForPromptAsync,
   generateWithTools,
   continueWithToolResult,
@@ -183,6 +221,10 @@ export {
   ragGetStatistics,
 } from './RunAnywhere+RAG';
 
+// Solutions Runtime (T4.7 / T4.8)
+export { solutions, SolutionHandle } from './RunAnywhere+Solutions';
+export type { SolutionRunArgs } from './RunAnywhere+Solutions';
+
 // Vision Language Model
 export {
   registerVLMBackend,
@@ -195,4 +237,14 @@ export {
   processImage,
   processImageStream,
   cancelVLMGeneration,
-} from './RunAnywhere+VLM';
+} from './RunAnywhere+VisionLanguage';
+
+// Plugin Loader (§12)
+export {
+  pluginApiVersion,
+  loadPlugin,
+  unloadPlugin,
+  registeredPluginCount,
+  registeredPluginNames,
+} from './RunAnywhere+PluginLoader';
+export type { PluginInfo } from './RunAnywhere+PluginLoader';

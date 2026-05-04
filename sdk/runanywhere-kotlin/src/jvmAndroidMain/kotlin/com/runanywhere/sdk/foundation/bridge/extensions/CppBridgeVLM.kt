@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -176,7 +176,7 @@ object CppBridgeVLM {
                     TAG,
                     "Native library not loaded. VLM inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             val result =
@@ -189,7 +189,7 @@ object CppBridgeVLM {
                         TAG,
                         "VLM component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("VLM native library not available. Please ensure the VLM backend is bundled in your APK.")
+                    throw SDKException.notInitialized("VLM native library not available. Please ensure the VLM backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -369,7 +369,7 @@ object CppBridgeVLM {
      * JNI call, so that [cancel] (which reads volatile fields directly) can
      * set the cancellation flag without waiting for processing to finish.
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun process(
         imageFormat: Int,
         imagePath: String?,
@@ -383,7 +383,7 @@ object CppBridgeVLM {
         // 1. Acquire lock for state check + transition
         synchronized(lock) {
             if (handle == 0L || state != VLMState.READY) {
-                throw SDKError.vlm("VLM component not ready for processing")
+                throw SDKException.vlm("VLM component not ready for processing")
             }
             isCancelled = false
             setState(VLMState.PROCESSING)
@@ -413,7 +413,7 @@ object CppBridgeVLM {
                     imageHeight,
                     prompt,
                     optionsJson,
-                ) ?: throw SDKError.vlm("VLM processing failed: null result")
+                ) ?: throw SDKException.vlm("VLM processing failed: null result")
 
             val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -433,7 +433,7 @@ object CppBridgeVLM {
             synchronized(lock) {
                 setState(VLMState.READY)
             }
-            throw if (e is SDKError) e else SDKError.vlm("VLM processing failed: ${e.message}")
+            throw if (e is SDKException) e else SDKException.vlm("VLM processing failed: ${e.message}")
         }
     }
 
@@ -444,7 +444,7 @@ object CppBridgeVLM {
      * JNI call, so that [cancel] (which reads volatile fields directly) can
      * set the cancellation flag without waiting for processing to finish.
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun processStream(
         imageFormat: Int,
         imagePath: String?,
@@ -459,7 +459,7 @@ object CppBridgeVLM {
         // 1. Acquire lock for state check + transition; set streamCallback while locked
         synchronized(lock) {
             if (handle == 0L || state != VLMState.READY) {
-                throw SDKError.vlm("VLM component not ready for processing")
+                throw SDKException.vlm("VLM component not ready for processing")
             }
             isCancelled = false
             streamCallback = callback
@@ -505,7 +505,7 @@ object CppBridgeVLM {
                     prompt,
                     optionsJson,
                     jniCallback,
-                ) ?: throw SDKError.vlm("VLM streaming processing failed: null result")
+                ) ?: throw SDKException.vlm("VLM streaming processing failed: null result")
 
             val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -527,7 +527,7 @@ object CppBridgeVLM {
                 setState(VLMState.READY)
                 streamCallback = null
             }
-            throw if (e is SDKError) e else SDKError.vlm("VLM streaming processing failed: ${e.message}")
+            throw if (e is SDKException) e else SDKException.vlm("VLM streaming processing failed: ${e.message}")
         }
     }
 

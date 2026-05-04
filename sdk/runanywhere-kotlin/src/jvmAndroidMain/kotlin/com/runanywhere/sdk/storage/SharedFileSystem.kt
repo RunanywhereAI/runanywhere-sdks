@@ -101,4 +101,15 @@ abstract class SharedFileSystem : FileSystem {
         withContext(Dispatchers.IO) {
             File(path).isDirectory
         }
+
+    // Round 1 KOTLIN (G-F5): non-blocking sync variants.
+    // The JVM/Android FileSystem relies on java.io.File which is safe to call
+    // on any thread without dispatcher switching — no runBlocking needed.
+
+    override fun existsSync(path: String): Boolean = File(path).exists()
+
+    override fun isDirectorySync(path: String): Boolean = File(path).isDirectory
+
+    override fun listSync(path: String): List<String> =
+        File(path).listFiles()?.map { it.absolutePath } ?: emptyList()
 }

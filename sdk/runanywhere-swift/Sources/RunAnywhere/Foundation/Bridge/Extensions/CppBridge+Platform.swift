@@ -94,8 +94,8 @@ extension CppBridge {
             callbacks.can_handle = { modelIdPtr, _ -> rac_bool_t in
                 let modelId = modelIdPtr.map { String(cString: $0) }
 
-                // Check if Foundation Models can handle this model
-                guard #available(iOS 26.0, macOS 26.0, *) else {
+                // Check if Foundation Models can handle this model on this runtime.
+                guard SystemFoundationModels.isAvailable else {
                     return RAC_FALSE
                 }
 
@@ -116,6 +116,13 @@ extension CppBridge {
 
             callbacks.create = { _, _, _ -> rac_handle_t? in
                 // Create Foundation Models service
+                guard SystemFoundationModels.isAvailable else {
+                    Platform.logger.error(
+                        "Foundation Models unavailable: \(SystemFoundationModels.unavailableReason ?? "unknown reason")"
+                    )
+                    return nil
+                }
+
                 guard #available(iOS 26.0, macOS 26.0, *) else {
                     return nil
                 }
@@ -278,10 +285,10 @@ extension CppBridge {
 
                 Task {
                     do {
-                        _ = try await service.synthesize(text: text, options: options)
+                        try await service.speak(text: text, options: options)
                         result = RAC_SUCCESS
                     } catch {
-                        Platform.logger.error("System TTS synthesize failed: \(error)")
+                        Platform.logger.error("System TTS speak failed: \(error)")
                         result = RAC_ERROR_INTERNAL
                     }
                     group.leave()

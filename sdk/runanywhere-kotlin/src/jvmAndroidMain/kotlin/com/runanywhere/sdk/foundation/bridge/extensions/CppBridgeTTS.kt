@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -167,9 +167,6 @@ object CppBridgeTTS {
                 else -> "UNKNOWN($reason)"
             }
     }
-
-    @Volatile
-    private var isRegistered: Boolean = false
 
     @Volatile
     private var state: Int = TTSState.NOT_CREATED
@@ -468,46 +465,16 @@ object CppBridgeTTS {
     }
 
     /**
-     * Register the TTS callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetTTSCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "TTS callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the TTS callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
-
-    /**
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("TTS component not created")
+                throw SDKException.notInitialized("TTS component not created")
             }
             return handle
         }
@@ -567,7 +534,7 @@ object CppBridgeTTS {
                     TAG,
                     "Native library not loaded. TTS inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create TTS component via RunAnywhereBridge
@@ -580,7 +547,7 @@ object CppBridgeTTS {
                         TAG,
                         "TTS component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
+                    throw SDKException.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -703,13 +670,13 @@ object CppBridgeTTS {
      * @param text The input text to synthesize
      * @param config Synthesis configuration (optional)
      * @return The synthesis result
-     * @throws SDKError if synthesis fails
+     * @throws SDKException if synthesis fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun synthesize(text: String, config: SynthesisConfig = SynthesisConfig.DEFAULT): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
-                throw SDKError.tts("TTS component not ready for synthesis")
+                throw SDKException.tts("TTS component not ready for synthesis")
             }
 
             isCancelled = false
@@ -732,12 +699,12 @@ object CppBridgeTTS {
             try {
                 val rawAudioData =
                     RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
-                        ?: throw SDKError.tts("Synthesis failed: null result")
+                        ?: throw SDKException.tts("Synthesis failed: null result")
 
                 // TTS backends output Float32 PCM - convert to WAV for playback compatibility
                 val audioData =
                     RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
-                        ?: throw SDKError.tts("Failed to convert audio to WAV format")
+                        ?: throw SDKException.tts("Failed to convert audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
@@ -779,7 +746,7 @@ object CppBridgeTTS {
                 return result
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.tts("Synthesis failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.tts("Synthesis failed: ${e.message}")
             }
         }
     }
@@ -791,9 +758,9 @@ object CppBridgeTTS {
      * @param config Synthesis configuration (optional)
      * @param callback Callback for audio chunks
      * @return The final synthesis result
-     * @throws SDKError if synthesis fails
+     * @throws SDKException if synthesis fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun synthesizeStream(
         text: String,
         config: SynthesisConfig = SynthesisConfig.DEFAULT,
@@ -801,7 +768,7 @@ object CppBridgeTTS {
     ): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
-                throw SDKError.tts("TTS component not ready for synthesis")
+                throw SDKException.tts("TTS component not ready for synthesis")
             }
 
             isCancelled = false
@@ -825,12 +792,12 @@ object CppBridgeTTS {
             try {
                 val rawAudioData =
                     RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
-                        ?: throw SDKError.tts("Streaming synthesis failed: null result")
+                        ?: throw SDKException.tts("Streaming synthesis failed: null result")
 
                 // TTS backends output Float32 PCM - convert to WAV for playback compatibility
                 val audioData =
                     RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
-                        ?: throw SDKError.tts("Failed to convert streaming audio to WAV format")
+                        ?: throw SDKException.tts("Failed to convert streaming audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
@@ -872,7 +839,7 @@ object CppBridgeTTS {
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.tts("Streaming synthesis failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.tts("Streaming synthesis failed: ${e.message}")
             }
         }
     }
@@ -884,9 +851,9 @@ object CppBridgeTTS {
      * @param outputPath Path to save the audio file
      * @param config Synthesis configuration (optional)
      * @return The synthesis result (with empty audioData, as it's saved to file)
-     * @throws SDKError if synthesis fails
+     * @throws SDKException if synthesis fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun synthesizeToFile(
         text: String,
         outputPath: String,
@@ -894,7 +861,7 @@ object CppBridgeTTS {
     ): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
-                throw SDKError.tts("TTS component not ready for synthesis")
+                throw SDKException.tts("TTS component not ready for synthesis")
             }
 
             isCancelled = false
@@ -917,7 +884,7 @@ object CppBridgeTTS {
             try {
                 val durationMs = RunAnywhereBridge.racTtsComponentSynthesizeToFile(handle, text, outputPath, config.toJson())
                 if (durationMs < 0) {
-                    throw SDKError.tts("Synthesis to file failed: error code $durationMs")
+                    throw SDKException.tts("Synthesis to file failed: error code $durationMs")
                 }
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
@@ -950,7 +917,7 @@ object CppBridgeTTS {
                 return result
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.tts("Synthesis to file failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.tts("Synthesis to file failed: ${e.message}")
             }
         }
     }
@@ -1153,190 +1120,6 @@ object CppBridgeTTS {
     @JvmStatic
     fun getLoadedModelIdCallback(): String? {
         return loadedModelId
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the TTS callbacks with C++ core.
-     *
-     * Registers [streamAudioCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_tts_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetTTSCallbacks()
-
-    /**
-     * Native method to unset the TTS callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_tts_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetTTSCallbacks()
-
-    /**
-     * Native method to create the TTS component.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_tts_component_create()
-     */
-    @JvmStatic
-    external fun nativeCreate(): Long
-
-    /**
-     * Native method to load a model.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_tts_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun nativeLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Native method to synthesize audio from text.
-     *
-     * @param handle The component handle
-     * @param text The input text
-     * @param configJson JSON configuration string
-     * @return Audio data bytes, or null on failure
-     *
-     * C API: rac_tts_component_synthesize(handle, text, config)
-     */
-    @JvmStatic
-    external fun nativeSynthesize(handle: Long, text: String, configJson: String): ByteArray?
-
-    /**
-     * Native method to synthesize audio with streaming.
-     *
-     * @param handle The component handle
-     * @param text The input text
-     * @param configJson JSON configuration string
-     * @return Final audio data bytes, or null on failure
-     *
-     * C API: rac_tts_component_synthesize_stream(handle, text, config)
-     */
-    @JvmStatic
-    external fun nativeSynthesizeStream(handle: Long, text: String, configJson: String): ByteArray?
-
-    /**
-     * Native method to synthesize audio to file.
-     *
-     * @param handle The component handle
-     * @param text The input text
-     * @param outputPath Path to save the audio file
-     * @param configJson JSON configuration string
-     * @return Audio duration in milliseconds, or negative error code on failure
-     *
-     * C API: rac_tts_component_synthesize_to_file(handle, text, output_path, config)
-     */
-    @JvmStatic
-    external fun nativeSynthesizeToFile(handle: Long, text: String, outputPath: String, configJson: String): Long
-
-    /**
-     * Native method to cancel synthesis.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_tts_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun nativeCancel(handle: Long)
-
-    /**
-     * Native method to unload the model.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_tts_component_unload(handle)
-     */
-    @JvmStatic
-    external fun nativeUnload(handle: Long)
-
-    /**
-     * Native method to destroy the component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_tts_component_destroy(handle)
-     */
-    @JvmStatic
-    external fun nativeDestroy(handle: Long)
-
-    /**
-     * Native method to get available voices.
-     *
-     * @param handle The component handle
-     * @return JSON array of voice information
-     *
-     * C API: rac_tts_component_get_voices(handle)
-     */
-    @JvmStatic
-    external fun nativeGetVoices(handle: Long): String?
-
-    /**
-     * Native method to set the active voice.
-     *
-     * @param handle The component handle
-     * @param voiceId The voice ID to use
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_tts_component_set_voice(handle, voice_id)
-     */
-    @JvmStatic
-    external fun nativeSetVoice(handle: Long, voiceId: String): Int
-
-    /**
-     * Native method to get supported languages.
-     *
-     * @param handle The component handle
-     * @return JSON array of supported language codes
-     *
-     * C API: rac_tts_component_get_languages(handle)
-     */
-    @JvmStatic
-    external fun nativeGetLanguages(handle: Long): String?
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the TTS callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetTTSCallbacks()
-
-            ttsListener = null
-            streamCallback = null
-            isRegistered = false
-        }
     }
 
     // ========================================================================

@@ -21,7 +21,146 @@ import type {
 } from '@runanywhere/core';
 import { VLMImageFormat } from '@runanywhere/core';
 
+/** Encode a `Uint8Array` to a base64 string. */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binaryString = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binaryString += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binaryString);
+}
+
 const logger = new SDKLogger('RunAnywhere.VLM');
+
+function buildVLMOptionsJson(
+  prompt: string,
+  options: VLMGenerationOptions | undefined,
+  streamingEnabled: boolean
+): string {
+  const customChatTemplate = options?.customChatTemplate;
+
+  return JSON.stringify({
+    prompt: options?.prompt ?? prompt,
+    max_tokens: options?.maxTokens ?? 2048,
+    temperature: options?.temperature ?? 0.7,
+    top_p: options?.topP ?? 0.9,
+    top_k: options?.topK ?? 0,
+    stop_sequences: options?.stopSequences ?? [],
+    streaming_enabled: streamingEnabled,
+    system_prompt: options?.systemPrompt,
+    max_image_size: options?.maxImageSize ?? 0,
+    n_threads: options?.nThreads ?? 0,
+    use_gpu: options?.useGpu ?? true,
+    model_family: options?.modelFamily ?? 0,
+    custom_chat_template: customChatTemplate
+      ? {
+          template_text: customChatTemplate.templateText,
+          image_marker: customChatTemplate.imageMarker,
+          default_system_prompt: customChatTemplate.defaultSystemPrompt,
+        }
+      : undefined,
+    image_marker_override: options?.imageMarkerOverride,
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readNumber(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+}
+
+function readString(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function createVLMResult(fields: {
+  text: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  processingTimeMs?: number;
+  tokensPerSecond?: number;
+  imageTokens?: number;
+  timeToFirstTokenMs?: number;
+  imageEncodeTimeMs?: number;
+  hardwareUsed?: string;
+}): VLMResult {
+  const promptTokens = fields.promptTokens ?? 0;
+  const completionTokens = fields.completionTokens ?? 0;
+
+  return {
+    text: fields.text,
+    promptTokens,
+    completionTokens,
+    totalTokens: fields.totalTokens ?? promptTokens + completionTokens,
+    processingTimeMs: fields.processingTimeMs ?? 0,
+    tokensPerSecond: fields.tokensPerSecond ?? 0,
+    imageTokens: fields.imageTokens ?? 0,
+    timeToFirstTokenMs: fields.timeToFirstTokenMs ?? 0,
+    imageEncodeTimeMs: fields.imageEncodeTimeMs ?? 0,
+    hardwareUsed: fields.hardwareUsed,
+  };
+}
+
+function createVLMResultFromNative(record: Record<string, unknown>): VLMResult {
+  const promptTokens =
+    readNumber(record, ['prompt_tokens', 'promptTokens']) ?? 0;
+  const completionTokens =
+    readNumber(record, ['completion_tokens', 'completionTokens']) ?? 0;
+
+  return createVLMResult({
+    text: readString(record, ['text']) ?? '',
+    promptTokens,
+    completionTokens,
+    totalTokens: readNumber(record, ['total_tokens', 'totalTokens']),
+    processingTimeMs: readNumber(record, [
+      'total_time_ms',
+      'processing_time_ms',
+      'totalTimeMs',
+      'processingTimeMs',
+    ]),
+    tokensPerSecond: readNumber(record, [
+      'tokens_per_second',
+      'tokensPerSecond',
+    ]),
+    imageTokens: readNumber(record, ['image_tokens', 'imageTokens']),
+    timeToFirstTokenMs: readNumber(record, [
+      'time_to_first_token_ms',
+      'timeToFirstTokenMs',
+    ]),
+    imageEncodeTimeMs: readNumber(record, [
+      'image_encode_time_ms',
+      'imageEncodeTimeMs',
+    ]),
+    hardwareUsed: readString(record, ['hardware_used', 'hardwareUsed']),
+  });
+}
 
 // ============================================================================
 // VLM Extension - Backend Agnostic
@@ -175,12 +314,7 @@ export async function processImage(
   const { imageFormat, imageData, imageWidth, imageHeight } =
     convertVLMImageToNative(image);
 
-  // Build options JSON
-  const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 2048,
-    temperature: options?.temperature ?? 0.7,
-    top_p: options?.topP ?? 0.9,
-  });
+  const optionsJson = buildVLMOptionsJson(prompt, options, false);
 
   const resultJson = await native.processVLMImage(
     imageFormat,
@@ -192,25 +326,16 @@ export async function processImage(
   );
 
   try {
-    const result = JSON.parse(resultJson);
-    return {
-      text: result.text ?? '',
-      promptTokens: result.prompt_tokens ?? 0,
-      completionTokens: result.completion_tokens ?? 0,
-      totalTimeMs: result.total_time_ms ?? 0,
-      tokensPerSecond: result.tokens_per_second ?? 0,
-    };
+    const result: unknown = JSON.parse(resultJson);
+    if (!isRecord(result)) {
+      return createVLMResult({ text: resultJson });
+    }
+    return createVLMResultFromNative(result);
   } catch {
     if (resultJson.includes('error')) {
       throw new Error(resultJson);
     }
-    return {
-      text: resultJson,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTimeMs: 0,
-      tokensPerSecond: 0,
-    };
+    return createVLMResult({ text: resultJson });
   }
 }
 
@@ -260,12 +385,7 @@ export async function processImageStream(
   const { imageFormat, imageData, imageWidth, imageHeight } =
     convertVLMImageToNative(image);
 
-  // Build options JSON
-  const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 2048,
-    temperature: options?.temperature ?? 0.7,
-    top_p: options?.topP ?? 0.9,
-  });
+  const optionsJson = buildVLMOptionsJson(prompt, options, true);
 
   // Create the result promise
   const resultPromise = new Promise<VLMResult>((resolve, reject) => {
@@ -321,13 +441,16 @@ export async function processImageStream(
             const tokensPerSecond =
               latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0;
 
-            const finalResult: VLMResult = {
+            const promptTokens = Math.ceil(prompt.length / 4);
+            const finalResult = createVLMResult({
               text: fullText,
-              promptTokens: Math.ceil(prompt.length / 4),
+              promptTokens,
               completionTokens: tokenCount,
-              totalTimeMs: latencyMs,
+              totalTokens: promptTokens + tokenCount,
+              processingTimeMs: latencyMs,
               tokensPerSecond,
-            };
+              timeToFirstTokenMs,
+            });
 
             if (resolveResult) {
               resolveResult(finalResult);
@@ -400,7 +523,11 @@ export function cancelVLMGeneration(): void {
 // ============================================================================
 
 /**
- * Convert VLMImage discriminated union to native parameters
+ * Convert proto `VLMImage` to native bridge parameters.
+ *
+ * The native side expects a numeric image format compatible with
+ * `rac_vlm_image_format_t` (FILE_PATH, RGB_PIXELS, BASE64). We map the
+ * proto enum values onto the C-ABI dispatch space.
  * @internal
  */
 function convertVLMImageToNative(image: VLMImage): {
@@ -410,46 +537,55 @@ function convertVLMImageToNative(image: VLMImage): {
   imageHeight: number;
 } {
   switch (image.format) {
-    case VLMImageFormat.FilePath:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH: {
+      const filePath = image.filePath ?? '';
+      if (!filePath) throw new Error('VLMImage.filePath is required for FILE_PATH format');
       return {
-        imageFormat: VLMImageFormat.FilePath,
-        imageData: image.filePath,
-        imageWidth: 0,
-        imageHeight: 0,
+        imageFormat: VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
+        imageData: filePath,
+        imageWidth: image.width ?? 0,
+        imageHeight: image.height ?? 0,
       };
+    }
 
-    case VLMImageFormat.RGBPixels:
-      // Convert Uint8Array to base64 string for bridge crossing
-      const base64Data = uint8ArrayToBase64(image.data);
+    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA: {
+      const rawBytes = image.rawRgb;
+      if (!rawBytes) throw new Error('VLMImage.rawRgb is required for RAW pixel format');
       return {
-        imageFormat: VLMImageFormat.RGBPixels,
-        imageData: base64Data,
+        imageFormat: image.format,
+        imageData: uint8ArrayToBase64(rawBytes),
         imageWidth: image.width,
         imageHeight: image.height,
       };
+    }
 
-    case VLMImageFormat.Base64:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_BASE64: {
+      const base64 = image.base64 ?? '';
+      if (!base64) throw new Error('VLMImage.base64 is required for BASE64 format');
       return {
-        imageFormat: VLMImageFormat.Base64,
-        imageData: image.base64,
-        imageWidth: 0,
-        imageHeight: 0,
+        imageFormat: VLMImageFormat.VLM_IMAGE_FORMAT_BASE64,
+        imageData: base64,
+        imageWidth: image.width ?? 0,
+        imageHeight: image.height ?? 0,
       };
+    }
+
+    case VLMImageFormat.VLM_IMAGE_FORMAT_JPEG:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_PNG:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_WEBP: {
+      const encoded = image.encoded;
+      if (!encoded)
+        throw new Error('VLMImage.encoded is required for encoded image formats');
+      return {
+        imageFormat: image.format,
+        imageData: uint8ArrayToBase64(encoded),
+        imageWidth: image.width ?? 0,
+        imageHeight: image.height ?? 0,
+      };
+    }
 
     default:
-      throw new Error(`Unknown VLM image format: ${(image as VLMImage).format}`);
+      throw new Error(`Unknown VLM image format: ${image.format}`);
   }
-}
-
-/**
- * Convert Uint8Array to base64 string
- * @internal
- */
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  // Use btoa with binary string conversion
-  let binaryString = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binaryString += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binaryString);
 }

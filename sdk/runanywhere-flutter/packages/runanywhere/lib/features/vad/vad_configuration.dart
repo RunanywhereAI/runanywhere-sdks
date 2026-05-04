@@ -1,8 +1,11 @@
 import 'package:runanywhere/core/protocols/component/component_configuration.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 
-/// Configuration for VAD component
-class VADConfiguration implements ComponentConfiguration {
+/// Dart-layer validation config for the VAD bridge. Not a data-transfer
+/// object — proto's [VADConfiguration] from vad_options.pb.dart is the
+/// canonical type. This exists only to run pre-FFI validation and carry
+/// energy-threshold/calibration settings not present in the proto.
+class VADComponentConfig implements ComponentConfiguration {
   /// Energy threshold for voice detection (0.0 to 1.0)
   final double energyThreshold;
 
@@ -18,7 +21,7 @@ class VADConfiguration implements ComponentConfiguration {
   /// Calibration multiplier (threshold = ambient noise * multiplier)
   final double calibrationMultiplier;
 
-  const VADConfiguration({
+  const VADComponentConfig({
     this.energyThreshold = 0.015,
     this.sampleRate = 16000,
     this.frameLength = 0.1,
@@ -30,38 +33,38 @@ class VADConfiguration implements ComponentConfiguration {
   void validate() {
     // Validate threshold range with better guidance
     if (energyThreshold < 0 || energyThreshold > 1.0) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05',
       );
     }
 
     // Warn if threshold is too low or too high
     if (energyThreshold < 0.002) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Energy threshold $energyThreshold is very low and may cause false positives. Recommended minimum: 0.002',
       );
     }
     if (energyThreshold > 0.1) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Energy threshold $energyThreshold is very high and may miss speech. Recommended maximum: 0.1',
       );
     }
 
     if (sampleRate <= 0 || sampleRate > 48000) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Sample rate must be between 1 and 48000 Hz',
       );
     }
 
     if (frameLength <= 0 || frameLength > 1.0) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Frame length must be between 0 and 1 second',
       );
     }
 
     // Validate calibration multiplier
     if (calibrationMultiplier < 1.5 || calibrationMultiplier > 5.0) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Calibration multiplier must be between 1.5 and 5.0',
       );
     }

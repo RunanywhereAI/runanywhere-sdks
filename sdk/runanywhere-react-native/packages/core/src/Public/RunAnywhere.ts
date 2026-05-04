@@ -17,11 +17,13 @@ import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
 import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
+import { TelemetryService } from '../services/Network';
 import {
-  HTTPService,
-  SDKEnvironment as NetworkSDKEnvironment,
-  TelemetryService,
-} from '../services/Network';
+  DEFAULT_BASE_URL,
+  hasUsableBackendConfig,
+  hasUsableSupabaseConfig,
+  isUsableCredential,
+} from '../services/Network/NetworkConfiguration';
 
 import type {
   InitializationState,
@@ -35,23 +37,37 @@ import {
   resetState,
 } from '../Foundation/Initialization';
 import type { ModelInfo, SDKInitOptions } from '../types';
+import type { DownloadProgress as ProtoDownloadProgress } from '@runanywhere/proto-ts/download_service';
 
 // Import extensions
 import * as TextGeneration from './Extensions/RunAnywhere+TextGeneration';
+import type { ThinkingExtractionResult } from './Extensions/RunAnywhere+TextGeneration';
 import * as STT from './Extensions/RunAnywhere+STT';
 import * as TTS from './Extensions/RunAnywhere+TTS';
 import * as VAD from './Extensions/RunAnywhere+VAD';
 import * as Storage from './Extensions/RunAnywhere+Storage';
+import * as SDKEvents from './Extensions/RunAnywhere+Events';
+import * as Lifecycle from './Extensions/RunAnywhere+Lifecycle';
 import * as Models from './Extensions/RunAnywhere+Models';
 import * as Logging from './Extensions/RunAnywhere+Logging';
 import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
-import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
+// v3.1: RunAnywhere+VoiceSession.ts deleted — use VoiceAgentStreamAdapter.
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
 import * as Device from './Extensions/RunAnywhere+Device';
-import * as VLM from './Extensions/RunAnywhere+VLM';
+import * as VLM from './Extensions/RunAnywhere+VisionLanguage';
+import { lora as LoRACapability } from './Extensions/RunAnywhere+LoRA';
+import * as Diffusion from './Extensions/RunAnywhere+Diffusion';
+import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
+// Phase D namespace extensions
+import * as Frameworks from './Extensions/RunAnywhere+Frameworks';
+import * as ModelAssignments from './Extensions/RunAnywhere+ModelAssignments';
+import * as ModelManagement from './Extensions/RunAnywhere+ModelManagement';
+import * as PluginLoader from './Extensions/RunAnywhere+PluginLoader';
+import * as VLMModels from './Extensions/RunAnywhere+VLMModels';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -86,6 +102,90 @@ export class Conversation {
 
   clear(): void {
     this.messages = [];
+  }
+}
+
+// ============================================================================
+// Download Model — Streaming AsyncGenerator
+// ============================================================================
+
+/**
+ * Download a model and stream `DownloadProgress` events.
+ *
+ * Written as `async function*` rather than an object literal with a
+ * `[Symbol.asyncIterator]` method because Babel compiles
+ * `Object.defineProperty(obj, Symbol.asyncIterator, fn)` to
+ * `_defineProperty2.default(...)` which Hermes does not recognise as
+ * async-iterable. Generators compile to code Hermes natively supports.
+ *
+ * Cancellation: breaking out of the `for await` loop triggers the
+ * generator's `return()` path, which fires the `finally` block and
+ * issues `Models.cancelDownload(modelId)` against the native cancel-token
+ * registry.
+ */
+async function* downloadModel(
+  modelId: string
+): AsyncGenerator<ProtoDownloadProgress, void, void> {
+  const queue: ProtoDownloadProgress[] = [];
+  let resolver: ((p: ProtoDownloadProgress | null) => void) | null = null;
+  let finished = false;
+  let dlError: Error | null = null;
+
+  const push = (progress: ProtoDownloadProgress): void => {
+    if (resolver) {
+      const r = resolver;
+      resolver = null;
+      r(progress);
+    } else {
+      queue.push(progress);
+    }
+  };
+
+  // Kick off the underlying download; `Models.downloadModel` delivers a
+  // full `runanywhere.v1.DownloadProgress` message per tick.
+  const downloadPromise = Models.downloadModel(modelId, (p) => {
+    push(p as ProtoDownloadProgress);
+  })
+    .then(() => {
+      finished = true;
+      if (resolver) {
+        const r = resolver;
+        resolver = null;
+        r(null);
+      }
+    })
+    .catch((err: unknown) => {
+      dlError = err instanceof Error ? err : new Error(String(err));
+      finished = true;
+      if (resolver) {
+        const r = resolver;
+        resolver = null;
+        r(null);
+      }
+    });
+
+  try {
+    while (!finished || queue.length > 0) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+        continue;
+      }
+      if (finished) break;
+      const next = await new Promise<ProtoDownloadProgress | null>((r) => {
+        resolver = r;
+      });
+      if (next !== null) {
+        yield next;
+      }
+    }
+    if (dlError) throw dlError;
+  } finally {
+    if (!finished) {
+      // Consumer broke out early — signal cancel and let the download
+      // promise settle so we don't leak the task.
+      void Models.cancelDownload(modelId);
+      await downloadPromise.catch(() => undefined);
+    }
   }
 }
 
@@ -128,21 +228,28 @@ export const RunAnywhere = {
   // ============================================================================
 
   async initialize(options: SDKInitOptions): Promise<void> {
-    const environment = options.environment ?? SDKEnvironment.Production;
+    const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+    const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
+    const effectiveApiKey = isUsableCredential(options.apiKey)
+      ? options.apiKey!.trim()
+      : '';
 
     // Fail fast: API key is required for production/staging environments
     // Development mode uses C++ dev config (Supabase credentials) instead
-    if (environment !== SDKEnvironment.Development && !options.apiKey) {
-      const envName = environment === SDKEnvironment.Staging ? 'staging' : 'production';
+    if (
+      environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
+      !hasUsableBackendConfig({ baseURL: effectiveBaseURL, apiKey: effectiveApiKey })
+    ) {
+      const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
       throw new Error(
-        `API key is required for ${envName} environment. ` +
-        `Pass apiKey in initialize() options or use SDKEnvironment.Development for local testing.`
+        `Usable API key and baseURL are required for ${envName} environment. ` +
+        'Pass real apiKey/baseURL values or use SDKEnvironment.Development for local testing.'
       );
     }
 
     const initParams: SDKInitParams = {
-      apiKey: options.apiKey,
-      baseURL: options.baseURL,
+      apiKey: effectiveApiKey,
+      baseURL: effectiveBaseURL,
       environment,
     };
 
@@ -167,44 +274,33 @@ export const RunAnywhere = {
         ? FileSystem.getDocumentsDirectory()
         : '';
 
-      // Configure network layer BEFORE native initialization
-      // This ensures HTTP is ready when C++ callbacks need it
-      const envString = environment === SDKEnvironment.Development ? 'development'
-        : environment === SDKEnvironment.Staging ? 'staging'
+      // HTTP transport is owned by native C++ (rac_http_client_*). The JS
+      // layer only needs to stash the base URL / API key with the native
+      // HTTPBridge so downstream native consumers (DeviceBridge, telemetry)
+      // resolve the right endpoint.
+      const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
+        : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
           : 'production';
 
-      // Map environment string to SDKEnvironment enum for HTTPService
-      const networkEnv = environment === SDKEnvironment.Development
-        ? NetworkSDKEnvironment.Development
-        : environment === SDKEnvironment.Staging
-          ? NetworkSDKEnvironment.Staging
-          : NetworkSDKEnvironment.Production;
-
-      // Configure HTTPService with network settings
-      HTTPService.shared.configure({
-        baseURL: options.baseURL || 'https://api.runanywhere.ai',
-        apiKey: options.apiKey ?? '',
-        environment: networkEnv,
-      });
-
-      // Configure dev mode if Supabase credentials provided
-      if (options.supabaseURL && options.supabaseKey) {
-        HTTPService.shared.configureDev({
-          supabaseURL: options.supabaseURL,
-          supabaseKey: options.supabaseKey,
-        });
+      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+        await native.configureHttp(
+          effectiveBaseURL,
+          effectiveApiKey
+        );
       }
 
-      // For development mode, Supabase credentials will be passed to native
-      if (environment === SDKEnvironment.Development && options.supabaseURL) {
+      if (
+        environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
+        hasUsableSupabaseConfig(options)
+      ) {
         logger.debug('Development mode - Supabase config provided');
       }
 
       // Initialize with config
       // Note: Backend registration (llamacpp, onnx) is done by their respective packages
       const configJson = JSON.stringify({
-        apiKey: options.apiKey,
-        baseURL: options.baseURL,
+        apiKey: effectiveApiKey,
+        baseURL: effectiveBaseURL,
         environment: envString,
         documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
         sdkVersion: SDKConstants.version, // Centralized version for C++ layer
@@ -226,17 +322,17 @@ export const RunAnywhere = {
       }
 
       // Initialize telemetry with device ID
-      TelemetryService.shared.configure(cachedDeviceId, networkEnv);
+      TelemetryService.shared.configure(cachedDeviceId, environment);
       TelemetryService.shared.trackSDKInit(envString, true);
 
       // For production/staging mode, authenticate with backend to get JWT tokens
       // This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-      if (environment !== SDKEnvironment.Development && options.apiKey) {
+      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && effectiveApiKey) {
         try {
           logger.info('Authenticating with backend (production/staging mode)...');
           const authenticated = await this._authenticateWithBackend(
-            options.apiKey,
-            options.baseURL || 'https://api.runanywhere.ai',
+            effectiveApiKey,
+            effectiveBaseURL,
             cachedDeviceId
           );
           if (authenticated) {
@@ -249,10 +345,24 @@ export const RunAnywhere = {
         }
       }
 
+      // Resolve build token: explicit option wins over RUNANYWHERE_BUILD_TOKEN.
+      // For production/staging we require a real token (either source). Native
+      // C++ has a baked-in dev fallback used only when environment === development,
+      // so dev mode may proceed with an undefined token.
+      const resolvedBuildToken = this._resolveBuildToken(options.buildToken);
+      if (!resolvedBuildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+        const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
+        throw new Error(
+          `Usable build token is required for ${envName} environment. ` +
+          'Pass `buildToken` in initialize() options or set the ' +
+          '`RUNANYWHERE_BUILD_TOKEN` environment variable at build time.'
+        );
+      }
+
       // Trigger device registration (non-blocking, best-effort)
       // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
       // Uses native C++ → platform HTTP (exactly like Swift)
-      this._registerDeviceIfNeeded(environment, options.supabaseKey).catch(err => {
+      this._registerDeviceIfNeeded(environment, options.supabaseKey, resolvedBuildToken).catch(err => {
         logger.warning(`Device registration failed (non-fatal): ${err.message}`);
       });
 
@@ -272,14 +382,12 @@ export const RunAnywhere = {
   },
 
   /**
-   * Register device with backend if not already registered
-   * Uses native C++ DeviceBridge + platform HTTP (URLSession/OkHttp)
-   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-   * @internal
-   */
-  /**
-   * Authenticate with backend to get JWT access/refresh tokens
-   * This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:)
+   * Authenticate with backend to get JWT access/refresh tokens.
+   *
+   * Delegates the full round-trip (request build + HTTP transport via
+   * rac_http_client_* + AuthBridge state update) to native C++. This
+   * mirrors Swift's HTTPClientAdapter and Kotlin's CppBridgeAuth so there
+   * is a single HTTP code path across all SDKs.
    * @internal
    */
   async _authenticateWithBackend(
@@ -288,38 +396,20 @@ export const RunAnywhere = {
     deviceId: string
   ): Promise<boolean> {
     try {
-      const endpoint = '/api/v1/auth/sdk/authenticate';
-      const fullUrl = baseURL.replace(/\/$/, '') + endpoint;
-
-      // Use actual platform (ios/android) as backend only accepts these values
-      // This matches how Swift sends 'ios' and Kotlin sends 'android'
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      const native = requireNativeModule();
 
-      const requestBody = JSON.stringify({
-        api_key: apiKey,
-        device_id: deviceId,
-        platform: platform,
-        sdk_version: SDKConstants.version,
-      });
+      logger.debug(`Auth request to: ${baseURL.replace(/\/$/, '')}/api/v1/auth/sdk/authenticate`);
 
-      logger.debug(`Auth request to: ${fullUrl}`);
+      const responseJson = await native.authAuthenticate(
+        apiKey,
+        baseURL,
+        deviceId,
+        platform,
+        SDKConstants.version,
+      );
 
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: requestBody,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error(`Authentication failed: HTTP ${response.status} - ${errorText}`);
-        return false;
-      }
-
-      const authResponse = await response.json() as {
+      let authResponse: {
         access_token: string;
         refresh_token: string;
         expires_in: number;
@@ -328,34 +418,21 @@ export const RunAnywhere = {
         user_id?: string;
         token_type: string;
       };
-
-      // Store tokens in HTTPService for subsequent requests
-      HTTPService.shared.setToken(authResponse.access_token);
-
-      // Store tokens in C++ AuthBridge for native HTTP requests (telemetry, device registration)
       try {
-        const native = requireNativeModule();
-        if (native && typeof native.setAuthTokens === 'function') {
-          await native.setAuthTokens(JSON.stringify(authResponse));
-          logger.debug('Auth tokens set in C++ AuthBridge');
-        } else {
-          logger.warning('setAuthTokens not available on native module - tokens stored in JS only');
-        }
-      } catch (nativeErr) {
-        logger.warning(`Failed to set auth tokens in native: ${nativeErr}`);
-        // Continue - tokens are still stored in HTTPService
+        authResponse = JSON.parse(responseJson);
+      } catch (parseErr) {
+        logger.error(`Auth response parse failed: ${parseErr}`);
+        return false;
       }
 
-      // Store tokens in secure storage for persistence
       try {
         await SecureStorageService.storeAuthTokens(
           authResponse.access_token,
           authResponse.refresh_token,
-          authResponse.expires_in
+          authResponse.expires_in,
         );
       } catch (storageErr) {
         logger.warning(`Failed to persist tokens: ${storageErr}`);
-        // Continue - tokens are still in memory
       }
 
       logger.info(`Authentication successful! Token expires in ${authResponse.expires_in}s`);
@@ -367,30 +444,63 @@ export const RunAnywhere = {
     }
   },
 
+  /**
+   * Resolve the build token from explicit option or environment variable.
+   * Returns `undefined` when no token is available — callers must decide
+   * whether that is acceptable (only `SDKEnvironment.Development` is, via the
+   * native C++ baked-in dev fallback).
+   * @internal
+   */
+  _resolveBuildToken(explicit?: string): string | undefined {
+    if (isUsableCredential(explicit)) return explicit!.trim();
+    const fromEnv =
+      typeof process !== 'undefined' && process.env
+        ? process.env.RUNANYWHERE_BUILD_TOKEN
+        : undefined;
+    return isUsableCredential(fromEnv) ? fromEnv!.trim() : undefined;
+  },
+
+  /**
+   * Register device with backend if not already registered.
+   * Uses native C++ DeviceBridge + shared rac_http_client_* transport.
+   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+   * @internal
+   */
   async _registerDeviceIfNeeded(
     environment: SDKEnvironment,
-    supabaseKey?: string
+    supabaseKey?: string,
+    buildToken?: string
   ): Promise<void> {
-    const envString = environment === SDKEnvironment.Development ? 'development'
-      : environment === SDKEnvironment.Staging ? 'staging'
+    const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
+      : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
         : 'production';
+
+    // Defensive: non-dev must have a token (initialize() already enforces this,
+    // but guard here too so we never silently register with an empty token).
+    if (!buildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      logger.debug('Skipping telemetry/device registration: no usable config');
+      return;
+    }
 
     try {
       const native = requireNativeModule();
 
       // Call native registerDevice which goes through:
-      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed → http_post callback → native HTTP
+      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed
+      // → http_post callback → rac_http_client_*.
       // This exactly mirrors Swift's flow!
+      // Empty `buildToken` is only emitted in development mode so native can
+      // apply its baked-in dev fallback.
       const success = await native.registerDevice(JSON.stringify({
         environment: envString,
-        supabaseKey: supabaseKey || '',
-        buildToken: '', // TODO: Add build token support if needed
+        supabaseKey: supabaseKey ?? '',
+        buildToken: buildToken ?? '',
       }));
 
       if (success) {
-        logger.info('Device registered successfully via native');
+        logger.debug('Device registration request completed via native');
       } else {
-        logger.warning('Device registration returned false');
+        logger.debug('Skipping telemetry/device registration: no usable config');
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -418,6 +528,68 @@ export const RunAnywhere = {
     if (!isNativeModuleAvailable()) return false;
     const native = requireNativeModule();
     return native.isInitialized();
+  },
+
+  /**
+   * Whether the SDK is fully active (core initialised AND services ready).
+   *
+   * Matches Swift: `RunAnywhere.isActive`.
+   */
+  get isActive(): boolean {
+    return initState.isCoreInitialized && initState.hasCompletedServicesInit;
+  },
+
+  /**
+   * Retry just the Phase-2 (services) initialisation. Useful after a
+   * transient connectivity failure where Phase 1 (core) succeeded but
+   * services init failed or was skipped.
+   *
+   * Matches Swift: `RunAnywhere.completeServicesInitialization()`.
+   */
+  async completeServicesInitialization(): Promise<void> {
+    if (!initState.isCoreInitialized) {
+      throw new Error(
+        'completeServicesInitialization() requires the SDK core to be initialised. Call initialize() first.'
+      );
+    }
+    if (initState.hasCompletedServicesInit) {
+      logger.debug('Services already initialised; nothing to do.');
+      return;
+    }
+
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    try {
+      const native = requireNativeModule();
+      // Re-trigger model registry hydration; native side is idempotent.
+      await ModelRegistry.initialize();
+
+      // Best-effort device registration retry. Build token resolution is
+      // identical to the original `initialize()` path.
+      const env = initState.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+      const buildToken = this._resolveBuildToken();
+      try {
+        await this._registerDeviceIfNeeded(env, undefined, buildToken);
+      } catch (e) {
+        logger.warning(
+          `Device registration retry failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`
+        );
+      }
+
+      ServiceContainer.shared.markInitialized();
+      initState = markServicesInitialized(initState);
+      // Touch native to keep the bridge warm; ignore returned bool here.
+      void native.isInitialized();
+      logger.info('Services initialisation completed.');
+      EventBus.publish('Initialization', { type: 'completed' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Services initialisation failed: ${msg}`);
+      EventBus.publish('Initialization', { type: 'failed', error: msg });
+      throw error;
+    }
   },
 
   // ============================================================================
@@ -477,29 +649,12 @@ export const RunAnywhere = {
   },
 
   /**
-   * Get device ID (Keychain-persisted, survives reinstalls)
-   * Note: This is async because it uses secure storage
+   * Get device ID (Keychain-persisted, survives reinstalls).
+   *
+   * Cached during `initialize()`. Empty string until then.
    */
   get deviceId(): string {
-    // Return cached value if available (set during init)
     return cachedDeviceId;
-  },
-
-  /**
-   * Get device ID asynchronously (Keychain-persisted, survives reinstalls)
-   */
-  async getDeviceId(): Promise<string> {
-    if (cachedDeviceId) {
-      return cachedDeviceId;
-    }
-    try {
-      const native = requireNativeModule();
-      const uuid = await native.getPersistentDeviceUUID();
-      cachedDeviceId = uuid;
-      return uuid;
-    } catch {
-      return '';
-    }
   },
 
   // ============================================================================
@@ -521,10 +676,20 @@ export const RunAnywhere = {
   loadModel: TextGeneration.loadModel,
   isModelLoaded: TextGeneration.isModelLoaded,
   unloadModel: TextGeneration.unloadModel,
+  // Canonical spec names (§3)
+  loadLLMModel: TextGeneration.loadModel,
+  unloadLLMModel: TextGeneration.unloadModel,
+  isLLMModelLoaded: TextGeneration.isModelLoaded,
   chat: TextGeneration.chat,
   generate: TextGeneration.generate,
   generateStream: TextGeneration.generateStream,
   cancelGeneration: TextGeneration.cancelGeneration,
+  // Introspection — canonical: `currentLLMModel()` only.
+  currentLLMModel: TextGeneration.currentLLMModel,
+  // Thinking token utilities (§3)
+  extractThinkingTokens: TextGeneration.extractThinkingTokens,
+  stripThinkingTokens: TextGeneration.stripThinkingTokens,
+  splitThinkingAndResponse: TextGeneration.splitThinkingAndResponse,
 
   // ============================================================================
   // Speech-to-Text (Delegated to Extension)
@@ -537,7 +702,17 @@ export const RunAnywhere = {
   transcribeSimple: STT.transcribeSimple,
   transcribeBuffer: STT.transcribeBuffer,
   transcribeStream: STT.transcribeStream,
+  transcribeStreamAsync: STT.transcribeStreamAsync,
   transcribeFile: STT.transcribeFile,
+  // Streaming audio ingestion (§4)
+  processStreamingAudio: STT.processStreamingAudio,
+  // Streaming control (matches Swift: stopStreamingTranscription)
+  stopStreamingTranscription: STT.stopStreamingTranscription,
+  isStreamingSTT: STT.isStreamingSTT,
+  // Introspection (matches Swift: currentSTTModel)
+  currentSTTModel: STT.currentSTTModel,
+  // Live transcription session (matches Swift: startLiveTranscription)
+  startLiveTranscription,
 
   // ============================================================================
   // Text-to-Speech (Delegated to Extension)
@@ -551,11 +726,14 @@ export const RunAnywhere = {
   unloadTTSModel: TTS.unloadTTSModel,
   synthesize: TTS.synthesize,
   synthesizeStream: TTS.synthesizeStream,
+  synthesizeStreamAsync: TTS.synthesizeStreamAsync,
   speak: TTS.speak,
   isSpeaking: TTS.isSpeaking,
   stopSpeaking: TTS.stopSpeaking,
   availableTTSVoices: TTS.availableTTSVoices,
   stopSynthesis: TTS.stopSynthesis,
+  // Introspection (matches Swift: currentTTSModel / currentTTSVoiceId)
+  currentTTSModel: TTS.currentTTSModel,
 
   // ============================================================================
   // Voice Activity Detection (Delegated to Extension)
@@ -567,12 +745,17 @@ export const RunAnywhere = {
   isVADModelLoaded: VAD.isVADModelLoaded,
   unloadVADModel: VAD.unloadVADModel,
   detectSpeech: VAD.detectSpeech,
+  detectVoiceActivity: VAD.detectVoiceActivity,
   processVAD: VAD.processVAD,
   startVAD: VAD.startVAD,
   stopVAD: VAD.stopVAD,
   resetVAD: VAD.resetVAD,
   setVADSpeechActivityCallback: VAD.setVADSpeechActivityCallback,
   setVADAudioBufferCallback: VAD.setVADAudioBufferCallback,
+  // VAD statistics callback (§6)
+  setVADStatisticsCallback: VAD.setVADStatisticsCallback,
+  // VAD streaming (§6)
+  streamVAD: VAD.streamVAD,
   cleanupVAD: VAD.cleanupVAD,
   getVADState: VAD.getVADState,
 
@@ -589,15 +772,16 @@ export const RunAnywhere = {
   voiceAgentTranscribe: VoiceAgent.voiceAgentTranscribe,
   voiceAgentGenerateResponse: VoiceAgent.voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
+  // Phase 1 / B4 fix: forwarder for the v3.1 Nitro `getVoiceAgentHandle()`
+  // method. The sample VoiceAssistantScreen calls `RunAnywhere.getVoiceAgentHandle()`
+  // to feed VoiceAgentStreamAdapter; previously missing from this facade.
+  getVoiceAgentHandle: VoiceAgent.getVoiceAgentHandle,
   cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
+  // Canonical public streaming surface — callers never need to import the adapter.
+  streamVoiceAgent: VoiceAgent.streamVoiceAgent,
 
-  // ============================================================================
-  // Voice Session (Delegated to Extension)
-  // ============================================================================
-
-  startVoiceSession: VoiceSession.startVoiceSession,
-  startVoiceSessionWithCallback: VoiceSession.startVoiceSessionWithCallback,
-  createVoiceSession: VoiceSession.createVoiceSession,
+  // v3.1: Voice Session methods DELETED. Use VoiceAgentStreamAdapter
+  // for streaming; compose STT/LLM/TTS directly for one-shot turns.
 
   // ============================================================================
   // Structured Output (Delegated to Extension)
@@ -605,6 +789,8 @@ export const RunAnywhere = {
 
   generateStructured: StructuredOutput.generateStructured,
   generateStructuredStream: StructuredOutput.generateStructuredStream,
+  // Extract structured data from existing text (§3)
+  extractStructuredOutput: StructuredOutput.extractStructuredOutput,
   extractEntities: StructuredOutput.extractEntities,
   classify: StructuredOutput.classify,
 
@@ -618,7 +804,6 @@ export const RunAnywhere = {
   clearTools: ToolCalling.clearTools,
   parseToolCall: ToolCalling.parseToolCall,
   executeTool: ToolCalling.executeTool,
-  formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
   formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
   generateWithTools: ToolCalling.generateWithTools,
   continueWithToolResult: ToolCalling.continueWithToolResult,
@@ -639,6 +824,28 @@ export const RunAnywhere = {
   cancelVLMGeneration: VLM.cancelVLMGeneration,
 
   // ============================================================================
+  // LoRA Adapters — canonical `RunAnywhere.lora.*` namespace
+  // Matches Swift: RunAnywhere+LoRA.swift
+  // ============================================================================
+
+  lora: LoRACapability,
+
+  // ============================================================================
+  // Diffusion / Image Generation (Delegated to Extension)
+  // Matches Swift: RunAnywhere+Diffusion.swift
+  // ============================================================================
+
+  generateImage: Diffusion.generateImage,
+  generateImageStream: Diffusion.generateImageStream,
+  loadDiffusionModel: Diffusion.loadDiffusionModel,
+  unloadDiffusionModel: Diffusion.unloadDiffusionModel,
+  isDiffusionModelLoaded: Diffusion.isDiffusionModelLoaded,
+  currentDiffusionModelId: Diffusion.currentDiffusionModelId,
+  currentDiffusionFramework: Diffusion.currentDiffusionFramework,
+  cancelImageGeneration: Diffusion.cancelImageGeneration,
+  getDiffusionCapabilities: Diffusion.getDiffusionCapabilities,
+
+  // ============================================================================
   // RAG Pipeline (Delegated to Extension)
   // ============================================================================
 
@@ -652,27 +859,76 @@ export const RunAnywhere = {
   ragGetStatistics: RAG.ragGetStatistics,
 
   // ============================================================================
+  // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
+  // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
+  // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
+  // destroy verbs. Mirrors the namespace exposed by every other RunAnywhere SDK.
+  // ============================================================================
+
+  solutions: SolutionsCapability,
+
+  // ============================================================================
   // Storage Management (Delegated to Extension)
   // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
+  getStorageInfoProto: Storage.getStorageInfoProto,
+  checkStorageAvailability: Storage.checkStorageAvailability,
+  planStorageDelete: Storage.planStorageDelete,
+  deleteStorage: Storage.deleteStorage,
   getModelsDirectory: Storage.getModelsDirectory,
   clearCache: Storage.clearCache,
+
+  // ============================================================================
+  // Canonical SDK Events / Lifecycle (proto-byte native truth)
+  // ============================================================================
+
+  subscribeSDKEvents: SDKEvents.subscribeSDKEvents,
+  publishSDKEvent: SDKEvents.publishSDKEvent,
+  pollSDKEvent: SDKEvents.pollSDKEvent,
+  publishSDKFailure: SDKEvents.publishSDKFailure,
+  loadModelLifecycle: Lifecycle.loadModelLifecycle,
+  unloadModelLifecycle: Lifecycle.unloadModelLifecycle,
+  getCurrentModel: Lifecycle.getCurrentModel,
+  getComponentLifecycleSnapshot: Lifecycle.getComponentLifecycleSnapshot,
 
   // ============================================================================
   // Model Registry (Delegated to Extension)
   // ============================================================================
 
+  // Canonical name §13: availableModels()
+  availableModels: Models.getAvailableModels,
+  // Legacy alias kept for internal callers already using the old name.
   getAvailableModels: Models.getAvailableModels,
   getModelInfo: Models.getModelInfo,
   getModelPath: Models.getModelPath,
   isModelDownloaded: Models.isModelDownloaded,
-  downloadModel: Models.downloadModel,
+  /**
+   * Download a model and stream `DownloadProgress` events.
+   *
+   * Returns an `AsyncGenerator<DownloadProgress>` per canonical spec §13.
+   * Each yielded value is a proto `DownloadProgress` object with `modelId`,
+   * `bytesDownloaded`, `totalBytes`, and a 0-1 `progress` field.
+   *
+   * The actual download is delegated to the native C++ transport
+   * (`rac_http_download_execute`). Callers can break out of the for-await
+   * at any time; cancellation is performed via `cancelDownload(modelId)`.
+   *
+   * Implemented as an `async function*` (not an object with
+   * `[Symbol.asyncIterator]`) because Babel compiles the latter through
+   * `Object.defineProperty(obj, Symbol.asyncIterator, fn)`, which Hermes
+   * does not recognise as async-iterable. Generators are emitted as a
+   * native form Hermes supports.
+   */
+  downloadModel: downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  deleteAllModels: Models.deleteAllModels,
   checkCompatibility: Models.checkCompatibility,
   registerModel: Models.registerModel,
   registerMultiFileModel: Models.registerMultiFileModel,
+  // Refresh model registry (§13) — was present in Models extension but not wired to facade.
+  refreshModelRegistry: Models.refreshModelRegistry,
 
   // ============================================================================
   // Utilities
@@ -693,15 +949,6 @@ export const RunAnywhere = {
     } catch {
       return {};
     }
-  },
-
-  /**
-   * Get SDK version
-   * @returns Version string
-   */
-  async getVersion(): Promise<string> {
-    // Return centralized SDK version constant
-    return SDKConstants.version;
   },
 
   /**
@@ -759,6 +1006,37 @@ export const RunAnywhere = {
   },
 
   // ============================================================================
+  // Phase D Namespace Extensions (Frameworks / ModelAssignments / ModelManagement /
+  // PluginLoader / VLMModels)
+  // ============================================================================
+
+  // Framework discovery (mirrors Swift +Frameworks)
+  getRegisteredFrameworks: Frameworks.getRegisteredFrameworks,
+  getFrameworksForCapability: Frameworks.getFrameworks,
+  getModelsForFramework: Frameworks.getModelsForFramework,
+
+  // Model assignments (mirrors Swift +ModelAssignments)
+  fetchModelAssignments: ModelAssignments.fetchModelAssignments,
+  getModelsForCategory: ModelAssignments.getModelsForCategory,
+
+  // Model management (mirrors Swift +ModelManagement)
+  loadModelByCategory: ModelManagement.loadModelByCategory,
+  resolveModelFilePath: ModelManagement.resolveModelFilePath,
+  ensureModelDownloaded: ModelManagement.ensureModelDownloaded,
+
+  // Plugin loader — canonical `RunAnywhere.pluginLoader.*` namespace (§12).
+  pluginLoader: {
+    get apiVersion() { return PluginLoader.pluginApiVersion(); },
+    load: PluginLoader.loadPlugin,
+    unload: PluginLoader.unloadPlugin,
+    get registeredCount() { return PluginLoader.registeredPluginCount(); },
+    registeredNames: PluginLoader.registeredPluginNames,
+  },
+
+  // VLM model overloads (mirrors Swift +VLMModels)
+  loadVLMModelByInfo: VLMModels.loadVLMModel,
+
+  // ============================================================================
   // Factory Methods
   // ============================================================================
 
@@ -771,5 +1049,6 @@ export const RunAnywhere = {
 // Type Exports
 // ============================================================================
 
-export type { ModelInfo } from '../types/models';
+/** @deprecated Legacy RN registry DTO; use ProtoModelInfo for new public APIs. */
+export type { ModelInfo, ModelInfoProto as ProtoModelInfo } from '../types/models';
 export type { DownloadProgress } from '../services/DownloadService';

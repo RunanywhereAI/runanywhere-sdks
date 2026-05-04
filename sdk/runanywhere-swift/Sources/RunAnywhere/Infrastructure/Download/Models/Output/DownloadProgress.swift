@@ -1,176 +1,166 @@
+//
+//  DownloadProgress.swift
+//  RunAnywhere SDK
+//
+//  Unified DownloadProgress / DownloadStage / DownloadState are now
+//  generated from `idl/download_service.proto` via protoc-gen-swift.
+//  This file exposes canonical aliases and the small amount of Swift
+//  sugar (factory helpers + stage weighting) that SDK consumers use.
+//
+
 import Foundation
 
-// MARK: - Download Stage
+// MARK: - Canonical proto types
+//
+// The proto-gen prefix is `RA` (from `option swift_prefix = "RA"`).
 
-/// Current stage in the download pipeline
-public enum DownloadStage: Sendable, Equatable {
-    /// Downloading the file(s)
-    case downloading
+public typealias DownloadProgress = RADownloadProgress
+public typealias DownloadStage = RADownloadStage
+public typealias DownloadState = RADownloadState
 
-    /// Extracting archive contents
-    case extracting
+// MARK: - Stage Helpers
 
-    /// Validating downloaded files
-    case validating
-
-    /// Download and all processing complete
-    case completed
-
-    /// Display name for UI
-    public var displayName: String {
+public extension DownloadStage {
+    /// Display name for UI.
+    var displayName: String {
         switch self {
+        case .unspecified: return "Pending"
         case .downloading: return "Downloading"
         case .extracting: return "Extracting"
         case .validating: return "Validating"
         case .completed: return "Completed"
+        case .UNRECOGNIZED: return "Unknown"
         }
     }
 
-    /// Weight of this stage for overall progress calculation
-    /// Download: 0-80%, Extraction: 80-95%, Validation: 95-100%
-    public var progressRange: (start: Double, end: Double) {
+    /// Weight of this stage for overall progress calculation.
+    /// Download: 0-80%, Extraction: 80-95%, Validation: 95-99%, Completed: 100%.
+    var progressRange: (start: Double, end: Double) {
         switch self {
         case .downloading: return (0.0, 0.80)
         case .extracting: return (0.80, 0.95)
         case .validating: return (0.95, 0.99)
         case .completed: return (1.0, 1.0)
+        default: return (0.0, 0.0)
         }
     }
 }
 
-// MARK: - Download Progress
+// MARK: - Progress Helpers
 
-/// Download progress information with stage awareness
-public struct DownloadProgress: Sendable {
-    /// Current stage of the download pipeline
-    public let stage: DownloadStage
-
-    /// Bytes downloaded (for download stage)
-    public let bytesDownloaded: Int64
-
-    /// Total bytes to download
-    public let totalBytes: Int64
-
-    /// Current state (downloading, extracting, failed, etc.)
-    public let state: DownloadState
-
-    /// Estimated time remaining in seconds
-    public let estimatedTimeRemaining: TimeInterval?
-
-    /// Download speed in bytes per second
-    public let speed: Double?
-
-    /// Progress within current stage (0.0 to 1.0)
-    public let stageProgress: Double
-
-    /// Overall progress across all stages (0.0 to 1.0)
-    public var overallProgress: Double {
+public extension DownloadProgress {
+    /// Overall progress across all stages (0.0 to 1.0).
+    var overallProgress: Double {
         let range = stage.progressRange
-        return range.start + (stageProgress * (range.end - range.start))
+        return range.start + (Double(stageProgress) * (range.end - range.start))
     }
 
-    /// Legacy percentage property (maps to stageProgress for download stage, overallProgress otherwise)
-    public var percentage: Double {
+    /// Legacy percentage convenience: returns stage progress for the
+    /// download stage, and the overall progress everywhere else.
+    var percentage: Double {
         switch stage {
         case .downloading:
-            return stageProgress
+            return Double(stageProgress)
         default:
             return overallProgress
         }
     }
 
-    // MARK: - Initializers
+    /// Download speed (bytes/sec). `nil` when unknown.
+    var speed: Double? {
+        overallSpeedBps > 0 ? Double(overallSpeedBps) : nil
+    }
 
-    /// Full initializer with all fields
-    public init(
+    /// Estimated time remaining. `nil` when unknown.
+    var estimatedTimeRemaining: TimeInterval? {
+        etaSeconds >= 0 ? TimeInterval(etaSeconds) : nil
+    }
+
+    // MARK: - Factories
+
+    /// Progress for the extraction stage.
+    static func extraction(
+        modelId: String,
+        progress: Double,
+        totalBytes: Int64 = 0
+    ) -> DownloadProgress {
+        var msg = DownloadProgress()
+        msg.modelID = modelId
+        msg.stage = .extracting
+        msg.state = .extracting
+        msg.bytesDownloaded = Int64(progress * Double(totalBytes))
+        msg.totalBytes = totalBytes
+        msg.stageProgress = Float(progress)
+        msg.etaSeconds = -1
+        return msg
+    }
+
+    /// Completed progress.
+    static func completed(modelId: String = "", totalBytes: Int64) -> DownloadProgress {
+        var msg = DownloadProgress()
+        msg.modelID = modelId
+        msg.stage = .completed
+        msg.state = .completed
+        msg.bytesDownloaded = totalBytes
+        msg.totalBytes = totalBytes
+        msg.stageProgress = 1.0
+        msg.etaSeconds = 0
+        return msg
+    }
+
+    /// Failed progress. The canonical proto uses a string error message
+    /// rather than a Swift `Error`; we capture `localizedDescription`.
+    static func failed(
+        _ error: Error,
+        modelId: String = "",
+        bytesDownloaded: Int64 = 0,
+        totalBytes: Int64 = 0
+    ) -> DownloadProgress {
+        var msg = DownloadProgress()
+        msg.modelID = modelId
+        msg.stage = .downloading
+        msg.state = .failed
+        msg.bytesDownloaded = bytesDownloaded
+        msg.totalBytes = totalBytes
+        msg.stageProgress = 0
+        msg.etaSeconds = -1
+        msg.errorMessage = error.localizedDescription
+        return msg
+    }
+
+    // MARK: - Convenience Init
+
+    /// Common-case init for the download stage.
+    init(
+        modelId: String = "",
         stage: DownloadStage,
         bytesDownloaded: Int64,
         totalBytes: Int64,
         stageProgress: Double,
         speed: Double? = nil,
         estimatedTimeRemaining: TimeInterval? = nil,
-        state: DownloadState
+        state: DownloadState,
+        retryAttempt: Int32 = 0,
+        errorMessage: String = ""
     ) {
+        self.init()
+        self.modelID = modelId
         self.stage = stage
         self.bytesDownloaded = bytesDownloaded
         self.totalBytes = totalBytes
-        self.stageProgress = stageProgress
-        self.speed = speed
-        self.estimatedTimeRemaining = estimatedTimeRemaining
+        self.stageProgress = Float(stageProgress)
+        self.overallSpeedBps = Float(speed ?? 0)
+        self.etaSeconds = estimatedTimeRemaining.map { Int64($0) } ?? -1
         self.state = state
+        self.retryAttempt = retryAttempt
+        self.errorMessage = errorMessage
     }
+}
 
-    /// Convenience init for download stage (calculates progress from bytes)
-    public init(
-        bytesDownloaded: Int64,
-        totalBytes: Int64,
-        state: DownloadState,
-        speed: Double? = nil,
-        estimatedTimeRemaining: TimeInterval? = nil
-    ) {
-        self.stage = state == .extracting ? .extracting : .downloading
-        self.bytesDownloaded = bytesDownloaded
-        self.totalBytes = totalBytes
-        self.state = state
-        self.speed = speed
-        self.estimatedTimeRemaining = estimatedTimeRemaining
-        self.stageProgress = totalBytes > 0 ? Double(bytesDownloaded) / Double(totalBytes) : 0
-    }
+// MARK: - State Helpers
 
-    /// Convenience init with explicit percentage
-    public init(
-        bytesDownloaded: Int64,
-        totalBytes: Int64,
-        percentage: Double,
-        speed: Double? = nil,
-        estimatedTimeRemaining: TimeInterval? = nil,
-        state: DownloadState
-    ) {
-        self.stage = state == .extracting ? .extracting : .downloading
-        self.bytesDownloaded = bytesDownloaded
-        self.totalBytes = totalBytes
-        self.stageProgress = percentage
-        self.speed = speed
-        self.estimatedTimeRemaining = estimatedTimeRemaining
-        self.state = state
-    }
-
-    // MARK: - Factory Methods
-
-    /// Create progress for extraction stage
-    public static func extraction(
-        modelId _: String,
-        progress: Double,
-        totalBytes: Int64 = 0
-    ) -> DownloadProgress {
-        DownloadProgress(
-            stage: .extracting,
-            bytesDownloaded: Int64(progress * Double(totalBytes)),
-            totalBytes: totalBytes,
-            stageProgress: progress,
-            state: .extracting
-        )
-    }
-
-    /// Create completed progress
-    public static func completed(totalBytes: Int64) -> DownloadProgress {
-        DownloadProgress(
-            stage: .completed,
-            bytesDownloaded: totalBytes,
-            totalBytes: totalBytes,
-            stageProgress: 1.0,
-            state: .completed
-        )
-    }
-
-    /// Create failed progress
-    public static func failed(_ error: Error, bytesDownloaded: Int64 = 0, totalBytes: Int64 = 0) -> DownloadProgress {
-        DownloadProgress(
-            stage: .downloading,
-            bytesDownloaded: bytesDownloaded,
-            totalBytes: totalBytes,
-            stageProgress: 0,
-            state: .failed(error)
-        )
-    }
+public extension DownloadState {
+    /// Human-readable error text for the `.failed` state (mirrors the
+    /// previous hand-rolled enum case's associated `Error`).
+    var errorDescription: String? { nil }
 }

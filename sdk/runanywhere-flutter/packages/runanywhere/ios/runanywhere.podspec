@@ -1,33 +1,13 @@
 #
 # RunAnywhere Core SDK - iOS
 #
-# This podspec integrates RACommons.xcframework into Flutter iOS apps.
-# RACommons provides the core infrastructure for on-device AI capabilities,
-# including the RAG pipeline (compiled directly into RACommons).
+# Vendors the locally built RACommons.xcframework (plus the C++ RAG bridge
+# source that consumes RACommons' C API) into Flutter iOS apps.
 #
-# Binary Configuration:
-#   - Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
-#   - Otherwise, binaries are downloaded from GitHub releases (production mode)
+# The xcframework is staged into this plugin's ios/Frameworks/ directory by
+# scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
+# script once after checkout, and re-run it whenever the native layer changes.
 #
-# Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
-#
-
-# =============================================================================
-# Version Constants (MUST match Swift Package.swift)
-# =============================================================================
-COMMONS_VERSION = "0.1.6"
-
-# =============================================================================
-# Binary Source - RACommons from runanywhere-sdks
-# =============================================================================
-GITHUB_ORG = "RunanywhereAI"
-COMMONS_REPO = "runanywhere-sdks"
-
-# =============================================================================
-# useLocalNatives Toggle (canonical name; testLocal kept as legacy alias)
-# Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
-# =============================================================================
-TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.testlocal'))
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
@@ -37,92 +17,30 @@ Pod::Spec.new do |s|
 Privacy-first, on-device AI SDK for Flutter. This package provides the core
 infrastructure (RACommons) for speech-to-text (STT), text-to-speech (TTS),
 language models (LLM), voice activity detection (VAD), embeddings, and RAG.
-Pre-built binaries are downloaded from:
-https://github.com/RunanywhereAI/runanywhere-sdks
                        DESC
   s.homepage         = 'https://runanywhere.ai'
   s.license          = { :type => 'MIT' }
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '14.0'
+  s.ios.deployment_target = '15.1'
   s.swift_version = '5.0'
 
-  # Source files: plugin code + C++ RAG bridge (symlinked from ../src/ into Classes/)
+  # Source files: Swift plugin entry point + C++ RAG bridge. The bridge
+  # includes `third_party/nlohmann/json.hpp` from the package root (src/)
+  # via Classes/ symlinks — see HEADER_SEARCH_PATHS below.
   s.source_files = 'Classes/**/*'
 
-  # Flutter dependency
   s.dependency 'Flutter'
 
   # =============================================================================
-  # RACommons XCFramework - Core infrastructure (includes RAG pipeline)
-  # Downloaded from runanywhere-sdks releases
+  # Vendored xcframework (built by scripts/build-core-xcframework.sh)
   # =============================================================================
-  if TEST_LOCAL
-    puts "[runanywhere] Using LOCAL RACommons from Frameworks/"
-    s.vendored_frameworks = [
-      'Frameworks/RACommons.xcframework'
-    ]
-  else
-    s.prepare_command = <<-CMD
-      set -e
+  s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
 
-      FRAMEWORK_DIR="Frameworks"
-
-      # ---------------------------------------------------------------------------
-      # RACommons
-      # ---------------------------------------------------------------------------
-      COMMONS_VERSION="#{COMMONS_VERSION}"
-      COMMONS_VERSION_FILE="$FRAMEWORK_DIR/.racommons_version"
-
-      # Check if already downloaded with correct version
-      if [ -f "$COMMONS_VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
-        CURRENT_VERSION=$(cat "$COMMONS_VERSION_FILE")
-        if [ "$CURRENT_VERSION" = "$COMMONS_VERSION" ]; then
-          echo "RACommons.xcframework version $COMMONS_VERSION already downloaded"
-        else
-          SKIP_COMMONS=false
-        fi
-      else
-        SKIP_COMMONS=false
-      fi
-
-      if [ "${SKIP_COMMONS:-true}" != "true" ]; then
-        echo "Downloading RACommons.xcframework version $COMMONS_VERSION..."
-
-        mkdir -p "$FRAMEWORK_DIR"
-        rm -rf "$FRAMEWORK_DIR/RACommons.xcframework"
-
-        COMMONS_DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$COMMONS_VERSION/RACommons-ios-v$COMMONS_VERSION.zip"
-        COMMONS_ZIP_FILE="/tmp/RACommons.zip"
-
-        echo "   URL: $COMMONS_DOWNLOAD_URL"
-
-        curl -L -f -o "$COMMONS_ZIP_FILE" "$COMMONS_DOWNLOAD_URL" || {
-          echo "Failed to download RACommons from $COMMONS_DOWNLOAD_URL"
-          exit 1
-        }
-
-        echo "Extracting RACommons.xcframework..."
-        unzip -q -o "$COMMONS_ZIP_FILE" -d "$FRAMEWORK_DIR/"
-        rm -f "$COMMONS_ZIP_FILE"
-
-        echo "$COMMONS_VERSION" > "$COMMONS_VERSION_FILE"
-
-        if [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
-          echo "RACommons.xcframework installed successfully"
-        else
-          echo "RACommons.xcframework extraction failed"
-          exit 1
-        fi
-      fi
-
-    CMD
-
-    s.vendored_frameworks = [
-      'Frameworks/RACommons.xcframework'
-    ]
-  end
+  # Keep the source tree that the RAG bridge includes and the xcframework
+  # next to the installed pod so downstream toolchains can resolve headers.
+  s.preserve_paths = ['Frameworks/**/*', '../src/**/*', 'Classes/third_party/**/*']
 
   # Required frameworks
   s.frameworks = [
@@ -140,45 +58,56 @@ https://github.com/RunanywhereAI/runanywhere-sdks
     'MetalPerformanceShaders'
   ]
 
-  # Build settings
-  # Note: -all_load forces all symbols from static libraries to be loaded
-  # With static linkage (use_frameworks! :linkage => :static in Podfile),
-  # all symbols from RACommons.xcframework will be available in the final app
-  # C++ bridge needs nlohmann/json headers and C++17
+  # ---------------------------------------------------------------------------
+  # pod_target_xcconfig
+  #
+  # EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64
+  #   The locally built xcframework only ships `ios-arm64` + `ios-arm64-simulator`
+  #   slices (no `ios-arm64_x86_64-simulator`). Xcode's default simulator archs
+  #   include x86_64 on Intel hosts; exclude it so the linker doesn't try to
+  #   pull a slice that isn't there.
+  #
+  # HEADER_SEARCH_PATHS
+  #   - Classes / ../src: nlohmann/json.hpp (vendored under third_party/)
+  #   - RACommons.xcframework/*/Headers: rac/** C API headers consumed by the
+  #     RAG bridge (surfaced by -headers on `xcodebuild -create-xcframework`).
+  # ---------------------------------------------------------------------------
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'x86_64',
+    # -lz matches the Swift SDK (Package.swift linkerSettings) — libarchive
+    # + libcurl baked into RACommons both transitively need zlib.
+    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -lz',
     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
     'ENABLE_BITCODE' => 'NO',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-    'HEADER_SEARCH_PATHS' => '"${PODS_TARGET_SRCROOT}/Classes" "${PODS_TARGET_SRCROOT}/Classes/third_party" "${PODS_TARGET_SRCROOT}/../src" "${PODS_TARGET_SRCROOT}/../src/third_party"',
+    'HEADER_SEARCH_PATHS' => [
+      '"${PODS_TARGET_SRCROOT}/Classes"',
+      '"${PODS_TARGET_SRCROOT}/Classes/third_party"',
+      '"${PODS_TARGET_SRCROOT}/../src"',
+      '"${PODS_TARGET_SRCROOT}/../src/third_party"',
+      '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64/Headers"',
+      '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64-simulator/Headers"',
+    ].join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited)',
   }
 
-  s.preserve_paths = ['Frameworks/**/*', '../src/**/*', 'Classes/third_party/**/*']
-
-  # CRITICAL: These flags propagate to the main app target to ensure all symbols
-  # from vendored static frameworks are linked AND EXPORTED in the final binary.
+  # ---------------------------------------------------------------------------
+  # user_target_xcconfig
   #
-  # -ObjC ensures Objective-C categories are loaded.
-  # -all_load forces ALL object files from static libraries to be linked.
-  # DEAD_CODE_STRIPPING=NO prevents unused symbol removal.
-  #
-  # SYMBOL EXPORT FIX (iOS):
-  # When using `use_frameworks! :linkage => :static`, symbols from static frameworks
-  # become LOCAL in the final dylib, making them invisible to dlsym() at runtime.
-  # Flutter FFI uses dlsym() to find symbols, so we MUST explicitly export them.
-  #
-  # -Wl,-export_dynamic exports ALL symbols from the dylib, making them accessible
-  # via dlsym(). This is broader than -exported_symbols_list but ensures Flutter's
-  # own symbols are not accidentally hidden.
+  # Flags that must propagate to the hosting app target so FFI symbols from
+  # vendored static frameworks actually reach the final binary:
+  #   -ObjC                  load Obj-C categories from static archives
+  #   -all_load              link every object in every static archive
+  #   -Wl,-export_dynamic    export local symbols so dlsym() can find them
+  #                          (Flutter FFI relies on DynamicLibrary.executable())
+  #   DEAD_CODE_STRIPPING=NO don't let the linker drop unreferenced symbols
+  # ---------------------------------------------------------------------------
   s.user_target_xcconfig = {
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -ObjC -all_load -Wl,-export_dynamic',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'x86_64',
+    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -lz -ObjC -all_load -Wl,-export_dynamic',
     'DEAD_CODE_STRIPPING' => 'NO',
   }
 
-  # Mark static framework for proper linking
   s.static_framework = true
 end

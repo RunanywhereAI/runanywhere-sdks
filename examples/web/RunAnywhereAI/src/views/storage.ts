@@ -7,7 +7,8 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager } from '../services/model-manager';
 import { showToast, showConfirmDialog } from '../components/dialogs';
-import { RunAnywhere } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { RunAnywhere } from '@runanywhere/web';
+import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
 
 let container: HTMLElement;
 
@@ -257,7 +258,7 @@ async function refreshStorage(): Promise<void> {
           <div class="model-info">
             <div class="model-name">${m.name}</div>
             <div class="model-meta">
-              <span class="model-framework-badge">${m.framework}</span>
+              <span class="model-framework-badge">${formatFramework(m.framework)}</span>
               ${m.sizeBytes ? `<span class="model-size">${formatBytes(m.sizeBytes)}</span>` : ''}
             </div>
             <div class="model-last-used">Last used: ${lastUsedText}</div>
@@ -305,6 +306,10 @@ function formatBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[Math.min(i, units.length - 1)];
+}
+
+function formatFramework(framework: ReturnType<typeof ModelManager.getModels>[number]['framework']): string {
+  return inferenceFrameworkToJSON(framework).replace(/^INFERENCE_FRAMEWORK_/, '').replaceAll('_', ' ');
 }
 
 /**

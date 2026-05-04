@@ -10,29 +10,40 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.STTOutput
+import ai.runanywhere.proto.v1.TTSOutput
+import ai.runanywhere.proto.v1.VoiceAgentComponentStates
+import ai.runanywhere.proto.v1.VoiceAgentConfig
+import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentComponentStates
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentConfiguration
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
-import kotlinx.coroutines.flow.Flow
+// v3.1: VoiceAgentResult / VoiceSessionEvent imports removed — the
+// expect declarations that used them (processVoice / startVoiceSession /
+// streamVoiceSession) were deleted.
+
+/**
+ * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
+ * type referenced in §10 of CANONICAL_API.md. SDK consumers can use either name.
+ */
+typealias ComponentStates = VoiceAgentComponentStates
 
 // MARK: - Voice Agent Configuration
 
 /**
- * Configure the voice agent.
+ * Initialize the voice agent with a configuration.
  *
- * @param configuration Voice agent configuration
+ * Canonical cross-SDK name. Replaces the deleted `configureVoiceAgent`.
+ *
+ * @param config Proto [VoiceAgentConfig] specifying model IDs for each component
  */
-expect suspend fun RunAnywhere.configureVoiceAgent(configuration: VoiceAgentConfiguration)
+expect suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig)
 
 /**
  * Get current voice agent component states.
  *
- * @return Current state of all voice agent components
+ * @return [ComponentStates] (alias for [VoiceAgentComponentStates]) proto message
+ *         with per-component load state and computed readiness flags.
  */
-expect suspend fun RunAnywhere.voiceAgentComponentStates(): VoiceAgentComponentStates
+expect suspend fun RunAnywhere.getVoiceAgentComponentStates(): ComponentStates
 
 /**
  * Check if the voice agent is fully ready (all components loaded).
@@ -47,99 +58,21 @@ expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
  * This function checks that STT, LLM, and TTS models are loaded,
  * then initializes the VoiceAgent orchestration component with those models.
  *
- * This is automatically called by startVoiceSession() if needed,
+ * v3.1: Call before constructing a VoiceAgentStreamAdapter. In the
  * but can be called explicitly for more control.
  *
- * @throws SDKError if SDK is not initialized
- * @throws SDKError if any component models are not loaded
- * @throws SDKError if VoiceAgent initialization fails
+ * @throws SDKException if SDK is not initialized
+ * @throws SDKException if any component models are not loaded
+ * @throws SDKException if VoiceAgent initialization fails
  */
 expect suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
-// MARK: - Voice Processing
-
-/**
- * Process audio through the voice pipeline (VAD -> STT -> LLM -> TTS).
- *
- * @param audioData Audio data to process
- * @return Voice agent result with transcription, response, and synthesized audio
- */
-expect suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentResult
-
-// MARK: - Voice Session
-
-/**
- * Start a voice session.
- *
- * Returns a Flow of voice session events.
- *
- * Example:
- * ```kotlin
- * RunAnywhere.startVoiceSession()
- *     .collect { event ->
- *         when (event) {
- *             is VoiceSessionEvent.Listening -> // Show listening UI
- *             is VoiceSessionEvent.Transcribed -> println(event.text)
- *             is VoiceSessionEvent.Responded -> println(event.text)
- *             // ...
- *         }
- *     }
- * ```
- *
- * @param config Session configuration
- * @return Flow of voice session events
- */
-expect fun RunAnywhere.startVoiceSession(
-    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT,
-): Flow<VoiceSessionEvent>
-
-/**
- * Stream a voice session with automatic silence detection.
- *
- * This is the recommended API for voice pipelines. It handles:
- * - Audio level calculation for visualization
- * - Speech detection (when audio level > threshold)
- * - Automatic silence detection (triggers processing after silence duration)
- * - STT → LLM → TTS pipeline orchestration
- * - Continuous conversation mode (auto-resumes listening after TTS)
- *
- * The app only needs to:
- * 1. Capture audio and emit chunks to the input Flow
- * 2. Collect events to update UI
- * 3. Play audio when TurnCompleted event is received (if autoPlayTTS is false)
- *
- * Example:
- * ```kotlin
- * // Audio capture Flow from your audio service
- * val audioChunks: Flow<ByteArray> = audioCaptureService.startCapture()
- *
- * RunAnywhere.streamVoiceSession(audioChunks)
- *     .collect { event ->
- *         when (event) {
- *             is VoiceSessionEvent.Started -> showListeningUI()
- *             is VoiceSessionEvent.Listening -> updateAudioLevel(event.audioLevel)
- *             is VoiceSessionEvent.SpeechStarted -> showSpeechDetected()
- *             is VoiceSessionEvent.Processing -> showProcessingUI()
- *             is VoiceSessionEvent.Transcribed -> showTranscript(event.text)
- *             is VoiceSessionEvent.Responded -> showResponse(event.text)
- *             is VoiceSessionEvent.TurnCompleted -> {
- *                 // Play audio if autoPlayTTS is false
- *                 event.audio?.let { playAudio(it) }
- *             }
- *             is VoiceSessionEvent.Stopped -> showIdleUI()
- *             is VoiceSessionEvent.Error -> showError(event.message)
- *         }
- *     }
- * ```
- *
- * @param audioChunks Flow of audio chunks (16kHz, mono, 16-bit PCM)
- * @param config Session configuration (silence duration, speech threshold, etc.)
- * @return Flow of voice session events
- */
-expect fun RunAnywhere.streamVoiceSession(
-    audioChunks: Flow<ByteArray>,
-    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT,
-): Flow<VoiceSessionEvent>
+// v3.1: processVoice / startVoiceSession / streamVoiceSession expect
+// declarations DELETED. Replacements:
+//   - Streaming: CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
+//   - One-shot:  compose CppBridgeSTT.transcribe → CppBridgeLLM.generate → CppBridgeTTS.synthesize
+// See the Android sample's processVoiceTurnDirect helper for the canonical
+// one-shot composition pattern.
 
 /**
  * Stop the current voice session.
@@ -166,3 +99,84 @@ expect suspend fun RunAnywhere.clearVoiceConversation()
  * @param prompt System prompt text
  */
 expect suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4a — VoiceAgent processing parity with Swift's
+// RunAnywhere+VoiceAgent.swift (`processVoiceTurn`, `voiceAgentTranscribe`,
+// `voiceAgentGenerateResponse`, `voiceAgentSynthesizeSpeech`,
+// `cleanupVoiceAgent`).
+//
+// These are *one-shot* helpers that compose the individual
+// STT/LLM/TTS bridges. They live here so cross-platform consumers can
+// migrate from Swift's API one-to-one. New code should still prefer the
+// streaming `VoiceAgentStreamAdapter` in
+// `com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Process a complete voice turn: audio -> transcription -> LLM response ->
+ * synthesized speech.
+ *
+ * Mirrors Swift's `RunAnywhere.processVoiceTurn(_ audioData:)`.
+ *
+ * @param audioData PCM audio bytes (16 kHz / 16-bit mono recommended).
+ * @return [VoiceAgentResult] with the transcript, response, and audio.
+ */
+expect suspend fun RunAnywhere.processVoiceTurn(
+    audioData: ByteArray,
+): VoiceAgentResult
+
+/**
+ * Transcribe audio using the voice-agent's STT component.
+ *
+ * Mirrors Swift's `RunAnywhere.voiceAgentTranscribe(_ audioData:)`.
+ *
+ * @return [STTOutput] proto with transcription text and metadata
+ */
+expect suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): STTOutput
+
+/**
+ * Generate an LLM response using the voice-agent's LLM component.
+ *
+ * Mirrors Swift's `RunAnywhere.voiceAgentGenerateResponse(_ prompt:)`.
+ */
+expect suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String
+
+/**
+ * Synthesize speech using the voice-agent's TTS component.
+ *
+ * Mirrors Swift's `RunAnywhere.voiceAgentSynthesizeSpeech(_ text:)`.
+ *
+ * @return [TTSOutput] proto with audio data and metadata
+ */
+expect suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): TTSOutput
+
+/**
+ * Cleanup voice-agent resources.
+ *
+ * Mirrors Swift's `RunAnywhere.cleanupVoiceAgent()`.
+ */
+expect suspend fun RunAnywhere.cleanupVoiceAgent()
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Round 1 KOTLIN (Task 7 / G-E4): canonical streaming voice-agent entry-point.
+//
+// Iron Rule 5: example apps MUST NOT call CppBridgeVoiceAgent directly.
+// `streamVoiceAgent()` is the public surface that replaces the pattern:
+//     val handle = CppBridgeVoiceAgent.getHandle()
+//     VoiceAgentStreamAdapter(handle).stream()
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Create or reuse the voice-agent handle and return a proto event stream.
+ *
+ * Internally allocates a [VoiceAgentStreamAdapter] backed by the singleton
+ * voice-agent handle. The stream closes when the collecting coroutine is
+ * cancelled; call [cleanupVoiceAgent] afterwards to release the native handle.
+ *
+ * Requires STT/LLM/TTS models to be loaded before calling.
+ *
+ * @throws SDKException if models are not loaded or the native handle
+ *         allocation fails.
+ */
+expect fun RunAnywhere.streamVoiceAgent(): kotlinx.coroutines.flow.Flow<ai.runanywhere.proto.v1.VoiceEvent>

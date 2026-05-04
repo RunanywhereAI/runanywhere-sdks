@@ -1,9 +1,5 @@
 package com.runanywhere.sdk.storage
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.runBlocking
-
 /**
  * Platform-agnostic file system abstraction
  * Provides common file operations that are implemented differently on each platform
@@ -46,19 +42,30 @@ interface FileSystem {
     suspend fun exists(path: String): Boolean
 
     /**
-     * Check if a file or directory exists (synchronous version)
+     * Check if a file or directory exists (synchronous version).
+     *
+     * Round 1 KOTLIN (G-F5): Default removed. Platform-specific
+     * implementations in androidMain/jvmAndroidMain must override this
+     * with a non-blocking version. Callers that need synchronous access
+     * should use the suspend variant [exists] inside a coroutine.
      */
-    fun existsSync(path: String): Boolean = runBlocking(Dispatchers.IO) { exists(path) }
+    fun existsSync(path: String): Boolean
 
     /**
-     * Check if path is a directory (synchronous version)
+     * Check if path is a directory (synchronous version).
+     *
+     * Round 1 KOTLIN (G-F5): Default removed. Platform-specific
+     * implementations must override with a non-blocking version.
      */
-    fun isDirectorySync(path: String): Boolean = runBlocking(Dispatchers.IO) { isDirectory(path) }
+    fun isDirectorySync(path: String): Boolean
 
     /**
-     * List files in a directory (synchronous version)
+     * List files in a directory (synchronous version).
+     *
+     * Round 1 KOTLIN (G-F5): Default removed. Platform-specific
+     * implementations must override with a non-blocking version.
      */
-    fun listSync(path: String): List<String> = runBlocking(Dispatchers.IO) { listFiles(path) }
+    fun listSync(path: String): List<String>
 
     /**
      * Delete a file or directory

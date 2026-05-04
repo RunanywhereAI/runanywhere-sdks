@@ -376,7 +376,6 @@ sdk/runanywhere-web/
 |       |   |       +-- RunAnywhere+TTS.ts
 |       |   |       +-- RunAnywhere+VAD.ts
 |       |   |       +-- RunAnywhere+VLM.ts
-|       |   |       +-- RunAnywhere+VoiceAgent.ts
 |       |   |       +-- RunAnywhere+VoicePipeline.ts
 |       |   |       +-- RunAnywhere+ToolCalling.ts
 |       |   |       +-- RunAnywhere+StructuredOutput.ts
@@ -731,8 +730,8 @@ The demo app runs on Vite with Cross-Origin Isolation headers pre-configured.
 | `TTS` | Text-to-speech synthesis |
 | `VAD` | Voice activity detection |
 | `VLM` | Vision-language model inference |
-| `VoicePipeline` | STT -> LLM -> TTS orchestration |
-| `VoiceAgent` | Complete voice agent with C API pipeline |
+| `VoicePipeline` | TS-side STT -> LLM -> TTS orchestration (compose-your-own via ExtensionPoint) |
+| `VoiceAgentStreamAdapter` | Proto `VoiceEvent` async iterable — cross-SDK parity with iOS / Android / Flutter / RN |
 | `ToolCalling` | Function calling with typed tool definitions |
 | `StructuredOutput` | JSON schema-guided generation |
 | `Embeddings` | Vector embedding generation |

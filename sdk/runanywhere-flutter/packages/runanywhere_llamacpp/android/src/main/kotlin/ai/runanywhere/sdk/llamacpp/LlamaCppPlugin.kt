@@ -21,13 +21,32 @@ class LlamaCppPlugin : FlutterPlugin, MethodCallHandler {
         private const val BACKEND_VERSION = "0.1.4"
         private const val BACKEND_NAME = "LlamaCPP"
 
+        private fun loadFirstAvailable(vararg names: String) {
+            var lastError: UnsatisfiedLinkError? = null
+            for (name in names) {
+                try {
+                    System.loadLibrary(name)
+                    return
+                } catch (e: UnsatisfiedLinkError) {
+                    lastError = e
+                }
+            }
+            if (lastError != null) {
+                throw lastError
+            }
+        }
+
         init {
             // Load LlamaCPP backend native libraries
             try {
-                System.loadLibrary("rac_backend_llamacpp_jni")
+                loadFirstAvailable(
+                    "rac_backend_llamacpp",
+                    "rac_backend_llamacpp_jni",
+                    "runanywhere_llamacpp",
+                )
             } catch (e: UnsatisfiedLinkError) {
                 // Library may not be available in all configurations
-                android.util.Log.w("LlamaCpp", "Failed to load rac_backend_llamacpp_jni: ${e.message}")
+                android.util.Log.w("LlamaCpp", "Failed to load LlamaCpp backend libraries: ${e.message}")
             }
         }
     }

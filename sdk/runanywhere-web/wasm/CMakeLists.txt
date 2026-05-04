@@ -162,9 +162,26 @@ else()
     add_compile_options("-fexceptions")
 endif()
 
-# Add RACommons as subdirectory (builds rac_commons static library)
-# Must come AFTER backend configuration so cache variables are set.
-add_subdirectory("${RAC_COMMONS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/rac_commons")
+# This target is wired from the repo-root CMakeLists after rac_commons and the
+# selected engine plugins have already been configured. Keep it in that build
+# graph so the wrapper never falls back to Emscripten's default `a.out.*`
+# output or an engine-less commons-only build.
+if(NOT TARGET rac_commons)
+    message(FATAL_ERROR
+        "runanywhere_wasm must be configured from the repository root.\n"
+        "Use: cmake --preset wasm && cmake --build --preset wasm --target runanywhere_wasm"
+    )
+endif()
+
+if(RAC_WASM_LLAMACPP AND NOT TARGET rac_backend_llamacpp)
+    message(FATAL_ERROR "RAC_WASM_LLAMACPP=ON requires rac_backend_llamacpp. Configure the root build with llama.cpp enabled.")
+endif()
+if(RAC_WASM_WHISPERCPP AND NOT TARGET rac_backend_whispercpp)
+    message(FATAL_ERROR "RAC_WASM_WHISPERCPP=ON requires rac_backend_whispercpp. Configure the root build with whisper.cpp enabled.")
+endif()
+if(RAC_WASM_ONNX AND NOT TARGET rac_backend_onnx)
+    message(FATAL_ERROR "RAC_WASM_ONNX=ON requires rac_backend_onnx. Configure the root build with ONNX enabled.")
+endif()
 
 # =============================================================================
 # WASM PLATFORM SHIMS
@@ -210,6 +227,78 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_http_download"
     "_rac_http_download_cancel"
     "_rac_extract_archive"
+    "_rac_proto_buffer_init"
+    "_rac_proto_buffer_copy"
+    "_rac_proto_buffer_set_error"
+    "_rac_proto_buffer_free"
+    "_rac_proto_buffer_copy_to_raw"
+    "_rac_proto_buffer_free_data"
+
+    # HTTP client / download (T3.13 — Web SDK migration off hand-rolled
+    # fetch() onto the commons libcurl-backed C ABI). See
+    # sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
+    # and rac_http_download.h. TypeScript wrapper lives at
+    # sdk/runanywhere-web/packages/core/src/Adapters/HTTPAdapter.ts.
+    # Progress/body chunk callbacks are installed via addFunction, so the
+    # runtime already enables the required ALLOW_TABLE_GROWTH flag above.
+    "_rac_http_client_create"
+    "_rac_http_client_destroy"
+    "_rac_http_request_send"
+    "_rac_http_request_stream"
+    "_rac_http_request_resume"
+    "_rac_http_response_free"
+    "_rac_http_download_execute"
+
+    # Platform HTTP transport registry (v2 close-out Phase H2 / H7). The
+    # WASM shim in rac_http_client_emscripten.cpp registers an
+    # emscripten_fetch()-backed adapter via this vtable so the router in
+    # rac_http_client_curl.cpp short-circuits to it. TypeScript side calls
+    # _rac_http_transport_register_emscripten() once after module load.
+    "_rac_http_transport_register"
+    "_rac_http_transport_is_registered"
+    "_rac_http_transport_register_emscripten"
+    # Stage 3d: JS-side adapter registration. JS provides function-table
+    # indices (from Module.addFunction) that implement the transport
+    # vtable directly in JS. See FetchHttpTransport.ts.
+    "_rac_http_transport_register_from_js"
+
+    # Struct layout helpers used by HTTPAdapter.ts to pack/unpack
+    # rac_http_request_t / rac_http_response_t / rac_http_download_request_t
+    # without hard-coding offsets (safe against future field changes).
+    "_rac_wasm_sizeof_http_request"
+    "_rac_wasm_offsetof_http_request_method"
+    "_rac_wasm_offsetof_http_request_url"
+    "_rac_wasm_offsetof_http_request_headers"
+    "_rac_wasm_offsetof_http_request_header_count"
+    "_rac_wasm_offsetof_http_request_body_bytes"
+    "_rac_wasm_offsetof_http_request_body_len"
+    "_rac_wasm_offsetof_http_request_timeout_ms"
+    "_rac_wasm_offsetof_http_request_follow_redirects"
+    "_rac_wasm_offsetof_http_request_expected_checksum_hex"
+    "_rac_wasm_sizeof_http_response"
+    "_rac_wasm_offsetof_http_response_status"
+    "_rac_wasm_offsetof_http_response_headers"
+    "_rac_wasm_offsetof_http_response_header_count"
+    "_rac_wasm_offsetof_http_response_body_bytes"
+    "_rac_wasm_offsetof_http_response_body_len"
+    "_rac_wasm_offsetof_http_response_redirected_url"
+    "_rac_wasm_sizeof_http_header_kv"
+    "_rac_wasm_offsetof_http_header_kv_name"
+    "_rac_wasm_offsetof_http_header_kv_value"
+    "_rac_wasm_sizeof_http_download_request"
+    "_rac_wasm_offsetof_http_download_request_url"
+    "_rac_wasm_offsetof_http_download_request_destination_path"
+    "_rac_wasm_offsetof_http_download_request_headers"
+    "_rac_wasm_offsetof_http_download_request_header_count"
+    "_rac_wasm_offsetof_http_download_request_timeout_ms"
+    "_rac_wasm_offsetof_http_download_request_follow_redirects"
+    "_rac_wasm_offsetof_http_download_request_resume_from_byte"
+    "_rac_wasm_offsetof_http_download_request_expected_sha256_hex"
+    "_rac_wasm_sizeof_proto_buffer"
+    "_rac_wasm_offsetof_proto_buffer_data"
+    "_rac_wasm_offsetof_proto_buffer_size"
+    "_rac_wasm_offsetof_proto_buffer_status"
+    "_rac_wasm_offsetof_proto_buffer_error_message"
 
     # Module registry
     "_rac_module_register"
@@ -219,10 +308,8 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_module_get_info"
 
     # Service registry
-    "_rac_service_register_provider"
-    "_rac_service_unregister_provider"
-    "_rac_service_create"
-    "_rac_service_list_providers"
+    # v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_*
+    # from rac/plugin/rac_plugin_entry.h and rac/router/rac_route.h.
 
     # Events
     "_rac_event_subscribe"
@@ -231,6 +318,12 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_event_publish"
     "_rac_event_track"
     "_rac_event_category_name"
+    "_rac_sdk_event_subscribe"
+    "_rac_sdk_event_unsubscribe"
+    "_rac_sdk_event_publish_proto"
+    "_rac_sdk_event_poll"
+    "_rac_sdk_event_publish_failure"
+    "_rac_sdk_event_clear_queue"
 
     # Error handling
     "_rac_error_message"
@@ -251,6 +344,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_model_registry_remove"
     "_rac_model_registry_get_downloaded"
     "_rac_model_registry_update_download_status"
+    "_rac_model_registry_refresh"
+    "_rac_model_registry_register_proto"
+    "_rac_model_registry_update_proto"
+    "_rac_model_registry_get_proto"
+    "_rac_model_registry_list_proto"
+    "_rac_model_registry_query_proto"
+    "_rac_model_registry_list_downloaded_proto"
+    "_rac_model_registry_remove_proto"
+    "_rac_model_registry_proto_free"
     "_rac_model_info_is_downloaded"
     "_rac_model_info_alloc"
     "_rac_model_info_free"
@@ -278,6 +380,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_lifecycle_destroy"
     "_rac_lifecycle_state_name"
 
+    # Model lifecycle proto ABI. Generated model_types/sdk_events protos are
+    # serialized through rac_proto_buffer_t so Web can expose the same stable
+    # lifecycle surface as native SDKs.
+    "_rac_model_lifecycle_load_proto"
+    "_rac_model_lifecycle_unload_proto"
+    "_rac_model_lifecycle_current_model_proto"
+    "_rac_component_lifecycle_snapshot_proto"
+    "_rac_model_lifecycle_reset"
+
     # LLM service
     "_rac_llm_create"
     "_rac_llm_initialize"
@@ -288,6 +399,20 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_llm_cleanup"
     "_rac_llm_destroy"
     "_rac_llm_result_free"
+    "_rac_llm_set_stream_proto_callback"
+    "_rac_llm_unset_stream_proto_callback"
+    "_rac_llm_generate_proto"
+    "_rac_llm_generate_stream_proto"
+    "_rac_llm_cancel_proto"
+
+    # LLM Thinking (<think>...</think> parsing) — v3 Phase A11 / GAP 08 #6.
+    # Wrapped by sdk/runanywhere-web/packages/core/src/Features/LLM/LlmThinking.ts
+    # via ccall. Pair with -sEXPORTED_RUNTIME_METHODS=['ccall','UTF8ToString',
+    # 'stringToUTF8','_malloc','_free'] (already enabled in this target for
+    # other ccall users).
+    "_rac_llm_extract_thinking"
+    "_rac_llm_strip_thinking"
+    "_rac_llm_split_thinking_tokens"
 
     # LLM component
     "_rac_llm_component_create"
@@ -344,6 +469,8 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_stt_component_transcribe"
     "_rac_stt_component_supports_streaming"
     "_rac_stt_component_transcribe_stream"
+    "_rac_stt_component_transcribe_proto"
+    "_rac_stt_component_transcribe_stream_proto"
     "_rac_stt_component_get_state"
     "_rac_stt_component_get_metrics"
     "_rac_stt_component_destroy"
@@ -370,6 +497,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_tts_component_stop"
     "_rac_tts_component_synthesize"
     "_rac_tts_component_synthesize_stream"
+    "_rac_tts_component_list_voices_proto"
+    "_rac_tts_component_synthesize_proto"
+    "_rac_tts_component_synthesize_stream_proto"
     "_rac_tts_component_get_state"
     "_rac_tts_component_get_metrics"
     "_rac_tts_component_destroy"
@@ -401,6 +531,10 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vad_component_stop"
     "_rac_vad_component_reset"
     "_rac_vad_component_process"
+    "_rac_vad_component_configure_proto"
+    "_rac_vad_component_process_proto"
+    "_rac_vad_component_get_statistics_proto"
+    "_rac_vad_component_set_activity_proto_callback"
     "_rac_vad_component_is_speech_active"
     "_rac_vad_component_get_energy_threshold"
     "_rac_vad_component_set_energy_threshold"
@@ -437,6 +571,51 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_voice_agent_detect_speech"
     "_rac_voice_agent_result_free"
 
+    # Voice Agent — proto-byte streaming ABI (GAP 09 Phase 15 / v3 Phase A4)
+    # Required by sdk/runanywhere-web/packages/core/src/Adapters/
+    # VoiceAgentStreamAdapter.ts, which calls it through
+    # m._rac_voice_agent_set_proto_callback(handle, cbPtr, 0). Pair with
+    # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
+    # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
+    "_rac_voice_agent_set_proto_callback"
+    "_rac_voice_agent_initialize_proto"
+    "_rac_voice_agent_component_states_proto"
+    "_rac_voice_agent_process_voice_turn_proto"
+
+    # Solutions runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8.
+    # Required by sdk/runanywhere-web/packages/core/src/Adapters/
+    # SolutionAdapter.ts (proto-byte / YAML driven L5 pipeline runtime).
+    # `rac_solution_create_from_proto` consumes a serialized
+    # `runanywhere.v1.SolutionConfig` (or PipelineSpec) message; the
+    # lifecycle verbs operate on the returned opaque handle.
+    "_rac_solution_create_from_proto"
+    "_rac_solution_create_from_yaml"
+    "_rac_solution_start"
+    "_rac_solution_stop"
+    "_rac_solution_cancel"
+    "_rac_solution_feed"
+    "_rac_solution_close_input"
+    "_rac_solution_destroy"
+
+    # C++-owned proto download workflow. JS keeps only transport/progress
+    # callback wiring while commons owns planning, lifecycle, resume/cancel,
+    # and progress state.
+    "_rac_download_set_progress_proto_callback"
+    "_rac_download_plan_proto"
+    "_rac_download_start_proto"
+    "_rac_download_cancel_proto"
+    "_rac_download_resume_proto"
+    "_rac_download_progress_poll_proto"
+
+    # Storage analyzer proto ABI. The browser supplies storage/file callbacks
+    # locally; commons owns availability, delete planning and deletion policy.
+    "_rac_storage_analyzer_create"
+    "_rac_storage_analyzer_destroy"
+    "_rac_storage_analyzer_info_proto"
+    "_rac_storage_analyzer_availability_proto"
+    "_rac_storage_analyzer_delete_plan_proto"
+    "_rac_storage_analyzer_delete_proto"
+
     # VLM service
     "_rac_vlm_get_builtin_template"
     "_rac_vlm_result_free"
@@ -446,6 +625,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vlm_process_stream"
     "_rac_vlm_get_info"
     "_rac_vlm_cancel"
+    "_rac_vlm_process_proto"
+    "_rac_vlm_process_stream_proto"
+    "_rac_vlm_cancel_proto"
     "_rac_vlm_cleanup"
     "_rac_vlm_destroy"
 
@@ -476,6 +658,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_structured_output_validation_free"
 
     # Diffusion component
+    "_rac_diffusion_generate_proto"
+    "_rac_diffusion_generate_with_progress_proto"
+    "_rac_diffusion_cancel_proto"
     "_rac_diffusion_component_create"
     "_rac_diffusion_component_configure"
     "_rac_diffusion_component_is_loaded"
@@ -501,6 +686,7 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_embeddings_initialize"
     "_rac_embeddings_embed"
     "_rac_embeddings_embed_batch"
+    "_rac_embeddings_embed_batch_proto"
     "_rac_embeddings_get_info"
     "_rac_embeddings_cleanup"
     "_rac_embeddings_destroy"
@@ -519,6 +705,21 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_embeddings_component_get_state"
     "_rac_embeddings_component_get_metrics"
     "_rac_embeddings_component_destroy"
+
+    # RAG generated-proto pipeline
+    "_rac_rag_session_create_proto"
+    "_rac_rag_session_destroy_proto"
+    "_rac_rag_ingest_proto"
+    "_rac_rag_query_proto"
+    "_rac_rag_clear_proto"
+    "_rac_rag_stats_proto"
+
+    # LoRA generated-proto service
+    "_rac_lora_register_proto"
+    "_rac_lora_compatibility_proto"
+    "_rac_lora_load_proto"
+    "_rac_lora_remove_proto"
+    "_rac_lora_clear_proto"
 
     # Environment / SDK config
     "_rac_sdk_init"
@@ -672,55 +873,55 @@ string(JOIN "," RAC_EXPORTED_FUNCTIONS_STR ${RAC_EXPORTED_FUNCTIONS})
 # WASM BUILD TARGET
 # =============================================================================
 
-add_executable(racommons
+add_executable(runanywhere_wasm
     ${WASM_EXPORT_SOURCES}
     ${WASM_PLATFORM_SOURCES}
 )
 
-target_link_libraries(racommons PRIVATE rac_commons)
+target_link_libraries(runanywhere_wasm PRIVATE rac_commons)
 
 if(RAC_WASM_LLAMACPP)
-    target_link_libraries(racommons PRIVATE rac_backend_llamacpp)
+    target_link_libraries(runanywhere_wasm PRIVATE rac_backend_llamacpp)
 endif()
 
 if(RAC_WASM_WHISPERCPP)
-    target_link_libraries(racommons PRIVATE rac_backend_whispercpp)
+    target_link_libraries(runanywhere_wasm PRIVATE rac_backend_whispercpp)
 endif()
 
 if(RAC_WASM_ONNX)
-    target_link_libraries(racommons PRIVATE rac_backend_onnx)
+    target_link_libraries(runanywhere_wasm PRIVATE rac_backend_onnx)
 endif()
 
-target_include_directories(racommons PRIVATE
+target_include_directories(runanywhere_wasm PRIVATE
     ${RAC_COMMONS_DIR}/include
     ${RAC_COMMONS_DIR}/src
 )
 
 # Emscripten compile definitions
-target_compile_definitions(racommons PRIVATE
+target_compile_definitions(runanywhere_wasm PRIVATE
     RAC_PLATFORM_WASM=1
     RAC_PLATFORM_NAME="Emscripten"
 )
 
 
 if(RAC_WASM_LLAMACPP)
-    target_compile_definitions(racommons PRIVATE RAC_WASM_LLAMACPP=1)
+    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_LLAMACPP=1)
 endif()
 
 if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
-    target_compile_definitions(racommons PRIVATE RAC_WASM_WEBGPU=1 GGML_USE_WEBGPU=1)
+    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_WEBGPU=1 GGML_USE_WEBGPU=1)
 endif()
 
 if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
-    target_compile_definitions(racommons PRIVATE RAC_WASM_VLM=1)
+    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_VLM=1)
 endif()
 
 if(RAC_WASM_WHISPERCPP)
-    target_compile_definitions(racommons PRIVATE RAC_WASM_WHISPERCPP=1)
+    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_WHISPERCPP=1)
 endif()
 
 if(RAC_WASM_ONNX)
-    target_compile_definitions(racommons PRIVATE RAC_WASM_ONNX=1)
+    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_ONNX=1)
 endif()
 
 # =============================================================================
@@ -743,7 +944,7 @@ set(EMSCRIPTEN_LINK_FLAGS
 
     # Function exports
     "-sEXPORTED_FUNCTIONS=[${RAC_EXPORTED_FUNCTIONS_STR}]"
-    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAPF32\",\"wasmMemory\"]"
+    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAP32\",\"HEAPU32\",\"HEAPF32\",\"wasmMemory\"]"
 
     # Allow JS function pointers (needed for platform adapter callbacks)
     "-sALLOW_TABLE_GROWTH=1"
@@ -771,7 +972,7 @@ if(RAC_WASM_PTHREADS)
         "-sPTHREAD_POOL_SIZE=4"
         "-sPTHREAD_POOL_SIZE_STRICT=0"
     )
-    target_compile_options(racommons PRIVATE "-pthread")
+    target_compile_options(runanywhere_wasm PRIVATE "-pthread")
     message(STATUS "pthreads ENABLED (requires Cross-Origin Isolation headers)")
 else()
     message(STATUS "pthreads DISABLED (single-threaded mode)")
@@ -863,7 +1064,7 @@ if(NOT DEFINED WASM_OUTPUT_NAME)
     set(WASM_OUTPUT_NAME "racommons-llamacpp")
 endif()
 
-set_target_properties(racommons PROPERTIES
+set_target_properties(runanywhere_wasm PROPERTIES
     LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
     OUTPUT_NAME "${WASM_OUTPUT_NAME}"
     SUFFIX ".js"
@@ -875,7 +1076,7 @@ set_target_properties(racommons PROPERTIES
 
 set(WASM_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages/llamacpp/wasm")
 
-add_custom_command(TARGET racommons POST_BUILD
+add_custom_command(TARGET runanywhere_wasm POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${WASM_OUTPUT_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.js"
@@ -888,10 +1089,10 @@ add_custom_command(TARGET racommons POST_BUILD
 
 # Also copy worker file if pthreads enabled
 if(RAC_WASM_PTHREADS)
-    add_custom_command(TARGET racommons POST_BUILD
+    add_custom_command(TARGET runanywhere_wasm POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/racommons.worker.js"
-            "${WASM_OUTPUT_DIR}/racommons.worker.js"
+            "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js"
+            "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js"
         COMMENT "Copying pthread worker to packages/llamacpp/wasm/"
     )
 endif()
@@ -907,6 +1108,7 @@ message(STATUS "====================================")
 message(STATUS "RACommons:    ${RAC_COMMONS_DIR}")
 message(STATUS "pthreads:     ${RAC_WASM_PTHREADS}")
 message(STATUS "Debug:        ${RAC_WASM_DEBUG}")
+message(STATUS "Target:       runanywhere_wasm")
 message(STATUS "llama.cpp:    ${RAC_WASM_LLAMACPP}")
 message(STATUS "WebGPU:       ${RAC_WASM_WEBGPU}")
 message(STATUS "VLM (mtmd):   ${RAC_VLM_USE_MTMD}")

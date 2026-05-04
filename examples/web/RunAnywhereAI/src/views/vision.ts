@@ -12,8 +12,8 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
-import { VideoCapture, type CapturedFrame } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
+import { VideoCapture, type CapturedFrame } from '@runanywhere/web';
+import { VLMWorkerBridge } from '@runanywhere/web-llamacpp';
 
 // ---------------------------------------------------------------------------
 // Constants (matching iOS VLMViewModel defaults)

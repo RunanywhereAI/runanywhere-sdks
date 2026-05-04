@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.data
 
+import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
@@ -7,7 +8,6 @@ import com.runanywhere.sdk.core.types.NPUChip
 import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
@@ -45,10 +45,13 @@ object ModelList {
                 category = ModelCategory.LANGUAGE,
                 memoryRequirement = 4_000_000_000,
             ),
+            // B-AK-10-001: Switched from third-party Void2377/qwen-lora-gguf base
+            // (re-packaged GGUF that llama.cpp couldn't parse — header parse failure,
+            // RAC_ERROR_MODEL_LOAD_FAILED -111) to the official Qwen GGUF release.
             AppModel(
                 id = "qwen2.5-0.5b-instruct-q8_0",
                 name = "Qwen 2.5 0.5B Instruct Q8_0",
-                url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/base-model-q8_0.gguf",
+                url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf",
                 framework = InferenceFramework.LLAMA_CPP,
                 category = ModelCategory.LANGUAGE,
                 memoryRequirement = 600_000_000,
@@ -63,6 +66,10 @@ object ModelList {
                 memoryRequirement = 2_500_000_000,
             ),
             // Qwen3 models
+            // NOTE (B-AK-3-001): Q4_K_M of Qwen3 0.6B is ~396 MB on disk;
+            // 500 MB below is an upper-bound RAM requirement (download size +
+            // KV cache + activations), kept conservative so available-RAM
+            // gating doesn't accept devices that will OOM under load.
             AppModel(
                 id = "qwen3-0.6b-q4_k_m",
                 name = "Qwen3 0.6B Q4_K_M",
@@ -146,14 +153,14 @@ object ModelList {
             ),
         )
 
-    // STT / TTS
+    // STT / TTS — served by the Sherpa-ONNX engine plugin (framework = SHERPA)
     private val sttModels =
         listOf(
             AppModel(
                 id = "sherpa-onnx-whisper-tiny.en",
                 name = "Sherpa Whisper Tiny (ONNX)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
-                framework = InferenceFramework.ONNX,
+                framework = InferenceFramework.SHERPA,
                 category = ModelCategory.SPEECH_RECOGNITION,
                 memoryRequirement = 75_000_000,
             ),
@@ -164,7 +171,7 @@ object ModelList {
                 id = "vits-piper-en_US-lessac-medium",
                 name = "Piper TTS (US English - Medium)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
-                framework = InferenceFramework.ONNX,
+                framework = InferenceFramework.SHERPA,
                 category = ModelCategory.SPEECH_SYNTHESIS,
                 memoryRequirement = 65_000_000,
             ),
@@ -172,7 +179,7 @@ object ModelList {
                 id = "vits-piper-en_GB-alba-medium",
                 name = "Piper TTS (British English)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
-                framework = InferenceFramework.ONNX,
+                framework = InferenceFramework.SHERPA,
                 category = ModelCategory.SPEECH_SYNTHESIS,
                 memoryRequirement = 65_000_000,
             ),
@@ -199,15 +206,21 @@ object ModelList {
     // LoRA Adapters
     private val loraAdapters =
         listOf(
+            // B-AK-10-001: This LoRA was trained against the third-party Void2377
+            // re-packaged base GGUF. Now that the base model points to the official
+            // Qwen/Qwen2.5-0.5B-Instruct-GGUF release, the adapter weights may not
+            // align cleanly with the official base — output quality could be degraded
+            // even though the AK-10 LoRA loading flow itself remains testable.
+            // Kept registered so the LoRA apply/unapply pipeline can still be exercised.
             LoraAdapterCatalogEntry(
                 id = "abliterated-lora",
                 name = "Abliterated LoRA (F16)",
                 description = "Removes refusal behavior — model answers all questions directly without disclaimers",
-                downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
+                url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
                 filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
-                compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
-                fileSize = 17_600_000,
-                defaultScale = 1.0f,
+                compatible_models = listOf("qwen2.5-0.5b-instruct-q8_0"),
+                size_bytes = 17_600_000,
+                default_scale = 1.0f,
             ),
         )
 

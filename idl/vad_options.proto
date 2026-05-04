@@ -1,0 +1,255 @@
+// RunAnywhere IDL — Voice Activity Detection (VAD) options & messages.
+//
+// Every message below is the *union* of fields currently declared by hand
+// across Swift, Kotlin, Dart, React Native, Web, and the C ABI. The pre-IDL
+// drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is
+// what motivated this schema. Every SDK consumes generated output; nothing
+// is hand-written.
+//
+// Note: this file does NOT redefine VADEventType / VADEvent — those already
+// live in voice_events.proto and are imported here when needed.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "VadOptionsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Speech-activity lifecycle kind.
+// Sources pre-IDL:
+//   Swift  VADTypes.swift:235               (started, ended)
+//   Kotlin VADTypes.kt:171                  (STARTED, ENDED)
+//   Dart   runanywhere_vad.dart:28          (started, ended)
+//   RN     VADTypes.ts:43                   ('started' | 'ended')
+//   Web    VADTypes.ts:8                    (Started, Ended, Ongoing)   ← only SDK with ONGOING
+//   C ABI  rac_vad_types.h:107              (RAC_SPEECH_STARTED, RAC_SPEECH_ENDED, RAC_SPEECH_ONGOING)
+// Canonical union: STARTED, ENDED, ONGOING.
+// ---------------------------------------------------------------------------
+enum SpeechActivityKind {
+    SPEECH_ACTIVITY_KIND_UNSPECIFIED   = 0;   // Reserved (proto3 default)
+    SPEECH_ACTIVITY_KIND_SPEECH_STARTED = 1;
+    SPEECH_ACTIVITY_KIND_SPEECH_ENDED   = 2;
+    SPEECH_ACTIVITY_KIND_ONGOING        = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Compile-time / load-time configuration for a VAD instance.
+// Sources pre-IDL:
+//   Swift  VADTypes.swift:15                (energyThreshold, sampleRate, frameLength,
+//                                            enableAutoCalibration, calibrationMultiplier)
+//   Kotlin VADTypes.kt:26                   (same five fields, defaults match Swift)
+//   Dart   vad_configuration.dart:5         (same five fields)
+//   RN     VADTypes.ts:12                   (sampleRate, frameLength, energyThreshold;
+//                                            no calibration fields)
+//   Web    VADTypes.ts —                    (no VADConfiguration; per-backend in WebSDK)
+//   C ABI  rac_vad_types.h:63 (rac_vad_config_t)
+//                                           (model_id, preferred_framework, energy_threshold,
+//                                            sample_rate, frame_length, enable_auto_calibration,
+//                                            calibration_multiplier)
+//
+// `frame_length_ms` is the canonical wire field — Swift/Kotlin/Dart/C use
+// seconds (float), but ms is more interoperable across protobuf consumers.
+// Generators must convert when binding to per-platform types.
+// ---------------------------------------------------------------------------
+message VADConfiguration {
+    // Optional model id; empty when using the built-in energy VAD.
+    // C ABI: model_id (rac_vad_config_t::model_id, may be NULL).
+    string model_id              = 1;
+
+    // PCM sample rate in Hz. Default 16000 (RAC_VAD_DEFAULT_SAMPLE_RATE).
+    int32  sample_rate           = 2;
+
+    // Frame length in milliseconds. Default 100 (Swift/Kotlin/Dart store
+    // 0.1 seconds; we canonicalize to ms on the wire).
+    int32  frame_length_ms       = 3;
+
+    // Energy threshold in [0.0, 1.0] for voice detection.
+    // Recommended range 0.01–0.05; default 0.015 across SDKs.
+    float  threshold             = 4;
+
+    // When true, the VAD performs ambient-noise calibration and uses the
+    // result as a multiplier on the threshold (see calibration_multiplier
+    // in the C ABI). Defaults to false.
+    bool   enable_auto_calibration = 5;
+
+    // Calibration multiplier (threshold = ambient noise * multiplier).
+    // Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+    float  calibration_multiplier = 6;
+
+    // Preferred framework for VAD. Absent = auto.
+    optional InferenceFramework preferred_framework = 7;
+
+    // Optional model path for backend-specific VADs (e.g. Silero ONNX).
+    optional string model_path = 8;
+
+    // Window size in samples for frame-based neural VAD backends. 0 =
+    // backend/default.
+    int32  window_size_samples = 9;
+
+    // Maximum continuous speech segment duration in milliseconds. 0 =
+    // backend/default.
+    int32  max_speech_duration_ms = 10;
+}
+
+// ---------------------------------------------------------------------------
+// Runtime / per-call options applied to a VAD pass.
+// Sources pre-IDL:
+//   Swift  none — Swift uses raw arguments to detectSpeech().
+//   Kotlin none — same as Swift.
+//   Dart   runanywhere_vad.dart:99          (`detectSpeech` takes raw Float32List)
+//   RN     VADTypes.ts —                    (no per-call options struct)
+//   Web    VADTypes.ts —                    (no per-call options struct)
+//   C ABI  rac_vad_types.h:123 (rac_vad_input_t)
+//                                           (audio_samples, num_samples,
+//                                            energy_threshold_override)
+//
+// We canonicalize on the energy_threshold_override + the speech-duration
+// gates that already appear as constants in rac_vad_types.h:50-51:
+//   RAC_VAD_MIN_SPEECH_DURATION_MS  = 100
+//   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
+// Surfacing them as fields lets callers tune debouncing without a rebuild.
+// ---------------------------------------------------------------------------
+message VADOptions {
+    // Per-call energy threshold override. Use 0 (default) to keep the
+    // configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
+    // (which uses -1 as the sentinel; on the wire we use 0 for proto3
+    // default semantics — generators emit -1 when this is unset).
+    float threshold                = 1;
+
+    // Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
+    // Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
+    int32 min_speech_duration_ms   = 2;
+
+    // Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
+    // Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
+    int32 min_silence_duration_ms  = 3;
+
+    // Maximum continuous speech duration (ms) before forcing a segment split.
+    // 0 = backend/default.
+    int32 max_speech_duration_ms    = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Result of a single VAD pass over a chunk of PCM audio.
+// Sources pre-IDL:
+//   Swift  VADTypes.swift —                 (no struct; bool returned from detectSpeech())
+//   Kotlin VADTypes.kt:152                  (isSpeech, confidence, energyLevel,
+//                                            statistics, timestamp)
+//   Dart   dart_bridge_vad.dart:290         (isSpeech, energy, speechProbability)
+//   RN     VADTypes.ts:26                   (isSpeech, probability, startTime, endTime)
+//   Web    VADTypes.ts —                    (no VADResult; only SpeechSegment)
+//   C ABI  rac_vad_types.h:151 (rac_vad_output_t)
+//                                           (is_speech_detected, energy_level, timestamp_ms)
+//
+// Drift notes:
+//   - Kotlin's `confidence` and Dart's `speechProbability` and RN's
+//     `probability` collapse onto the canonical `confidence` field.
+//   - Kotlin/RN/C all carry timing — we encode duration_ms (length of the
+//     analyzed frame). Wall-clock timestamps belong on the carrying envelope
+//     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
+// ---------------------------------------------------------------------------
+message VADResult {
+    // Whether speech was detected in this frame.
+    // Mirrors rac_vad_output_t::is_speech_detected.
+    bool  is_speech    = 1;
+
+    // Confidence / probability in [0.0, 1.0]. Backend-dependent.
+    float confidence   = 2;
+
+    // RMS energy level of the analyzed frame.
+    // Mirrors rac_vad_output_t::energy_level.
+    float energy       = 3;
+
+    // Length of the analyzed frame in milliseconds.
+    int32 duration_ms  = 4;
+
+    // Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+    int64 timestamp_ms = 5;
+
+    // Optional detected segment start/end times, in milliseconds. 0 = unset.
+    int64 start_time_ms = 6;
+    int64 end_time_ms   = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Internal VAD statistics, exposed for debugging / waveform UIs.
+// Sources pre-IDL:
+//   Swift  VADTypes.swift:174               (current, threshold, ambient,
+//                                            recentAvg, recentMax)
+//   Kotlin VADTypes.kt:123                  (same five fields)
+//   Dart   none — Dart bridge does not surface statistics yet.
+//   RN     VADTypes.ts —                    (none)
+//   Web    VADTypes.ts —                    (none)
+//   C ABI  rac_vad_types.h:194 (rac_vad_statistics_t)
+//                                           (current_threshold, ambient_noise_level,
+//                                            total_speech_segments, total_speech_duration_ms,
+//                                            average_energy, peak_energy)
+//
+// We canonicalize on the Swift/Kotlin shape because it is the most widely
+// used. The richer C ABI fields (segment counts, totals) belong on a future
+// VADAnalytics message and are intentionally NOT included here.
+// ---------------------------------------------------------------------------
+message VADStatistics {
+    // Current instantaneous energy level. (Swift/Kotlin: `current`)
+    float current_energy   = 1;
+
+    // Energy threshold currently in use. (Swift/Kotlin: `threshold`;
+    // C ABI: rac_vad_statistics_t::current_threshold)
+    float current_threshold = 2;
+
+    // Ambient noise level captured by calibration. (Swift/Kotlin: `ambient`;
+    // C ABI: rac_vad_statistics_t::ambient_noise_level)
+    float ambient_level    = 3;
+
+    // Recent moving-window average energy. (Swift/Kotlin: `recentAvg`)
+    float recent_avg       = 4;
+
+    // Recent moving-window peak energy. (Swift/Kotlin: `recentMax`)
+    float recent_max       = 5;
+
+    // Richer service-level counters from rac_vad_statistics_t. Zero = unset
+    // for energy-only implementations.
+    int32 total_speech_segments     = 6;
+    int64 total_speech_duration_ms  = 7;
+    float average_energy            = 8;
+    float peak_energy               = 9;
+}
+
+// ---------------------------------------------------------------------------
+// Activity transition emitted by the VAD as it watches a stream.
+// Sources pre-IDL:
+//   Swift  VADTypes.swift:235               (SpeechActivityEvent enum: started/ended)
+//   Kotlin VADTypes.kt:171                  (SpeechActivityEvent enum: STARTED/ENDED)
+//   Dart   runanywhere_vad.dart:28          (SpeechActivityEvent enum: started/ended)
+//   RN     VADTypes.ts:43                   ('started' | 'ended' string union)
+//   Web    VADTypes.ts:8                    (SpeechActivity enum: Started/Ended/Ongoing)
+//   C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
+//                                           (RAC_SPEECH_STARTED/ENDED/ONGOING)
+//
+// Distinct from voice_events.proto's `VADEvent`/`VADEventType`, which carry
+// the broader pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc).
+// `SpeechActivityEvent` here is the narrow component-level transition.
+// ---------------------------------------------------------------------------
+message SpeechActivityEvent {
+    // Which transition happened.
+    SpeechActivityKind event_type = 1;
+
+    // Wall-clock time of the transition, in milliseconds since epoch.
+    // Aligns with rac_vad_output_t::timestamp_ms.
+    int64 timestamp_ms            = 2;
+
+    // Optional duration of the speech / silence that triggered this event,
+    // in milliseconds. Set on SPEECH_ENDED to communicate the just-finished
+    // utterance length; left zero on SPEECH_STARTED.
+    int32 duration_ms             = 3;
+}

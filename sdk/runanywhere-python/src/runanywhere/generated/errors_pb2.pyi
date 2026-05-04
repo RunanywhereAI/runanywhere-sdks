@@ -1,0 +1,340 @@
+from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import message as _message
+from collections.abc import Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
+
+DESCRIPTOR: _descriptor.FileDescriptor
+
+class ErrorCategory(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_CATEGORY_UNSPECIFIED: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_NETWORK: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_VALIDATION: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_MODEL: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_COMPONENT: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_IO: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_AUTH: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_INTERNAL: _ClassVar[ErrorCategory]
+    ERROR_CATEGORY_CONFIGURATION: _ClassVar[ErrorCategory]
+
+class ErrorSeverity(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_SEVERITY_UNSPECIFIED: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_DEBUG: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_INFO: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_WARNING: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_ERROR: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_CRITICAL: _ClassVar[ErrorSeverity]
+
+class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_CODE_UNSPECIFIED: _ClassVar[ErrorCode]
+    ERROR_CODE_NOT_INITIALIZED: _ClassVar[ErrorCode]
+    ERROR_CODE_ALREADY_INITIALIZED: _ClassVar[ErrorCode]
+    ERROR_CODE_INITIALIZATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_CONFIGURATION: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_API_KEY: _ClassVar[ErrorCode]
+    ERROR_CODE_ENVIRONMENT_MISMATCH: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_PARAMETER: _ClassVar[ErrorCode]
+    ERROR_CODE_MODEL_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_MODEL_LOAD_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_MODEL_VALIDATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_MODEL_INCOMPATIBLE: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_MODEL_FORMAT: _ClassVar[ErrorCode]
+    ERROR_CODE_MODEL_STORAGE_CORRUPTED: _ClassVar[ErrorCode]
+    ERROR_CODE_MODEL_NOT_LOADED: _ClassVar[ErrorCode]
+    ERROR_CODE_GENERATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_GENERATION_TIMEOUT: _ClassVar[ErrorCode]
+    ERROR_CODE_CONTEXT_TOO_LONG: _ClassVar[ErrorCode]
+    ERROR_CODE_TOKEN_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_COST_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_INFERENCE_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_NETWORK_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_NETWORK_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_REQUEST_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_DOWNLOAD_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVER_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_TIMEOUT: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_RESPONSE: _ClassVar[ErrorCode]
+    ERROR_CODE_HTTP_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_CONNECTION_LOST: _ClassVar[ErrorCode]
+    ERROR_CODE_PARTIAL_DOWNLOAD: _ClassVar[ErrorCode]
+    ERROR_CODE_HTTP_REQUEST_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_HTTP_NOT_SUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_INSUFFICIENT_STORAGE: _ClassVar[ErrorCode]
+    ERROR_CODE_STORAGE_FULL: _ClassVar[ErrorCode]
+    ERROR_CODE_STORAGE_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_FILE_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_FILE_READ_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_FILE_WRITE_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
+    ERROR_CODE_DELETE_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_MOVE_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_DIRECTORY_CREATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_DIRECTORY_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_PATH: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_FILE_NAME: _ClassVar[ErrorCode]
+    ERROR_CODE_TEMP_FILE_CREATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_HARDWARE_UNSUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_INSUFFICIENT_MEMORY: _ClassVar[ErrorCode]
+    ERROR_CODE_COMPONENT_NOT_READY: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_STATE: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_NOT_AVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_BUSY: _ClassVar[ErrorCode]
+    ERROR_CODE_PROCESSING_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_START_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_NOT_SUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_VALIDATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_INPUT: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_FORMAT: _ClassVar[ErrorCode]
+    ERROR_CODE_EMPTY_INPUT: _ClassVar[ErrorCode]
+    ERROR_CODE_TEXT_TOO_LONG: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_SSML: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_SPEAKING_RATE: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_PITCH: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_VOLUME: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_ARGUMENT: _ClassVar[ErrorCode]
+    ERROR_CODE_NULL_POINTER: _ClassVar[ErrorCode]
+    ERROR_CODE_BUFFER_TOO_SMALL: _ClassVar[ErrorCode]
+    ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_AUDIO_SESSION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_MICROPHONE_PERMISSION_DENIED: _ClassVar[ErrorCode]
+    ERROR_CODE_INSUFFICIENT_AUDIO_DATA: _ClassVar[ErrorCode]
+    ERROR_CODE_EMPTY_AUDIO_BUFFER: _ClassVar[ErrorCode]
+    ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_LANGUAGE_NOT_SUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_VOICE_NOT_AVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_STREAMING_NOT_SUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_STREAM_CANCELLED: _ClassVar[ErrorCode]
+    ERROR_CODE_AUTHENTICATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_UNAUTHORIZED: _ClassVar[ErrorCode]
+    ERROR_CODE_FORBIDDEN: _ClassVar[ErrorCode]
+    ERROR_CODE_KEYCHAIN_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_ENCODING_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_DECODING_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_SECURE_STORAGE_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_EXTRACTION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_CHECKSUM_MISMATCH: _ClassVar[ErrorCode]
+    ERROR_CODE_UNSUPPORTED_ARCHIVE: _ClassVar[ErrorCode]
+    ERROR_CODE_CALIBRATION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_CALIBRATION_TIMEOUT: _ClassVar[ErrorCode]
+    ERROR_CODE_CANCELLED: _ClassVar[ErrorCode]
+    ERROR_CODE_MODULE_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_MODULE_ALREADY_REGISTERED: _ClassVar[ErrorCode]
+    ERROR_CODE_MODULE_LOAD_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_ALREADY_REGISTERED: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_CREATE_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_CAPABILITY_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_PROVIDER_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_NO_CAPABLE_PROVIDER: _ClassVar[ErrorCode]
+    ERROR_CODE_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_ADAPTER_NOT_SET: _ClassVar[ErrorCode]
+    ERROR_CODE_BACKEND_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_BACKEND_NOT_READY: _ClassVar[ErrorCode]
+    ERROR_CODE_BACKEND_INIT_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_BACKEND_BUSY: _ClassVar[ErrorCode]
+    ERROR_CODE_BACKEND_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_HANDLE: _ClassVar[ErrorCode]
+    ERROR_CODE_EVENT_INVALID_CATEGORY: _ClassVar[ErrorCode]
+    ERROR_CODE_EVENT_SUBSCRIPTION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_EVENT_PUBLISH_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_NOT_IMPLEMENTED: _ClassVar[ErrorCode]
+    ERROR_CODE_FEATURE_NOT_AVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_FRAMEWORK_NOT_AVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_UNSUPPORTED_MODALITY: _ClassVar[ErrorCode]
+    ERROR_CODE_UNKNOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_INTERNAL: _ClassVar[ErrorCode]
+    ERROR_CODE_ABI_VERSION_MISMATCH: _ClassVar[ErrorCode]
+    ERROR_CODE_CAPABILITY_UNSUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_PLUGIN_DUPLICATE: _ClassVar[ErrorCode]
+    ERROR_CODE_PLUGIN_LOAD_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_PLUGIN_BUSY: _ClassVar[ErrorCode]
+    ERROR_CODE_WASM_LOAD_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_WASM_NOT_LOADED: _ClassVar[ErrorCode]
+    ERROR_CODE_WASM_CALLBACK_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_WASM_MEMORY_ERROR: _ClassVar[ErrorCode]
+ERROR_CATEGORY_UNSPECIFIED: ErrorCategory
+ERROR_CATEGORY_NETWORK: ErrorCategory
+ERROR_CATEGORY_VALIDATION: ErrorCategory
+ERROR_CATEGORY_MODEL: ErrorCategory
+ERROR_CATEGORY_COMPONENT: ErrorCategory
+ERROR_CATEGORY_IO: ErrorCategory
+ERROR_CATEGORY_AUTH: ErrorCategory
+ERROR_CATEGORY_INTERNAL: ErrorCategory
+ERROR_CATEGORY_CONFIGURATION: ErrorCategory
+ERROR_SEVERITY_UNSPECIFIED: ErrorSeverity
+ERROR_SEVERITY_DEBUG: ErrorSeverity
+ERROR_SEVERITY_INFO: ErrorSeverity
+ERROR_SEVERITY_WARNING: ErrorSeverity
+ERROR_SEVERITY_ERROR: ErrorSeverity
+ERROR_SEVERITY_CRITICAL: ErrorSeverity
+ERROR_CODE_UNSPECIFIED: ErrorCode
+ERROR_CODE_NOT_INITIALIZED: ErrorCode
+ERROR_CODE_ALREADY_INITIALIZED: ErrorCode
+ERROR_CODE_INITIALIZATION_FAILED: ErrorCode
+ERROR_CODE_INVALID_CONFIGURATION: ErrorCode
+ERROR_CODE_INVALID_API_KEY: ErrorCode
+ERROR_CODE_ENVIRONMENT_MISMATCH: ErrorCode
+ERROR_CODE_INVALID_PARAMETER: ErrorCode
+ERROR_CODE_MODEL_NOT_FOUND: ErrorCode
+ERROR_CODE_MODEL_LOAD_FAILED: ErrorCode
+ERROR_CODE_MODEL_VALIDATION_FAILED: ErrorCode
+ERROR_CODE_MODEL_INCOMPATIBLE: ErrorCode
+ERROR_CODE_INVALID_MODEL_FORMAT: ErrorCode
+ERROR_CODE_MODEL_STORAGE_CORRUPTED: ErrorCode
+ERROR_CODE_MODEL_NOT_LOADED: ErrorCode
+ERROR_CODE_GENERATION_FAILED: ErrorCode
+ERROR_CODE_GENERATION_TIMEOUT: ErrorCode
+ERROR_CODE_CONTEXT_TOO_LONG: ErrorCode
+ERROR_CODE_TOKEN_LIMIT_EXCEEDED: ErrorCode
+ERROR_CODE_COST_LIMIT_EXCEEDED: ErrorCode
+ERROR_CODE_INFERENCE_FAILED: ErrorCode
+ERROR_CODE_NETWORK_UNAVAILABLE: ErrorCode
+ERROR_CODE_NETWORK_ERROR: ErrorCode
+ERROR_CODE_REQUEST_FAILED: ErrorCode
+ERROR_CODE_DOWNLOAD_FAILED: ErrorCode
+ERROR_CODE_SERVER_ERROR: ErrorCode
+ERROR_CODE_TIMEOUT: ErrorCode
+ERROR_CODE_INVALID_RESPONSE: ErrorCode
+ERROR_CODE_HTTP_ERROR: ErrorCode
+ERROR_CODE_CONNECTION_LOST: ErrorCode
+ERROR_CODE_PARTIAL_DOWNLOAD: ErrorCode
+ERROR_CODE_HTTP_REQUEST_FAILED: ErrorCode
+ERROR_CODE_HTTP_NOT_SUPPORTED: ErrorCode
+ERROR_CODE_INSUFFICIENT_STORAGE: ErrorCode
+ERROR_CODE_STORAGE_FULL: ErrorCode
+ERROR_CODE_STORAGE_ERROR: ErrorCode
+ERROR_CODE_FILE_NOT_FOUND: ErrorCode
+ERROR_CODE_FILE_READ_FAILED: ErrorCode
+ERROR_CODE_FILE_WRITE_FAILED: ErrorCode
+ERROR_CODE_PERMISSION_DENIED: ErrorCode
+ERROR_CODE_DELETE_FAILED: ErrorCode
+ERROR_CODE_MOVE_FAILED: ErrorCode
+ERROR_CODE_DIRECTORY_CREATION_FAILED: ErrorCode
+ERROR_CODE_DIRECTORY_NOT_FOUND: ErrorCode
+ERROR_CODE_INVALID_PATH: ErrorCode
+ERROR_CODE_INVALID_FILE_NAME: ErrorCode
+ERROR_CODE_TEMP_FILE_CREATION_FAILED: ErrorCode
+ERROR_CODE_HARDWARE_UNSUPPORTED: ErrorCode
+ERROR_CODE_INSUFFICIENT_MEMORY: ErrorCode
+ERROR_CODE_COMPONENT_NOT_READY: ErrorCode
+ERROR_CODE_INVALID_STATE: ErrorCode
+ERROR_CODE_SERVICE_NOT_AVAILABLE: ErrorCode
+ERROR_CODE_SERVICE_BUSY: ErrorCode
+ERROR_CODE_PROCESSING_FAILED: ErrorCode
+ERROR_CODE_START_FAILED: ErrorCode
+ERROR_CODE_NOT_SUPPORTED: ErrorCode
+ERROR_CODE_VALIDATION_FAILED: ErrorCode
+ERROR_CODE_INVALID_INPUT: ErrorCode
+ERROR_CODE_INVALID_FORMAT: ErrorCode
+ERROR_CODE_EMPTY_INPUT: ErrorCode
+ERROR_CODE_TEXT_TOO_LONG: ErrorCode
+ERROR_CODE_INVALID_SSML: ErrorCode
+ERROR_CODE_INVALID_SPEAKING_RATE: ErrorCode
+ERROR_CODE_INVALID_PITCH: ErrorCode
+ERROR_CODE_INVALID_VOLUME: ErrorCode
+ERROR_CODE_INVALID_ARGUMENT: ErrorCode
+ERROR_CODE_NULL_POINTER: ErrorCode
+ERROR_CODE_BUFFER_TOO_SMALL: ErrorCode
+ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED: ErrorCode
+ERROR_CODE_AUDIO_SESSION_FAILED: ErrorCode
+ERROR_CODE_MICROPHONE_PERMISSION_DENIED: ErrorCode
+ERROR_CODE_INSUFFICIENT_AUDIO_DATA: ErrorCode
+ERROR_CODE_EMPTY_AUDIO_BUFFER: ErrorCode
+ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED: ErrorCode
+ERROR_CODE_LANGUAGE_NOT_SUPPORTED: ErrorCode
+ERROR_CODE_VOICE_NOT_AVAILABLE: ErrorCode
+ERROR_CODE_STREAMING_NOT_SUPPORTED: ErrorCode
+ERROR_CODE_STREAM_CANCELLED: ErrorCode
+ERROR_CODE_AUTHENTICATION_FAILED: ErrorCode
+ERROR_CODE_UNAUTHORIZED: ErrorCode
+ERROR_CODE_FORBIDDEN: ErrorCode
+ERROR_CODE_KEYCHAIN_ERROR: ErrorCode
+ERROR_CODE_ENCODING_ERROR: ErrorCode
+ERROR_CODE_DECODING_ERROR: ErrorCode
+ERROR_CODE_SECURE_STORAGE_FAILED: ErrorCode
+ERROR_CODE_EXTRACTION_FAILED: ErrorCode
+ERROR_CODE_CHECKSUM_MISMATCH: ErrorCode
+ERROR_CODE_UNSUPPORTED_ARCHIVE: ErrorCode
+ERROR_CODE_CALIBRATION_FAILED: ErrorCode
+ERROR_CODE_CALIBRATION_TIMEOUT: ErrorCode
+ERROR_CODE_CANCELLED: ErrorCode
+ERROR_CODE_MODULE_NOT_FOUND: ErrorCode
+ERROR_CODE_MODULE_ALREADY_REGISTERED: ErrorCode
+ERROR_CODE_MODULE_LOAD_FAILED: ErrorCode
+ERROR_CODE_SERVICE_NOT_FOUND: ErrorCode
+ERROR_CODE_SERVICE_ALREADY_REGISTERED: ErrorCode
+ERROR_CODE_SERVICE_CREATE_FAILED: ErrorCode
+ERROR_CODE_CAPABILITY_NOT_FOUND: ErrorCode
+ERROR_CODE_PROVIDER_NOT_FOUND: ErrorCode
+ERROR_CODE_NO_CAPABLE_PROVIDER: ErrorCode
+ERROR_CODE_NOT_FOUND: ErrorCode
+ERROR_CODE_ADAPTER_NOT_SET: ErrorCode
+ERROR_CODE_BACKEND_NOT_FOUND: ErrorCode
+ERROR_CODE_BACKEND_NOT_READY: ErrorCode
+ERROR_CODE_BACKEND_INIT_FAILED: ErrorCode
+ERROR_CODE_BACKEND_BUSY: ErrorCode
+ERROR_CODE_BACKEND_UNAVAILABLE: ErrorCode
+ERROR_CODE_INVALID_HANDLE: ErrorCode
+ERROR_CODE_EVENT_INVALID_CATEGORY: ErrorCode
+ERROR_CODE_EVENT_SUBSCRIPTION_FAILED: ErrorCode
+ERROR_CODE_EVENT_PUBLISH_FAILED: ErrorCode
+ERROR_CODE_NOT_IMPLEMENTED: ErrorCode
+ERROR_CODE_FEATURE_NOT_AVAILABLE: ErrorCode
+ERROR_CODE_FRAMEWORK_NOT_AVAILABLE: ErrorCode
+ERROR_CODE_UNSUPPORTED_MODALITY: ErrorCode
+ERROR_CODE_UNKNOWN: ErrorCode
+ERROR_CODE_INTERNAL: ErrorCode
+ERROR_CODE_ABI_VERSION_MISMATCH: ErrorCode
+ERROR_CODE_CAPABILITY_UNSUPPORTED: ErrorCode
+ERROR_CODE_PLUGIN_DUPLICATE: ErrorCode
+ERROR_CODE_PLUGIN_LOAD_FAILED: ErrorCode
+ERROR_CODE_PLUGIN_BUSY: ErrorCode
+ERROR_CODE_WASM_LOAD_FAILED: ErrorCode
+ERROR_CODE_WASM_NOT_LOADED: ErrorCode
+ERROR_CODE_WASM_CALLBACK_ERROR: ErrorCode
+ERROR_CODE_WASM_MEMORY_ERROR: ErrorCode
+
+class ErrorContext(_message.Message):
+    __slots__ = ("metadata", "source_file", "source_line", "operation")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FILE_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_LINE_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_FIELD_NUMBER: _ClassVar[int]
+    metadata: _containers.ScalarMap[str, str]
+    source_file: str
+    source_line: int
+    operation: str
+    def __init__(self, metadata: _Optional[_Mapping[str, str]] = ..., source_file: _Optional[str] = ..., source_line: _Optional[int] = ..., operation: _Optional[str] = ...) -> None: ...
+
+class SDKError(_message.Message):
+    __slots__ = ("code", "category", "message", "context", "c_abi_code", "nested_message", "timestamp_ms", "severity", "component")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    C_ABI_CODE_FIELD_NUMBER: _ClassVar[int]
+    NESTED_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    SEVERITY_FIELD_NUMBER: _ClassVar[int]
+    COMPONENT_FIELD_NUMBER: _ClassVar[int]
+    code: ErrorCode
+    category: ErrorCategory
+    message: str
+    context: ErrorContext
+    c_abi_code: int
+    nested_message: str
+    timestamp_ms: int
+    severity: ErrorSeverity
+    component: str
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., category: _Optional[_Union[ErrorCategory, str]] = ..., message: _Optional[str] = ..., context: _Optional[_Union[ErrorContext, _Mapping]] = ..., c_abi_code: _Optional[int] = ..., nested_message: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., severity: _Optional[_Union[ErrorSeverity, str]] = ..., component: _Optional[str] = ...) -> None: ...

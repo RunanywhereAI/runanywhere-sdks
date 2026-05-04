@@ -9,6 +9,7 @@
 import CRACommons
 import Foundation
 import Security
+import os
 
 // MARK: - Platform Adapter Bridge
 
@@ -58,10 +59,8 @@ extension CppBridge {
             // MARK: Clock
             adapter.now_ms = platformNowMsCallback
 
-            // MARK: Memory Info (not implemented)
-            adapter.get_memory_info = { _, _ -> rac_result_t in
-                RAC_ERROR_NOT_SUPPORTED
-            }
+            // MARK: Memory Info
+            adapter.get_memory_info = platformGetMemoryInfoCallback
 
             // MARK: Error Tracking (Sentry)
             adapter.track_error = platformTrackErrorCallback
@@ -343,6 +342,46 @@ private func platformNowMsCallback(
     Int64(Date().timeIntervalSince1970 * 1000)
 }
 
+// MARK: - Memory Info Callback
+
+/// Reports process-level memory usage to C++ via the platform adapter.
+///
+/// Uses `task_vm_info` (mach) for accurate process footprint on Apple platforms.
+/// `phys_footprint` is the value Apple uses for Jetsam/OOM accounting, which
+/// maps most directly to the "used" memory concept the C++ core expects.
+private func platformGetMemoryInfoCallback(
+    outInfo: UnsafeMutablePointer<rac_memory_info_t>?,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    guard let outInfo = outInfo else {
+        return RAC_ERROR_NULL_POINTER
+    }
+
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(
+        MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size
+    )
+    let kr = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+
+    guard kr == KERN_SUCCESS else {
+        return RAC_ERROR_INTERNAL
+    }
+
+    let total = ProcessInfo.processInfo.physicalMemory
+    let used = UInt64(info.phys_footprint)
+    let available = total > used ? total - used : 0
+
+    outInfo.pointee.total_bytes = total
+    outInfo.pointee.used_bytes = used
+    outInfo.pointee.available_bytes = available
+
+    return RAC_SUCCESS
+}
+
 // MARK: - Error Tracking Callback
 
 /// Receives structured error JSON from C++ and sends to Sentry
@@ -360,7 +399,7 @@ private func platformTrackErrorCallback(
         return
     }
 
-    // Convert C++ structured error to Swift SDKError for consistent handling
+    // Convert C++ structured error to Swift SDKException for consistent handling
     let sdkError = createSDKErrorFromCppError(errorDict)
 
     // Log through the standard logging system (which routes to Sentry)
@@ -412,40 +451,128 @@ private func platformTrackErrorCallback(
     }
 }
 
-// Creates an SDKError from C++ error dictionary for consistent error handling
+// Creates an SDKException from C++ error dictionary for consistent error handling
 // swiftlint:disable:next avoid_any_type prefer_concrete_types
-private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKError {
+private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKException {
     let code = errorDict["code"] as? Int32 ?? Int32(RAC_ERROR_UNKNOWN)
     let message = errorDict["message"] as? String ?? "Unknown error"
-    let categoryName = errorDict["category"] as? String ?? "general"
+    let categoryName = errorDict["category"] as? String ?? "internal"
 
-    // Map category name to ErrorCategory
-    let category = ErrorCategory(rawValue: categoryName) ?? .general
-
-    // Map C++ error code to Swift ErrorCode
-    let errorCode = CommonsErrorMapping.toSDKError(code)?.code ?? .unknown
-
-    // Build stack trace from C++ if available
-    var stackTrace: [String] = []
-    if let sourceFile = errorDict["source_file"] as? String,
-       let sourceLine = errorDict["source_line"] as? Int,
-       let sourceFunction = errorDict["source_function"] as? String {
-        stackTrace.append("\(sourceFunction) at \(sourceFile):\(sourceLine)")
+    // Map category name to RAErrorCategory (proto canonical 9-bucket enum)
+    let category: RAErrorCategory
+    switch categoryName.lowercased() {
+    case "network":       category = .network
+    case "validation":    category = .validation
+    case "model":         category = .model
+    case "component":     category = .component
+    case "io":            category = .io
+    case "auth":          category = .auth
+    case "configuration": category = .configuration
+    default:              category = .internal
     }
 
-    return SDKError(
+    // Map C++ error code to RAErrorCode
+    let errorCode = CommonsErrorMapping.toSDKException(code)?.proto.code ?? .unknown
+
+    return SDKException(
         code: errorCode,
         message: message,
         category: category,
-        stackTrace: stackTrace,
-        underlyingError: nil
+        underlying: nil
     )
 }
 
 // MARK: - HTTP Download Callbacks
+//
+// The C++ platform adapter still exposes an HTTP-download callback
+// slot for historical reasons (see `rac_http_download` in
+// `rac_platform_adapter.h`). On Swift we route every request through
+// the canonical libcurl-backed `rac_http_download_execute` runner so
+// the transport matches what the other SDKs use and there is no
+// URLSession code left in the SDK. Cancellation is bridged via a
+// shared flag map keyed on the task id the platform callback hands
+// to the C++ caller.
 
-private let httpDownloadQueue = DispatchQueue(label: "com.runanywhere.sdk.httpdownload")
-private var httpDownloadTasks: [String: URLSessionDownloadTask] = [:]
+private final class PlatformDownloadCancelFlag {
+    // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
+    private let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
+
+    func cancel() {
+        cancelled.withLock { $0 = true }
+    }
+
+    var isCancelled: Bool {
+        cancelled.withLock { $0 }
+    }
+}
+
+private let platformHttpDownloadQueue = DispatchQueue(
+    label: "com.runanywhere.sdk.platformhttpdownload",
+    qos: .userInitiated,
+    attributes: .concurrent
+)
+
+private let platformHttpDownloadFlagsRegistry =
+    OSAllocatedUnfairLock<[String: PlatformDownloadCancelFlag]>(initialState: [:])
+
+private func platformDownloadRegister(_ taskId: String, _ flag: PlatformDownloadCancelFlag) {
+    platformHttpDownloadFlagsRegistry.withLock { $0[taskId] = flag }
+}
+
+private func platformDownloadUnregister(_ taskId: String) {
+    platformHttpDownloadFlagsRegistry.withLock { _ = $0.removeValue(forKey: taskId) }
+}
+
+private func platformDownloadLookup(_ taskId: String) -> PlatformDownloadCancelFlag? {
+    platformHttpDownloadFlagsRegistry.withLock { $0[taskId] }
+}
+
+/// Boxed per-download state forwarded into the C progress callback
+/// via an opaque pointer (`Unmanaged.passRetained`).
+private final class PlatformDownloadProgressState {
+    let progressCallback: rac_http_progress_callback_fn?
+    let callbackUserData: UnsafeMutableRawPointer?
+    let cancelFlag: PlatformDownloadCancelFlag
+
+    init(
+        progressCallback: rac_http_progress_callback_fn?,
+        callbackUserData: UnsafeMutableRawPointer?,
+        cancelFlag: PlatformDownloadCancelFlag
+    ) {
+        self.progressCallback = progressCallback
+        self.callbackUserData = callbackUserData
+        self.cancelFlag = cancelFlag
+    }
+}
+
+private func platformDownloadProgressTrampoline(
+    bytesWritten: UInt64,
+    totalBytes: UInt64,
+    userData: UnsafeMutableRawPointer?
+) -> rac_bool_t {
+    guard let userData = userData else { return RAC_TRUE }
+    let state = Unmanaged<PlatformDownloadProgressState>.fromOpaque(userData).takeUnretainedValue()
+
+    if state.cancelFlag.isCancelled {
+        return RAC_FALSE
+    }
+
+    if let progressCallback = state.progressCallback {
+        let written = Int64(min(UInt64(Int64.max), bytesWritten))
+        let total = Int64(min(UInt64(Int64.max), totalBytes))
+        progressCallback(written, total, state.callbackUserData)
+    }
+    return RAC_TRUE
+}
+
+private func platformMapDownloadStatusToResult(_ status: rac_http_download_status_t) -> rac_result_t {
+    switch status {
+    case RAC_HTTP_DL_OK:
+        return RAC_SUCCESS
+    default:
+        return RAC_ERROR_DOWNLOAD_FAILED
+    }
+}
 
 private func platformHttpDownloadCallback(
     url: UnsafePointer<CChar>?,
@@ -463,55 +590,65 @@ private func platformHttpDownloadCallback(
     let urlString = String(cString: url)
     let destination = String(cString: destinationPath)
 
-    guard let downloadURL = URL(string: urlString) else {
+    guard URL(string: urlString) != nil else {
         return RAC_ERROR_INVALID_ARGUMENT
     }
 
     let taskId = UUID().uuidString
     outTaskId.pointee = rac_strdup(taskId)
 
-    let session = URLSession(configuration: .default)
-    let task = session.downloadTask(with: downloadURL) { [session] tempURL, _, error in
-        // Invalidate the session after task completes to avoid resource leak.
-        // URLSession is not deallocated until explicitly invalidated.
-        defer { session.finishTasksAndInvalidate() }
-        var result: rac_result_t = RAC_SUCCESS
-        var finalPath: String?
+    let cancelFlag = PlatformDownloadCancelFlag()
+    platformDownloadRegister(taskId, cancelFlag)
 
+    platformHttpDownloadQueue.async {
+        // Ensure the destination directory exists before handing off
+        // to curl — the runner opens the destination in write mode
+        // but does not create intermediate directories.
+        let destinationURL = URL(fileURLWithPath: destination)
+        let destinationDir = destinationURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+
+        let state = PlatformDownloadProgressState(
+            progressCallback: progressCallback,
+            callbackUserData: callbackUserData,
+            cancelFlag: cancelFlag
+        )
+        let stateRef = Unmanaged.passRetained(state)
         defer {
-            httpDownloadQueue.async {
-                httpDownloadTasks.removeValue(forKey: taskId)
+            stateRef.release()
+            platformDownloadUnregister(taskId)
+        }
+
+        var finalStatus: rac_http_download_status_t = RAC_HTTP_DL_UNKNOWN
+
+        urlString.withCString { urlC in
+            destination.withCString { destC in
+                var request = rac_http_download_request_t(
+                    url: urlC,
+                    destination_path: destC,
+                    headers: nil,
+                    header_count: 0,
+                    timeout_ms: 0,
+                    follow_redirects: RAC_TRUE,
+                    resume_from_byte: 0,
+                    expected_sha256_hex: nil
+                )
+
+                var httpStatusOut: Int32 = 0
+                finalStatus = rac_http_download_execute(
+                    &request,
+                    platformDownloadProgressTrampoline,
+                    stateRef.toOpaque(),
+                    &httpStatusOut
+                )
             }
         }
 
-        if error != nil {
-            result = RAC_ERROR_DOWNLOAD_FAILED
-        } else if let tempURL = tempURL {
-            do {
-                let destinationURL = URL(fileURLWithPath: destination)
-                let destinationDir = destinationURL.deletingLastPathComponent()
-                try FileManager.default.createDirectory(at: destinationDir,
-                                                        withIntermediateDirectories: true,
-                                                        attributes: nil)
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
-                try FileManager.default.moveItem(at: tempURL, to: destinationURL)
-                finalPath = destinationURL.path
-            } catch {
-                result = RAC_ERROR_DOWNLOAD_FAILED
-            }
-        } else {
-            result = RAC_ERROR_DOWNLOAD_FAILED
-        }
-
-        if let progressCallback = progressCallback {
-            if let finalPath = finalPath,
-               let attrs = try? FileManager.default.attributesOfItem(atPath: finalPath),
-               let fileSize = attrs[.size] as? NSNumber {
-                progressCallback(fileSize.int64Value, fileSize.int64Value, callbackUserData)
-            }
-        }
+        let result = platformMapDownloadStatusToResult(finalStatus)
+        let finalPath: String? = result == RAC_SUCCESS ? destination : nil
 
         if let completeCallback = completeCallback {
             if let finalPath = finalPath {
@@ -524,11 +661,6 @@ private func platformHttpDownloadCallback(
         }
     }
 
-    httpDownloadQueue.async {
-        httpDownloadTasks[taskId] = task
-    }
-
-    task.resume()
     return RAC_SUCCESS
 }
 
@@ -541,19 +673,9 @@ private func platformHttpDownloadCancelCallback(
     }
 
     let taskKey = String(cString: taskId)
-    var task: URLSessionDownloadTask?
-
-    httpDownloadQueue.sync {
-        task = httpDownloadTasks[taskKey]
-    }
-
-    guard let downloadTask = task else {
+    guard let flag = platformDownloadLookup(taskKey) else {
         return RAC_ERROR_NOT_FOUND
     }
-
-    downloadTask.cancel()
-    httpDownloadQueue.async {
-        httpDownloadTasks.removeValue(forKey: taskKey)
-    }
+    flag.cancel()
     return RAC_SUCCESS
 }

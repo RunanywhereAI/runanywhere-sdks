@@ -16,7 +16,7 @@
 #include <cstring>
 #include <string>
 
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir
@@ -348,6 +348,45 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
     }
 
     return status;
+}
+
+rac_result_t rac_extract_model_archive_native(
+    const char* archive_path, const char* destination_dir, const rac_model_info_t* model_info,
+    const char* expected_primary_sha256, const rac_extraction_options_t* options,
+    rac_extraction_progress_fn progress_callback, void* user_data,
+    rac_model_extraction_result_t* out_result) {
+    if (!archive_path || !destination_dir || !model_info || !out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    memset(out_result, 0, sizeof(*out_result));
+    out_result->archive_type = RAC_ARCHIVE_TYPE_NONE;
+    rac_archive_type_t detected = RAC_ARCHIVE_TYPE_NONE;
+    if (rac_detect_archive_type(archive_path, &detected) == RAC_TRUE) {
+        out_result->archive_type = detected;
+    } else if (options && options->archive_type_hint != RAC_ARCHIVE_TYPE_NONE) {
+        out_result->archive_type = options->archive_type_hint;
+    } else if (model_info->artifact_info.kind == RAC_ARTIFACT_KIND_ARCHIVE) {
+        out_result->archive_type = model_info->artifact_info.archive_type;
+    }
+
+    rac_result_t rc = rac_extract_archive_native(archive_path, destination_dir, options,
+                                                 progress_callback, user_data,
+                                                 &out_result->extraction);
+    if (RAC_FAILED(rc)) {
+        return rc;
+    }
+
+    return rac_model_paths_resolve_artifact(model_info, destination_dir, expected_primary_sha256,
+                                            &out_result->resolution);
+}
+
+void rac_model_extraction_result_free(rac_model_extraction_result_t* result) {
+    if (!result)
+        return;
+    rac_model_path_resolution_free(&result->resolution);
+    memset(&result->extraction, 0, sizeof(result->extraction));
+    result->archive_type = RAC_ARCHIVE_TYPE_NONE;
 }
 
 // =============================================================================

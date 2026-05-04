@@ -1,0 +1,158 @@
+// RunAnywhere IDL — model download progress streaming service.
+//
+// GAP 09 Phase 12. Server-streaming rpc returning per-chunk download
+// progress + extraction + validation events. Replaces the per-SDK download
+// observers (Kotlin DownloadProgress channel, Dart Stream<DownloadProgress>,
+// Swift Combine.PassthroughSubject) with one schema + 5 thin adapters.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "DownloadServiceProto";
+option objc_class_prefix     = "RAV1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+message DownloadSubscribeRequest {
+    string model_id = 1;
+    string task_id  = 2;
+}
+
+message DownloadProgress {
+    string         model_id          = 1;
+    DownloadStage  stage             = 2;
+    int64          bytes_downloaded  = 3;
+    int64          total_bytes       = 4;   // 0 if unknown
+    float          stage_progress    = 5;   // 0.0..1.0 within current stage
+    float          overall_speed_bps = 6;
+    int64          eta_seconds       = 7;   // -1 if unknown
+    DownloadState  state             = 8;
+    int32          retry_attempt     = 9;   // 0 on first try
+    string         error_message     = 10;  // populated when state == FAILED
+    string         task_id           = 11;
+    int32          current_file_index = 12; // 0-based within the planned file list
+    int32          total_files       = 13;
+    string         storage_key       = 14;  // C++ storage identifier, not a platform file handle
+    string         local_path        = 15;  // final path once known
+}
+
+enum DownloadStage {
+    DOWNLOAD_STAGE_UNSPECIFIED = 0;
+    DOWNLOAD_STAGE_DOWNLOADING = 1;
+    DOWNLOAD_STAGE_EXTRACTING  = 2;
+    DOWNLOAD_STAGE_VALIDATING  = 3;
+    DOWNLOAD_STAGE_COMPLETED   = 4;
+}
+
+enum DownloadState {
+    DOWNLOAD_STATE_UNSPECIFIED = 0;
+    DOWNLOAD_STATE_PENDING     = 1;
+    DOWNLOAD_STATE_DOWNLOADING = 2;
+    DOWNLOAD_STATE_EXTRACTING  = 3;
+    DOWNLOAD_STATE_RETRYING    = 4;
+    DOWNLOAD_STATE_COMPLETED   = 5;
+    DOWNLOAD_STATE_FAILED      = 6;
+    DOWNLOAD_STATE_CANCELLED   = 7;
+    DOWNLOAD_STATE_PAUSED      = 8;
+    DOWNLOAD_STATE_RESUMING    = 9;
+}
+
+// ---------------------------------------------------------------------------
+// Download operation contracts.
+//
+// HTTP transport stays platform-owned: adapters provide auth, cookies,
+// background-session identifiers, browser fetch handles, and byte streams.
+// These messages capture C++-owned workflow decisions: what to fetch, where
+// the normalized storage keys land, whether extraction/validation is required,
+// and how start/cancel/resume state is reported to every SDK.
+// ---------------------------------------------------------------------------
+
+message DownloadPlanRequest {
+    string             model_id              = 1;
+    optional ModelInfo model                 = 2;
+    bool               resume_existing       = 3;
+    int64              available_storage_bytes = 4;
+    bool               allow_metered_network = 5;
+}
+
+message DownloadFilePlan {
+    ModelFileDescriptor file                = 1;
+    string              storage_key         = 2;
+    string              destination_path    = 3;
+    int64               expected_bytes      = 4;
+    bool                requires_extraction = 5;
+    string              checksum_sha256     = 6;
+}
+
+message DownloadPlanResult {
+    bool                  can_start          = 1;
+    string                model_id           = 2;
+    repeated DownloadFilePlan files          = 3;
+    int64                 total_bytes        = 4;
+    bool                  requires_extraction = 5;
+    bool                  can_resume         = 6;
+    int64                 resume_from_bytes  = 7;
+    repeated string       warnings           = 8;
+    string                error_message      = 9;
+}
+
+message DownloadStartRequest {
+    string              model_id = 1;
+    DownloadPlanResult  plan     = 2;
+    bool                resume   = 3;
+}
+
+message DownloadStartResult {
+    bool             accepted         = 1;
+    string           task_id          = 2;
+    string           model_id         = 3;
+    DownloadProgress initial_progress = 4;
+    string           error_message    = 5;
+}
+
+message DownloadCancelRequest {
+    string task_id              = 1;
+    string model_id             = 2;
+    bool   delete_partial_bytes = 3;
+}
+
+message DownloadCancelResult {
+    bool   success               = 1;
+    string task_id               = 2;
+    string model_id              = 3;
+    int64  partial_bytes_deleted = 4;
+    string error_message         = 5;
+}
+
+message DownloadResumeRequest {
+    string task_id           = 1;
+    string model_id          = 2;
+    int64  resume_from_bytes = 3;
+}
+
+message DownloadResumeResult {
+    bool             accepted         = 1;
+    string           task_id          = 2;
+    string           model_id         = 3;
+    DownloadProgress initial_progress = 4;
+    string           error_message    = 5;
+}
+
+service Download {
+    rpc Plan(DownloadPlanRequest) returns (DownloadPlanResult);
+    rpc Start(DownloadStartRequest) returns (DownloadStartResult);
+
+    // Server-streaming: emits a DownloadProgress message every time
+    // bytes_downloaded crosses a per-engine reporting threshold (currently
+    // every 64 KiB) until state ∈ {COMPLETED, FAILED, CANCELLED}.
+    rpc Subscribe(DownloadSubscribeRequest) returns (stream DownloadProgress);
+
+    rpc Cancel(DownloadCancelRequest) returns (DownloadCancelResult);
+    rpc Resume(DownloadResumeRequest) returns (DownloadResumeResult);
+}

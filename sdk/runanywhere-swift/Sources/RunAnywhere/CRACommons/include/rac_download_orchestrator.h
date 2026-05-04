@@ -24,8 +24,12 @@
 #ifndef RAC_DOWNLOAD_ORCHESTRATOR_H
 #define RAC_DOWNLOAD_ORCHESTRATOR_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "rac_error.h"
 #include "rac_types.h"
+#include "rac_proto_buffer.h"
 #include "rac_download.h"
 #include "rac_model_types.h"
 
@@ -64,8 +68,7 @@ extern "C" {
 RAC_API rac_result_t rac_download_orchestrate(
     rac_download_manager_handle_t dm_handle, const char* model_id, const char* download_url,
     rac_inference_framework_t framework, rac_model_format_t format,
-    rac_archive_structure_t archive_structure,
-    rac_download_progress_callback_fn progress_callback,
+    rac_archive_structure_t archive_structure, rac_download_progress_callback_fn progress_callback,
     rac_download_complete_callback_fn complete_callback, void* user_data, char** out_task_id);
 
 /**
@@ -96,6 +99,37 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
     rac_download_complete_callback_fn complete_callback, void* user_data, char** out_task_id);
 
 // =============================================================================
+// PROTO-BYTE DOWNLOAD WORKFLOW ABI
+// =============================================================================
+
+typedef void (*rac_download_proto_progress_callback_fn)(const uint8_t* proto_bytes,
+                                                        size_t proto_size,
+                                                        void* user_data);
+
+RAC_API rac_result_t rac_download_set_progress_proto_callback(
+    rac_download_proto_progress_callback_fn callback, void* user_data);
+
+RAC_API rac_result_t rac_download_plan_proto(const uint8_t* request_bytes,
+                                             size_t request_size,
+                                             rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
+                                              size_t request_size,
+                                              rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes,
+                                               size_t request_size,
+                                               rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_resume_proto(const uint8_t* request_bytes,
+                                               size_t request_size,
+                                               rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_progress_poll_proto(const uint8_t* request_bytes,
+                                                      size_t request_size,
+                                                      rac_proto_buffer_t* out_result);
+
+// =============================================================================
 // POST-EXTRACTION MODEL PATH FINDING
 // =============================================================================
 
@@ -118,10 +152,11 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS if model path found, RAC_ERROR_NOT_FOUND if no model file found
  */
-RAC_API rac_result_t rac_find_model_path_after_extraction(
-    const char* extracted_dir, rac_archive_structure_t structure,
-    rac_inference_framework_t framework, rac_model_format_t format, char* out_path,
-    size_t path_size);
+RAC_API rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
+                                                          rac_archive_structure_t structure,
+                                                          rac_inference_framework_t framework,
+                                                          rac_model_format_t format, char* out_path,
+                                                          size_t path_size);
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -142,12 +177,9 @@ RAC_API rac_result_t rac_find_model_path_after_extraction(
  * @param out_needs_extraction Output: RAC_TRUE if download needs extraction
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_compute_destination(const char* model_id,
-                                                       const char* download_url,
-                                                       rac_inference_framework_t framework,
-                                                       rac_model_format_t format, char* out_path,
-                                                       size_t path_size,
-                                                       rac_bool_t* out_needs_extraction);
+RAC_API rac_result_t rac_download_compute_destination(
+    const char* model_id, const char* download_url, rac_inference_framework_t framework,
+    rac_model_format_t format, char* out_path, size_t path_size, rac_bool_t* out_needs_extraction);
 
 /**
  * @brief Check if a download URL requires extraction.

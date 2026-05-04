@@ -5,44 +5,125 @@
  * Allows LLMs to request external actions (API calls, device functions, etc.)
  *
  * ARCHITECTURE:
- * - C++ (ToolCallingBridge) handles: parsing <tool_call> tags (single source of truth)
- * - TypeScript handles: tool registration, executor storage, prompt formatting, orchestration
+ * - C++ (ToolCallingBridge) handles: parsing <tool_call> tags and prompt formatting
+ * - TypeScript handles: tool registration, executor storage, and JS execution adapters
+ *
+ * Wave-4 §15 cleanup: Canonical tool-calling shapes now come from
+ * `@runanywhere/proto-ts/tool_calling`. RN-only helpers (`ToolExecutor`,
+ * `RegisteredTool`) — which carry a JS-side function reference and so cannot
+ * round-trip through proto — are declared inline below.
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { generateStream } from './RunAnywhere+TextGeneration';
+import { generateStream, generate } from './RunAnywhere+TextGeneration';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
 } from '../../native';
-import type {
-  ToolDefinition,
-  ToolCall,
-  ToolResult,
-  ToolExecutor,
-  RegisteredTool,
-  ToolCallingOptions,
-  ToolCallingResult,
-} from '../../types/ToolCallingTypes';
+import {
+  ToolParameterType,
+  type ToolDefinition,
+  type ToolParameter,
+  type ToolCall,
+  type ToolResult,
+  type ToolCallingOptions,
+  type ToolCallingResult,
+} from '@runanywhere/proto-ts/tool_calling';
+import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
 
 // =============================================================================
+// RN-LOCAL HELPERS (no proto equivalent — function references can't round-trip
+// through wire format).
+// =============================================================================
+
+/**
+ * Function type for tool executors. Receives the parsed JSON arguments
+ * (decoded from `ToolCall.argumentsJson`) and returns a JSON-serialisable
+ * result that will be re-encoded into `ToolResult.resultJson`.
+ */
+export type ToolExecutor = (
+  args: Record<string, unknown>
+) => Promise<Record<string, unknown>>;
+
+/**
+ * A registered tool with its proto-canonical definition and JS executor.
+ */
+export interface RegisteredTool {
+  definition: ToolDefinition;
+  executor: ToolExecutor;
+}
+
+// Re-export proto-canonical tool-calling types so consumers of this
+// extension keep a single import surface.
+export type {
+  ToolDefinition,
+  ToolParameter,
+  ToolCall,
+  ToolResult,
+  ToolCallingOptions,
+  ToolCallingResult,
+};
+export { ToolParameterType };
+
+// =============================================================================
 // PRIVATE STATE - Stores registered tools and executors
-// Executors must stay in TypeScript (they need JS APIs like fetch)
 // =============================================================================
 
 const registeredTools: Map<string, RegisteredTool> = new Map();
+
+/**
+ * Map a proto `ToolParameterType` enum value to the lowercase JSON-Schema
+ * style scalar string that the C++ bridge expects in its serialised
+ * tool descriptors.
+ */
+function parameterTypeToWireString(type: ToolParameterType): string {
+  switch (type) {
+    case ToolParameterType.TOOL_PARAMETER_TYPE_STRING:
+      return 'string';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER:
+      return 'number';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_BOOLEAN:
+      return 'boolean';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_OBJECT:
+      return 'object';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_ARRAY:
+      return 'array';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_UNSPECIFIED:
+    case ToolParameterType.UNRECOGNIZED:
+    default:
+      return 'string';
+  }
+}
+
+function serializeToolsForCpp(toolsToFormat: ToolDefinition[]): string {
+  return JSON.stringify(toolsToFormat.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters.map((p) => ({
+      name: p.name,
+      type: parameterTypeToWireString(p.type),
+      description: p.description,
+      required: p.required,
+      ...(p.enumValues && p.enumValues.length > 0
+        ? { enumValues: p.enumValues }
+        : {}),
+    })),
+  })));
+}
 
 // =============================================================================
 // TOOL REGISTRATION
 // =============================================================================
 
 /**
- * Register a tool that the LLM can use
+ * Register a tool that the LLM can use.
  *
- * @param definition Tool definition (name, description, parameters)
- * @param executor Function that executes the tool (stays in TypeScript)
+ * @param definition Proto-canonical `ToolDefinition` (name, description,
+ *   parameters using `ToolParameterType` enum values, optional category).
+ * @param executor JS function that executes the tool. Receives parsed
+ *   arguments and returns a JSON-serialisable result.
  */
 export function registerTool(
   definition: ToolDefinition,
@@ -86,77 +167,33 @@ async function parseToolCallViaCpp(llmOutput: string): Promise<{
   toolCall: ToolCall | null;
 }> {
   if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available for parseToolCall');
-    return { text: llmOutput, toolCall: null };
+    throw new Error('Native module not available for parseToolCall');
   }
 
-  try {
-    const native = requireNativeModule();
-    const resultJson = await native.parseToolCallFromOutput(llmOutput);
-    const result = JSON.parse(resultJson);
+  const native = requireNativeModule();
+  const resultJson = await native.parseToolCallFromOutput(llmOutput);
+  const result = JSON.parse(resultJson);
 
-    if (!result.hasToolCall) {
-      return { text: result.cleanText || llmOutput, toolCall: null };
-    }
-
-    // Parse argumentsJson if it's a string, otherwise use as-is
-    let args: Record<string, unknown> = {};
-    if (result.argumentsJson) {
-      args = typeof result.argumentsJson === 'string'
-        ? JSON.parse(result.argumentsJson)
-        : result.argumentsJson;
-    }
-
-    const toolCall: ToolCall = {
-      toolName: result.toolName,
-      arguments: args,
-      callId: `call_${result.callId || Date.now()}`,
-    };
-
-    return { text: result.cleanText || '', toolCall };
-  } catch (error) {
-    logger.error(`C++ parseToolCall failed: ${error}`);
-    return { text: llmOutput, toolCall: null };
-  }
-}
-
-/**
- * Format tool definitions for LLM prompt
- * Creates a system prompt describing available tools
- *
- * Uses C++ single source of truth via native module.
- * Falls back to synchronous TypeScript implementation if native unavailable.
- *
- * @param tools - Tool definitions (defaults to registered tools)
- * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
- */
-export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string): string {
-  const toolsToFormat = tools || getRegisteredTools();
-  const toolFormat = format?.toLowerCase() || 'default';
-
-  if (toolsToFormat.length === 0) {
-    return '';
+  if (!result.hasToolCall) {
+    return { text: result.cleanText || llmOutput, toolCall: null };
   }
 
-  // Serialize tools to JSON for C++ consumption
-  const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters.map((p) => ({
-      name: p.name,
-      type: p.type,
-      description: p.description,
-      required: p.required,
-      ...(p.enum ? { enumValues: p.enum } : {}),
-    })),
-  })));
+  // Normalise C++ output into the proto `ToolCall` shape: an `id`,
+  // a `name`, a JSON-encoded `argumentsJson`, and a `type` discriminator.
+  const argumentsJson =
+    typeof result.argumentsJson === 'string'
+      ? result.argumentsJson
+      : JSON.stringify(result.argumentsJson ?? {});
 
-  // Use async C++ bridge version internally
-  // For sync callers, we return a placeholder and log a warning
-  // Prefer using formatToolsForPromptAsync for new code
-  logger.warning('formatToolsForPrompt is sync but C++ bridge is async. Use formatToolsForPromptAsync() for full C++ integration.');
+  const toolCall: ToolCall = {
+    id: `call_${result.callId || Date.now()}`,
+    name: result.toolName,
+    argumentsJson,
+    arguments: {},
+    type: 'function',
+  };
 
-  return toolsJson; // Return raw JSON - actual formatting done by buildInitialPrompt
+  return { text: result.cleanText || '', toolCall };
 }
 
 /**
@@ -174,31 +211,14 @@ export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format
     return '';
   }
 
-  // Serialize tools to JSON for C++ consumption
-  const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters.map((p) => ({
-      name: p.name,
-      type: p.type,
-      description: p.description,
-      required: p.required,
-      ...(p.enum ? { enumValues: p.enum } : {}),
-    })),
-  })));
+  const toolsJson = serializeToolsForCpp(toolsToFormat);
 
   if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available, returning raw tools JSON');
-    return toolsJson;
+    throw new Error('Native module not available for formatToolsForPrompt');
   }
 
-  try {
-    const native = requireNativeModule();
-    return await native.formatToolsForPrompt(toolsJson, toolFormat);
-  } catch (error) {
-    logger.error(`C++ formatToolsForPrompt failed: ${error}`);
-    return toolsJson;
-  }
+  const native = requireNativeModule();
+  return native.formatToolsForPrompt(toolsJson, toolFormat);
 }
 
 // =============================================================================
@@ -206,40 +226,66 @@ export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format
 // =============================================================================
 
 /**
- * Execute a tool call
- * Stays in TypeScript because executors need JS APIs (fetch, etc.)
+ * Execute a tool call.
+ *
+ * Reads the proto `ToolCall.argumentsJson` payload, decodes it, runs the
+ * registered executor, and returns a proto `ToolResult` with the executor
+ * output JSON-encoded into `resultJson` (or `error` populated on failure).
  */
 export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
-  const tool = registeredTools.get(toolCall.toolName);
+  const tool = registeredTools.get(toolCall.name);
 
   if (!tool) {
     return {
-      toolName: toolCall.toolName,
+      toolCallId: toolCall.id,
+      name: toolCall.name,
+      resultJson: '',
+      error: `Unknown tool: ${toolCall.name}`,
       success: false,
-      error: `Unknown tool: ${toolCall.toolName}`,
-      callId: toolCall.callId,
+      result: {},
+    };
+  }
+
+  let parsedArgs: Record<string, unknown> = {};
+  try {
+    parsedArgs = toolCall.argumentsJson
+      ? (JSON.parse(toolCall.argumentsJson) as Record<string, unknown>)
+      : {};
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Tool argument parsing failed: ${errorMessage}`);
+    return {
+      toolCallId: toolCall.id,
+      name: toolCall.name,
+      resultJson: '',
+      error: `Failed to parse tool arguments: ${errorMessage}`,
+      success: false,
+      result: {},
     };
   }
 
   try {
-    logger.debug(`Executing tool: ${toolCall.toolName}`);
-    const result = await tool.executor(toolCall.arguments);
+    logger.debug(`Executing tool: ${toolCall.name}`);
+    const result = await tool.executor(parsedArgs);
 
     return {
-      toolName: toolCall.toolName,
+      toolCallId: toolCall.id,
+      name: toolCall.name,
+      resultJson: JSON.stringify(result),
       success: true,
-      result,
-      callId: toolCall.callId,
+      result: {},
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Tool execution failed: ${errorMessage}`);
 
     return {
-      toolName: toolCall.toolName,
-      success: false,
+      toolCallId: toolCall.id,
+      name: toolCall.name,
+      resultJson: '',
       error: errorMessage,
-      callId: toolCall.callId,
+      success: false,
+      result: {},
     };
   }
 }
@@ -248,46 +294,35 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 // MAIN API: GENERATE WITH TOOLS
 // =============================================================================
 
-// =============================================================================
-// C++ BRIDGE HELPERS - Use C++ single source of truth for prompt building
-// =============================================================================
-
 /**
- * Build initial prompt using C++ bridge
- * Falls back to simple concatenation if native unavailable
+ * Build initial prompt using C++ bridge.
  */
 async function buildInitialPromptViaCpp(
   userPrompt: string,
   toolsJson: string,
-  options?: ToolCallingOptions
+  options?: Partial<ToolCallingOptions>
 ): Promise<string> {
+  const formatHint = (options?.formatHint || 'default').toLowerCase();
   if (!isNativeModuleAvailable()) {
-    // Fallback: simple concatenation
-    return `${toolsJson}\n\nUser: ${userPrompt}`;
+    throw new Error('Native module not available for buildInitialPrompt');
   }
 
-  try {
-    const native = requireNativeModule();
-    const optionsJson = JSON.stringify({
-      maxToolCalls: options?.maxToolCalls ?? 5,
-      autoExecute: options?.autoExecute ?? true,
-      temperature: options?.temperature ?? 0.7,
-      maxTokens: options?.maxTokens ?? 1024,
-      format: options?.format ?? 'default',
-      replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
-      keepToolsAvailable: options?.keepToolsAvailable ?? false,
-      systemPrompt: options?.systemPrompt,
-    });
-    return await native.buildInitialPrompt(userPrompt, toolsJson, optionsJson);
-  } catch (error) {
-    logger.error(`C++ buildInitialPrompt failed: ${error}`);
-    return `${toolsJson}\n\nUser: ${userPrompt}`;
-  }
+  const native = requireNativeModule();
+  const optionsJson = JSON.stringify({
+    maxToolCalls: options?.maxIterations ?? 5,
+    autoExecute: options?.autoExecute ?? true,
+    temperature: options?.temperature ?? 0.7,
+    maxTokens: options?.maxTokens ?? 1024,
+    format: formatHint,
+    replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
+    keepToolsAvailable: options?.keepToolsAvailable ?? false,
+    systemPrompt: options?.systemPrompt,
+  });
+  return native.buildInitialPrompt(userPrompt, toolsJson, optionsJson);
 }
 
 /**
- * Build follow-up prompt using C++ bridge
- * Falls back to template string if native unavailable
+ * Build follow-up prompt using C++ bridge.
  */
 async function buildFollowupPromptViaCpp(
   originalPrompt: string,
@@ -297,35 +332,23 @@ async function buildFollowupPromptViaCpp(
   keepToolsAvailable: boolean
 ): Promise<string> {
   if (!isNativeModuleAvailable()) {
-    // Fallback: simple template
-    if (keepToolsAvailable) {
-      return `${toolsPrompt}\n\nUser: ${originalPrompt}\n\nTool ${toolName} returned: ${resultJson}`;
-    }
-    return `The user asked: "${originalPrompt}"\n\nYou used ${toolName} and got: ${resultJson}\n\nRespond naturally.`;
+    throw new Error('Native module not available for buildFollowupPrompt');
   }
 
-  try {
-    const native = requireNativeModule();
-    return await native.buildFollowupPrompt(
-      originalPrompt,
-      toolsPrompt,
-      toolName,
-      resultJson,
-      keepToolsAvailable
-    );
-  } catch (error) {
-    logger.error(`C++ buildFollowupPrompt failed: ${error}`);
-    return `The user asked: "${originalPrompt}"\n\nYou used ${toolName} and got: ${resultJson}`;
-  }
+  const native = requireNativeModule();
+  return native.buildFollowupPrompt(
+    originalPrompt,
+    toolsPrompt,
+    toolName,
+    resultJson,
+    keepToolsAvailable
+  );
 }
 
-// =============================================================================
-// MAIN API: GENERATE WITH TOOLS
-// =============================================================================
-
 /**
- * Generate a response with tool calling support
- * Uses C++ for parsing AND prompt building (single source of truth)
+ * Generate a response with tool calling support.
+ *
+ * Uses C++ for parsing AND prompt building (single source of truth).
  *
  * ARCHITECTURE:
  * - Parsing & Prompts: C++ ToolCallingBridge (single source of truth)
@@ -334,28 +357,18 @@ async function buildFollowupPromptViaCpp(
  */
 export async function generateWithTools(
   prompt: string,
-  options?: ToolCallingOptions
+  options?: Partial<ToolCallingOptions>
 ): Promise<ToolCallingResult> {
   const tools = options?.tools ?? getRegisteredTools();
-  const maxToolCalls = options?.maxToolCalls ?? 5;
+  const maxIterations = options?.maxIterations ?? 5;
   const autoExecute = options?.autoExecute ?? true;
   const keepToolsAvailable = options?.keepToolsAvailable ?? false;
-  const format = options?.format || 'default';
+  const formatHint = (options?.formatHint || 'default').toLowerCase();
 
-  logger.debug(`[ToolCalling] Starting with format: ${format}, tools: ${tools.length}`);
+  logger.debug(`[ToolCalling] Starting with format: ${formatHint}, tools: ${tools.length}`);
 
   // Serialize tools to JSON for C++ consumption
-  const toolsJson = JSON.stringify(tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters.map((p) => ({
-      name: p.name,
-      type: p.type,
-      description: p.description,
-      required: p.required,
-      ...(p.enum ? { enumValues: p.enum } : {}),
-    })),
-  })));
+  const toolsJson = serializeToolsForCpp(tools);
 
   // Build initial prompt using C++ single source of truth
   let fullPrompt = await buildInitialPromptViaCpp(prompt, toolsJson, options);
@@ -363,7 +376,7 @@ export async function generateWithTools(
 
   // Get formatted tools prompt for follow-up (if keepToolsAvailable)
   const toolsPrompt = keepToolsAvailable
-    ? await formatToolsForPromptAsync(tools, format)
+    ? await formatToolsForPromptAsync(tools, formatHint)
     : '';
 
   const allToolCalls: ToolCall[] = [];
@@ -371,19 +384,25 @@ export async function generateWithTools(
   let finalText = '';
   let iterations = 0;
 
-  while (iterations < maxToolCalls) {
+  while (iterations < maxIterations) {
     iterations++;
     logger.debug(`[ToolCalling] === Iteration ${iterations} ===`);
 
     // Generate response
     let responseText = '';
-    const streamResult = await generateStream(fullPrompt, {
-      maxTokens: options?.maxTokens,
-      temperature: options?.temperature,
-    });
-
-    for await (const token of streamResult.stream) {
-      responseText += token;
+    for await (const event of generateStream(fullPrompt, {
+      maxTokens: options?.maxTokens ?? 1000,
+      temperature: options?.temperature ?? 0.7,
+      topP: 1.0,
+      topK: 0,
+      repetitionPenalty: 1.0,
+      stopSequences: [],
+      streamingEnabled: true,
+      preferredFramework: 0,
+      enableRealTimeTracking: false,
+    })) {
+      if (event.token) responseText += event.token;
+      if (event.isFinal) break;
     }
 
     logger.debug(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);
@@ -399,7 +418,7 @@ export async function generateWithTools(
       break;
     }
 
-    logger.debug(`[ToolCalling] Tool call: ${toolCall.toolName}(${JSON.stringify(toolCall.arguments)})`);
+    logger.debug(`[ToolCalling] Tool call: ${toolCall.name}(${toolCall.argumentsJson})`);
     allToolCalls.push(toolCall);
 
     if (!autoExecute) {
@@ -409,27 +428,31 @@ export async function generateWithTools(
         toolCalls: allToolCalls,
         toolResults: [],
         isComplete: false,
+        iterationsUsed: iterations,
       };
     }
 
     // Execute the tool (in TypeScript - needs JS APIs)
-    logger.debug(`[ToolCalling] Executing tool: ${toolCall.toolName}...`);
+    logger.debug(`[ToolCalling] Executing tool: ${toolCall.name}...`);
     const result = await executeTool(toolCall);
     allToolResults.push(result);
-    logger.debug(`[ToolCalling] Tool result success: ${result.success}`);
-    if (result.success) {
-      logger.debug(`[ToolCalling] Tool data: ${JSON.stringify(result.result)}`);
+    const succeeded = !result.error;
+    logger.debug(`[ToolCalling] Tool result success: ${succeeded}`);
+    if (succeeded) {
+      logger.debug(`[ToolCalling] Tool data: ${result.resultJson}`);
     } else {
       logger.debug(`[ToolCalling] Tool error: ${result.error}`);
     }
 
     // Build follow-up prompt using C++ single source of truth
-    const resultData = result.success ? result.result : { error: result.error };
+    const followupBody = succeeded
+      ? result.resultJson
+      : JSON.stringify({ error: result.error });
     fullPrompt = await buildFollowupPromptViaCpp(
       prompt,
       toolsPrompt,
-      toolCall.toolName,
-      JSON.stringify(resultData),
+      toolCall.name,
+      followupBody,
       keepToolsAvailable
     );
 
@@ -444,28 +467,28 @@ export async function generateWithTools(
     toolCalls: allToolCalls,
     toolResults: allToolResults,
     isComplete: true,
+    iterationsUsed: iterations,
   };
 }
 
 /**
- * Continue generation after manual tool execution
+ * Continue generation after a tool result has been produced externally.
+ *
+ * Canonical cross-SDK signature (§3):
+ *   `continueWithToolResult(toolCallId: string, result: string) → LLMGenerationResult`
+ *
+ * The tool call ID and result string are appended to the current conversation
+ * context held by the LLM component, then generation is resumed. The returned
+ * `LLMGenerationResult` carries the model's response text and token metrics.
  */
 export async function continueWithToolResult(
-  previousPrompt: string,
-  toolCall: ToolCall,
-  toolResult: ToolResult,
-  options?: ToolCallingOptions
-): Promise<ToolCallingResult> {
-  const resultJson = toolResult.success
-    ? JSON.stringify(toolResult.result)
-    : `Error: ${toolResult.error}`;
-
-  const continuedPrompt = `${previousPrompt}\n\nTool Result for ${toolCall.toolName}: ${resultJson}\n\nBased on the tool result, please provide your response:`;
-
-  return generateWithTools(continuedPrompt, {
-    ...options,
-    maxToolCalls: (options?.maxToolCalls ?? 5) - 1,
-  });
+  toolCallId: string,
+  result: string
+): Promise<LLMGenerationResult> {
+  // Build a follow-up prompt that injects the tool result.
+  const continuedPrompt =
+    `Tool call ID: ${toolCallId}\nTool result: ${result}\n\nBased on the tool result, please provide your response:`;
+  return generate(continuedPrompt);
 }
 
 // Legacy export for backwards compatibility

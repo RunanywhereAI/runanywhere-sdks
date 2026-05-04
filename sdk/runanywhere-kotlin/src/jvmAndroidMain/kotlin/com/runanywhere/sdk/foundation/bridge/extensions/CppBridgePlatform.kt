@@ -11,7 +11,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 
 /**
  * Platform bridge that provides platform services callbacks for C++ core.
@@ -59,7 +59,6 @@ object CppBridgePlatform {
 
         /** Platform vision/image understanding service */
         const val VISION = 6
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; not exposed
 
         /**
          * Get a human-readable name for the service type.
@@ -584,10 +583,6 @@ object CppBridgePlatform {
             // Initialize service availability cache
             initializeServiceAvailability()
 
-            // Register the platform callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetPlatformCallbacks()
-
             isRegistered = true
 
             CppBridgePlatformAdapter.logCallback(
@@ -1098,26 +1093,6 @@ object CppBridgePlatform {
     // ========================================================================
 
     /**
-     * Native method to set the platform callbacks with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_platform_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetPlatformCallbacks()
-
-    /**
-     * Native method to unset the platform callbacks.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_platform_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetPlatformCallbacks()
-
-    /**
      * Native method to send a streaming token to C++.
      *
      * @param token The token text
@@ -1128,36 +1103,6 @@ object CppBridgePlatform {
      */
     @JvmStatic
     external fun nativeOnStreamingToken(token: String, isFinal: Boolean): Boolean
-
-    /**
-     * Native method to check if platform LLM is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_llm_available()
-     */
-    @JvmStatic
-    external fun nativeIsLLMAvailable(): Int
-
-    /**
-     * Native method to check if platform TTS is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_tts_available()
-     */
-    @JvmStatic
-    external fun nativeIsTTSAvailable(): Int
-
-    /**
-     * Native method to check if platform STT is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_stt_available()
-     */
-    @JvmStatic
-    external fun nativeIsSTTAvailable(): Int
 
     // ========================================================================
     // LIFECYCLE MANAGEMENT
@@ -1173,9 +1118,6 @@ object CppBridgePlatform {
             if (!isRegistered) {
                 return
             }
-
-            // TODO: Call native unregistration
-            // nativeUnsetPlatformCallbacks()
 
             platformListener = null
             platformProvider = null
@@ -1239,20 +1181,20 @@ object CppBridgePlatform {
      * @param request The LLM request
      * @param callback Optional streaming callback
      * @return The LLM response
-     * @throws SDKError if the request fails
+     * @throws SDKException if the request fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun executeLLM(request: LLMRequest, callback: StreamCallback? = null): LLMResponse {
         val provider =
             platformProvider
-                ?: throw SDKError.platform("Platform provider not set")
+                ?: throw SDKException.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.LLM)) {
-            throw SDKError.platform("Platform LLM service not available")
+            throw SDKException.platform("Platform LLM service not available")
         }
 
         return provider.executeLLMRequest(request, callback)
-            ?: throw SDKError.platform("Platform LLM request failed")
+            ?: throw SDKException.platform("Platform LLM request failed")
     }
 
     /**
@@ -1260,20 +1202,20 @@ object CppBridgePlatform {
      *
      * @param request The TTS request
      * @return The TTS response
-     * @throws SDKError if the request fails
+     * @throws SDKException if the request fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun executeTTS(request: TTSRequest): TTSResponse {
         val provider =
             platformProvider
-                ?: throw SDKError.platform("Platform provider not set")
+                ?: throw SDKException.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.TTS)) {
-            throw SDKError.platform("Platform TTS service not available")
+            throw SDKException.platform("Platform TTS service not available")
         }
 
         return provider.executeTTSRequest(request)
-            ?: throw SDKError.platform("Platform TTS request failed")
+            ?: throw SDKException.platform("Platform TTS request failed")
     }
 
     /**
@@ -1281,20 +1223,20 @@ object CppBridgePlatform {
      *
      * @param request The STT request
      * @return The STT response
-     * @throws SDKError if the request fails
+     * @throws SDKException if the request fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun executeSTT(request: STTRequest): STTResponse {
         val provider =
             platformProvider
-                ?: throw SDKError.platform("Platform provider not set")
+                ?: throw SDKException.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.STT)) {
-            throw SDKError.platform("Platform STT service not available")
+            throw SDKException.platform("Platform STT service not available")
         }
 
         return provider.executeSTTRequest(request)
-            ?: throw SDKError.platform("Platform STT request failed")
+            ?: throw SDKException.platform("Platform STT request failed")
     }
 
     /**
@@ -1324,8 +1266,6 @@ object CppBridgePlatform {
         serviceAvailability[ServiceType.STT] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.EMBEDDING] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.VISION] = AvailabilityStatus.UNKNOWN
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Android
-        serviceAvailability[5] = AvailabilityStatus.UNKNOWN
     }
 
     /**

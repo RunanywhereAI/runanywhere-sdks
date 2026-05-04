@@ -1,7 +1,13 @@
 /**
  * RunAnywhere React Native SDK - Data Models
  *
- * These interfaces match the iOS Swift SDK data structures.
+ * These interfaces match the iOS Swift SDK data structures and
+ * describe the JS-runtime shape exchanged with the native bridge.
+ * The canonical proto-encoded counterparts live in
+ * `@runanywhere/proto-ts/storage_types` (storage models) and
+ * `@runanywhere/proto-ts/llm_options` (perf metrics) and are
+ * re-exported under `*Proto` aliases.
+ *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/
  */
 
@@ -15,18 +21,27 @@ import type {
   SDKEnvironment,
 } from './enums';
 
-// Structured output types (inline definitions since handler was deleted)
-export type GeneratableType = 'string' | 'number' | 'boolean' | 'object' | 'array';
+// Canonical proto-encoded model / storage messages. Prefer these for every new
+// public API. The hand-written interfaces below are legacy RN bridge DTOs kept
+// only until the native registry/storage JSON surfaces are replaced by proto
+// bytes.
+export type {
+  ModelInfo as ModelInfoProto,
+  ModelFileDescriptor as ModelFileDescriptorProto,
+  SingleFileArtifact as SingleFileArtifactProto,
+  ArchiveArtifact as ArchiveArtifactProto,
+  MultiFileArtifact as MultiFileArtifactProto,
+  ExpectedModelFiles as ExpectedModelFilesProto,
+} from '@runanywhere/proto-ts/model_types';
 
-export interface StructuredOutputConfig {
-  schema?: Record<string, unknown>;
-  jsonMode?: boolean;
-}
-
-export interface StructuredOutputValidation {
-  isValid: boolean;
-  errors?: string[];
-}
+export type {
+  DeviceStorageInfo as DeviceStorageInfoProto,
+  AppStorageInfo as AppStorageInfoProto,
+  ModelStorageMetrics as ModelStorageMetricsProto,
+  StorageInfo as StorageInfoProto,
+  StorageAvailability as StorageAvailabilityProto,
+  StoredModel as StoredModelProto,
+} from '@runanywhere/proto-ts/storage_types';
 
 // ============================================================================
 // Model Information
@@ -52,8 +67,10 @@ export interface ModelInfoMetadata {
 }
 
 /**
- * Information about a model
- * Reference: ModelInfo.swift
+ * @deprecated Legacy RN registry bridge DTO. New public APIs must use generated
+ * `ModelInfo` from `@runanywhere/proto-ts/model_types`. This shape remains
+ * unsupported for new work and exists only because current native registry
+ * methods still return JSON with `compatibleFrameworks` / `isDownloaded`.
  */
 export interface ModelInfo {
   /** Unique identifier */
@@ -121,6 +138,15 @@ export interface ModelInfo {
 
   /** Whether the model is available for use */
   isAvailable: boolean;
+
+  /**
+   * Optional lowercase hex SHA-256 checksum of the downloaded artifact.
+   * When populated, forwarded to the native `rac_http_download_execute`
+   * call via `expected_sha256_hex` so the libcurl write path verifies
+   * the hash inline and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on
+   * mismatch. Matches the Swift/Kotlin/Flutter contract.
+   */
+  checksumSha256?: string;
 }
 
 // ============================================================================
@@ -128,7 +154,8 @@ export interface ModelInfo {
 // ============================================================================
 
 /**
- * Result of a model compatibility check
+ * @deprecated Legacy RN compatibility DTO. Replace with C++/proto model routing
+ * and compatibility results when the RN bridge exposes the proto-byte API.
  */
 export interface ModelCompatibilityResult {
   /** Overall compatibility (canRun AND canFit) */
@@ -157,74 +184,10 @@ export interface ModelCompatibilityResult {
 // Generation Types
 // ============================================================================
 
-/**
- * Performance metrics for generation
- * Reference: GenerationResult.swift
- */
-export interface PerformanceMetrics {
-  /** Time to first token in milliseconds */
-  timeToFirstTokenMs?: number;
-
-  /** Tokens generated per second */
-  tokensPerSecond?: number;
-
-  /** Total inference time in milliseconds */
-  inferenceTimeMs: number;
-}
-
-// Structured output types are defined above
 
 /**
- * Result of a text generation request
- * Reference: GenerationResult.swift
- */
-export interface GenerationResult {
-  /** Generated text (with thinking content removed if extracted) */
-  text: string;
-
-  /** Thinking/reasoning content extracted from the response */
-  thinkingContent?: string;
-
-  /** Number of tokens used */
-  tokensUsed: number;
-
-  /** Model used for generation */
-  modelUsed: string;
-
-  /** Latency in milliseconds */
-  latencyMs: number;
-
-  /** Execution target (device/cloud/hybrid) */
-  executionTarget: ExecutionTarget;
-
-  /** Amount saved by using on-device execution */
-  savedAmount: number;
-
-  /** Framework used for generation (if on-device) */
-  framework?: LLMFramework;
-
-  /** Hardware acceleration used */
-  hardwareUsed: HardwareAcceleration;
-
-  /** Memory used during generation (in bytes) */
-  memoryUsed: number;
-
-  /** Detailed performance metrics */
-  performanceMetrics: PerformanceMetrics;
-
-  /** Structured output validation result */
-  structuredOutputValidation?: StructuredOutputValidation;
-
-  /** Number of tokens used for thinking/reasoning */
-  thinkingTokens?: number;
-
-  /** Number of tokens in the actual response content */
-  responseTokens: number;
-}
-
-/**
- * Options for text generation
- * Reference: GenerationOptions.swift
+ * @deprecated Use generated `LLMGenerationOptions` from
+ * `@runanywhere/proto-ts/llm_options`.
  */
 export interface GenerationOptions {
   /** Maximum number of tokens to generate */
@@ -251,18 +214,10 @@ export interface GenerationOptions {
   /** Preferred framework for generation */
   preferredFramework?: LLMFramework;
 
-  /** Structured output configuration */
-  structuredOutput?: StructuredOutputConfig;
-
   /** System prompt to define AI behavior */
   systemPrompt?: string;
 }
 
-/**
- * Alias for GenerationOptions to match iOS SDK naming convention.
- * @see GenerationOptions
- */
-export type LLMGenerationOptions = GenerationOptions;
 
 // ============================================================================
 // Voice Types
@@ -289,131 +244,6 @@ export interface VoiceAudioChunk {
 
   /** Whether this is the final chunk */
   isFinal: boolean;
-}
-
-/**
- * STT segment with timing information
- */
-export interface STTSegment {
-  /** Transcribed text */
-  text: string;
-
-  /** Start time in seconds */
-  startTime: number;
-
-  /** End time in seconds */
-  endTime: number;
-
-  /** Speaker ID if diarization is enabled */
-  speakerId?: string;
-
-  /** Confidence score */
-  confidence: number;
-}
-
-/**
- * STT alternative transcription
- */
-export interface STTAlternative {
-  /** Alternative text */
-  text: string;
-
-  /** Confidence score */
-  confidence: number;
-}
-
-/**
- * Speech-to-text result
- */
-export interface STTResult {
-  /** Main transcription text */
-  text: string;
-
-  /** Segments with timing */
-  segments: STTSegment[];
-
-  /** Detected language */
-  language?: string;
-
-  /** Overall confidence */
-  confidence: number;
-
-  /** Duration in seconds */
-  duration: number;
-
-  /** Alternative transcriptions */
-  alternatives: STTAlternative[];
-}
-
-/**
- * STT options for transcription
- */
-export interface STTOptions {
-  /** Language code (e.g., 'en', 'es') */
-  language?: string;
-
-  /** Enable punctuation */
-  punctuation?: boolean;
-
-  /** Enable speaker diarization */
-  diarization?: boolean;
-
-  /** Enable word timestamps */
-  wordTimestamps?: boolean;
-
-  /** Sample rate */
-  sampleRate?: number;
-}
-
-/**
- * TTS configuration
- */
-export interface TTSConfiguration {
-  /** Voice identifier */
-  voice?: string;
-
-  /** Speech rate (0.5 - 2.0) */
-  rate?: number;
-
-  /** Pitch (0.5 - 2.0) */
-  pitch?: number;
-
-  /** Volume (0.0 - 1.0) */
-  volume?: number;
-}
-
-/**
- * TTS synthesis result
- */
-export interface TTSResult {
-  /** Base64 encoded audio data */
-  audio: string;
-
-  /** Sample rate of the audio */
-  sampleRate: number;
-
-  /** Number of samples */
-  numSamples: number;
-
-  /** Duration in seconds */
-  duration: number;
-}
-
-/**
- * VAD configuration
- */
-export interface VADConfiguration {
-  /** Energy threshold */
-  energyThreshold?: number;
-
-  /** Sample rate */
-  sampleRate?: number;
-
-  /** Frame length in milliseconds */
-  frameLength?: number;
-
-  /** Enable auto calibration */
-  autoCalibration?: boolean;
 }
 
 // ============================================================================
@@ -473,6 +303,18 @@ export interface SDKInitOptions {
    */
   supabaseKey?: string;
 
+  /**
+   * Build token for device registration.
+   *
+   * Resolution order (highest precedence first):
+   *   1. This option.
+   *   2. `RUNANYWHERE_BUILD_TOKEN` environment variable (build-time).
+   *   3. Native development-mode fallback (development environment only).
+   *
+   * Production/staging apps must provide this via option or env var.
+   */
+  buildToken?: string;
+
   /** Enable debug logging */
   debug?: boolean;
 }
@@ -487,7 +329,8 @@ export interface DefaultGenerationSettings {
 }
 
 /**
- * Storage information
+ * @deprecated Use generated `StorageInfo` from
+ * `@runanywhere/proto-ts/storage_types`.
  */
 export interface StorageInfo {
   /** Total storage available in bytes */
@@ -504,7 +347,7 @@ export interface StorageInfo {
 }
 
 /**
- * Stored model information
+ * @deprecated Use generated storage/model registry protos instead.
  */
 export interface StoredModel {
   /** Model ID */

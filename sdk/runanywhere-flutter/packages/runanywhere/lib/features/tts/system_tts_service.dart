@@ -101,7 +101,7 @@ class TTSOutput {
 class SystemTTSService {
   final FlutterTts _flutterTts = FlutterTts();
   List<TTSVoice> _availableVoicesList = [];
-  TTSConfiguration? _configuration;
+  TTSComponentConfig? _configuration;
   bool _isSynthesizing = false;
 
   SystemTTSService();
@@ -116,7 +116,7 @@ class SystemTTSService {
       _availableVoicesList.map((v) => v.id).toList();
 
   Future<void> initialize({String? modelPath}) async {
-    _configuration = const TTSConfiguration();
+    _configuration = const TTSComponentConfig();
 
     // Configure TTS engine
     await _flutterTts.setSharedInstance(true);

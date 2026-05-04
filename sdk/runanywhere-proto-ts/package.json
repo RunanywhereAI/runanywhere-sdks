@@ -1,0 +1,53 @@
+{
+  "name": "@runanywhere/proto-ts",
+  "version": "0.21.0",
+  "description": "Shared RunAnywhere ts-proto generated types and stream wrappers",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js",
+      "default": "./dist/streams/*.js"
+    },
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./dist/streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js",
+      "default": "./dist/streams/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "long": "^5.2.3",
+    "protobufjs": "^7.2.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

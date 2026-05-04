@@ -9,6 +9,7 @@
 #define PlatformAdapterBridge_h
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,36 +121,12 @@ bool PlatformAdapter_getGPUFamily(char** outValue);
 bool PlatformAdapter_isTablet(void);
 
 // ============================================================================
-// HTTP POST for Device Registration (Synchronous)
+// HTTP Download (Async Platform Adapter Fallback)
 // ============================================================================
 
 /**
- * Synchronous HTTP POST for device registration
- * Called from C++ device manager callbacks
- *
- * @param url Full URL to POST to
- * @param jsonBody JSON body string
- * @param supabaseKey Supabase API key (for dev mode, can be NULL)
- * @param outStatusCode Pointer to store HTTP status code
- * @param outResponseBody Pointer to store response body (must be freed by caller)
- * @param outErrorMessage Pointer to store error message (must be freed by caller)
- * @return true if request succeeded (2xx or 409)
- */
-bool PlatformAdapter_httpPostSync(
-    const char* url,
-    const char* jsonBody,
-    const char* supabaseKey,
-    int* outStatusCode,
-    char** outResponseBody,
-    char** outErrorMessage
-);
-
-// ============================================================================
-// HTTP Download (Async)
-// ============================================================================
-
-/**
- * Start an HTTP download.
+ * Start an HTTP download for RACommons platform-adapter-only callers.
+ * Public RN model downloads use native C++ rac_http_download_execute.
  * @param url URL to download
  * @param destinationPath Destination file path
  * @param taskId Task identifier (provided by C++)

@@ -16,7 +16,7 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"

@@ -33,7 +33,7 @@ struct ImageGenerationView: View {
             }
             .navigationTitle("Image Generation")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
         }
         #if os(iOS)
@@ -322,7 +322,7 @@ struct DiffusionModelPickerView: View {
             }
             .navigationTitle("Diffusion Models")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

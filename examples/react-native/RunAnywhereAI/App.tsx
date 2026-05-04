@@ -44,6 +44,7 @@ import {
   initializeNitroModulesGlobally,
   getChip,
   getNPUDownloadUrl,
+  hasUsableBackendConfig,
 } from '@runanywhere/core';
 
 /**
@@ -167,6 +168,13 @@ async function registerModulesAndModels(): Promise<void> {
         memoryRequirement: 600_000_000,
       }),
       RunAnywhere.registerModel({
+        id: 'qwen3-0.6b-q4_k_m',
+        name: 'Qwen3 0.6B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+        framework: LLMFramework.LlamaCpp,
+        memoryRequirement: 477_000_000,
+      }),
+      RunAnywhere.registerModel({
         id: 'llama-3.2-3b-instruct-q4_k_m',
         name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
         url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
@@ -224,8 +232,8 @@ async function registerModulesAndModels(): Promise<void> {
         name: 'SmolVLM 500M Instruct',
         url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
         framework: LLMFramework.LlamaCpp,
-        modality: ModelCategory.Multimodal,
-        artifactType: ModelArtifactType.TarGzArchive,
+        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
         memoryRequirement: 600_000_000,
       }),
       // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
@@ -244,7 +252,7 @@ async function registerModulesAndModels(): Promise<void> {
           },
         ],
         framework: LLMFramework.LlamaCpp,
-        modality: ModelCategory.Multimodal,
+        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirement: 1_800_000_000,
       }),
       // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
@@ -262,7 +270,7 @@ async function registerModulesAndModels(): Promise<void> {
           },
         ],
         framework: LLMFramework.LlamaCpp,
-        modality: ModelCategory.Multimodal,
+        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirement: 600_000_000,
       }),
     ]);
@@ -341,31 +349,32 @@ async function registerModulesAndModels(): Promise<void> {
   await ONNX.register();
 
   await Promise.all([
+    // Sherpa-ONNX speech models — served by the Sherpa engine plugin
     RunAnywhere.registerModel({
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
       url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-      framework: LLMFramework.ONNX,
-      modality: ModelCategory.SpeechRecognition,
-      artifactType: ModelArtifactType.TarGzArchive,
+      framework: LLMFramework.Sherpa,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
       memoryRequirement: 75_000_000,
     }),
     RunAnywhere.registerModel({
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
       url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
-      framework: LLMFramework.ONNX,
-      modality: ModelCategory.SpeechSynthesis,
-      artifactType: ModelArtifactType.TarGzArchive,
+      framework: LLMFramework.Sherpa,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
       memoryRequirement: 65_000_000,
     }),
     RunAnywhere.registerModel({
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
       url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
-      framework: LLMFramework.ONNX,
-      modality: ModelCategory.SpeechSynthesis,
-      artifactType: ModelArtifactType.TarGzArchive,
+      framework: LLMFramework.Sherpa,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
       memoryRequirement: 65_000_000,
     }),
     // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
@@ -384,7 +393,7 @@ async function registerModulesAndModels(): Promise<void> {
         },
       ],
       framework: LLMFramework.ONNX,
-      modality: ModelCategory.Embedding,
+      modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
       memoryRequirement: 25_500_000,
     }),
   ]);
@@ -417,12 +426,17 @@ const App: React.FC = () => {
       const customBaseURL = await getStoredBaseURL();
       const hasCustomConfig = await hasCustomConfiguration();
 
-      if (hasCustomConfig && customApiKey && customBaseURL) {
+      if (
+        hasCustomConfig &&
+        customApiKey &&
+        customBaseURL &&
+        hasUsableBackendConfig({ apiKey: customApiKey, baseURL: customBaseURL })
+      ) {
         console.log('[App] Found custom API configuration');
         await RunAnywhere.initialize({
           apiKey: customApiKey,
           baseURL: customBaseURL,
-          environment: SDKEnvironment.Production,
+          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         });
         console.log(
           '[App] SDK initialized with custom configuration (production)'
@@ -431,7 +445,7 @@ const App: React.FC = () => {
         await RunAnywhere.initialize({
           apiKey: '',
           baseURL: 'https://api.runanywhere.ai',
-          environment: SDKEnvironment.Development,
+          environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
         });
         console.log('[App] SDK initialized in DEVELOPMENT mode');
       }
@@ -440,7 +454,7 @@ const App: React.FC = () => {
 
       const initTime = Date.now() - startTime;
       const isInit = await RunAnywhere.isInitialized();
-      const version = await RunAnywhere.getVersion();
+      const version = RunAnywhere.version;
       const backendInfo = await RunAnywhere.getBackendInfo();
 
       console.log(

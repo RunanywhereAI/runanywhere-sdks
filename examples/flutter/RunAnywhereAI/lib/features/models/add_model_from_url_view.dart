@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -9,7 +10,7 @@ import 'package:runanywhere_ai/features/models/model_types.dart';
 ///
 /// View for adding models from URLs.
 class AddModelFromURLView extends StatefulWidget {
-  final void Function(ModelInfo) onModelAdded;
+  final Future<void> Function() onModelAdded;
 
   const AddModelFromURLView({
     super.key,
@@ -26,7 +27,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
   final _urlController = TextEditingController();
   final _sizeController = TextEditingController();
 
-  LLMFramework _selectedFramework = LLMFramework.llamaCpp;
+  LLMFramework _selectedFramework = LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
   bool _supportsThinking = false;
   bool _useCustomThinkingTags = false;
   String _thinkingOpenTag = '<thinking>';
@@ -35,9 +36,9 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
   String? _errorMessage;
 
   final List<LLMFramework> _availableFrameworks = [
-    LLMFramework.llamaCpp,
-    LLMFramework.mediaPipe,
-    LLMFramework.onnxRuntime,
+    LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    LLMFramework.INFERENCE_FRAMEWORK_ONNX,
+    LLMFramework.INFERENCE_FRAMEWORK_GENIE,
   ];
 
   @override
@@ -387,27 +388,16 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
       final sizeText = _sizeController.text.trim();
       final estimatedSize = sizeText.isNotEmpty ? int.tryParse(sizeText) : null;
 
-      // TODO: Use RunAnywhere SDK to add model
-      // final modelInfo = await RunAnywhere.addModelFromURL(
-      //   url,
-      //   name: name,
-      //   type: _selectedFramework.rawValue,
-      // );
-
-      // Create placeholder model for demo
-      final modelInfo = ModelInfo(
-        id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
+      sdk.RunAnywhereSDK.instance.models.register(
         name: name,
-        category: ModelCategory.language,
-        format: ModelFormat.gguf,
-        downloadURL: url,
-        memoryRequired: estimatedSize,
-        compatibleFrameworks: [_selectedFramework],
-        preferredFramework: _selectedFramework,
+        url: Uri.parse(url),
+        framework: _selectedFramework,
+        modality: sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        memoryRequirement: estimatedSize,
         supportsThinking: _supportsThinking,
       );
 
-      widget.onModelAdded(modelInfo);
+      await widget.onModelAdded();
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -30,3 +30,6 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# v2 close-out: test build output
+packages/core/dist-test/

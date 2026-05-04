@@ -7,8 +7,8 @@
 /// Modules only need to provide metadata and call the C++ registration function.
 library runanywhere_module;
 
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart';
+import 'package:runanywhere/generated/sdk_events.pbenum.dart';
 
 /// Protocol for SDK modules that provide AI capabilities.
 ///
@@ -29,13 +29,14 @@ import 'package:runanywhere/core/types/sdk_component.dart';
 ///   String get moduleName => 'LlamaCpp';
 ///
 ///   @override
-///   Set<SDKComponent> get capabilities => {SDKComponent.llm};
+///   Set<SDKComponent> get capabilities => {SDKComponent.SDK_COMPONENT_LLM};
 ///
 ///   @override
 ///   int get defaultPriority => 100;
 ///
 ///   @override
-///   InferenceFramework get inferenceFramework => InferenceFramework.llamaCpp;
+///   InferenceFramework get inferenceFramework =>
+///       InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
 ///
 ///   static Future<void> register({int priority = 100}) async {
 ///     // Call C++ registration via FFI

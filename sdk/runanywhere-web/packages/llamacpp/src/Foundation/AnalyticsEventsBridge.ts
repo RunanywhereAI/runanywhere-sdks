@@ -13,7 +13,7 @@
  * 5. Forward raw event+data to TelemetryService for batching
  */
 
-import { EventBus, SDKEventType, SDKLogger } from '@runanywhere/web';
+import { EventBus, ModelCategory, SDKEventType, SDKLogger, SpeechActivity } from '@runanywhere/web';
 import type { LlamaCppModule } from './LlamaCppBridge';
 
 const logger = new SDKLogger('AnalyticsEventsBridge');
@@ -268,7 +268,7 @@ export class AnalyticsEventsBridge {
         EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
           modelId,
           component: 'llm',
-          category: 'llm',
+          category: ModelCategory.Language,
           loadTimeMs: durationMs,
         });
         break;
@@ -286,7 +286,7 @@ export class AnalyticsEventsBridge {
       case RACEventType.LLM_MODEL_UNLOADED: {
         const base = dataPtr + DATA_OFFSET;
         const modelId = this.readStringAt(m, base);
-        EventBus.shared.emit('model.unloaded', SDKEventType.Model, { modelId, category: 'llm' });
+        EventBus.shared.emit('model.unloaded', SDKEventType.Model, { modelId, category: ModelCategory.Language });
         break;
       }
 
@@ -331,7 +331,7 @@ export class AnalyticsEventsBridge {
         EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
           modelId,
           component: 'stt',
-          category: 'stt',
+          category: ModelCategory.SpeechRecognition,
         });
         break;
       }
@@ -378,14 +378,14 @@ export class AnalyticsEventsBridge {
         EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
           modelId,
           component: 'tts',
-          category: 'tts',
+          category: ModelCategory.SpeechSynthesis,
         });
         break;
       }
 
       // ------- VAD events -------
       case RACEventType.VAD_SPEECH_STARTED:
-        EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: 'started' });
+        EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: SpeechActivity.Started });
         break;
 
       case RACEventType.VAD_SPEECH_ENDED: {
@@ -393,7 +393,7 @@ export class AnalyticsEventsBridge {
         const base = dataPtr + DATA_OFFSET;
         const speechDurationMs = m.getValue(base, 'double');
         EventBus.shared.emit('vad.speechEnded', SDKEventType.Voice, {
-          activity: 'ended',
+          activity: SpeechActivity.Ended,
           speechDurationMs,
         });
         break;

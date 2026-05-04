@@ -264,21 +264,22 @@ class DartBridgeToolCalling {
     String userPrompt,
     String toolsJson, {
     String? optionsJson,
+    String? formatName,
   }) {
     try {
       final buildFn = lib.lookupFunction<
           Int32 Function(
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<RacToolCallingOptionsStruct>,
-            Pointer<Pointer<Utf8>>,
-          ),
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<RacToolCallingOptionsStruct>,
+        Pointer<Pointer<Utf8>>,
+      ),
           int Function(
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<RacToolCallingOptionsStruct>,
-            Pointer<Pointer<Utf8>>,
-          )>('rac_tool_call_build_initial_prompt');
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<RacToolCallingOptionsStruct>,
+        Pointer<Pointer<Utf8>>,
+      )>('rac_tool_call_build_initial_prompt');
 
       final racFreeFn = lib.lookupFunction<Void Function(Pointer<Void>),
           void Function(Pointer<Void>)>('rac_free');
@@ -296,6 +297,7 @@ class DartBridgeToolCalling {
       optionsPtr.ref.systemPrompt = nullptr;
       optionsPtr.ref.replaceSystemPrompt = RAC_FALSE;
       optionsPtr.ref.keepToolsAvailable = RAC_FALSE;
+      optionsPtr.ref.format = formatName == 'lfm2' ? 1 : 0;
 
       try {
         final rc = buildFn(userPtr, toolsPtr, optionsPtr, promptPtrPtr);
@@ -339,21 +341,21 @@ class DartBridgeToolCalling {
     try {
       final buildFn = lib.lookupFunction<
           Int32 Function(
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Int32,
-            Pointer<Pointer<Utf8>>,
-          ),
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Int32,
+        Pointer<Pointer<Utf8>>,
+      ),
           int Function(
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            int,
-            Pointer<Pointer<Utf8>>,
-          )>('rac_tool_call_build_followup_prompt');
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        int,
+        Pointer<Pointer<Utf8>>,
+      )>('rac_tool_call_build_followup_prompt');
 
       final racFreeFn = lib.lookupFunction<Void Function(Pointer<Void>),
           void Function(Pointer<Void>)>('rac_free');

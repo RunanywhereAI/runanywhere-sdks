@@ -135,6 +135,43 @@ export interface RunAnywhereCore
   // ============================================================================
 
   /**
+   * Get all registered models as serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  getAvailableModelsProto(): Promise<ArrayBuffer>;
+
+  /**
+   * Get one registered model as serialized runanywhere.v1.ModelInfo bytes.
+   * Returns an empty buffer when the model does not exist.
+   */
+  getModelInfoProto(modelId: string): Promise<ArrayBuffer>;
+
+  /**
+   * Register a model from serialized runanywhere.v1.ModelInfo bytes.
+   */
+  registerModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
+   */
+  updateModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Remove a model registry entry by ID through the proto-byte C ABI.
+   */
+  removeModelProto(modelId: string): Promise<boolean>;
+
+  /**
+   * Query registered models from serialized runanywhere.v1.ModelQuery bytes.
+   * Returns serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  queryModelsProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Get downloaded registered models as serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  getDownloadedModelsProto(): Promise<ArrayBuffer>;
+
+  /**
    * Get list of available models
    * @returns JSON array of model info
    */
@@ -176,37 +213,111 @@ export interface RunAnywhereCore
    */
   checkCompatibility(modelId: string): Promise<string>;
 
+  /**
+   * Refresh the model registry — T4.9 unified cross-SDK surface.
+   *
+   * Routes to `rac_model_registry_refresh` in commons. Each flag is
+   * independent. The higher-level JS `RunAnywhere+Models.refreshModelRegistry`
+   * wrapper composes this native refresh with RN filesystem reconciliation so
+   * local rescans and orphan pruning behave like the other SDKs.
+   *
+   * @param includeRemoteCatalog Fetch the backend model assignment catalog.
+   * @param rescanLocal Request a local filesystem rescan when routed through
+   *   the public JS wrapper.
+   * @param pruneOrphans Clear `localPath` on models whose file is missing when
+   *   routed through the public JS wrapper.
+   * @returns `true` if the refresh returned `RAC_SUCCESS`.
+   */
+  refreshModelRegistry(
+    includeRemoteCatalog: boolean,
+    rescanLocal: boolean,
+    pruneOrphans: boolean
+  ): Promise<boolean>;
+
   // ============================================================================
   // Download Service
-  // Matches Swift: CppBridge+Download.swift
+  // Backed by `rac_download_orchestrate` (commons) which routes through the
+  // platform HTTP transport registered by the RN core (OkHttp on Android,
+  // URLSession on iOS). Progress is delivered as a JSON-serialized
+  // `runanywhere.v1.DownloadProgress` message (field names match the proto
+  // camelCase spelling — `DownloadProgress.fromJSON(JSON.parse(json))` from
+  // `@runanywhere/proto-ts/download_service` decodes it in one step).
+  // Cancellation is keyed on `cancelToken`.
   // ============================================================================
 
   /**
-   * Download a model
-   * @param modelId Model identifier
-   * @param url Download URL
-   * @param destPath Destination path
-   * @returns true if download started successfully
+   * Download a file to `destPath` using the commons download orchestrator.
+   *
+   * @param url Absolute HTTP/HTTPS URL to download
+   * @param destPath Destination file path
+   * @param cancelToken Opaque token the caller uses to cancel via cancelDownload
+   * @param onProgress Progress callback — receives a JSON string encoding a
+   *   `runanywhere.v1.DownloadProgress` message with all 10 fields
+   *   (modelId, stage, bytesDownloaded, totalBytes, stageProgress,
+   *   overallSpeedBps, etaSeconds, state, retryAttempt, errorMessage).
+   *   Parse with `DownloadProgress.fromJSON(JSON.parse(progressJson))`.
+   * @param expectedSha256Hex Optional lowercase hex SHA-256 checksum of
+   *   the downloaded bytes. When provided, the native runner verifies the
+   *   hash inline and rejects the promise with a
+   *   `RAC_HTTP_DL_CHECKSUM_FAILED` error on mismatch.
+   * @returns Resolves when the file is fully written; rejects on error /
+   *   cancellation.
    */
   downloadModel(
-    modelId: string,
     url: string,
-    destPath: string
+    destPath: string,
+    cancelToken: string,
+    onProgress: (progressJson: string) => void,
+    expectedSha256Hex?: string
+  ): Promise<void>;
+
+  /**
+   * Cancel an ongoing download identified by `cancelToken`.
+   * @returns true if a matching in-flight download was found and cancelled.
+   */
+  cancelDownload(cancelToken: string): Promise<boolean>;
+
+  /**
+   * Plan a download from serialized runanywhere.v1.DownloadPlanRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadPlanResult bytes.
+   */
+  downloadPlanProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Start a native download from serialized runanywhere.v1.DownloadStartRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadStartResult bytes.
+   */
+  downloadStartProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Cancel a native download from serialized runanywhere.v1.DownloadCancelRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadCancelResult bytes.
+   */
+  downloadCancelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Resume a native download from serialized runanywhere.v1.DownloadResumeRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadResumeResult bytes.
+   */
+  downloadResumeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Poll native download progress from serialized runanywhere.v1.DownloadSubscribeRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadProgress bytes, or an empty buffer if no task exists.
+   */
+  downloadProgressPollProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Register a process-wide native DownloadProgress proto callback.
+   */
+  setDownloadProgressCallbackProto(
+    onProgressBytes: (progressBytes: ArrayBuffer) => void
   ): Promise<boolean>;
 
   /**
-   * Cancel an ongoing download
-   * @param modelId Model identifier
-   * @returns true if cancelled
+   * Clear the process-wide native DownloadProgress proto callback.
    */
-  cancelDownload(modelId: string): Promise<boolean>;
-
-  /**
-   * Get download progress
-   * @param modelId Model identifier
-   * @returns JSON with progress info (bytes, total, percentage)
-   */
-  getDownloadProgress(modelId: string): Promise<string>;
+  clearDownloadProgressCallbackProto(): Promise<boolean>;
 
   // ============================================================================
   // Storage
@@ -232,6 +343,40 @@ export interface RunAnywhereCore
    */
   deleteModel(modelId: string): Promise<boolean>;
 
+  /**
+   * Analyze storage from serialized runanywhere.v1.StorageInfoRequest bytes.
+   * Returns serialized runanywhere.v1.StorageInfoResult bytes.
+   */
+  storageInfoProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Check storage availability from serialized runanywhere.v1.StorageAvailabilityRequest bytes.
+   * Returns serialized runanywhere.v1.StorageAvailabilityResult bytes.
+   */
+  storageAvailabilityProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Build a delete plan from serialized runanywhere.v1.StorageDeletePlanRequest bytes.
+   * Returns serialized runanywhere.v1.StorageDeletePlan bytes.
+   */
+  storageDeletePlanProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Execute or dry-run delete from serialized runanywhere.v1.StorageDeleteRequest bytes.
+   * Returns serialized runanywhere.v1.StorageDeleteResult bytes.
+   */
+  storageDeleteProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // Hardware
+  // Matches commons rac_hardware_profile_get proto ABI
+  // ============================================================================
+
+  /**
+   * Get serialized runanywhere.v1.HardwareProfileResult bytes.
+   */
+  hardwareProfileProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // Events
   // Matches Swift: CppBridge+Events.swift
@@ -249,33 +394,129 @@ export interface RunAnywhereCore
    */
   pollEvents(): Promise<string>;
 
+  /**
+   * Subscribe to serialized runanywhere.v1.SDKEvent bytes.
+   * Returns a native subscription id.
+   */
+  subscribeSDKEventsProto(
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<number>;
+
+  /**
+   * Unsubscribe from a native SDKEvent proto stream.
+   */
+  unsubscribeSDKEventsProto(subscriptionId: number): Promise<void>;
+
+  /**
+   * Publish serialized runanywhere.v1.SDKEvent bytes.
+   */
+  publishSDKEventProto(eventBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Poll the next queued serialized runanywhere.v1.SDKEvent bytes.
+   * Returns an empty buffer when no event is queued.
+   */
+  pollSDKEventProto(): Promise<ArrayBuffer>;
+
+  /**
+   * Publish a canonical failure SDKEvent through native commons.
+   */
+  publishSDKFailureProto(
+    errorCode: number,
+    message: string,
+    component: string,
+    operation: string,
+    recoverable: boolean
+  ): Promise<boolean>;
+
   // ============================================================================
-  // HTTP Client
-  // Matches Swift: CppBridge+HTTP.swift
+  // Model Lifecycle
   // ============================================================================
 
   /**
-   * Configure HTTP client
-   * @param baseUrl Base URL for API
-   * @param apiKey API key for authentication
+   * Load a model from serialized runanywhere.v1.ModelLoadRequest bytes.
+   * Returns serialized runanywhere.v1.ModelLoadResult bytes.
+   */
+  modelLifecycleLoadProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Unload model(s) from serialized runanywhere.v1.ModelUnloadRequest bytes.
+   * Returns serialized runanywhere.v1.ModelUnloadResult bytes.
+   */
+  modelLifecycleUnloadProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Query current model from serialized runanywhere.v1.CurrentModelRequest bytes.
+   * Returns serialized runanywhere.v1.CurrentModelResult bytes.
+   */
+  currentModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Snapshot one component lifecycle state.
+   * Returns serialized runanywhere.v1.ComponentLifecycleSnapshot bytes.
+   */
+  componentLifecycleSnapshotProto(component: number): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // HTTP Client (libcurl-backed — rac_http_client_*)
+  // Matches Swift: HTTPClientAdapter.swift / Kotlin: CppBridgeHTTP.kt
+  // ============================================================================
+
+  /**
+   * Configure HTTP client base URL / API key for downstream C++ consumers
+   * (DeviceBridge etc.). TypeScript callers use `httpRequest` directly.
    * @returns true if configured successfully
    */
   configureHttp(baseUrl: string, apiKey: string): Promise<boolean>;
 
   /**
-   * Make HTTP POST request
-   * @param path API path
-   * @param bodyJson Request body JSON
-   * @returns Response JSON
+   * Perform a synchronous HTTP request via the native curl-backed client.
+   * Returns a JSON string `{"status": number, "body": string, "headersJson":
+   * string}` on any HTTP response (including 4xx/5xx). Rejects the promise
+   * only on transport-level failures (DNS / TLS / timeout / cancellation).
+   *
+   * @param method HTTP method (uppercase: GET / POST / PUT / DELETE / PATCH / HEAD)
+   * @param url Absolute URL (http:// or https://)
+   * @param headersJson Request headers serialized as `{"Name": "Value", ...}`
+   *        (empty string or `{}` for none)
+   * @param bodyJson Request body as string (ignored for GET/HEAD)
+   * @param timeoutMs Request timeout in ms (0 = no timeout)
    */
-  httpPost(path: string, bodyJson: string): Promise<string>;
+  httpRequest(
+    method: string,
+    url: string,
+    headersJson: string,
+    bodyJson: string,
+    timeoutMs: number
+  ): Promise<string>;
 
   /**
-   * Make HTTP GET request
-   * @param path API path
-   * @returns Response JSON
+   * Authenticate with the RunAnywhere backend and store the resulting JWT
+   * access/refresh tokens in the C++ AuthBridge. The native implementation
+   * builds the request JSON, executes the POST via rac_http_client_*, and
+   * calls AuthBridge::setAuth on success so subsequent native HTTP calls
+   * (device registration, telemetry) pick up the access token automatically.
+   *
+   * @returns The full auth response body (`{access_token, refresh_token,
+   *   expires_in, device_id, organization_id, user_id, token_type}`) as a
+   *   JSON string. Rejects when the backend returns a non-2xx response.
    */
-  httpGet(path: string): Promise<string>;
+  authAuthenticate(
+    apiKey: string,
+    baseURL: string,
+    deviceId: string,
+    platform: string,
+    sdkVersion: string
+  ): Promise<string>;
+
+  /**
+   * Refresh the stored JWT access token using the refresh token currently
+   * held by AuthBridge. Rejects when no refresh token is present or the
+   * backend rejects the refresh.
+   *
+   * @returns The new auth response body as a JSON string.
+   */
+  authRefreshToken(baseURL: string): Promise<string>;
 
   // ============================================================================
   // Utility Functions
@@ -351,6 +592,16 @@ export interface RunAnywhereCore
   ): Promise<string>;
 
   /**
+   * Get the native LLM-component handle as a JS number. Pass to
+   * `LLM.subscribeProtoEvents(handle, ...)` to subscribe to streaming
+   * events. Mirrors `getVoiceAgentHandle()` — exposes the underlying
+   * `rac_llm_handle_t` so the `LLMStreamAdapter` pattern works.
+   *
+   * @returns handle as number (0 if LLM component not yet allocated).
+   */
+  getLLMHandle(): Promise<number>;
+
+  /**
    * Cancel ongoing text generation
    */
   cancelGeneration(): Promise<boolean>;
@@ -366,6 +617,57 @@ export interface RunAnywhereCore
     prompt: string,
     schema: string,
     optionsJson?: string
+  ): Promise<string>;
+
+  llmGenerateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  llmGenerateStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  llmCancelProto(): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // LLM Thinking (<think>...</think> parsing)
+  // Matches Swift: ThinkingContentParser + CppBridge+LLMThinking.swift
+  // Kotlin: CppBridgeLlmThinking / Dart: LlmThinking
+  // Wraps rac_llm_thinking.h — byte-for-byte identical across all 5 SDKs.
+  // v3-readiness Phase A10 / GAP 08 #6.
+  // ============================================================================
+
+  /**
+   * Split a full LLM response into (response, thinking) on the FIRST
+   * `<think>...</think>` block.
+   *
+   * @param text Full LLM response text
+   * @returns JSON: `{ "response": string, "thinking": string | null }`.
+   *   Response is never null (empty string when input is only a think
+   *   block). Returns an empty JSON object `"{}"` on error.
+   */
+  llmExtractThinking(text: string): Promise<string>;
+
+  /**
+   * Remove ALL `<think>...</think>` blocks (and trailing unclosed
+   * `<think>`) from text.
+   *
+   * @param text Full LLM response text
+   * @returns The trimmed remainder. Empty string on error.
+   */
+  llmStripThinking(text: string): Promise<string>;
+
+  /**
+   * Apportion a total token count between thinking + response segments
+   * proportionally by character length.
+   *
+   * @param totalCompletionTokens Total tokens reported by the LLM
+   * @param responseText Pass empty string when absent
+   * @param thinkingText Pass empty string when absent (returns (0, total))
+   * @returns JSON: `{ "thinking": int, "response": int }`. Guarantees
+   *   `thinking + response == total` on success.
+   */
+  llmSplitThinkingTokens(
+    totalCompletionTokens: number,
+    responseText: string,
+    thinkingText: string
   ): Promise<string>;
 
   // ============================================================================
@@ -417,6 +719,16 @@ export interface RunAnywhereCore
    * @returns Transcription result as JSON
    */
   transcribeFile(filePath: string, language?: string): Promise<string>;
+
+  sttTranscribeProto(
+    audioBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  sttTranscribeStreamProto(
+    audioBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer,
+    onPartialBytes: (partialBytes: ArrayBuffer) => void
+  ): Promise<void>;
 
   // ============================================================================
   // TTS Capability (Backend-Agnostic)
@@ -473,6 +785,19 @@ export interface RunAnywhereCore
    */
   cancelTTS(): Promise<boolean>;
 
+  ttsListVoicesProto(
+    onVoiceBytes: (voiceBytes: ArrayBuffer) => void
+  ): Promise<boolean>;
+  ttsSynthesizeProto(
+    text: string,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  ttsSynthesizeStreamProto(
+    text: string,
+    optionsBytes: ArrayBuffer,
+    onChunkBytes: (chunkBytes: ArrayBuffer) => void
+  ): Promise<void>;
+
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VAD.swift - calls rac_vad_component_* APIs
@@ -509,6 +834,16 @@ export interface RunAnywhereCore
    * Reset VAD state
    */
   resetVAD(): Promise<void>;
+
+  vadConfigureProto(configBytes: ArrayBuffer): Promise<boolean>;
+  vadProcessProto(
+    samplesBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  vadGetStatisticsProto(): Promise<ArrayBuffer>;
+  vadSetActivityCallbackProto(
+    onActivityBytes: (activityBytes: ArrayBuffer) => void
+  ): Promise<boolean>;
 
   // ============================================================================
   // Secure Storage
@@ -604,6 +939,16 @@ export interface RunAnywhereCore
   initializeVoiceAgentWithLoadedModels(): Promise<boolean>;
 
   /**
+   * Get the native voice-agent handle as a JS number. Pass to
+   * `VoiceAgent.subscribeProtoEvents(handle, ...)` to subscribe to
+   * streaming events. v3.1 addition — exposes the underlying
+   * `rac_voice_agent_handle_t` so the adapter pattern works.
+   *
+   * @returns handle as number (0 if voice agent not yet initialized).
+   */
+  getVoiceAgentHandle(): Promise<number>;
+
+  /**
    * Check if voice agent is ready
    */
   isVoiceAgentReady(): Promise<boolean>;
@@ -646,6 +991,10 @@ export interface RunAnywhereCore
    * Cleanup voice agent resources
    */
   cleanupVoiceAgent(): Promise<void>;
+
+  voiceAgentInitializeProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  voiceAgentComponentStatesProto(): Promise<ArrayBuffer>;
+  voiceAgentProcessTurnProto(audioBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Tool Calling Capability
@@ -763,4 +1112,76 @@ export interface RunAnywhereCore
    * @returns JSON with stats
    */
   ragGetStatistics(): Promise<string>;
+
+  ragCreatePipelineProto(configBytes: ArrayBuffer): Promise<boolean>;
+  ragDestroyPipelineProto(): Promise<boolean>;
+  ragIngestProto(documentBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragClearProto(): Promise<ArrayBuffer>;
+  ragStatsProto(): Promise<ArrayBuffer>;
+
+  embeddingsCreateProto(modelId: string, configJson?: string): Promise<number>;
+  embeddingsEmbedBatchProto(
+    handle: number,
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  embeddingsDestroyProto(handle: number): Promise<void>;
+
+  loraLoadProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraRemoveProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraClearProto(): Promise<ArrayBuffer>;
+  loraCompatibilityProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  // ===========================================================================
+  // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
+  //
+  // Proto-byte / YAML driven L5 solution runtime. Callers pass a serialized
+  // `runanywhere.v1.SolutionConfig` (or PipelineSpec) protobuf or a YAML
+  // document and receive an opaque handle that maps to the same
+  // `rac_solution_handle_t` used by every other SDK.
+  //
+  // The handle is exposed to JS as a `double` — we pack the C pointer
+  // into a 64-bit double (same trick the VoiceAgent / LLM capabilities
+  // use for their native handles). Lifecycle verbs (start/stop/cancel/
+  // feed/closeInput/destroy) take that handle back.
+  // ===========================================================================
+
+  /**
+   * Construct a solution from a serialized `runanywhere.v1.SolutionConfig`
+   * (or PipelineSpec) protobuf. The handle is returned in the **created**
+   * state — call `solutionStart(handle)` to launch worker threads.
+   *
+   * @param configBytesBase64 Base64-encoded SolutionConfig / PipelineSpec
+   *        proto bytes. Base64 is used because Nitro does not yet bridge
+   *        `Uint8Array` cleanly on every platform; the native side decodes
+   *        before calling `rac_solution_create_from_proto`.
+   * @returns Native solution handle as a double (0 on failure).
+   */
+  solutionCreateFromProto(configBytesBase64: string): Promise<number>;
+
+  /**
+   * Construct a solution from a YAML document (SolutionConfig-shape or
+   * PipelineSpec-shape — loader auto-disambiguates on `operators:`).
+   *
+   * @returns Native solution handle as a double (0 on failure).
+   */
+  solutionCreateFromYaml(yamlText: string): Promise<number>;
+
+  /** Start the underlying scheduler (non-blocking). */
+  solutionStart(handle: number): Promise<boolean>;
+
+  /** Request a graceful shutdown (non-blocking). */
+  solutionStop(handle: number): Promise<boolean>;
+
+  /** Force-cancel the graph; returns once workers observe cancellation. */
+  solutionCancel(handle: number): Promise<boolean>;
+
+  /** Feed one UTF-8 item into the root input edge. */
+  solutionFeed(handle: number, item: string): Promise<boolean>;
+
+  /** Signal end-of-stream on the root input edge. */
+  solutionCloseInput(handle: number): Promise<boolean>;
+
+  /** Cancel, join, and release native resources. Idempotent. */
+  solutionDestroy(handle: number): Promise<void>;
 }

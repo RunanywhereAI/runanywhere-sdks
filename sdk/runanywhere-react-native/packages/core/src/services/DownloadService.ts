@@ -7,11 +7,51 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Download.swift
  */
 
+import {
+  DownloadCancelRequest,
+  DownloadCancelResult,
+  DownloadPlanRequest,
+  DownloadPlanResult,
+  DownloadProgress,
+  DownloadResumeRequest,
+  DownloadResumeResult,
+  DownloadStartRequest,
+  DownloadStartResult,
+  DownloadSubscribeRequest,
+  DownloadState,
+} from '@runanywhere/proto-ts/download_service';
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { EventBus } from '../Public/Events';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import { arrayBufferToBytes, bytesToArrayBuffer } from './ProtoBytes';
 
 const logger = new SDKLogger('DownloadService');
+
+/**
+ * Re-export the canonical proto types so consumers have a single import
+ * surface. `DownloadProgress` is the 10-field
+ * `runanywhere.v1.DownloadProgress` message; `DownloadState` is the matching
+ * enum. Field names are proto-ts camelCase (`bytesDownloaded`,
+ * `stageProgress`, etc.).
+ */
+export { DownloadProgress, DownloadState } from '@runanywhere/proto-ts/download_service';
+export { DownloadStage } from '@runanywhere/proto-ts/download_service';
+
+function encode<T>(
+  message: T,
+  codec: { encode(value: T): { finish(): Uint8Array } }
+): ArrayBuffer {
+  return bytesToArrayBuffer(codec.encode(message).finish());
+}
+
+function decode<T>(
+  buffer: ArrayBuffer,
+  codec: { decode(bytes: Uint8Array): T },
+  fallback: T
+): T {
+  const bytes = arrayBufferToBytes(buffer);
+  return bytes.byteLength === 0 ? fallback : codec.decode(bytes);
+}
 
 /**
  * Extended native module type for download service methods
@@ -28,32 +68,6 @@ interface DownloadNativeModule {
   isDownloadServiceHealthy?: () => Promise<boolean>;
   cancelDownload: (taskId: string) => Promise<boolean>;
   getDownloadProgress: (modelId: string) => Promise<string>;
-}
-
-/**
- * Download state
- */
-export enum DownloadState {
-  Idle = 'idle',
-  Queued = 'queued',
-  Downloading = 'downloading',
-  Paused = 'paused',
-  Completed = 'completed',
-  Failed = 'failed',
-  Cancelled = 'cancelled',
-}
-
-/**
- * Download progress information
- */
-export interface DownloadProgress {
-  taskId: string;
-  modelId: string;
-  bytesDownloaded: number;
-  totalBytes: number;
-  progress: number;
-  state: DownloadState;
-  error?: string;
 }
 
 /**
@@ -78,7 +92,8 @@ export interface DownloadConfiguration {
 }
 
 /**
- * Progress callback type
+ * Progress callback type — receives the full 10-field proto
+ * `runanywhere.v1.DownloadProgress` message.
  */
 export type ProgressCallback = (progress: DownloadProgress) => void;
 
@@ -87,6 +102,180 @@ export type ProgressCallback = (progress: DownloadProgress) => void;
  */
 class DownloadServiceImpl {
   private activeTasks = new Map<string, DownloadTask>();
+
+  /**
+   * Plan a model download through native commons.
+   */
+  async planDownload(request: DownloadPlanRequest): Promise<DownloadPlanResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    const native = requireNativeModule();
+    const buffer = await native.downloadPlanProto(
+      encode(request, DownloadPlanRequest)
+    );
+    return decode(
+      buffer,
+      DownloadPlanResult,
+      DownloadPlanResult.fromPartial({
+        canStart: false,
+        modelId: request.modelId,
+        errorMessage: 'download planning returned an empty result',
+      })
+    );
+  }
+
+  /**
+   * Start a planned native download.
+   */
+  async startDownload(request: DownloadStartRequest): Promise<DownloadStartResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    const native = requireNativeModule();
+    const buffer = await native.downloadStartProto(
+      encode(request, DownloadStartRequest)
+    );
+    const result = decode(
+      buffer,
+      DownloadStartResult,
+      DownloadStartResult.fromPartial({
+        accepted: false,
+        modelId: request.modelId,
+        errorMessage: 'download start returned an empty result',
+      })
+    );
+
+    if (result.accepted && result.taskId) {
+      this.activeTasks.set(result.taskId, {
+        id: result.taskId,
+        modelId: result.modelId,
+        state:
+          result.initialProgress?.state ??
+          DownloadState.DOWNLOAD_STATE_PENDING,
+        promise: Promise.resolve(result.initialProgress?.localPath ?? ''),
+        cancel: async () => {
+          await this.cancelNativeDownload({
+            taskId: result.taskId,
+            modelId: result.modelId,
+            deletePartialBytes: false,
+          });
+        },
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Cancel a native proto download.
+   */
+  async cancelNativeDownload(
+    request: DownloadCancelRequest
+  ): Promise<DownloadCancelResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    const native = requireNativeModule();
+    const buffer = await native.downloadCancelProto(
+      encode(request, DownloadCancelRequest)
+    );
+    const result = decode(
+      buffer,
+      DownloadCancelResult,
+      DownloadCancelResult.fromPartial({
+        success: false,
+        taskId: request.taskId,
+        modelId: request.modelId,
+        errorMessage: 'download cancel returned an empty result',
+      })
+    );
+    if (result.success) {
+      this.activeTasks.delete(result.taskId);
+    }
+    return result;
+  }
+
+  /**
+   * Resume a native proto download.
+   */
+  async resumeNativeDownload(
+    request: DownloadResumeRequest
+  ): Promise<DownloadResumeResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    const native = requireNativeModule();
+    const buffer = await native.downloadResumeProto(
+      encode(request, DownloadResumeRequest)
+    );
+    return decode(
+      buffer,
+      DownloadResumeResult,
+      DownloadResumeResult.fromPartial({
+        accepted: false,
+        taskId: request.taskId,
+        modelId: request.modelId,
+        errorMessage: 'download resume returned an empty result',
+      })
+    );
+  }
+
+  /**
+   * Poll native proto download progress.
+   */
+  async pollProgress(
+    request: DownloadSubscribeRequest
+  ): Promise<DownloadProgress | null> {
+    if (!isNativeModuleAvailable()) {
+      return null;
+    }
+
+    const native = requireNativeModule();
+    const buffer = await native.downloadProgressPollProto(
+      encode(request, DownloadSubscribeRequest)
+    );
+    const bytes = arrayBufferToBytes(buffer);
+    if (bytes.byteLength === 0) {
+      return null;
+    }
+    return DownloadProgress.decode(bytes);
+  }
+
+  /**
+   * Subscribe to process-wide native DownloadProgress proto callbacks.
+   */
+  async subscribeProgress(
+    callback: ProgressCallback
+  ): Promise<() => Promise<void>> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
+    const native = requireNativeModule();
+    const ok = await native.setDownloadProgressCallbackProto(
+      (progressBytes: ArrayBuffer) => {
+        try {
+          callback(DownloadProgress.decode(arrayBufferToBytes(progressBytes)));
+        } catch (error) {
+          logger.warning('Failed to decode native DownloadProgress proto:', {
+            error,
+          });
+        }
+      }
+    );
+    if (!ok) {
+      throw new Error('Native download progress subscription failed');
+    }
+
+    return async () => {
+      await native.clearDownloadProgressCallbackProto();
+    };
+  }
 
   /**
    * Download a model by ID
@@ -111,15 +300,22 @@ class DownloadServiceImpl {
     let unsubscribe: (() => void) | null = null;
     if (onProgress) {
       unsubscribe = EventBus.onModel((event) => {
-        if (event.type === 'downloadProgress' && 'modelId' in event && event.modelId === modelId) {
-          onProgress({
-            taskId: (event as { taskId?: string }).taskId ?? taskId,
+        if (
+          event.type === 'downloadProgress' &&
+          'modelId' in event &&
+          event.modelId === modelId
+        ) {
+          const payload = event as Record<string, unknown>;
+          const progress = DownloadProgress.fromPartial({
             modelId,
-            bytesDownloaded: (event as { bytesDownloaded?: number }).bytesDownloaded ?? 0,
-            totalBytes: (event as { totalBytes?: number }).totalBytes ?? 0,
-            progress: (event as { progress?: number }).progress ?? 0,
-            state: DownloadState.Downloading,
+            bytesDownloaded:
+              typeof payload.bytesDownloaded === 'number' ? payload.bytesDownloaded : 0,
+            totalBytes: typeof payload.totalBytes === 'number' ? payload.totalBytes : 0,
+            stageProgress:
+              typeof payload.progress === 'number' ? payload.progress : 0,
+            state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
           });
+          onProgress(progress);
         }
       });
     }
@@ -150,7 +346,16 @@ class DownloadServiceImpl {
     if (!isNativeModuleAvailable()) return;
 
     const native = requireNativeModule() as unknown as DownloadNativeModule;
-    await native.cancelDownload(taskId);
+    const task = this.activeTasks.get(taskId);
+    if (task) {
+      await this.cancelNativeDownload({
+        taskId,
+        modelId: task.modelId,
+        deletePartialBytes: false,
+      });
+    } else {
+      await native.cancelDownload(taskId);
+    }
     this.activeTasks.delete(taskId);
   }
 
@@ -261,7 +466,10 @@ class DownloadServiceImpl {
    */
   isDownloading(modelId: string): boolean {
     for (const task of this.activeTasks.values()) {
-      if (task.modelId === modelId && task.state === DownloadState.Downloading) {
+      if (
+        task.modelId === modelId &&
+        task.state === DownloadState.DOWNLOAD_STATE_DOWNLOADING
+      ) {
         return true;
       }
     }

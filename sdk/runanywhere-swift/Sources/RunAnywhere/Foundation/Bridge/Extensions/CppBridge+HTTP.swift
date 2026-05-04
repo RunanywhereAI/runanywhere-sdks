@@ -38,5 +38,12 @@ extension CppBridge {
                 await HTTPService.shared.isConfigured
             }
         }
+
+        /// Check if HTTP has a non-placeholder endpoint and token.
+        public static var hasUsableConfiguration: Bool {
+            get async {
+                await HTTPService.shared.hasUsableConfiguration
+            }
+        }
     }
 }

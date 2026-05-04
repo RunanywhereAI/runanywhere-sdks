@@ -41,24 +41,6 @@ class PlatformChannelHandler(private val context: Context) {
                 "getDeviceCapabilities" -> {
                     result.success(getDeviceCapabilities())
                 }
-                "loadNativeModel" -> {
-                    val modelId = call.argument<String>("modelId")
-                    val modelPath = call.argument<String>("modelPath")
-                    if (modelId != null && modelPath != null) {
-                        loadNativeModel(modelId, modelPath, result)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Missing modelId or modelPath", null)
-                    }
-                }
-                "unloadNativeModel" -> {
-                    val modelId = call.argument<String>("modelId")
-                    if (modelId != null) {
-                        unloadNativeModel(modelId)
-                        result.success(null)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Missing modelId", null)
-                    }
-                }
                 else -> {
                     result.notImplemented()
                 }
@@ -110,14 +92,5 @@ class PlatformChannelHandler(private val context: Context) {
             "maxMemory" to runtime.maxMemory(),
             "availableProcessors" to runtime.availableProcessors(),
         )
-    }
-
-    private fun loadNativeModel(modelId: String, modelPath: String, result: MethodChannel.Result) {
-        // TODO: Implement native model loading
-        result.success(true)
-    }
-
-    private fun unloadNativeModel(modelId: String) {
-        // TODO: Implement native model unloading
     }
 }

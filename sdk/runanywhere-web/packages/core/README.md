@@ -342,7 +342,6 @@ sdk/runanywhere-web/
 |       |   |       +-- RunAnywhere+TTS.ts
 |       |   |       +-- RunAnywhere+VAD.ts
 |       |   |       +-- RunAnywhere+VLM.ts
-|       |   |       +-- RunAnywhere+VoiceAgent.ts
 |       |   |       +-- RunAnywhere+VoicePipeline.ts
 |       |   |       +-- RunAnywhere+ToolCalling.ts
 |       |   |       +-- RunAnywhere+StructuredOutput.ts

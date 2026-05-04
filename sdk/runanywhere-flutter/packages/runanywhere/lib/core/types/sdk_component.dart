@@ -1,32 +1,4 @@
-/// Component Types
-///
-/// Core type definitions for component models.
-/// Matches Swift ComponentTypes.swift from Core/Types/
 library component_types;
-
-import 'package:runanywhere/core/types/model_types.dart';
-
-// MARK: - Component Protocols
-
-/// Protocol for component configuration and initialization
-///
-/// All component configurations (LLM, STT, TTS, VAD, etc.) implement this.
-/// Provides common properties needed for model selection and framework preference.
-abstract class ComponentConfiguration {
-  /// Model identifier (optional - uses default if not specified)
-  String? get modelId;
-
-  /// Preferred inference framework for this component (optional)
-  InferenceFramework? get preferredFramework => null;
-
-  /// Validates the configuration
-  void validate();
-}
-
-/// Protocol for component output data
-abstract class ComponentOutput {
-  DateTime get timestamp;
-}
 
 // MARK: - SDK Component Enum
 

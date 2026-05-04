@@ -1,16 +1,45 @@
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
 import 'package:runanywhere/native/dart_bridge_dev_config.dart';
 
-/// SDK Environment mode - determines how data is handled
+/// SDK Environment mode — determines how data is handled.
+///
+/// GAP 01 Phase 4: `toProto()` / `fromProto()` keep this enum in sync with
+/// `runanywhere.v1.SDKEnvironment` in `idl/model_types.proto`. Adding a case
+/// requires updating both sides; the CI drift-check enforces freshness of
+/// `lib/generated/model_types.pbenum.dart`.
 enum SDKEnvironment {
-  /// Development/testing mode - may use local data, verbose logging
+  /// Development/testing mode — may use local data, verbose logging.
   development,
 
-  /// Staging mode - testing with real services
+  /// Staging mode — testing with real services.
   staging,
 
-  /// Production mode - live environment
-  production,
+  /// Production mode — live environment.
+  production;
+
+  /// Convert to the IDL-generated Wire enum.
+  pb.SDKEnvironment toProto() {
+    switch (this) {
+      case SDKEnvironment.development:
+        return pb.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+      case SDKEnvironment.staging:
+        return pb.SDKEnvironment.SDK_ENVIRONMENT_STAGING;
+      case SDKEnvironment.production:
+        return pb.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+    }
+  }
+
+  /// Decode from the IDL-generated Wire enum. Unknown → development.
+  static SDKEnvironment fromProto(pb.SDKEnvironment proto) {
+    if (proto == pb.SDKEnvironment.SDK_ENVIRONMENT_STAGING) {
+      return SDKEnvironment.staging;
+    }
+    if (proto == pb.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION) {
+      return SDKEnvironment.production;
+    }
+    return SDKEnvironment.development;
+  }
 }
 
 extension SDKEnvironmentExtension on SDKEnvironment {
@@ -105,7 +134,7 @@ class SupabaseConfig {
   });
 
   /// Get configuration for environment
-  /// 
+  ///
   /// For development mode, reads from C++ dev config (development_config.cpp).
   /// This ensures credentials are stored in a single git-ignored location.
   static SupabaseConfig? configuration(SDKEnvironment environment) {
@@ -114,22 +143,39 @@ class SupabaseConfig {
         // Read from C++ dev config - credentials stored in development_config.cpp (git-ignored)
         final supabaseUrl = DartBridgeDevConfig.supabaseURL;
         final supabaseKey = DartBridgeDevConfig.supabaseKey;
-        
-        if (supabaseUrl == null || supabaseUrl.isEmpty ||
-            supabaseKey == null || supabaseKey.isEmpty) {
-          // Dev config not available - this is expected if development_config.cpp 
+
+        if (supabaseUrl == null ||
+            supabaseUrl.isEmpty ||
+            supabaseKey == null ||
+            supabaseKey.isEmpty ||
+            _looksLikePlaceholder(supabaseUrl) ||
+            _looksLikePlaceholder(supabaseKey)) {
+          // Dev config not available - this is expected if development_config.cpp
           // hasn't been filled in. Telemetry will be disabled in dev mode.
           return null;
         }
-        
+
+        final uri = Uri.tryParse(supabaseUrl);
+        if (uri == null ||
+            !uri.hasScheme ||
+            (uri.scheme != 'http' && uri.scheme != 'https') ||
+            uri.host.isEmpty) {
+          return null;
+        }
+
         return SupabaseConfig(
-          projectURL: Uri.parse(supabaseUrl),
+          projectURL: uri,
           anonKey: supabaseKey,
         );
       case SDKEnvironment.staging:
       case SDKEnvironment.production:
         return null;
     }
+  }
+
+  static bool _looksLikePlaceholder(String value) {
+    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+        .hasMatch(value);
   }
 }
 

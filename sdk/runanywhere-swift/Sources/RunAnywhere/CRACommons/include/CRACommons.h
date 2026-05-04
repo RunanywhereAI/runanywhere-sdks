@@ -17,6 +17,7 @@
 
 #include "rac_types.h"
 #include "rac_error.h"
+#include "rac_proto_buffer.h"
 #include "rac_structured_error.h"
 #include "rac_logger.h"
 #include "rac_core.h"
@@ -26,6 +27,7 @@
 
 // Lifecycle management
 #include "rac_lifecycle.h"
+#include "rac_model_lifecycle.h"
 
 // SDK State (centralized state management)
 #include "rac_sdk_state.h"
@@ -43,6 +45,9 @@
 #include "rac_llm_analytics.h"
 #include "rac_llm_events.h"
 #include "rac_llm_structured_output.h"
+#include "rac_llm_thinking.h"
+// v2 close-out Phase G-2: proto-byte LLM stream ABI.
+#include "rac_llm_stream.h"
 #include "rac_tool_calling.h"
 
 // STT (Speech-to-Text)
@@ -88,10 +93,18 @@
 
 // Voice Agent
 #include "rac_voice_agent.h"
+#include "rac_voice_event_abi.h"
+#include "rac_modality_proto_abi.h"
+
+// Embeddings
+#include "rac_embeddings.h"
 
 // RAG (Retrieval-Augmented Generation)
 #include "rac_rag_pipeline.h"
 #include "rac_rag.h"
+
+// Solutions (T4.7) — proto/YAML driven L5 solution runtime
+#include "rac_solution.h"
 
 // =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management
@@ -99,6 +112,7 @@
 
 // Event system
 #include "rac_events.h"
+#include "rac_sdk_event_stream.h"
 #include "rac_analytics_events.h"
 
 // Download management
@@ -144,6 +158,8 @@
 #include "rac_endpoints.h"
 #include "rac_api_types.h"
 #include "rac_http_client.h"
+#include "rac_http_transport.h"
+#include "rac_http_download.h"
 #include "rac_auth_manager.h"
 #include "rac_dev_config.h"
 
@@ -153,5 +169,17 @@
 
 #include "rac_telemetry_types.h"
 #include "rac_telemetry_manager.h"
+
+// =============================================================================
+// PLUGIN REGISTRY + ROUTER (v3 Phase B10 — replaces rac_service_* legacy)
+// =============================================================================
+
+#include "rac_primitive.h"
+#include "rac_engine_vtable.h"
+#include "rac_cpu_runtime_provider.h"
+#include "rac_plugin_entry.h"
+#include "rac_plugin_loader.h"  // v2 close-out (B31): runtime dlopen path
+#include "rac_routing_hints.h"
+#include "rac_route.h"
 
 #endif /* CRACOMMONS_H */

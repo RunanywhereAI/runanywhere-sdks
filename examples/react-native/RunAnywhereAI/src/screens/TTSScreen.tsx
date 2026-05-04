@@ -34,6 +34,8 @@ import {
   NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Slider from '@react-native-community/slider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
@@ -99,10 +101,14 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework } from '../types/model';
+import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  type ModelInfo as SDKModelInfo,
+} from '@runanywhere/core';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
 export const TTSScreen: React.FC = () => {
   // State
@@ -126,6 +132,9 @@ export const TTSScreen: React.FC = () => {
   const [audioFilePath, setAudioFilePath] = useState<string | null>(null);
   const [sampleRate, setSampleRate] = useState(22050);
   const [showModelSelection, setShowModelSelection] = useState(false);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Audio player refs - using react-native-sound directly
   const soundRef = useRef<typeof Sound | null>(null);
@@ -197,7 +206,8 @@ export const TTSScreen: React.FC = () => {
       const allModels = await RunAnywhere.getAvailableModels();
       // Filter by category (speech-synthesis) matching SDK's ModelCategory
       const ttsModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === 'speech-synthesis'
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
       );
       setAvailableModels(ttsModels);
 
@@ -322,7 +332,7 @@ export const TTSScreen: React.FC = () => {
 
         // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
         // and finding the correct nested model folder
-        const modelType = model.category || 'piper';
+        const modelType = 'piper';
         console.warn(
           `[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`
         );
@@ -526,12 +536,15 @@ export const TTSScreen: React.FC = () => {
         return;
       }
 
-      // SDK uses simple TTSConfiguration with rate/pitch/volume
+      // Proto-canonical TTSOptions (Wave 2: aligned to @runanywhere/proto-ts/tts_options).
       const sdkConfig = {
         voice: 'default',
-        rate: speed,
+        languageCode: '',
+        speakingRate: speed,
         pitch: pitch,
         volume: volume,
+        enableSsml: false,
+        audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
       };
 
       console.warn(
@@ -539,27 +552,40 @@ export const TTSScreen: React.FC = () => {
         text.substring(0, 50) + '...'
       );
 
-      // SDK returns TTSResult with audio, sampleRate, numSamples, duration
+      // SDK returns proto TTSOutput with audioData (Uint8Array), sampleRate, durationMs.
       const result = await RunAnywhere.synthesize(text, sdkConfig);
+
+      // Convert audioData (Uint8Array of Float32 PCM bytes) to base64 for WAV write.
+      const audioBytes = result.audioData;
+      const numSamples = Math.floor(audioBytes.byteLength / 4);
+      let audioBase64 = '';
+      {
+        const u8 = new Uint8Array(
+          audioBytes.buffer,
+          audioBytes.byteOffset,
+          audioBytes.byteLength
+        );
+        let binary = '';
+        for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]!);
+        audioBase64 = btoa(binary);
+      }
 
       console.warn('[TTSScreen] Synthesis result:', {
         sampleRate: result.sampleRate,
-        numSamples: result.numSamples,
-        duration: result.duration,
-        audioLength: result.audio?.length || 0,
+        numSamples,
+        durationMs: result.durationMs,
+        audioBytes: audioBytes.byteLength,
       });
 
-      // Use actual duration from result, or estimate if not available
-      const audioDuration =
-        result.duration ||
-        result.numSamples / result.sampleRate ||
+      const audioDuration = (result.durationMs ?? 0) / 1000 ||
+        numSamples / (result.sampleRate || 22050) ||
         text.length * 0.05;
       setDuration(audioDuration);
       setSampleRate(result.sampleRate || 22050);
-      setLastGeneratedAudio(result.audio);
+      setLastGeneratedAudio(audioBase64);
 
       // Convert to WAV and save to file for playback
-      if (result.audio && result.audio.length > 0) {
+      if (audioBase64.length > 0) {
         try {
           // Clean up previous file
           if (audioFilePath) {
@@ -567,7 +593,7 @@ export const TTSScreen: React.FC = () => {
           }
 
           const wavPath = await RunAnywhere.Audio.createWavFromPCMFloat32(
-            result.audio,
+            audioBase64,
             result.sampleRate || 22050
           );
           setAudioFilePath(wavPath);
@@ -583,7 +609,7 @@ export const TTSScreen: React.FC = () => {
             'Audio Generated',
             `Duration: ${audioDuration.toFixed(2)}s\n` +
               `Sample Rate: ${result.sampleRate} Hz\n` +
-              `Samples: ${result.numSamples.toLocaleString()}\n\n` +
+              `Samples: ${numSamples.toLocaleString()}\n\n` +
               'Audio file creation failed. Tap play to try again.',
             [{ text: 'OK' }]
           );
@@ -921,26 +947,19 @@ export const TTSScreen: React.FC = () => {
         <Text style={styles.sliderLabel}>{label}</Text>
         <Text style={styles.sliderValue}>{formatValue(value)}</Text>
       </View>
-      {/* TODO: Add @react-native-community/slider package */}
-      <View style={styles.sliderTrack}>
-        <View
-          style={[
-            styles.sliderFill,
-            { width: `${((value - min) / (max - min)) * 100}%` },
-          ]}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sliderThumb,
-            { left: `${((value - min) / (max - min)) * 100}%` },
-          ]}
-          onPress={() => {
-            // Simple increment for demo
-            const newValue = value + step > max ? min : value + step;
-            onValueChange(Math.round(newValue * 10) / 10);
-          }}
-        />
-      </View>
+      <Slider
+        style={styles.slider}
+        value={value}
+        onValueChange={(v: number) =>
+          onValueChange(Math.round(v / step) * step)
+        }
+        minimumValue={min}
+        maximumValue={max}
+        step={step}
+        minimumTrackTintColor={Colors.primaryBlue}
+        maximumTrackTintColor={Colors.backgroundGray5}
+        thumbTintColor={Colors.primaryBlue}
+      />
     </View>
   );
 
@@ -948,7 +967,7 @@ export const TTSScreen: React.FC = () => {
    * Render header
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
       <Text style={styles.title}>Text to Speech</Text>
       {text && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -1131,7 +1150,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
@@ -1190,27 +1210,9 @@ const styles = StyleSheet.create({
     color: Colors.primaryBlue,
     fontWeight: '600',
   },
-  sliderTrack: {
-    height: 6,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 3,
-    position: 'relative',
-  },
-  sliderFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: 3,
-  },
-  sliderThumb: {
-    position: 'absolute',
-    top: -7,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.backgroundPrimary,
-    borderWidth: 2,
-    borderColor: Colors.primaryBlue,
-    marginLeft: -10,
+  slider: {
+    width: '100%',
+    height: 36,
   },
   playbackSection: {
     marginTop: Spacing.xLarge,

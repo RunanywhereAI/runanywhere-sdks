@@ -80,7 +80,7 @@ public extension RunAnywhere {
         )
 
         let logger = SDKLogger(category: "RunAnywhere.Models")
-        logger.info("Registering model: \(modelId), framework: \(framework.rawValue) (\(framework.displayName))")
+        logger.info("Registering model: \(modelId), framework: \(framework.wireString) (\(framework.displayName))")
         let task = Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)
@@ -92,6 +92,28 @@ public extension RunAnywhere {
         trackPendingRegistration(task)
 
         return modelInfo
+    }
+
+    /// Register a model from a pre-built `ModelInfo` — canonical single-arg form (CANONICAL_API §13).
+    ///
+    /// Delegates to the decomposed-params overload using fields from the provided `ModelInfo`.
+    ///
+    /// - Parameter model: A fully populated `ModelInfo` instance.
+    /// - Returns: The same `ModelInfo` (passed through for chaining / storage).
+    @discardableResult
+    static func registerModel(_ model: ModelInfo) -> ModelInfo {
+        let logger = SDKLogger(category: "RunAnywhere.Models")
+        let task = Task {
+            do {
+                try await CppBridge.ModelRegistry.shared.save(model)
+                logger.info("Model saved to registry: \(model.id)")
+            } catch {
+                logger.error("Failed to register model: \(error)")
+            }
+        }
+        trackPendingRegistration(task)
+
+        return model
     }
 
     /// Register a model from a URL string
@@ -132,17 +154,44 @@ public extension RunAnywhere {
         )
     }
 
+    /// Register a multi-file model from a pre-built `ModelInfo` — canonical single-arg form (CANONICAL_API §13).
+    ///
+    /// Extracts file descriptors from `model.artifactType` (`.multiFile(files)`) and
+    /// delegates to the decomposed-params form. If `artifactType` is not `.multiFile`,
+    /// an empty files array is used and the model is still registered in the catalog.
+    ///
+    /// - Parameter model: A fully populated `ModelInfo` with `.multiFile` artifact type.
+    /// - Returns: The same `ModelInfo` (passed through for chaining).
+    @discardableResult
+    static func registerMultiFileModel(_ model: ModelInfo) -> ModelInfo {
+        let files: [ModelFileDescriptor]
+        if case .multiFile(let descriptors) = model.artifactType {
+            files = descriptors
+        } else {
+            files = []
+        }
+        return registerMultiFileModel(
+            id: model.id,
+            name: model.name,
+            files: files,
+            framework: model.framework,
+            modality: model.category,
+            memoryRequirement: model.downloadSize
+        )
+    }
+
     // MARK: - Multi-File Model Cache
 
-    /// Cache for multi-file model descriptors (C++ registry doesn't preserve file arrays)
-    private static var multiFileModelCache: [String: [ModelFileDescriptor]] = [:]
-    private static let multiFileCacheLock = NSLock()
+    /// Cache for multi-file model descriptors.
+    /// The proto registry preserves file arrays; this remains for legacy
+    /// binaries and call sites that query descriptors directly.
+    /// Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
+    private static let multiFileModelCache =
+        OSAllocatedUnfairLock<[String: [ModelFileDescriptor]]>(initialState: [:])
 
     /// Get cached file descriptors for a multi-file model
     static func getMultiFileDescriptors(forModelId modelId: String) -> [ModelFileDescriptor]? {
-        multiFileCacheLock.lock()
-        defer { multiFileCacheLock.unlock() }
-        return multiFileModelCache[modelId]
+        multiFileModelCache.withLock { $0[modelId] }
     }
 
     /// Register a multi-file model (e.g., VLM with separate main model + mmproj files)
@@ -165,9 +214,7 @@ public extension RunAnywhere {
         memoryRequirement: Int64? = nil
     ) -> ModelInfo {
         // Cache the file descriptors (C++ registry doesn't preserve them)
-        multiFileCacheLock.lock()
-        multiFileModelCache[id] = files
-        multiFileCacheLock.unlock()
+        multiFileModelCache.withLock { $0[id] = files }
 
         // Create ModelInfo with multiFile artifact type
         let modelInfo = ModelInfo(
@@ -229,13 +276,13 @@ extension RunAnywhere {
     /// This method fetches models assigned to this device based on device type and platform
     /// - Parameter forceRefresh: Force refresh even if cached models are available
     /// - Returns: Array of ModelInfo objects assigned to this device
-    /// - Throws: SDKError if fetching fails
+    /// - Throws: SDKException if fetching fails
     public static func fetchModelAssignments(forceRefresh: Bool = false) async throws -> [ModelInfo] {
         let logger = SDKLogger(category: "RunAnywhere.ModelAssignments")
 
         // Ensure SDK is initialized
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized
@@ -255,8 +302,8 @@ extension RunAnywhere {
     /// - Returns: Array of ModelInfo objects compatible with the specified framework
     public static func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized
@@ -271,8 +318,8 @@ extension RunAnywhere {
     /// - Returns: Array of ModelInfo objects in the specified category
     public static func getModelsForCategory(_ category: ModelCategory) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized

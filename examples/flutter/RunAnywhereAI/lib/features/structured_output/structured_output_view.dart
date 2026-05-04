@@ -200,7 +200,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
       return;
     }
 
-    if (!sdk.RunAnywhere.isModelLoaded) {
+    if (!sdk.RunAnywhereSDK.instance.llm.isLoaded) {
       setState(() {
         _errorMessage = 'LLM model not loaded. Please load a model first.';
       });
@@ -234,50 +234,53 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   }
 
   Future<void> _generateNonStream(StructuredOutputExample example) async {
-    final result = await sdk.RunAnywhere.generate(
+    final result = await sdk.RunAnywhereSDK.instance.llm.generate(
       _promptController.text,
-      options: sdk.LLMGenerationOptions(
+      sdk.LLMGenerationOptions(
         maxTokens: 1000,
         temperature: 0.7,
-        structuredOutput: sdk.StructuredOutputConfig(
-          typeName: example.typeName,
-          schema: example.schema,
-        ),
+        jsonSchema: example.schema,
       ),
     );
 
     setState(() {
       _rawResponse = result.text;
-      _structuredData = result.structuredData;
+      _structuredData = result.hasJsonOutput()
+          ? jsonDecode(result.jsonOutput) as Map<String, dynamic>?
+          : null;
     });
   }
 
   Future<void> _generateStream(StructuredOutputExample example) async {
-    final streamResult = await sdk.RunAnywhere.generateStream(
+    // Wave 2: streaming returns Stream<LLMStreamEvent>; structured-output
+    // parsing happens on the accumulated text after the terminal event.
+    final eventStream = sdk.RunAnywhereSDK.instance.llm.generateStream(
       _promptController.text,
-      options: sdk.LLMGenerationOptions(
+      sdk.LLMGenerationOptions(
         maxTokens: 1000,
         temperature: 0.7,
-        structuredOutput: sdk.StructuredOutputConfig(
-          typeName: example.typeName,
-          schema: example.schema,
-        ),
+        jsonSchema: example.schema,
       ),
     );
 
     final buffer = StringBuffer();
-
-    await for (final token in streamResult.stream) {
-      buffer.write(token);
-      setState(() {
-        _rawResponse = buffer.toString();
-      });
+    await for (final event in eventStream) {
+      if (event.isFinal) {
+        if (event.errorMessage.isNotEmpty) {
+          throw Exception(event.errorMessage);
+        }
+        break;
+      }
+      if (event.token.isNotEmpty) {
+        buffer.write(event.token);
+        setState(() {
+          _rawResponse = buffer.toString();
+        });
+      }
     }
-
-    final finalResult = await streamResult.result;
-    setState(() {
-      _structuredData = finalResult.structuredData;
-    });
+    // structuredData must now be parsed by the caller from the raw
+    // response text; the prior LLMGenerationResult.structuredData field
+    // was populated by the deleted streaming-result wrapper.
   }
 
   void _copyToClipboard(String text) {

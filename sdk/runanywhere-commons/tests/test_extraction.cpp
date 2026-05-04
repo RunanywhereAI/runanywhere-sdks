@@ -19,7 +19,7 @@
 #include <cstring>
 #include <fstream>
 #include <string>
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 #include <vector>
 
 #ifdef _WIN32
@@ -108,6 +108,18 @@ static bool write_file(const std::string& path, const void* data, size_t size) {
 /** Write string to a file. */
 static bool write_file(const std::string& path, const std::string& content) {
     return write_file(path, content.data(), content.size());
+}
+
+static rac_model_info_t make_test_model(const char* id, rac_inference_framework_t framework,
+                                        rac_model_format_t format) {
+    rac_model_info_t model = {};
+    model.id = const_cast<char*>(id);
+    model.name = const_cast<char*>(id);
+    model.framework = framework;
+    model.format = format;
+    model.category = RAC_MODEL_CATEGORY_LANGUAGE;
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_SINGLE_FILE;
+    return model;
 }
 
 /** Check if tar command is available. */
@@ -549,6 +561,226 @@ static TestResult test_unsupported_format() {
 }
 
 // =============================================================================
+// Test: resolve single-file artifact and checksum
+// =============================================================================
+
+static TestResult test_resolve_single_file_with_checksum() {
+    std::string model_path = g_test_dir + "/single.gguf";
+    ASSERT_TRUE(write_file(model_path, "abc"), "Should write single model file");
+
+    rac_model_info_t model =
+        make_test_model("single", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(
+        &model, model_path.c_str(),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Single file with matching SHA-256 should resolve");
+    ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be populated");
+    ASSERT_TRUE(std::string(resolution.primary_model_path).find("single.gguf") !=
+                    std::string::npos,
+                "Primary path should point to the GGUF file");
+    ASSERT_EQ(resolution.checksum_validated, RAC_TRUE, "Checksum should be validated");
+    ASSERT_EQ(resolution.checksum_matched, RAC_TRUE, "Checksum should match");
+    rac_model_path_resolution_free(&resolution);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: resolve multi-file artifact companions
+// =============================================================================
+
+static TestResult test_resolve_companion_files() {
+    std::string dir = create_temp_dir("resolve_companions");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/main-model.gguf", "main"), "Should write main model");
+    ASSERT_TRUE(write_file(dir + "/mmproj-main-model.gguf", "mmproj"), "Should write mmproj");
+    ASSERT_TRUE(write_file(dir + "/tokenizer.json", "{}"), "Should write tokenizer");
+    ASSERT_TRUE(write_file(dir + "/config.json", "{}"), "Should write config");
+
+    const char* required[] = {"*.gguf", "tokenizer.json"};
+    const char* optional[] = {"merges.txt"};
+    rac_expected_model_files_t expected = {};
+    expected.required_patterns = required;
+    expected.required_pattern_count = 2;
+    expected.optional_patterns = optional;
+    expected.optional_pattern_count = 1;
+
+    rac_model_info_t model =
+        make_test_model("main-model", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
+    model.artifact_info.expected_files = &expected;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Multi-file model should resolve");
+    ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be populated");
+    ASSERT_TRUE(resolution.mmproj_path != nullptr, "mmproj companion should be discovered");
+    ASSERT_TRUE(resolution.tokenizer_path != nullptr, "Tokenizer should be discovered");
+    ASSERT_TRUE(resolution.config_path != nullptr, "Config should be discovered");
+    ASSERT_EQ(resolution.missing_required_file_count, static_cast<size_t>(0),
+              "No required files should be missing");
+    rac_model_path_resolution_free(&resolution);
+    remove_dir(dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: missing required file fails while optional file is allowed
+// =============================================================================
+
+static TestResult test_resolve_missing_required_optional_allowed() {
+    std::string dir = create_temp_dir("resolve_missing");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/model.gguf", "model"), "Should write model");
+
+    const char* required[] = {"*.gguf", "tokenizer.json"};
+    const char* optional[] = {"config.json"};
+    rac_expected_model_files_t expected = {};
+    expected.required_patterns = required;
+    expected.required_pattern_count = 2;
+    expected.optional_patterns = optional;
+    expected.optional_pattern_count = 1;
+
+    rac_model_info_t model =
+        make_test_model("model", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.expected_files = &expected;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_ERROR_MODEL_VALIDATION_FAILED,
+              "Missing required tokenizer should fail validation");
+    ASSERT_EQ(resolution.missing_required_file_count, static_cast<size_t>(1),
+              "Exactly one required file should be missing");
+    ASSERT_TRUE(std::string(resolution.missing_required_files[0]) == "tokenizer.json",
+                "Missing required file should be tokenizer.json");
+    rac_model_path_resolution_free(&resolution);
+    remove_dir(dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: file descriptors participate in required-file validation
+// =============================================================================
+
+static TestResult test_resolve_file_descriptor_required() {
+    std::string dir = create_temp_dir("resolve_descriptors");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/model.gguf", "model"), "Should write model");
+
+    rac_model_file_descriptor_t descriptors[2] = {};
+    descriptors[0].relative_path = "model.gguf";
+    descriptors[0].destination_path = "model.gguf";
+    descriptors[0].is_required = RAC_TRUE;
+    descriptors[1].relative_path = "tokenizer.model";
+    descriptors[1].destination_path = "tokenizer.model";
+    descriptors[1].is_required = RAC_TRUE;
+
+    rac_model_info_t model =
+        make_test_model("model", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
+    model.artifact_info.file_descriptors = descriptors;
+    model.artifact_info.file_descriptor_count = 2;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_ERROR_MODEL_VALIDATION_FAILED,
+              "Missing required descriptor should fail validation");
+    ASSERT_EQ(resolution.missing_required_file_count, static_cast<size_t>(1),
+              "One descriptor should be missing");
+    ASSERT_TRUE(std::string(resolution.missing_required_files[0]) == "tokenizer.model",
+                "Missing descriptor should be tokenizer.model");
+    rac_model_path_resolution_free(&resolution);
+    remove_dir(dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: checksum mismatch fails validation
+// =============================================================================
+
+static TestResult test_resolve_checksum_mismatch() {
+    std::string model_path = g_test_dir + "/checksum-mismatch.gguf";
+    ASSERT_TRUE(write_file(model_path, "abc"), "Should write checksum test model");
+
+    rac_model_info_t model =
+        make_test_model("checksum-mismatch", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(
+        &model, model_path.c_str(),
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        &resolution);
+    ASSERT_EQ(rc, RAC_ERROR_MODEL_VALIDATION_FAILED,
+              "Wrong checksum should fail validation");
+    ASSERT_EQ(resolution.checksum_validated, RAC_TRUE, "Checksum should be attempted");
+    ASSERT_EQ(resolution.checksum_matched, RAC_FALSE, "Checksum should not match");
+    rac_model_path_resolution_free(&resolution);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: extract archive and resolve model path in one native call
+// =============================================================================
+
+static TestResult test_extract_and_resolve_archive() {
+    if (!has_tar()) {
+        TestResult r;
+        r.passed = true;
+        r.details = "SKIPPED (tar not available)";
+        return r;
+    }
+
+    std::string archive_dir = create_temp_dir("resolve_archive_src");
+    std::string content_dir = archive_dir + "/bundle";
+    compat_mkdir(content_dir.c_str());
+    ASSERT_TRUE(write_file(content_dir + "/bundle.gguf", "abc"), "Should write archive model");
+    ASSERT_TRUE(write_file(content_dir + "/tokenizer.json", "{}"), "Should write tokenizer");
+
+    std::string archive_path = archive_dir + "/bundle.tar.gz";
+    std::string cmd = "tar czf \"" + archive_path + "\" -C \"" + archive_dir + "\" bundle";
+    ASSERT_TRUE(system(cmd.c_str()) == 0, "Should create model archive");
+
+    std::string dest_dir = create_temp_dir("resolve_archive_dest");
+    ASSERT_TRUE(!dest_dir.empty(), "Should create destination dir");
+
+    const char* required[] = {"*.gguf", "tokenizer.json"};
+    rac_expected_model_files_t expected = {};
+    expected.required_patterns = required;
+    expected.required_pattern_count = 2;
+
+    rac_model_info_t model =
+        make_test_model("bundle", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_ARCHIVE;
+    model.artifact_info.archive_type = RAC_ARCHIVE_TYPE_TAR_GZ;
+    model.artifact_info.archive_structure = RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
+    model.artifact_info.expected_files = &expected;
+
+    rac_model_extraction_result_t result = {};
+    rac_result_t rc = rac_extract_model_archive_native(
+        archive_path.c_str(), dest_dir.c_str(), &model,
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", nullptr,
+        nullptr, nullptr, &result);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Archive extraction and model resolution should succeed");
+    ASSERT_EQ(result.archive_type, RAC_ARCHIVE_TYPE_TAR_GZ, "Archive type should be detected");
+    ASSERT_TRUE(result.extraction.files_extracted >= 2, "Should extract model and tokenizer");
+    ASSERT_TRUE(result.resolution.primary_model_path != nullptr,
+                "Resolved primary path should be populated");
+    ASSERT_TRUE(std::string(result.resolution.primary_model_path).find("bundle.gguf") !=
+                    std::string::npos,
+                "Resolved primary path should point to extracted GGUF");
+    rac_model_extraction_result_free(&result);
+    remove_dir(archive_dir);
+    remove_dir(dest_dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
 // Test: extraction creates destination directory
 // =============================================================================
 
@@ -825,6 +1057,13 @@ int main(int argc, char** argv) {
     // Extraction
     suite.add("extract_tar_gz", test_extract_tar_gz);
     suite.add("extract_zip", test_extract_zip);
+    suite.add("resolve_single_file_with_checksum", test_resolve_single_file_with_checksum);
+    suite.add("resolve_companion_files", test_resolve_companion_files);
+    suite.add("resolve_missing_required_optional_allowed",
+              test_resolve_missing_required_optional_allowed);
+    suite.add("resolve_file_descriptor_required", test_resolve_file_descriptor_required);
+    suite.add("resolve_checksum_mismatch", test_resolve_checksum_mismatch);
+    suite.add("extract_and_resolve_archive", test_extract_and_resolve_archive);
     suite.add("progress_callback", test_progress_callback_invoked);
     suite.add("extraction_result_stats", test_extraction_result_stats);
     suite.add("creates_dest_dir", test_creates_dest_dir);

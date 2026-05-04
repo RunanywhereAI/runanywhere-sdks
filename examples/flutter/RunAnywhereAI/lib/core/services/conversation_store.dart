@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:runanywhere/runanywhere.dart' show MessageRole;
 
 import 'package:runanywhere_ai/core/models/app_types.dart';
 

@@ -4,21 +4,20 @@ import 'dart:io';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
-/// Minimal Genie NPU backend FFI bindings.
+/// Minimal experimental Genie NPU backend FFI bindings.
 ///
 /// This is a **thin wrapper** that only provides:
 /// - `register()` - calls `rac_backend_genie_register()`
 /// - `unregister()` - calls `rac_backend_genie_unregister()`
 ///
-/// All other LLM operations (create, load, generate, etc.) are handled by
-/// the core SDK via `rac_llm_component_*` functions in RACommons.
+/// The public native shell exposes registration only. LLM operations remain
+/// backend-unavailable until SDK-backed native ops are built and registered.
 ///
 /// ## Architecture (matches Swift/Kotlin)
 ///
-/// The C++ backend (RABackendGenie) handles all business logic:
-/// - Service provider registration with the C++ service registry
-/// - Model loading and inference on Snapdragon NPU
-/// - Streaming generation
+/// The C++ backend shell handles registration with the C++ plugin registry.
+/// Model loading, inference, and streaming require native binaries built with
+/// the Qualcomm Genie SDK and real LLM ops.
 ///
 /// This Dart code just:
 /// 1. Calls `rac_backend_genie_register()` to register the backend
@@ -26,8 +25,8 @@ import 'package:runanywhere/native/platform_loader.dart';
 ///
 /// ## Platform Support
 ///
-/// Genie is Android/Snapdragon only. On iOS and other platforms,
-/// `checkAvailability()` always returns false.
+/// Genie is experimental and Android/Snapdragon only. On iOS and other
+/// platforms, `checkAvailability()` always returns false.
 class GenieBindings {
   final DynamicLibrary _lib;
 
@@ -37,7 +36,7 @@ class GenieBindings {
 
   /// Create bindings using the appropriate library for each platform.
   ///
-  /// - Android: Loads librac_backend_genie_jni.so separately
+  /// - Android: Loads Qualcomm Genie SDK-built librac_backend_genie_jni.so separately
   /// - iOS/other: Returns DynamicLibrary.executable() but symbols won't be found
   GenieBindings() : _lib = _loadLibrary() {
     _bindFunctions();
@@ -55,13 +54,13 @@ class GenieBindings {
 
   /// Load the Genie backend library.
   ///
-  /// On Android: Loads librac_backend_genie_jni.so or librunanywhere_genie.so
+  /// On Android: Loads a Qualcomm Genie SDK-built backend library
   /// On iOS/other: Returns DynamicLibrary.executable() (symbols won't be available)
   ///
   /// This is exposed as a static method so it can be used by [Genie.isAvailable].
   static DynamicLibrary loadBackendLibrary() {
     if (Platform.isAndroid) {
-      // On Android, the Genie backend is in a separate .so file.
+      // On Android, the experimental Genie backend is in a separate .so file.
       // We need to ensure librac_commons.so is loaded first (dependency).
       try {
         PlatformLoader.loadCommons();
@@ -85,7 +84,7 @@ class GenieBindings {
 
       // If backend library not found, throw an error
       throw ArgumentError(
-        'Could not load Genie backend library on Android. '
+        'Could not load Qualcomm Genie SDK-built backend library on Android. '
         'Tried: ${libraryNames.join(", ")}',
       );
     }
@@ -95,10 +94,10 @@ class GenieBindings {
     return PlatformLoader.loadCommons();
   }
 
-  /// Check if the Genie backend library can be loaded on this platform.
+  /// Check if the Genie backend library and registration symbol can be loaded.
   ///
-  /// Always returns false on non-Android platforms since Genie
-  /// is a Snapdragon NPU-only backend.
+  /// This is a loadability probe, not a guarantee that the router can select
+  /// Genie. The native capability check can still reject SDK-absent shells.
   static bool checkAvailability() {
     if (!Platform.isAndroid) {
       return false;
@@ -143,7 +142,7 @@ class GenieBindings {
     if (_register == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _register!();
+    return _register();
   }
 
   /// Unregister the Genie backend from C++ registry.
@@ -151,7 +150,7 @@ class GenieBindings {
     if (_unregister == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregister!();
+    return _unregister();
   }
 }
 

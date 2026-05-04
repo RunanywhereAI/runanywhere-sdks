@@ -4,12 +4,11 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import ai.runanywhere.proto.v1.ToolDefinition
+import ai.runanywhere.proto.v1.ToolParameter
+import ai.runanywhere.proto.v1.ToolParameterType
+import ai.runanywhere.proto.v1.ToolValue
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
-import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
-import com.runanywhere.sdk.public.extensions.LLM.ToolParameter
-import com.runanywhere.sdk.public.extensions.LLM.ToolParameterType
-import com.runanywhere.sdk.public.extensions.LLM.ToolValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -111,7 +110,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 listOf(
                                     ToolParameter(
                                         name = "location",
-                                        type = ToolParameterType.STRING,
+                                        type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
                                         description = "City name (e.g., 'San Francisco', 'London', 'Tokyo')",
                                         required = true,
                                     ),
@@ -119,7 +118,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             category = "Utility",
                         ),
                     executor = { args: Map<String, ToolValue> ->
-                        fetchWeather((args["location"] as? ToolValue.StringValue)?.value ?: "San Francisco")
+                        fetchWeather(args["location"]?.string_value ?: "San Francisco")
                     },
                 )
 
@@ -143,11 +142,11 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         val tz = TimeZone.getDefault()
 
                         mapOf(
-                            "datetime" to ToolValue.StringValue(dateFormatter.format(now)),
-                            "time" to ToolValue.StringValue(timeFormatter.format(now)),
-                            "timestamp" to ToolValue.StringValue(isoFormatter.format(now)),
-                            "timezone" to ToolValue.StringValue(tz.id),
-                            "utc_offset" to ToolValue.StringValue(tz.getDisplayName(false, TimeZone.SHORT)),
+                            "datetime" to ToolValue(string_value = dateFormatter.format(now)),
+                            "time" to ToolValue(string_value = timeFormatter.format(now)),
+                            "timestamp" to ToolValue(string_value = isoFormatter.format(now)),
+                            "timezone" to ToolValue(string_value = tz.id),
+                            "utc_offset" to ToolValue(string_value = tz.getDisplayName(false, TimeZone.SHORT)),
                         )
                     },
                 )
@@ -162,7 +161,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 listOf(
                                     ToolParameter(
                                         name = "expression",
-                                        type = ToolParameterType.STRING,
+                                        type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
                                         description = "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')",
                                         required = true,
                                     ),
@@ -171,14 +170,19 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         ),
                     executor = { args: Map<String, ToolValue> ->
                         val expression =
-                            (args["expression"] as? ToolValue.StringValue)?.value
-                                ?: (args["input"] as? ToolValue.StringValue)?.value
+                            args["expression"]?.string_value
+                                ?: args["input"]?.string_value
                                 ?: "0"
                         evaluateMathExpression(expression)
                     },
                 )
 
-                Timber.i("✅ Demo tools registered")
+                // B-AK-7-001: emit a single, easy-to-grep observability log
+                // line so QA can confirm the demo tools landed without
+                // scraping individual register lines.
+                val tools = RunAnywhereToolCalling.getRegisteredTools()
+                android.util.Log.i("ToolRegistry", "Registered ${tools.size} demo tools")
+                Timber.i("✅ Demo tools registered (count=${tools.size})")
                 refreshRegisteredTools()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to register demo tools")
@@ -207,12 +211,12 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
      * Detect the appropriate tool call format based on model name.
      * LFM2-Tool models use the lfm2 format, others use default JSON format.
      */
-    fun detectToolCallFormat(modelName: String?): ToolCallFormat {
-        val name = modelName?.lowercase() ?: return ToolCallFormat.Default
+    fun detectToolCallFormat(modelName: String?): String {
+        val name = modelName?.lowercase() ?: return "default"
         return if (name.contains("lfm2") && name.contains("tool")) {
-            ToolCallFormat.LFM2
+            "lfm2"
         } else {
-            ToolCallFormat.Default
+            "default"
         }
     }
 
@@ -241,8 +245,8 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
 
                     if (latMatch == null || lonMatch == null) {
                         return@withTimeout mapOf(
-                            "error" to ToolValue.StringValue("Location not found: $location"),
-                            "location" to ToolValue.StringValue(location),
+                            "error" to ToolValue(string_value = "Location not found: $location"),
+                            "location" to ToolValue(string_value = location),
                         )
                     }
 
@@ -279,31 +283,32 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         }
 
                     mapOf(
-                        "location" to ToolValue.StringValue(resolvedName),
-                        "temperature_celsius" to ToolValue.NumberValue(temperature),
-                        "temperature_fahrenheit" to ToolValue.NumberValue(temperature * 9 / 5 + 32),
-                        "humidity_percent" to ToolValue.NumberValue(humidity.toDouble()),
-                        "wind_speed_kmh" to ToolValue.NumberValue(windSpeed),
-                        "condition" to ToolValue.StringValue(condition),
+                        "location" to ToolValue(string_value = resolvedName),
+                        "temperature_celsius" to ToolValue(number_value = temperature),
+                        "temperature_fahrenheit" to ToolValue(number_value = temperature * 9 / 5 + 32),
+                        "humidity_percent" to ToolValue(number_value = humidity.toDouble()),
+                        "wind_speed_kmh" to ToolValue(number_value = windSpeed),
+                        "condition" to ToolValue(string_value = condition),
                     )
                 }
             } catch (e: TimeoutCancellationException) {
                 Timber.w("Weather API request timed out for location: $location")
                 mapOf(
-                    "error" to ToolValue.StringValue("Weather API request timed out. Please try again."),
-                    "location" to ToolValue.StringValue(location),
+                    "error" to ToolValue(string_value = "Weather API request timed out. Please try again."),
+                    "location" to ToolValue(string_value = location),
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Weather fetch failed")
                 mapOf(
-                    "error" to ToolValue.StringValue("Failed to fetch weather: ${e.message}"),
-                    "location" to ToolValue.StringValue(location),
+                    "error" to ToolValue(string_value = "Failed to fetch weather: ${e.message}"),
+                    "location" to ToolValue(string_value = location),
                 )
             }
         }
     }
 
     private fun fetchUrl(urlString: String): String {
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         val url = URL(urlString)
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
@@ -335,13 +340,13 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             val result = evaluateSimpleExpression(cleaned)
 
             mapOf(
-                "result" to ToolValue.NumberValue(result),
-                "expression" to ToolValue.StringValue(expression),
+                "result" to ToolValue(number_value = result),
+                "expression" to ToolValue(string_value = expression),
             )
         } catch (e: Exception) {
             mapOf(
-                "error" to ToolValue.StringValue("Could not evaluate expression: $expression"),
-                "expression" to ToolValue.StringValue(expression),
+                "error" to ToolValue(string_value = "Could not evaluate expression: $expression"),
+                "expression" to ToolValue(string_value = expression),
             )
         }
     }

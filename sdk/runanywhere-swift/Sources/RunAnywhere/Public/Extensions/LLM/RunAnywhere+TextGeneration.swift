@@ -6,6 +6,13 @@
 //  Calls C++ directly via CppBridge.LLM for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
+//  v2 close-out Phase G-2: the direct-C-callback streaming plumbing
+//  (`createTokenStream` + `LLMStreamCallbackContext` + `LLMStreamCallbacks`
+//  + `LLMStreamingMetricsCollector`) was DELETED from this file. The
+//  public `generateStream` now returns the proto-encoded event stream
+//  emitted by `LLMStreamAdapter` (which is the single C-callback
+//  registration path — no parallel hand-rolled shim remains).
+//
 
 import CRACommons
 import Foundation
@@ -14,7 +21,7 @@ import Foundation
 
 public extension RunAnywhere {
 
-    /// Simple text generation with automatic event publishing
+    /// Simple text generation with automatic event publishing.
     /// - Parameter prompt: The text prompt
     /// - Returns: Generated response (text only)
     static func chat(_ prompt: String) async throws -> String {
@@ -22,7 +29,7 @@ public extension RunAnywhere {
         return result.text
     }
 
-    /// Generate text with full metrics and analytics
+    /// Generate text with full metrics and analytics.
     /// - Parameters:
     ///   - prompt: The text prompt
     ///   - options: Generation options (optional)
@@ -32,514 +39,195 @@ public extension RunAnywhere {
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
+        let opts = options ?? LLMGenerationOptions()
+        var request = opts.toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = false
+        let result = try await generate(request)
+        return LLMGenerationResult(from: result)
+    }
+
+    /// Generate text through the generated-proto C++ LLM service ABI.
+    static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
-        // Get handle from CppBridge.LLM
-        let handle = try await CppBridge.LLM.shared.getHandle()
-
-        // Verify model is loaded
-        guard await CppBridge.LLM.shared.isLoaded else {
-            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+        guard await isModelLoaded else {
+            throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
-        let opts = options ?? LLMGenerationOptions()
-
-        let startTime = Date()
-
-        // Build C options
-        var cOptions = rac_llm_options_t()
-        cOptions.max_tokens = Int32(opts.maxTokens)
-        cOptions.temperature = opts.temperature
-        cOptions.top_p = opts.topP
-        cOptions.streaming_enabled = RAC_FALSE
-
-        let systemPromptDesc = opts.systemPrompt.map { "set(\($0.count) chars)" } ?? "nil"
+        let systemPromptDesc = request.systemPrompt.isEmpty ? "nil" : "set(\(request.systemPrompt.count) chars)"
         SDKLogger.llm.info(
-            "[PARAMS] generate: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), "
-            + "max_tokens=\(cOptions.max_tokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(cOptions.streaming_enabled == RAC_TRUE)"
+            "[PARAMS] generate: temperature=\(request.temperature), top_p=\(request.topP), "
+            + "max_tokens=\(request.maxTokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(request.streamingEnabled)"
         )
 
-        // Generate (C++ emits events) - wrap in system_prompt lifetime scope
-        var llmResult = rac_llm_result_t()
-        let generateResult: rac_result_t
-        if let systemPrompt = opts.systemPrompt {
-            generateResult = systemPrompt.withCString { sysPromptPtr in
-                cOptions.system_prompt = sysPromptPtr
-                return prompt.withCString { promptPtr in
-                    rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
-                }
-            }
-        } else {
-            cOptions.system_prompt = nil
-            generateResult = prompt.withCString { promptPtr in
-                rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
-            }
-        }
-
-        guard generateResult == RAC_SUCCESS else {
-            throw SDKError.llm(.generationFailed, "Generation failed: \(generateResult)")
-        }
-
-        let endTime = Date()
-        let totalTimeMs = endTime.timeIntervalSince(startTime) * 1000
-
-        // Extract result
-        let rawText: String
-        if let textPtr = llmResult.text {
-            rawText = String(cString: textPtr)
-        } else {
-            rawText = ""
-        }
-        let inputTokens = Int(llmResult.prompt_tokens)
-        let outputTokens = Int(llmResult.completion_tokens)
-        let tokensPerSecond = llmResult.tokens_per_second > 0 ? Double(llmResult.tokens_per_second) : 0
-
-        let (generatedText, thinkingContent) = ThinkingContentParser.extract(from: rawText)
-        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
-            totalCompletionTokens: outputTokens,
-            responseText: generatedText,
-            thinkingContent: thinkingContent
-        )
-
-        return LLMGenerationResult(
-            text: generatedText,
-            thinkingContent: thinkingContent,
-            inputTokens: inputTokens,
-            tokensUsed: outputTokens,
-            modelUsed: modelId,
-            latencyMs: totalTimeMs,
-            framework: "llamacpp",
-            tokensPerSecond: tokensPerSecond,
-            timeToFirstTokenMs: nil,
-            thinkingTokens: thinkingTokens,
-            responseTokens: responseTokens
-        )
+        return try await CppBridge.LLM.shared.generate(request)
     }
 
-    /// Streaming text generation with complete analytics
+    /// Streaming text generation using the Phase G-2 proto-byte event
+    /// stream. Returns an `AsyncStream<RALLMStreamEvent>` — one event per
+    /// generated token, plus a terminal event (`isFinal == true`) that
+    /// carries the `finish_reason` ("stop" / "length" / "cancelled" /
+    /// "error") and optional `error_message`.
     ///
-    /// Returns both a token stream for real-time display and a task that resolves to complete metrics.
+    /// Under the hood this delegates to [`LLMStreamAdapter`] which owns
+    /// the single `rac_llm_set_stream_proto_callback` registration for
+    /// the handle. There is no parallel hand-rolled streaming path; this
+    /// is the single C-callback-to-Swift path for LLM tokens.
     ///
-    /// Example usage:
+    /// Example:
     /// ```swift
-    /// let result = try await RunAnywhere.generateStream(prompt)
-    ///
-    /// // Display tokens in real-time
-    /// for try await token in result.stream {
-    ///     print(token, terminator: "")
+    /// let stream = try await RunAnywhere.generateStream(prompt)
+    /// for await event in stream {
+    ///     if event.isFinal { break }
+    ///     print(event.token, terminator: "")
     /// }
-    ///
-    /// // Get complete analytics after streaming finishes
-    /// let metrics = try await result.result.value
-    /// print("Speed: \(metrics.performanceMetrics.tokensPerSecond) tok/s")
-    /// print("Tokens: \(metrics.tokensUsed)")
-    /// print("Time: \(metrics.latencyMs)ms")
     /// ```
     ///
     /// - Parameters:
     ///   - prompt: The text prompt
     ///   - options: Generation options (optional)
-    /// - Returns: StreamingResult containing both the token stream and final metrics task
+    /// - Returns: `AsyncStream<RALLMStreamEvent>` of proto-decoded events.
     static func generateStream(
         _ prompt: String,
         options: LLMGenerationOptions? = nil
-    ) async throws -> LLMStreamingResult {
+    ) async throws -> AsyncStream<RALLMStreamEvent> {
+        let opts = options ?? LLMGenerationOptions(streamingEnabled: true)
+        var request = opts.toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = true
+        return try await generateStream(request)
+    }
+
+    /// Stream text generation through the generated-proto C++ LLM service ABI.
+    static func generateStream(_ request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
-        let handle = try await CppBridge.LLM.shared.getHandle()
-
-        guard await CppBridge.LLM.shared.isLoaded else {
-            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+        guard await isModelLoaded else {
+            throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
-        let opts = options ?? LLMGenerationOptions()
-
-        let collector = LLMStreamingMetricsCollector(modelId: modelId, promptLength: prompt.count)
-
-        var cOptions = rac_llm_options_t()
-        cOptions.max_tokens = Int32(opts.maxTokens)
-        cOptions.temperature = opts.temperature
-        cOptions.top_p = opts.topP
-        cOptions.streaming_enabled = RAC_TRUE
-
-        let systemPromptDesc = opts.systemPrompt.map { "set(\($0.count) chars)" } ?? "nil"
+        let systemPromptDesc = request.systemPrompt.isEmpty ? "nil" : "set(\(request.systemPrompt.count) chars)"
         SDKLogger.llm.info(
-            "[PARAMS] generateStream: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), "
-            + "max_tokens=\(cOptions.max_tokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(cOptions.streaming_enabled == RAC_TRUE)"
+            "[PARAMS] generateStream: temperature=\(request.temperature), top_p=\(request.topP), "
+            + "max_tokens=\(request.maxTokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(request.streamingEnabled)"
         )
 
-        let stream = createTokenStream(
-            prompt: prompt,
-            handle: handle,
-            options: cOptions,
-            collector: collector,
-            systemPrompt: opts.systemPrompt
-        )
-
-        let resultTask = Task<LLMGenerationResult, Error> {
-            try await collector.waitForResult()
-        }
-
-        return LLMStreamingResult(stream: stream, result: resultTask)
-    }
-
-    // MARK: - Private Streaming Helpers
-
-    private static func createTokenStream(
-        prompt: String,
-        handle: UnsafeMutableRawPointer,
-        options: rac_llm_options_t,
-        collector: LLMStreamingMetricsCollector,
-        systemPrompt: String? = nil
-    ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream<String, Error> { continuation in
-            Task {
-                await collector.markStart()
-
-                let context = LLMStreamCallbackContext(continuation: continuation, collector: collector)
-                // passRetained: context is released in completeCallback or errorCallback
-                let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-                let callbacks = LLMStreamCallbacks.create()
-                var cOptions = options
-
-                let callCFunction: () -> rac_result_t = {
-                    prompt.withCString { promptPtr in
-                        rac_llm_component_generate_stream(
-                            handle,
-                            promptPtr,
-                            &cOptions,
-                            callbacks.token,
-                            callbacks.complete,
-                            callbacks.error,
-                            contextPtr
-                        )
-                    }
-                }
-
-                let streamResult: rac_result_t
-                if let systemPrompt = systemPrompt {
-                    streamResult = systemPrompt.withCString { sysPtr in
-                        cOptions.system_prompt = sysPtr
-                        return callCFunction()
-                    }
-                } else {
-                    cOptions.system_prompt = nil
-                    streamResult = callCFunction()
-                }
-
-                if streamResult != RAC_SUCCESS {
-                    // NOTE: Do not release contextPtr here. The C++ layer always invokes
-                    // errorCallback before returning non-SUCCESS, and errorCallback consumes
-                    // the retained reference via takeRetainedValue(). Releasing here would
-                    // cause a double-release.
-                    let error = SDKError.llm(.generationFailed, "Stream generation failed: \(streamResult)")
-                    continuation.finish(throwing: error)
-                    await collector.markFailed(error)
-                }
-            }
-        }
-    }
-
-}
-
-// MARK: - Streaming Callbacks
-
-private enum LLMStreamCallbacks {
-    typealias TokenFn = rac_llm_component_token_callback_fn
-    typealias CompleteFn = rac_llm_component_complete_callback_fn
-    typealias ErrorFn = rac_llm_component_error_callback_fn
-
-    struct Callbacks {
-        let token: TokenFn
-        let complete: CompleteFn
-        let error: ErrorFn
-    }
-
-    static func create() -> Callbacks {
-        let tokenCallback: TokenFn = { tokenPtr, userData -> rac_bool_t in
-            // Cancellation is handled by an atomic flag in llm_component.cpp — no Swift Task
-            // context exists on this C callback thread, so Task.isCancelled would always be false.
-            guard let tokenPtr = tokenPtr, let userData = userData else { return RAC_TRUE }
-            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
-            let token = String(cString: tokenPtr)
-            Task {
-                await ctx.collector.recordToken(token)
-                ctx.continuation.yield(token)
-            }
-            return RAC_TRUE
-        }
-
-        let completeCallback: CompleteFn = { resultPtr, userData in
-            guard let userData = userData else { return }
-            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeRetainedValue()
-            ctx.continuation.finish()
-
-            if let result = resultPtr?.pointee {
-                Task {
-                    await ctx.collector.markCompleteWithMetrics(
-                        promptTokens: Int(result.prompt_tokens),
-                        completionTokens: Int(result.completion_tokens),
-                        tokensPerSecond: Double(result.tokens_per_second),
-                        timeToFirstTokenMs: Double(result.time_to_first_token_ms)
-                    )
-                }
-            } else {
-                Task { await ctx.collector.markComplete() }
-            }
-        }
-
-        let errorCallback: ErrorFn = { _, errorMsg, userData in
-            guard let userData = userData else { return }
-            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeRetainedValue()
-            let message = errorMsg.map { String(cString: $0) } ?? "Unknown error"
-            let error = SDKError.llm(.generationFailed, message)
-            ctx.continuation.finish(throwing: error)
-            Task { await ctx.collector.markFailed(error) }
-        }
-
-        return Callbacks(token: tokenCallback, complete: completeCallback, error: errorCallback)
+        return try await CppBridge.LLM.shared.generateStream(request)
     }
 }
 
-// MARK: - Streaming Callback Context
+// MARK: - Thinking Token Utilities (CANONICAL_API §3)
 
-private final class LLMStreamCallbackContext: @unchecked Sendable {
-    let continuation: AsyncThrowingStream<String, Error>.Continuation
-    let collector: LLMStreamingMetricsCollector
+public extension RunAnywhere {
 
-    init(continuation: AsyncThrowingStream<String, Error>.Continuation, collector: LLMStreamingMetricsCollector) {
-        self.continuation = continuation
-        self.collector = collector
-    }
-}
-
-// MARK: - Thinking Content Parser
-
-public enum ThinkingContentParser {
-    /// Extracts `<think>...</think>` content from generated text.
-    /// - NOTE: Only the first `<think>` block is extracted; additional blocks are left inline in the response text.
-    /// - Returns: Tuple of (responseText, thinkingContent). If no tags found, responseText = original text, thinkingContent = nil.
-    public static func extract(from text: String) -> (text: String, thinking: String?) {
-        guard let startRange = text.range(of: "<think>"),
-              let endRange = text.range(of: "</think>"),
-              startRange.upperBound <= endRange.lowerBound else {
-            return (text: text, thinking: nil)
-        }
-        let thinkingContent = String(text[startRange.upperBound..<endRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        // Include any text before <think> and after </think>
-        let textBefore = String(text[..<startRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let textAfter = String(text[endRange.upperBound...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let responseText = [textBefore, textAfter]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-        return (
-            text: responseText,
-            thinking: thinkingContent.isEmpty ? nil : thinkingContent
-        )
-    }
-
-    /// Apportions the total completion token count between the thinking segment
-    /// and the visible response segment using character-length ratios.
+    /// Extract `<think>…</think>` blocks from model output.
     ///
-    /// The C++ layer reports only a total `completion_tokens` count — it does
-    /// not break it down by segment. Rather than guessing with an independent
-    /// word-count heuristic (which would not sum to the reported total), we
-    /// split the known total proportionally by character length. This keeps
-    /// `thinkingTokens + responseTokens == totalCompletionTokens`.
+    /// Returns the text outside the block as `.text` and the thinking
+    /// content inside the block as `.thinking` (nil if no block found).
     ///
-    /// - Returns: `(thinkingTokens, responseTokens)`. If there is no thinking
-    ///   content, `thinkingTokens` is 0 and all tokens are attributed to the
-    ///   response.
-    public static func splitTokens(
-        totalCompletionTokens: Int,
-        responseText: String,
-        thinkingContent: String?
-    ) -> (thinkingTokens: Int, responseTokens: Int) {
-        guard let thinking = thinkingContent, !thinking.isEmpty else {
-            return (0, totalCompletionTokens)
-        }
-        let thinkingChars = thinking.count
-        let responseChars = responseText.count
-        let totalChars = thinkingChars + responseChars
-        guard totalChars > 0, totalCompletionTokens > 0 else {
-            return (0, totalCompletionTokens)
-        }
-        let thinkingTokens = Int(
-            (Double(thinkingChars) / Double(totalChars)) * Double(totalCompletionTokens)
-        )
-        let clamped = max(0, min(thinkingTokens, totalCompletionTokens))
-        return (clamped, totalCompletionTokens - clamped)
+    /// - Parameter text: Raw model output that may contain `<think>` blocks.
+    /// - Returns: `ThinkingExtractionResult` with `.text` and `.thinking`.
+    static func extractThinkingTokens(_ text: String) -> ThinkingExtractionResult {
+        let (responseText, thinkingContent) = ThinkingContentParser.extract(from: text)
+        return ThinkingExtractionResult(text: responseText, thinking: thinkingContent)
     }
 
-    /// Strips all `<think>...</think>` blocks (including multiple blocks) and trailing unclosed
-    /// `<think>` tags from the given text, returning only the response portion.
-    /// - Parameter text: Raw text potentially containing thinking blocks.
-    /// - Returns: Text with all thinking blocks removed, trimmed of surrounding whitespace.
-    public static func strip(from text: String) -> String {
-        var result = text
-        // Remove all complete <think>...</think> blocks
-        while let startRange = result.range(of: "<think>"),
-              let endRange = result.range(of: "</think>"),
-              startRange.upperBound <= endRange.lowerBound {
-            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
-        }
-        // Drop any trailing unclosed <think> ... (still streaming)
-        if let trailingStart = result.range(of: "<think>", options: .backwards),
-           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
-            result = String(result[result.startIndex..<trailingStart.lowerBound])
-        }
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Remove all `<think>…</think>` blocks (including unclosed trailing ones)
+    /// from model output.
+    ///
+    /// - Parameter text: Raw model output.
+    /// - Returns: Text with all thinking blocks removed.
+    static func stripThinkingTokens(_ text: String) -> String {
+        return ThinkingContentParser.strip(from: text)
+    }
+
+    /// Split model output into a `(thinking, response)` tuple.
+    ///
+    /// If no `<think>` block is found, `thinking` is empty and `response`
+    /// contains the full text.
+    ///
+    /// - Parameter text: Raw model output.
+    /// - Returns: Named tuple `(thinking: String, response: String)`.
+    static func splitThinkingAndResponse(_ text: String) -> (thinking: String, response: String) {
+        let (responseText, thinkingContent) = ThinkingContentParser.extract(from: text)
+        return (thinking: thinkingContent ?? "", response: responseText)
     }
 }
 
-// MARK: - Streaming Metrics Collector
+// MARK: - Structured Output Extraction (CANONICAL_API §3)
 
-/// Internal actor for collecting streaming metrics
-private actor LLMStreamingMetricsCollector {
-    private let modelId: String
-    private let promptLength: Int
+public extension RunAnywhere {
 
-    private var startTime: Date?
-    private var firstTokenTime: Date?
-    private var fullText = ""
-    private var tokenCount = 0
-    private var firstTokenRecorded = false
-    private var isComplete = false
-    private var error: Error?
-    private var resultContinuation: CheckedContinuation<LLMGenerationResult, Error>?
-
-    private var cppPromptTokens: Int?
-    private var cppCompletionTokens: Int?
-    private var cppTokensPerSecond: Double?
-    private var cppTimeToFirstTokenMs: Double?
-
-    init(modelId: String, promptLength: Int) {
-        self.modelId = modelId
-        self.promptLength = promptLength
-    }
-
-    func markStart() {
-        startTime = Date()
-    }
-
-    func recordToken(_ token: String) {
-        fullText += token
-        tokenCount += 1
-
-        if !firstTokenRecorded {
-            firstTokenRecorded = true
-            firstTokenTime = Date()
+    /// Extract structured output from a raw text string using a JSON schema.
+    ///
+    /// Delegates to the `rac_structured_output_extract_json` C ABI to find
+    /// and validate the JSON in `text`, then wraps the result in an
+    /// `RAStructuredOutputResult`.
+    ///
+    /// - Parameters:
+    ///   - text: Raw text (e.g. a previously-generated LLM response).
+    ///   - schema: The expected JSON schema (`RAJSONSchema` / `JSONSchema`).
+    /// - Returns: `RAStructuredOutputResult` with `rawOutput`, `jsonOutput`, and `validation`.
+    static func extractStructuredOutput(
+        text: String,
+        schema: RAJSONSchema
+    ) -> RAStructuredOutputResult {
+        var jsonPtr: UnsafeMutablePointer<CChar>?
+        let extractResult = text.withCString { textPtr in
+            rac_structured_output_extract_json(textPtr, &jsonPtr, nil)
         }
-    }
 
-    func markComplete() {
-        isComplete = true
-        if let continuation = resultContinuation {
-            continuation.resume(returning: buildResult())
-            resultContinuation = nil
-        }
-    }
+        var result = RAStructuredOutputResult()
+        result.rawText = text
 
-    func markCompleteWithMetrics(
-        promptTokens: Int,
-        completionTokens: Int,
-        tokensPerSecond: Double,
-        timeToFirstTokenMs: Double
-    ) {
-        if promptTokens > 0 { cppPromptTokens = promptTokens }
-        if completionTokens > 0 { cppCompletionTokens = completionTokens }
-        if tokensPerSecond > 0 { cppTokensPerSecond = tokensPerSecond }
-        if timeToFirstTokenMs > 0 { cppTimeToFirstTokenMs = timeToFirstTokenMs }
-
-        isComplete = true
-        if let continuation = resultContinuation {
-            continuation.resume(returning: buildResult())
-            resultContinuation = nil
-        }
-    }
-
-    func markFailed(_ error: Error) {
-        self.error = error
-        if let continuation = resultContinuation {
-            continuation.resume(throwing: error)
-            resultContinuation = nil
-        }
-    }
-
-    func waitForResult() async throws -> LLMGenerationResult {
-        if isComplete {
-            return buildResult()
-        }
-        if let error = error {
-            throw error
-        }
-        return try await withCheckedThrowingContinuation { continuation in
-            resultContinuation = continuation
-        }
-    }
-
-    private func buildResult() -> LLMGenerationResult {
-        let endTime = Date()
-        let latencyMs = (startTime.map { endTime.timeIntervalSince($0) } ?? 0) * 1000
-
-        let timeToFirstTokenMs: Double?
-        if let cppTtft = cppTimeToFirstTokenMs {
-            timeToFirstTokenMs = cppTtft
-        } else if let start = startTime, let firstToken = firstTokenTime {
-            timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
+        if extractResult == RAC_SUCCESS, let ptr = jsonPtr {
+            let jsonString = String(cString: ptr)
+            rac_free(ptr)
+            if let jsonData = jsonString.data(using: .utf8) {
+                result.parsedJson = jsonData
+            }
+            var validation = RAStructuredOutputValidation()
+            validation.isValid = true
+            validation.containsJson = true
+            result.validation = validation
         } else {
-            timeToFirstTokenMs = nil
+            var validation = RAStructuredOutputValidation()
+            validation.isValid = false
+            validation.containsJson = false
+            validation.errorMessage = "No valid JSON found in the response"
+            result.validation = validation
         }
-
-        let outputTokens = cppCompletionTokens ?? max(1, tokenCount)
-        // Fallback: if backend didn't report prompt tokens, estimate from prompt
-        // character length (~4 chars per token) rather than reporting 0.
-        let estimatedPromptTokens = promptLength > 0 ? max(1, promptLength / 4) : 0
-        let inputTokens = cppPromptTokens ?? estimatedPromptTokens
-
-        let tokensPerSecond: Double
-        if let cppTps = cppTokensPerSecond {
-            tokensPerSecond = cppTps
-        } else {
-            let totalTimeSec = latencyMs / 1000.0
-            tokensPerSecond = totalTimeSec > 0 ? Double(outputTokens) / totalTimeSec : 0
-        }
-
-        let (responseText, thinkingContent) = ThinkingContentParser.extract(from: fullText)
-        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
-            totalCompletionTokens: outputTokens,
-            responseText: responseText,
-            thinkingContent: thinkingContent
-        )
-
-        return LLMGenerationResult(
-            text: responseText,
-            thinkingContent: thinkingContent,
-            inputTokens: inputTokens,
-            tokensUsed: outputTokens,
-            modelUsed: modelId,
-            latencyMs: latencyMs,
-            framework: "llamacpp",
-            tokensPerSecond: tokensPerSecond,
-            timeToFirstTokenMs: timeToFirstTokenMs,
-            thinkingTokens: thinkingTokens,
-            responseTokens: responseTokens
-        )
+        return result
     }
 }
+
+// MARK: - ThinkingExtractionResult
+
+/// Result of extracting thinking tokens from model output.
+public struct ThinkingExtractionResult: Sendable {
+    /// The response text with thinking blocks removed.
+    public let text: String
+    /// The extracted thinking content, or nil if no `<think>` block was found.
+    public let thinking: String?
+
+    public init(text: String, thinking: String?) {
+        self.text = text
+        self.thinking = thinking
+    }
+}
+
+// v2 close-out Phase 9 (P2-4): the in-Swift `ThinkingContentParser` enum
+// was deleted from this file (~80 LOC). The replacement, with the same
+// public API and byte-equivalent behavior, lives in
+// `Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+LLMThinking.swift`
+// and delegates to the `rac_llm_*` C ABI in
+// `rac/features/llm/rac_llm_thinking.h`.

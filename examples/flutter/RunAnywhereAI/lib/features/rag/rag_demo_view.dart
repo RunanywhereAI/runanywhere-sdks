@@ -11,7 +11,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/public/types/rag_types.dart';
+import 'package:runanywhere/generated/rag.pb.dart';
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -42,8 +42,8 @@ class _RagDemoViewState extends State<RagDemoView> {
   // MARK: - Computed
 
   bool get _areModelsReady =>
-      _selectedEmbeddingModel?.localPath != null &&
-      _selectedLLMModel?.localPath != null;
+      (_selectedEmbeddingModel?.localPath.isNotEmpty ?? false) &&
+      (_selectedLLMModel?.localPath.isNotEmpty ?? false);
 
   // MARK: - Lifecycle
 
@@ -94,46 +94,27 @@ class _RagDemoViewState extends State<RagDemoView> {
       return localPath;
     }
     final dir = Directory(localPath);
-    final ggufFile = dir
-        .listSync()
-        .whereType<File>()
-        .firstWhere(
+    final ggufFile = dir.listSync().whereType<File>().firstWhere(
           (f) => f.path.toLowerCase().endsWith('.gguf'),
           orElse: () => File(localPath),
         );
     return ggufFile.path;
   }
 
-  /// Resolve the vocab.txt path for the embedding model.
-  ///
-  /// For multi-file models (directory) vocab.txt is inside the directory.
-  /// For single-file models vocab.txt is a sibling file.
-  String? _resolveVocabPath(ModelInfo embeddingModel) {
-    final localPath = embeddingModel.localPath;
-    if (localPath == null) return null;
-
-    if (Directory(localPath).existsSync()) {
-      return '$localPath/vocab.txt';
-    }
-    // Single-file: sibling vocab.txt
-    final parent = File(localPath).parent.path;
-    return '$parent/vocab.txt';
-  }
-
   /// Build a [RAGConfiguration] from selected models with resolved paths.
   RAGConfiguration? _buildRagConfig() {
     final embeddingPath = _selectedEmbeddingModel?.localPath;
     final llmPath = _selectedLLMModel?.localPath;
-    if (embeddingPath == null || llmPath == null) return null;
-
-    final vocabPath = _resolveVocabPath(_selectedEmbeddingModel!);
-    final embeddingConfigJson =
-        vocabPath != null ? '{"vocab_path":"$vocabPath"}' : null;
+    if (embeddingPath == null ||
+        embeddingPath.isEmpty ||
+        llmPath == null ||
+        llmPath.isEmpty) {
+      return null;
+    }
 
     return RAGConfiguration(
       embeddingModelPath: _resolveEmbeddingFilePath(embeddingPath),
       llmModelPath: _resolveLLMFilePath(llmPath),
-      embeddingConfigJSON: embeddingConfigJson,
     );
   }
 
@@ -442,8 +423,7 @@ class _RagDemoViewState extends State<RagDemoView> {
       ),
       decoration: BoxDecoration(
         color: AppColors.primaryRed.withValues(alpha: 0.1),
-        borderRadius:
-            BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
       ),
       child: Row(
         children: [
@@ -711,8 +691,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
                       styleSheet: MarkdownStyleSheet(
                         p: AppTypography.body(context),
                         code: AppTypography.monospaced.copyWith(
-                          backgroundColor:
-                              AppColors.backgroundGray6(context),
+                          backgroundColor: AppColors.backgroundGray6(context),
                         ),
                       ),
                     ),
@@ -734,9 +713,10 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
   }
 
   Widget _buildTimingMetrics(BuildContext context, RAGResult result) {
-    final retrievalMs = result.retrievalTimeMs.round();
-    final generationS = (result.generationTimeMs / 1000).toStringAsFixed(1);
-    final totalS = (result.totalTimeMs / 1000).toStringAsFixed(1);
+    final retrievalMs = result.retrievalTimeMs.toInt();
+    final generationS =
+        (result.generationTimeMs.toInt() / 1000).toStringAsFixed(1);
+    final totalS = (result.totalTimeMs.toInt() / 1000).toStringAsFixed(1);
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xSmall),
@@ -770,7 +750,9 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
                 ),
                 const SizedBox(width: AppSpacing.xSmall),
                 Text(
-                  _showChunks ? 'Hide chunks' : 'Show $count chunk${count == 1 ? '' : 's'}',
+                  _showChunks
+                      ? 'Hide chunks'
+                      : 'Show $count chunk${count == 1 ? '' : 's'}',
                   style: AppTypography.caption(context).copyWith(
                     color: AppColors.primaryAccent,
                   ),
@@ -803,16 +785,14 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     final snippet = chunk.text.length > maxSnippetLength
         ? '${chunk.text.substring(0, maxSnippetLength)}...'
         : chunk.text;
-    final scorePercent =
-        (chunk.similarityScore * 100).toStringAsFixed(1);
+    final scorePercent = (chunk.similarityScore * 100).toStringAsFixed(1);
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.xSmall),
       padding: const EdgeInsets.all(AppSpacing.smallMedium),
       decoration: BoxDecoration(
         color: AppColors.backgroundGray6(context),
-        borderRadius:
-            BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
         border: Border.all(
           color: AppColors.borderMedium,
         ),
@@ -831,8 +811,8 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.badgeBlue,
-                  borderRadius: BorderRadius.circular(
-                      AppSpacing.cornerRadiusSmall),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cornerRadiusSmall),
                 ),
                 child: Text(
                   '$scorePercent%',

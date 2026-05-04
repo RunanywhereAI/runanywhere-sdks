@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.models
 
+import com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe
 import java.net.NetworkInterface
 import java.security.MessageDigest
 import java.util.UUID
@@ -54,9 +55,10 @@ private fun collectAndroidDeviceInfo(): DeviceInfo {
                 "unknown"
             }
 
-        val runtime = Runtime.getRuntime()
-        val totalMemory = runtime.maxMemory()
-        val processorCount = runtime.availableProcessors()
+        // G-DV20: Use physical device RAM, not the JVM heap cap. On Android
+        // `Runtime.maxMemory()` defaults to ~512 MB regardless of device RAM.
+        val totalMemory = PhysicalMemoryProbe.totalPhysicalMemoryBytes()
+        val processorCount = Runtime.getRuntime().availableProcessors()
 
         DeviceInfo(
             deviceId = generateDeviceId(),
@@ -92,9 +94,11 @@ private fun collectJvmDeviceInfo(): DeviceInfo {
             else -> "JVM"
         }
 
-    val runtime = Runtime.getRuntime()
-    val totalMemory = runtime.maxMemory()
-    val processorCount = runtime.availableProcessors()
+    // Prefer physical RAM (via /proc/meminfo on Linux, ActivityManager on Android)
+    // over JVM heap cap. Falls back to Runtime.maxMemory() on platforms like
+    // macOS/Windows where neither probe is available.
+    val totalMemory = PhysicalMemoryProbe.totalPhysicalMemoryBytes()
+    val processorCount = Runtime.getRuntime().availableProcessors()
 
     return DeviceInfo(
         deviceId = generateDeviceId(),

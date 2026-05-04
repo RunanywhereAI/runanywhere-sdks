@@ -14,7 +14,7 @@
  * The sherpa-onnx module is lazy-loaded on first use of STT/TTS/VAD.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { SDKException, SDKErrorCode, SDKLogger, HTTPAdapter } from '@runanywhere/web';
 
 const logger = new SDKLogger('SherpaONNX');
 
@@ -100,6 +100,81 @@ interface SherpaFS {
   analyzePath: (path: string) => { exists: boolean };
 }
 
+type SherpaCreateModule = (options: Record<string, unknown>) => SherpaONNXModule | Promise<SherpaONNXModule>;
+
+const BROWSER_PATH_FS_SHIM =
+  'var PATH_FS={resolve:(...paths)=>PATH.normalize([FS.cwd(),...paths].filter(Boolean).join("/")),relative:(from,to)=>{from=PATH.normalize(from||FS.cwd());to=PATH.normalize(to||FS.cwd());var f=from.split("/").filter(Boolean);var t=to.split("/").filter(Boolean);while(f.length&&t.length&&f[0]===t[0]){f.shift();t.shift()}return f.map(() => "..").concat(t).join("/")||"."}};';
+
+function patchSherpaGlueForBrowser(source: string): string {
+  let patched = source;
+
+  patched = patched.replace(/var ENVIRONMENT_IS_NODE=[^;]+;/, 'var ENVIRONMENT_IS_NODE=false;');
+  patched = patched.replace(
+    /var nodeTTY=require\(["']node:tty["']\);/g,
+    'var nodeTTY={isatty:function(){return false}};',
+  );
+  patched = patched.replace(
+    /var PATH_FS=\{resolve:\(\.\.\.paths\)=>\{paths\.unshift\(FS\.cwd\(\)\);return nodePath\.posix\.resolve\(\.\.\.paths\)\},relative:\(from,to\)=>nodePath\.posix\.relative\(from\|\|FS\.cwd\(\),to\|\|FS\.cwd\(\)\)\};/g,
+    BROWSER_PATH_FS_SHIM,
+  );
+  patched = patched.replace(
+    /var VFS=\{\.\.\.FS\};for\(const\[key,value\]of Object\.entries\(NODERAWFS\)\)\{FS\[key\]=_wrapNodeError\(value\)\}for\(const\[key,value\]of Object\.entries\(NODERAWFS_stream_funcs\)\)\{FS\[key\]=_wrapNodeStreamFunc\(value,FS\[key\]\)\}/g,
+    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+  );
+  patched = patched.replace(
+    /var VFS=\{\.\.\.FS\};for\(var _key in NODERAWFS\)\{FS\[_key\]=_wrapNodeError\(NODERAWFS\[_key\]\)\}/g,
+    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+  );
+
+  if (!/\bexport\s+default\s+Module\b/.test(patched)) {
+    patched += '\nexport default Module;\n';
+  }
+
+  return patched;
+}
+
+function coerceSherpaCreateModule(moduleNamespace: unknown): SherpaCreateModule {
+  if (typeof moduleNamespace === 'function') {
+    return moduleNamespace as SherpaCreateModule;
+  }
+
+  const namespace = moduleNamespace as Record<string, unknown>;
+  const candidate = namespace.default ?? namespace.Module;
+  if (typeof candidate !== 'function') {
+    throw new Error('sherpa-onnx-glue.js did not export a module factory');
+  }
+
+  return candidate as SherpaCreateModule;
+}
+
+async function importSherpaGlue(moduleUrl: string): Promise<SherpaCreateModule> {
+  const canPatchBrowserModule =
+    typeof window !== 'undefined' &&
+    typeof Blob !== 'undefined' &&
+    typeof URL !== 'undefined' &&
+    typeof fetch !== 'undefined';
+
+  if (!canPatchBrowserModule) {
+    const imported = await import(/* @vite-ignore */ moduleUrl);
+    return coerceSherpaCreateModule(imported);
+  }
+
+  const response = await fetch(moduleUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sherpa-onnx-glue.js: ${response.status} ${response.statusText}`);
+  }
+
+  const patchedSource = patchSherpaGlueForBrowser(await response.text());
+  const objectUrl = URL.createObjectURL(new Blob([patchedSource], { type: 'text/javascript' }));
+
+  try {
+    const imported = await import(/* @vite-ignore */ objectUrl);
+    return coerceSherpaCreateModule(imported);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SherpaONNXBridge
 // ---------------------------------------------------------------------------
@@ -155,7 +230,7 @@ export class SherpaONNXBridge {
 
   get module(): SherpaONNXModule {
     if (!this._module) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMNotLoaded,
         'Sherpa-ONNX WASM not loaded. Call ensureLoaded() first.',
       );
@@ -180,8 +255,11 @@ export class SherpaONNXBridge {
     }
 
     this._loading = this._doLoad(wasmUrl);
-    await this._loading;
-    this._loading = null;
+    try {
+      await this._loading;
+    } finally {
+      this._loading = null;
+    }
   }
 
   private async _doLoad(wasmUrl?: string): Promise<void> {
@@ -189,16 +267,17 @@ export class SherpaONNXBridge {
 
     try {
       const moduleUrl = wasmUrl ?? this.wasmUrl ?? new URL('../../wasm/sherpa/sherpa-onnx-glue.js', import.meta.url).href;
-      const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
+      const createModule = await importSherpaGlue(moduleUrl);
 
       // Derive the base URL for the .wasm binary
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
       const wasmBinaryUrl = baseUrl + 'sherpa-onnx.wasm';
 
       // Pre-fetch the WASM binary to avoid Emscripten's sync XHR
-      // (the Node.js-targeted build uses sync fetch which fails in browsers)
+      // (the Node.js-targeted build uses sync browser loading that fails here).
       logger.info(`Fetching sherpa-onnx WASM binary from ${wasmBinaryUrl}`);
-      const wasmResponse = await fetch(wasmBinaryUrl);
+      // HTTP_FETCH_CARVE_OUTS.bootstrapOnly: the WASM binary is required before any Sherpa module exists.
+      const wasmResponse = await fetch(wasmBinaryUrl); // fetch() carve-out: bootstrap-only WASM binary.
       if (!wasmResponse.ok) {
         throw new Error(`Failed to fetch sherpa-onnx.wasm: ${wasmResponse.status} ${wasmResponse.statusText}`);
       }
@@ -291,7 +370,7 @@ export class SherpaONNXBridge {
       this._loaded = false;
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load Sherpa-ONNX WASM: ${message}`);
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.WASMLoadFailed,
         `Failed to load Sherpa-ONNX WASM module: ${message}. ` +
         'Build with: ./wasm/scripts/build-sherpa-onnx.sh',
@@ -344,7 +423,7 @@ export class SherpaONNXBridge {
       };
     }
 
-    throw new SDKError(SDKErrorCode.WASMNotLoaded, 'Sherpa-ONNX FS not available');
+    throw new SDKException(SDKErrorCode.WASMNotLoaded, 'Sherpa-ONNX FS not available');
   }
 
   /**
@@ -416,6 +495,15 @@ export class SherpaONNXBridge {
 
   /**
    * Download a file from a URL and write it to the sherpa-onnx FS.
+   *
+   * Transport selection (T3.13):
+   *   1. If any backend has registered an HTTPAdapter default module
+   *      (typically `@runanywhere/web-llamacpp`), stream through the
+   *      commons libcurl C ABI for parity with the other SDKs.
+   *   2. Otherwise fall back to browser fetch — unavoidable when
+   *      the consumer only uses `@runanywhere/web-onnx` and no other
+   *      backend has loaded. Sherpa's own WASM does NOT ship the
+   *      `rac_http_*` exports, so we can't route through its module.
    */
   async downloadAndWrite(
     url: string,
@@ -424,9 +512,31 @@ export class SherpaONNXBridge {
   ): Promise<void> {
     logger.info(`Downloading ${url} -> ${fsPath}`);
 
-    const response = await fetch(url);
+    const http = HTTPAdapter.tryDefault();
+    if (http) {
+      const chunks: Uint8Array[] = [];
+      let loaded = 0;
+      let declaredTotal = 0;
+      await http.stream({ url }, (chunk, totalWritten, contentLength) => {
+        chunks.push(chunk);
+        loaded = totalWritten;
+        if (contentLength > 0) declaredTotal = contentLength;
+        onProgress?.(loaded, declaredTotal);
+      });
+      const combined = new Uint8Array(loaded);
+      let offset = 0;
+      for (const c of chunks) {
+        combined.set(c, offset);
+        offset += c.length;
+      }
+      this.writeFile(fsPath, combined);
+      return;
+    }
+
+    // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: ONNX-only consumers may not load a commons HTTP module.
+    const response = await fetch(url); // fetch() carve-out: fallback when no WASM module registered.
     if (!response.ok) {
-      throw new SDKError(
+      throw new SDKException(
         SDKErrorCode.NetworkError,
         `Failed to download ${url}: ${response.status} ${response.statusText}`,
       );
@@ -436,13 +546,11 @@ export class SherpaONNXBridge {
     const reader = response.body?.getReader();
 
     if (!reader) {
-      // Fallback: read all at once
       const buffer = await response.arrayBuffer();
       this.writeFile(fsPath, new Uint8Array(buffer));
       return;
     }
 
-    // Stream download with progress
     const chunks: Uint8Array[] = [];
     let loaded = 0;
 
@@ -454,7 +562,6 @@ export class SherpaONNXBridge {
       onProgress?.(loaded, contentLength);
     }
 
-    // Combine chunks
     const combined = new Uint8Array(loaded);
     let offset = 0;
     for (const chunk of chunks) {

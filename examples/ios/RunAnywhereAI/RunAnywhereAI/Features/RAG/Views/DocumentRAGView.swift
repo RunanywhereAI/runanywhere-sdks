@@ -98,7 +98,7 @@ struct DocumentRAGView: View {
             .background(AppColors.backgroundGrouped)
             .navigationTitle("Document Q&A")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
         }
         #if os(iOS)

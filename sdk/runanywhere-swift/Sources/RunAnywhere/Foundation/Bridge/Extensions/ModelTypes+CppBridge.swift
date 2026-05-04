@@ -15,24 +15,16 @@ extension ModelCategory {
     /// Convert to C++ model category type
     func toC() -> rac_model_category_t {
         switch self {
-        case .language:
-            return RAC_MODEL_CATEGORY_LANGUAGE
-        case .speechRecognition:
-            return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
-        case .speechSynthesis:
-            return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-        case .vision:
-            return RAC_MODEL_CATEGORY_VISION
-        case .imageGeneration:
-            return RAC_MODEL_CATEGORY_IMAGE_GENERATION
-        case .multimodal:
-            return RAC_MODEL_CATEGORY_MULTIMODAL
-        case .audio:
-            return RAC_MODEL_CATEGORY_AUDIO
-        case .embedding:
-            return RAC_MODEL_CATEGORY_EMBEDDING
-        case .voiceActivityDetection:
-            return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+        case .language:                 return RAC_MODEL_CATEGORY_LANGUAGE
+        case .speechRecognition:        return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
+        case .speechSynthesis:          return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
+        case .vision:                   return RAC_MODEL_CATEGORY_VISION
+        case .imageGeneration:          return RAC_MODEL_CATEGORY_IMAGE_GENERATION
+        case .multimodal:               return RAC_MODEL_CATEGORY_MULTIMODAL
+        case .audio:                    return RAC_MODEL_CATEGORY_AUDIO
+        case .embedding:                return RAC_MODEL_CATEGORY_EMBEDDING
+        case .voiceActivityDetection:   return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+        default:                        return RAC_MODEL_CATEGORY_UNKNOWN
         }
     }
 
@@ -58,7 +50,7 @@ extension ModelCategory {
         case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
             self = .voiceActivityDetection
         default:
-            self = .language  // Default fallback
+            self = .unspecified
         }
     }
 }
@@ -69,18 +61,15 @@ extension ModelFormat {
     /// Convert to C++ model format type
     func toC() -> rac_model_format_t {
         switch self {
-        case .onnx:
-            return RAC_MODEL_FORMAT_ONNX
-        case .ort:
-            return RAC_MODEL_FORMAT_ORT
-        case .gguf:
-            return RAC_MODEL_FORMAT_GGUF
-        case .bin:
-            return RAC_MODEL_FORMAT_BIN
-        case .coreml:
+        case .onnx:     return RAC_MODEL_FORMAT_ONNX
+        case .ort:      return RAC_MODEL_FORMAT_ORT
+        case .gguf:     return RAC_MODEL_FORMAT_GGUF
+        case .bin:      return RAC_MODEL_FORMAT_BIN
+        case .coreml, .mlmodel, .mlpackage:
             return RAC_MODEL_FORMAT_COREML
-        case .unknown:
-            return RAC_MODEL_FORMAT_UNKNOWN
+        case .qnnContext:
+            return RAC_MODEL_FORMAT_QNN_CONTEXT
+        default:        return RAC_MODEL_FORMAT_UNKNOWN
         }
     }
 
@@ -97,6 +86,8 @@ extension ModelFormat {
             self = .bin
         case RAC_MODEL_FORMAT_COREML:
             self = .coreml
+        case RAC_MODEL_FORMAT_QNN_CONTEXT:
+            self = .qnnContext
         default:
             self = .unknown
         }
@@ -106,64 +97,14 @@ extension ModelFormat {
 // MARK: - InferenceFramework C++ Conversion
 
 extension InferenceFramework {
-    /// Convert to C++ inference framework type
-    func toC() -> rac_inference_framework_t {
-        switch self {
-        case .onnx:
-            return RAC_FRAMEWORK_ONNX
-        case .llamaCpp:
-            return RAC_FRAMEWORK_LLAMACPP
-        case .foundationModels:
-            return RAC_FRAMEWORK_FOUNDATION_MODELS
-        case .systemTTS:
-            return RAC_FRAMEWORK_SYSTEM_TTS
-        case .fluidAudio:
-            return RAC_FRAMEWORK_FLUID_AUDIO
-        case .coreml:
-            return RAC_FRAMEWORK_COREML
-        case .mlx:
-            return RAC_FRAMEWORK_MLX
-        case .whisperKitCoreML:
-            return RAC_FRAMEWORK_WHISPERKIT_COREML
-        case .metalrt:
-            return RAC_FRAMEWORK_METALRT
-        case .builtIn:
-            return RAC_FRAMEWORK_BUILTIN
-        case .none:
-            return RAC_FRAMEWORK_NONE
-        case .unknown:
-            return RAC_FRAMEWORK_UNKNOWN
-        }
-    }
+    /// Convert to C++ inference framework type.
+    /// Delegates to the shared `toCFramework()` defined in `ModelTypes.swift`.
+    func toC() -> rac_inference_framework_t { toCFramework() }
 
-    /// Initialize from C++ inference framework type
+    /// Initialize from C++ inference framework type.
+    /// Delegates to the shared `fromCFramework(_:)` defined in `ModelTypes.swift`.
     init(from cFramework: rac_inference_framework_t) {
-        switch cFramework {
-        case RAC_FRAMEWORK_ONNX:
-            self = .onnx
-        case RAC_FRAMEWORK_LLAMACPP:
-            self = .llamaCpp
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:
-            self = .foundationModels
-        case RAC_FRAMEWORK_SYSTEM_TTS:
-            self = .systemTTS
-        case RAC_FRAMEWORK_FLUID_AUDIO:
-            self = .fluidAudio
-        case RAC_FRAMEWORK_COREML:
-            self = .coreml
-        case RAC_FRAMEWORK_MLX:
-            self = .mlx
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            self = .whisperKitCoreML
-        case RAC_FRAMEWORK_METALRT:
-            self = .metalrt
-        case RAC_FRAMEWORK_BUILTIN:
-            self = .builtIn
-        case RAC_FRAMEWORK_NONE:
-            self = .none
-        default:
-            self = .unknown
-        }
+        self = InferenceFramework.fromCFramework(cFramework)
     }
 }
 
@@ -238,22 +179,18 @@ extension ModelSource {
     /// Convert to C++ model source type
     func toC() -> rac_model_source_t {
         switch self {
-        case .remote:
-            return RAC_MODEL_SOURCE_REMOTE
-        case .local:
-            return RAC_MODEL_SOURCE_LOCAL
+        case .remote:   return RAC_MODEL_SOURCE_REMOTE
+        case .local:    return RAC_MODEL_SOURCE_LOCAL
+        default:        return RAC_MODEL_SOURCE_LOCAL
         }
     }
 
     /// Initialize from C++ model source type
     init(from cSource: rac_model_source_t) {
         switch cSource {
-        case RAC_MODEL_SOURCE_REMOTE:
-            self = .remote
-        case RAC_MODEL_SOURCE_LOCAL:
-            self = .local
-        default:
-            self = .local
+        case RAC_MODEL_SOURCE_REMOTE:   self = .remote
+        case RAC_MODEL_SOURCE_LOCAL:    self = .local
+        default:                        self = .local
         }
     }
 }
@@ -340,8 +277,8 @@ extension DownloadStage {
 // MARK: - DownloadState C++ Conversion
 
 extension DownloadState {
-    /// Initialize from C++ download state and progress
-    init(from cState: rac_download_state_t, cProgress: rac_download_progress_t) {
+    /// Initialize from C++ download state.
+    init(from cState: rac_download_state_t) {
         switch cState {
         case RAC_DOWNLOAD_STATE_PENDING:
             self = .pending
@@ -350,12 +287,11 @@ extension DownloadState {
         case RAC_DOWNLOAD_STATE_EXTRACTING:
             self = .extracting
         case RAC_DOWNLOAD_STATE_RETRYING:
-            self = .retrying(attempt: Int(cProgress.retry_attempt))
+            self = .retrying
         case RAC_DOWNLOAD_STATE_COMPLETED:
             self = .completed
         case RAC_DOWNLOAD_STATE_FAILED:
-            let errorMessage = cProgress.error_message.map { String(cString: $0) } ?? "Download failed"
-            self = .failed(SDKError.download(.downloadFailed, errorMessage))
+            self = .failed
         case RAC_DOWNLOAD_STATE_CANCELLED:
             self = .cancelled
         default:
@@ -369,14 +305,17 @@ extension DownloadState {
 extension DownloadProgress {
     /// Initialize from C++ download progress struct
     init(from cProgress: rac_download_progress_t) {
-        self.init(
-            stage: DownloadStage(from: cProgress.stage),
-            bytesDownloaded: cProgress.bytes_downloaded,
-            totalBytes: cProgress.total_bytes,
-            stageProgress: cProgress.stage_progress,
-            speed: cProgress.speed > 0 ? cProgress.speed : nil,
-            estimatedTimeRemaining: cProgress.estimated_time_remaining >= 0 ? cProgress.estimated_time_remaining : nil,
-            state: DownloadState(from: cProgress.state, cProgress: cProgress)
-        )
+        self.init()
+        self.stage = DownloadStage(from: cProgress.stage)
+        self.state = DownloadState(from: cProgress.state)
+        self.bytesDownloaded = cProgress.bytes_downloaded
+        self.totalBytes = cProgress.total_bytes
+        self.stageProgress = Float(cProgress.stage_progress)
+        self.overallSpeedBps = cProgress.speed > 0 ? Float(cProgress.speed) : 0
+        self.etaSeconds = cProgress.estimated_time_remaining >= 0 ? Int64(cProgress.estimated_time_remaining) : -1
+        self.retryAttempt = cProgress.retry_attempt
+        if let errMsg = cProgress.error_message.map({ String(cString: $0) }) {
+            self.errorMessage = errMsg
+        }
     }
 }

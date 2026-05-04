@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -128,15 +128,18 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Loading STT model: ${model.name}');
 
-      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
-      await sdk.RunAnywhere.loadSTTModel(model.id);
+      // Load STT model via v4 capability API.
+      await sdk.RunAnywhereSDK.instance.stt.load(model.id);
 
       setState(() {
-        _selectedFramework =
-            model.preferredFramework ?? LLMFramework.whisperKit;
+        _selectedFramework = model.preferredFramework;
         _selectedModelName = model.name;
-        // WhisperKit supports live mode, ONNX may have limitations
-        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit;
+        // B-FL-11-001: Sherpa-ONNX supports
+        // streaming transcription via its zipformer/RNN-T runtime. Allow
+        // Live mode for both WhisperKit and ONNX-backed STT models.
+        _supportsLiveMode = model.preferredFramework ==
+                LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN ||
+            model.preferredFramework == LLMFramework.INFERENCE_FRAMEWORK_ONNX;
         _isProcessing = false;
       });
 
@@ -147,6 +150,17 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
         _errorMessage = 'Failed to load model: $e';
         _isProcessing = false;
       });
+      // B-FL-10-002 / B-FL-12-002: surface load failures via SnackBar so the user
+      // sees them even if the inline error text is below the fold or behind a
+      // sheet animation.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('STT load failed: $e'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 
@@ -236,22 +250,21 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Check if STT model is loaded via SDK (matches Swift: RunAnywhere.isSTTModelLoaded)
-      if (!sdk.RunAnywhere.isSTTModelLoaded) {
+      if (!sdk.RunAnywhereSDK.instance.stt.isLoaded) {
         throw Exception(
             'STT component not loaded. Please load an STT model first.');
       }
 
-      // Call SDK transcription API (matches Swift: RunAnywhere.transcribe(_:))
       final audioBytes = Uint8List.fromList(audioData);
-      final transcribedText = await sdk.RunAnywhere.transcribe(audioBytes);
+      final result =
+          await sdk.RunAnywhereSDK.instance.stt.transcribe(audioBytes);
 
       setState(() {
-        _transcribedText = transcribedText;
+        _transcribedText = result.text;
         _isTranscribing = false;
       });
 
-      debugPrint('✅ Transcription complete: ${transcribedText.length} chars');
+      debugPrint('✅ Transcription complete: ${result.text.length} chars');
     } catch (e) {
       debugPrint('❌ Transcription failed: $e');
       setState(() {
@@ -269,7 +282,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   }
 
   void _copyToClipboard() {
-    // TODO: Implement clipboard copy
+    if (_transcribedText.isEmpty) return;
+    unawaited(Clipboard.setData(ClipboardData(text: _transcribedText)));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Copied to clipboard')),
     );

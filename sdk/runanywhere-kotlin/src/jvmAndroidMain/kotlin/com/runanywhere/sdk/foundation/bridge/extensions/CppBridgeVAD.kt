@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -154,9 +154,6 @@ object CppBridgeVAD {
                 else -> "UNKNOWN($type)"
             }
     }
-
-    @Volatile
-    private var isRegistered: Boolean = false
 
     @Volatile
     private var state: Int = VADState.NOT_CREATED
@@ -429,46 +426,16 @@ object CppBridgeVAD {
     }
 
     /**
-     * Register the VAD callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetVADCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "VAD callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the VAD callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
-
-    /**
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("VAD component not created")
+                throw SDKException.notInitialized("VAD component not created")
             }
             return handle
         }
@@ -528,7 +495,7 @@ object CppBridgeVAD {
                     TAG,
                     "Native library not loaded. VAD inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create VAD component via RunAnywhereBridge
@@ -541,7 +508,7 @@ object CppBridgeVAD {
                         TAG,
                         "VAD component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
+                    throw SDKException.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -662,13 +629,13 @@ object CppBridgeVAD {
      * @param audioData Raw audio data bytes
      * @param config Detection configuration (optional)
      * @return The detection result
-     * @throws SDKError if detection fails
+     * @throws SDKException if detection fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun process(audioData: ByteArray, config: DetectionConfig = DetectionConfig.DEFAULT): DetectionResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
-                throw SDKError.vad("VAD component not ready for detection")
+                throw SDKException.vad("VAD component not ready for detection")
             }
 
             isCancelled = false
@@ -691,7 +658,7 @@ object CppBridgeVAD {
             try {
                 val resultJson =
                     RunAnywhereBridge.racVadComponentProcess(handle, audioData, config.toJson())
-                        ?: throw SDKError.vad("Detection failed: null result")
+                        ?: throw SDKException.vad("Detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -712,7 +679,7 @@ object CppBridgeVAD {
                 return result
             } catch (e: Exception) {
                 setState(VADState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.vad("Detection failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.vad("Detection failed: ${e.message}")
             }
         }
     }
@@ -724,9 +691,9 @@ object CppBridgeVAD {
      * @param config Detection configuration (optional)
      * @param callback Callback for frame results
      * @return The final detection result
-     * @throws SDKError if detection fails
+     * @throws SDKException if detection fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun processStream(
         audioData: ByteArray,
         config: DetectionConfig = DetectionConfig.DEFAULT,
@@ -734,7 +701,7 @@ object CppBridgeVAD {
     ): DetectionResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
-                throw SDKError.vad("VAD component not ready for detection")
+                throw SDKException.vad("VAD component not ready for detection")
             }
 
             isCancelled = false
@@ -758,7 +725,7 @@ object CppBridgeVAD {
             try {
                 val resultJson =
                     RunAnywhereBridge.racVadComponentProcessStream(handle, audioData, config.toJson())
-                        ?: throw SDKError.vad("Streaming detection failed: null result")
+                        ?: throw SDKException.vad("Streaming detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -781,7 +748,7 @@ object CppBridgeVAD {
             } catch (e: Exception) {
                 setState(VADState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.vad("Streaming detection failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.vad("Streaming detection failed: ${e.message}")
             }
         }
     }
@@ -792,23 +759,23 @@ object CppBridgeVAD {
      * @param audioData Raw audio data bytes for the frame
      * @param config Detection configuration (optional)
      * @return The frame result
-     * @throws SDKError if processing fails
+     * @throws SDKException if processing fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun processFrame(audioData: ByteArray, config: DetectionConfig = DetectionConfig.DEFAULT): FrameResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
-                throw SDKError.vad("VAD component not ready for detection")
+                throw SDKException.vad("VAD component not ready for detection")
             }
 
             try {
                 val resultJson =
                     RunAnywhereBridge.racVadComponentProcessFrame(handle, audioData, config.toJson())
-                        ?: throw SDKError.vad("Frame processing failed: null result")
+                        ?: throw SDKException.vad("Frame processing failed: null result")
 
                 return parseFrameResult(resultJson)
             } catch (e: Exception) {
-                throw if (e is SDKError) e else SDKError.vad("Frame processing failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.vad("Frame processing failed: ${e.message}")
             }
         }
     }
@@ -1102,188 +1069,6 @@ object CppBridgeVAD {
     @JvmStatic
     fun getLoadedModelIdCallback(): String? {
         return loadedModelId
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the VAD callbacks with C++ core.
-     *
-     * Registers [streamFrameCallback], [speechStartCallback],
-     * [speechEndCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_vad_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetVADCallbacks()
-
-    /**
-     * Native method to unset the VAD callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_vad_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetVADCallbacks()
-
-    /**
-     * Native method to create the VAD component.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_vad_component_create()
-     */
-    @JvmStatic
-    external fun nativeCreate(): Long
-
-    /**
-     * Native method to load a model.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_vad_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun nativeLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Native method to process audio data.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_vad_component_process(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun nativeProcess(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Native method to process audio with streaming.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_vad_component_process_stream(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun nativeProcessStream(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Native method to process a single audio frame.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes for the frame
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_vad_component_process_frame(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun nativeProcessFrame(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Native method to cancel detection.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun nativeCancel(handle: Long)
-
-    /**
-     * Native method to reset the VAD state.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_reset(handle)
-     */
-    @JvmStatic
-    external fun nativeReset(handle: Long)
-
-    /**
-     * Native method to unload the model.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_unload(handle)
-     */
-    @JvmStatic
-    external fun nativeUnload(handle: Long)
-
-    /**
-     * Native method to destroy the component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_destroy(handle)
-     */
-    @JvmStatic
-    external fun nativeDestroy(handle: Long)
-
-    /**
-     * Native method to get the minimum frame size.
-     *
-     * @param handle The component handle
-     * @return The minimum frame size in samples
-     *
-     * C API: rac_vad_component_get_min_frame_size(handle)
-     */
-    @JvmStatic
-    external fun nativeGetMinFrameSize(handle: Long): Int
-
-    /**
-     * Native method to get the supported sample rates.
-     *
-     * @param handle The component handle
-     * @return JSON array of supported sample rates
-     *
-     * C API: rac_vad_component_get_sample_rates(handle)
-     */
-    @JvmStatic
-    external fun nativeGetSampleRates(handle: Long): String?
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the VAD callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetVADCallbacks()
-
-            vadListener = null
-            streamCallback = null
-            isRegistered = false
-        }
     }
 
     // ========================================================================

@@ -7,6 +7,11 @@ include(FetchContent)
 # All versions are defined in VERSIONS file - no hardcoded fallbacks needed
 include(LoadVersions)
 
+if(TARGET onnxruntime)
+    message(STATUS "ONNX Runtime target already configured — reusing existing imported target.")
+    return()
+endif()
+
 # Validate required versions are loaded
 if(NOT DEFINED ONNX_VERSION_IOS OR "${ONNX_VERSION_IOS}" STREQUAL "")
     message(FATAL_ERROR "ONNX_VERSION_IOS not defined in VERSIONS file")
@@ -19,6 +24,11 @@ if(NOT DEFINED ONNX_VERSION_LINUX OR "${ONNX_VERSION_LINUX}" STREQUAL "")
 endif()
 
 message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, Android=${ONNX_VERSION_ANDROID}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}")
+
+# Vendored ONNX and Sherpa artifacts live under sdk/runanywhere-commons/third_party.
+# Anchor all local lookups on this module path so the single-root CMake build no
+# longer needs a repo-root third_party symlink.
+set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
 if(EMSCRIPTEN)
     # ==========================================================================
@@ -33,7 +43,7 @@ if(EMSCRIPTEN)
 
     add_library(onnxruntime INTERFACE)
 
-    set(ONNX_WASM_HEADERS "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-wasm/include")
+    set(ONNX_WASM_HEADERS "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-wasm/include")
     if(EXISTS "${ONNX_WASM_HEADERS}")
         target_include_directories(onnxruntime INTERFACE "${ONNX_WASM_HEADERS}")
         message(STATUS "ONNX Runtime WASM headers: ${ONNX_WASM_HEADERS}")
@@ -50,7 +60,7 @@ elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(ONNX_IOS_VERSION "${ONNX_VERSION_IOS}")
 
     # third_party is inside runanywhere-commons
-    set(ONNX_LOCAL_PATH "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-ios")
+    set(ONNX_LOCAL_PATH "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-ios")
 
     message(STATUS "Using local ONNX Runtime iOS xcframework v${ONNX_IOS_VERSION}")
     message(STATUS "ONNX Runtime path: ${ONNX_LOCAL_PATH}")
@@ -121,7 +131,10 @@ elseif(ANDROID)
     # Sherpa-ONNX version is defined in VERSIONS file: SHERPA_ONNX_VERSION_ANDROID
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
     # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
-    set(SHERPA_ONNX_DIR "${CMAKE_SOURCE_DIR}/third_party/sherpa-onnx-android")
+    # Anchor on this module's location so the lookup is stable under the
+    # GAP_07 single-root CMake layout, where CMAKE_SOURCE_DIR is the repo
+    # root but download-sherpa-onnx.sh populates sdk/runanywhere-commons/third_party/.
+    set(SHERPA_ONNX_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party/sherpa-onnx-android")
 
     # Check if Sherpa-ONNX libraries exist
     if(EXISTS "${SHERPA_ONNX_DIR}/jniLibs/${ANDROID_ABI}/libonnxruntime.so")
@@ -138,7 +151,8 @@ elseif(ANDROID)
 
         # Sherpa-ONNX Android prebuilts only ship the C API header.
         # The ONNX C++ API headers (onnxruntime_cxx_api.h etc.) are header-only
-        # wrappers needed by wakeword_onnx.cpp.  Download them if missing.
+        # wrappers still consumed by Sherpa wakeword compatibility code.
+        # Download them if missing.
         if(NOT EXISTS "${ONNX_HEADER_PATH}/onnxruntime_cxx_api.h")
             set(ONNX_CXX_HEADER_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-cxx-headers")
             file(MAKE_DIRECTORY "${ONNX_CXX_HEADER_DIR}")
@@ -182,7 +196,7 @@ elseif(APPLE)
     # Downloaded by: ./scripts/macos/download-onnx.sh
 
     set(ONNX_MACOS_VERSION "${ONNX_VERSION_MACOS}")
-    set(ONNX_MACOS_DIR "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-macos")
+    set(ONNX_MACOS_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos")
 
     if(EXISTS "${ONNX_MACOS_DIR}/lib/libonnxruntime.dylib")
         # Use local ONNX Runtime

@@ -14,6 +14,7 @@
 #include "TelemetryBridge.hpp"
 #include "InitBridge.hpp"
 #include "AuthBridge.hpp"
+#include "ExternalConfigGuard.hpp"
 #include "rac_dev_config.h"
 
 // Platform-specific logging
@@ -257,47 +258,60 @@ static void telemetryHttpCallback(
     if (env == RAC_ENV_DEVELOPMENT) {
         // Development: Use Supabase from C++ dev config (development_config.cpp)
         // NO FALLBACK - credentials must come from C++ config only
-        const char* devUrl = rac_dev_config_get_supabase_url();
-        const char* devKey = rac_dev_config_get_supabase_key();
+        auto supabaseConfig = config::makeEndpointConfig(
+            rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
+            rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
 
-        baseURL = devUrl ? devUrl : "";
-        apiKey = devKey ? devKey : "";
-
-        if (baseURL.empty()) {
-            LOGW("Development mode but Supabase URL not configured in C++ dev_config");
-        } else {
-            LOGD("Telemetry using Supabase: %s", baseURL.c_str());
+        if (!supabaseConfig.usable) {
+            LOGI("Skipping telemetry/device registration: no usable config");
+            rac_telemetry_manager_http_complete(
+                bridge->getHandle(),
+                RAC_TRUE,
+                "{}",
+                nullptr
+            );
+            return;
         }
+
+        baseURL = supabaseConfig.baseURL;
+        apiKey = supabaseConfig.token;
+        LOGD("Telemetry using configured development Supabase endpoint");
     } else {
         // Production/Staging: Use configured Railway URL
         // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
-        baseURL = InitBridge::shared().getBaseURL();
+        baseURL = config::trim(InitBridge::shared().getBaseURL());
         
         // For production mode, prefer JWT access token (from authentication)
         // over raw API key. This matches Swift/Kotlin behavior.
         std::string accessToken = AuthBridge::shared().getAccessToken();
-        if (!accessToken.empty()) {
+        if (config::isUsableSecret(accessToken)) {
             apiKey = accessToken;  // Use JWT for Authorization header
             LOGD("Telemetry using JWT access token");
         } else {
             // Fallback to API key if not authenticated yet
-            apiKey = InitBridge::shared().getApiKey();
+            apiKey = config::trim(InitBridge::shared().getApiKey());
             LOGD("Telemetry using API key (not authenticated)");
         }
         
-        // Fallback to default if not configured
-        if (baseURL.empty()) {
-            baseURL = "https://api.runanywhere.ai";
+        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
+            LOGI("Skipping telemetry/device registration: no usable config");
+            rac_telemetry_manager_http_complete(
+                bridge->getHandle(),
+                RAC_TRUE,
+                "{}",
+                nullptr
+            );
+            return;
         }
         
-        LOGD("Telemetry using production: %s", baseURL.c_str());
+        LOGD("Telemetry using configured production/staging endpoint");
     }
 
-    std::string fullURL = baseURL + path;
+    std::string fullURL = config::appendEndpointPath(baseURL, path);
 
     LOGI("Telemetry POST to: %s", fullURL.c_str());
 
-    // Use platform-native HTTP (same as device registration)
+    // Use shared native C++ HTTP transport (same as device registration).
     auto [success, statusCode, responseBody, errorMessage] =
         InitBridge::shared().httpPostSync(fullURL, json, apiKey);
 
@@ -356,4 +370,3 @@ static void analyticsEventCallback(
 
 } // namespace bridges
 } // namespace runanywhere
-

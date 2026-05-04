@@ -23,11 +23,11 @@ public extension RunAnywhere {
     /// - Returns: Transcribed text
     static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        let result = try await transcribeWithOptions(audioData, options: STTOptions())
+        let result = try await transcribe(audio: audioData, options: STTOptions())
         return result.text
     }
 
@@ -35,8 +35,8 @@ public extension RunAnywhere {
 
     /// Unload the currently loaded STT model
     static func unloadSTTModel() async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         await CppBridge.STT.shared.unload()
@@ -49,82 +49,51 @@ public extension RunAnywhere {
         }
     }
 
+    /// Whether streaming transcription is currently active (CANONICAL_API §4).
+    ///
+    /// Forwards the underlying component's streaming-capable flag. A value of
+    /// `true` indicates the model supports and is configured for streaming.
+    static var isStreamingSTT: Bool {
+        get async {
+            guard await CppBridge.STT.shared.isLoaded else { return false }
+            return await CppBridge.STT.shared.supportsStreaming
+        }
+    }
+
     // MARK: - Transcription
 
-    /// Transcribe audio data to text (with options)
+    /// Transcribe audio data to text with options (CANONICAL_API §4).
+    ///
+    /// Canonical two-argument overload: `transcribe(audio:options:)`.
+    /// The previous name `transcribeWithOptions(_:options:)` has been removed.
+    ///
     /// - Parameters:
-    ///   - audioData: Raw audio data
+    ///   - audio: Raw audio data
     ///   - options: Transcription options
     /// - Returns: Transcription output with text and metadata
-    static func transcribeWithOptions(
-        _ audioData: Data,
+    static func transcribe(
+        audio audioData: Data,
         options: STTOptions
     ) async throws -> STTOutput {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
+        let output = try await transcribe(audio: audioData, options: options.toRASTTOptions())
+        return STTOutput(from: output)
+    }
 
-        let handle = try await CppBridge.STT.shared.getHandle()
+    /// Transcribe audio data through the generated-proto C++ STT ABI.
+    static func transcribe(
+        audio audioData: Data,
+        options: RASTTOptions = RASTTOptions()
+    ) async throws -> RASTTOutput {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
 
         guard await CppBridge.STT.shared.isLoaded else {
-            throw SDKError.stt(.notInitialized, "STT model not loaded")
+            throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
-        let modelId = await CppBridge.STT.shared.currentModelId ?? "unknown"
-        let startTime = Date()
-
-        let audioSizeBytes = audioData.count
-        let audioLengthSec = estimateAudioLength(dataSize: audioSizeBytes)
-
-        var sttResult = rac_stt_result_t()
-        defer { rac_stt_result_free(&sttResult) }
-        let transcribeResult = options.withCOptions { cOptionsPtr in
-            audioData.withUnsafeBytes { audioPtr in
-                rac_stt_component_transcribe(
-                    handle,
-                    audioPtr.baseAddress,
-                    audioData.count,
-                    cOptionsPtr,
-                    &sttResult
-                )
-            }
-        }
-
-        guard transcribeResult == RAC_SUCCESS else {
-            throw SDKError.stt(.processingFailed, "Transcription failed: \(transcribeResult)")
-        }
-
-        let endTime = Date()
-        let processingTimeSec = endTime.timeIntervalSince(startTime)
-
-        let transcribedText: String
-        if let textPtr = sttResult.text {
-            transcribedText = String(cString: textPtr)
-        } else {
-            transcribedText = ""
-        }
-        let detectedLanguage: String?
-        if let langPtr = sttResult.detected_language {
-            detectedLanguage = String(cString: langPtr)
-        } else {
-            detectedLanguage = nil
-        }
-        let confidence = sttResult.confidence
-
-        let metadata = TranscriptionMetadata(
-            modelId: modelId,
-            processingTime: processingTimeSec,
-            audioLength: audioLengthSec
-        )
-
-        return STTOutput(
-            text: transcribedText,
-            confidence: confidence,
-            wordTimestamps: nil,
-            detectedLanguage: detectedLanguage,
-            alternatives: nil,
-            metadata: metadata
-        )
+        return try await CppBridge.STT.shared.transcribe(audioData: audioData, options: options)
     }
 
     /// Transcribe audio buffer to text
@@ -136,12 +105,12 @@ public extension RunAnywhere {
         _ buffer: AVAudioPCMBuffer,
         language: String? = nil
     ) async throws -> STTOutput {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         guard let channelData = buffer.floatChannelData else {
-            throw SDKError.stt(.emptyAudioBuffer, "Audio buffer has no channel data")
+            throw SDKException.stt(.emptyAudioBuffer, "Audio buffer has no channel data")
         }
 
         let frameLength = Int(buffer.frameLength)
@@ -154,134 +123,119 @@ public extension RunAnywhere {
             options = STTOptions()
         }
 
-        return try await transcribeWithOptions(audioData, options: options)
+        return try await transcribe(audio: audioData, options: options)
     }
 
-    /// Start streaming transcription
-    @available(*, deprecated, message: "Use transcribeStream(audioData:options:onPartialResult:) instead")
-    static func startStreamingTranscription(
-        options _: STTOptions = STTOptions(),
-        onPartialResult _: @escaping (STTTranscriptionResult) -> Void,
-        onFinalResult _: @escaping (STTOutput) -> Void,
-        onError _: @escaping (Error) -> Void
-    ) async throws {
-        throw SDKError.stt(.streamingNotSupported, "Use transcribeStream(audioData:options:onPartialResult:) instead")
+    // MARK: - Streaming Transcription (CANONICAL_API §4)
+
+    /// Canonical stream-in / stream-out transcription (CANONICAL_API §4).
+    ///
+    /// Consumes an `AsyncStream<Data>` of PCM audio chunks and yields
+    /// `RASTTPartialResult` events. Each partial result carries an
+    /// incremental transcript and an `isFinal` flag; the stream closes after
+    /// the final event or on error.
+    ///
+    /// - Parameters:
+    ///   - audio: Source stream of raw PCM audio chunks.
+    ///   - options: Transcription options (optional).
+    /// - Returns: `AsyncStream<RASTTPartialResult>` of partial transcription events.
+    static func transcribeStream(
+        audio: AsyncStream<Data>,
+        options: STTOptions = STTOptions()
+    ) -> AsyncStream<RASTTPartialResult> {
+        transcribeStream(audio: audio, options: options.toRASTTOptions())
     }
 
-    /// Transcribe audio with streaming callbacks
+    /// Canonical stream-in / stream-out transcription using generated protos.
+    static func transcribeStream(
+        audio: AsyncStream<Data>,
+        options: RASTTOptions
+    ) -> AsyncStream<RASTTPartialResult> {
+        AsyncStream { continuation in
+            Task {
+                guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+                guard await CppBridge.STT.shared.isLoaded else {
+                    continuation.finish()
+                    return
+                }
+                for await chunk in audio {
+                    if Task.isCancelled { break }
+                    guard let partials = try? await CppBridge.STT.shared.transcribeStream(
+                        audioData: chunk,
+                        options: options
+                    ) else {
+                        continue
+                    }
+                    for await partial in partials {
+                        continuation.yield(partial)
+                    }
+                }
+                var finalPartial = RASTTPartialResult()
+                finalPartial.isFinal = true
+                continuation.yield(finalPartial)
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Transcribe audio with streaming callbacks (legacy form — prefer `transcribeStream(audio:options:)`)
     static func transcribeStream(
         audioData: Data,
         options: STTOptions = STTOptions(),
         onPartialResult: @escaping (STTTranscriptionResult) -> Void
     ) async throws -> STTOutput {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await CppBridge.STT.shared.getHandle()
-
         guard await CppBridge.STT.shared.isLoaded else {
-            throw SDKError.stt(.notInitialized, "STT model not loaded")
+            throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
         guard await CppBridge.STT.shared.supportsStreaming else {
-            throw SDKError.stt(.streamingNotSupported, "Model does not support streaming")
+            throw SDKException.stt(.streamingNotSupported, "Model does not support streaming")
         }
 
-        let modelId = await CppBridge.STT.shared.currentModelId ?? "unknown"
-        let startTime = Date()
-
-        let context = STTStreamingContext(onPartialResult: onPartialResult)
-        let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-        let result = options.withCOptions { cOptionsPtr in
-            audioData.withUnsafeBytes { audioPtr in
-                rac_stt_component_transcribe_stream(
-                    handle,
-                    audioPtr.baseAddress,
-                    audioData.count,
-                    cOptionsPtr,
-                    { partialText, isFinal, userData in
-                        guard let userData = userData else { return }
-                        let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
-
-                        let text = partialText.map { String(cString: $0) } ?? ""
-                        let partialResult = STTTranscriptionResult(
-                            transcript: text,
-                            confidence: nil,
-                            timestamps: nil,
-                            language: nil,
-                            alternatives: nil
-                        )
-
-                        ctx.onPartialResult(partialResult)
-
-                        if isFinal == RAC_TRUE {
-                            ctx.finalText = text
-                        }
-                    },
-                    contextPtr
+        let stream = try await CppBridge.STT.shared.transcribeStream(
+            audioData: audioData,
+            options: options.toRASTTOptions()
+        )
+        var finalText = ""
+        for await partial in stream {
+            onPartialResult(
+                STTTranscriptionResult(
+                    transcript: partial.text,
+                    confidence: partial.confidence > 0 ? partial.confidence : nil,
+                    timestamps: nil,
+                    language: partial.hasLanguageCode ? partial.languageCode : nil,
+                    alternatives: nil
                 )
+            )
+            if partial.isFinal || !partial.text.isEmpty {
+                finalText = partial.text
             }
         }
-
-        let finalContext = Unmanaged<STTStreamingContext>.fromOpaque(contextPtr).takeRetainedValue()
-
-        guard result == RAC_SUCCESS else {
-            throw SDKError.stt(.processingFailed, "Streaming transcription failed: \(result)")
-        }
-
-        let endTime = Date()
-        let processingTimeSec = endTime.timeIntervalSince(startTime)
-        let audioLengthSec = estimateAudioLength(dataSize: audioData.count)
-
-        let metadata = TranscriptionMetadata(
-            modelId: modelId,
-            processingTime: processingTimeSec,
-            audioLength: audioLengthSec
-        )
-
-        return STTOutput(
-            text: finalContext.finalText,
-            confidence: 0.0,
-            wordTimestamps: nil,
-            detectedLanguage: nil,
-            alternatives: nil,
-            metadata: metadata
-        )
+        var output = RASTTOutput()
+        output.text = finalText
+        output.durationMs = Int64(estimateAudioLength(dataSize: audioData.count) * 1000)
+        return STTOutput(from: output)
     }
 
     /// Process audio samples for streaming transcription
     static func processStreamingAudio(_ samples: [Float], options: STTOptions = STTOptions()) async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await CppBridge.STT.shared.getHandle()
-
         guard await CppBridge.STT.shared.isLoaded else {
-            throw SDKError.stt(.notInitialized, "STT model not loaded")
+            throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
-
-        var sttResult = rac_stt_result_t()
-        defer { rac_stt_result_free(&sttResult) }
-        let transcribeResult = options.withCOptions { cOptionsPtr in
-            data.withUnsafeBytes { audioPtr in
-                rac_stt_component_transcribe(
-                    handle,
-                    audioPtr.baseAddress,
-                    data.count,
-                    cOptionsPtr,
-                    &sttResult
-                )
-            }
-        }
-
-        if transcribeResult != RAC_SUCCESS {
-            throw SDKError.stt(.processingFailed, "Streaming process failed: \(transcribeResult)")
-        }
+        _ = try await transcribe(audio: data, options: options.toRASTTOptions())
     }
 
     /// Stop streaming transcription

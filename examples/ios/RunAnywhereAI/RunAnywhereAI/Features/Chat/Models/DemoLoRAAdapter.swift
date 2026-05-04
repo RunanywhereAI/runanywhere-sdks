@@ -4,9 +4,6 @@
 //
 //  Registers LoRA adapters into the SDK's global LoRA registry at startup.
 //  Uses the SDK's LoraAdapterCatalogEntry — same type and registry that Android uses.
-//
-// swiftlint:disable:next todo
-//  TODO: #1 [Portal Integration] Replace hardcoded adapters with portal-provided catalog.
 
 import Foundation
 import os
@@ -20,7 +17,7 @@ enum LoRAAdapterCatalog {
     static func registerAll() async {
         for entry in adapters {
             do {
-                try await RunAnywhere.registerLoraAdapter(entry)
+                try await RunAnywhere.lora.register(entry)
             } catch {
                 logger.error("Failed to register adapter \(entry.id): \(error)")
             }

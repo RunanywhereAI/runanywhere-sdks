@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.data.network
 
+import ai.runanywhere.proto.v1.ErrorCategory
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.errors.ErrorCategory
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -48,7 +48,7 @@ class CircuitBreaker(
                         // Still in open state - reject the call
                         val timeUntilRetry = recoveryTimeoutMs - (System.currentTimeMillis() - lastFailureTime)
                         logger.warn("Circuit breaker is OPEN, rejecting call (retry in ${timeUntilRetry}ms)")
-                        throw SDKError.network("Circuit breaker is open for $name. Service temporarily unavailable.")
+                        throw SDKException.network("Circuit breaker is open for $name. Service temporarily unavailable.")
                     }
                 }
 
@@ -60,7 +60,7 @@ class CircuitBreaker(
                     } else {
                         // Too many calls in half-open state, reject
                         logger.warn("Circuit breaker HALF_OPEN max calls reached, rejecting call")
-                        throw SDKError.network("Circuit breaker is in half-open state with max calls reached for $name")
+                        throw SDKException.network("Circuit breaker is in half-open state with max calls reached for $name")
                     }
                 }
             }
@@ -152,10 +152,10 @@ class CircuitBreaker(
      */
     private fun isFailureCountable(exception: Exception): Boolean =
         when (exception) {
-            is SDKError -> {
+            is SDKException -> {
                 when (exception.category) {
-                    ErrorCategory.NETWORK -> {
-                        val message = exception.message.lowercase()
+                    ErrorCategory.ERROR_CATEGORY_NETWORK -> {
+                        val message = (exception.message ?: "").lowercase()
                         // Count timeouts, connection errors, and server errors
                         message.contains("timeout") ||
                             message.contains("connection") ||
@@ -163,7 +163,7 @@ class CircuitBreaker(
                             message.contains("rate limit") ||
                             message.contains("service unavailable")
                     }
-                    ErrorCategory.AUTHENTICATION -> false // Auth errors shouldn't trigger circuit breaker
+                    ErrorCategory.ERROR_CATEGORY_AUTH -> false // Auth errors shouldn't trigger circuit breaker
                     else -> false
                 }
             }

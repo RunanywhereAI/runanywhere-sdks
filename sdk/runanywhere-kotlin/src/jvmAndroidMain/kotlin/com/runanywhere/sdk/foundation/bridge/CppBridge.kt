@@ -9,7 +9,6 @@
 package com.runanywhere.sdk.foundation.bridge
 
 import com.runanywhere.sdk.foundation.Logging
-import com.runanywhere.sdk.foundation.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
@@ -22,6 +21,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.logging.SentryDestination
 import com.runanywhere.sdk.foundation.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.SDKEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -151,6 +151,22 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
+            // F3 fix: initialize the native auth manager with a secure-storage
+            // vtable backed by the platform adapter secureGet/secureSet/
+            // secureDelete callbacks. Must happen AFTER the adapter is
+            // registered (the JNI-side vtable delegates to it) and BEFORE any
+            // auth operation. Without this, tokens are lost on every process
+            // restart because rac_auth_save_tokens / rac_auth_clear are no-ops.
+            CppBridgeAuth.initialize()
+
+            // v2 close-out Phase H4: install the OkHttp HTTP transport BEFORE
+            // any network I/O happens (device registration, model assignment
+            // fetch, telemetry, auth all go through rac_http_request_*). The
+            // adapter gives us the Android system trust store + proxy +
+            // NetworkSecurityConfig for free and fixes the rc=77 SSL failure
+            // on ~5% of devices. Safe to no-op if the native lib is missing.
+            registerOkHttpTransport()
+
             // Configure logging with Sentry integration
             // Setup Sentry hooks so Logging can trigger Sentry setup/teardown
             setupSentryHooks(environment)
@@ -182,7 +198,11 @@ object CppBridge {
                 }
                 logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
             } else {
-                logger.debug("Development mode: using Supabase URL from C++ dev config")
+                if (CppBridgeTelemetry.hasUsableDevelopmentConfig()) {
+                    logger.debug("Development mode: using Supabase URL from C++ dev config")
+                } else {
+                    logger.debug("Development mode: no usable Supabase config; external telemetry/auth/device registration disabled")
+                }
             }
 
             // Register device callbacks (sets up JNI callbacks for C++ to call)
@@ -337,6 +357,53 @@ object CppBridge {
     }
 
     /**
+     * Register the OkHttp platform HTTP transport with the C++ core.
+     *
+     * Installs `rac_http_transport_ops` so that every `rac_http_request_*`
+     * call routes through Kotlin's [com.runanywhere.sdk.foundation.http.OkHttpTransport]
+     * instead of libcurl. Gives Android / JVM consumers the system trust
+     * store + NetworkSecurityConfig + proxy + HTTP/2 for free.
+     *
+     * Guarded: skipped silently when the native library isn't loaded,
+     * since `RunAnywhereBridge.racHttpTransportRegisterOkHttp()` would
+     * throw UnsatisfiedLinkError in that case and the SDK should still
+     * boot (without inference) for non-networking use cases.
+     */
+    private fun registerOkHttpTransport() {
+        if (!_nativeLibraryLoaded) {
+            logger.debug("Skipping OkHttp transport registration: native lib not loaded")
+            return
+        }
+        try {
+            val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
+            if (rc == 0) {
+                logger.info("✅ OkHttp HTTP transport registered (system trust store + proxy)")
+            } else {
+                logger.warn("OkHttp HTTP transport registration returned rc=$rc; falling back to libcurl")
+            }
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warn("OkHttp HTTP transport symbol missing in native lib: ${e.message}")
+        } catch (e: Throwable) {
+            logger.warn("OkHttp HTTP transport registration failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Unregister the OkHttp platform HTTP transport. Best-effort — any
+     * failure is logged but does not block shutdown.
+     */
+    private fun unregisterOkHttpTransport() {
+        if (!_nativeLibraryLoaded) return
+        try {
+            RunAnywhereBridge.racHttpTransportUnregisterOkHttp()
+        } catch (_: UnsatisfiedLinkError) {
+            // Symbol not present — nothing to do.
+        } catch (e: Throwable) {
+            logger.warn("OkHttp HTTP transport unregistration failed: ${e.message}")
+        }
+    }
+
+    /**
      * Try to load the native commons library.
      * This is optional - the SDK works without it for non-inference features.
      *
@@ -455,13 +522,27 @@ object CppBridge {
             // Register platform services callbacks
             CppBridgePlatform.register()
 
-            // Flush any queued telemetry events now that HTTP should be configured
-            // This ensures events queued during Phase 1 initialization are sent
-            CppBridgeTelemetry.flush()
+            // Flush any queued telemetry events now that HTTP should be configured.
+            // In demo/default development mode, no usable external config is expected.
+            if (CppBridgeTelemetry.hasUsableNetworkConfig()) {
+                CppBridgeTelemetry.flush()
+            } else {
+                logger.debug("Skipping telemetry flush: no usable external config")
+            }
 
             // Trigger device registration with backend (non-blocking, best-effort)
             // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
             try {
+                if (!CppBridgeTelemetry.hasUsableNetworkConfig()) {
+                    logger.debug("Skipping device registration: no usable external config")
+                    synchronized(lock) {
+                        _servicesInitialized = true
+                        _servicesInitializing = false
+                    }
+                    logger.info("✅ Phase 2 services initialization complete")
+                    return
+                }
+
                 val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
                 // Get build token for development mode (mirrors Swift SDK)
@@ -541,6 +622,12 @@ object CppBridge {
             CppBridgeDevice.unregister()
             CppBridgeTelemetry.unregister()
             CppBridgeEvents.unregister()
+
+            // v2 close-out Phase H4: release the OkHttp transport before the
+            // platform adapter, so any final rac_http_request_* inside shutdown
+            // (e.g. telemetry flush) still has a working HTTP path.
+            unregisterOkHttpTransport()
+
             CppBridgePlatformAdapter.unregister()
 
             // Teardown Sentry logging
@@ -599,9 +686,9 @@ object CppBridge {
     private fun setupSentryLogging(environment: Environment) {
         val sdkEnvironment =
             when (environment) {
-                Environment.DEVELOPMENT -> SDKEnvironment.DEVELOPMENT
-                Environment.STAGING -> SDKEnvironment.STAGING
-                Environment.PRODUCTION -> SDKEnvironment.PRODUCTION
+                Environment.DEVELOPMENT -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+                Environment.STAGING -> SDKEnvironment.SDK_ENVIRONMENT_STAGING
+                Environment.PRODUCTION -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             }
 
         try {

@@ -23,7 +23,7 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
 import {
@@ -76,7 +76,7 @@ async function collectGeneration(
 }
 
 function requireBridge(): LlamaCppBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  if (!RunAnywhere.isInitialized) throw SDKException.notInitialized();
   return LlamaCppBridge.shared;
 }
 
@@ -142,39 +142,38 @@ interface RegisteredTool {
 
 // ---------------------------------------------------------------------------
 // Internal: C++ Bridge helpers
+//
+// SINGLE SOURCE OF TRUTH: all tool-call parsing, prompt formatting, and
+// follow-up prompt building goes through the commons C ABI (rac_tool_call_*)
+// compiled into the WASM module. No TypeScript duplicate of parsing logic.
+//
+// The C++ tool-calling functions are pure (no imports, no I/O, no suspension
+// points), so synchronous ccall is safe on both JIT and JSPI/WebGPU builds.
 // ---------------------------------------------------------------------------
 
 /**
- * Check if C++ tool calling functions are available in the WASM module.
- *
- * On WebGPU builds, all WASM imports are wrapped with WebAssembly.Suspending.
- * Synchronous ccall to C++ tool-calling functions (which are NOT
- * WebAssembly.promising-wrapped) will throw "trying to suspend without
- * WebAssembly.promising" if any import inside the C++ code returns a Promise.
- * To avoid this, we always use the TypeScript fallback on WebGPU builds.
+ * Assert that the WASM module has the required rac_tool_call_* exports.
+ * If this throws, the loaded WASM was built without the tool_calling source
+ * compiled in — fix the build, do not silently fall back.
  */
-function hasNativeToolCalling(): boolean {
-  try {
-    const bridge = requireBridge();
-    // WebGPU builds have JSPI Suspending on ALL imports, so synchronous
-    // ccall to native tool helpers triggers SuspendError.  Use TS fallback.
-    if (bridge.accelerationMode === 'webgpu') return false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return typeof (bridge.module as any)['_rac_tool_call_parse'] === 'function';
-  } catch {
-    return false;
+function assertNativeToolCalling(): void {
+  const bridge = requireBridge();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod = bridge.module as any;
+  if (typeof mod['_rac_tool_call_parse'] !== 'function') {
+    throw new SDKException(
+      SDKErrorCode.NotInitialized,
+      'rac_tool_call_parse not exported by WASM module - rebuild with tool_calling.cpp compiled in',
+    );
   }
 }
 
 /**
- * Parse LLM output for tool calls.
- * Uses C++ when available, falls back to TypeScript regex parsing.
+ * Parse LLM output for tool calls via commons C ABI.
  */
 function parseToolCall(llmOutput: string): { text: string; toolCall: ToolCall | null } {
-  if (hasNativeToolCalling()) {
-    return parseToolCallNative(llmOutput);
-  }
-  return parseToolCallTS(llmOutput);
+  assertNativeToolCalling();
+  return parseToolCallNative(llmOutput);
 }
 
 /**
@@ -232,122 +231,47 @@ function parseToolCallNative(llmOutput: string): { text: string; toolCall: ToolC
 }
 
 /**
- * TypeScript fallback parser for when WASM doesn't have tool_calling compiled.
- * Handles both default and LFM2 formats.
- */
-function parseToolCallTS(llmOutput: string): { text: string; toolCall: ToolCall | null } {
-  // Try default format: <tool_call>{"tool":"name","arguments":{...}}</tool_call>
-  const defaultMatch = llmOutput.match(/<tool_call>([\s\S]*?)(?:<\/tool_call>|$)/);
-  if (defaultMatch) {
-    const jsonStr = defaultMatch[1].trim();
-    const cleanText = llmOutput.replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/, '').trim();
-    try {
-      const parsed = JSON.parse(jsonStr);
-      const toolName = parsed.tool || parsed.name || parsed.function || '';
-      const rawArgs = parsed.arguments || parsed.args || parsed.parameters || {};
-      return {
-        text: cleanText,
-        toolCall: {
-          toolName,
-          arguments: jsonToToolValues(rawArgs),
-          callId: `call_${Date.now()}`,
-        },
-      };
-    } catch {
-      // Try to fix common LLM JSON issues (unquoted keys)
-      try {
-        const fixed = jsonStr.replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
-        const parsed = JSON.parse(fixed);
-        const toolName = parsed.tool || parsed.name || parsed.function || '';
-        const rawArgs = parsed.arguments || parsed.args || parsed.parameters || {};
-        return {
-          text: cleanText,
-          toolCall: {
-            toolName,
-            arguments: jsonToToolValues(rawArgs),
-            callId: `call_${Date.now()}`,
-          },
-        };
-      } catch {
-        return { text: llmOutput, toolCall: null };
-      }
-    }
-  }
-
-  // Try LFM2 format: <|tool_call_start|>[func_name(arg="val")]<|tool_call_end|>
-  const lfm2Match = llmOutput.match(/<\|tool_call_start\|>\s*\[(\w+)\((.*?)\)\]\s*<\|tool_call_end\|>/);
-  if (lfm2Match) {
-    const funcName = lfm2Match[1];
-    const argsStr = lfm2Match[2];
-    const cleanText = llmOutput.replace(/<\|tool_call_start\|>[\s\S]*?<\|tool_call_end\|>/, '').trim();
-
-    // Parse LFM2 arguments: arg1="val1", arg2="val2"
-    const args: Record<string, ToolValue> = {};
-    const argPattern = /(\w+)="([^"]*)"/g;
-    let argMatch;
-    while ((argMatch = argPattern.exec(argsStr)) !== null) {
-      args[argMatch[1]] = { type: 'string', value: argMatch[2] };
-    }
-
-    return {
-      text: cleanText,
-      toolCall: {
-        toolName: funcName,
-        arguments: args,
-        callId: `call_${Date.now()}`,
-      },
-    };
-  }
-
-  return { text: llmOutput, toolCall: null };
-}
-
-/**
- * Format tool definitions into system prompt.
- * Uses C++ when available, falls back to TypeScript.
+ * Format tool definitions into system prompt via commons C ABI.
  */
 function formatToolsForPrompt(tools: ToolDefinition[], format: ToolCallFormat = ToolCallFormat.Default): string {
   if (tools.length === 0) return '';
 
+  assertNativeToolCalling();
+  const bridge = requireBridge();
+  const m = bridge.module;
   const toolsJson = serializeToolDefinitions(tools);
+  const jsonPtr = bridge.allocString(toolsJson);
+  const fmtPtr = bridge.allocString(format);
+  const outPtrPtr = m._malloc(4);
+  m.setValue(outPtrPtr, 0, '*');
 
-  if (hasNativeToolCalling()) {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const jsonPtr = bridge.allocString(toolsJson);
-    const fmtPtr = bridge.allocString(format);
-    const outPtrPtr = m._malloc(4);
-    m.setValue(outPtrPtr, 0, '*');
+  try {
+    const rc = m.ccall(
+      'rac_tool_call_format_prompt_json_with_format_name', 'number',
+      ['number', 'number', 'number'],
+      [jsonPtr, fmtPtr, outPtrPtr],
+    ) as number;
 
-    try {
-      const rc = m.ccall(
-        'rac_tool_call_format_prompt_json_with_format_name', 'number',
-        ['number', 'number', 'number'],
-        [jsonPtr, fmtPtr, outPtrPtr],
-      ) as number;
-
-      if (rc === 0) {
-        const outPtr = m.getValue(outPtrPtr, '*') as number;
-        if (outPtr) {
-          const result = bridge.readString(outPtr);
-          m.ccall('rac_free', null, ['number'], [outPtr]);
-          return result;
-        }
-      }
-    } finally {
-      bridge.free(jsonPtr);
-      bridge.free(fmtPtr);
-      m._free(outPtrPtr);
+    if (rc !== 0) {
+      throw new SDKException(
+        SDKErrorCode.BackendError,
+        `rac_tool_call_format_prompt_json_with_format_name failed with code ${rc}`,
+      );
     }
+    const outPtr = m.getValue(outPtrPtr, '*') as number;
+    if (!outPtr) return '';
+    const result = bridge.readString(outPtr);
+    m.ccall('rac_free', null, ['number'], [outPtr]);
+    return result;
+  } finally {
+    bridge.free(jsonPtr);
+    bridge.free(fmtPtr);
+    m._free(outPtrPtr);
   }
-
-  // Fallback: build prompt in TypeScript
-  return formatToolsForPromptTS(tools, format);
 }
 
 /**
- * Build follow-up prompt after tool execution.
- * Uses C++ when available, falls back to TypeScript.
+ * Build follow-up prompt after tool execution via commons C ABI.
  */
 function buildFollowUpPrompt(
   originalPrompt: string,
@@ -356,74 +280,41 @@ function buildFollowUpPrompt(
   toolResultJson: string,
   keepToolsAvailable: boolean,
 ): string {
-  if (hasNativeToolCalling()) {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const promptPtr = bridge.allocString(originalPrompt);
-    const toolsPromptPtr = toolsPrompt ? bridge.allocString(toolsPrompt) : 0;
-    const namePtr = bridge.allocString(toolName);
-    const resultPtr = bridge.allocString(toolResultJson);
-    const outPtrPtr = m._malloc(4);
-    m.setValue(outPtrPtr, 0, '*');
+  assertNativeToolCalling();
+  const bridge = requireBridge();
+  const m = bridge.module;
+  const promptPtr = bridge.allocString(originalPrompt);
+  const toolsPromptPtr = toolsPrompt ? bridge.allocString(toolsPrompt) : 0;
+  const namePtr = bridge.allocString(toolName);
+  const resultPtr = bridge.allocString(toolResultJson);
+  const outPtrPtr = m._malloc(4);
+  m.setValue(outPtrPtr, 0, '*');
 
-    try {
-      const rc = m.ccall(
-        'rac_tool_call_build_followup_prompt', 'number',
-        ['number', 'number', 'number', 'number', 'number', 'number'],
-        [promptPtr, toolsPromptPtr, namePtr, resultPtr, keepToolsAvailable ? 1 : 0, outPtrPtr],
-      ) as number;
+  try {
+    const rc = m.ccall(
+      'rac_tool_call_build_followup_prompt', 'number',
+      ['number', 'number', 'number', 'number', 'number', 'number'],
+      [promptPtr, toolsPromptPtr, namePtr, resultPtr, keepToolsAvailable ? 1 : 0, outPtrPtr],
+    ) as number;
 
-      if (rc === 0) {
-        const outPtr = m.getValue(outPtrPtr, '*') as number;
-        if (outPtr) {
-          const result = bridge.readString(outPtr);
-          m.ccall('rac_free', null, ['number'], [outPtr]);
-          return result;
-        }
-      }
-    } finally {
-      bridge.free(promptPtr);
-      if (toolsPromptPtr) bridge.free(toolsPromptPtr);
-      bridge.free(namePtr);
-      bridge.free(resultPtr);
-      m._free(outPtrPtr);
+    if (rc !== 0) {
+      throw new SDKException(
+        SDKErrorCode.BackendError,
+        `rac_tool_call_build_followup_prompt failed with code ${rc}`,
+      );
     }
+    const outPtr = m.getValue(outPtrPtr, '*') as number;
+    if (!outPtr) return '';
+    const result = bridge.readString(outPtr);
+    m.ccall('rac_free', null, ['number'], [outPtr]);
+    return result;
+  } finally {
+    bridge.free(promptPtr);
+    if (toolsPromptPtr) bridge.free(toolsPromptPtr);
+    bridge.free(namePtr);
+    bridge.free(resultPtr);
+    m._free(outPtrPtr);
   }
-
-  // Fallback: build in TypeScript
-  return buildFollowUpPromptTS(originalPrompt, toolName, toolResultJson, keepToolsAvailable);
-}
-
-// ---------------------------------------------------------------------------
-// TypeScript fallback helpers
-// ---------------------------------------------------------------------------
-
-function formatToolsForPromptTS(tools: ToolDefinition[], format: ToolCallFormat): string {
-  const toolDescriptions = tools.map((t) => {
-    const params = t.parameters.map((p) => {
-      const req = p.required !== false ? ' (required)' : ' (optional)';
-      return `    - ${p.name} (${p.type}${req}): ${p.description}`;
-    }).join('\n');
-    return `  ${t.name}: ${t.description}\n    Parameters:\n${params}`;
-  }).join('\n\n');
-
-  if (format === ToolCallFormat.LFM2) {
-    return `You have access to the following tools:\n\n${toolDescriptions}\n\nTo use a tool, respond with:\n<|tool_call_start|>[tool_name(arg1="value1", arg2="value2")]<|tool_call_end|>\n\nIf no tool is needed, respond normally.`;
-  }
-
-  return `You have access to the following tools:\n\n${toolDescriptions}\n\nTo use a tool, respond with:\n<tool_call>{"tool": "tool_name", "arguments": {"arg1": "value1"}}</tool_call>\n\nIf no tool is needed, respond normally.`;
-}
-
-function buildFollowUpPromptTS(
-  originalPrompt: string,
-  toolName: string,
-  toolResultJson: string,
-  keepToolsAvailable: boolean,
-): string {
-  if (keepToolsAvailable) {
-    return `User: ${originalPrompt}\n\nYou previously used the ${toolName} tool and received:\n${toolResultJson}\n\nBased on this tool result, either use another tool if needed, or provide a helpful response.`;
-  }
-  return `The user asked: "${originalPrompt}"\n\nYou used the ${toolName} tool and received this data:\n${toolResultJson}\n\nNow provide a helpful, natural response to the user based on this information.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -561,11 +452,11 @@ class ToolCallingImpl {
     options: ToolCallingOptions = {},
   ): Promise<ToolCallingResult> {
     if (!RunAnywhere.isInitialized) {
-      throw SDKError.notInitialized();
+      throw SDKException.notInitialized();
     }
 
     if (!TextGeneration.isModelLoaded) {
-      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
     const maxToolCalls = options.maxToolCalls ?? 5;

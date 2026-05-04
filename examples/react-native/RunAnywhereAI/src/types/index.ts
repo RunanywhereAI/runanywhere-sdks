@@ -32,6 +32,7 @@ export type RootTabParamList = {
   Voice: undefined;
   RAG: undefined;
   Vision: undefined;
+  Solutions: undefined;
   Settings: undefined;
 };
 

@@ -13,6 +13,9 @@
 #ifndef RAC_MODEL_REGISTRY_H
 #define RAC_MODEL_REGISTRY_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "rac_error.h"
 #include "rac_types.h"
 #include "rac_model_types.h"
@@ -85,6 +88,21 @@ RAC_API rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
  */
 RAC_API rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle,
                                             const char* model_id, rac_model_info_t** out_model);
+
+/**
+ * @brief Get model metadata by local path.
+ *
+ * Searches through all registered models and returns the one with matching local_path.
+ * This is useful when loading models by path instead of model_id.
+ *
+ * @param handle Registry handle
+ * @param local_path Local path to search for
+ * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
+                                                    const char* local_path,
+                                                    rac_model_info_t** out_model);
 
 /**
  * @brief Load all stored models.
@@ -167,6 +185,111 @@ RAC_API rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle
 RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle_t handle,
                                                                const char* model_id,
                                                                const char* local_path);
+
+// =============================================================================
+// PROTO-BYTE MODEL INFO API
+// =============================================================================
+
+/**
+ * @brief Save model metadata from serialized runanywhere.v1.ModelInfo bytes.
+ *
+ * This is the canonical SDK-facing write path for generated proto adapters.
+ * The registry converts the proto to its internal C++/C representation and
+ * applies the same semantics as rac_model_registry_save().
+ *
+ * @param handle Registry handle
+ * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
+ * @param proto_size Byte count
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handle,
+                                                       const uint8_t* proto_bytes,
+                                                       size_t proto_size);
+
+/**
+ * @brief Update existing model metadata from serialized runanywhere.v1.ModelInfo bytes.
+ *
+ * Unlike register_proto, this returns RAC_ERROR_NOT_FOUND when the model id is
+ * not already present in the registry.
+ *
+ * @param handle Registry handle
+ * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
+ * @param proto_size Byte count
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
+                                                     const uint8_t* proto_bytes,
+                                                     size_t proto_size);
+
+/**
+ * @brief Get model metadata as serialized runanywhere.v1.ModelInfo bytes.
+ *
+ * The caller owns the returned buffer and must free it with
+ * rac_model_registry_proto_free().
+ *
+ * @param handle Registry handle
+ * @param model_id Model identifier
+ * @param proto_bytes_out Output: allocated proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_get_proto(rac_model_registry_handle_t handle,
+                                                  const char* model_id,
+                                                  uint8_t** proto_bytes_out,
+                                                  size_t* proto_size_out);
+
+/**
+ * @brief List all model metadata as serialized runanywhere.v1.ModelInfoList bytes.
+ *
+ * The caller owns the returned buffer and must free it with
+ * rac_model_registry_proto_free().
+ *
+ * @param handle Registry handle
+ * @param proto_bytes_out Output: allocated proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_list_proto(rac_model_registry_handle_t handle,
+                                                   uint8_t** proto_bytes_out,
+                                                   size_t* proto_size_out);
+
+/**
+ * @brief Query model metadata using serialized runanywhere.v1.ModelQuery bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelInfoList bytes.
+ */
+RAC_API rac_result_t rac_model_registry_query_proto(rac_model_registry_handle_t handle,
+                                                    const uint8_t* query_proto_bytes,
+                                                    size_t query_proto_size,
+                                                    uint8_t** proto_bytes_out,
+                                                    size_t* proto_size_out);
+
+/**
+ * @brief List downloaded model metadata as serialized runanywhere.v1.ModelInfoList bytes.
+ */
+RAC_API rac_result_t rac_model_registry_list_downloaded_proto(rac_model_registry_handle_t handle,
+                                                              uint8_t** proto_bytes_out,
+                                                              size_t* proto_size_out);
+
+/**
+ * @brief Remove model metadata by id.
+ *
+ * Provided as part of the proto-byte ABI surface so SDK adapters can stop
+ * depending on struct/JSON registry paths for mutations.
+ *
+ * @param handle Registry handle
+ * @param model_id Model identifier
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_remove_proto(rac_model_registry_handle_t handle,
+                                                     const char* model_id);
+
+/**
+ * @brief Free buffers returned by registry proto-byte APIs.
+ *
+ * @param proto_bytes Buffer to free (may be NULL)
+ */
+RAC_API void rac_model_registry_proto_free(uint8_t* proto_bytes);
 
 // =============================================================================
 // QUERY HELPERS
@@ -349,6 +472,57 @@ RAC_API rac_result_t rac_model_registry_discover_downloaded(
  * @param result Discovery result to free
  */
 RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
+
+// =============================================================================
+// REFRESH - Unified cross-SDK registry refresh (T4.9)
+// =============================================================================
+
+/**
+ * @brief Options for rac_model_registry_refresh().
+ *
+ * Semantic fields (per task spec):
+ *   - include_remote_catalog: RAC_TRUE to fetch the remote model assignment
+ *       catalog via rac_model_assignment_fetch(force_refresh=TRUE). Requires
+ *       that rac_model_assignment_set_callbacks() has previously been called
+ *       (usually at SDK init); otherwise this step no-ops and returns success.
+ *   - rescan_local: RAC_TRUE to rescan on-disk model folders and link any
+ *       newly-discovered downloads back to registered model entries.
+ *       Requires discovery_callbacks to be non-NULL; otherwise this step is
+ *       skipped silently.
+ *   - prune_orphans: RAC_TRUE to clear local_path on models whose recorded
+ *       path no longer exists on disk (detected via
+ *       discovery_callbacks->path_exists). Requires discovery_callbacks to
+ *       be non-NULL; otherwise this step is skipped silently.
+ *
+ * discovery_callbacks mirrors rac_model_registry_discover_downloaded's
+ * callback struct. It stays optional in the ABI so consumers that only want
+ * `include_remote_catalog` don't have to wire platform file-IO stubs.
+ */
+typedef struct {
+    rac_bool_t include_remote_catalog;
+    rac_bool_t rescan_local;
+    rac_bool_t prune_orphans;
+    /** Optional — required only when rescan_local or prune_orphans is set. */
+    const rac_discovery_callbacks_t* discovery_callbacks;
+} rac_model_registry_refresh_opts_t;
+
+/**
+ * @brief Refresh the model registry.
+ *
+ * Unifies what used to be three separate SDK-specific calls (Kotlin's
+ * fetchModelAssignments, Flutter's discoverDownloadedModels, Swift's
+ * discoverDownloadedModels) behind a single C ABI. Each step is independent;
+ * a failure in one does not abort the others — the first non-success code
+ * encountered is returned so callers can still observe errors.
+ *
+ * @param handle Registry handle (usually rac_get_model_registry()).
+ * @param opts   Refresh options (passed by value).
+ * @return       RAC_SUCCESS if all requested steps succeeded.
+ *               RAC_ERROR_INVALID_ARGUMENT if handle is NULL.
+ *               Propagated error code from the first failing step otherwise.
+ */
+RAC_API rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
+                                                rac_model_registry_refresh_opts_t opts);
 
 #ifdef __cplusplus
 }

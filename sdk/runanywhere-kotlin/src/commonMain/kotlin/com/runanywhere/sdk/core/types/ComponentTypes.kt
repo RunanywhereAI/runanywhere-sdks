@@ -1,6 +1,9 @@
 package com.runanywhere.sdk.core.types
 
-import kotlinx.serialization.Serializable
+// Re-export the proto-generated AudioFormat so callers that previously imported
+// com.runanywhere.sdk.core.types.AudioFormat continue to resolve. The hand-rolled
+// enum class has been deleted per Iron Rule 2 / §15 of CANONICAL_API.md.
+typealias AudioFormat = ai.runanywhere.proto.v1.AudioFormat
 
 // MARK: - Component Protocols
 
@@ -27,32 +30,6 @@ interface ComponentConfiguration {
  */
 interface ComponentOutput {
     val timestamp: Long
-}
-
-// MARK: - Audio Format
-
-/**
- * Audio format enumeration.
- * Mirrors Swift's AudioFormat enum.
- */
-@Serializable
-enum class AudioFormat(
-    val rawValue: String,
-) {
-    PCM("pcm"),
-    WAV("wav"),
-    MP3("mp3"),
-    AAC("aac"),
-    OGG("ogg"),
-    OPUS("opus"),
-    FLAC("flac"),
-    ;
-
-    companion object {
-        fun fromRawValue(value: String): AudioFormat? {
-            return entries.find { it.rawValue.equals(value, ignoreCase = true) }
-        }
-    }
 }
 
 // MARK: - SDK Component
@@ -117,13 +94,20 @@ enum class SDKComponent(
 /**
  * Supported inference frameworks/runtimes for executing models.
  *
- * Matches iOS InferenceFramework exactly.
+ * GAP 01 Phase 3: this Kotlin enum is a subset of the IDL
+ * `runanywhere.v1.InferenceFramework`; Apple-only frameworks (`CoreML`, `MLX`,
+ * `WhisperKitCoreML`, `MetalRT`) and secondary runtimes (`TFLite`,
+ * `ExecuTorch`, etc.) are present in the proto but intentionally omitted here
+ * until the Kotlin SDK ships support. Adding a case here requires a
+ * corresponding IDL update; the `toProto()` bijection forces the mapping to
+ * stay in sync.
  */
 enum class InferenceFramework(
     val rawValue: String,
 ) {
     // Model-based frameworks
     ONNX("ONNX"),
+    SHERPA("Sherpa"), // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
     LLAMA_CPP("LlamaCpp"),
     FOUNDATION_MODELS("FoundationModels"),
     SYSTEM_TTS("SystemTTS"),
@@ -141,6 +125,7 @@ enum class InferenceFramework(
         get() =
             when (this) {
                 ONNX -> "ONNX Runtime"
+                SHERPA -> "Sherpa-ONNX"
                 LLAMA_CPP -> "llama.cpp"
                 FOUNDATION_MODELS -> "Foundation Models"
                 SYSTEM_TTS -> "System TTS"
@@ -156,6 +141,7 @@ enum class InferenceFramework(
         get() =
             when (this) {
                 ONNX -> "onnx"
+                SHERPA -> "sherpa"
                 LLAMA_CPP -> "llama_cpp"
                 FOUNDATION_MODELS -> "foundation_models"
                 SYSTEM_TTS -> "system_tts"
@@ -166,18 +152,43 @@ enum class InferenceFramework(
                 UNKNOWN -> "unknown"
             }
 
+    /** Convert to the IDL-generated Wire enum. */
+    fun toProto(): ai.runanywhere.proto.v1.InferenceFramework =
+        when (this) {
+            ONNX -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+            SHERPA -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+            LLAMA_CPP -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+            FOUNDATION_MODELS -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
+            SYSTEM_TTS -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+            FLUID_AUDIO -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
+            GENIE -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE
+            BUILT_IN -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN
+            NONE -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE
+            UNKNOWN -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+        }
+
     companion object {
         /** Create from raw string value, matching case-insensitively */
         fun fromRawValue(value: String): InferenceFramework {
             val lowercased = value.lowercase()
-
-            // Try exact match
             entries.find { it.rawValue.equals(value, ignoreCase = true) }?.let { return it }
-
-            // Try analytics key match
             entries.find { it.analyticsKey == lowercased }?.let { return it }
-
             return UNKNOWN
         }
+
+        /** Decode from the IDL-generated Wire enum; unsupported → UNKNOWN. */
+        fun fromProto(proto: ai.runanywhere.proto.v1.InferenceFramework): InferenceFramework =
+            when (proto) {
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> ONNX
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> SHERPA
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> LLAMA_CPP
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> FOUNDATION_MODELS
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> SYSTEM_TTS
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> FLUID_AUDIO
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> GENIE
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> BUILT_IN
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE -> NONE
+                else -> UNKNOWN
+            }
     }
 }

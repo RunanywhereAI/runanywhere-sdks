@@ -46,7 +46,7 @@ export { DiffusionScheduler, DiffusionModelVariant, DiffusionMode } from './Exte
 export type { DiffusionGenerationOptions, DiffusionGenerationResult, DiffusionProgressCallback } from './Extensions/RunAnywhere+Diffusion';
 export { Embeddings } from './Extensions/RunAnywhere+Embeddings';
 export { EmbeddingsNormalize, EmbeddingsPooling } from './Extensions/RunAnywhere+Embeddings';
-export type { EmbeddingVector, EmbeddingsResult, EmbeddingsOptions } from './Extensions/RunAnywhere+Embeddings';
+export type { EmbeddingVector, EmbeddingsResult, EmbeddingsCallOptions } from './Extensions/RunAnywhere+Embeddings';
 
 // Telemetry & Analytics
 export { TelemetryService, getOrCreateDeviceId } from './Foundation/TelemetryService';

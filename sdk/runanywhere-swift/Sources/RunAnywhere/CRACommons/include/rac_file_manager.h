@@ -149,6 +149,11 @@ typedef struct {
  * Creates: Models/, Cache/, Temp/, Downloads/ under {base_dir}/RunAnywhere/
  * Uses rac_model_paths for path computation.
  *
+ * Replaces:
+ * - Swift: SimplifiedFileManager.createDirectoryStructure()
+ * - Kotlin: SharedFileSystem directory creation
+ * - Flutter: SimplifiedFileManager._createDirectoryStructure()
+ *
  * @param cb Platform I/O callbacks
  * @return RAC_SUCCESS or error code
  */
@@ -171,9 +176,9 @@ RAC_API rac_result_t rac_file_manager_create_directory_structure(const rac_file_
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb,
-                                                           const char* model_id,
-                                                           rac_inference_framework_t framework,
-                                                           char* out_path, size_t path_size);
+                                                          const char* model_id,
+                                                          rac_inference_framework_t framework,
+                                                          char* out_path, size_t path_size);
 
 /**
  * @brief Check if a model folder exists and optionally if it has contents.
@@ -186,13 +191,17 @@ RAC_API rac_result_t rac_file_manager_create_model_folder(const rac_file_callbac
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb,
-                                                           const char* model_id,
-                                                           rac_inference_framework_t framework,
-                                                           rac_bool_t* out_exists,
-                                                           rac_bool_t* out_has_contents);
+                                                          const char* model_id,
+                                                          rac_inference_framework_t framework,
+                                                          rac_bool_t* out_exists,
+                                                          rac_bool_t* out_has_contents);
 
 /**
  * @brief Delete a model folder recursively.
+ *
+ * Replaces:
+ * - Swift: SimplifiedFileManager.deleteModel(modelId:framework:)
+ * - Flutter: SimplifiedFileManager.deleteModelFolder()
  *
  * @param cb Platform I/O callbacks
  * @param model_id Model identifier
@@ -200,8 +209,8 @@ RAC_API rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbac
  * @return RAC_SUCCESS, or RAC_ERROR_FILE_NOT_FOUND if folder doesn't exist
  */
 RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb,
-                                                    const char* model_id,
-                                                    rac_inference_framework_t framework);
+                                                   const char* model_id,
+                                                   rac_inference_framework_t framework);
 
 // =============================================================================
 // DIRECTORY SIZE CALCULATION
@@ -210,23 +219,34 @@ RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* c
 /**
  * @brief Calculate directory size recursively.
  *
+ * Traverses the directory tree using callbacks, summing file sizes.
+ * This is the core duplicated logic across all SDKs.
+ *
+ * Replaces:
+ * - Swift: SimplifiedFileManager.calculateDirectorySize(at:)
+ * - Kotlin: calculateDirectorySize(directory:)
+ * - Flutter: SimplifiedFileManager.calculateModelsSize()
+ * - RN: FileSystem.getDirectorySize()
+ *
  * @param cb Platform I/O callbacks
  * @param path Directory path to measure
  * @param out_size Output: Total size in bytes
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb,
-                                                          const char* path, int64_t* out_size);
+                                                         const char* path, int64_t* out_size);
 
 /**
  * @brief Get total models directory storage used.
+ *
+ * Convenience wrapper: calculates size of the models directory.
  *
  * @param cb Platform I/O callbacks
  * @param out_size Output: Total models size in bytes
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb,
-                                                           int64_t* out_size);
+                                                          int64_t* out_size);
 
 // =============================================================================
 // CACHE & TEMP MANAGEMENT
@@ -235,6 +255,14 @@ RAC_API rac_result_t rac_file_manager_models_storage_used(const rac_file_callbac
 /**
  * @brief Clear the cache directory.
  *
+ * Deletes all files and subdirectories in the cache directory,
+ * then recreates the empty cache directory.
+ *
+ * Replaces:
+ * - Swift: SimplifiedFileManager.clearCache()
+ * - Kotlin: RunAnywhere.clearCache()
+ * - Flutter: SimplifiedFileManager.clearCache()
+ *
  * @param cb Platform I/O callbacks
  * @return RAC_SUCCESS or error code
  */
@@ -242,6 +270,13 @@ RAC_API rac_result_t rac_file_manager_clear_cache(const rac_file_callbacks_t* cb
 
 /**
  * @brief Clear the temp directory.
+ *
+ * Deletes all files and subdirectories in the temp directory,
+ * then recreates the empty temp directory.
+ *
+ * Replaces:
+ * - Swift: SimplifiedFileManager.cleanTempFiles()
+ * - Flutter: SimplifiedFileManager.clearTemp()
  *
  * @param cb Platform I/O callbacks
  * @return RAC_SUCCESS or error code
@@ -255,8 +290,7 @@ RAC_API rac_result_t rac_file_manager_clear_temp(const rac_file_callbacks_t* cb)
  * @param out_size Output: Cache size in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
-                                                  int64_t* out_size);
+RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb, int64_t* out_size);
 
 // =============================================================================
 // STORAGE INFO
@@ -265,24 +299,40 @@ RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
 /**
  * @brief Get combined storage information.
  *
+ * Calculates device storage, models size, cache size, and temp size
+ * in a single call.
+ *
+ * Replaces:
+ * - Swift: SimplifiedFileManager.getDeviceStorageInfo() + getAvailableSpace()
+ * - Kotlin: RunAnywhere.storageInfo()
+ * - Flutter: SimplifiedFileManager.getDeviceStorageInfo()
+ *
  * @param cb Platform I/O callbacks
  * @param out_info Output: Storage information
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
-                                                        rac_file_manager_storage_info_t* out_info);
+                                                       rac_file_manager_storage_info_t* out_info);
 
 /**
  * @brief Check storage availability for a download.
  *
+ * Checks if enough space is available and warns if remaining
+ * space would be below 1GB after the operation.
+ *
+ * Replaces:
+ * - Kotlin: RunAnywhere.checkStorageAvailability(requiredBytes:)
+ * - Swift: storage availability logic in download flow
+ *
  * @param cb Platform I/O callbacks
  * @param required_bytes Space needed in bytes
- * @param out_availability Output: Availability result
+ * @param out_availability Output: Availability result (uses rac_storage_availability_t
+ *        from rac_storage_analyzer.h)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_check_storage(
-    const rac_file_callbacks_t* cb, int64_t required_bytes,
-    rac_storage_availability_t* out_availability);
+RAC_API rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb,
+                                                    int64_t required_bytes,
+                                                    rac_storage_availability_t* out_availability);
 
 // =============================================================================
 // DIRECTORY CLEARING (INTERNAL HELPER)
@@ -291,12 +341,15 @@ RAC_API rac_result_t rac_file_manager_check_storage(
 /**
  * @brief Clear all contents of a directory (delete + recreate).
  *
+ * Useful for clearing any directory. Used internally by
+ * rac_file_manager_clear_cache() and rac_file_manager_clear_temp().
+ *
  * @param cb Platform I/O callbacks
  * @param path Directory path to clear
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_clear_directory(const rac_file_callbacks_t* cb,
-                                                       const char* path);
+                                                      const char* path);
 
 #ifdef __cplusplus
 }

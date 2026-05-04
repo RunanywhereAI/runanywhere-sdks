@@ -5,6 +5,7 @@
 
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showToast, showEvictionDialog } from './dialogs';
+import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
 
 let modalEl: HTMLElement | null = null;
 
@@ -131,7 +132,7 @@ function renderModelList(models: ModelInfo[]): void {
           <div class="model-info">
             <div class="model-name">${m.name}</div>
             <div class="model-meta">
-              <span class="model-framework-badge">${m.framework}</span>
+              <span class="model-framework-badge">${formatFramework(m.framework)}</span>
               ${m.memoryRequirement ? `<span class="model-size">${formatMB(m.memoryRequirement)}</span>` : ''}
             </div>
             ${progressBar}
@@ -156,10 +157,36 @@ function renderModelList(models: ModelInfo[]): void {
         if (success) {
           showToast(`${ModelManager.getModels().find((m) => m.id === modelId)?.name ?? 'Model'} Ready`);
           closeSheet();
+        } else {
+          // B-WEB-4-001 / B-WEB-5-001: surface the load error inline below
+          // the row so the user has context and the drawer stays open
+          // (no silent rollback to "Retry"). ModelManager records the
+          // last error on the model under .error.
+          const failed = ModelManager.getModels().find((m) => m.id === modelId);
+          const errorMsg = (failed as { error?: string } | undefined)?.error
+            ?? 'Load failed. See console for details.';
+          renderInlineError(modelId, errorMsg);
         }
       }
     });
   });
+}
+
+/**
+ * Inject (or replace) an inline error chip below a specific model row.
+ * Surfaces the captured load error so the user knows _why_ a load
+ * failed instead of seeing the row silently revert to Retry.
+ */
+function renderInlineError(modelId: string, message: string): void {
+  const row = document.querySelector(`[data-model-id="${CSS.escape(modelId)}"]`);
+  if (!row) return;
+  let errorEl = row.querySelector<HTMLElement>('.model-row-error');
+  if (!errorEl) {
+    errorEl = document.createElement('div');
+    errorEl.className = 'model-row-error error';
+    row.appendChild(errorEl);
+  }
+  errorEl.textContent = message;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,8 +271,13 @@ function getModelEmoji(model: ModelInfo): string {
     case ModelCategory.SpeechRecognition: return '&#127908;';
     case ModelCategory.SpeechSynthesis: return '&#128266;';
     case ModelCategory.ImageGeneration: return '&#127912;';
+    case ModelCategory.VoiceActivityDetection: return '&#128483;';
     default: return '&#129302;';
   }
+}
+
+function formatFramework(framework: ModelInfo['framework']): string {
+  return inferenceFrameworkToJSON(framework).replace(/^INFERENCE_FRAMEWORK_/, '').replaceAll('_', ' ');
 }
 
 function formatMB(bytes: number): string {

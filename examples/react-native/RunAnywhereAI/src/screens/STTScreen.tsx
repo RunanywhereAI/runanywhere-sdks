@@ -14,7 +14,7 @@
  * Architecture:
  * - Uses native audio recording (AudioService)
  * - Model loading via RunAnywhere.loadSTTModel()
- * - Transcription via RunAnywhere.transcribeAudio()
+ * - Transcription via RunAnywhere.transcribe()
  * - Supports ONNX-based Whisper models
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
@@ -35,6 +35,7 @@ import {
   Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -47,11 +48,15 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework } from '../types/model';
+import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 import { STTMode } from '../types/voice';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  STTLanguage,
+  type ModelInfo as SDKModelInfo,
+} from '@runanywhere/core';
 
 // STT Model IDs (kept for reference, uses SDK model registry)
 const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
@@ -70,6 +75,9 @@ export const STTScreen: React.FC = () => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showModelSelection, setShowModelSelection] = useState(false);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Audio recording path ref (for batch mode only)
   const recordingPath = useRef<string | null>(null);
@@ -142,7 +150,8 @@ export const STTScreen: React.FC = () => {
       const allModels = await RunAnywhere.getAvailableModels();
       // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === 'speech-recognition'
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setAvailableModels(sttModels);
 
@@ -238,7 +247,7 @@ export const STTScreen: React.FC = () => {
       // and finding the correct nested model folder
       const success = await RunAnywhere.loadSTTModel(
         model.localPath,
-        model.category || 'whisper'
+        'whisper'
       );
 
       if (success) {
@@ -430,7 +439,7 @@ export const STTScreen: React.FC = () => {
       // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
       console.warn('[STTScreen] Starting transcription...');
       const result = await RunAnywhere.transcribeFile(normalizedPath, {
-        language: 'en',
+        language: STTLanguage.STT_LANGUAGE_EN,
       });
 
       console.warn('[STTScreen] Transcription result:', result);
@@ -597,7 +606,7 @@ export const STTScreen: React.FC = () => {
 
       // Transcribe using native module (handles audio decoding)
       const result = await RunAnywhere.transcribeFile(audioPath, {
-        language: 'en',
+        language: STTLanguage.STT_LANGUAGE_EN,
       });
       console.warn('[STTScreen] Live chunk transcription:', result.text);
 
@@ -670,7 +679,7 @@ export const STTScreen: React.FC = () => {
             console.warn('[STTScreen] Transcribing final live chunk...');
             // Transcribe using native module (handles audio decoding)
             const result = await RunAnywhere.transcribeFile(audioPath, {
-              language: 'en',
+              language: STTLanguage.STT_LANGUAGE_EN,
             });
             if (result.text && result.text.trim()) {
               const newText = result.text.trim();
@@ -806,7 +815,7 @@ export const STTScreen: React.FC = () => {
    * Render header
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
       <Text style={styles.title}>Speech to Text</Text>
       {transcript && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -994,7 +1003,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

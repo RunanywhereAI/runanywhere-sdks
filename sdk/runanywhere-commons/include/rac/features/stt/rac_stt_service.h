@@ -46,6 +46,32 @@ typedef struct rac_stt_service_ops {
 
     /** Destroy the service */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new STT service instance.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
+
+    /**
+     * Enumerate language codes the backend can transcribe as a JSON array of
+     * BCP-47-ish strings, e.g. "[\"en\",\"es\",\"fr\"]". Callee allocates with
+     * malloc; caller MUST free via free(). Returns RAC_ERROR_NOT_SUPPORTED if
+     * the backend cannot enumerate (leave this slot NULL to get that behavior
+     * for free via the generic dispatcher).
+     */
+    rac_result_t (*get_languages)(void* impl, char** out_json);
+
+    /**
+     * Detect the spoken language of a short PCM audio clip. audio_data layout
+     * follows the same format backends use for transcribe() (Int16 mono).
+     * Writes a NUL-terminated language code (e.g. "en") to *out_language;
+     * callee allocates with malloc, caller MUST free via free(). Returns
+     * RAC_ERROR_NOT_SUPPORTED when the slot is NULL.
+     */
+    rac_result_t (*detect_language)(void* impl, const void* audio_data, size_t audio_size,
+                                    const rac_stt_options_t* options, char** out_language);
 } rac_stt_service_ops_t;
 
 /**
@@ -146,6 +172,36 @@ RAC_API void rac_stt_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_stt_result_free(rac_stt_result_t* result);
+
+/**
+ * @brief Get supported languages for the loaded STT model as a JSON array string.
+ *
+ * Dispatches through the backend vtable. Returns RAC_ERROR_NOT_SUPPORTED if the
+ * backend does not enumerate languages.
+ *
+ * @param handle      Service handle
+ * @param out_json    Output: malloc'd JSON string (e.g. "[\"en\",\"es\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_stt_get_languages(rac_handle_t handle, char** out_json);
+
+/**
+ * @brief Detect language of an audio clip via the loaded STT model.
+ *
+ * Dispatches through the backend vtable. Returns RAC_ERROR_NOT_SUPPORTED if the
+ * backend does not expose language detection.
+ *
+ * @param handle        Service handle
+ * @param audio_data    PCM audio buffer (backend-defined format, typically Int16 mono 16 kHz)
+ * @param audio_size    Size of audio_data in bytes
+ * @param options       Optional decoding hints (can be NULL)
+ * @param out_language  Output: malloc'd NUL-terminated language code. Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* audio_data,
+                                             size_t audio_size,
+                                             const rac_stt_options_t* options,
+                                             char** out_language);
 
 #ifdef __cplusplus
 }

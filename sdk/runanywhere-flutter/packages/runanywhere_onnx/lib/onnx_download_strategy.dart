@@ -3,8 +3,8 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
-import 'package:http/http.dart' as http;
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/adapters/model_download_adapter.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -74,7 +74,7 @@ class OnnxDownloadStrategy {
         progressHandler: progressHandler,
       );
     } else {
-      throw SDKError.downloadFailed(
+      throw SDKException.downloadFailed(
         urlString,
         'Unsupported ONNX model format',
       );
@@ -204,8 +204,7 @@ class OnnxDownloadStrategy {
     );
     final modelDir = foundPath != null ? Directory(foundPath) : modelFolder;
     if (foundPath != null && foundPath != modelFolder.path) {
-      logger.info(
-          'Model files found at: ${foundPath.split('/').last}');
+      logger.info('Model files found at: ${foundPath.split('/').last}');
     }
 
     // Report completion (100%)
@@ -240,7 +239,7 @@ class OnnxDownloadStrategy {
       );
 
       if (result != 0) {
-        throw SDKError.downloadFailed(
+        throw SDKException.downloadFailed(
           archivePath,
           'Native extraction failed with code: $result',
         );
@@ -262,33 +261,23 @@ class OnnxDownloadStrategy {
     // Ensure destination directory exists
     await to.parent.create(recursive: true);
 
-    final request = http.Request('GET', from);
-    final response = await http.Client().send(request);
-
-    if (response.statusCode != 200) {
-      throw SDKError.downloadFailed(
+    try {
+      await ModelDownloadService.shared.downloadFile(
+        downloadId: '${from.toString()} -> ${to.path}',
+        url: from,
+        destination: to,
+        onProgress: (bytesDownloaded, totalBytes) {
+          if (totalBytes > 0 && progressHandler != null) {
+            progressHandler(bytesDownloaded / totalBytes);
+          }
+        },
+      );
+    } catch (e) {
+      throw SDKException.downloadFailed(
         from.toString(),
-        'Download failed with status ${response.statusCode}',
+        e.toString(),
       );
     }
-
-    final totalBytes = response.contentLength ?? 0;
-    int bytesDownloaded = 0;
-
-    final sink = to.openWrite();
-
-    // Stream response and track progress
-    await for (final chunk in response.stream) {
-      sink.add(chunk);
-      bytesDownloaded += chunk.length;
-
-      if (totalBytes > 0 && progressHandler != null) {
-        final progress = bytesDownloaded / totalBytes;
-        progressHandler(progress);
-      }
-    }
-
-    await sink.close();
 
     if (progressHandler != null) {
       progressHandler(1.0);

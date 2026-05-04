@@ -4,14 +4,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/public/runanywhere_tool_calling.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart' show ToolDefinition, ToolParameter, ToolParameterType, ToolCallingOptions;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 
 /// ToolsView - Demonstrates tool calling functionality
 ///
@@ -27,8 +26,12 @@ class _ToolsViewState extends State<ToolsView> {
   final TextEditingController _promptController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  // Single source of truth for the tool-calling toggle (B-FL-2-001).
+  // The Settings tab also reads/writes this same singleton so toggling
+  // in one place reflects in the other.
+  final ToolSettingsViewModel _toolSettings = ToolSettingsViewModel.shared;
+
   // State
-  bool _toolCallingEnabled = true;
   bool _isGenerating = false;
   String? _errorMessage;
   List<ToolDefinition> _registeredTools = [];
@@ -40,35 +43,30 @@ class _ToolsViewState extends State<ToolsView> {
   // Model state
   String? _loadedModelName;
 
+  bool get _toolCallingEnabled => _toolSettings.toolCallingEnabled;
+
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSettings());
+    _toolSettings.addListener(_onToolSettingsChanged);
     unawaited(_syncModelState());
     _registerDemoTools();
   }
 
   @override
   void dispose() {
+    _toolSettings.removeListener(_onToolSettingsChanged);
     _promptController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _toolCallingEnabled = prefs.getBool('tool_calling_enabled') ?? true;
-    });
-  }
-
-  Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('tool_calling_enabled', _toolCallingEnabled);
+  void _onToolSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.currentLLMModel();
+    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -78,18 +76,17 @@ class _ToolsViewState extends State<ToolsView> {
 
   /// Register demo tools matching iOS/Android examples
   void _registerDemoTools() {
-    // Clear any existing tools
-    RunAnywhereTools.clearTools();
+    sdk.RunAnywhereSDK.instance.tools.clear();
 
     // 1. Weather tool
-    RunAnywhereTools.registerTool(
-      const ToolDefinition(
+    sdk.RunAnywhereSDK.instance.tools.register(
+      ToolDefinition(
         name: 'get_weather',
         description: 'Get current weather for a location',
         parameters: [
           ToolParameter(
             name: 'location',
-            type: ToolParameterType.string,
+            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description: 'City name or coordinates (e.g., "San Francisco, CA")',
           ),
         ],
@@ -98,14 +95,14 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 2. Calculator tool
-    RunAnywhereTools.registerTool(
-      const ToolDefinition(
+    sdk.RunAnywhereSDK.instance.tools.register(
+      ToolDefinition(
         name: 'calculate',
         description: 'Perform basic arithmetic calculations',
         parameters: [
           ToolParameter(
             name: 'expression',
-            type: ToolParameterType.string,
+            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description: 'Math expression (e.g., "2 + 2", "10 * 5")',
           ),
         ],
@@ -114,8 +111,8 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 3. Time tool
-    RunAnywhereTools.registerTool(
-      const ToolDefinition(
+    sdk.RunAnywhereSDK.instance.tools.register(
+      ToolDefinition(
         name: 'get_current_time',
         description: 'Get the current date and time',
         parameters: [],
@@ -124,20 +121,20 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     setState(() {
-      _registeredTools = RunAnywhereTools.getRegisteredTools();
+      _registeredTools = sdk.RunAnywhereSDK.instance.tools.registeredTools();
     });
   }
 
   /// Weather tool executor - fetches real weather data
-  Future<Map<String, ToolValue>> _fetchWeather(
-    Map<String, ToolValue> args,
+  Future<Map<String, dynamic>> _fetchWeather(
+    Map<String, dynamic> args,
   ) async {
-    final rawLocation = args['location']?.stringValue;
+    final rawLocation = args['location'] as String?;
 
     // Require location argument - no hardcoded defaults
     if (rawLocation == null || rawLocation.isEmpty) {
       return {
-        'error': const StringToolValue('Missing required argument: location'),
+        'error': 'Missing required argument: location',
       };
     }
 
@@ -159,8 +156,8 @@ class _ToolsViewState extends State<ToolsView> {
       final results = geocodeData['results'] as List?;
       if (results == null || results.isEmpty) {
         return {
-          'error': StringToolValue('Could not find location: $location'),
-          'location': StringToolValue(location),
+          'error': 'Could not find location: $location',
+          'location': location,
         };
       }
 
@@ -187,17 +184,17 @@ class _ToolsViewState extends State<ToolsView> {
       final weatherCode = current['weather_code'] as int? ?? 0;
 
       return {
-        'location': StringToolValue(cityName),
-        'temperature': NumberToolValue(temp.toDouble()),
-        'unit': const StringToolValue('fahrenheit'),
-        'humidity': NumberToolValue(humidity.toDouble()),
-        'wind_speed_mph': NumberToolValue(windSpeed.toDouble()),
-        'condition': StringToolValue(_weatherCodeToCondition(weatherCode)),
+        'location': cityName,
+        'temperature': temp.toDouble(),
+        'unit': 'fahrenheit',
+        'humidity': humidity.toDouble(),
+        'wind_speed_mph': windSpeed.toDouble(),
+        'condition': _weatherCodeToCondition(weatherCode),
       };
     } catch (e) {
       return {
-        'error': StringToolValue('Weather fetch failed: $e'),
-        'location': StringToolValue(location),
+        'error': 'Weather fetch failed: $e',
+        'location': location,
       };
     }
   }
@@ -284,15 +281,15 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   /// Calculator tool executor
-  Future<Map<String, ToolValue>> _calculate(
-    Map<String, ToolValue> args,
+  Future<Map<String, dynamic>> _calculate(
+    Map<String, dynamic> args,
   ) async {
-    final expression = args['expression']?.stringValue;
+    final expression = args['expression'] as String?;
     
     // Require expression argument - no hardcoded defaults
     if (expression == null || expression.isEmpty) {
       return {
-        'error': const StringToolValue('Missing required argument: expression'),
+        'error': 'Missing required argument: expression',
       };
     }
 
@@ -300,13 +297,13 @@ class _ToolsViewState extends State<ToolsView> {
       // Simple expression parser for basic arithmetic
       final result = _evaluateExpression(expression);
       return {
-        'expression': StringToolValue(expression),
-        'result': NumberToolValue(result),
+        'expression': expression,
+        'result': result,
       };
     } catch (e) {
       return {
-        'error': StringToolValue('Calculation failed: $e'),
-        'expression': StringToolValue(expression),
+        'error': 'Calculation failed: $e',
+        'expression': expression,
       };
     }
   }
@@ -363,23 +360,21 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   /// Time tool executor
-  Future<Map<String, ToolValue>> _getCurrentTime(
-    Map<String, ToolValue> args,
+  Future<Map<String, dynamic>> _getCurrentTime(
+    Map<String, dynamic> args,
   ) async {
     final now = DateTime.now();
     return {
-      'date': StringToolValue(
+      'date':
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
-      ),
-      'time': StringToolValue(
+      'time':
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
-      ),
-      'timezone': StringToolValue(now.timeZoneName),
+      'timezone': now.timeZoneName,
     };
   }
 
   Future<void> _runToolCalling() async {
-    if (!sdk.RunAnywhere.isModelLoaded) {
+    if (!sdk.RunAnywhereSDK.instance.llm.isLoaded) {
       setState(() {
         _errorMessage = 'Please load an LLM model first';
       });
@@ -404,28 +399,29 @@ class _ToolsViewState extends State<ToolsView> {
     try {
       _addToLog('Starting generation with tools...');
 
-      final result = await RunAnywhereTools.generateWithTools(
+      final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
         prompt,
-        options: const ToolCallingOptions(
-          maxToolCalls: 3,
+        options: ToolCallingOptions(
+          maxIterations: 3,
           autoExecute: true,
         ),
       );
 
       // Log tool calls
       for (final toolCall in result.toolCalls) {
-        _addToLog('Tool called: ${toolCall.toolName}');
-        _addToLog('Arguments: ${toolCall.arguments}');
+        _addToLog('Tool called: ${toolCall.name}');
+        _addToLog('Arguments: ${toolCall.argumentsJson}');
       }
 
       // Log tool results
       for (final toolResult in result.toolResults) {
-        _addToLog('Tool result: ${toolResult.toolName}');
-        _addToLog('Success: ${toolResult.success}');
-        if (toolResult.result != null) {
-          _addToLog('Result: ${toolResult.result}');
+        _addToLog('Tool result: ${toolResult.name}');
+        final hasError = toolResult.error.isNotEmpty;
+        _addToLog('Success: ${!hasError}');
+        if (toolResult.resultJson.isNotEmpty) {
+          _addToLog('Result: ${toolResult.resultJson}');
         }
-        if (toolResult.error != null) {
+        if (hasError) {
           _addToLog('Error: ${toolResult.error}');
         }
       }
@@ -565,10 +561,9 @@ class _ToolsViewState extends State<ToolsView> {
         subtitle: const Text('Allow LLM to use external tools'),
         value: _toolCallingEnabled,
         onChanged: (value) {
-          setState(() {
-            _toolCallingEnabled = value;
-          });
-          unawaited(_saveSettings());
+          // Routes through ToolSettingsViewModel.shared so the Settings
+          // tab toggle stays in sync (B-FL-2-001).
+          _toolSettings.toolCallingEnabled = value;
         },
       ),
     );

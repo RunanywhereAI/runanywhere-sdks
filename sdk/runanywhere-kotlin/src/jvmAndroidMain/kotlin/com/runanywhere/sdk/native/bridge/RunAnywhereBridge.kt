@@ -16,6 +16,12 @@ package com.runanywhere.sdk.native.bridge
 
 import com.runanywhere.sdk.foundation.SDKLogger
 
+/*
+ * Transport DTOs/listeners used by native HTTP bindings live in
+ * RunAnywhereBridgeTransportTypes.kt. External JNI declarations stay on this
+ * object because the native library exports Java_*_RunAnywhereBridge_* symbols.
+ */
+
 /**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
@@ -98,6 +104,29 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racLog(level: Int, tag: String, message: String)
+
+    // ========================================================================
+    // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
+    // Path shape: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/
+    // ========================================================================
+
+    /**
+     * Set the base directory used by C++ path utilities.
+     * Must be called once during SDK init before any model path lookups.
+     */
+    @JvmStatic
+    external fun racModelPathsSetBaseDir(baseDir: String): Int
+
+    /**
+     * Get the model folder path under the canonical schema:
+     * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
+     *
+     * @param modelId Model identifier
+     * @param framework Inference framework int matching RAC_FRAMEWORK_* values
+     * @return The model folder path, or null on error
+     */
+    @JvmStatic
+    external fun racModelPathsGetModelFolder(modelId: String, framework: Int): String?
 
     // ========================================================================
     // LLM COMPONENT (rac_llm_component.h)
@@ -187,8 +216,21 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentTokenize(handle: Long, text: String): Int
 
+    // ========================================================================
+    // LLM GENERATED-PROTO ABI (rac_llm_service.h)
+    // ========================================================================
+
     @JvmStatic
-    external fun racLlmSetCallbacks(streamCallback: Any?, progressCallback: Any?)
+    external fun racLlmGenerateProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racLlmGenerateStreamProto(
+        requestProto: ByteArray,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
+    @JvmStatic
+    external fun racLlmCancelProto(): ByteArray?
 
     // ========================================================================
     // LLM LORA ADAPTER (rac_llm_component.h - LoRA section)
@@ -252,8 +294,24 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttComponentDetectLanguage(handle: Long, audioData: ByteArray): String?
 
+    // ========================================================================
+    // STT GENERATED-PROTO ABI (rac_stt_component.h)
+    // ========================================================================
+
     @JvmStatic
-    external fun racSttSetCallbacks(frameCallback: Any?, progressCallback: Any?)
+    external fun racSttComponentTranscribeProto(
+        handle: Long,
+        audioData: ByteArray,
+        optionsProto: ByteArray?,
+    ): ByteArray?
+
+    @JvmStatic
+    external fun racSttComponentTranscribeStreamProto(
+        handle: Long,
+        audioData: ByteArray,
+        optionsProto: ByteArray?,
+        listener: NativeProtoProgressListener?,
+    ): Int
 
     // ========================================================================
     // TTS COMPONENT (rac_tts_component.h)
@@ -298,8 +356,30 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTtsComponentGetLanguages(handle: Long): String?
 
+    // ========================================================================
+    // TTS GENERATED-PROTO ABI (rac_tts_component.h)
+    // ========================================================================
+
     @JvmStatic
-    external fun racTtsSetCallbacks(audioCallback: Any?, progressCallback: Any?)
+    external fun racTtsComponentListVoicesProto(
+        handle: Long,
+        listener: NativeProtoProgressListener,
+    ): Int
+
+    @JvmStatic
+    external fun racTtsComponentSynthesizeProto(
+        handle: Long,
+        text: String,
+        optionsProto: ByteArray?,
+    ): ByteArray?
+
+    @JvmStatic
+    external fun racTtsComponentSynthesizeStreamProto(
+        handle: Long,
+        text: String,
+        optionsProto: ByteArray?,
+        listener: NativeProtoProgressListener?,
+    ): Int
 
     // ========================================================================
     // VAD COMPONENT (rac_vad_component.h)
@@ -347,13 +427,28 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVadComponentGetSampleRates(handle: Long): String?
 
+    // ========================================================================
+    // VAD GENERATED-PROTO ABI (rac_vad_component.h)
+    // ========================================================================
+
     @JvmStatic
-    external fun racVadSetCallbacks(
-        frameCallback: Any?,
-        speechStartCallback: Any?,
-        speechEndCallback: Any?,
-        progressCallback: Any?,
-    )
+    external fun racVadComponentConfigureProto(handle: Long, configProto: ByteArray): Int
+
+    @JvmStatic
+    external fun racVadComponentProcessProto(
+        handle: Long,
+        samples: FloatArray,
+        optionsProto: ByteArray?,
+    ): ByteArray?
+
+    @JvmStatic
+    external fun racVadComponentGetStatisticsProto(handle: Long): ByteArray?
+
+    @JvmStatic
+    external fun racVadComponentSetActivityProtoCallback(
+        handle: Long,
+        listener: NativeProtoProgressListener?,
+    ): Int
 
     // ========================================================================
     // VLM COMPONENT (rac_vlm_component.h)
@@ -456,14 +551,35 @@ object RunAnywhereBridge {
     external fun racVlmComponentGetMetrics(handle: Long): String?
 
     // ========================================================================
-    // HTTP DOWNLOAD (platform adapter callbacks)
+    // VLM GENERATED-PROTO SERVICE ABI (rac_vlm_service.h)
     // ========================================================================
 
     @JvmStatic
-    external fun racHttpDownloadReportProgress(taskId: String, downloadedBytes: Long, totalBytes: Long): Int
+    external fun racVlmCreate(modelIdOrPath: String): Long
 
     @JvmStatic
-    external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
+    external fun racVlmInitialize(handle: Long, modelPath: String, mmprojPath: String?): Int
+
+    @JvmStatic
+    external fun racVlmProcessProto(
+        handle: Long,
+        imageProto: ByteArray,
+        optionsProto: ByteArray,
+    ): ByteArray?
+
+    @JvmStatic
+    external fun racVlmProcessStreamProto(
+        handle: Long,
+        imageProto: ByteArray,
+        optionsProto: ByteArray,
+        listener: NativeProtoProgressListener?,
+    ): ByteArray?
+
+    @JvmStatic
+    external fun racVlmCancelProto(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmDestroy(handle: Long)
 
     // ========================================================================
     // ARCHIVE EXTRACTION (rac_extraction.h)
@@ -622,6 +738,99 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
+
+    /**
+     * Register model metadata from serialized runanywhere.v1.ModelInfo bytes.
+     *
+     * The JNI implementation should forward to `rac_model_registry_register_proto`.
+     */
+    @JvmStatic
+    external fun racModelRegistryRegisterProto(modelInfoProto: ByteArray): Int
+
+    /**
+     * Update existing model metadata from serialized runanywhere.v1.ModelInfo bytes.
+     *
+     * The JNI implementation should forward to `rac_model_registry_update_proto`.
+     */
+    @JvmStatic
+    external fun racModelRegistryUpdateProto(modelInfoProto: ByteArray): Int
+
+    /**
+     * Get serialized runanywhere.v1.ModelInfo bytes for one model.
+     *
+     * Returns null when the model is not found or when the native proto ABI is unavailable.
+     */
+    @JvmStatic
+    external fun racModelRegistryGetProto(modelId: String): ByteArray?
+
+    /**
+     * List all models as serialized runanywhere.v1.ModelInfoList bytes.
+     *
+     * Returns null when the native proto ABI is unavailable.
+     */
+    @JvmStatic
+    external fun racModelRegistryListProto(): ByteArray?
+
+    /**
+     * Query model metadata using serialized runanywhere.v1.ModelQuery bytes.
+     *
+     * Returns serialized runanywhere.v1.ModelInfoList bytes.
+     */
+    @JvmStatic
+    external fun racModelRegistryQueryProto(queryProto: ByteArray): ByteArray?
+
+    /**
+     * List downloaded models as serialized runanywhere.v1.ModelInfoList bytes.
+     */
+    @JvmStatic
+    external fun racModelRegistryListDownloadedProto(): ByteArray?
+
+    /**
+     * Remove a model through the proto registry ABI surface.
+     *
+     * The JNI implementation should forward to `rac_model_registry_remove_proto`.
+     */
+    @JvmStatic
+    external fun racModelRegistryRemoveProto(modelId: String): Int
+
+    /**
+     * Refresh the C++ model registry (T4.9).
+     *
+     * Backed by `rac_model_registry_refresh` in commons. Each flag is
+     * independent; steps that require unavailable infrastructure (e.g. the
+     * model assignment HTTP callbacks) are skipped silently.
+     *
+     * @param includeRemoteCatalog Fetch the backend model catalog.
+     * @param rescanLocal Rescan the on-disk model directories (no-op from JVM
+     *   until the Kotlin SDK wires discovery callbacks; today discovery runs
+     *   in Kotlin via `ModelFileSystem`).
+     * @param pruneOrphans Clear `localPath` entries whose file no longer
+     *   exists (no-op from JVM for the same reason as `rescanLocal`).
+     * @return `RAC_SUCCESS` (0) on success, otherwise the first error code
+     *   encountered while running the requested steps.
+     */
+    @JvmStatic
+    external fun racModelRegistryRefresh(
+        includeRemoteCatalog: Boolean,
+        rescanLocal: Boolean,
+        pruneOrphans: Boolean,
+    ): Int
+
+    // ========================================================================
+    // MODEL LIFECYCLE PROTO ABI (rac_model_lifecycle.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racModelLifecycleLoadProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racModelLifecycleUnloadProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racModelLifecycleCurrentModelProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racComponentLifecycleSnapshotProto(component: Int): ByteArray?
 
     // ========================================================================
     // LORA REGISTRY (rac_lora_registry.h)
@@ -1202,6 +1411,462 @@ object RunAnywhereBridge {
     external fun nativeFileManagerGetStorageInfo(): String?
 
     // ========================================================================
+    // STORAGE PROTO ABI (rac_storage_analyzer.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racStorageInfoProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racStorageAvailabilityProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racStorageDeletePlanProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racStorageDeleteProto(requestProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // SDK EVENT STREAM PROTO ABI (rac_sdk_event_stream.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racSdkEventSubscribe(listener: NativeProtoProgressListener): Long
+
+    @JvmStatic
+    external fun racSdkEventUnsubscribe(subscriptionId: Long)
+
+    @JvmStatic
+    external fun racSdkEventPublishProto(eventProto: ByteArray): Int
+
+    @JvmStatic
+    external fun racSdkEventPoll(): ByteArray?
+
+    @JvmStatic
+    external fun racSdkEventPublishFailure(
+        errorCode: Int,
+        message: String,
+        component: String,
+        operation: String,
+        recoverable: Boolean,
+    ): Int
+
+    // ========================================================================
+    // DOWNLOAD PROTO ABI (rac_download_orchestrator.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racDownloadSetProgressProtoCallback(listener: NativeProtoProgressListener?): Int
+
+    @JvmStatic
+    external fun racDownloadPlanProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racDownloadStartProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racDownloadCancelProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racDownloadResumeProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racDownloadProgressPollProto(requestProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // LLM THINKING (rac_llm_thinking.h)
+    // ========================================================================
+    //
+    // v3-readiness Phase A8 / GAP 08 #6. Cross-SDK parity with Swift's
+    // `CppBridge+LLMThinking.swift`. Previously missing from Kotlin per
+    // the 3-agent audit; this block closes that gap.
+
+    /** Split full text into (response, thinking) on the FIRST
+     *  `<think>...</think>` block. Returns String[2]:
+     *    [0] = response text (never null; empty when input is only a think block)
+     *    [1] = thinking text, or null when no <think> block was found
+     *  Returns null on error. */
+    @JvmStatic external fun racLlmExtractThinking(text: String): Array<String?>?
+
+    /** Remove ALL `<think>...</think>` blocks (plus trailing unclosed
+     *  `<think>`). Returns the stripped remainder, or null on error. */
+    @JvmStatic external fun racLlmStripThinking(text: String): String?
+
+    /** Apportion `totalCompletionTokens` between thinking and response
+     *  segments by character-length ratio. Returns int[2]:
+     *    [0] = thinking tokens
+     *    [1] = response tokens (0 + total when thinking is null/empty).
+     *  Returns null on error. */
+    @JvmStatic external fun racLlmSplitThinkingTokens(
+        totalCompletionTokens: Int,
+        responseText: String?,
+        thinkingText: String?,
+    ): IntArray?
+
+    // ========================================================================
+    // VOICE AGENT (rac_voice_agent.h)
+    // ========================================================================
+    //
+    // v3.1 P3.2: 4 thunks exposing the voice-agent handle lifecycle to
+    // Kotlin. Mirrors Swift's CppBridge.VoiceAgent.shared.getHandle()
+    // pattern. The handle is what VoiceAgentStreamAdapter(handle).stream()
+    // subscribes to for proto event streaming.
+
+    /** Create a standalone voice-agent handle that owns its STT/LLM/TTS/VAD
+     *  component handles. Returns 0 on failure. */
+    @JvmStatic external fun racVoiceAgentCreateStandalone(): Long
+
+    /** Initialize a voice-agent handle against already-loaded STT/LLM/TTS
+     *  models in the singleton component handles. Returns rac_result_t
+     *  (0 = success). */
+    @JvmStatic external fun racVoiceAgentInitializeWithLoadedModels(handle: Long): Int
+
+    /** Check if the voice agent is ready (all required models loaded). */
+    @JvmStatic external fun racVoiceAgentIsReady(handle: Long): Boolean
+
+    /** Destroy the voice-agent handle and release owned component handles
+     *  (when created via standalone). */
+    @JvmStatic external fun racVoiceAgentDestroy(handle: Long)
+
+    /** Initialize a voice-agent handle from serialized VoiceAgentComposeConfig bytes. */
+    @JvmStatic external fun racVoiceAgentInitializeProto(handle: Long, configProto: ByteArray): ByteArray?
+
+    /** Snapshot component state as serialized VoiceAgentComponentStates bytes. */
+    @JvmStatic external fun racVoiceAgentComponentStatesProto(handle: Long): ByteArray?
+
+    /** Process one voice turn and return serialized VoiceAgentResult bytes. */
+    @JvmStatic external fun racVoiceAgentProcessVoiceTurnProto(handle: Long, audioData: ByteArray): ByteArray?
+
+    // ========================================================================
+    // SOLUTIONS (rac/solutions/rac_solution.h) — T4.7/T4.8
+    // ========================================================================
+    //
+    // Proto-byte / YAML driven L5 solution runtime. Each call returns a
+    // Long handle that wraps a `rac_solution_handle_t` from the C side;
+    // pass the same handle to start/stop/cancel/feed/closeInput/destroy.
+    // 0 from `racSolutionCreateFromProto` / `racSolutionCreateFromYaml`
+    // signals failure (handle was never allocated).
+
+    /** Construct a solution from a serialized `runanywhere.v1.SolutionConfig`
+     *  (or `PipelineSpec`) protobuf. Returns 0 on failure. */
+    @JvmStatic external fun racSolutionCreateFromProto(configBytes: ByteArray): Long
+
+    /** Construct a solution from a YAML document. Returns 0 on failure. */
+    @JvmStatic external fun racSolutionCreateFromYaml(yamlText: String): Long
+
+    /** Start the underlying scheduler (non-blocking). Returns rac_result_t. */
+    @JvmStatic external fun racSolutionStart(handle: Long): Int
+
+    /** Request a graceful shutdown (non-blocking). Returns rac_result_t. */
+    @JvmStatic external fun racSolutionStop(handle: Long): Int
+
+    /** Force-cancel the graph. Returns rac_result_t. */
+    @JvmStatic external fun racSolutionCancel(handle: Long): Int
+
+    /** Feed one UTF-8 item into the root input edge. Returns rac_result_t. */
+    @JvmStatic external fun racSolutionFeed(handle: Long, item: String): Int
+
+    /** Close the root input edge (signal end-of-stream). Returns rac_result_t. */
+    @JvmStatic external fun racSolutionCloseInput(handle: Long): Int
+
+    /** Cancel, join, and destroy the solution. Always safe; null handle is a no-op. */
+    @JvmStatic external fun racSolutionDestroy(handle: Long)
+
+    // ========================================================================
+    // EMBEDDINGS GENERATED-PROTO ABI (rac_embeddings_service.h)
+    // ========================================================================
+
+    @JvmStatic external fun racEmbeddingsCreate(modelId: String): Long
+
+    @JvmStatic external fun racEmbeddingsCreateWithConfig(modelId: String, configJson: String?): Long
+
+    @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racEmbeddingsDestroy(handle: Long)
+
+    // ========================================================================
+    // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
+    // ========================================================================
+
+    /** Create a RAG session. Returns 0 on failure. */
+    @JvmStatic external fun racRagSessionCreateProto(configProto: ByteArray): Long
+
+    /** Destroy a RAG session and release all resources. */
+    @JvmStatic external fun racRagSessionDestroyProto(handle: Long)
+
+    /** Ingest one serialized RAGDocument and return serialized RAGStatistics bytes. */
+    @JvmStatic external fun racRagIngestProto(handle: Long, documentProto: ByteArray): ByteArray?
+
+    /** Run a query and return serialized RAGResult proto bytes. Null on error. */
+    @JvmStatic external fun racRagQueryProto(handle: Long, queryProto: ByteArray): ByteArray?
+
+    /** Clear all ingested documents and return serialized RAGStatistics bytes. */
+    @JvmStatic external fun racRagClearProto(handle: Long): ByteArray?
+
+    /** Get serialized RAGStatistics proto bytes. Null on error. */
+    @JvmStatic external fun racRagStatsProto(handle: Long): ByteArray?
+
+    // ========================================================================
+    // DIFFUSION GENERATED-PROTO ABI (rac_diffusion_service.h)
+    // ========================================================================
+
+    @JvmStatic external fun racDiffusionCreate(modelIdOrPath: String): Long
+
+    @JvmStatic external fun racDiffusionInitialize(handle: Long, modelPath: String): Int
+
+    /** Generate an image. Returns serialized DiffusionResult proto bytes, or null on error. */
+    @JvmStatic external fun racDiffusionGenerateProto(handle: Long, optionsBytes: ByteArray): ByteArray?
+
+    /** Generate an image with serialized DiffusionProgress callbacks. */
+    @JvmStatic external fun racDiffusionGenerateWithProgressProto(
+        handle: Long,
+        optionsBytes: ByteArray,
+        listener: NativeProtoProgressListener?,
+    ): ByteArray?
+
+    /** Cancel ongoing image generation. */
+    @JvmStatic external fun racDiffusionCancelProto(handle: Long): Int
+
+    @JvmStatic external fun racDiffusionDestroy(handle: Long)
+
+    /** Get the service capability bitmask; no generated-proto getter exists yet. */
+    @JvmStatic external fun racDiffusionGetCapabilitiesMask(handle: Long): Int
+
+    // ========================================================================
+    // LORA GENERATED-PROTO ABI (rac_lora_service.h)
+    // ========================================================================
+
+    @JvmStatic external fun racLoraLoadProto(llmHandle: Long, configProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraRemoveProto(llmHandle: Long, configProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraClearProto(llmHandle: Long): ByteArray?
+
+    @JvmStatic external fun racLoraCompatibilityProto(llmHandle: Long, configProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraRegisterProto(entryProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // PLUGIN LOADER (rac/router/rac_plugin_loader.h) — Round 1 G-A4
+    // ========================================================================
+    //
+    // Round 1 KOTLIN (G-A4): added external thunks for the plugin loader.
+
+    /** Returns the compile-time plugin API version this build supports. */
+    @JvmStatic external fun racRegistryGetPluginApiVersion(): Int
+
+    /** Load a plugin shared library at runtime. Returns rac_result_t. */
+    @JvmStatic external fun racRegistryLoadPlugin(path: String): Int
+
+    /** Unload a registered plugin by name. Returns rac_result_t. */
+    @JvmStatic external fun racRegistryUnloadPlugin(name: String): Int
+
+    /** Total number of currently registered plugins. */
+    @JvmStatic external fun racRegistryGetPluginCount(): Int
+
+    /** Snapshot of currently registered plugin names. */
+    @JvmStatic external fun racRegistryGetRegisteredNames(): Array<String>?
+
+    // ========================================================================
+    // LORA (rac/features/llm/rac_llm_lora.h) — Round 1 G-A7
+    // ========================================================================
+    //
+    // Round 1 KOTLIN (G-A7): added external thunks for canonical LoRA
+    // capability (RunAnywhere.lora.*). These wrap the per-handle LoRA
+    // ops in rac_llm_component plus the registry in rac_lora_registry.
+
+    /** Load a LoRA adapter. configBytes = serialized LoRAAdapterConfig proto. Returns rac_result_t. */
+    @JvmStatic external fun racLoraLoad(configBytes: ByteArray): Int
+
+    /** Remove a LoRA adapter by id. Returns rac_result_t. */
+    @JvmStatic external fun racLoraRemove(adapterId: String): Int
+
+    /** Clear all loaded LoRA adapters. */
+    @JvmStatic external fun racLoraClear(): Int
+
+    /** Snapshot of currently loaded adapters as JSON-encoded LoRAAdapterInfo[]. Null on error. */
+    @JvmStatic external fun racLoraGetLoaded(): String?
+
+    /** Check compatibility. Returns serialized LoraCompatibilityResult proto bytes. */
+    @JvmStatic external fun racLoraCheckCompatibility(adapterId: String, modelId: String): ByteArray?
+
+    // ========================================================================
+    // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
+    // ========================================================================
+    //
+    // v2 close-out Phase H. Replaces the 1.3 KLOC HttpURLConnection path
+    // that used to live in CppBridgeDownload.kt. The native runner
+    // streams chunks to disk through libcurl, updates SHA-256 inline,
+    // and forwards progress to the Kotlin listener via JNI on every
+    // chunk. Returning `false` from the listener's onProgress cancels
+    // the transfer.
+    //
+    // @param url                  Absolute HTTP/HTTPS URL.
+    // @param destPath             Local file path to write bytes to.
+    // @param expectedSha256Hex    Lowercase hex SHA-256, or null/empty
+    //                             to skip checksum verification.
+    // @param resumeFromByte       Byte offset to resume from (0 = fresh).
+    // @param timeoutMs            Timeout in ms (0 = no timeout).
+    // @param listener             Optional progress listener (nullable).
+    // @param outHttpStatus        Single-element int[] out-param: the
+    //                             final HTTP status code. Pass null if
+    //                             you don't need it.
+    // @return RAC_HTTP_DL_* code (see CppBridgeDownload.DownloadError for
+    //         the byte-for-byte mapping).
+    @JvmStatic external fun racHttpDownloadExecute(
+        url: String,
+        destPath: String,
+        expectedSha256Hex: String?,
+        resumeFromByte: Long,
+        timeoutMs: Int,
+        listener: NativeDownloadProgressListener?,
+        outHttpStatus: IntArray?,
+    ): Int
+
+    // ========================================================================
+    // PLATFORM HTTP TRANSPORT (rac_http_transport.h) — v2 close-out Phase H4
+    // ========================================================================
+    //
+    // Registers / unregisters the OkHttp-backed `rac_http_transport_ops`
+    // adapter. When registered, every `rac_http_request_*` call from
+    // native code routes through Kotlin's `OkHttpTransport` instead of
+    // libcurl — so Android consumers get the system CA trust store,
+    // NetworkSecurityConfig, user-CAs, and proxy support for free.
+    //
+    // The C++ side lives in `sdk/runanywhere-commons/src/jni/
+    // okhttp_transport_adapter.cpp`.
+
+    /** Register the OkHttp platform HTTP transport. Returns rac_result_t. */
+    @JvmStatic external fun racHttpTransportRegisterOkHttp(): Int
+
+    /** Unregister the OkHttp transport and fall back to libcurl. Returns rac_result_t. */
+    @JvmStatic external fun racHttpTransportUnregisterOkHttp(): Int
+
+    // ========================================================================
+    // NATIVE HTTP REQUEST (rac_http_client.h)
+    // ========================================================================
+    //
+    // v2.1 quick-wins / T3.5. Single blocking entrypoint that wraps
+    // rac_http_client_create + rac_http_request_send + rac_http_response_free
+    // + rac_http_client_destroy. Used by CppBridgeHTTP, CppBridgeAuth, and
+    // CppBridgeTelemetry to replace per-SDK HttpURLConnection plumbing with
+    // the libcurl-backed C ABI shared across Swift / Dart / RN / Web.
+    //
+    // Headers are passed as parallel String[] arrays (keys, values) to keep
+    // the JNI signature flat. Return is a [NativeHttpResponse] or null only
+    // on catastrophic JNI failure (class resolution failed).
+    //
+    // @param method         HTTP method ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD").
+    // @param url            Absolute HTTP/HTTPS URL.
+    // @param headerKeys     Header name array (parallel to headerValues; may be empty).
+    // @param headerValues   Header value array (parallel to headerKeys).
+    // @param body           Request body bytes (null for GET/HEAD).
+    // @param timeoutMs      Timeout in milliseconds (0 = no timeout).
+    // @param followRedirects True to follow 3xx up to 10 hops.
+    // @return [NativeHttpResponse] — statusCode == -1 + non-null errorMessage on transport error.
+    @JvmStatic external fun racHttpRequestExecute(
+        method: String,
+        url: String,
+        headerKeys: Array<String>,
+        headerValues: Array<String>,
+        body: ByteArray?,
+        timeoutMs: Int,
+        followRedirects: Boolean,
+    ): NativeHttpResponse?
+
+    // ========================================================================
+    // AUTH MANAGER (rac_auth_manager.h)
+    // ========================================================================
+    //
+    // v2.1 quick-wins Item 4 / GAP 08 #2. 16 thunks delegating to the
+    // matching rac_auth_* C ABI in runanywhere_commons_jni.cpp. The
+    // higher-level CppBridgeAuth facade calls these instead of doing its
+    // own HTTP/JSON state bookkeeping. The HTTP transport stays in Kotlin
+    // (no JNI httpPost helper); native owns request building + response
+    // parsing + state.
+
+    /** Initialize auth state with in-memory storage. KeyStore-backed
+     *  variant is the v2.1-2 follow-up. */
+    @JvmStatic external fun racAuthInit()
+
+    /** Reset auth state (clears in-memory tokens + IDs). */
+    @JvmStatic external fun racAuthReset()
+
+    /** Clear all auth state including secure storage (if wired). */
+    @JvmStatic external fun racAuthClear()
+
+    /** Restore tokens from secure storage. Returns 0 on success, -1 if
+     *  not found or storage callbacks not wired. */
+    @JvmStatic external fun racAuthLoadStoredTokens(): Int
+
+    /** Persist current tokens to secure storage. Returns 0 on success. */
+    @JvmStatic external fun racAuthSaveTokens(): Int
+
+    @JvmStatic external fun racAuthIsAuthenticated(): Boolean
+
+    @JvmStatic external fun racAuthNeedsRefresh(): Boolean
+
+    @JvmStatic external fun racAuthGetAccessToken(): String?
+
+    @JvmStatic external fun racAuthGetDeviceId(): String?
+
+    @JvmStatic external fun racAuthGetUserId(): String?
+
+    @JvmStatic external fun racAuthGetOrganizationId(): String?
+
+    /** Build the JSON body for POST /api/v1/auth/sdk/authenticate.
+     *  Returns null on error. The 6-arg signature mirrors rac_sdk_config_t.
+     *  environment: 0 = DEVELOPMENT, 1 = STAGING, 2 = PRODUCTION. */
+    @JvmStatic external fun racAuthBuildAuthenticateRequest(
+        apiKey: String,
+        baseUrl: String,
+        deviceId: String,
+        platform: String,
+        sdkVersion: String,
+        environment: Int,
+    ): String?
+
+    /** Build the JSON body for POST /api/v1/auth/sdk/refresh.
+     *  Returns null if no refresh token is available. */
+    @JvmStatic external fun racAuthBuildRefreshRequest(): String?
+
+    /** Parse + store an authenticate response. Returns 0 on success, -1 on parse error. */
+    @JvmStatic external fun racAuthHandleAuthenticateResponse(json: String): Int
+
+    /** Parse + store a refresh response. Returns 0 on success, -1 on parse error. */
+    @JvmStatic external fun racAuthHandleRefreshResponse(json: String): Int
+
+    /** Returns String[2] = [token-or-null, "true"/"false"-needs-refresh] or null on error.
+     *  Java has no clean tuple type so this avoids out-param games; the typed
+     *  CppBridgeAuth wrapper unpacks it into a Pair<String?, Boolean>?. */
+    @JvmStatic external fun racAuthGetValidToken(): Array<String?>?
+
+    // ========================================================================
+    // STRUCTURED OUTPUT (rac/features/llm/rac_structured_output.h)
+    // Round 1 KOTLIN: JNI thunk declaration for extractStructuredOutput.
+    // [CPP-BLOCKED]: the C++ side (rac_structured_output_extract_json) is not
+    // yet wired in runanywhere_commons_jni.cpp. The declaration lives here so
+    // the public SDK method calls the thunk naturally; callers will see
+    // UnsatisfiedLinkError at runtime until the C++ track lands.
+    // ========================================================================
+
+    /** Extract a JSON object from [text], optionally validated against [schemaJson].
+     *  Returns serialized StructuredOutputResult proto bytes, or null on failure. */
+    @JvmStatic external fun racStructuredOutputExtractJson(text: String, schemaJson: String?): ByteArray?
+
+    // ========================================================================
+    // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h) — Round 2
+    // ========================================================================
+    //
+    // Round 2 KOTLIN: Added JNI thunk for rac_hardware_profile_get which
+    // was added by the C++ round 1 fix. Returns a serialized HardwareProfileResult
+    // proto, or null if the C++ implementation is not wired yet.
+
+    /** Get the hardware profile for the current device.
+     *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
+    @JvmStatic external fun racHardwareProfileGet(): ByteArray?
+
+    // ========================================================================
     // CONSTANTS
     // ========================================================================
 
@@ -1220,6 +1885,8 @@ object RunAnywhereBridge {
     const val RAC_ERROR_MODULE_ALREADY_REGISTERED = -20
     const val RAC_ERROR_MODULE_NOT_FOUND = -21
     const val RAC_ERROR_SERVICE_NOT_FOUND = -22
+    const val RAC_ERROR_NOT_FOUND = -423
+    const val RAC_ERROR_FEATURE_NOT_AVAILABLE = -801
 
     // Lifecycle states
     const val RAC_LIFECYCLE_IDLE = 0

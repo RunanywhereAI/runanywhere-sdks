@@ -12,7 +12,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.data.transform.IncompleteBytesToStringBuffer
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -131,9 +131,6 @@ object CppBridgeLLM {
                 else -> "UNKNOWN($reason)"
             }
     }
-
-    @Volatile
-    private var isRegistered: Boolean = false
 
     @Volatile
     private var state: Int = LLMState.NOT_CREATED
@@ -406,46 +403,16 @@ object CppBridgeLLM {
     }
 
     /**
-     * Register the LLM callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetLLMCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "LLM callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the LLM callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
-
-    /**
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("LLM component not created")
+                throw SDKException.notInitialized("LLM component not created")
             }
             return handle
         }
@@ -505,7 +472,7 @@ object CppBridgeLLM {
                     TAG,
                     "Native library not loaded. LLM inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create LLM component via RunAnywhereBridge
@@ -519,7 +486,7 @@ object CppBridgeLLM {
                         TAG,
                         "LLM component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
+                    throw SDKException.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -645,14 +612,14 @@ object CppBridgeLLM {
      * @param prompt The input prompt
      * @param config Generation configuration (optional)
      * @return The generation result
-     * @throws SDKError if generation fails
+     * @throws SDKException if generation fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun generate(prompt: String, config: GenerationConfig = GenerationConfig.DEFAULT): GenerationResult {
         val currentHandle: Long
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
-                throw SDKError.llm("LLM component not ready for generation")
+                throw SDKException.llm("LLM component not ready for generation")
             }
             currentHandle = handle
             isCancelled = false
@@ -677,7 +644,7 @@ object CppBridgeLLM {
             // JNI call outside lock so cancel() can acquire lock and set isCancelled
             val resultJson =
                 RunAnywhereBridge.racLlmComponentGenerate(currentHandle, prompt, config.toJson())
-                    ?: throw SDKError.llm("Generation failed: null result")
+                    ?: throw SDKException.llm("Generation failed: null result")
 
             val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -702,7 +669,7 @@ object CppBridgeLLM {
             synchronized(lock) {
                 setState(LLMState.READY) // Reset to ready, not error
             }
-            throw if (e is SDKError) e else SDKError.llm("Generation failed: ${e.message}")
+            throw if (e is SDKException) e else SDKException.llm("Generation failed: ${e.message}")
         }
     }
 
@@ -713,9 +680,9 @@ object CppBridgeLLM {
      * @param config Generation configuration (optional)
      * @param callback Callback for each generated token
      * @return The final generation result
-     * @throws SDKError if generation fails
+     * @throws SDKException if generation fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun generateStream(
         prompt: String,
         config: GenerationConfig = GenerationConfig.DEFAULT,
@@ -724,7 +691,7 @@ object CppBridgeLLM {
         val currentHandle: Long
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
-                throw SDKError.llm("LLM component not ready for generation")
+                throw SDKException.llm("LLM component not ready for generation")
             }
             currentHandle = handle
             isCancelled = false
@@ -774,7 +741,7 @@ object CppBridgeLLM {
                     prompt,
                     config.toJson(),
                     jniCallback,
-                ) ?: throw SDKError.llm("Streaming generation failed: null result")
+                ) ?: throw SDKException.llm("Streaming generation failed: null result")
 
             try {
                 // when stream ends:
@@ -809,7 +776,7 @@ object CppBridgeLLM {
                 setState(LLMState.READY) // Reset to ready, not error
                 streamCallback = null
             }
-            throw if (e is SDKError) e else SDKError.llm("Streaming generation failed: ${e.message}")
+            throw if (e is SDKException) e else SDKException.llm("Streaming generation failed: ${e.message}")
         }
     }
 
@@ -1133,165 +1100,6 @@ object CppBridgeLLM {
     @JvmStatic
     fun getLoadedModelIdCallback(): String? {
         return loadedModelId
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the LLM callbacks with C++ core.
-     *
-     * Registers [streamTokenCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_llm_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetLLMCallbacks()
-
-    /**
-     * Native method to unset the LLM callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_llm_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetLLMCallbacks()
-
-    /**
-     * Native method to create the LLM component.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_llm_component_create()
-     */
-    @JvmStatic
-    external fun nativeCreate(): Long
-
-    /**
-     * Native method to load a model.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_llm_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun nativeLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Native method to generate text.
-     *
-     * @param handle The component handle
-     * @param prompt The input prompt
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_llm_component_generate(handle, prompt, config)
-     */
-    @JvmStatic
-    external fun nativeGenerate(handle: Long, prompt: String, configJson: String): String?
-
-    /**
-     * Native method to generate text with streaming.
-     *
-     * @param handle The component handle
-     * @param prompt The input prompt
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_llm_component_generate_stream(handle, prompt, config)
-     */
-    @JvmStatic
-    external fun nativeGenerateStream(handle: Long, prompt: String, configJson: String): String?
-
-    /**
-     * Native method to cancel generation.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_llm_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun nativeCancel(handle: Long)
-
-    /**
-     * Native method to unload the model.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_llm_component_unload(handle)
-     */
-    @JvmStatic
-    external fun nativeUnload(handle: Long)
-
-    /**
-     * Native method to destroy the component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_llm_component_destroy(handle)
-     */
-    @JvmStatic
-    external fun nativeDestroy(handle: Long)
-
-    /**
-     * Native method to get context size.
-     *
-     * @param handle The component handle
-     * @return The context size in tokens
-     *
-     * C API: rac_llm_component_get_context_size(handle)
-     */
-    @JvmStatic
-    external fun nativeGetContextSize(handle: Long): Int
-
-    /**
-     * Native method to tokenize text.
-     *
-     * @param handle The component handle
-     * @param text The text to tokenize
-     * @return The number of tokens
-     *
-     * C API: rac_llm_component_tokenize(handle, text)
-     */
-    @JvmStatic
-    external fun nativeTokenize(handle: Long, text: String): Int
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the LLM callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetLLMCallbacks()
-
-            llmListener = null
-            streamCallback = null
-            isRegistered = false
-        }
     }
 
     // ========================================================================

@@ -1,12 +1,12 @@
 /**
  * NetworkConfiguration.ts
  *
- * Network configuration types and utilities.
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/Services/HTTPService.swift
+ * Network configuration types and utilities. HTTP transport lives entirely in
+ * native code (rac_http_client_*) — this module only defines the
+ * configuration shape consumed by the SDK facade.
  */
 
-import { SDKEnvironment } from './HTTPService';
+import { SDKEnvironment } from '../../types';
 
 export { SDKEnvironment };
 
@@ -60,6 +60,55 @@ export const DEFAULT_BASE_URL = 'https://api.runanywhere.ai';
  */
 export const DEFAULT_TIMEOUT_MS = 30000;
 
+const PLACEHOLDER_PATTERN = /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i;
+
+/**
+ * True for empty values and template strings such as
+ * `YOUR_SUPABASE_PROJECT_URL`.
+ */
+export function looksLikePlaceholder(value?: string | null): boolean {
+  return !value || value.trim().length === 0 || PLACEHOLDER_PATTERN.test(value);
+}
+
+/**
+ * Validate external HTTP endpoints before handing them to native transport.
+ */
+export function isUsableHttpUrl(value?: string | null): boolean {
+  if (looksLikePlaceholder(value)) {
+    return false;
+  }
+
+  const trimmed = value!.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return false;
+  }
+
+  const withoutScheme = trimmed.replace(/^https?:\/\//i, '');
+  const host = withoutScheme.split(/[/?#]/, 1)[0];
+  return host.length > 0 && !/[\s<>]/.test(host);
+}
+
+export function isUsableCredential(value?: string | null): boolean {
+  return !looksLikePlaceholder(value);
+}
+
+export function hasUsableBackendConfig(options: {
+  baseURL?: string | null;
+  apiKey?: string | null;
+}): boolean {
+  return isUsableHttpUrl(options.baseURL) && isUsableCredential(options.apiKey);
+}
+
+export function hasUsableSupabaseConfig(options: {
+  supabaseURL?: string | null;
+  supabaseKey?: string | null;
+}): boolean {
+  return (
+    isUsableHttpUrl(options.supabaseURL) &&
+    isUsableCredential(options.supabaseKey)
+  );
+}
+
 /**
  * Create network configuration from SDK init options
  */
@@ -71,26 +120,35 @@ export function createNetworkConfig(options: {
   supabaseKey?: string;
   timeoutMs?: number;
 }): NetworkConfig {
-  // Map string environment to enum
-  let environment = SDKEnvironment.Production;
+  let environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
   if (options.environment === 'development') {
-    environment = SDKEnvironment.Development;
+    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   } else if (options.environment === 'staging') {
-    environment = SDKEnvironment.Staging;
+    environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING;
   }
 
-  // Build supabase config if provided
   const supabase =
-    options.supabaseURL && options.supabaseKey
+    hasUsableSupabaseConfig({
+      supabaseURL: options.supabaseURL,
+      supabaseKey: options.supabaseKey,
+    })
       ? {
-          url: options.supabaseURL,
-          anonKey: options.supabaseKey,
-        }
+          url: options.supabaseURL!.trim(),
+          anonKey: options.supabaseKey!.trim(),
+      }
       : undefined;
 
+  const trimmedBaseURL = options.baseURL?.trim();
+  const baseURL =
+    trimmedBaseURL && trimmedBaseURL.length > 0
+      ? isUsableHttpUrl(trimmedBaseURL)
+        ? trimmedBaseURL
+        : undefined
+      : DEFAULT_BASE_URL;
+
   return {
-    baseURL: options.baseURL || DEFAULT_BASE_URL,
-    apiKey: options.apiKey,
+    baseURL,
+    apiKey: isUsableCredential(options.apiKey) ? options.apiKey.trim() : '',
     environment,
     supabase,
     timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
@@ -102,29 +160,23 @@ export function createNetworkConfig(options: {
  */
 export function getEnvironmentName(env: SDKEnvironment): string {
   switch (env) {
-    case SDKEnvironment.Development:
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
       return 'development';
-    case SDKEnvironment.Staging:
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
       return 'staging';
-    case SDKEnvironment.Production:
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return 'production';
     default:
       return 'unknown';
   }
 }
 
-/**
- * Check if environment is development
- */
 export function isDevelopment(env: SDKEnvironment): boolean {
-  return env === SDKEnvironment.Development;
+  return env === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 }
 
-/**
- * Check if environment is production
- */
 export function isProduction(env: SDKEnvironment): boolean {
-  return env === SDKEnvironment.Production;
+  return env === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
 }
 
 export default NetworkConfig;

@@ -8,20 +8,20 @@ public struct FileOperationsUtilities {
 
     /// Get the documents directory URL
     /// - Returns: URL to the documents directory
-    /// - Throws: SDKError if documents directory is not accessible
+    /// - Throws: SDKException if documents directory is not accessible
     public static func getDocumentsDirectory() throws -> URL {
         guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
+            throw SDKException.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         return documentsURL
     }
 
     /// Get the caches directory URL
     /// - Returns: URL to the caches directory
-    /// - Throws: SDKError if caches directory is not accessible
+    /// - Throws: SDKException if caches directory is not accessible
     public static func getCachesDirectory() throws -> URL {
         guard let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            throw SDKError.fileManagement(.permissionDenied, "Unable to access caches directory")
+            throw SDKException.fileManagement(.permissionDenied, "Unable to access caches directory")
         }
         return cachesURL
     }

@@ -30,9 +30,11 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
@@ -59,6 +61,7 @@ import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
   RunAnywhere,
+  ToolParameterType,
   type ModelInfo as SDKModelInfo,
   type GenerationOptions,
 } from '@runanywhere/core';
@@ -87,10 +90,11 @@ const registerChatTools = () => {
       parameters: [
         {
           name: 'location',
-          type: 'string',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
           description:
             'City name or location (e.g., "Tokyo", "New York", "London")',
           required: true,
+          enumValues: [],
         },
       ],
     },
@@ -102,6 +106,7 @@ const registerChatTools = () => {
 
       try {
         const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -158,9 +163,10 @@ const registerChatTools = () => {
       parameters: [
         {
           name: 'expression',
-          type: 'string',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
           description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
           required: true,
+          enumValues: [],
         },
       ],
     },
@@ -227,7 +233,6 @@ export const ChatScreen: React.FC = () => {
     createConversation,
     setCurrentConversation,
     addMessage,
-    updateMessage,
   } = useConversationStore();
 
   // Local state
@@ -244,6 +249,9 @@ export const ChatScreen: React.FC = () => {
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -320,7 +328,7 @@ export const ChatScreen: React.FC = () => {
     try {
       const allModels = await RunAnywhere.getAvailableModels();
       const llmModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === ModelCategory.Language
+        (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
       setAvailableModels(llmModels);
       console.warn(
@@ -336,35 +344,17 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Check if a model is loaded
-   * Note: If a model is already loaded from a previous session, we set a placeholder.
-   * For proper tool calling format detection, the user should select a model through the UI.
+   * Check if a model is loaded from a previous session.
+   *
+   * The SDK can confirm a model is loaded but doesn't expose which one, so we
+   * intentionally leave `currentModel` as null and let the model-required empty
+   * state prompt the user to pick one (required anyway for tool-call format
+   * detection). No stand-in model entry is inserted.
    */
   const checkModelStatus = async () => {
     try {
       const isLoaded = await RunAnywhere.isModelLoaded();
       console.warn('[ChatScreen] Text model loaded:', isLoaded);
-      if (isLoaded) {
-        // Model is loaded but we don't know which one - set placeholder
-        // User should select a model through UI for proper format detection
-        setCurrentModel({
-          id: 'loaded-model',
-          name: 'Loaded Model (select model for tool calling)',
-          category: ModelCategory.Language,
-          compatibleFrameworks: [LLMFramework.LlamaCpp],
-          preferredFramework: LLMFramework.LlamaCpp,
-          isDownloaded: true,
-          isAvailable: true,
-          supportsThinking: false,
-        });
-        // Register tools if model already loaded
-        registerChatTools();
-        const tools = RunAnywhere.getRegisteredTools();
-        setRegisteredToolCount(tools.length);
-        console.warn(
-          '[ChatScreen] Model loaded from previous session. For LFM2 tool calling, please select the model again.'
-        );
-      }
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
     }
@@ -412,16 +402,15 @@ export const ChatScreen: React.FC = () => {
         const fw =
           (model.preferredFramework as unknown as LLMFramework) ??
           LLMFramework.LlamaCpp;
-        const modelInfo = {
-          id: model.id,
-          name: model.name,
-          category: ModelCategory.Language,
+        const modelInfo: ModelInfo = {
+          ...model,
+          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
           compatibleFrameworks:
             (model.compatibleFrameworks as unknown as LLMFramework[]) ?? [fw],
           preferredFramework: fw,
           isDownloaded: true,
           isAvailable: true,
-          supportsThinking: false,
+          supportsThinking: model.supportsThinking ?? false,
         };
         setCurrentModel(modelInfo);
 
@@ -452,11 +441,11 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Send a message using the real SDK with tool calling support
-   * Uses RunAnywhere.generateWithTools() for AI that can take actions
+   * Send a message and stream the response token-by-token.
+   * Uses RunAnywhere.generateStream() for real-time streaming UI.
    *
-   * Example: "What's the weather in Tokyo?"
-   * → LLM calls get_weather tool → Real API call → Final response
+   * generateWithTools() is still available on RunAnywhere for callers
+   * that genuinely need the batch tool-calling form.
    */
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !currentConversation) return;
@@ -474,95 +463,85 @@ export const ChatScreen: React.FC = () => {
     setInputText('');
     setIsLoading(true);
 
-    // Create placeholder assistant message
     const assistantMessageId = generateId();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: MessageRole.Assistant,
-      content: 'Thinking...',
-      timestamp: new Date(),
-    };
-    await addMessage(assistantMessage, currentConversation.id);
 
-    // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
     try {
-      // Detect tool call format based on loaded model (matches iOS LLMViewModel+ToolCalling.swift)
-      const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
-      // eslint-disable-next-line no-console -- demo generation diagnostic
-      console.log(
-        '[ChatScreen] Starting generation with tools for:',
-        prompt,
-        'model:',
-        currentModel?.id,
-        'format:',
-        format
-      );
-
       // Get user-configured generation options
       const options = await getGenerationOptions();
 
-      // Use tool-enabled generation
-      // If the LLM needs to call a tool (like weather API), it happens automatically
-      const result = await RunAnywhere.generateWithTools(prompt, {
-        autoExecute: true,
-        maxToolCalls: 3,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
+      // eslint-disable-next-line no-console -- demo generation diagnostic
+      console.log(
+        '[ChatScreen] Starting streaming generation for:',
+        prompt,
+        'model:',
+        currentModel?.id,
+      );
+
+      let accumulatedText = '';
+
+      const genOptions = {
+        maxTokens: options.maxTokens ?? 512,
+        temperature: options.temperature ?? 0.7,
+        topP: 1.0,
+        topK: 0,
+        repetitionPenalty: 1.0,
+        stopSequences: [],
+        streamingEnabled: true,
+        preferredFramework: 0,
         systemPrompt: options.systemPrompt,
-        format: format,
-      });
+        enableRealTimeTracking: false,
+      };
 
-      // Log tool usage for debugging
-      if (result.toolCalls.length > 0) {
-        /* eslint-disable no-console -- demo tool-use diagnostic */
-        console.log(
-          '[ChatScreen] Tools used:',
-          result.toolCalls.map((t) => t.toolName)
-        );
-        console.log('[ChatScreen] Tool results:', result.toolResults);
-        /* eslint-enable no-console */
+      if (Platform.OS === 'android') {
+        // NitroModules async iterator bridge doesn't deliver token
+        // callbacks on Android — fall back to non-streaming generate().
+        const result = await RunAnywhere.generate(prompt, genOptions);
+        accumulatedText = result.text ?? '';
+      } else {
+        // Stream tokens as they arrive — canonical cross-SDK path (§1 spec).
+        const stream = RunAnywhere.generateStream(prompt, genOptions);
+
+        // Manual async iteration — Hermes `for await` doesn't recognise
+        // NitroModules' custom async iterables, so we call the protocol
+        // methods directly.
+        const iterator = stream[Symbol.asyncIterator]();
+        let iterResult = await iterator.next();
+        while (!iterResult.done) {
+          const event = iterResult.value;
+          if (event.token) {
+            accumulatedText += event.token;
+            const partialMessage: Message = {
+              id: assistantMessageId,
+              role: MessageRole.Assistant,
+              content: accumulatedText,
+              timestamp: new Date(),
+              modelInfo: {
+                modelId: currentModel?.id || 'unknown',
+                modelName: currentModel?.name || 'Unknown Model',
+                framework: currentModel?.preferredFramework || 'unknown',
+                frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
+              },
+            };
+            await addMessage(partialMessage, currentConversation.id);
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }
+          if (event.isFinal) break;
+          iterResult = await iterator.next();
+        }
       }
 
-      // Build final message content
-      const finalContent = result.text || '(No response generated)';
+      const finalContent = accumulatedText || '(No response generated)';
 
-      // Extract tool call info from result (matching iOS implementation)
-      let toolCallInfo: ToolCallInfo | undefined;
-      if (result.toolCalls.length > 0) {
-        const lastToolCall = result.toolCalls[result.toolCalls.length - 1];
-        const lastToolResult =
-          result.toolResults[result.toolResults.length - 1];
-
-        toolCallInfo = {
-          toolName: lastToolCall.toolName,
-          arguments: JSON.stringify(lastToolCall.arguments, null, 2),
-          result: lastToolResult?.success
-            ? JSON.stringify(lastToolResult.result, null, 2)
-            : undefined,
-          success: lastToolResult?.success ?? false,
-          error: lastToolResult?.error,
-        };
-
-        // eslint-disable-next-line no-console -- demo tool-use diagnostic
-        console.log(
-          '[ChatScreen] Created toolCallInfo:',
-          toolCallInfo.toolName,
-          'success:',
-          toolCallInfo.success
-        );
-      }
-
-      // Update with final message
+      // Persist the final message with analytics
       const finalMessage: Message = {
         id: assistantMessageId,
         role: MessageRole.Assistant,
         content: finalContent,
         timestamp: new Date(),
-        toolCallInfo, // Attach tool call info to message
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',
@@ -581,7 +560,7 @@ export const ChatScreen: React.FC = () => {
         },
       };
 
-      updateMessage(finalMessage, currentConversation.id);
+      await addMessage(finalMessage, currentConversation.id);
 
       // Final scroll to bottom
       setTimeout(() => {
@@ -590,8 +569,7 @@ export const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      // Update the placeholder message with error
-      updateMessage(
+      await addMessage(
         {
           id: assistantMessageId,
           role: MessageRole.Assistant,
@@ -603,7 +581,7 @@ export const ChatScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentConversation, currentModel, addMessage, updateMessage]);
+  }, [inputText, currentConversation, currentModel, addMessage]);
 
   /**
    * Create a new conversation (clears current chat)
@@ -611,6 +589,15 @@ export const ChatScreen: React.FC = () => {
   const handleNewChat = useCallback(async () => {
     await createConversation();
   }, [createConversation]);
+
+  // Expose test helpers for E2E automation via Hermes debugger
+  useEffect(() => {
+    if (__DEV__) {
+      (globalThis as any).__testNewChat = handleNewChat;
+      (globalThis as any).__testSend = handleSend;
+      (globalThis as any).__testSetInput = setInputText;
+    }
+  }, [handleNewChat, handleSend]);
 
   /**
    * Handle selecting a conversation from the list
@@ -659,7 +646,7 @@ export const ChatScreen: React.FC = () => {
    * Render header with actions
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
       {/* Conversations list button */}
       <TouchableOpacity
         style={styles.headerButton}
@@ -834,7 +821,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

@@ -38,7 +38,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_vlm_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKError.vlm(.notInitialized, "Failed to create VLM component: \(result)")
+                throw SDKException.vlm(.notInitialized, "Failed to create VLM component: \(result)")
             }
 
             self.handle = handle
@@ -101,7 +101,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.vlm(.modelLoadFailed, "Failed to load VLM model: \(result)")
+                throw SDKException.vlm(.modelLoadFailed, "Failed to load VLM model: \(result)")
             }
 
             loadedModelId = modelId
@@ -122,7 +122,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.vlm(.modelLoadFailed, "Failed to load VLM model by ID: \(modelId) (error: \(result))")
+                throw SDKException.vlm(.modelLoadFailed, "Failed to load VLM model by ID: \(modelId) (error: \(result))")
             }
 
             loadedModelId = modelId
@@ -176,9 +176,9 @@ extension CppBridge {
     }
 }
 
-// MARK: - SDKError VLM Extension
+// MARK: - SDKException VLM Extension
 
-extension SDKError {
+extension SDKException {
 
     /// VLM-specific error codes
     public enum VLMErrorCode: Int, Sendable {
@@ -190,7 +190,7 @@ extension SDKError {
     }
 
     /// Create a VLM error
-    public static func vlm(_ code: VLMErrorCode, _ message: String) -> SDKError {
-        return SDKError.general(.unknown, "VLM[\(code.rawValue)]: \(message)")
+    public static func vlm(_ code: VLMErrorCode, _ message: String) -> SDKException {
+        return SDKException.general(.unknown, "VLM[\(code.rawValue)]: \(message)")
     }
 }

@@ -1,0 +1,75 @@
+name: streaming-perf
+
+# v2 close-out Phase I-1: cross-SDK streaming-parity perf gate.
+# Runs the C++ producers + Python aggregators on Linux for any change
+# touching tests/streaming/** or the voice-agent commons surface.
+# Per-SDK runners run in their respective SDK CI; this workflow gates the
+# C++ side and the cross-SDK aggregator outputs.
+
+on:
+  pull_request:
+    paths:
+      - 'tests/streaming/**'
+      - 'sdk/runanywhere-commons/src/features/voice_agent/**'
+      - 'sdk/runanywhere-commons/include/rac/features/voice_agent/**'
+      - 'idl/voice_events.proto'
+      - 'idl/voice_agent_service.proto'
+      - 'cmake/**'
+      - '.github/workflows/streaming-perf.yml'
+  push:
+    branches:
+      - main
+      - feat/v2-architecture
+    paths:
+      - 'tests/streaming/**'
+      - 'sdk/runanywhere-commons/src/features/voice_agent/**'
+      - 'sdk/runanywhere-commons/include/rac/features/voice_agent/**'
+      - 'idl/voice_events.proto'
+      - 'idl/voice_agent_service.proto'
+
+jobs:
+  cpp-producers-and-aggregators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake libprotobuf-dev protobuf-compiler libabsl-dev python3
+
+      - name: Configure
+        run: cmake --preset linux-debug -DRAC_BUILD_TESTS=ON
+
+      - name: Build streaming targets
+        run: |
+          cmake --build --preset linux-debug --target parity_test_cpp
+          cmake --build --preset linux-debug --target perf_producer
+          cmake --build --preset linux-debug --target cancel_producer
+
+      - name: Run parity check (C++ golden producer)
+        run: ctest --test-dir build/linux-debug -R parity_test_cpp_check --output-on-failure
+
+      - name: Run perf producer
+        run: ctest --test-dir build/linux-debug -R perf_producer_cpp --output-on-failure
+
+      - name: Run cancel producer
+        run: ctest --test-dir build/linux-debug -R cancel_producer_cpp --output-on-failure
+
+      - name: Aggregate perf percentiles (no per-SDK logs => harness sanity only)
+        run: ctest --test-dir build/linux-debug -R perf_aggregate --output-on-failure || true
+
+      - name: Aggregate cancel traces
+        run: ctest --test-dir build/linux-debug -R cancel_aggregate --output-on-failure || true
+
+      - name: Upload perf-bench fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-bench-fixture
+          path: build/linux-debug/tests/streaming/perf_bench/
+
+      - name: Upload cancel-parity fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: cancel-parity-fixture
+          path: build/linux-debug/tests/streaming/cancel_parity/

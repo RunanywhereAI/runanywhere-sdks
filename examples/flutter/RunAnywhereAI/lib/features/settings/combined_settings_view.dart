@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart' show ToolDefinition;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -312,22 +312,20 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     });
 
     try {
-      // Get storage info from SDK
-      final storageInfo = await sdk.RunAnywhere.getStorageInfo();
+      final storageInfo = await sdk.RunAnywhereSDK.instance.downloads.getStorageInfo();
 
-      // Get downloaded models with full info (including sizes)
-      final storedModels = await sdk.RunAnywhere.getDownloadedModelsWithInfo();
+      final storedModels = await sdk.RunAnywhereSDK.instance.downloads.list();
 
       // Calculate total model storage from actual models
       int totalModelStorage = 0;
       for (final model in storedModels) {
-        totalModelStorage += model.size;
+        totalModelStorage += model.sizeBytes.toInt();
       }
 
       if (mounted) {
         setState(() {
-          _totalStorageSize = storageInfo.appStorage.totalSize;
-          _availableSpace = storageInfo.deviceStorage.freeSpace;
+          _totalStorageSize = storageInfo.app.totalBytes.toInt();
+          _availableSpace = storageInfo.device.freeBytes.toInt();
           _modelStorageSize = totalModelStorage;
           _storedModels = storedModels;
           _isRefreshingStorage = false;
@@ -359,35 +357,27 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
   /// Clear cache using RunAnywhere SDK
   Future<void> _clearCache() async {
-    // TODO: Implement clearCache() in SDK
-    // Once SDK implements clearCache(), replace this with:
-    // try {
-    //   await sdk.RunAnywhere.clearCache();
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('Cache cleared')),
-    //     );
-    //   }
-    //   await _loadStorageData();
-    // } catch (e) {
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(content: Text('Failed to clear cache: $e')),
-    //     );
-    //   }
-    // }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clear Cache not available yet')),
-      );
+    try {
+      await sdk.RunAnywhereSDK.instance.downloads.clearCache();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cache cleared')),
+        );
+      }
+      await _loadStorageData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to clear cache: $e')),
+        );
+      }
     }
   }
 
   /// Delete a stored model using RunAnywhere SDK
   Future<void> _deleteModel(sdk.StoredModel model) async {
     try {
-      await sdk.RunAnywhere.deleteStoredModel(model.id);
+      await sdk.RunAnywhereSDK.instance.downloads.delete(model.modelId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${model.name} deleted')),
@@ -1057,7 +1047,7 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                     ),
                     const SizedBox(height: AppSpacing.xSmall),
                     Text(
-                      widget.model.size.formattedFileSize,
+                      widget.model.sizeBytes.toInt().formattedFileSize,
                       style: AppTypography.caption2(context).copyWith(
                         color: AppColors.textSecondary(context),
                       ),
@@ -1101,10 +1091,12 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildDetailRow(
-                      'Downloaded:', _formatDate(widget.model.createdDate)),
-                  _buildDetailRow('Size:', widget.model.size.formattedFileSize),
-                  _buildDetailRow(
-                      'Framework:', widget.model.framework.rawValue),
+                      'Downloaded:',
+                      _formatDate(DateTime.fromMillisecondsSinceEpoch(
+                          widget.model.downloadedAtMs.toInt()))),
+                  _buildDetailRow('Size:',
+                      widget.model.sizeBytes.toInt().formattedFileSize),
+                  _buildDetailRow('Path:', widget.model.localPath),
                 ],
               ),
             ),

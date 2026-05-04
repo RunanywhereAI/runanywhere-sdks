@@ -1,139 +1,179 @@
 /**
- * RunAnywhere Web SDK - VoiceAgent Extension
+ * RunAnywhere+VoiceAgent.ts
  *
- * Orchestrates the complete voice pipeline: VAD -> STT -> LLM -> TTS.
- * Uses the RACommons rac_voice_agent_* C API for pipeline management.
+ * Top-level Voice Agent C-ABI parity surface. Mirrors Swift's
+ * `RunAnywhere.processVoiceTurn`, `voiceAgentTranscribe`,
+ * `voiceAgentGenerateResponse`, `voiceAgentSynthesizeSpeech`,
+ * `streamVoiceAgent`, and `cleanupVoiceAgent` static verbs.
  *
- * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/
+ * Single canonical path: backend packages (e.g. `@runanywhere/web-llamacpp`,
+ * `@runanywhere/web-onnx`) install a `VoiceAgentProvider` via
+ * `setVoiceAgentProvider(...)`. Each verb delegates directly. There is no
+ * TS-side compose fallback — that path was deleted in v0.20.0 alongside
+ * `RunAnywhere+VoicePipeline.ts` (see CANONICAL_API.md §10 / G-F4).
  *
- * Usage:
- *   import { VoiceAgent } from '@runanywhere/web';
- *
- *   const agent = await VoiceAgent.create();
- *   await agent.loadModels({ stt: '/models/whisper.bin', llm: '/models/llama.gguf', tts: '/models/piper.onnx' });
- *   const result = await agent.processVoiceTurn(audioData);
- *   console.log('Transcription:', result.transcription);
- *   console.log('Response:', result.response);
+ * Streaming: `streamVoiceAgent()` returns an `AsyncIterable<VoiceEvent>`
+ * built on `VoiceAgentStreamAdapter`. The provider supplies either a raw
+ * `rac_voice_agent_handle_t` (proto-byte WASM callback) or a custom
+ * `VoiceAgentStreamTransport` for tests.
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { SDKError } from '../../Foundation/ErrorTypes';
+import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
-import type { VoiceAgentModels, VoiceTurnResult } from './VoiceAgentTypes';
-
-export { PipelineState } from './VoiceAgentTypes';
-export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './VoiceAgentTypes';
+import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
+import type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
+import type { VoiceAgentComposeConfig, VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
+import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
+import type {
+  VoiceAgentComponentStates,
+  VoiceAgentResult,
+} from '../../types/index';
+import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule';
 
 const logger = new SDKLogger('VoiceAgent');
 
-// ---------------------------------------------------------------------------
-// VoiceAgent Instance
-// ---------------------------------------------------------------------------
-
 /**
- * VoiceAgentSession orchestrates the complete voice pipeline (VAD → STT → LLM → TTS).
- *
- * TODO: Refactor to use the ExtensionPoint/provider pattern.
- * The previous implementation called rac_voice_agent_* C functions via WASMBridge,
- * which has been removed from the core package. Each backend package (e.g.
- * @runanywhere/web-llamacpp) should register a VoiceAgent provider through
- * ExtensionPoint so that this session can delegate to it.
+ * Backend-supplied voice-agent provider. Installed by `@runanywhere/web-llamacpp`
+ * + `@runanywhere/web-onnx` (or a unified backend) once the WASM
+ * `rac_voice_agent_*` exports are loaded. Until a provider is registered,
+ * every verb on `RunAnywhere.<voice agent>` throws `backendNotAvailable`.
  */
-export class VoiceAgentSession {
-  private _handle: number;
-
-  constructor(handle: number) {
-    this._handle = handle;
-  }
-
-  /**
-   * Load models for all components.
-   *
-   * TODO: Delegate to backend provider via ExtensionPoint.
-   */
-  async loadModels(models: VoiceAgentModels): Promise<void> {
-    if (models.stt) logger.info(`Loading STT model: ${models.stt.id}`);
-    if (models.llm) logger.info(`Loading LLM model: ${models.llm.id}`);
-    if (models.tts) logger.info(`Loading TTS voice: ${models.tts.id}`);
-
-    // TODO: Invoke backend-specific voice agent provider to load models.
-    throw SDKError.componentNotReady('VoiceAgent', 'No WASM backend registered — use a backend package (e.g. @runanywhere/web-llamacpp)');
-  }
+export interface VoiceAgentProvider {
+  initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void>;
+  initializeVoiceAgentWithLoadedModels(): Promise<void>;
+  isVoiceAgentReady(): Promise<boolean> | boolean;
+  getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> | VoiceAgentComponentStates;
+  processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult>;
+  voiceAgentTranscribe(audio: Float32Array | Uint8Array): Promise<string>;
+  voiceAgentGenerateResponse(prompt: string): Promise<string>;
+  voiceAgentSynthesizeSpeech(text: string): Promise<Float32Array>;
+  cleanupVoiceAgent(): Promise<void> | void;
 
   /**
-   * Process a complete voice turn (audio in → text response + audio out).
-   *
-   * TODO: Delegate to backend provider via ExtensionPoint.
+   * Either a numeric WASM handle (`rac_voice_agent_handle_t`) plus the
+   * Emscripten module that owns it, or a custom transport for tests. When
+   * absent, `streamVoiceAgent()` throws `backendNotAvailable`.
    */
-  async processVoiceTurn(_audioData: Uint8Array): Promise<VoiceTurnResult> {
-    // TODO: Invoke backend-specific voice agent provider.
-    throw SDKError.componentNotReady('VoiceAgent', 'No WASM backend registered — use a backend package (e.g. @runanywhere/web-llamacpp)');
-  }
+  getVoiceAgentStream?(): {
+    handle: number;
+    module: EmscriptenRunanywhereModule;
+  } | {
+    transport: VoiceAgentStreamTransport;
+  } | null;
+}
 
-  /**
-   * Check if the voice agent is ready.
-   *
-   * TODO: Delegate to backend provider via ExtensionPoint.
-   */
-  get isReady(): boolean {
-    // TODO: Query backend provider readiness.
-    return false;
-  }
+let _provider: VoiceAgentProvider | null = null;
 
-  /**
-   * Transcribe audio without the full pipeline.
-   *
-   * TODO: Delegate to backend provider via ExtensionPoint.
-   */
-  async transcribe(_audioData: Uint8Array): Promise<string> {
-    // TODO: Invoke backend-specific STT provider.
-    throw SDKError.componentNotReady('VoiceAgent', 'No WASM backend registered — use a backend package (e.g. @runanywhere/web-llamacpp)');
-  }
+export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void {
+  _provider = provider;
+}
 
-  /**
-   * Generate LLM response without the full pipeline.
-   *
-   * TODO: Delegate to backend provider via ExtensionPoint.
-   */
-  async generateResponse(_prompt: string): Promise<string> {
-    // TODO: Invoke backend-specific LLM provider.
-    throw SDKError.componentNotReady('VoiceAgent', 'No WASM backend registered — use a backend package (e.g. @runanywhere/web-llamacpp)');
+function requireProvider(verb: string): VoiceAgentProvider {
+  if (!_provider) {
+    throw SDKException.backendNotAvailable(
+      verb,
+      'No voice-agent provider registered. Install and register a backend ' +
+      '(e.g. `@runanywhere/web-llamacpp` + `@runanywhere/web-onnx`) so the ' +
+      'WASM rac_voice_agent_* exports are reachable.',
+    );
   }
-
-  /** Get the native handle (used by backend providers). */
-  get handle(): number {
-    return this._handle;
-  }
-
-  /**
-   * Destroy the voice agent session.
-   *
-   * TODO: Delegate cleanup to backend provider via ExtensionPoint.
-   */
-  destroy(): void {
-    // TODO: Invoke backend-specific cleanup.
-    this._handle = 0;
-  }
+  return _provider;
 }
 
 // ---------------------------------------------------------------------------
-// VoiceAgent Factory
+// Public API — Swift-symmetric verbs.
 // ---------------------------------------------------------------------------
 
-export const VoiceAgent = {
-  /**
-   * Create a standalone VoiceAgent session.
-   * The agent manages its own STT, LLM, TTS, and VAD components.
-   *
-   * TODO: Delegate to backend provider via ExtensionPoint.
-   */
-  async create(): Promise<VoiceAgentSession> {
-    if (!RunAnywhere.isInitialized) {
-      throw SDKError.notInitialized();
-    }
+export async function initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void> {
+  await requireProvider('initializeVoiceAgent').initializeVoiceAgent(config);
+  logger.info('VoiceAgent initialized');
+}
 
-    // TODO: Look up a registered VoiceAgent provider from ExtensionPoint
-    // and delegate session creation to it.
-    throw SDKError.componentNotReady('VoiceAgent', 'No WASM backend registered — use a backend package (e.g. @runanywhere/web-llamacpp)');
-  },
+export async function initializeVoiceAgentWithLoadedModels(): Promise<void> {
+  await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels();
+}
+
+export async function isVoiceAgentReady(): Promise<boolean> {
+  return Promise.resolve(requireProvider('isVoiceAgentReady').isVoiceAgentReady());
+}
+
+export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
+  return Promise.resolve(requireProvider('getVoiceAgentComponentStates').getVoiceAgentComponentStates());
+}
+
+export async function areAllVoiceComponentsReady(): Promise<boolean> {
+  return (await getVoiceAgentComponentStates()).ready;
+}
+
+/** Mirror Swift `RunAnywhere.processVoiceTurn(audioData) -> VoiceAgentResult`. */
+export async function processVoiceTurn(
+  audio: Float32Array | Uint8Array,
+): Promise<VoiceAgentResult> {
+  return requireProvider('processVoiceTurn').processVoiceTurn(audio);
+}
+
+export async function voiceAgentTranscribe(
+  audio: Float32Array | Uint8Array,
+): Promise<string> {
+  return requireProvider('voiceAgentTranscribe').voiceAgentTranscribe(audio);
+}
+
+export async function voiceAgentGenerateResponse(prompt: string): Promise<string> {
+  return requireProvider('voiceAgentGenerateResponse').voiceAgentGenerateResponse(prompt);
+}
+
+export async function voiceAgentSynthesizeSpeech(text: string): Promise<Float32Array> {
+  return requireProvider('voiceAgentSynthesizeSpeech').voiceAgentSynthesizeSpeech(text);
+}
+
+export async function cleanupVoiceAgent(): Promise<void> {
+  if (!_provider) return;
+  await Promise.resolve(_provider.cleanupVoiceAgent());
+}
+
+/**
+ * Mirror Swift `RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>`.
+ *
+ * Returns an `AsyncIterable<VoiceEvent>` driven by the backend's
+ * `rac_voice_agent_set_proto_callback` (or a custom transport for tests).
+ * The provider must implement `getVoiceAgentStream()`; if absent, throws
+ * `backendNotAvailable`.
+ */
+export function streamVoiceAgent(
+  req: VoiceAgentRequest = { eventFilter: '' },
+): AsyncIterable<VoiceEvent> {
+  const provider = requireProvider('streamVoiceAgent');
+  if (typeof provider.getVoiceAgentStream !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'streamVoiceAgent',
+      'Backend voice-agent provider does not implement getVoiceAgentStream().',
+    );
+  }
+  const src = provider.getVoiceAgentStream();
+  if (src == null) {
+    throw SDKException.backendNotAvailable(
+      'streamVoiceAgent',
+      'Backend has not constructed a voice-agent handle yet — call ' +
+      'initializeVoiceAgent / initializeVoiceAgentWithLoadedModels first.',
+    );
+  }
+  const adapter = 'transport' in src
+    ? new VoiceAgentStreamAdapter(src.transport)
+    : new VoiceAgentStreamAdapter(src.handle, src.module);
+  return adapter.stream(req);
+}
+
+export const VoiceAgent = {
+  setProvider: setVoiceAgentProvider,
+  initialize: initializeVoiceAgent,
+  initializeWithLoadedModels: initializeVoiceAgentWithLoadedModels,
+  isReady: isVoiceAgentReady,
+  getComponentStates: getVoiceAgentComponentStates,
+  areAllComponentsReady: areAllVoiceComponentsReady,
+  processTurn: processVoiceTurn,
+  transcribe: voiceAgentTranscribe,
+  generateResponse: voiceAgentGenerateResponse,
+  synthesizeSpeech: voiceAgentSynthesizeSpeech,
+  stream: streamVoiceAgent,
+  cleanup: cleanupVoiceAgent,
 };

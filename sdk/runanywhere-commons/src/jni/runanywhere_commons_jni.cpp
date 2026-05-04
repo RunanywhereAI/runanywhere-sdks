@@ -17,11 +17,19 @@
 #include <jni.h>
 
 #include <condition_variable>
+#include <cstdio>
 #include <cstring>
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
+#include <fstream>
+#include <limits>
 #include <mutex>
 #include <new>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -34,25 +42,53 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_tool_calling.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/lora/rac_lora_service.h"
+#include "rac/features/rag/rac_rag_pipeline.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vlm/rac_vlm_component.h"
+#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_download.h"
+#include "../infrastructure/http/rac_http_internal.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/features/voice_agent/rac_voice_agent.h"
+#include "rac/features/voice_agent/rac_voice_event_abi.h"
+#include "rac/solutions/rac_solution.h"
+// v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
+#include "rac/features/llm/rac_llm_stream.h"
+// Round-1 CPP fix: hardware ABI, structured output, VAD statistics.
+#include "rac/features/llm/rac_llm_structured_output.h"
+#include "rac/plugin/rac_plugin_loader.h"
+#include "rac/router/rac_hardware_abi.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/storage/rac_storage_analyzer.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -65,6 +101,22 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 #define LOGe(...) RAC_LOG_ERROR(JNI_LOG_TAG, __VA_ARGS__)
 #define LOGw(...) RAC_LOG_WARNING(JNI_LOG_TAG, __VA_ARGS__)
 #define LOGd(...) RAC_LOG_DEBUG(JNI_LOG_TAG, __VA_ARGS__)
+
+// =============================================================================
+// JNI AttachCurrentThread signature shim
+// =============================================================================
+// The `AttachCurrentThread` parameter type differs between JVM headers:
+//   - Android NDK jni.h (r27+):  AttachCurrentThread(JNIEnv**, void*)
+//   - Oracle / Temurin  jni.h:   AttachCurrentThread(void**,   void*)
+// NDK r27 tightened parameter-type checking, so the previous
+// `reinterpret_cast<void**>(&env)` no longer compiles on Android. Pick
+// the right cast per platform. `GetEnv` still takes `void**` on both
+// platforms and does not need this shim.
+#ifdef __ANDROID__
+#define RAC_JNI_ATTACH_ENVPP(envpp) (envpp)
+#else
+#define RAC_JNI_ATTACH_ENVPP(envpp) (reinterpret_cast<void**>(envpp))
+#endif
 
 // =============================================================================
 // Global State for Platform Adapter JNI Callbacks
@@ -121,7 +173,10 @@ static JNIEnv* getJNIEnv() {
     int status = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (status == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        // Use RAC_JNI_ATTACH_ENVPP to bridge the Android NDK vs Oracle/Temurin
+        // parameter-type difference (see shim definition near the top of
+        // this file). NDK r27 no longer tolerates the prior `void**` cast.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
             return nullptr;
         }
     }
@@ -144,6 +199,283 @@ static const char* getNullableCString(JNIEnv* env, jstring str, std::string& sto
         return nullptr;
     storage = getCString(env, str);
     return storage.c_str();
+}
+
+static jbyteArray makeModelRegistryProtoByteArray(JNIEnv* env, uint8_t* bytes, size_t size,
+                                                  const char* operation) {
+    if (size > 0 && bytes == nullptr) {
+        LOGe("%s: native proto payload is null with non-zero size %zu", operation, size);
+        return nullptr;
+    }
+
+    if (size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        LOGe("%s: proto payload too large for JNI byte array: %zu", operation, size);
+        rac_model_registry_proto_free(bytes);
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(size));
+    if (result == nullptr) {
+        LOGe("%s: failed to allocate JNI byte array of size %zu", operation, size);
+        rac_model_registry_proto_free(bytes);
+        return nullptr;
+    }
+
+    if (size > 0) {
+        env->SetByteArrayRegion(result, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+
+    rac_model_registry_proto_free(bytes);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
+static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
+                                           const char* operation) {
+    if (buffer == nullptr) {
+        return nullptr;
+    }
+    if (RAC_FAILED(buffer->status)) {
+        LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
+             buffer->error_message ? buffer->error_message : "");
+        rac_proto_buffer_free(buffer);
+        return nullptr;
+    }
+    if (buffer->size > 0 && buffer->data == nullptr) {
+        LOGe("%s: native proto payload is null with non-zero size %zu", operation, buffer->size);
+        rac_proto_buffer_free(buffer);
+        return nullptr;
+    }
+    if (buffer->size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        LOGe("%s: proto payload too large for JNI byte array: %zu", operation, buffer->size);
+        rac_proto_buffer_free(buffer);
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(buffer->size));
+    if (result == nullptr) {
+        LOGe("%s: failed to allocate JNI byte array of size %zu", operation, buffer->size);
+        rac_proto_buffer_free(buffer);
+        return nullptr;
+    }
+    if (buffer->size > 0) {
+        env->SetByteArrayRegion(result, 0, static_cast<jsize>(buffer->size),
+                                reinterpret_cast<const jbyte*>(buffer->data));
+    }
+    rac_proto_buffer_free(buffer);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
+using ModelRegistryProtoWriteFn =
+    rac_result_t (*)(rac_model_registry_handle_t, const uint8_t*, size_t);
+
+static jint callModelRegistryProtoWrite(JNIEnv* env, jbyteArray modelInfoProto,
+                                        ModelRegistryProtoWriteFn writeFn,
+                                        const char* operation) {
+    if (!modelInfoProto) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("%s: model registry not initialized", operation);
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    const jsize length = env->GetArrayLength(modelInfoProto);
+    if (length == 0) {
+        return static_cast<jint>(writeFn(registry, nullptr, 0));
+    }
+
+    jbyte* bytes = env->GetByteArrayElements(modelInfoProto, nullptr);
+    if (bytes == nullptr) {
+        LOGe("%s: failed to access JNI byte array", operation);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    rac_result_t result =
+        writeFn(registry, reinterpret_cast<const uint8_t*>(bytes), static_cast<size_t>(length));
+    env->ReleaseByteArrayElements(modelInfoProto, bytes, JNI_ABORT);
+    return static_cast<jint>(result);
+}
+
+using ProtoBufferCallFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
+
+static jbyteArray callProtoBufferFn(JNIEnv* env, jbyteArray requestProto,
+                                    ProtoBufferCallFn callFn, const char* operation) {
+    if (requestProto == nullptr) {
+        return nullptr;
+    }
+
+    const jsize length = env->GetArrayLength(requestProto);
+    jbyte* bytes = length > 0 ? env->GetByteArrayElements(requestProto, nullptr) : nullptr;
+    if (length > 0 && bytes == nullptr) {
+        LOGe("%s: failed to access JNI byte array", operation);
+        return nullptr;
+    }
+
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = callFn(reinterpret_cast<const uint8_t*>(bytes), static_cast<size_t>(length),
+                             &result);
+    if (bytes != nullptr) {
+        env->ReleaseByteArrayElements(requestProto, bytes, JNI_ABORT);
+    }
+    if (RAC_FAILED(rc) && result.status == RAC_SUCCESS) {
+        rac_proto_buffer_set_error(&result, rc, operation);
+    }
+    return makeProtoBufferByteArray(env, &result, operation);
+}
+
+static jbyteArray callLifecycleLoadProtoFn(JNIEnv* env, jbyteArray requestProto) {
+    static const char* operation = "racModelLifecycleLoadProto";
+    if (requestProto == nullptr) {
+        return nullptr;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("%s: model registry not initialized", operation);
+        return nullptr;
+    }
+
+    const jsize length = env->GetArrayLength(requestProto);
+    jbyte* bytes = length > 0 ? env->GetByteArrayElements(requestProto, nullptr) : nullptr;
+    if (length > 0 && bytes == nullptr) {
+        LOGe("%s: failed to access JNI byte array", operation);
+        return nullptr;
+    }
+
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_model_lifecycle_load_proto(
+        registry, reinterpret_cast<const uint8_t*>(bytes), static_cast<size_t>(length), &result);
+    if (bytes != nullptr) {
+        env->ReleaseByteArrayElements(requestProto, bytes, JNI_ABORT);
+    }
+    if (RAC_FAILED(rc) && result.status == RAC_SUCCESS) {
+        rac_proto_buffer_set_error(&result, rc, operation);
+    }
+    return makeProtoBufferByteArray(env, &result, operation);
+}
+
+static jboolean invokeProtoListener(JNIEnv* env, jobject listener, const uint8_t* bytes,
+                                    size_t size, const char* operation) {
+    if (env == nullptr || listener == nullptr) {
+        return JNI_FALSE;
+    }
+    if (size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        LOGe("%s: callback payload too large: %zu", operation, size);
+        return JNI_FALSE;
+    }
+    jbyteArray jBytes = env->NewByteArray(static_cast<jsize>(size));
+    if (jBytes == nullptr) {
+        return JNI_FALSE;
+    }
+    if (size > 0 && bytes != nullptr) {
+        env->SetByteArrayRegion(jBytes, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+    jclass cls = env->GetObjectClass(listener);
+    jmethodID method = env->GetMethodID(cls, "onProgress", "([B)Z");
+    env->DeleteLocalRef(cls);
+    if (method == nullptr) {
+        env->DeleteLocalRef(jBytes);
+        return JNI_FALSE;
+    }
+    jboolean keepGoing = env->CallBooleanMethod(listener, method, jBytes);
+    env->DeleteLocalRef(jBytes);
+    return env->ExceptionCheck() ? JNI_FALSE : keepGoing;
+}
+
+struct JByteArrayView {
+    JNIEnv* env = nullptr;
+    jbyteArray array = nullptr;
+    jbyte* bytes = nullptr;
+    jsize length = 0;
+    bool ok = false;
+
+    JByteArrayView(JNIEnv* e, jbyteArray a, bool allowNull = false) : env(e), array(a) {
+        if (array == nullptr) {
+            ok = allowNull;
+            return;
+        }
+        length = env->GetArrayLength(array);
+        bytes = length > 0 ? env->GetByteArrayElements(array, nullptr) : nullptr;
+        ok = (length == 0 || bytes != nullptr);
+    }
+
+    ~JByteArrayView() {
+        if (bytes != nullptr) {
+            env->ReleaseByteArrayElements(array, bytes, JNI_ABORT);
+        }
+    }
+
+    const uint8_t* u8() const {
+        return reinterpret_cast<const uint8_t*>(bytes);
+    }
+
+    const void* data() const {
+        return static_cast<const void*>(bytes);
+    }
+
+    size_t size() const {
+        return static_cast<size_t>(length);
+    }
+};
+
+struct ProtoListenerUserData {
+    jobject listener;
+    const char* operation;
+};
+
+static void proto_void_callback(const uint8_t* proto_bytes, size_t proto_size, void* user_data) {
+    auto* ctx = static_cast<ProtoListenerUserData*>(user_data);
+    if (ctx == nullptr || ctx->listener == nullptr) {
+        return;
+    }
+    JNIEnv* env = getJNIEnv();
+    invokeProtoListener(env, ctx->listener, proto_bytes, proto_size, ctx->operation);
+}
+
+static rac_bool_t proto_bool_callback(const uint8_t* proto_bytes, size_t proto_size,
+                                      void* user_data) {
+    auto* ctx = static_cast<ProtoListenerUserData*>(user_data);
+    if (ctx == nullptr || ctx->listener == nullptr) {
+        return RAC_TRUE;
+    }
+    JNIEnv* env = getJNIEnv();
+    return invokeProtoListener(env, ctx->listener, proto_bytes, proto_size, ctx->operation)
+        ? RAC_TRUE
+        : RAC_FALSE;
+}
+
+static jbyteArray makeProtoCallResult(JNIEnv* env, rac_result_t rc,
+                                      rac_proto_buffer_t* result, const char* operation) {
+    if (RAC_FAILED(rc) && result != nullptr && result->status == RAC_SUCCESS) {
+        rac_proto_buffer_set_error(result, rc, operation);
+    }
+    return makeProtoBufferByteArray(env, result, operation);
+}
+
+static rac_handle_t handleFromJLong(jlong handle) {
+    return reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+}
+
+template <typename Fn>
+static Fn optionalNativeSymbol(const char* name) {
+#ifdef _WIN32
+    (void)name;
+    return nullptr;
+#else
+    return reinterpret_cast<Fn>(dlsym(RTLD_DEFAULT, name));
+#endif
+}
+
+static jbyteArray makeFeatureUnavailableResult(JNIEnv* env, const char* operation) {
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    return makeProtoCallResult(env, RAC_ERROR_FEATURE_NOT_AVAILABLE, &result, operation);
 }
 
 // =============================================================================
@@ -454,6 +786,31 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 }
 
 // =============================================================================
+// JNI FUNCTIONS - Model Paths (canonical Swift-aligned schema)
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsSetBaseDir(
+    JNIEnv* env, jclass clazz, jstring baseDir) {
+    std::string baseDirStr = getCString(env, baseDir);
+    rac_result_t result = rac_model_paths_set_base_dir(baseDirStr.c_str());
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetModelFolder(
+    JNIEnv* env, jclass clazz, jstring modelId, jint framework) {
+    std::string modelIdStr = getCString(env, modelId);
+    char buf[2048] = {0};
+    rac_result_t result = rac_model_paths_get_model_folder(
+        modelIdStr.c_str(), static_cast<rac_inference_framework_t>(framework), buf, sizeof(buf));
+    if (result != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+// =============================================================================
 // JNI FUNCTIONS - LLM Component
 // =============================================================================
 
@@ -492,19 +849,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadMode
     LOGi("racLlmComponentLoadModel path=%s, id=%s, name=%s", path.c_str(), id.c_str(),
          name.c_str());
 
-    // Debug: List registered providers BEFORE loading
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result = rac_service_list_providers(RAC_CAPABILITY_TEXT_GENERATION,
-                                                          &provider_names, &provider_count);
-    LOGi("Before load_model - TEXT_GENERATION providers: count=%zu, list_result=%d", provider_count,
-         list_result);
-    if (provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+    // v3 Phase B9: debug-log registered plugins BEFORE loading.
+    // rac_service_list_providers deleted; rac_plugin_list fills an
+    // array of vtables sorted by priority.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result = rac_plugin_list(RAC_PRIMITIVE_GENERATE_TEXT, plugins, 16,
+                                                   &plugin_count);
+        LOGi("Before load_model - GENERATE_TEXT plugins: count=%zu, list_result=%d",
+             plugin_count, list_result);
+        if (plugin_count > 0) {
+            for (size_t i = 0; i < plugin_count; ++i) {
+                LOGi("  Plugin[%zu]: %s", i,
+                     plugins[i] && plugins[i]->metadata.name ? plugins[i]->metadata.name : "NULL");
+            }
+        } else {
+            LOGw("NO plugins registered for GENERATE_TEXT!");
         }
-    } else {
-        LOGw("NO providers registered for TEXT_GENERATION!");
     }
 
     // Pass model_path, model_id, and model_name separately to C++ lifecycle
@@ -739,7 +1101,7 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("Failed to attach thread for streaming callback");
@@ -1295,11 +1657,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentIsLoaded
                                                                                : JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject streamCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
-}
-
 // =============================================================================
 // JNI FUNCTIONS - LLM LoRA Adapter Management
 // =============================================================================
@@ -1608,18 +1965,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadMode
          name.c_str());
 
     // Debug: List registered providers BEFORE loading
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result =
-        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-    LOGi("Before load_model - STT providers: count=%zu, list_result=%d", provider_count,
-         list_result);
-    if (provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+    // v3 Phase B9: debug-log registered plugins BEFORE loading.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result =
+            rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
+        LOGi("Before load_model - TRANSCRIBE plugins: count=%zu, list_result=%d", plugin_count,
+             list_result);
+        if (plugin_count > 0) {
+            for (size_t i = 0; i < plugin_count; ++i) {
+                LOGi("  Plugin[%zu]: %s", i,
+                     plugins[i] && plugins[i]->metadata.name ? plugins[i]->metadata.name : "NULL");
+            }
+        } else {
+            LOGw("NO plugins registered for TRANSCRIBE!");
         }
-    } else {
-        LOGw("NO providers registered for STT!");
     }
 
     // Pass model_path, model_id, and model_name separately to C++ lifecycle
@@ -1701,6 +2062,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     json_obj["duration_ms"] = result.processing_time_ms;
     json_obj["completion_reason"] = 1;  // END_OF_AUDIO
     json_obj["confidence"] = result.confidence;
+
+    // v2 close-out (E-5): emit word-level timestamps when the backend
+    // populated them. Times are converted from milliseconds (C ABI) to
+    // seconds (frontend convention) so Kotlin/Swift/Dart see them in the
+    // same units used by Whisper/Sherpa client examples.
+    if (result.words != nullptr && result.num_words > 0) {
+        nlohmann::json words_arr = nlohmann::json::array();
+        for (size_t i = 0; i < result.num_words; ++i) {
+            const rac_stt_word_t& w = result.words[i];
+            nlohmann::json word;
+            word["word"] = w.text ? std::string(w.text) : "";
+            word["start_time"] = static_cast<double>(w.start_ms) / 1000.0;
+            word["end_time"] = static_cast<double>(w.end_ms) / 1000.0;
+            word["confidence"] = w.confidence;
+            words_arr.push_back(std::move(word));
+        }
+        json_obj["word_timestamps"] = std::move(words_arr);
+    }
+
     std::string json_result = json_obj.dump();
 
     rac_stt_result_free(&result);
@@ -1712,11 +2092,154 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeFile(
     JNIEnv* env, jclass clazz, jlong handle, jstring audioPath, jstring configJson) {
-    // NOTE: rac_stt_component_transcribe_file does not exist in current API
-    // This is a stub - actual implementation would need to read file and call transcribe
-    if (handle == 0)
-        return nullptr;
-    return env->NewStringUTF("{\"error\": \"transcribe_file not implemented\"}");
+    if (handle == 0 || audioPath == nullptr) {
+        return env->NewStringUTF("{\"error\":\"invalid_handle_or_path\"}");
+    }
+
+    const char* audio_path = env->GetStringUTFChars(audioPath, nullptr);
+    if (audio_path == nullptr) {
+        return env->NewStringUTF("{\"error\":\"failed_to_read_audio_path\"}");
+    }
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+    std::string language_override;
+
+    if (configJson != nullptr) {
+        const char* json_str = env->GetStringUTFChars(configJson, nullptr);
+        if (json_str != nullptr) {
+            try {
+                auto json = nlohmann::json::parse(json_str);
+                if (json.contains("sample_rate") && json["sample_rate"].is_number_integer()) {
+                    const int sample_rate = json["sample_rate"].get<int>();
+                    if (sample_rate > 0) {
+                        options.sample_rate = sample_rate;
+                    }
+                }
+                if (json.contains("language") && json["language"].is_string()) {
+                    language_override = json["language"].get<std::string>();
+                    options.language = language_override.c_str();
+                }
+            } catch (const nlohmann::json::exception& e) {
+                LOGe("Failed to parse STT transcribeFile config JSON: %s", e.what());
+            }
+            env->ReleaseStringUTFChars(configJson, json_str);
+        }
+    }
+
+    std::ifstream file(audio_path, std::ios::binary | std::ios::ate);
+    env->ReleaseStringUTFChars(audioPath, audio_path);
+
+    if (!file.is_open()) {
+        return env->NewStringUTF("{\"error\":\"failed_to_open_audio_file\"}");
+    }
+
+    std::streamsize file_size = file.tellg();
+    if (file_size <= 0) {
+        return env->NewStringUTF("{\"error\":\"audio_file_is_empty\"}");
+    }
+
+    file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> file_data(static_cast<size_t>(file_size));
+    if (!file.read(reinterpret_cast<char*>(file_data.data()), file_size)) {
+        return env->NewStringUTF("{\"error\":\"failed_to_read_audio_file\"}");
+    }
+
+    const uint8_t* data = file_data.data();
+    const size_t data_size = file_data.size();
+    int32_t sample_rate = options.sample_rate;
+
+    if (data_size < 44) {
+        return env->NewStringUTF("{\"error\":\"file_too_small_for_wav\"}");
+    }
+    if (data[0] != 'R' || data[1] != 'I' || data[2] != 'F' || data[3] != 'F') {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_riff\"}");
+    }
+    if (data[8] != 'W' || data[9] != 'A' || data[10] != 'V' || data[11] != 'E') {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_wave\"}");
+    }
+
+    size_t pos = 12;
+    size_t audio_data_offset = 0;
+    size_t audio_data_size = 0;
+
+    while (pos + 8 < data_size) {
+        char chunk_id[5] = {0};
+        std::memcpy(chunk_id, &data[pos], 4);
+
+        uint32_t chunk_size = 0;
+        std::memcpy(&chunk_size, &data[pos + 4], sizeof(chunk_size));
+
+        if (std::strcmp(chunk_id, "fmt ") == 0) {
+            if (pos + 8 + chunk_size <= data_size && chunk_size >= 16) {
+                std::memcpy(&sample_rate, &data[pos + 12], sizeof(sample_rate));
+                if (sample_rate <= 0 || sample_rate > 48000) {
+                    sample_rate = options.sample_rate;
+                }
+            }
+        } else if (std::strcmp(chunk_id, "data") == 0) {
+            audio_data_offset = pos + 8;
+            audio_data_size = chunk_size;
+            break;
+        }
+
+        pos += 8 + chunk_size;
+        if (chunk_size % 2 != 0) {
+            ++pos;
+        }
+    }
+
+    if (audio_data_size == 0 || audio_data_offset + audio_data_size > data_size) {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_data_chunk\"}");
+    }
+
+    if (audio_data_size < 3200) {
+        return env->NewStringUTF("{\"error\":\"recording_too_short_to_transcribe\"}");
+    }
+
+    options.sample_rate = sample_rate;
+
+    rac_stt_result_t result = {};
+    rac_result_t status = rac_stt_component_transcribe(
+        reinterpret_cast<rac_handle_t>(handle),
+        &data[audio_data_offset],
+        audio_data_size,
+        &options,
+        &result);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("STT transcribeFile failed with status: %d", status);
+        rac_stt_result_free(&result);
+        nlohmann::json error_json;
+        error_json["error"] = "transcription_failed";
+        error_json["status"] = status;
+        const std::string error_result = error_json.dump();
+        return env->NewStringUTF(error_result.c_str());
+    }
+
+    nlohmann::json json_obj;
+    json_obj["text"] = result.text ? std::string(result.text) : "";
+    json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
+    json_obj["duration_ms"] = result.processing_time_ms;
+    json_obj["completion_reason"] = 1;
+    json_obj["confidence"] = result.confidence;
+
+    if (result.words != nullptr && result.num_words > 0) {
+        nlohmann::json words_arr = nlohmann::json::array();
+        for (size_t i = 0; i < result.num_words; ++i) {
+            const rac_stt_word_t& w = result.words[i];
+            nlohmann::json word;
+            word["word"] = w.text ? std::string(w.text) : "";
+            word["start_time"] = static_cast<double>(w.start_ms) / 1000.0;
+            word["end_time"] = static_cast<double>(w.end_ms) / 1000.0;
+            word["confidence"] = w.confidence;
+            words_arr.push_back(std::move(word));
+        }
+        json_obj["word_timestamps"] = std::move(words_arr);
+    }
+
+    const std::string json_result = json_obj.dump();
+    rac_stt_result_free(&result);
+    return env->NewStringUTF(json_result.c_str());
 }
 
 JNIEXPORT jstring JNICALL
@@ -1759,20 +2282,52 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentGetLanguages(JNIEnv* env,
                                                                                      jclass clazz,
                                                                                      jlong handle) {
-    // Return empty array for now
-    return env->NewStringUTF("[]");
+    if (handle == 0)
+        return nullptr;
+
+    char* json = nullptr;
+    rac_result_t rc = rac_stt_component_get_supported_languages(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+    if (rc != RAC_SUCCESS || !json) {
+        if (json)
+            free(json);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(json);
+    free(json);
+    return result;
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDetectLanguage(
     JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData) {
-    // Return null for now - language detection not implemented
-    return nullptr;
-}
+    if (handle == 0 || audioData == nullptr)
+        return nullptr;
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject partialCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
+    const jsize size = env->GetArrayLength(audioData);
+    if (size <= 0)
+        return nullptr;
+
+    jbyte* bytes = env->GetByteArrayElements(audioData, nullptr);
+    if (!bytes)
+        return nullptr;
+
+    char* detected = nullptr;
+    rac_result_t rc = rac_stt_component_detect_language(reinterpret_cast<rac_handle_t>(handle),
+                                                        bytes, static_cast<size_t>(size),
+                                                        &detected);
+    env->ReleaseByteArrayElements(audioData, bytes, JNI_ABORT);
+
+    if (rc != RAC_SUCCESS || !detected) {
+        if (detected)
+            free(detected);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(detected);
+    free(detected);
+    return result;
 }
 
 // =============================================================================
@@ -1873,16 +2428,57 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesi
 
     std::string textStr = getCString(env, text);
     std::string pathStr = getCString(env, outputPath);
+    if (pathStr.empty()) {
+        LOGe("racTtsComponentSynthesizeToFile: output path is empty");
+        return -1;
+    }
+
     rac_tts_options_t options = {};
     rac_tts_result_t result = {};
 
     rac_result_t status = rac_tts_component_synthesize(reinterpret_cast<rac_handle_t>(handle),
                                                        textStr.c_str(), &options, &result);
 
-    // TODO: Write result to file
-    rac_tts_result_free(&result);
+    if (status != RAC_SUCCESS) {
+        LOGe("racTtsComponentSynthesizeToFile: synthesize failed with code %d", status);
+        rac_tts_result_free(&result);
+        return -1;
+    }
 
-    return status == RAC_SUCCESS ? 0 : -1;
+    if (result.audio_data == nullptr || result.audio_size == 0) {
+        LOGe("racTtsComponentSynthesizeToFile: empty audio buffer returned");
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    // Write raw PCM bytes to disk. Caller is responsible for wrapping in a
+    // WAV container if desired; mirroring iOS CppBridge+TTS which writes the
+    // raw rac_tts_result_t.audio_data buffer the synthesizer produced.
+    std::ofstream out(pathStr, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+        LOGe("racTtsComponentSynthesizeToFile: failed to open %s for writing", pathStr.c_str());
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    out.write(reinterpret_cast<const char*>(result.audio_data),
+              static_cast<std::streamsize>(result.audio_size));
+    const bool writeOk = out.good();
+    out.close();
+
+    if (!writeOk) {
+        LOGe("racTtsComponentSynthesizeToFile: write failed (wrote partial data)");
+        std::remove(pathStr.c_str());
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    const int64_t durationMs = result.duration_ms;
+    LOGi("racTtsComponentSynthesizeToFile: wrote %zu bytes (%lld ms audio) -> %s",
+         result.audio_size, (long long)durationMs, pathStr.c_str());
+
+    rac_tts_result_free(&result);
+    return static_cast<jlong>(durationMs);
 }
 
 JNIEXPORT void JNICALL
@@ -1941,12 +2537,21 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentGetLanguages(JNIEnv* env,
                                                                                      jclass clazz,
                                                                                      jlong handle) {
-    return env->NewStringUTF("[]");
-}
+    if (handle == 0)
+        return nullptr;
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject audioCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
+    char* json = nullptr;
+    rac_result_t rc = rac_tts_component_get_supported_languages(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+    if (rc != RAC_SUCCESS || !json) {
+        if (json)
+            free(json);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(json);
+    free(json);
+    return result;
 }
 
 // =============================================================================
@@ -2085,12 +2690,6 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetSampleRates(
     JNIEnv* env, jclass clazz, jlong handle) {
     return env->NewStringUTF("[16000]");
-}
-
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject frameCallback, jobject speechStartCallback,
-    jobject speechEndCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
 }
 
 // =============================================================================
@@ -2444,6 +3043,221 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateD
     return static_cast<jint>(result);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRegisterProto(
+    JNIEnv* env, jclass clazz, jbyteArray modelInfoProto) {
+    return callModelRegistryProtoWrite(env, modelInfoProto, rac_model_registry_register_proto,
+                                       "racModelRegistryRegisterProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateProto(
+    JNIEnv* env, jclass clazz, jbyteArray modelInfoProto) {
+    return callModelRegistryProtoWrite(env, modelInfoProto, rac_model_registry_update_proto,
+                                       "racModelRegistryUpdateProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryGetProto(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    if (!modelId) {
+        return nullptr;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryGetProto: model registry not initialized");
+        return nullptr;
+    }
+
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    if (!id_str) {
+        return nullptr;
+    }
+
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t result = rac_model_registry_get_proto(registry, id_str, &bytes, &size);
+    env->ReleaseStringUTFChars(modelId, id_str);
+
+    if (result != RAC_SUCCESS) {
+        rac_model_registry_proto_free(bytes);
+        if (result != RAC_ERROR_NOT_FOUND) {
+            LOGe("racModelRegistryGetProto: failed with code %d", result);
+        }
+        return nullptr;
+    }
+
+    return makeModelRegistryProtoByteArray(env, bytes, size, "racModelRegistryGetProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryListProto(JNIEnv* env,
+                                                                                   jclass clazz) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryListProto: model registry not initialized");
+        return nullptr;
+    }
+
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t result = rac_model_registry_list_proto(registry, &bytes, &size);
+    if (result != RAC_SUCCESS) {
+        rac_model_registry_proto_free(bytes);
+        LOGe("racModelRegistryListProto: failed with code %d", result);
+        return nullptr;
+    }
+
+    return makeModelRegistryProtoByteArray(env, bytes, size, "racModelRegistryListProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryQueryProto(
+    JNIEnv* env, jclass clazz, jbyteArray queryProto) {
+    if (!queryProto) {
+        return nullptr;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryQueryProto: model registry not initialized");
+        return nullptr;
+    }
+
+    const jsize length = env->GetArrayLength(queryProto);
+    jbyte* queryBytes = length > 0 ? env->GetByteArrayElements(queryProto, nullptr) : nullptr;
+    if (length > 0 && queryBytes == nullptr) {
+        LOGe("racModelRegistryQueryProto: failed to access JNI byte array");
+        return nullptr;
+    }
+
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t result = rac_model_registry_query_proto(
+        registry, reinterpret_cast<const uint8_t*>(queryBytes), static_cast<size_t>(length),
+        &bytes, &size);
+    if (queryBytes != nullptr) {
+        env->ReleaseByteArrayElements(queryProto, queryBytes, JNI_ABORT);
+    }
+    if (result != RAC_SUCCESS) {
+        rac_model_registry_proto_free(bytes);
+        LOGe("racModelRegistryQueryProto: failed with code %d", result);
+        return nullptr;
+    }
+
+    return makeModelRegistryProtoByteArray(env, bytes, size, "racModelRegistryQueryProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryListDownloadedProto(
+    JNIEnv* env, jclass clazz) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryListDownloadedProto: model registry not initialized");
+        return nullptr;
+    }
+
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t result = rac_model_registry_list_downloaded_proto(registry, &bytes, &size);
+    if (result != RAC_SUCCESS) {
+        rac_model_registry_proto_free(bytes);
+        LOGe("racModelRegistryListDownloadedProto: failed with code %d", result);
+        return nullptr;
+    }
+
+    return makeModelRegistryProtoByteArray(env, bytes, size,
+                                           "racModelRegistryListDownloadedProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRemoveProto(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    if (!modelId) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryRemoveProto: model registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    if (!id_str) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    rac_result_t result = rac_model_registry_remove_proto(registry, id_str);
+    env->ReleaseStringUTFChars(modelId, id_str);
+    return static_cast<jint>(result);
+}
+
+// racModelRegistryRefresh — T4.9.
+// Mirrors the C ABI rac_model_registry_refresh(handle, opts). We do not wire
+// discovery callbacks from the JVM here (Kotlin discovery currently runs in
+// Java-side code via registerModel + filesystem helpers), so only the
+// include_remote_catalog branch needs transport — which reuses the model
+// assignment callbacks already registered at SDK init.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh(
+    JNIEnv* env, jclass /*clazz*/, jboolean includeRemoteCatalog, jboolean rescanLocal,
+    jboolean pruneOrphans) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryRefresh: registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_model_registry_refresh_opts_t opts = {};
+    opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE;
+    opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE;
+    opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE;
+    opts.discovery_callbacks = nullptr;
+
+    rac_result_t result = rac_model_registry_refresh(registry, opts);
+    LOGi("racModelRegistryRefresh result=%d", result);
+    return static_cast<jint>(result);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Model Lifecycle Proto ABI (rac_model_lifecycle.h)
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelLifecycleLoadProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callLifecycleLoadProtoFn(env, requestProto);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelLifecycleUnloadProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_model_lifecycle_unload_proto,
+                             "racModelLifecycleUnloadProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelLifecycleCurrentModelProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_model_lifecycle_current_model_proto,
+                             "racModelLifecycleCurrentModelProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racComponentLifecycleSnapshotProto(
+    JNIEnv* env, jclass clazz, jint component) {
+    rac_proto_buffer_t snapshot = {};
+    rac_proto_buffer_init(&snapshot);
+    rac_result_t rc =
+        rac_component_lifecycle_snapshot_proto(static_cast<uint32_t>(component), &snapshot);
+    if (RAC_FAILED(rc) && snapshot.status == RAC_SUCCESS) {
+        rac_proto_buffer_set_error(&snapshot, rc, "racComponentLifecycleSnapshotProto");
+    }
+    return makeProtoBufferByteArray(env, &snapshot, "racComponentLifecycleSnapshotProto");
+}
+
 // =============================================================================
 // JNI FUNCTIONS - Model Assignment (rac_model_assignment.h)
 // =============================================================================
@@ -2478,10 +3292,12 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
 
     JNIEnv* env = nullptr;
     bool did_attach = false;
-    jint get_result = g_model_assignment_state.jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    jint get_result = g_model_assignment_state.jvm->GetEnv(
+        reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (get_result == JNI_EDETACHED) {
-        if (g_model_assignment_state.jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+        if (g_model_assignment_state.jvm->AttachCurrentThread(
+                RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
             did_attach = true;
         } else {
             LOGe("model_assignment_http_get_callback: failed to attach thread");
@@ -3897,9 +4713,52 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitial
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
     std::string toolsStr = getCString(env, toolsJson);
+    std::string optionsStr = getCString(env, optionsJson);
 
-    // Parse options if provided (simplified - use defaults for now)
-    rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
+    // Defaults (all 8 fields of rac_tool_calling_options_t incl. format)
+    rac_tool_calling_options_t options =
+        RAC_TOOL_CALLING_OPTIONS_DEFAULT;
+
+    // Parse optionsJson so Kotlin-side fields (format, temperature, etc.) are honored.
+    // Keeps a stable std::string for the system_prompt so the char* stays valid for
+    // the duration of the rac_tool_call_build_initial_prompt call below.
+    std::string systemPromptStorage;
+    std::string formatStorage;
+    if (!optionsStr.empty()) {
+        try {
+            auto opts = nlohmann::json::parse(optionsStr);
+            if (opts.contains("maxToolCalls") && opts["maxToolCalls"].is_number_integer()) {
+                options.max_tool_calls = opts["maxToolCalls"].get<int32_t>();
+            }
+            if (opts.contains("autoExecute") && opts["autoExecute"].is_boolean()) {
+                options.auto_execute = opts["autoExecute"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("temperature") && opts["temperature"].is_number()) {
+                options.temperature = opts["temperature"].get<float>();
+            }
+            if (opts.contains("maxTokens") && opts["maxTokens"].is_number_integer()) {
+                options.max_tokens = opts["maxTokens"].get<int32_t>();
+            }
+            if (opts.contains("systemPrompt") && opts["systemPrompt"].is_string()) {
+                systemPromptStorage = opts["systemPrompt"].get<std::string>();
+                options.system_prompt = systemPromptStorage.c_str();
+            }
+            if (opts.contains("replaceSystemPrompt") && opts["replaceSystemPrompt"].is_boolean()) {
+                options.replace_system_prompt =
+                    opts["replaceSystemPrompt"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("keepToolsAvailable") && opts["keepToolsAvailable"].is_boolean()) {
+                options.keep_tools_available =
+                    opts["keepToolsAvailable"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("format") && opts["format"].is_string()) {
+                formatStorage = opts["format"].get<std::string>();
+                options.format = rac_tool_call_format_from_name(formatStorage.c_str());
+            }
+        } catch (const std::exception& e) {
+            LOGe("racToolCallBuildInitialPrompt: failed to parse optionsJson: %s", e.what());
+        }
+    }
 
     char* prompt = nullptr;
     rac_result_t rc =
@@ -4205,7 +5064,7 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("VLM: Failed to attach thread for streaming callback");
@@ -4648,6 +5507,88 @@ static rac_file_callbacks_t build_jni_file_callbacks() {
     return cb;
 }
 
+static int64_t jni_storage_calculate_dir_size(const char* path, void* user_data) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t result = rac_file_manager_calculate_dir_size(&cb, path ? path : "", &size);
+    return RAC_SUCCEEDED(result) ? size : -1;
+}
+
+static rac_result_t jni_storage_is_model_loaded(const char* /*model_id*/,
+                                                rac_bool_t* out_is_loaded,
+                                                void* /*user_data*/) {
+    if (out_is_loaded != nullptr) {
+        *out_is_loaded = RAC_FALSE;
+    }
+    return RAC_SUCCESS;
+}
+
+static rac_result_t jni_storage_unload_model(const char* /*model_id*/, void* /*user_data*/) {
+    return RAC_SUCCESS;
+}
+
+static rac_storage_callbacks_t build_jni_storage_callbacks() {
+    rac_storage_callbacks_t cb = {};
+    cb.calculate_dir_size = jni_storage_calculate_dir_size;
+    cb.get_file_size = jni_fc_get_file_size;
+    cb.path_exists = jni_fc_path_exists;
+    cb.get_available_space = jni_fc_get_available_space;
+    cb.get_total_space = jni_fc_get_total_space;
+    cb.delete_path = jni_fc_delete_path;
+    cb.is_model_loaded = jni_storage_is_model_loaded;
+    cb.unload_model = jni_storage_unload_model;
+    cb.user_data = nullptr;
+    return cb;
+}
+
+using StorageProtoCallFn = rac_result_t (*)(rac_storage_analyzer_handle_t,
+                                            rac_model_registry_handle_t,
+                                            const uint8_t*,
+                                            size_t,
+                                            rac_proto_buffer_t*);
+
+static jbyteArray callStorageProtoFn(JNIEnv* env, jbyteArray requestProto,
+                                     StorageProtoCallFn callFn, const char* operation) {
+    if (requestProto == nullptr) {
+        return nullptr;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("%s: model registry not initialized", operation);
+        return nullptr;
+    }
+
+    rac_storage_callbacks_t callbacks = build_jni_storage_callbacks();
+    rac_storage_analyzer_handle_t analyzer = nullptr;
+    rac_result_t createResult = rac_storage_analyzer_create(&callbacks, &analyzer);
+    if (RAC_FAILED(createResult) || analyzer == nullptr) {
+        LOGe("%s: failed to create storage analyzer: %d", operation, createResult);
+        return nullptr;
+    }
+
+    const jsize length = env->GetArrayLength(requestProto);
+    jbyte* requestBytes = length > 0 ? env->GetByteArrayElements(requestProto, nullptr) : nullptr;
+    if (length > 0 && requestBytes == nullptr) {
+        rac_storage_analyzer_destroy(analyzer);
+        LOGe("%s: failed to access JNI byte array", operation);
+        return nullptr;
+    }
+
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = callFn(analyzer, registry, reinterpret_cast<const uint8_t*>(requestBytes),
+                             static_cast<size_t>(length), &result);
+    if (requestBytes != nullptr) {
+        env->ReleaseByteArrayElements(requestProto, requestBytes, JNI_ABORT);
+    }
+    rac_storage_analyzer_destroy(analyzer);
+    if (RAC_FAILED(rc) && result.status == RAC_SUCCESS) {
+        rac_proto_buffer_set_error(&result, rc, operation);
+    }
+    return makeProtoBufferByteArray(env, &result, operation);
+}
+
 // Register file callbacks object from Kotlin
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerRegisterCallbacks(
@@ -4817,6 +5758,2055 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetSto
 
     std::string jsonStr = j.dump();
     return env->NewStringUTF(jsonStr.c_str());
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStorageInfoProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callStorageProtoFn(env, requestProto, rac_storage_analyzer_info_proto,
+                              "racStorageInfoProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStorageAvailabilityProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callStorageProtoFn(env, requestProto, rac_storage_analyzer_availability_proto,
+                              "racStorageAvailabilityProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStorageDeletePlanProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callStorageProtoFn(env, requestProto, rac_storage_analyzer_delete_plan_proto,
+                              "racStorageDeletePlanProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStorageDeleteProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callStorageProtoFn(env, requestProto, rac_storage_analyzer_delete_proto,
+                              "racStorageDeleteProto");
+}
+
+static std::mutex g_sdk_event_listener_mutex;
+static std::unordered_map<uint64_t, jobject> g_sdk_event_listeners;
+
+static void sdk_event_jni_callback(const uint8_t* proto_bytes, size_t proto_size, void* user_data) {
+    auto* listener = static_cast<jobject>(user_data);
+    JNIEnv* env = getJNIEnv();
+    invokeProtoListener(env, listener, proto_bytes, proto_size, "sdkEventCallback");
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventSubscribe(
+    JNIEnv* env, jclass clazz, jobject listener) {
+    if (listener == nullptr) {
+        return 0;
+    }
+    jobject globalListener = env->NewGlobalRef(listener);
+    uint64_t subscriptionId = rac_sdk_event_subscribe(sdk_event_jni_callback, globalListener);
+    if (subscriptionId == 0) {
+        env->DeleteGlobalRef(globalListener);
+        return 0;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
+        g_sdk_event_listeners[subscriptionId] = globalListener;
+    }
+    return static_cast<jlong>(subscriptionId);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventUnsubscribe(
+    JNIEnv* env, jclass clazz, jlong subscriptionId) {
+    const uint64_t id = static_cast<uint64_t>(subscriptionId);
+    jobject listener = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
+        auto it = g_sdk_event_listeners.find(id);
+        if (it != g_sdk_event_listeners.end()) {
+            listener = it->second;
+            g_sdk_event_listeners.erase(it);
+        }
+    }
+    rac_sdk_event_unsubscribe(id);
+    if (listener != nullptr) {
+        env->DeleteGlobalRef(listener);
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventPublishProto(
+    JNIEnv* env, jclass clazz, jbyteArray eventProto) {
+    if (eventProto == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    const jsize length = env->GetArrayLength(eventProto);
+    jbyte* bytes = length > 0 ? env->GetByteArrayElements(eventProto, nullptr) : nullptr;
+    if (length > 0 && bytes == nullptr) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    rac_result_t result = rac_sdk_event_publish_proto(
+        reinterpret_cast<const uint8_t*>(bytes), static_cast<size_t>(length));
+    if (bytes != nullptr) {
+        env->ReleaseByteArrayElements(eventProto, bytes, JNI_ABORT);
+    }
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventPoll(JNIEnv* env,
+                                                                         jclass clazz) {
+    rac_proto_buffer_t event = {};
+    rac_proto_buffer_init(&event);
+    rac_result_t result = rac_sdk_event_poll(&event);
+    if (RAC_FAILED(result)) {
+        rac_proto_buffer_free(&event);
+        return nullptr;
+    }
+    return makeProtoBufferByteArray(env, &event, "racSdkEventPoll");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventPublishFailure(
+    JNIEnv* env, jclass clazz, jint errorCode, jstring message, jstring component,
+    jstring operation, jboolean recoverable) {
+    std::string messageStorage = getCString(env, message);
+    std::string componentStorage = getCString(env, component);
+    std::string operationStorage = getCString(env, operation);
+    return static_cast<jint>(rac_sdk_event_publish_failure(
+        static_cast<rac_result_t>(errorCode), messageStorage.c_str(), componentStorage.c_str(),
+        operationStorage.c_str(), recoverable ? RAC_TRUE : RAC_FALSE));
+}
+
+static jobject g_download_proto_listener = nullptr;
+static std::mutex g_download_proto_listener_mutex;
+
+static void download_proto_jni_callback(const uint8_t* proto_bytes, size_t proto_size,
+                                        void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    jobject listener = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
+        if (env != nullptr && g_download_proto_listener != nullptr) {
+            listener = env->NewLocalRef(g_download_proto_listener);
+        }
+    }
+    invokeProtoListener(env, listener, proto_bytes, proto_size, "downloadProtoCallback");
+    if (env != nullptr && listener != nullptr) {
+        env->DeleteLocalRef(listener);
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadSetProgressProtoCallback(
+    JNIEnv* env, jclass clazz, jobject listener) {
+    std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
+    if (g_download_proto_listener != nullptr) {
+        env->DeleteGlobalRef(g_download_proto_listener);
+        g_download_proto_listener = nullptr;
+    }
+    if (listener == nullptr) {
+        return static_cast<jint>(rac_download_set_progress_proto_callback(nullptr, nullptr));
+    }
+    g_download_proto_listener = env->NewGlobalRef(listener);
+    return static_cast<jint>(
+        rac_download_set_progress_proto_callback(download_proto_jni_callback, nullptr));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadPlanProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_download_plan_proto, "racDownloadPlanProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadStartProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_download_start_proto, "racDownloadStartProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadCancelProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_download_cancel_proto, "racDownloadCancelProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadResumeProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_download_resume_proto, "racDownloadResumeProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPollProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_download_progress_poll_proto,
+                             "racDownloadProgressPollProto");
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Auth Manager (rac_auth_*)
+// =============================================================================
+//
+// F3 fix: racAuthInit now installs a rac_secure_storage_t vtable backed by
+// the existing platform-adapter secure-storage callbacks (secureGet/
+// secureSet/secureDelete on CppBridgePlatformAdapter, which delegate to
+// AndroidSecureStorage under the hood). Without this wiring,
+// rac_auth_save_tokens / rac_auth_clear were no-ops and tokens were lost
+// on every process restart.
+//
+// Previous behavior passed `nullptr` and commented about a "v2.1-2
+// follow-up that adds the KeyStoreBridge". The follow-up is this function.
+//
+// All thunks here are JvmStatic on RunAnywhereBridge (jclass receiver).
+
+// =============================================================================
+// rac_secure_storage_t adapter over the JNI platform adapter
+// =============================================================================
+//
+// The rac_platform_adapter_t secure-storage callbacks (jni_secure_*_callback
+// above) use base64-encoded bytes via the Kotlin secureGet/secureSet/
+// secureDelete instance methods. rac_auth_manager expects plain C strings
+// with a `int (*retrieve)(key, buf, buf_size, ctx)` signature that writes
+// a NUL-terminated value into the provided buffer and returns the length.
+//
+// These shims call the platform adapter's JNI methods directly (NOT the
+// base64 wrappers) so we pass plain strings end-to-end between the auth
+// manager and the Kotlin PlatformSecureStorage delegate.
+
+static int auth_storage_store(const char* key, const char* value, void* /*ctx*/) {
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
+        return -1;
+    }
+    jstring jKey = env->NewStringUTF(key ? key : "");
+    // Auth-manager values are already base64-safe (random bytes from JWTs);
+    // the platform adapter's secureSet takes base64, so we base64 the value
+    // here. We'd pay the same cost either way; doing it here keeps the
+    // existing rac_platform_adapter_t contract unchanged.
+    jclass base64Class = env->FindClass("android/util/Base64");
+    jboolean ok = JNI_FALSE;
+    if (base64Class != nullptr) {
+        jmethodID encodeToString = env->GetStaticMethodID(
+            base64Class, "encodeToString", "([BI)Ljava/lang/String;");
+        size_t len = value ? strlen(value) : 0;
+        jbyteArray raw = env->NewByteArray(static_cast<jsize>(len));
+        if (raw != nullptr) {
+            env->SetByteArrayRegion(
+                raw, 0, static_cast<jsize>(len),
+                reinterpret_cast<const jbyte*>(value ? value : ""));
+            jstring encoded = static_cast<jstring>(
+                env->CallStaticObjectMethod(base64Class, encodeToString, raw, /*NO_WRAP=*/2));
+            if (encoded != nullptr) {
+                ok = env->CallBooleanMethod(g_platform_adapter, g_method_secure_set, jKey, encoded);
+                env->DeleteLocalRef(encoded);
+            }
+            env->DeleteLocalRef(raw);
+        }
+        env->DeleteLocalRef(base64Class);
+    }
+    env->DeleteLocalRef(jKey);
+    return ok ? 0 : -1;
+}
+
+static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer_size,
+                                 void* /*ctx*/) {
+    if (out_value == nullptr || buffer_size == 0) return -1;
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
+        return -1;
+    }
+
+    jstring jKey = env->NewStringUTF(key ? key : "");
+    jstring encodedJ = static_cast<jstring>(
+        env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
+    env->DeleteLocalRef(jKey);
+    if (encodedJ == nullptr) return -1;
+
+    // Decode the base64 payload back to bytes
+    jclass base64Class = env->FindClass("android/util/Base64");
+    int written = -1;
+    if (base64Class != nullptr) {
+        jmethodID decode =
+            env->GetStaticMethodID(base64Class, "decode", "(Ljava/lang/String;I)[B");
+        jbyteArray raw = static_cast<jbyteArray>(
+            env->CallStaticObjectMethod(base64Class, decode, encodedJ, /*NO_WRAP=*/2));
+        if (raw != nullptr) {
+            jsize len = env->GetArrayLength(raw);
+            if (static_cast<size_t>(len) + 1 <= buffer_size) {
+                env->GetByteArrayRegion(raw, 0, len, reinterpret_cast<jbyte*>(out_value));
+                out_value[len] = '\0';
+                written = static_cast<int>(len);
+            }
+            env->DeleteLocalRef(raw);
+        }
+        env->DeleteLocalRef(base64Class);
+    }
+    env->DeleteLocalRef(encodedJ);
+    return written;
+}
+
+static int auth_storage_delete(const char* key, void* /*ctx*/) {
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
+        return -1;
+    }
+    jstring jKey = env->NewStringUTF(key ? key : "");
+    jboolean ok = env->CallBooleanMethod(g_platform_adapter, g_method_secure_delete, jKey);
+    env->DeleteLocalRef(jKey);
+    return ok ? 0 : -1;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthInit(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    // Require the platform adapter to have been registered first so our
+    // storage vtable has somewhere to delegate. If the Kotlin SDK forgot to
+    // register it, fall back to in-memory only rather than crash.
+    if (g_platform_adapter == nullptr) {
+        RAC_LOG_WARNING(JNI_LOG_TAG,
+            "racAuthInit called before platform adapter registered — "
+            "tokens will NOT persist across process restart");
+        rac_auth_init(nullptr);
+        return;
+    }
+
+    rac_secure_storage_t storage = {};
+    storage.store = auth_storage_store;
+    storage.retrieve = auth_storage_retrieve;
+    storage.delete_key = auth_storage_delete;
+    storage.context = nullptr;
+    rac_auth_init(&storage);
+
+    // Restore any previously persisted tokens into the in-memory auth state.
+    if (rac_auth_load_stored_tokens() == 0) {
+        RAC_LOG_INFO(JNI_LOG_TAG, "rac_auth_init: restored tokens from secure storage");
+    } else {
+        RAC_LOG_DEBUG(JNI_LOG_TAG, "rac_auth_init: no persisted tokens (first launch or cleared)");
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthReset(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    rac_auth_reset();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthIsAuthenticated(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return rac_auth_is_authenticated() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthNeedsRefresh(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return rac_auth_needs_refresh() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetAccessToken(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* token = rac_auth_get_access_token();
+    return token ? env->NewStringUTF(token) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetDeviceId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_device_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetUserId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_user_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetOrganizationId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_organization_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthBuildAuthenticateRequest(
+    JNIEnv* env, jclass /*cls*/,
+    jstring apiKey, jstring baseUrl, jstring deviceId,
+    jstring platform, jstring sdkVersion, jint environment) {
+    // Maps Kotlin-side credentials to the C rac_sdk_config_t. Kotlin
+    // calls this with the AuthenticationRequest fields it already knows
+    // about; the C side builds the JSON request body.
+    std::string apiKeyStr     = getCString(env, apiKey);
+    std::string baseUrlStr    = getCString(env, baseUrl);
+    std::string deviceIdStr   = getCString(env, deviceId);
+    std::string platformStr   = getCString(env, platform);
+    std::string sdkVersionStr = getCString(env, sdkVersion);
+
+    rac_sdk_config_t cfg = {};
+    cfg.environment = static_cast<rac_environment_t>(environment);
+    cfg.api_key     = apiKeyStr.empty()   ? nullptr : apiKeyStr.c_str();
+    cfg.base_url    = baseUrlStr.empty()  ? nullptr : baseUrlStr.c_str();
+    cfg.device_id   = deviceIdStr.empty() ? nullptr : deviceIdStr.c_str();
+    cfg.platform    = platformStr.empty() ? nullptr : platformStr.c_str();
+    cfg.sdk_version = sdkVersionStr.empty() ? nullptr : sdkVersionStr.c_str();
+
+    char* json = rac_auth_build_authenticate_request(&cfg);
+    if (!json) return nullptr;
+    jstring out = env->NewStringUTF(json);
+    free(json);  // C ABI says caller frees
+    return out;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthBuildRefreshRequest(
+    JNIEnv* env, jclass /*cls*/) {
+    char* json = rac_auth_build_refresh_request();
+    if (!json) return nullptr;
+    jstring out = env->NewStringUTF(json);
+    free(json);
+    return out;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthHandleAuthenticateResponse(
+    JNIEnv* env, jclass /*cls*/, jstring jsonResponse) {
+    std::string json = getCString(env, jsonResponse);
+    return static_cast<jint>(rac_auth_handle_authenticate_response(json.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthHandleRefreshResponse(
+    JNIEnv* env, jclass /*cls*/, jstring jsonResponse) {
+    std::string json = getCString(env, jsonResponse);
+    return static_cast<jint>(rac_auth_handle_refresh_response(json.c_str()));
+}
+
+// Returns a 2-element String[]: [token-or-null, "true"/"false" needs_refresh].
+// Kotlin unpacks via the existing typed wrapper; this avoids out-param games.
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetValidToken(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* token        = nullptr;
+    bool        needsRefresh = false;
+    int rc = rac_auth_get_valid_token(&token, &needsRefresh);
+    if (rc < 0) return nullptr;
+
+    jclass strCls = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+    if (token) {
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(token));
+    }
+    env->SetObjectArrayElement(arr, 1,
+        env->NewStringUTF(needsRefresh ? "true" : "false"));
+    return arr;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthClear(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    rac_auth_clear();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthLoadStoredTokens(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return static_cast<jint>(rac_auth_load_stored_tokens());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthSaveTokens(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return static_cast<jint>(rac_auth_save_tokens());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLM Thinking (rac_llm_thinking.h)
+// =============================================================================
+//
+// v3-readiness Phase A8 / GAP 08 #6. 3 thunks wrapping the C ABI
+// `rac_llm_extract_thinking` / `rac_llm_strip_thinking` /
+// `rac_llm_split_thinking_tokens`. These give the Kotlin SDK the same
+// <think>-tag parsing behavior Swift's CppBridge+LLMThinking.swift
+// already has (commit a8cc072c's post-audit baseline matrix had Kotlin
+// / Dart / RN / Web all missing this).
+//
+// Return style: Object[] / long[] wrappers so Kotlin can destructure
+// the multi-out-param C shape into a tuple cleanly. The same approach
+// as racAuthGetValidToken (Phase A1 predecessor).
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmExtractThinking(
+    JNIEnv* env, jclass /*cls*/, jstring text) {
+    if (!text) return nullptr;
+    std::string textStr = getCString(env, text);
+
+    const char* out_response      = nullptr;
+    size_t      out_response_len  = 0;
+    const char* out_thinking      = nullptr;
+    size_t      out_thinking_len  = 0;
+
+    rac_result_t rc = rac_llm_extract_thinking(
+        textStr.c_str(),
+        &out_response, &out_response_len,
+        &out_thinking, &out_thinking_len);
+    if (RAC_FAILED(rc)) return nullptr;
+
+    // Return String[2]: [response, thinking-or-null].
+    jclass strCls = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+
+    // Response is never NULL on success (empty string at minimum).
+    if (out_response) {
+        // Copy into a stable NUL-terminated buffer (C ABI only guarantees
+        // the pointer + length; the buffer may not be NUL-terminated on
+        // its own even though the implementation happens to NUL-terminate
+        // today).
+        std::string resp(out_response, out_response_len);
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(resp.c_str()));
+    } else {
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(""));
+    }
+
+    if (out_thinking) {
+        std::string think(out_thinking, out_thinking_len);
+        env->SetObjectArrayElement(arr, 1, env->NewStringUTF(think.c_str()));
+    } else {
+        // Index 1 stays null — Kotlin reads as `String?`.
+    }
+    return arr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmStripThinking(
+    JNIEnv* env, jclass /*cls*/, jstring text) {
+    if (!text) return nullptr;
+    std::string textStr = getCString(env, text);
+
+    const char* out_stripped     = nullptr;
+    size_t      out_stripped_len = 0;
+    rac_result_t rc = rac_llm_strip_thinking(
+        textStr.c_str(), &out_stripped, &out_stripped_len);
+    if (RAC_FAILED(rc) || !out_stripped) return nullptr;
+
+    std::string stripped(out_stripped, out_stripped_len);
+    return env->NewStringUTF(stripped.c_str());
+}
+
+// Returns int[2]: [thinking_tokens, response_tokens]. Kotlin unpacks
+// into a Pair<Int, Int>.
+JNIEXPORT jintArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSplitThinkingTokens(
+    JNIEnv* env, jclass /*cls*/,
+    jint totalCompletionTokens,
+    jstring responseText,
+    jstring thinkingText) {
+    std::string respStr  = responseText ? getCString(env, responseText) : "";
+    std::string thinkStr = thinkingText ? getCString(env, thinkingText) : "";
+
+    int32_t thinking_tokens = 0;
+    int32_t response_tokens = 0;
+    rac_result_t rc = rac_llm_split_thinking_tokens(
+        totalCompletionTokens,
+        respStr.empty()  ? nullptr : respStr.c_str(),
+        thinkStr.empty() ? nullptr : thinkStr.c_str(),
+        &thinking_tokens, &response_tokens);
+    if (RAC_FAILED(rc)) return nullptr;
+
+    jintArray arr = env->NewIntArray(2);
+    jint buf[2] = { static_cast<jint>(thinking_tokens),
+                    static_cast<jint>(response_tokens) };
+    env->SetIntArrayRegion(arr, 0, 2, buf);
+    return arr;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - VoiceAgentStreamAdapter (rac_voice_agent_set_proto_callback)
+// =============================================================================
+//
+// v3-readiness Phase A1 / GAP 09 #6. Closes the broken Kotlin streaming path
+// the 3-agent audit flagged: VoiceAgentStreamAdapter.kt declared
+// nativeRegisterCallback / nativeUnregisterCallback with no matching JNI
+// symbols, which would throw UnsatisfiedLinkError at runtime.
+//
+// Pattern: one registration = one heap-allocated VaStreamCallbackCtx holding
+// a global ref to the Kotlin Function1<ByteArray, Unit> lambda + the cached
+// Function1.invoke() method ID. The C trampoline resolves JNIEnv* on the
+// fly (audio dispatcher threads are attached via AttachCurrentThread) and
+// forwards bytes back to the JVM.
+//
+// ABI limitation: rac_voice_agent_set_proto_callback has ONE callback slot
+// per voice-agent handle. Multiple concurrent stream() calls on the same
+// handle will REPLACE each other — documented on the Kotlin companion.
+
+namespace {
+
+struct VaStreamCallbackCtx {
+    jobject   lambda_ref;       // Global ref to Kotlin Function1<ByteArray, Unit>
+    jclass    function1_cls;    // Global ref to kotlin.jvm.functions.Function1
+    jmethodID invoke_mid;       // Function1.invoke(Object)
+};
+
+void va_stream_trampoline(const uint8_t* event_bytes,
+                          size_t         event_size,
+                          void*          user_data) {
+    if (!user_data || !event_bytes || !g_jvm) return;
+
+    auto* ctx = static_cast<VaStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env          = nullptr;
+    bool    needs_detach = false;
+    jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        // `void**` cast matches the working GetEnv pattern above and the
+        // host-JDK signature on macOS/Linux; Android NDK's `JNIEnv**` is
+        // binary-compatible.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(
+            jbytes, 0, static_cast<jsize>(event_size),
+            reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;  // INVALID_CALLBACK_ID on the Kotlin side
+    }
+
+    // 1. Global-ref the lambda so it survives past this thunk.
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef) return 0;
+
+    // 2. Resolve + cache Function1.invoke(Object)
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx           = new VaStreamCallbackCtx{};
+    ctx->lambda_ref     = lambdaRef;
+    ctx->function1_cls  = function1Cls;
+    ctx->invoke_mid     = invokeMid;
+
+    rac_voice_agent_handle_t racHandle =
+        reinterpret_cast<rac_voice_agent_handle_t>(static_cast<uintptr_t>(handle));
+    rac_result_t rc =
+        rac_voice_agent_set_proto_callback(racHandle, &va_stream_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0) return;
+
+    rac_voice_agent_handle_t racHandle =
+        reinterpret_cast<rac_voice_agent_handle_t>(static_cast<uintptr_t>(handle));
+    // Clear the C-side slot first so no further callbacks fire.
+    rac_voice_agent_set_proto_callback(racHandle, nullptr, nullptr);
+
+    auto* ctx = reinterpret_cast<VaStreamCallbackCtx*>(
+        static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)    env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls) env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
+// =============================================================================
+//
+// v2 close-out Phase G-2. Same pattern as VaStreamCallbackCtx above — one
+// heap-allocated LlmStreamCallbackCtx per registration, Function1.invoke()
+// method ID cached, trampoline attaches the thread if needed.
+//
+// The C ABI has ONE callback slot per LLM component handle. Kotlin's
+// LLMStreamAdapter builds per-handle fan-out on top (same shape as
+// VoiceAgentStreamAdapter.HandleFanOut).
+
+namespace {
+
+struct LlmStreamCallbackCtx {
+    jobject   lambda_ref;
+    jclass    function1_cls;
+    jmethodID invoke_mid;
+};
+
+void llm_stream_trampoline(const uint8_t* event_bytes,
+                           size_t         event_size,
+                           void*          user_data) {
+    if (!user_data || !event_bytes || !g_jvm) return;
+
+    auto* ctx = static_cast<LlmStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env          = nullptr;
+    bool    needs_detach = false;
+    jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(
+            jbytes, 0, static_cast<jsize>(event_size),
+            reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;
+    }
+
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef) return 0;
+
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx           = new LlmStreamCallbackCtx{};
+    ctx->lambda_ref     = lambdaRef;
+    ctx->function1_cls  = function1Cls;
+    ctx->invoke_mid     = invokeMid;
+
+    rac_handle_t racHandle =
+        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+    rac_result_t rc =
+        rac_llm_set_stream_proto_callback(racHandle, &llm_stream_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0) return;
+
+    rac_handle_t racHandle =
+        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+    rac_llm_unset_stream_proto_callback(racHandle);
+
+    auto* ctx = reinterpret_cast<LlmStreamCallbackCtx*>(
+        static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)    env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls) env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
+// Generated-proto modality ABI thunks
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmGenerateProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    return callProtoBufferFn(env, requestProto, rac_llm_generate_proto, "racLlmGenerateProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmGenerateStreamProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok) return RAC_ERROR_NULL_POINTER;
+
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{globalListener, "racLlmGenerateStreamProto"};
+    rac_result_t rc = rac_llm_generate_stream_proto(
+        request.u8(), request.size(),
+        globalListener != nullptr ? proto_void_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr) {
+        env->DeleteGlobalRef(globalListener);
+    }
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmCancelProto(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_llm_cancel_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racLlmCancelProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jbyteArray optionsProto) {
+    (void)clazz;
+    JByteArrayView audio(env, audioData);
+    JByteArrayView options(env, optionsProto, true);
+    if (handle == 0L || !audio.ok || !options.ok) return nullptr;
+
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_stt_component_transcribe_proto(
+        handleFromJLong(handle), audio.data(), audio.size(), options.u8(), options.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racSttComponentTranscribeProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeStreamProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jbyteArray optionsProto,
+    jobject listener) {
+    (void)clazz;
+    JByteArrayView audio(env, audioData);
+    JByteArrayView options(env, optionsProto, true);
+    if (handle == 0L || !audio.ok || !options.ok) return RAC_ERROR_NULL_POINTER;
+
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{globalListener, "racSttComponentTranscribeStreamProto"};
+    rac_result_t rc = rac_stt_component_transcribe_stream_proto(
+        handleFromJLong(handle), audio.data(), audio.size(), options.u8(), options.size(),
+        globalListener != nullptr ? proto_void_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr) {
+        env->DeleteGlobalRef(globalListener);
+    }
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentListVoicesProto(
+    JNIEnv* env, jclass clazz, jlong handle, jobject listener) {
+    (void)clazz;
+    if (handle == 0L || listener == nullptr) return RAC_ERROR_NULL_POINTER;
+
+    jobject globalListener = env->NewGlobalRef(listener);
+    ProtoListenerUserData ctx{globalListener, "racTtsComponentListVoicesProto"};
+    rac_result_t rc = rac_tts_component_list_voices_proto(
+        handleFromJLong(handle), proto_void_callback, &ctx);
+    env->DeleteGlobalRef(globalListener);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesizeProto(
+    JNIEnv* env, jclass clazz, jlong handle, jstring text, jbyteArray optionsProto) {
+    (void)clazz;
+    if (handle == 0L || text == nullptr) return nullptr;
+    std::string textStorage = getCString(env, text);
+    JByteArrayView options(env, optionsProto, true);
+    if (!options.ok) return nullptr;
+
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_tts_component_synthesize_proto(
+        handleFromJLong(handle), textStorage.c_str(), options.u8(), options.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racTtsComponentSynthesizeProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesizeStreamProto(
+    JNIEnv* env, jclass clazz, jlong handle, jstring text, jbyteArray optionsProto,
+    jobject listener) {
+    (void)clazz;
+    if (handle == 0L || text == nullptr) return RAC_ERROR_NULL_POINTER;
+    std::string textStorage = getCString(env, text);
+    JByteArrayView options(env, optionsProto, true);
+    if (!options.ok) return RAC_ERROR_NULL_POINTER;
+
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{globalListener, "racTtsComponentSynthesizeStreamProto"};
+    rac_result_t rc = rac_tts_component_synthesize_stream_proto(
+        handleFromJLong(handle), textStorage.c_str(), options.u8(), options.size(),
+        globalListener != nullptr ? proto_void_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr) {
+        env->DeleteGlobalRef(globalListener);
+    }
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentConfigureProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray configProto) {
+    (void)clazz;
+    JByteArrayView config(env, configProto);
+    if (handle == 0L || !config.ok) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(
+        rac_vad_component_configure_proto(handleFromJLong(handle), config.u8(), config.size()));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentProcessProto(
+    JNIEnv* env, jclass clazz, jlong handle, jfloatArray samplesArray, jbyteArray optionsProto) {
+    (void)clazz;
+    if (handle == 0L || samplesArray == nullptr) return nullptr;
+    const jsize numSamples = env->GetArrayLength(samplesArray);
+    jfloat* samples = numSamples > 0 ? env->GetFloatArrayElements(samplesArray, nullptr) : nullptr;
+    if (numSamples > 0 && samples == nullptr) return nullptr;
+    JByteArrayView options(env, optionsProto, true);
+    if (!options.ok) {
+        if (samples != nullptr) env->ReleaseFloatArrayElements(samplesArray, samples, JNI_ABORT);
+        return nullptr;
+    }
+
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_component_process_proto(
+        handleFromJLong(handle), reinterpret_cast<const float*>(samples),
+        static_cast<size_t>(numSamples), options.u8(), options.size(), &result);
+    if (samples != nullptr) env->ReleaseFloatArrayElements(samplesArray, samples, JNI_ABORT);
+    return makeProtoCallResult(env, rc, &result, "racVadComponentProcessProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetStatisticsProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_component_get_statistics_proto(handleFromJLong(handle), &result);
+    return makeProtoCallResult(env, rc, &result, "racVadComponentGetStatisticsProto");
+}
+
+static std::mutex g_vad_proto_listener_mutex;
+static std::unordered_map<uintptr_t, jobject> g_vad_proto_listeners;
+
+static void vad_activity_proto_callback(const uint8_t* proto_bytes, size_t proto_size,
+                                        void* user_data) {
+    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr) return;
+
+    jobject listener = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+        auto it = g_vad_proto_listeners.find(key);
+        if (it != g_vad_proto_listeners.end() && it->second != nullptr) {
+            listener = env->NewLocalRef(it->second);
+        }
+    }
+    if (listener != nullptr) {
+        invokeProtoListener(env, listener, proto_bytes, proto_size, "vadActivityProtoCallback");
+        env->DeleteLocalRef(listener);
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActivityProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle, jobject listener) {
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    {
+        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+        auto it = g_vad_proto_listeners.find(key);
+        if (it != g_vad_proto_listeners.end()) {
+            env->DeleteGlobalRef(it->second);
+            g_vad_proto_listeners.erase(it);
+        }
+        if (listener != nullptr) {
+            g_vad_proto_listeners[key] = env->NewGlobalRef(listener);
+        }
+    }
+    return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
+        handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
+        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCreate(
+    JNIEnv* env, jclass clazz, jstring modelIdOrPath) {
+    (void)clazz;
+    if (modelIdOrPath == nullptr) return 0L;
+    std::string model = getCString(env, modelIdOrPath);
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_vlm_create(model.c_str(), &handle);
+    if (RAC_FAILED(rc)) return 0L;
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmInitialize(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring mmprojPath) {
+    (void)clazz;
+    if (handle == 0L || modelPath == nullptr) return RAC_ERROR_NULL_POINTER;
+    std::string modelPathStorage = getCString(env, modelPath);
+    std::string mmprojStorage;
+    const char* mmproj = getNullableCString(env, mmprojPath, mmprojStorage);
+    return static_cast<jint>(
+        rac_vlm_initialize(handleFromJLong(handle), modelPathStorage.c_str(), mmproj));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray imageProto, jbyteArray optionsProto) {
+    (void)clazz;
+    JByteArrayView image(env, imageProto);
+    JByteArrayView options(env, optionsProto);
+    if (handle == 0L || !image.ok || !options.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vlm_process_proto(
+        handleFromJLong(handle), image.u8(), image.size(), options.u8(), options.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVlmProcessProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessStreamProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray imageProto, jbyteArray optionsProto,
+    jobject listener) {
+    (void)clazz;
+    JByteArrayView image(env, imageProto);
+    JByteArrayView options(env, optionsProto);
+    if (handle == 0L || !image.ok || !options.ok) return nullptr;
+
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{globalListener, "racVlmProcessStreamProto"};
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vlm_process_stream_proto(
+        handleFromJLong(handle), image.u8(), image.size(), options.u8(), options.size(),
+        globalListener != nullptr ? proto_bool_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr, &result);
+    if (globalListener != nullptr) env->DeleteGlobalRef(globalListener);
+    return makeProtoCallResult(env, rc, &result, "racVlmProcessStreamProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCancelProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(rac_vlm_cancel_proto(handleFromJLong(handle)));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle != 0L) rac_vlm_destroy(handleFromJLong(handle));
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsCreate(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    (void)clazz;
+    if (modelId == nullptr) return 0L;
+    std::string model = getCString(env, modelId);
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_embeddings_create(model.c_str(), &handle);
+    if (RAC_FAILED(rc)) return 0L;
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsCreateWithConfig(
+    JNIEnv* env, jclass clazz, jstring modelId, jstring configJson) {
+    (void)clazz;
+    if (modelId == nullptr) return 0L;
+    std::string model = getCString(env, modelId);
+    std::string configStorage;
+    const char* config = getNullableCString(env, configJson, configStorage);
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_embeddings_create_with_config(model.c_str(), config, &handle);
+    if (RAC_FAILED(rc)) return 0L;
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatchProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (handle == 0L || !request.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_embeddings_embed_batch_proto(
+        handleFromJLong(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchProto");
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle != 0L) rac_embeddings_destroy(handleFromJLong(handle));
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionCreateProto(
+    JNIEnv* env, jclass clazz, jbyteArray configProto) {
+    (void)clazz;
+    JByteArrayView config(env, configProto);
+    if (!config.ok) return 0L;
+    using Fn = rac_result_t (*)(const uint8_t*, size_t, rac_handle_t*);
+    Fn createSession = optionalNativeSymbol<Fn>("rac_rag_session_create_proto");
+    if (createSession == nullptr) return 0L;
+    rac_handle_t session = nullptr;
+    rac_result_t rc = createSession(config.u8(), config.size(), &session);
+    if (RAC_FAILED(rc)) return 0L;
+    return reinterpret_cast<jlong>(session);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionDestroyProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    using Fn = void (*)(rac_handle_t);
+    Fn destroySession = optionalNativeSymbol<Fn>("rac_rag_session_destroy_proto");
+    if (destroySession != nullptr) destroySession(handleFromJLong(handle));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagIngestProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray documentProto) {
+    (void)clazz;
+    JByteArrayView document(env, documentProto);
+    if (handle == 0L || !document.ok) return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn ingest = optionalNativeSymbol<Fn>("rac_rag_ingest_proto");
+    if (ingest == nullptr) return makeFeatureUnavailableResult(env, "racRagIngestProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = ingest(handleFromJLong(handle), document.u8(), document.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagIngestProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray queryProto) {
+    (void)clazz;
+    JByteArrayView query(env, queryProto);
+    if (handle == 0L || !query.ok) return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn queryRag = optionalNativeSymbol<Fn>("rac_rag_query_proto");
+    if (queryRag == nullptr) return makeFeatureUnavailableResult(env, "racRagQueryProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = queryRag(handleFromJLong(handle), query.u8(), query.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagQueryProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagClearProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L) return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, rac_proto_buffer_t*);
+    Fn clear = optionalNativeSymbol<Fn>("rac_rag_clear_proto");
+    if (clear == nullptr) return makeFeatureUnavailableResult(env, "racRagClearProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = clear(handleFromJLong(handle), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagClearProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagStatsProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L) return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, rac_proto_buffer_t*);
+    Fn stats = optionalNativeSymbol<Fn>("rac_rag_stats_proto");
+    if (stats == nullptr) return makeFeatureUnavailableResult(env, "racRagStatsProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = stats(handleFromJLong(handle), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagStatsProto");
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionCreate(
+    JNIEnv* env, jclass clazz, jstring modelIdOrPath) {
+    (void)clazz;
+    if (modelIdOrPath == nullptr) return 0L;
+    std::string model = getCString(env, modelIdOrPath);
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_diffusion_create(model.c_str(), &handle);
+    if (RAC_FAILED(rc)) return 0L;
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionInitialize(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath) {
+    (void)clazz;
+    if (handle == 0L || modelPath == nullptr) return RAC_ERROR_NULL_POINTER;
+    std::string path = getCString(env, modelPath);
+    return static_cast<jint>(
+        rac_diffusion_initialize(handleFromJLong(handle), path.c_str(), nullptr));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGenerateProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray optionsProto) {
+    (void)clazz;
+    JByteArrayView options(env, optionsProto);
+    if (handle == 0L || !options.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_diffusion_generate_proto(
+        handleFromJLong(handle), options.u8(), options.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racDiffusionGenerateProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGenerateWithProgressProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray optionsProto, jobject listener) {
+    (void)clazz;
+    JByteArrayView options(env, optionsProto);
+    if (handle == 0L || !options.ok) return nullptr;
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{globalListener, "racDiffusionGenerateWithProgressProto"};
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_diffusion_generate_with_progress_proto(
+        handleFromJLong(handle), options.u8(), options.size(),
+        globalListener != nullptr ? proto_bool_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr, &result);
+    if (globalListener != nullptr) env->DeleteGlobalRef(globalListener);
+    return makeProtoCallResult(env, rc, &result, "racDiffusionGenerateWithProgressProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionCancelProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(rac_diffusion_cancel_proto(handleFromJLong(handle)));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle != 0L) rac_diffusion_destroy(handleFromJLong(handle));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGetCapabilitiesMask(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return 0;
+    return static_cast<jint>(rac_diffusion_get_capabilities(handleFromJLong(handle)));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraLoadProto(
+    JNIEnv* env, jclass clazz, jlong llmHandle, jbyteArray configProto) {
+    (void)clazz;
+    JByteArrayView config(env, configProto);
+    if (llmHandle == 0L || !config.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_load_proto(handleFromJLong(llmHandle), config.u8(), config.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraLoadProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRemoveProto(
+    JNIEnv* env, jclass clazz, jlong llmHandle, jbyteArray configProto) {
+    (void)clazz;
+    JByteArrayView config(env, configProto);
+    if (llmHandle == 0L || !config.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_remove_proto(handleFromJLong(llmHandle), config.u8(), config.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraRemoveProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraClearProto(
+    JNIEnv* env, jclass clazz, jlong llmHandle) {
+    (void)clazz;
+    if (llmHandle == 0L) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_clear_proto(handleFromJLong(llmHandle), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraClearProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCompatibilityProto(
+    JNIEnv* env, jclass clazz, jlong llmHandle, jbyteArray configProto) {
+    (void)clazz;
+    JByteArrayView config(env, configProto);
+    if (llmHandle == 0L || !config.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_compatibility_proto(
+        handleFromJLong(llmHandle), config.u8(), config.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraCompatibilityProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegisterProto(
+    JNIEnv* env, jclass clazz, jbyteArray entryProto) {
+    (void)clazz;
+    JByteArrayView entry(env, entryProto);
+    if (!entry.ok) return nullptr;
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_register_proto(registry, entry.u8(), entry.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraRegisterProto");
+}
+
+// =============================================================================
+// Voice Agent Handle API (v3.1 P3.2: Android sample needs a voice agent
+// handle to feed VoiceAgentStreamAdapter. Mirrors Swift's
+// CppBridge.VoiceAgent.shared.getHandle() pattern.)
+// =============================================================================
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreateStandalone(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_voice_agent_handle_t handle = nullptr;
+    rac_result_t result = rac_voice_agent_create_standalone(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("racVoiceAgentCreateStandalone failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentInitializeWithLoadedModels(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_voice_agent_initialize_with_loaded_models(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle)));
+}
+
+JNIEXPORT jboolean JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentIsReady(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return JNI_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    rac_result_t result = rac_voice_agent_is_ready(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), &is_ready);
+    return (result == RAC_SUCCESS && is_ready == RAC_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    rac_voice_agent_destroy(reinterpret_cast<rac_voice_agent_handle_t>(handle));
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentInitializeProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray configProto) {
+    (void)clazz;
+    JByteArrayView config(env, configProto);
+    if (handle == 0L || !config.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_voice_agent_initialize_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), config.u8(), config.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVoiceAgentInitializeProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentComponentStatesProto(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_voice_agent_component_states_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), &result);
+    return makeProtoCallResult(env, rc, &result, "racVoiceAgentComponentStatesProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessVoiceTurnProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData) {
+    (void)clazz;
+    JByteArrayView audio(env, audioData);
+    if (handle == 0L || !audio.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_voice_agent_process_voice_turn_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), audio.data(), audio.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVoiceAgentProcessVoiceTurnProto");
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
+// =============================================================================
+//
+// T4.7/T4.8 — proto-byte / YAML driven L5 solution runtime. One-to-one
+// mapping over `rac_solution_*`; the Kotlin handle is the C handle cast
+// to jlong. 0 from create_from_* signals failure and the handle was
+// never allocated, so destroy is a no-op for it.
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCreateFromProto(
+    JNIEnv* env, jclass clazz, jbyteArray configBytes) {
+    (void)clazz;
+    if (configBytes == nullptr) return 0L;
+
+    const jsize len = env->GetArrayLength(configBytes);
+    jbyte* bytes = env->GetByteArrayElements(configBytes, nullptr);
+    if (bytes == nullptr) return 0L;
+
+    rac_solution_handle_t handle = nullptr;
+    const rac_result_t result = rac_solution_create_from_proto(
+        static_cast<const void*>(bytes), static_cast<size_t>(len), &handle);
+
+    env->ReleaseByteArrayElements(configBytes, bytes, JNI_ABORT);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racSolutionCreateFromProto failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCreateFromYaml(
+    JNIEnv* env, jclass clazz, jstring yamlText) {
+    (void)clazz;
+    if (yamlText == nullptr) return 0L;
+
+    const char* utf = env->GetStringUTFChars(yamlText, nullptr);
+    if (utf == nullptr) return 0L;
+
+    rac_solution_handle_t handle = nullptr;
+    const rac_result_t result = rac_solution_create_from_yaml(utf, &handle);
+
+    env->ReleaseStringUTFChars(yamlText, utf);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racSolutionCreateFromYaml failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStart(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_start(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStop(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_stop(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCancel(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_cancel(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionFeed(
+    JNIEnv* env, jclass clazz, jlong handle, jstring item) {
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    if (item == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+
+    const char* utf = env->GetStringUTFChars(item, nullptr);
+    if (utf == nullptr) return static_cast<jint>(RAC_ERROR_OUT_OF_MEMORY);
+
+    const rac_result_t result =
+        rac_solution_feed(reinterpret_cast<rac_solution_handle_t>(handle), utf);
+
+    env->ReleaseStringUTFChars(item, utf);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCloseInput(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_close_input(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    rac_solution_destroy(reinterpret_cast<rac_solution_handle_t>(handle));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Native HTTP download (v2 close-out Phase H)
+// =============================================================================
+//
+// Single synchronous entrypoint that Kotlin's CppBridgeDownload shim calls
+// from its own worker thread. The JNI call blocks until the download
+// completes, fails, or is cancelled. Progress is forwarded back to Kotlin
+// via a NativeDownloadProgressListener instance whose `onProgress(long,
+// long): Boolean` method is invoked on every libcurl chunk — returning
+// `false` cancels the download.
+//
+// This replaces the 1.3 KLOC HttpURLConnection loop previously implemented
+// entirely in Kotlin (see docs/v2_closeout_phase_h_report.md).
+
+namespace {
+
+struct DownloadProgressCtx {
+    JNIEnv* env;                // thread-local
+    jobject listener;           // local ref, valid for the JNI call
+    jmethodID on_progress_mid;  // method ID (not cached globally — Kotlin
+                                // class may change across JNI_OnLoad cycles)
+};
+
+rac_bool_t jni_download_progress_cb(uint64_t bytes_written, uint64_t total_bytes, void* user) {
+    auto* ctx = static_cast<DownloadProgressCtx*>(user);
+    if (!ctx || !ctx->env || !ctx->listener || !ctx->on_progress_mid) {
+        return RAC_TRUE;  // no listener = can't cancel
+    }
+    jboolean keep = ctx->env->CallBooleanMethod(ctx->listener, ctx->on_progress_mid,
+                                                static_cast<jlong>(bytes_written),
+                                                static_cast<jlong>(total_bytes));
+    if (ctx->env->ExceptionCheck()) {
+        ctx->env->ExceptionDescribe();
+        ctx->env->ExceptionClear();
+        // Any Kotlin-side exception treated as "continue" — the download
+        // completes and the listener can log from its exception handler.
+        return RAC_TRUE;
+    }
+    return keep == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
+}
+
+}  // namespace
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
+    JNIEnv* env, jclass /*clazz*/, jstring urlStr, jstring destPathStr, jstring expectedShaStr,
+    jlong resumeFromByte, jint timeoutMs, jobject listener, jintArray outHttpStatus) {
+
+    if (!urlStr || !destPathStr) {
+        LOGe("racHttpDownloadExecute INVALID_URL early-return: urlStr=%p destPathStr=%p",
+             static_cast<const void*>(urlStr), static_cast<const void*>(destPathStr));
+        return static_cast<jint>(RAC_HTTP_DL_INVALID_URL);
+    }
+
+    const char* url = env->GetStringUTFChars(urlStr, nullptr);
+    const char* dest = env->GetStringUTFChars(destPathStr, nullptr);
+    const char* sha = expectedShaStr ? env->GetStringUTFChars(expectedShaStr, nullptr) : nullptr;
+    LOGi("racHttpDownloadExecute starting: url=[%s] dest=[%s] timeoutMs=%d",
+         url ? url : "(null)", dest ? dest : "(null)", static_cast<int>(timeoutMs));
+
+    rac_http_download_request_t req{};
+    req.url = url;
+    req.destination_path = dest;
+    req.timeout_ms = timeoutMs > 0 ? timeoutMs : 0;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = resumeFromByte > 0 ? static_cast<uint64_t>(resumeFromByte) : 0;
+    req.expected_sha256_hex = (sha && sha[0] != '\0') ? sha : nullptr;
+
+    DownloadProgressCtx ctx{};
+    ctx.env = env;
+    ctx.listener = listener;
+    if (listener) {
+        jclass listener_cls = env->GetObjectClass(listener);
+        if (listener_cls) {
+            ctx.on_progress_mid = env->GetMethodID(listener_cls, "onProgress", "(JJ)Z");
+            env->DeleteLocalRef(listener_cls);
+        }
+    }
+
+    // Route through the internal C++ streaming facade (Stage 2 refactor).
+    // Under the hood this still calls rac_http_download_execute, but
+    // going through the facade centralises where libcurl can be swapped
+    // out for the registered platform transport (Stage 5 deletion).
+    int32_t http_status = 0;
+    rac_http_download_status_t status = rac::http::execute_stream(
+        req, listener ? jni_download_progress_cb : nullptr, &ctx, &http_status);
+
+    if (outHttpStatus) {
+        jint tmp = static_cast<jint>(http_status);
+        env->SetIntArrayRegion(outHttpStatus, 0, 1, &tmp);
+    }
+
+    env->ReleaseStringUTFChars(urlStr, url);
+    env->ReleaseStringUTFChars(destPathStr, dest);
+    if (sha) env->ReleaseStringUTFChars(expectedShaStr, sha);
+
+    return static_cast<jint>(status);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Native HTTP request/response (v2.1 quick-wins, T3.5)
+// =============================================================================
+//
+// Single blocking entrypoint for buffered HTTP request/response. Wraps
+// rac_http_client_create + rac_http_request_send + rac_http_response_free
+// + rac_http_client_destroy into one call so Kotlin never touches the
+// curl handle lifecycle (matches Swift's URLSession-based parity layer).
+//
+// Replaces the HttpURLConnection paths in:
+//   - CppBridgeAuth.kt  (POST authenticate / refresh)
+//   - CppBridgeHTTP.kt  (generic GET/POST/PUT/DELETE)
+//   - CppBridgeTelemetry.kt (POST telemetry batches)
+//   - data/network/HttpClient.kt (deleted)
+
+namespace {
+
+// Returns a freshly-allocated NativeHttpResponse. Caller-owned local refs.
+jobject build_native_http_response(JNIEnv* env, jint statusCode, const uint8_t* body,
+                                   size_t body_len, const rac_http_header_kv_t* headers,
+                                   size_t header_count, const char* error_message) {
+    jclass strCls = env->FindClass("java/lang/String");
+
+    // Body: empty array when the transport layer produced no bytes.
+    jbyteArray jBody = env->NewByteArray(static_cast<jsize>(body_len));
+    if (body && body_len > 0) {
+        env->SetByteArrayRegion(jBody, 0, static_cast<jsize>(body_len),
+                                reinterpret_cast<const jbyte*>(body));
+    }
+
+    // Headers: parallel String[] arrays (avoids Map<String,String> marshaling
+    // and keeps the JNI signature simple).
+    jobjectArray jKeys = env->NewObjectArray(static_cast<jsize>(header_count), strCls, nullptr);
+    jobjectArray jVals = env->NewObjectArray(static_cast<jsize>(header_count), strCls, nullptr);
+    for (size_t i = 0; i < header_count; ++i) {
+        if (headers[i].name) {
+            jstring k = env->NewStringUTF(headers[i].name);
+            env->SetObjectArrayElement(jKeys, static_cast<jsize>(i), k);
+            env->DeleteLocalRef(k);
+        }
+        if (headers[i].value) {
+            jstring v = env->NewStringUTF(headers[i].value);
+            env->SetObjectArrayElement(jVals, static_cast<jsize>(i), v);
+            env->DeleteLocalRef(v);
+        }
+    }
+
+    jstring jErr = error_message ? env->NewStringUTF(error_message) : nullptr;
+
+    jclass respCls =
+        env->FindClass("com/runanywhere/sdk/native/bridge/NativeHttpResponse");
+    if (!respCls) {
+        LOGe("build_native_http_response: NativeHttpResponse class not found");
+        return nullptr;
+    }
+    jmethodID ctor = env->GetMethodID(
+        respCls, "<init>", "(I[B[Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)V");
+    if (!ctor) {
+        LOGe("build_native_http_response: NativeHttpResponse ctor not found");
+        env->DeleteLocalRef(respCls);
+        return nullptr;
+    }
+    jobject obj = env->NewObject(respCls, ctor, statusCode, jBody, jKeys, jVals, jErr);
+    env->DeleteLocalRef(respCls);
+    return obj;
+}
+
+}  // namespace
+
+JNIEXPORT jobject JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
+    JNIEnv* env, jclass /*clazz*/, jstring jMethod, jstring jUrl, jobjectArray jHeaderKeys,
+    jobjectArray jHeaderValues, jbyteArray jBody, jint timeoutMs, jboolean followRedirects) {
+
+    if (!jMethod || !jUrl) {
+        return build_native_http_response(env, -1, nullptr, 0, nullptr, 0,
+                                          "Invalid argument: method/url is null");
+    }
+
+    // Pin Kotlin strings for the request lifetime. rac_http_request_t
+    // requires the pointers stay valid until rac_http_request_send returns.
+    const char* method = env->GetStringUTFChars(jMethod, nullptr);
+    const char* url    = env->GetStringUTFChars(jUrl, nullptr);
+
+    // Copy headers into stable std::string storage so the KV array
+    // remains valid after we release the Kotlin String handles.
+    jsize headerCount = 0;
+    if (jHeaderKeys && jHeaderValues) {
+        jsize k = env->GetArrayLength(jHeaderKeys);
+        jsize v = env->GetArrayLength(jHeaderValues);
+        headerCount = k < v ? k : v;
+    }
+    std::vector<std::string> hNames;
+    std::vector<std::string> hValues;
+    std::vector<rac_http_header_kv_t> hKVs;
+    hNames.reserve(static_cast<size_t>(headerCount));
+    hValues.reserve(static_cast<size_t>(headerCount));
+    hKVs.reserve(static_cast<size_t>(headerCount));
+    for (jsize i = 0; i < headerCount; ++i) {
+        auto jk = reinterpret_cast<jstring>(env->GetObjectArrayElement(jHeaderKeys, i));
+        auto jv = reinterpret_cast<jstring>(env->GetObjectArrayElement(jHeaderValues, i));
+        if (!jk || !jv) {
+            if (jk) env->DeleteLocalRef(jk);
+            if (jv) env->DeleteLocalRef(jv);
+            continue;
+        }
+        hNames.emplace_back(getCString(env, jk));
+        hValues.emplace_back(getCString(env, jv));
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    }
+    for (size_t i = 0; i < hNames.size(); ++i) {
+        rac_http_header_kv_t kv{};
+        kv.name  = hNames[i].c_str();
+        kv.value = hValues[i].c_str();
+        hKVs.push_back(kv);
+    }
+
+    // Body bytes: copy into std::vector so we can safely pass a raw pointer.
+    std::vector<uint8_t> bodyBuf;
+    if (jBody) {
+        jsize n = env->GetArrayLength(jBody);
+        bodyBuf.resize(static_cast<size_t>(n));
+        if (n > 0) {
+            env->GetByteArrayRegion(jBody, 0, n, reinterpret_cast<jbyte*>(bodyBuf.data()));
+        }
+    }
+
+    rac_http_request_t req{};
+    req.method          = method;
+    req.url             = url;
+    req.headers         = hKVs.empty() ? nullptr : hKVs.data();
+    req.header_count    = hKVs.size();
+    req.body_bytes      = bodyBuf.empty() ? nullptr : bodyBuf.data();
+    req.body_len        = bodyBuf.size();
+    req.timeout_ms      = timeoutMs > 0 ? timeoutMs : 0;
+    req.follow_redirects = followRedirects == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
+
+    // Route through the internal C++ HTTP facade (Stage 2 refactor).
+    // The facade owns the rac_http_client_t lifecycle internally and
+    // routes the send through the registered platform transport when
+    // one is installed, else falls back to libcurl.
+    rac_http_response_t resp{};
+    rac_result_t rc = rac::http::execute(req, resp);
+
+    jobject result = nullptr;
+    if (rc != RAC_SUCCESS) {
+        const char* errMsg = "HTTP transport error";
+        switch (rc) {
+            case RAC_ERROR_NETWORK_ERROR: errMsg = "Network error"; break;
+            case RAC_ERROR_TIMEOUT:       errMsg = "Request timeout"; break;
+            case RAC_ERROR_CANCELLED:     errMsg = "Request cancelled"; break;
+            case RAC_ERROR_INVALID_ARGUMENT: errMsg = "Invalid HTTP argument"; break;
+            case RAC_ERROR_OUT_OF_MEMORY: errMsg = "Out of memory"; break;
+            default: break;
+        }
+        result = build_native_http_response(env, -1, nullptr, 0, nullptr, 0, errMsg);
+    } else {
+        result = build_native_http_response(env, static_cast<jint>(resp.status), resp.body_bytes,
+                                            resp.body_len, resp.headers, resp.header_count,
+                                            nullptr);
+    }
+
+    rac_http_response_free(&resp);
+
+    env->ReleaseStringUTFChars(jMethod, method);
+    env->ReleaseStringUTFChars(jUrl, url);
+
+    return result;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Hardware Profile (Task 1 — CPP-blocked G-C6 round-1 fix)
+// Mirrors Swift's RunAnywhere+Hardware.swift / Kotlin's hardware namespace.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareProfileGet(JNIEnv* env,
+                                                                               jclass clazz) {
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t rc = rac_hardware_profile_get(&bytes, &size);
+    if (rc != RAC_SUCCESS || bytes == nullptr) {
+        LOGe("racHardwareProfileGet: failed with code %d", rc);
+        return nullptr;
+    }
+
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
+    if (jArr == nullptr) {
+        rac_hardware_profile_free(bytes);
+        LOGe("racHardwareProfileGet: failed to allocate jbyteArray");
+        return nullptr;
+    }
+
+    if (size > 0) {
+        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+    rac_hardware_profile_free(bytes);
+    return jArr;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareGetAccelerators(JNIEnv* env,
+                                                                                    jclass clazz) {
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t rc = rac_hardware_get_accelerators(&bytes, &size);
+    if (rc != RAC_SUCCESS || bytes == nullptr) {
+        LOGe("racHardwareGetAccelerators: failed with code %d", rc);
+        return nullptr;
+    }
+
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
+    if (jArr != nullptr && size > 0) {
+        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+    rac_hardware_profile_free(bytes);
+    return jArr;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareSetAcceleratorPreference(
+    JNIEnv* env, jclass clazz, jint preferenceEnum) {
+    return static_cast<jint>(
+        rac_hardware_set_accelerator_preference(static_cast<int>(preferenceEnum)));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Structured Output (Task 2 — CPP-blocked G-A4 round-1 fix)
+// Kotlin's racStructuredOutputExtractJson(text, schemaJson) declared in
+// RunAnywhereBridge.kt — now wired to the C implementation.
+//
+// Signature contract (RunAnywhereBridge.kt:1599):
+//   external fun racStructuredOutputExtractJson(text: String, schemaJson: String?): ByteArray?
+//
+// The returned ByteArray is a serialized `runanywhere.v1.StructuredOutputResult`
+// proto (see idl/structured_output.proto). We hand-encode the wire bytes
+// directly so this JNI translation unit does not need to link libprotobuf
+// (mirrors the same strategy used by rac_llm_stream.cpp on Android —
+// libprotobuf adds ~12 MB per APK).
+//
+// Fields encoded for the success path:
+//   1 (bytes)  parsed_json := extracted JSON UTF-8 bytes
+//   3 (string) raw_text    := original input text (for debug / fallback)
+// The `validation` sub-message (field 2) is omitted — callers that need
+// validation should round-trip through rac_structured_output_validate.
+// =============================================================================
+
+namespace {
+
+inline void proto_wire_varint(std::vector<uint8_t>& out, uint64_t value) {
+    while (value >= 0x80u) {
+        out.push_back(static_cast<uint8_t>(value | 0x80u));
+        value >>= 7;
+    }
+    out.push_back(static_cast<uint8_t>(value));
+}
+
+inline void proto_wire_tag(std::vector<uint8_t>& out, uint32_t field_number,
+                           uint32_t wire_type) {
+    proto_wire_varint(out, (static_cast<uint64_t>(field_number) << 3) | wire_type);
+}
+
+// Encode a length-delimited (wire type 2) field: tag + length + raw bytes.
+inline void proto_wire_len_delim(std::vector<uint8_t>& out, uint32_t field_number,
+                                 const void* data, size_t len) {
+    proto_wire_tag(out, field_number, /*wire_type=*/2);
+    proto_wire_varint(out, static_cast<uint64_t>(len));
+    const auto* p = static_cast<const uint8_t*>(data);
+    out.insert(out.end(), p, p + len);
+}
+
+}  // namespace
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputExtractJson(
+    JNIEnv* env, jclass clazz, jstring jText, jstring jSchemaJson) {
+    if (jText == nullptr) return nullptr;
+
+    std::string text = getCString(env, jText);
+    // schemaJson is reserved for future validation; extract_json only needs the text.
+    (void)jSchemaJson;
+
+    char* out_json = nullptr;
+    size_t out_len = 0;
+    rac_result_t rc = rac_structured_output_extract_json(text.c_str(), &out_json, &out_len);
+    if (rc != RAC_SUCCESS || out_json == nullptr) {
+        LOGd("racStructuredOutputExtractJson: no JSON found (rc=%d)", rc);
+        return nullptr;
+    }
+
+    // Build the StructuredOutputResult proto wire bytes.
+    // Layout: field 1 (parsed_json, bytes) + field 3 (raw_text, string).
+    std::vector<uint8_t> wire;
+    wire.reserve(out_len + text.size() + 16);  // tags + two length varints headroom
+    proto_wire_len_delim(wire, /*field=*/1, out_json, out_len);
+    if (!text.empty()) {
+        proto_wire_len_delim(wire, /*field=*/3, text.data(), text.size());
+    }
+
+    rac_free(out_json);
+
+    jbyteArray jResult = env->NewByteArray(static_cast<jsize>(wire.size()));
+    if (jResult == nullptr) {
+        LOGe("racStructuredOutputExtractJson: NewByteArray failed (size=%zu)", wire.size());
+        return nullptr;
+    }
+    env->SetByteArrayRegion(jResult, 0, static_cast<jsize>(wire.size()),
+                            reinterpret_cast<const jbyte*>(wire.data()));
+    return jResult;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - VAD Statistics (Task 3 — CPP-blocked G-C6 round-1 fix)
+// Swift's setVADStatisticsCallback needs ambientLevel, recentAvg, recentMax.
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetStatistics(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) return nullptr;
+
+    float ambient = 0.0f, recent_avg = 0.0f, recent_max = 0.0f;
+    rac_result_t rc = rac_vad_component_get_statistics(
+        reinterpret_cast<rac_handle_t>(handle), &ambient, &recent_avg, &recent_max);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racVadComponentGetStatistics: failed with code %d", rc);
+        return nullptr;
+    }
+
+    char buf[256];
+    snprintf(buf, sizeof(buf), "{\"ambient_level\":%.6f,\"recent_avg\":%.6f,\"recent_max\":%.6f}",
+             static_cast<double>(ambient), static_cast<double>(recent_avg),
+             static_cast<double>(recent_max));
+    return env->NewStringUTF(buf);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Model Registry Fetch Assignments (Task 5 — Web WASM / Kotlin)
+// Web SDK's fetchModelAssignments() and Kotlin's complementary path.
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryFetchAssignments(
+    JNIEnv* env, jclass clazz, jboolean forceRefresh) {
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+
+    rac_result_t rc = rac_model_registry_fetch_assignments(
+        forceRefresh == JNI_TRUE ? RAC_TRUE : RAC_FALSE, &models, &count);
+
+    if (rc != RAC_SUCCESS) {
+        LOGe("racModelRegistryFetchAssignments: failed with code %d", rc);
+        return nullptr;
+    }
+
+    // Return JSON array of model IDs so Kotlin can update its own registry.
+    std::string json = "[";
+    for (size_t i = 0; i < count; ++i) {
+        if (i > 0) json += ",";
+        json += "\"";
+        if (models[i] && models[i]->id) {
+            json += models[i]->id;
+        }
+        json += "\"";
+    }
+    json += "]";
+
+    rac_model_info_array_free(models, count);
+    LOGi("racModelRegistryFetchAssignments: fetched %zu model assignments", count);
+    return env->NewStringUTF(json.c_str());
 }
 
 }  // extern "C"

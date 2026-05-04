@@ -1,0 +1,319 @@
+// RunAnywhere v2 IDL — TTS configuration, options, output, and metadata.
+//
+// Phase 3 of v2 IDL Exhaustiveness migration. These messages were hand-rolled
+// across 5 SDKs + the C ABI:
+//   - Swift   sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/TTSTypes.swift:15
+//             (TTSConfiguration), :173 (TTSOptions), :269 (TTSOutput),
+//             :367 (TTSSynthesisMetadata), :399 (TTSPhonemeTimestamp),
+//             :424 (TTSSpeakResult)
+//   - Kotlin  sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/TTS/TTSTypes.kt:28
+//             (TTSConfiguration), :126 (TTSOptions), :174 (TTSOutput),
+//             :223 (TTSSynthesisMetadata), :243 (TTSPhonemeTimestamp),
+//             :262 (TTSSpeakResult)
+//   - Dart    sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/generation_types.dart:265
+//             (TTSOptions), :303 (PhonemeTimestamp), :321 (TTSSynthesisMetadata),
+//             :348 (TTSResult/TTSOutput typedef), :401 (TTSSpeakResult)
+//   - RN      sdk/runanywhere-react-native/packages/core/src/types/TTSTypes.ts:12
+//             (TTSOptions), :43 (TTSOutput), :63 (PhonemeTimestamp),
+//             :72 (TTSSynthesisMetadata), :89 (TTSSpeakResult), :106 (TTSVoiceInfo)
+//   - Web     sdk/runanywhere-web/packages/core/src/types/TTSTypes.ts:8
+//             (TTSSynthesisResult), :20 (TTSSynthesizeOptions) — note: Web has
+//             diverged to a backend-agnostic shape; canonical definition follows
+//             Swift/Kotlin/C-ABI.
+//   - C ABI   sdk/runanywhere-commons/include/rac/features/tts/rac_tts_types.h:56
+//             (rac_tts_config_t), :112 (rac_tts_options_t), :194 (rac_tts_result_t),
+//             :259 (rac_tts_phoneme_timestamp_t), :280 (rac_tts_synthesis_metadata_t),
+//             :307 (rac_tts_output_t), :342 (rac_tts_speak_result_t)
+//
+// Drift table (pre-IDL):
+//   ┌──────────────────────────┬────────┬────────┬───────┬───────┬───────┬───────┐
+//   │ Field                    │ Swift  │ Kotlin │ Dart  │ RN    │ Web   │ C ABI │
+//   ├──────────────────────────┼────────┼────────┼───────┼───────┼───────┼───────┤
+//   │ TTSConfiguration         │   ✓    │   ✓    │   ✗   │   ✗   │   ✗   │   ✓   │
+//   │ TTSOptions               │   ✓    │   ✓    │   ✓   │   ✓   │ partial│   ✓   │
+//   │ TTSOutput.audio_data     │ Data   │ ByteArr│ F32Lst│ string│ F32Arr│ void* │
+//   │ duration units           │ secs   │ secs   │ ms    │ secs  │ ms    │ ms    │
+//   │ phoneme times units      │ secs   │ secs   │ secs  │ secs  │ —     │ ms    │
+//   │ processing_time units    │ secs   │ secs   │ secs  │ secs  │ ms    │ ms    │
+//   │ TTSSpeakResult           │   ✓    │   ✓    │   ✓   │   ✓   │   ✗   │   ✓   │
+//   │ TTSVoiceInfo             │   ✗    │   ✗    │   ✗   │   ✓   │   ✗   │   ✗   │
+//   │ Optional voice field     │ String?│ String?│ String?│ string?│ — │ NULL  │
+//   └──────────────────────────┴────────┴────────┴───────┴───────┴───────┴───────┘
+//
+// Canonicalization decisions:
+//   - All time durations are int64 milliseconds (matches C ABI exactly).
+//     SDKs that exposed seconds-as-double convert at the binding layer.
+//   - audio_data is `bytes` (proto3 binary) — each SDK adapts to its native
+//     buffer type (Data, ByteArray, Uint8List, ArrayBuffer, void*).
+//   - sample_rate is int32 Hz.
+//   - TTSConfiguration drops `preferred_framework` from the wire shape; that's
+//     a runtime hint owned by the component layer, not part of the synthesis
+//     contract.
+//   - TTSVoiceInfo is included (RN-only pre-IDL) so all SDKs gain a typed
+//     voice-listing API. `gender` uses an enum to avoid string drift.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "TtsOptionsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Voice gender — union across SDKs.
+// Sources pre-IDL:
+//   RN     TTSTypes.ts:117    ('male' | 'female' | 'neutral')
+// (Other SDKs did not expose voice listing pre-IDL; canonicalized here.)
+// ---------------------------------------------------------------------------
+enum TTSVoiceGender {
+    TTS_VOICE_GENDER_UNSPECIFIED = 0;
+    TTS_VOICE_GENDER_MALE        = 1;
+    TTS_VOICE_GENDER_FEMALE      = 2;
+    TTS_VOICE_GENDER_NEUTRAL     = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Component-level TTS configuration.
+//
+// Mirrors the C ABI rac_tts_config_t exactly (minus preferred_framework, which
+// is a runtime hint, not part of the wire contract). Field names match Swift
+// TTSConfiguration / Kotlin TTSConfiguration.
+//
+// Defaults (for documentation; proto3 zero-values apply on the wire):
+//   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
+//   language_code      = "en-US"
+//   speaking_rate      = 1.0   (range 0.5 – 2.0)
+//   pitch              = 1.0   (range 0.5 – 2.0)
+//   volume             = 1.0   (range 0.0 – 1.0)
+//   audio_format       = AUDIO_FORMAT_PCM
+//   sample_rate        = 22050 (RAC_TTS_DEFAULT_SAMPLE_RATE)
+//   enable_neural_voice= true
+//   enable_ssml        = false
+// ---------------------------------------------------------------------------
+message TTSConfiguration {
+    // Model identifier (voice model file id, e.g. piper voice). Optional —
+    // platform TTS engines (Apple System TTS, Android TextToSpeech) don't
+    // require a model file.
+    string             model_id            = 1;
+
+    // Voice identifier to use for synthesis. For platform engines this is the
+    // engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
+    string             voice               = 2;
+
+    // Language for synthesis (BCP-47, e.g. "en-US").
+    string             language_code       = 3;
+
+    // Speaking rate (0.5 – 2.0; 1.0 is normal).
+    float              speaking_rate       = 4;
+
+    // Speech pitch (0.5 – 2.0; 1.0 is normal).
+    float              pitch               = 5;
+
+    // Speech volume (0.0 – 1.0).
+    float              volume              = 6;
+
+    // Output audio format.
+    runanywhere.v1.AudioFormat audio_format = 7;
+
+    // Sample rate for output audio in Hz. 0 = engine default
+    // (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
+    int32              sample_rate         = 8;
+
+    // Whether to use neural / premium voice if available.
+    bool               enable_neural_voice = 9;
+
+    // Whether to enable SSML markup support.
+    bool               enable_ssml         = 10;
+
+    // Preferred framework for the component. Absent = auto. Mirrors the C
+    // ABI rac_tts_config_t preferred_framework field.
+    optional InferenceFramework preferred_framework = 11;
+}
+
+// ---------------------------------------------------------------------------
+// Per-call TTS synthesis options.
+//
+// Mirrors the C ABI rac_tts_options_t exactly. Field names match Swift
+// TTSOptions / Kotlin TTSOptions / Dart TTSOptions.
+//
+// Note: `voice` is optional at the source (Swift `String?`, C `const char* =
+// NULL`). On the wire, an empty string MUST be interpreted as "use the
+// component's configured voice".
+// ---------------------------------------------------------------------------
+message TTSOptions {
+    // Voice override (empty = use component default).
+    string             voice               = 1;
+
+    // Language override (BCP-47). Empty = use component default.
+    string             language_code       = 2;
+
+    // Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
+    // `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
+    // canonicalize on `speaking_rate` to match TTSConfiguration; bindings
+    // alias to `rate` where appropriate.
+    float              speaking_rate       = 3;
+
+    // Speech pitch (0.5 – 2.0; 1.0 is normal).
+    float              pitch               = 4;
+
+    // Speech volume (0.0 – 1.0).
+    float              volume              = 5;
+
+    // Whether the input contains SSML markup. C ABI: `use_ssml`, Swift:
+    // `useSSML`, Kotlin: `useSSML`, Dart: `useSSML`. Canonicalized to
+    // `enable_ssml` for consistency with TTSConfiguration.
+    bool               enable_ssml         = 6;
+
+    // Output audio format.
+    runanywhere.v1.AudioFormat audio_format = 7;
+
+    // Output sample rate override in Hz. 0 = component/default sample rate.
+    // Present in rac_tts_options_t and several SDK option structs.
+    int32              sample_rate         = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Phoneme-level timestamp.
+//
+// Mirrors the C ABI rac_tts_phoneme_timestamp_t exactly. Time units are
+// **milliseconds** on the wire (matches C ABI). Swift / Kotlin / Dart bindings
+// expose seconds (double) and convert at the binding boundary.
+// ---------------------------------------------------------------------------
+message TTSPhonemeTimestamp {
+    // The phoneme symbol (IPA or engine-specific).
+    string phoneme  = 1;
+
+    // Start time within the synthesized audio, in milliseconds.
+    int64  start_ms = 2;
+
+    // End time within the synthesized audio, in milliseconds.
+    int64  end_ms   = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Synthesis metadata.
+//
+// Mirrors the C ABI rac_tts_synthesis_metadata_t. Time units in milliseconds
+// and durations as int64 to match the C ABI.
+// ---------------------------------------------------------------------------
+message TTSSynthesisMetadata {
+    // Voice id used for synthesis.
+    string voice_id            = 1;
+
+    // Language used for synthesis (BCP-47). Source field name varies:
+    // C ABI: `language`, Swift: `language`, Kotlin: `language`. We use
+    // `language_code` to match TTSConfiguration / TTSOptions.
+    string language_code       = 2;
+
+    // Wall-clock processing time in milliseconds.
+    int64  processing_time_ms  = 3;
+
+    // Number of input characters synthesized.
+    int32  character_count     = 4;
+
+    // Audio duration in milliseconds. Present in C ABI rac_tts_output_t but
+    // mirrored here so metadata is self-describing for clients that consume
+    // metadata-only paths (e.g. TTSSpeakResult).
+    int64  audio_duration_ms   = 5;
+
+    // Characters processed per second. Some native paths expose this directly;
+    // consumers may also compute it from character_count / processing_time_ms.
+    float  characters_per_second = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Full TTS output: synthesized audio plus metadata.
+//
+// Mirrors the C ABI rac_tts_output_t. `audio_data` is opaque bytes; bindings
+// adapt to native buffers (Swift Data, Kotlin ByteArray, Dart Uint8List,
+// JS ArrayBuffer/Float32Array, C void*). Sample rate is required because PCM
+// payloads are otherwise unparseable.
+// ---------------------------------------------------------------------------
+message TTSOutput {
+    // Synthesized audio bytes, encoded per `audio_format`.
+    bytes                          audio_data          = 1;
+
+    // Audio format of the bytes in `audio_data`.
+    runanywhere.v1.AudioFormat     audio_format        = 2;
+
+    // Sample rate in Hz. For PCM payloads this is required to interpret the
+    // bytes; for compressed formats (mp3, opus, …) it reflects the synthesis
+    // sample rate, not the container rate.
+    int32                          sample_rate         = 3;
+
+    // Audio duration in milliseconds (matches C ABI `duration_ms`).
+    int64                          duration_ms         = 4;
+
+    // Phoneme-level timestamps, if the engine produced them. May be empty.
+    repeated TTSPhonemeTimestamp   phoneme_timestamps  = 5;
+
+    // Per-pass synthesis metadata.
+    TTSSynthesisMetadata           metadata            = 6;
+
+    // Wall-clock timestamp when the output was produced
+    // (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
+    int64                          timestamp_ms        = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Result of a `speak()` call — metadata-only view of an already-played
+// synthesis pass. Used when the SDK plays audio internally and the caller
+// does not need raw bytes.
+//
+// Mirrors the C ABI rac_tts_speak_result_t. Identical to TTSOutput minus
+// `audio_data` and `phoneme_timestamps`; `audio_size_bytes` is retained for
+// callers that want to know how much was synthesized.
+// ---------------------------------------------------------------------------
+message TTSSpeakResult {
+    // Audio format used during synthesis.
+    runanywhere.v1.AudioFormat     audio_format        = 1;
+
+    // Sample rate in Hz used during synthesis.
+    int32                          sample_rate         = 2;
+
+    // Audio duration in milliseconds.
+    int64                          duration_ms         = 3;
+
+    // Audio size in bytes (0 for system TTS that plays directly without
+    // exposing buffers).
+    int64                          audio_size_bytes    = 4;
+
+    // Per-pass synthesis metadata.
+    TTSSynthesisMetadata           metadata            = 5;
+
+    // Wall-clock timestamp when speech completed (ms since UNIX epoch).
+    int64                          timestamp_ms        = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Descriptor for a TTS voice the engine can use.
+//
+// Pre-IDL only RN exposed this (TTSTypes.ts:106). Canonicalized here so all
+// SDKs gain a typed voice-listing API. `gender` uses an enum to avoid the
+// string-typed drift that RN had ('male' | 'female' | 'neutral').
+// ---------------------------------------------------------------------------
+message TTSVoiceInfo {
+    // Engine-specific voice identifier (passed back as TTSOptions.voice or
+    // TTSConfiguration.voice).
+    string         id            = 1;
+
+    // Human-readable display name (e.g. "Samantha", "Daniel").
+    string         display_name  = 2;
+
+    // Language spoken by this voice (BCP-47, e.g. "en-US").
+    string         language_code = 3;
+
+    // Voice gender, when known.
+    TTSVoiceGender gender        = 4;
+
+    // Optional descriptive text (locale, age, style notes).
+    string         description   = 5;
+}

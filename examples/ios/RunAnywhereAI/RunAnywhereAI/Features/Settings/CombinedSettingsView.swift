@@ -701,7 +701,7 @@ private struct ApiConfigurationSheet: View {
             #endif
             .navigationTitle("API Configuration")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 #if os(iOS)
@@ -749,9 +749,7 @@ private struct StoredModelRow: View {
     @State private var isDeleting = false
 
     private var isDeletable: Bool {
-        // Platform models (built-in) can't be deleted
-        guard let framework = model.framework else { return false }
-        return framework != .foundationModels && framework != .systemTTS
+        !model.id.isEmpty
     }
 
     var body: some View {

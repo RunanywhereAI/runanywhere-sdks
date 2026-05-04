@@ -9,96 +9,18 @@
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { AnalyticsEmitter } from '../services/AnalyticsEmitter';
-import type { OPFSStorage } from './OPFSStorage';
-import type { MetadataMap } from './OPFSStorage';
+import type { OPFSStorage, MetadataMap } from './OPFSStorage';
 import type { LocalFileStorage } from './LocalFileStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
+import { DownloadState } from '@runanywhere/proto-ts/download_service';
 import type { ManagedModel, DownloadProgress } from './ModelRegistry';
 import type { ModelRegistry } from './ModelRegistry';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter';
+import { validateModelUrl } from './ModelDownloadValidation';
+import { checkModelStorageQuota } from './ModelDownloadQuota';
+import type { QuotaCheckResult } from './ModelDownloadQuota';
 
-// ---------------------------------------------------------------------------
-// Quota Check Result
-// ---------------------------------------------------------------------------
-
-/** Candidate model that could be evicted to free space. */
-export interface EvictionCandidateInfo {
-  id: string;
-  name: string;
-  sizeBytes: number;
-  lastUsedAt: number;
-}
-
-/** Result of a pre-download quota check. */
-export interface QuotaCheckResult {
-  /** Whether the model fits in available storage without eviction. */
-  fits: boolean;
-  /** Currently available bytes (estimate). */
-  availableBytes: number;
-  /** Total bytes needed for the model (primary + additional files). */
-  neededBytes: number;
-  /**
-   * Models that could be evicted to free space, sorted by lastUsedAt ascending
-   * (least recently used first). Only populated when `fits` is false.
-   */
-  evictionCandidates: EvictionCandidateInfo[];
-}
-
-// ---------------------------------------------------------------------------
-// Model Downloader
-// ---------------------------------------------------------------------------
-
-/**
- * Validate that a URL is safe to fetch from.
- *
- * Security: Prevents SSRF-like attacks where user-controlled model URLs
- * could be pointed at internal/private network addresses. Only HTTPS is
- * allowed in production. HTTP is permitted for localhost during development.
- *
- * @param url - The URL to validate
- * @throws Error if the URL is not allowed
- */
-function validateModelUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(`Invalid model URL: ${url}`);
-  }
-
-  // Only allow HTTPS (and HTTP for localhost during development)
-  const isLocalhost =
-    parsed.hostname === 'localhost' ||
-    parsed.hostname === '127.0.0.1' ||
-    parsed.hostname === '[::1]';
-
-  if (parsed.protocol === 'http:' && !isLocalhost) {
-    throw new Error(
-      `Model URL must use HTTPS (got HTTP for ${parsed.hostname}). ` +
-      'HTTP is only allowed for localhost during development.',
-    );
-  }
-
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error(`Model URL has unsupported protocol: ${parsed.protocol}`);
-  }
-
-  // Block common private/internal network ranges
-  const blockedPatterns = [
-    /^10\./,
-    /^172\.(1[6-9]|2\d|3[0-1])\./,
-    /^192\.168\./,
-    /^169\.254\./,
-    /^0\./,
-  ];
-
-  if (!isLocalhost) {
-    for (const pattern of blockedPatterns) {
-      if (pattern.test(parsed.hostname)) {
-        throw new Error(`Model URL points to private network address: ${parsed.hostname}`);
-      }
-    }
-  }
-}
+export type { EvictionCandidateInfo, QuotaCheckResult } from './ModelDownloadQuota';
 
 /**
  * ModelDownloader — downloads model files (single or multi-file) and
@@ -123,6 +45,7 @@ export class ModelDownloader {
    * Keyed by modelId/file key. Cleared once the data is consumed by loadFromOPFS.
    */
   private readonly memoryCache = new Map<string, Uint8Array>();
+  private readonly activeDownloadControllers = new Map<string, Set<AbortController>>();
 
   constructor(registry: ModelRegistry, storage: OPFSStorage) {
     this.registry = registry;
@@ -157,54 +80,7 @@ export class ModelDownloader {
     metadata: MetadataMap,
     loadedModelId?: string,
   ): Promise<QuotaCheckResult> {
-    const { usedBytes, quotaBytes } = await this.storage.getStorageUsage();
-    const availableBytes = Math.max(0, quotaBytes - usedBytes);
-
-    // Estimate total download size
-    const neededBytes = model.memoryRequirement ?? 0;
-
-    if (availableBytes >= neededBytes) {
-      return { fits: true, availableBytes, neededBytes, evictionCandidates: [] };
-    }
-
-    // Not enough space — build eviction candidate list
-    const stored = await this.storage.listModels();
-    const keepBase = model.id.split('__')[0];
-
-    const candidates: EvictionCandidateInfo[] = [];
-    for (const s of stored) {
-      // Skip the model being downloaded and its siblings
-      const storedBase = s.id.split('__')[0];
-      if (storedBase === keepBase) continue;
-      // Skip currently loaded model
-      if (loadedModelId && s.id === loadedModelId) continue;
-      // Skip metadata file
-      if (s.id === '_metadata.json') continue;
-
-      const registered = this.registry.getModel(s.id) ?? this.registry.getModel(storedBase);
-      candidates.push({
-        id: storedBase,
-        name: registered?.name ?? s.id,
-        sizeBytes: s.sizeBytes,
-        lastUsedAt: metadata[storedBase]?.lastUsedAt ?? s.lastModified,
-      });
-    }
-
-    // Deduplicate by base id (main model + companion files combined)
-    const deduped = new Map<string, EvictionCandidateInfo>();
-    for (const c of candidates) {
-      const existing = deduped.get(c.id);
-      if (existing) {
-        existing.sizeBytes += c.sizeBytes;
-      } else {
-        deduped.set(c.id, { ...c });
-      }
-    }
-
-    // Sort by least-recently-used first
-    const sorted = [...deduped.values()].sort((a, b) => a.lastUsedAt - b.lastUsedAt);
-
-    return { fits: false, availableBytes, neededBytes, evictionCandidates: sorted };
+    return checkModelStorageQuota(model, metadata, loadedModelId, this.storage, this.registry);
   }
 
   /**
@@ -232,23 +108,39 @@ export class ModelDownloader {
         this.registry.updateModel(modelId, { downloadProgress: overallProgress });
         this.emitDownloadProgress({
           modelId,
-          stage: DownloadStage.Downloading,
-          progress: overallProgress,
+          stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+          state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+          stageProgress: overallProgress,
           bytesDownloaded: cumulativeBytesDownloaded,
           totalBytes: cumulativeBytesExpected,
-          currentFile: model.url.split('/').pop(),
-          filesCompleted: 0,
-          filesTotal: totalFiles,
+          overallSpeedBps: 0,
+          etaSeconds: -1,
+          retryAttempt: 0,
+          errorMessage: '',
+          taskId: modelId,
+          currentFileIndex: 0,
+          totalFiles,
+          storageKey: modelId,
+          localPath: '',
         });
       };
 
-      let primarySize = await this.downloadAndStoreStreaming(model.url, modelId, primaryProgressCb);
+      let primarySize = await this.downloadAndStoreStreaming(model.url, modelId, primaryProgressCb, modelId);
       if (primarySize === null) {
-        const primaryData = await this.downloadFile(model.url, primaryProgressCb);
+        const primaryData = await this.downloadFile(model.url, primaryProgressCb, modelId);
         await this.storeInOPFS(modelId, primaryData);
         primarySize = primaryData.length;
       }
       completedFileSizes.push(primarySize);
+
+      // Integrity verification — native SDKs get inline SHA-256 via
+      // `rac_http_download_execute`'s `expected_sha256_hex`; Web bypasses
+      // the WASM HTTP client for HTTPS (browser fetch handles TLS), so we
+      // reproduce the same guarantee by recomputing the hash from the
+      // persisted bytes and deleting + throwing on mismatch.
+      if (model.checksumSha256) {
+        await this.verifyStoredFileSha256(modelId, model.checksumSha256, modelId);
+      }
 
       // Download additional files (e.g., mmproj for VLM)
       if (model.additionalFiles && model.additionalFiles.length > 0) {
@@ -266,40 +158,100 @@ export class ModelDownloader {
             this.registry.updateModel(modelId, { downloadProgress: overallProgress });
             this.emitDownloadProgress({
               modelId,
-              stage: DownloadStage.Downloading,
-              progress: overallProgress,
+              stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
+              state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+              stageProgress: overallProgress,
               bytesDownloaded: cumulativeBytesDownloaded,
               totalBytes: cumulativeBytesExpected,
-              currentFile: file.filename,
-              filesCompleted: 1 + i,
-              filesTotal: totalFiles,
+              overallSpeedBps: 0,
+              etaSeconds: -1,
+              retryAttempt: 0,
+              errorMessage: '',
+              taskId: modelId,
+              currentFileIndex: i + 1,
+              totalFiles,
+              storageKey: fileKey,
+              localPath: '',
             });
           };
 
           let fileSize: number;
-          const streamedSize = await this.downloadAndStoreStreaming(file.url, fileKey, fileProgressCb);
+          const streamedSize = await this.downloadAndStoreStreaming(file.url, fileKey, fileProgressCb, modelId);
           if (streamedSize === null) {
-            const fileData = await this.downloadFile(file.url, fileProgressCb);
+            const fileData = await this.downloadFile(file.url, fileProgressCb, modelId);
             await this.storeInOPFS(fileKey, fileData);
             fileSize = fileData.length;
           } else {
             fileSize = streamedSize;
           }
           completedFileSizes.push(fileSize);
+
+          if (file.checksumSha256) {
+            await this.verifyStoredFileSha256(fileKey, file.checksumSha256, modelId);
+          }
         }
       }
 
       const totalSize = completedFileSizes.reduce((a, b) => a + b, 0);
 
+      // Extracting stage — observability hook for archive unpacking that happens
+      // downstream of core downloads (e.g. ONNXProvider's extractTarGz for
+      // sherpa .tar.gz model bundles). Even when no extraction is needed
+      // (single-file GGUF etc.), we emit EXTRACTING so observers see the
+      // complete DOWNLOADING → EXTRACTING → VALIDATING → COMPLETED sequence
+      // that mirrors native SDKs' rac_extract_archive_native hook.
+      this.emitDownloadProgress({
+        modelId,
+        stage: DownloadStage.DOWNLOAD_STAGE_EXTRACTING,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        stageProgress: 0,
+        bytesDownloaded: totalSize,
+        totalBytes: totalSize,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
+      });
+      this.emitDownloadProgress({
+        modelId,
+        stage: DownloadStage.DOWNLOAD_STAGE_EXTRACTING,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        stageProgress: 1,
+        bytesDownloaded: totalSize,
+        totalBytes: totalSize,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
+      });
+
       // Validating stage
       this.emitDownloadProgress({
         modelId,
-        stage: DownloadStage.Validating,
-        progress: 0.95,
+        stage: DownloadStage.DOWNLOAD_STAGE_VALIDATING,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        stageProgress: 0.95,
         bytesDownloaded: totalSize,
         totalBytes: totalSize,
-        filesCompleted: totalFiles,
-        filesTotal: totalFiles,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
       });
 
       this.registry.updateModel(modelId, {
@@ -311,12 +263,20 @@ export class ModelDownloader {
       // Completed stage
       this.emitDownloadProgress({
         modelId,
-        stage: DownloadStage.Completed,
-        progress: 1,
+        stage: DownloadStage.DOWNLOAD_STAGE_COMPLETED,
+        state: DownloadState.DOWNLOAD_STATE_COMPLETED,
+        stageProgress: 1,
         bytesDownloaded: totalSize,
         totalBytes: totalSize,
-        filesCompleted: totalFiles,
-        filesTotal: totalFiles,
+        overallSpeedBps: 0,
+        etaSeconds: 0,
+        retryAttempt: 0,
+        errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
       });
       EventBus.shared.emit('model.downloadCompleted', SDKEventType.Model, { modelId, sizeBytes: totalSize });
       AnalyticsEmitter.emitModelDownloadCompleted(modelId, totalSize, 0);
@@ -325,6 +285,38 @@ export class ModelDownloader {
       this.registry.updateModel(modelId, { status: ModelStatus.Error, error: message });
       EventBus.shared.emit('model.downloadFailed', SDKEventType.Model, { modelId, error: message });
       AnalyticsEmitter.emitModelDownloadFailed(modelId, message);
+    } finally {
+      this.activeDownloadControllers.delete(modelId);
+    }
+  }
+
+  cancelDownload(modelId: string): boolean {
+    const controllers = this.activeDownloadControllers.get(modelId);
+    if (!controllers || controllers.size === 0) return false;
+
+    for (const controller of controllers) {
+      controller.abort();
+    }
+    this.activeDownloadControllers.delete(modelId);
+    this.registry.updateModel(modelId, { status: ModelStatus.Registered, downloadProgress: 0 });
+    EventBus.shared.emit('model.downloadCancelled', SDKEventType.Model, { modelId });
+    return true;
+  }
+
+  private registerAbortController(modelId: string): AbortController {
+    const controller = new AbortController();
+    const controllers = this.activeDownloadControllers.get(modelId) ?? new Set<AbortController>();
+    controllers.add(controller);
+    this.activeDownloadControllers.set(modelId, controllers);
+    return controller;
+  }
+
+  private unregisterAbortController(modelId: string, controller: AbortController): void {
+    const controllers = this.activeDownloadControllers.get(modelId);
+    if (!controllers) return;
+    controllers.delete(controller);
+    if (controllers.size === 0) {
+      this.activeDownloadControllers.delete(modelId);
     }
   }
 
@@ -337,38 +329,91 @@ export class ModelDownloader {
    * Exposed so ModelManager can use it for on-demand file downloads during load.
    *
    * URLs are validated before fetching to prevent SSRF and enforce HTTPS.
+   *
+   * Transport selection (T3.13):
+   *   1. If a backend package has registered an Emscripten module with
+   *      HTTPAdapter, route through the commons libcurl C ABI for
+   *      parity with Swift/Kotlin/RN/Flutter downloads.
+   *   2. Otherwise fall back to the browser fetch stream — this
+   *      is the bootstrap path, reached before any backend WASM has
+   *      loaded (e.g. a consumer that only uses core storage APIs).
    */
   async downloadFile(
     url: string,
     onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+    cancelGroup?: string,
   ): Promise<Uint8Array> {
     validateModelUrl(url);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 
-    const total = Number(response.headers.get('content-length') || 0);
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error('No response body');
+    const http = HTTPAdapter.tryDefault();
+    const isHttps = url.startsWith('https://');
+    if (http && !isHttps) {
+      return this.downloadFileViaWasm(http, url, onProgress);
+    }
 
+    // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: pure-core callers can download before a backend loads.
+    // Web also bypasses WASM curl for HTTPS because the libcurl WASM build lacks HTTPS support; fetch() handles TLS via the browser.
+    const controller = cancelGroup ? this.registerAbortController(cancelGroup) : null;
+    try {
+      const response = await fetch(url, { signal: controller?.signal }); // fetch() carve-out: fallback when no WASM module registered, or HTTPS without WASM TLS.
+      if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+
+      const total = Number(response.headers.get('content-length') || 0);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        const progress = total > 0 ? received / total : 0;
+        onProgress?.(progress, received, total);
+      }
+
+      const data = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) {
+        data.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      return data;
+    } finally {
+      if (cancelGroup && controller) this.unregisterAbortController(cancelGroup, controller);
+    }
+  }
+
+  /**
+   * WASM-backed variant of `downloadFile` — collects chunks delivered
+   * via the commons streaming HTTP client into a single `Uint8Array`.
+   */
+  private async downloadFileViaWasm(
+    http: HTTPAdapter,
+    url: string,
+    onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+  ): Promise<Uint8Array> {
     const chunks: Uint8Array[] = [];
     let received = 0;
+    let declaredTotal = 0;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      const progress = total > 0 ? received / total : 0;
-      onProgress?.(progress, received, total);
-    }
+    await http.stream({ url }, (chunk, totalWritten, contentLength) => {
+      chunks.push(chunk);
+      received = totalWritten;
+      if (contentLength > 0) declaredTotal = contentLength;
+      const progress = declaredTotal > 0 ? received / declaredTotal : 0;
+      onProgress?.(progress, received, declaredTotal);
+    });
 
     const data = new Uint8Array(received);
     let offset = 0;
-    for (const chunk of chunks) {
-      data.set(chunk, offset);
-      offset += chunk.length;
+    for (const c of chunks) {
+      data.set(c, offset);
+      offset += c.length;
     }
-
     return data;
   }
 
@@ -385,27 +430,37 @@ export class ModelDownloader {
     url: string,
     storageKey: string,
     onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+    cancelGroup?: string,
   ): Promise<number | null> {
     validateModelUrl(url);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-    if (!response.body) return null;
 
-    const total = Number(response.headers.get('content-length') || 0);
-    let received = 0;
+    const http = HTTPAdapter.tryDefault();
+    const isHttps = url.startsWith('https://');
+    if (http && !isHttps) {
+      return this.streamViaWasm(http, url, storageKey, onProgress);
+    }
 
-    // Build a progress-tracking pass-through stream
-    const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
-      transform: (chunk, controller) => {
-        received += chunk.length;
-        onProgress?.(total > 0 ? received / total : 0, received, total);
-        controller.enqueue(chunk);
-      },
-    });
-
-    const storageStream = response.body.pipeThrough(progressTransform);
-
+    // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: pure-core callers can stream before a backend loads.
+    // Web also bypasses WASM curl for HTTPS because the libcurl WASM build lacks HTTPS support; fetch() handles TLS via the browser.
+    const controller = cancelGroup ? this.registerAbortController(cancelGroup) : null;
     try {
+      const response = await fetch(url, { signal: controller?.signal }); // fetch() carve-out: fallback when no WASM module registered, or HTTPS without WASM TLS.
+      if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+      if (!response.body) return null;
+
+      const total = Number(response.headers.get('content-length') || 0);
+      let received = 0;
+
+      const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
+        transform: (chunk, controller) => {
+          received += chunk.length;
+          onProgress?.(total > 0 ? received / total : 0, received, total);
+          controller.enqueue(chunk);
+        },
+      });
+
+      const storageStream = response.body.pipeThrough(progressTransform);
+
       if (this.localFileStorage?.isReady) {
         await this.localFileStorage.saveModelFromStream(storageKey, storageStream);
         logger.info(`Streamed ${storageKey} to local storage (${(received / 1024 / 1024).toFixed(1)} MB)`);
@@ -418,6 +473,63 @@ export class ModelDownloader {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.warning(`Streaming store failed for "${storageKey}": ${msg}, will fall back to buffered download`);
+      return null;
+    } finally {
+      if (cancelGroup && controller) this.unregisterAbortController(cancelGroup, controller);
+    }
+  }
+
+  /**
+   * WASM-backed streaming download: bridges `rac_http_request_stream`
+   * chunk callbacks into a JS `ReadableStream` that the same storage
+   * pipeline (`saveModelFromStream`) can consume unchanged.
+   */
+  private async streamViaWasm(
+    http: HTTPAdapter,
+    url: string,
+    storageKey: string,
+    onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+  ): Promise<number | null> {
+    let received = 0;
+    let declaredTotal = 0;
+    let enqueue: ((chunk: Uint8Array) => void) | null = null;
+    let closeStream: (() => void) | null = null;
+    let errorStream: ((err: unknown) => void) | null = null;
+
+    const body: ReadableStream<Uint8Array> = new ReadableStream({
+      start(controller) {
+        enqueue = (chunk) => controller.enqueue(chunk);
+        closeStream = () => controller.close();
+        errorStream = (err) => controller.error(err);
+      },
+    });
+
+    const pump = http.stream({ url }, (chunk, totalWritten, contentLength) => {
+      if (enqueue) enqueue(chunk);
+      received = totalWritten;
+      if (contentLength > 0) declaredTotal = contentLength;
+      onProgress?.(declaredTotal > 0 ? received / declaredTotal : 0, received, declaredTotal);
+    }).then(() => {
+      closeStream?.();
+    }, (err) => {
+      errorStream?.(err);
+    });
+
+    try {
+      if (this.localFileStorage?.isReady) {
+        await this.localFileStorage.saveModelFromStream(storageKey, body);
+        await pump;
+        logger.info(`Streamed ${storageKey} to local storage via WASM HTTP (${(received / 1024 / 1024).toFixed(1)} MB)`);
+        return received;
+      }
+
+      await this.storage.saveModelFromStream(storageKey, body);
+      await pump;
+      logger.info(`Streamed ${storageKey} to OPFS via WASM HTTP (${(received / 1024 / 1024).toFixed(1)} MB)`);
+      return received;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`WASM-backed streaming store failed for "${storageKey}": ${msg}, will fall back to buffered download`);
       return null;
     }
   }
@@ -692,14 +804,56 @@ export class ModelDownloader {
     return `${modelId}__${filename}`;
   }
 
+  /**
+   * Recompute SHA-256 of the persisted bytes for `storageKey` and compare
+   * against `expectedHex` (lowercase hex). On mismatch, deletes the stored
+   * file from all backends (OPFS, local FS, memory cache) and throws.
+   *
+   * Matches the `RAC_HTTP_DL_CHECKSUM_FAILED` surface that the native SDKs
+   * get for free via the libcurl write-path check in
+   * `rac_http_download_execute`.
+   */
+  private async verifyStoredFileSha256(
+    storageKey: string,
+    expectedHex: string,
+    modelId: string,
+  ): Promise<void> {
+    const bytes = await this.loadFromOPFS(storageKey);
+    if (!bytes) {
+      throw new Error(
+        `SHA-256 verification requested for "${storageKey}" but no stored bytes were found`,
+      );
+    }
+
+    const digestBuffer = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+    const actualHex = Array.from(new Uint8Array(digestBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const expectedNormalized = expectedHex.toLowerCase();
+    if (actualHex !== expectedNormalized) {
+      logger.warning(
+        `SHA-256 mismatch for "${storageKey}" (modelId=${modelId}): expected=${expectedNormalized}, actual=${actualHex}. Deleting corrupted bytes.`,
+      );
+      await this.deleteFromOPFS(storageKey);
+      throw new Error(
+        `SHA-256 checksum mismatch for "${storageKey}" — expected ${expectedNormalized} but got ${actualHex}`,
+      );
+    }
+
+    logger.debug(
+      `SHA-256 verified for "${storageKey}" (modelId=${modelId}, ${bytes.length} bytes)`,
+    );
+  }
+
   /** Emit a structured download progress event via EventBus */
   private emitDownloadProgress(progress: DownloadProgress): void {
     EventBus.shared.emit('model.downloadProgress', SDKEventType.Model, {
       modelId: progress.modelId,
-      progress: progress.progress,
+      progress: progress.stageProgress,
       bytesDownloaded: progress.bytesDownloaded,
       totalBytes: progress.totalBytes,
-      stage: progress.stage as string | undefined,
+      stage: DownloadStage[progress.stage],
     });
   }
 }

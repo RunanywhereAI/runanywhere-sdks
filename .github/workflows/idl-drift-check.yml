@@ -1,0 +1,124 @@
+name: IDL drift check
+
+# Runs on every PR and every push to `main`. If any .proto under idl/ is edited
+# without regenerating the committed language bindings, or if anyone hand-edits
+# a generated file, this job fails with ::error::IDL-generated code is out of
+# sync with .proto sources. Fixing the PR is a one-liner locally:
+#
+#   ./idl/codegen/generate_all.sh && (cd sdk/runanywhere-proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
+
+on:
+  pull_request:
+    paths:
+      - 'idl/**'
+      - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
+      - 'sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**'
+      - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
+      - 'sdk/runanywhere-react-native/packages/core/src/generated/**'
+      - 'sdk/runanywhere-web/packages/core/src/generated/**'
+      - 'sdk/runanywhere-proto-ts/**'
+      - 'sdk/runanywhere-commons/src/generated/proto/**'
+      - 'sdk/runanywhere-python/src/runanywhere/generated/**'
+      - 'scripts/setup-toolchain.sh'
+      - '.github/workflows/idl-drift-check.yml'
+  push:
+    # v2 close-out (B34): include long-lived integration branches so a
+    # direct push that touches IDL-adjacent files without a PR still
+    # gets the drift gate.
+    branches: [main, feat/v2-architecture]
+    paths:
+      - 'idl/**'
+      - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
+      - 'sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**'
+      - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
+      - 'sdk/runanywhere-react-native/packages/core/src/generated/**'
+      - 'sdk/runanywhere-web/packages/core/src/generated/**'
+      - 'sdk/runanywhere-proto-ts/**'
+      - 'sdk/runanywhere-commons/src/generated/proto/**'
+      - 'sdk/runanywhere-python/src/runanywhere/generated/**'
+      - 'scripts/setup-toolchain.sh'
+      - '.github/workflows/idl-drift-check.yml'
+
+jobs:
+  check:
+    name: Verify generated code matches IDL
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Homebrew
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/Homebrew
+            /opt/homebrew
+            ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup-toolchain.sh') }}
+
+      - name: Install protoc + swift-protobuf (Homebrew)
+        run: |
+          brew install protobuf swift-protobuf
+
+      - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
+        run: |
+          # v2 close-out Phase 3: grpc-swift formula installs the binary as
+          # protoc-gen-grpc-swift-2; symlink to the legacy name our codegen
+          # script expects.
+          brew install grpc-swift || echo "grpc-swift bottle unavailable; Swift gRPC stubs skipped"
+          if [ -x /opt/homebrew/bin/protoc-gen-grpc-swift-2 ]; then
+            ln -sf /opt/homebrew/bin/protoc-gen-grpc-swift-2 /opt/homebrew/bin/protoc-gen-grpc-swift
+          fi
+
+      - name: Install wire-compiler (best-effort — Gradle Wire plugin is the fallback)
+        run: |
+          brew install wire || echo "wire bottle unavailable; Gradle Wire plugin will handle Kotlin codegen"
+
+      - name: Install Dart plugin (protoc-gen-dart)
+        run: |
+          if command -v dart >/dev/null 2>&1; then
+            dart pub global activate protoc_plugin 21.1.2
+            echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+          else
+            echo "::warning::dart not found on macos-14 runner; Dart codegen skipped"
+          fi
+
+      - name: Install ts-proto (npm)
+        run: |
+          npm install -g ts-proto@1.181.1 protobufjs
+
+      - name: Install Python protobuf
+        run: |
+          python3 -m pip install --upgrade "protobuf>=4.25,<5" grpcio-tools
+
+      - name: Dump toolchain versions (debug)
+        run: |
+          echo "protoc: $(protoc --version)"
+          echo "protoc-gen-swift: $(protoc-gen-swift --version 2>/dev/null || echo 'not present')"
+          echo "wire-compiler: $(wire-compiler --version 2>/dev/null || echo 'not present')"
+          echo "protoc-gen-dart: $(protoc-gen-dart --version 2>/dev/null || echo 'present or skipped')"
+          echo "node: $(node --version)"
+          echo "python3: $(python3 --version)"
+
+      - name: Regenerate all bindings
+        run: ./idl/codegen/generate_all.sh
+
+      - name: Build shared TypeScript proto package
+        run: |
+          cd sdk/runanywhere-proto-ts
+          npm install --package-lock=false
+          npm run build
+
+      - name: Fail on drift
+        run: |
+          if ! git diff --exit-code --stat; then
+            echo "::error::IDL-generated code is out of sync with .proto sources."
+            echo ""
+            echo "To fix locally:"
+            echo "  ./scripts/setup-toolchain.sh"
+            echo "  ./idl/codegen/generate_all.sh"
+            echo "  (cd sdk/runanywhere-proto-ts && npm install --package-lock=false && npm run build)"
+            echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"
+            exit 1
+          fi
+          echo "✓ No drift detected."

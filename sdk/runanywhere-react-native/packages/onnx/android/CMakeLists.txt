@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
 
 # Path to pre-built native libraries (downloaded from runanywhere-binaries)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
@@ -19,12 +19,8 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx.so")
-    message(WARNING "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
-                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_onnx:downloadNativeLibs\n"
-                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
-    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
-    return()
+    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
+                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_onnx SHARED IMPORTED)
@@ -72,6 +68,18 @@ if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-jni.so")
         IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-jni.so"
         IMPORTED_NO_SONAME TRUE
     )
+endif()
+# B-RN-10-001 fix: link rac_backend_sherpa so the dynamic linker loads it
+# alongside librunanywhereonnx.so. Its __attribute__((constructor)) registers
+# Sherpa STT/TTS/VAD with the unified plugin registry. Previously the .so
+# shipped in the APK but was never dlopen-ed, so rac_plugin_route returned -423.
+if(EXISTS "${JNILIB_DIR}/librac_backend_sherpa.so")
+    add_library(rac_backend_sherpa SHARED IMPORTED)
+    set_target_properties(rac_backend_sherpa PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_sherpa.so"
+        IMPORTED_NO_SONAME TRUE
+    )
+    message(STATUS "[RunAnywhereONNX] Found rac_backend_sherpa at ${JNILIB_DIR}/librac_backend_sherpa.so")
 endif()
 
 # =============================================================================
@@ -164,6 +172,7 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
     rac_commons
     rac_backend_onnx
     onnxruntime
@@ -179,9 +188,17 @@ endif()
 if(TARGET sherpa_onnx_jni)
     target_link_libraries(${PACKAGE_NAME} sherpa_onnx_jni)
 endif()
+# B-RN-10-001: rac_backend_sherpa registers itself via __attribute__((constructor))
+# on dlopen — linking it here forces the dynamic linker to load it alongside
+# librunanywhereonnx.so.
+if(TARGET rac_backend_sherpa)
+    target_link_libraries(${PACKAGE_NAME} rac_backend_sherpa)
+endif()
 
 # HAS_ONNX is always defined since ONNX backend is required
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1 ORT_API_VERSION=17)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
-target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)
+target_link_options(${PACKAGE_NAME} PRIVATE
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384)

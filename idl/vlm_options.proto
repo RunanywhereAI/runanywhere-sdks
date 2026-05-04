@@ -1,0 +1,340 @@
+// RunAnywhere IDL — Vision Language Model (VLM) types.
+//
+// Every enum / message below is the *union* of cases currently declared by
+// hand across Swift, Kotlin, Dart, React Native, Web SDKs, and the C ABI.
+// The pre-IDL drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap
+// Matters") is what motivated this schema. Every SDK consumes generated
+// output; nothing is hand-written.
+//
+// Drift sources (file:line):
+//   Swift   sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VLM/VLMTypes.swift:23
+//             VLMImage struct (line 23) + nested Format enum (line 25:
+//             filePath, rgbPixels, base64, uiImage, pixelBuffer)
+//           sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VLM/VLMTypes.swift:208
+//             VLMResult (text, promptTokens, completionTokens, totalTimeMs,
+//             tokensPerSecond — note: no completionTokens vs totalTokens split,
+//             totalTimeMs is a Double here)
+//           sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+VLM.swift:184
+//             VLMErrorCode (notInitialized=1, modelLoadFailed=2,
+//             processingFailed=3, invalidImage=4, cancelled=5)
+//   Kotlin  sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/VLM/VLMTypes.kt:26
+//             VLMImageFormat (FILE_PATH=0, RGB_PIXELS=1, BASE64=2)
+//           sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/VLM/VLMTypes.kt:47
+//             VLMImage (format, filePath, pixelData, base64Data, width, height)
+//           sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/VLM/VLMTypes.kt:103
+//             VLMGenerationOptions (maxTokens, temperature, topP,
+//             systemPrompt, maxImageSize, nThreads, useGpu)
+//           sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/VLM/VLMTypes.kt:120
+//             VLMResult (text, promptTokens, imageTokens, completionTokens,
+//             totalTokens, timeToFirstTokenMs, imageEncodeTimeMs, totalTimeMs,
+//             tokensPerSecond)
+//           sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/VLM/VLMTypes.kt:163
+//             VLMConfiguration (modelId, contextLength, temperature,
+//             maxTokens, systemPrompt, streamingEnabled, preferredFramework)
+//   Dart    sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/vlm_types.dart:19
+//             VLMImage class
+//           sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/vlm_types.dart:36
+//             VLMImageFormat sealed (filePath, rgbPixels, base64)
+//           sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/vlm_types.dart:68
+//             VLMResult (text, promptTokens, completionTokens, totalTimeMs,
+//             tokensPerSecond)
+//           sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/vlm_types.dart:127
+//             VLMGenerationOptions (maxTokens, temperature, topP,
+//             systemPrompt, maxImageSize, nThreads, useGpu)
+//           sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/vlm_types.dart:164
+//             VLMErrorCode (notInitialized=1, modelLoadFailed=2,
+//             processingFailed=3, invalidImage=4, cancelled=5)
+//   RN      sdk/runanywhere-react-native/packages/core/src/types/VLMTypes.ts:8
+//             VLMImageFormat (FilePath=0, RGBPixels=1, Base64=2)
+//           sdk/runanywhere-react-native/packages/core/src/types/VLMTypes.ts:15
+//             VLMImage discriminated union
+//           sdk/runanywhere-react-native/packages/core/src/types/VLMTypes.ts:21
+//             VLMGenerationOptions (maxTokens, temperature, topP)
+//           sdk/runanywhere-react-native/packages/core/src/types/VLMTypes.ts:28
+//             VLMResult (text, promptTokens, completionTokens, totalTimeMs,
+//             tokensPerSecond)
+//           sdk/runanywhere-react-native/packages/core/src/types/VLMTypes.ts:44
+//             VLMErrorCode (NotInitialized=1, ModelLoadFailed=2,
+//             ProcessingFailed=3, InvalidImage=4, Cancelled=5)
+//   Web     sdk/runanywhere-web/packages/core/src/types/VLMTypes.ts:10
+//             VLMImageFormat (FilePath=0, RGBPixels=1, Base64=2)
+//           sdk/runanywhere-web/packages/core/src/types/VLMTypes.ts:16
+//             VLMImage (format, filePath?, pixelData?, base64Data?, width?, height?)
+//           sdk/runanywhere-web/packages/core/src/types/VLMTypes.ts:28
+//             VLMGenerationOptions (maxTokens, temperature, topP,
+//             systemPrompt, modelFamily, streaming)
+//           sdk/runanywhere-web/packages/core/src/types/VLMTypes.ts:38
+//             VLMGenerationResult (text, promptTokens, imageTokens,
+//             completionTokens, totalTokens, timeToFirstTokenMs,
+//             imageEncodeTimeMs, totalTimeMs, tokensPerSecond, hardwareUsed)
+//   C ABI   sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_types.h:96
+//             rac_vlm_image_format_t (FILE_PATH=0, RGB_PIXELS=1, BASE64=2)
+//           sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_types.h:110
+//             rac_vlm_image_t (format, file_path, pixel_data, base64_data,
+//             width, height, data_size)
+//           sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_types.h:143
+//             rac_vlm_options_t (max_tokens, temperature, top_p,
+//             stop_sequences, num_stop_sequences, streaming_enabled,
+//             system_prompt, max_image_size, n_threads, use_gpu, model_family,
+//             custom_chat_template, image_marker_override)
+//           sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_types.h:224
+//             rac_vlm_config_t (model_id, preferred_framework, context_length,
+//             temperature, max_tokens, system_prompt, streaming_enabled)
+//           sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_types.h:268
+//             rac_vlm_result_t (text, prompt_tokens, image_tokens,
+//             completion_tokens, total_tokens, time_to_first_token_ms,
+//             image_encode_time_ms, total_time_ms, tokens_per_second)
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "VlmOptionsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// VLM image input format — union across all SDKs and the C ABI.
+//
+// SDK ↔ proto enum mapping pre-IDL:
+//   C ABI  / Kotlin / RN / Web all expose three numeric formats (FILE_PATH=0,
+//          RGB_PIXELS=1, BASE64=2). Mapped to FILE_PATH, RAW_RGB, BASE64.
+//   Swift  Format enum adds Apple-only cases uiImage / pixelBuffer that are
+//          flattened to RAW_RGB before crossing the C ABI (see VLMTypes.swift
+//          lines 70-89). RAW_RGBA is reserved for SDKs that pass straight
+//          RGBA pixel buffers without the BGRA→RGB downsample step.
+//   Dart   sealed class with the same three formats (filePath / rgbPixels /
+//          base64); Flutter adapter passes RGB pixels through to the C ABI.
+//
+// JPEG / PNG / WEBP are container hints carried in the encoded `bytes`
+// payload (no current SDK declares these as enum cases — they are
+// reserved here so we can disambiguate decoded vs encoded sources without a
+// schema migration once a backend exposes container detection).
+// ---------------------------------------------------------------------------
+enum VLMImageFormat {
+    VLM_IMAGE_FORMAT_UNSPECIFIED = 0;
+    VLM_IMAGE_FORMAT_JPEG        = 1;   // reserved — encoded JPEG bytes
+    VLM_IMAGE_FORMAT_PNG         = 2;   // reserved — encoded PNG bytes
+    VLM_IMAGE_FORMAT_WEBP        = 3;   // reserved — encoded WebP bytes
+    VLM_IMAGE_FORMAT_RAW_RGB     = 4;   // Swift rgbPixels / Kotlin RGB_PIXELS /
+                                        // RN RGBPixels / Web RGBPixels /
+                                        // C ABI RAC_VLM_IMAGE_FORMAT_RGB_PIXELS
+    VLM_IMAGE_FORMAT_RAW_RGBA    = 5;   // reserved — raw RGBA pixel buffer
+                                        // (Swift UIImage path produces RGBA
+                                        // before downsample; pre-IDL no SDK
+                                        // exposes RGBA over the C ABI)
+    VLM_IMAGE_FORMAT_BASE64      = 6;   // Swift base64 / Kotlin BASE64 /
+                                        // Dart base64 / RN Base64 /
+                                        // Web Base64 /
+                                        // C ABI RAC_VLM_IMAGE_FORMAT_BASE64
+    VLM_IMAGE_FORMAT_FILE_PATH   = 7;   // Swift filePath / Kotlin FILE_PATH /
+                                        // Dart filePath / RN FilePath /
+                                        // Web FilePath /
+                                        // C ABI RAC_VLM_IMAGE_FORMAT_FILE_PATH
+}
+
+// ---------------------------------------------------------------------------
+// VLM model family for chat-template selection.
+// Mirrors rac_vlm_model_family_t.
+// ---------------------------------------------------------------------------
+enum VLMModelFamily {
+    VLM_MODEL_FAMILY_UNSPECIFIED = 0;
+    VLM_MODEL_FAMILY_AUTO        = 1;
+    VLM_MODEL_FAMILY_QWEN2_VL    = 2;
+    VLM_MODEL_FAMILY_SMOLVLM     = 3;
+    VLM_MODEL_FAMILY_LLAVA       = 4;
+    VLM_MODEL_FAMILY_CUSTOM      = 99;
+}
+
+// ---------------------------------------------------------------------------
+// Custom VLM chat template.
+// Mirrors rac_vlm_chat_template_t.
+// ---------------------------------------------------------------------------
+message VLMChatTemplate {
+    string template_text         = 1;
+    optional string image_marker = 2;
+    optional string default_system_prompt = 3;
+}
+
+// ---------------------------------------------------------------------------
+// VLM image input.
+//
+// `source` is a oneof so that exactly one of {file_path, encoded, raw_rgb,
+// base64} can be supplied per request. `width` / `height` are required for
+// non-encoded formats (raw_rgb, raw_rgba) where the consumer cannot infer
+// dimensions from a container header. `format` disambiguates encoded `bytes`
+// payloads (JPEG / PNG / WEBP) and explicitly tags raw / file-path / base64
+// sources.
+// ---------------------------------------------------------------------------
+message VLMImage {
+    oneof source {
+        string file_path = 1;   // VLM_IMAGE_FORMAT_FILE_PATH
+        bytes  encoded   = 2;   // VLM_IMAGE_FORMAT_{JPEG,PNG,WEBP} container bytes
+        bytes  raw_rgb   = 3;   // VLM_IMAGE_FORMAT_RAW_RGB / RAW_RGBA pixel buffer
+        string base64    = 4;   // VLM_IMAGE_FORMAT_BASE64 (UTF-8 string)
+    }
+
+    // Required for VLM_IMAGE_FORMAT_RAW_RGB and VLM_IMAGE_FORMAT_RAW_RGBA
+    // (consumers cannot infer dimensions for raw pixel buffers). Optional
+    // for encoded / file_path / base64 sources where the decoder reads
+    // dimensions from the container.
+    int32 width  = 5;
+    int32 height = 6;
+
+    VLMImageFormat format = 7;
+}
+
+// ---------------------------------------------------------------------------
+// VLM component configuration.
+// Sources pre-IDL:
+//   Kotlin VLMTypes.kt:163        (modelId, contextLength, temperature,
+//                                  maxTokens, systemPrompt, streamingEnabled,
+//                                  preferredFramework)
+//   C ABI  rac_vlm_types.h:224    (model_id, preferred_framework,
+//                                  context_length, temperature, max_tokens,
+//                                  system_prompt, streaming_enabled)
+//
+// Per the canonicalization brief, only the load-bearing identification +
+// limits cross the IDL boundary here: model_id, max_image_size_px, max_tokens.
+// Per-request sampling parameters live on VLMGenerationOptions; runtime
+// streaming toggles and chat-template selection stay backend-private.
+// ---------------------------------------------------------------------------
+message VLMConfiguration {
+    string model_id            = 1;
+    int32  max_image_size_px   = 2;   // Kotlin maxImageSize / C ABI max_image_size
+                                      // (0 = backend default)
+    int32  max_tokens          = 3;   // Kotlin maxTokens / C ABI max_tokens
+
+    // Additional component-level fields from rac_vlm_config_t.
+    int32  context_length      = 4;
+    float  temperature         = 5;
+    optional string system_prompt = 6;
+    bool   streaming_enabled   = 7;
+    optional InferenceFramework preferred_framework = 8;
+}
+
+// ---------------------------------------------------------------------------
+// VLM generation options — per-request sampling + prompt parameters.
+// Sources pre-IDL:
+//   Kotlin VLMTypes.kt:103        (maxTokens, temperature, topP, systemPrompt,
+//                                  maxImageSize, nThreads, useGpu)
+//   Dart   vlm_types.dart:127     (maxTokens, temperature, topP, systemPrompt,
+//                                  maxImageSize, nThreads, useGpu)
+//   RN     VLMTypes.ts:21         (maxTokens, temperature, topP)
+//   Web    VLMTypes.ts:28         (maxTokens, temperature, topP, systemPrompt,
+//                                  modelFamily, streaming)
+//   C ABI  rac_vlm_types.h:143    (max_tokens, temperature, top_p,
+//                                  stop_sequences, num_stop_sequences,
+//                                  streaming_enabled, system_prompt,
+//                                  max_image_size, n_threads, use_gpu,
+//                                  model_family, custom_chat_template,
+//                                  image_marker_override)
+//
+// top_k is included to align with the other text generation services
+// (LLM / chat) even though no current VLM SDK exposes it; the C ABI's
+// llama.cpp backend already supports top_k internally.
+// ---------------------------------------------------------------------------
+message VLMGenerationOptions {
+    string prompt      = 1;
+    int32  max_tokens  = 2;
+    float  temperature = 3;
+    float  top_p       = 4;
+    int32  top_k       = 5;
+
+    // Full rac_vlm_options_t coverage.
+    repeated string stop_sequences = 6;
+    bool   streaming_enabled = 7;
+    optional string system_prompt = 8;
+    int32  max_image_size = 9;
+    int32  n_threads = 10;
+    bool   use_gpu = 11;
+    VLMModelFamily model_family = 12;
+    optional VLMChatTemplate custom_chat_template = 13;
+    optional string image_marker_override = 14;
+}
+
+// ---------------------------------------------------------------------------
+// VLM generation result.
+// Sources pre-IDL:
+//   Swift  VLMTypes.swift:208     (text, promptTokens, completionTokens,
+//                                  totalTimeMs as Double, tokensPerSecond)
+//   Kotlin VLMTypes.kt:120        (text, promptTokens, imageTokens,
+//                                  completionTokens, totalTokens,
+//                                  timeToFirstTokenMs, imageEncodeTimeMs,
+//                                  totalTimeMs, tokensPerSecond)
+//   Dart   vlm_types.dart:68      (text, promptTokens, completionTokens,
+//                                  totalTimeMs, tokensPerSecond)
+//   RN     VLMTypes.ts:28         (text, promptTokens, completionTokens,
+//                                  totalTimeMs, tokensPerSecond)
+//   Web    VLMTypes.ts:38         (VLMGenerationResult: text, promptTokens,
+//                                  imageTokens, completionTokens, totalTokens,
+//                                  timeToFirstTokenMs, imageEncodeTimeMs,
+//                                  totalTimeMs, tokensPerSecond, hardwareUsed)
+//   C ABI  rac_vlm_types.h:268    (text, prompt_tokens, image_tokens,
+//                                  completion_tokens, total_tokens,
+//                                  time_to_first_token_ms,
+//                                  image_encode_time_ms, total_time_ms,
+//                                  tokens_per_second)
+//
+// Streaming note: streaming results reuse this VLMResult message; per-token
+// text deltas are emitted on the existing LLM stream channel
+// (llm_service.proto streaming surface). No VLM-specific stream-event message
+// is introduced here.
+// ---------------------------------------------------------------------------
+message VLMResult {
+    string text                = 1;
+    int32  prompt_tokens       = 2;
+    int32  completion_tokens   = 3;
+    int64  total_tokens        = 4;
+    int64  processing_time_ms  = 5;   // Kotlin/C ABI total_time_ms;
+                                      // Swift VLMResult totalTimeMs (Double ms).
+    float  tokens_per_second   = 6;
+
+    // Detailed VLM metrics from Kotlin/Web/C ABI.
+    int32  image_tokens             = 7;
+    int64  time_to_first_token_ms   = 8;
+    int64  image_encode_time_ms     = 9;
+    optional string hardware_used   = 10;
+}
+
+// ---------------------------------------------------------------------------
+// VLM error codes — canonical SDK-facing surface.
+// Sources pre-IDL:
+//   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
+//                                    processingFailed=3, invalidImage=4,
+//                                    cancelled=5)
+//   Dart   vlm_types.dart:164       (notInitialized=1, modelLoadFailed=2,
+//                                    processingFailed=3, invalidImage=4,
+//                                    cancelled=5)
+//   RN     VLMTypes.ts:44           (NotInitialized=1, ModelLoadFailed=2,
+//                                    ProcessingFailed=3, InvalidImage=4,
+//                                    Cancelled=5)
+//   Kotlin / Web                    (no enum declared pre-IDL)
+//
+// The canonicalized set below narrows the surface to image-specific failure
+// modes that the C ABI can distinguish at the boundary; transport / lifecycle
+// errors (notInitialized, modelLoadFailed, processingFailed, cancelled) are
+// folded back into the shared rac_result_t error codes in rac_error.h and do
+// not appear here.
+// ---------------------------------------------------------------------------
+enum VLMErrorCode {
+    VLM_ERROR_CODE_UNSPECIFIED        = 0;
+    VLM_ERROR_CODE_INVALID_IMAGE      = 1;   // Swift/Dart/RN invalidImage
+    VLM_ERROR_CODE_MODEL_NOT_LOADED   = 2;   // Swift/Dart/RN notInitialized +
+                                             // modelLoadFailed
+    VLM_ERROR_CODE_UNSUPPORTED_FORMAT = 3;   // VLMImageFormat case the active
+                                             // backend cannot decode
+    VLM_ERROR_CODE_IMAGE_TOO_LARGE    = 4;   // Image exceeds
+                                             // VLMConfiguration.max_image_size_px
+    VLM_ERROR_CODE_NOT_INITIALIZED    = 5;
+    VLM_ERROR_CODE_MODEL_LOAD_FAILED  = 6;
+    VLM_ERROR_CODE_PROCESSING_FAILED  = 7;
+    VLM_ERROR_CODE_CANCELLED          = 8;
+}

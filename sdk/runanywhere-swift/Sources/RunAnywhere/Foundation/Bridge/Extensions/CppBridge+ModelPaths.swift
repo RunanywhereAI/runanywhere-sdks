@@ -29,7 +29,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Failed to set base directory")
+                throw SDKException.general(.initializationFailed, "Failed to set base directory")
             }
 
             logger.debug("Base directory set to: \(baseDir.lastPathComponent)")
@@ -50,7 +50,7 @@ extension CppBridge {
             let result = rac_model_paths_get_models_directory(&buffer, buffer.count)
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))
@@ -63,7 +63,7 @@ extension CppBridge {
             let result = rac_model_paths_get_framework_directory(framework.toCFramework(), &buffer, buffer.count)
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))
@@ -78,7 +78,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))
@@ -102,7 +102,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))
@@ -114,7 +114,7 @@ extension CppBridge {
             let result = rac_model_paths_get_cache_directory(&buffer, buffer.count)
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))
@@ -126,7 +126,7 @@ extension CppBridge {
             let result = rac_model_paths_get_downloads_directory(&buffer, buffer.count)
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))
@@ -138,7 +138,7 @@ extension CppBridge {
             let result = rac_model_paths_get_temp_directory(&buffer, buffer.count)
 
             guard result == RAC_SUCCESS else {
-                throw SDKError.general(.initializationFailed, "Base directory not configured")
+                throw SDKException.general(.initializationFailed, "Base directory not configured")
             }
 
             return URL(fileURLWithPath: String(cString: buffer))

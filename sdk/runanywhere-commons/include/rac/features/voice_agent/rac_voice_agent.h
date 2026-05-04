@@ -21,6 +21,7 @@
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/wakeword/rac_wakeword_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -662,6 +663,35 @@ RAC_API rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t hand
  * @param result Result to free
  */
 RAC_API void rac_voice_agent_result_free(rac_voice_agent_result_t* result);
+
+// =============================================================================
+// GENERATED-PROTO C ABI
+// =============================================================================
+
+/**
+ * @brief Initialize from serialized runanywhere.v1.VoiceAgentComposeConfig bytes.
+ */
+RAC_API rac_result_t rac_voice_agent_initialize_proto(
+    rac_voice_agent_handle_t handle,
+    const uint8_t* config_proto_bytes,
+    size_t config_proto_size,
+    rac_proto_buffer_t* out_component_states);
+
+/**
+ * @brief Snapshot component state as serialized runanywhere.v1.VoiceAgentComponentStates bytes.
+ */
+RAC_API rac_result_t rac_voice_agent_component_states_proto(
+    rac_voice_agent_handle_t handle,
+    rac_proto_buffer_t* out_component_states);
+
+/**
+ * @brief Process one voice turn and return serialized runanywhere.v1.VoiceAgentResult bytes.
+ */
+RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(
+    rac_voice_agent_handle_t handle,
+    const void* audio_data,
+    size_t audio_size,
+    rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

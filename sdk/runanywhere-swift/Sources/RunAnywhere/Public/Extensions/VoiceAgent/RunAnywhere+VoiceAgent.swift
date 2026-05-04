@@ -24,44 +24,32 @@ public extension RunAnywhere {
 
     // MARK: - Component State Management
 
-    /// Get the current state of all voice agent components (STT, LLM, TTS)
+    /// Get the current state of all voice agent components (VAD, STT, LLM, TTS).
     ///
-    /// Use this to check which models are loaded and ready for the voice pipeline.
+    /// Returns `ComponentStates` (canonical CANONICAL_API §10 name, aliased to
+    /// `VoiceAgentComponentStates`). Use this to check which models are loaded
+    /// and ready for the voice pipeline.
     /// Models are loaded via the individual APIs (loadSTT, loadLLM, loadTTS).
-    static func getVoiceAgentComponentStates() async -> VoiceAgentComponentStates {
-        guard isSDKInitialized else {
+    static func getVoiceAgentComponentStates() async -> ComponentStates {
+        guard isInitialized else {
             return VoiceAgentComponentStates()
         }
 
+        if let states = try? await CppBridge.VoiceAgent.shared.componentStatesProto() {
+            return states
+        }
+
         let sttLoaded = await CppBridge.STT.shared.isLoaded
-        let sttId = await CppBridge.STT.shared.currentModelId
         let llmLoaded = await CppBridge.LLM.shared.isLoaded
-        let llmId = await CppBridge.LLM.shared.currentModelId
         let ttsLoaded = await CppBridge.TTS.shared.isLoaded
-        let ttsId = await CppBridge.TTS.shared.currentVoiceId
+        let vadLoaded = await CppBridge.VAD.shared.isModelLoaded
 
-        let sttState: ComponentLoadState
-        if sttLoaded, let modelId = sttId {
-            sttState = .loaded(modelId: modelId)
-        } else {
-            sttState = .notLoaded
-        }
-
-        let llmState: ComponentLoadState
-        if llmLoaded, let modelId = llmId {
-            llmState = .loaded(modelId: modelId)
-        } else {
-            llmState = .notLoaded
-        }
-
-        let ttsState: ComponentLoadState
-        if ttsLoaded, let modelId = ttsId {
-            ttsState = .loaded(modelId: modelId)
-        } else {
-            ttsState = .notLoaded
-        }
-
-        return VoiceAgentComponentStates(stt: sttState, llm: llmState, tts: ttsState)
+        return VoiceAgentComponentStates(
+            stt: sttLoaded ? .loaded : .notLoaded,
+            llm: llmLoaded ? .loaded : .notLoaded,
+            tts: ttsLoaded ? .loaded : .notLoaded,
+            vad: vadLoaded ? .loaded : .notLoaded
+        )
     }
 
     /// Check if all voice agent components are loaded and ready
@@ -74,61 +62,30 @@ public extension RunAnywhere {
 
     // MARK: - Initialization
 
-    /// Initialize the voice agent with configuration
-    /// Events are emitted from C++ - no Swift event emissions needed
-    static func initializeVoiceAgent(_ config: VoiceAgentConfiguration) async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+    /// Initialize the voice agent with configuration (CANONICAL_API §10).
+    ///
+    /// Accepts `VoiceAgentConfig` (canonical cross-SDK name, aliased to
+    /// `VoiceAgentConfiguration`). Events are emitted from C++ — no Swift
+    /// event emissions needed.
+    static func initializeVoiceAgent(_ config: VoiceAgentConfig) async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
-
-        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-
-        // Build C config
-        var cConfig = rac_voice_agent_config_t()
-
-        // VAD config
-        cConfig.vad_config.sample_rate = Int32(config.vadSampleRate)
-        cConfig.vad_config.frame_length = config.vadFrameLength
-        cConfig.vad_config.energy_threshold = config.vadEnergyThreshold
-
-        // STT config
-        if let sttModelId = config.sttModelId {
-            cConfig.stt_config.model_id = (sttModelId as NSString).utf8String
-        }
-
-        // LLM config
-        if let llmModelId = config.llmModelId {
-            cConfig.llm_config.model_id = (llmModelId as NSString).utf8String
-        }
-
-        // TTS config
-        if let ttsVoice = config.ttsVoice {
-            cConfig.tts_config.voice_id = (ttsVoice as NSString).utf8String
-        }
-
-        let result = rac_voice_agent_initialize(handle, &cConfig)
-        guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.initializationFailed, "Voice agent initialization failed: \(result)")
-        }
+        _ = try await CppBridge.VoiceAgent.shared.initialize(config)
     }
 
     /// Initialize voice agent using already-loaded models from individual APIs
     /// Events are emitted from C++ - no Swift event emissions needed
     static func initializeVoiceAgentWithLoadedModels() async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
-        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-
-        let result = rac_voice_agent_initialize_with_loaded_models(handle)
-        guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.initializationFailed, "Failed to initialize with loaded models: \(result)")
-        }
+        _ = try await CppBridge.VoiceAgent.shared.initialize(RAVoiceAgentComposeConfig())
     }
 
     /// Check if voice agent is ready (all components initialized)
@@ -142,64 +99,28 @@ public extension RunAnywhere {
 
     /// Process a complete voice turn: audio -> transcription -> LLM response -> synthesized speech
     static func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-
-        var isReady: rac_bool_t = RAC_FALSE
-        rac_voice_agent_is_ready(handle, &isReady)
-        guard isReady == RAC_TRUE else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice agent not ready")
+        guard await CppBridge.VoiceAgent.shared.isReady else {
+            throw SDKException.voiceAgent(.notInitialized, "Voice agent not ready")
         }
 
-        var cResult = rac_voice_agent_result_t()
-        let result = audioData.withUnsafeBytes { audioPtr in
-            rac_voice_agent_process_voice_turn(
-                handle,
-                audioPtr.baseAddress,
-                audioData.count,
-                &cResult
-            )
-        }
-
-        guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.processingFailed, "Voice turn processing failed: \(result)")
-        }
-
-        // Extract results
-        let speechDetected = cResult.speech_detected == RAC_TRUE
-        let transcription: String? = cResult.transcription.map { String(cString: $0) }
-        let response: String? = cResult.response.map { String(cString: $0) }
-
-        // C++ returns WAV format directly
-        var synthesizedAudio: Data?
-        if let audioPtr = cResult.synthesized_audio, cResult.synthesized_audio_size > 0 {
-            synthesizedAudio = Data(bytes: audioPtr, count: cResult.synthesized_audio_size)
-        }
-
-        // Free C result
-        rac_voice_agent_result_free(&cResult)
-
-        return VoiceAgentResult(
-            speechDetected: speechDetected,
-            transcription: transcription,
-            response: response,
-            synthesizedAudio: synthesizedAudio
-        )
+        return try await CppBridge.VoiceAgent.shared.processVoiceTurnProto(audioData)
     }
 
     // MARK: - Individual Operations
 
     /// Transcribe audio (voice agent must be initialized)
-    static func voiceAgentTranscribe(_ audioData: Data) async throws -> String {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+    static func voiceAgentTranscribe(_ audioData: Data) async throws -> STTOutput {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
 
+        let start = Date()
         var transcriptionPtr: UnsafeMutablePointer<CChar>?
         let result = audioData.withUnsafeBytes { audioPtr in
             rac_voice_agent_transcribe(
@@ -211,19 +132,32 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = transcriptionPtr else {
-            throw SDKError.voiceAgent(.processingFailed, "Transcription failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Transcription failed: \(result)")
         }
 
         let transcription = String(cString: ptr)
         free(ptr)
 
-        return transcription
+        let processingTime = Date().timeIntervalSince(start)
+        let metadata = TranscriptionMetadata(
+            modelId: await CppBridge.STT.shared.currentModelId ?? "voice-agent",
+            processingTime: processingTime,
+            audioLength: 0
+        )
+        return STTOutput(
+            text: transcription,
+            confidence: 1.0,
+            wordTimestamps: nil,
+            detectedLanguage: nil,
+            alternatives: nil,
+            metadata: metadata
+        )
     }
 
     /// Generate LLM response (voice agent must be initialized)
     static func voiceAgentGenerateResponse(_ prompt: String) async throws -> String {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
@@ -234,7 +168,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = responsePtr else {
-            throw SDKError.voiceAgent(.processingFailed, "Response generation failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Response generation failed: \(result)")
         }
 
         let response = String(cString: ptr)
@@ -244,13 +178,14 @@ public extension RunAnywhere {
     }
 
     /// Synthesize speech (voice agent must be initialized)
-    static func voiceAgentSynthesizeSpeech(_ text: String) async throws -> Data {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+    static func voiceAgentSynthesizeSpeech(_ text: String) async throws -> TTSOutput {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
 
+        let start = Date()
         var audioPtr: UnsafeMutableRawPointer?
         var audioSize: Int = 0
         let result = text.withCString { textPtr in
@@ -264,15 +199,85 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS else {
-            throw SDKError.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
+            throw SDKException.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
         }
 
-        guard let ptr = audioPtr, audioSize > 0 else {
-            return Data()
+        let audioData: Data
+        if let ptr = audioPtr, audioSize > 0 {
+            audioData = Data(bytes: ptr, count: audioSize)
+        } else {
+            audioData = Data()
         }
 
-        let audioData = Data(bytes: ptr, count: audioSize)
-        return audioData
+        let processingTime = Date().timeIntervalSince(start)
+        let metadata = TTSSynthesisMetadata(
+            voice: await CppBridge.TTS.shared.currentVoiceId ?? "voice-agent",
+            language: "en-US",
+            processingTime: processingTime,
+            characterCount: text.count
+        )
+        return TTSOutput(
+            audioData: audioData,
+            format: .pcm,
+            duration: 0,
+            phonemeTimestamps: nil,
+            metadata: metadata
+        )
+    }
+
+    // MARK: - Streaming
+
+    /// Open a stream of canonical `RAVoiceEvent` proto events for the active
+    /// voice agent. Equivalent to the per-SDK `streamVoiceAgent()` entries
+    /// in Kotlin, Flutter, RN, and Web (see CANONICAL_API §10).
+    ///
+    /// The voice agent must be initialized (e.g. via
+    /// `initializeVoiceAgentWithLoadedModels()`) before calling this; the
+    /// implementation will obtain the underlying handle from the SDK
+    /// internals and wire a `VoiceAgentStreamAdapter` over the C ABI proto
+    /// callback.
+    ///
+    /// Cancellation: breaking out of the consuming `for-await` loop (or
+    /// cancelling the surrounding `Task`) tears down the C callback via
+    /// `rac_voice_agent_set_proto_callback(handle, nullptr, nullptr)`.
+    ///
+    /// - Returns: `AsyncStream<RAVoiceEvent>` — yields one event per agent
+    ///            state change, partial transcript, LLM token, TTS chunk,
+    ///            etc. Stream finishes when the agent ends or cancellation
+    ///            is observed.
+    static func streamVoiceAgent() -> AsyncStream<RAVoiceEvent> {
+        AsyncStream { continuation in
+            // The C callback is registered on `Adapter.stream()` consumption;
+            // we hop off the calling sync context to fetch the handle from
+            // the actor and forward events through.
+            let task = Task {
+                guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+
+                let handle: rac_voice_agent_handle_t
+                do {
+                    handle = try await CppBridge.VoiceAgent.shared.getHandle()
+                } catch {
+                    continuation.finish()
+                    return
+                }
+
+                let adapter = VoiceAgentStreamAdapter(handle: handle)
+                for await event in adapter.stream() {
+                    if Task.isCancelled { break }
+                    continuation.yield(event)
+                }
+                continuation.finish()
+            }
+
+            continuation.onTermination = { @Sendable _ in
+                // Cancel the consumer task; the adapter's own onTermination
+                // hook deregisters `rac_voice_agent_set_proto_callback`.
+                task.cancel()
+            }
+        }
     }
 
     // MARK: - Cleanup
@@ -280,5 +285,17 @@ public extension RunAnywhere {
     /// Cleanup voice agent resources
     static func cleanupVoiceAgent() async {
         await CppBridge.VoiceAgent.shared.cleanup()
+    }
+}
+
+private func withOptionalCString<Result>(
+    _ string: String?,
+    _ body: (UnsafePointer<CChar>?) -> Result
+) -> Result {
+    guard let string, !string.isEmpty else {
+        return body(nil)
+    }
+    return string.withCString { pointer in
+        body(pointer)
     }
 }

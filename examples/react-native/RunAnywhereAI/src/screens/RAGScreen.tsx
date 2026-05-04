@@ -196,11 +196,12 @@ export const RAGScreen: React.FC = () => {
       const config = {
         embeddingModelPath: embeddingPath,
         llmModelPath: llmPath,
+        embeddingDimension: 384,
         topK: 3,
         similarityThreshold: 0.12,
-        maxContextTokens: 2048,
         chunkSize: 180,
         chunkOverlap: 30,
+        maxContextTokens: 2048,
       };
 
       // Create pipeline and ingest document (same as iOS loadDocument)

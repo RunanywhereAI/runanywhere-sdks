@@ -110,7 +110,7 @@ export class TelemetryService {
 
   private enabled: boolean = true;
   private deviceId: string | null = null;
-  private environment: SDKEnvironment = SDKEnvironment.Production;
+  private environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
 
   // ============================================================================
   // Initialization

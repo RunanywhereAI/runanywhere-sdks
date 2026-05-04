@@ -142,7 +142,12 @@ struct RunAnywhereAIApp: App {
         let customApiKey = SettingsViewModel.getStoredApiKey()
         let customBaseURL = SettingsViewModel.getStoredBaseURL()
 
-        if let apiKey = customApiKey, let baseURL = customBaseURL {
+        if let apiKey = customApiKey,
+           let baseURL = customBaseURL,
+           !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !looksLikePlaceholder(apiKey),
+           isUsableHTTPURL(baseURL) {
             // Custom configuration mode - use stored credentials
             // Always use .production for custom backends (model assignment auto-fetch enabled)
             logger.info("🔧 Found custom API configuration")
@@ -161,19 +166,39 @@ struct RunAnywhereAIApp: App {
             try RunAnywhere.initialize()
             logger.info("✅ SDK initialized in DEVELOPMENT mode")
             #else
-            // Production mode - requires API key and backend URL
-            // Configure these via Settings screen or set environment variables
-            let apiKey = "YOUR_API_KEY_HERE"
-            let baseURL = "YOUR_BASE_URL_HERE"
-
-            try RunAnywhere.initialize(
-                apiKey: apiKey,
-                baseURL: baseURL,
-                environment: .production
-            )
-            logger.info("✅ SDK initialized in PRODUCTION mode")
+            // Release builds must be configured before launch — either via
+            // the in-app Settings screen (which writes to Settings.bundle and
+            // is read back via SettingsViewModel.getStoredApiKey()/getStoredBaseURL())
+            // or via an .xcconfig that injects RUNANYWHERE_API_KEY /
+            // RUNANYWHERE_BASE_URL at build time. We deliberately fail loud
+            // here so a release build never silently runs against placeholder
+            // credentials.
+            fatalError("Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; set in Settings.bundle or .xcconfig before shipping.")
             #endif
         }
+    }
+
+    private func looksLikePlaceholder(_ value: String) -> Bool {
+        value.range(
+            of: "YOUR_|<your|REPLACE_ME|PLACEHOLDER",
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
+    private func isUsableHTTPURL(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !looksLikePlaceholder(trimmed),
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              let host = url.host,
+              !host.isEmpty,
+              host.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              !host.contains("<"),
+              !host.contains(">") else {
+            return false
+        }
+        return true
     }
 
     private func retryInitialization() async {
@@ -241,8 +266,6 @@ struct RunAnywhereAIApp: App {
             )
         }
         // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
-        // swiftlint:disable:next todo
-        // TODO: #1 [Portal Integration] Remove once portal delivers model + adapter pairings
         if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen2.5-1.5b-instruct-q4_k_m",
@@ -555,14 +578,14 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ VLM models registered")
 
-        // Register ONNX STT and TTS models
+        // Register Sherpa-ONNX STT and TTS models — served by the Sherpa engine plugin
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
         if let whisperURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz") {
             RunAnywhere.registerModel(
                 id: "sherpa-onnx-whisper-tiny.en",
                 name: "Sherpa Whisper Tiny (ONNX)",
                 url: whisperURL,
-                framework: .onnx,
+                framework: .sherpa,
                 modality: .speechRecognition,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 75_000_000
@@ -573,7 +596,7 @@ struct RunAnywhereAIApp: App {
                 id: "vits-piper-en_US-lessac-medium",
                 name: "Piper TTS (US English - Medium)",
                 url: piperUSURL,
-                framework: .onnx,
+                framework: .sherpa,
                 modality: .speechSynthesis,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 65_000_000
@@ -584,7 +607,7 @@ struct RunAnywhereAIApp: App {
                 id: "vits-piper-en_GB-alba-medium",
                 name: "Piper TTS (British English)",
                 url: piperGBURL,
-                framework: .onnx,
+                framework: .sherpa,
                 modality: .speechSynthesis,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 65_000_000

@@ -16,6 +16,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
@@ -48,6 +49,7 @@ void emit_device_registered(const char* device_id) {
     event.data.device.device_id = device_id;
 
     rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTERED, &event);
+    rac::events::publish_device_registered(device_id);
 }
 
 // Helper to emit device registration failed event
@@ -59,6 +61,7 @@ void emit_device_registration_failed(rac_result_t error_code, const char* error_
     event.data.device.error_message = error_message;
 
     rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTRATION_FAILED, &event);
+    rac::events::publish_device_registration_failed(error_code, error_message);
 }
 
 }  // namespace
@@ -89,6 +92,10 @@ rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* call
 
     RAC_LOG_INFO(LOG_CAT, "Device manager callbacks configured");
     return RAC_SUCCESS;
+}
+
+rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks) {
+    return rac_device_manager_set_callbacks(callbacks);
 }
 
 rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const char* build_token) {

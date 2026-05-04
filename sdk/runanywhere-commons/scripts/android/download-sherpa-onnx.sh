@@ -243,7 +243,7 @@ ensure_headers() {
         # C API (used by onnx_backend.cpp)
         download_header "${ONNX_HEADER_BASE}/onnxruntime_c_api.h" \
             "${SHERPA_DIR}/include/onnxruntime_c_api.h"
-        # C++ API wrapper (used by wakeword_onnx.cpp)
+        # C++ API wrapper (used by Sherpa wakeword compatibility code)
         download_header "${ONNX_HEADER_BASE}/onnxruntime_cxx_api.h" \
             "${SHERPA_DIR}/include/onnxruntime_cxx_api.h"
         download_header "${ONNX_HEADER_BASE}/onnxruntime_cxx_inline.h" \

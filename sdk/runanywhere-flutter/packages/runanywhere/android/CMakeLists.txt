@@ -44,3 +44,9 @@ target_link_libraries(flutter_rag_bridge
     rac_commons
     log
 )
+
+if(ANDROID)
+    target_link_options(flutter_rag_bridge PRIVATE
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
+endif()

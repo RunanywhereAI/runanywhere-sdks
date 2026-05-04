@@ -1,8 +1,10 @@
 import 'package:runanywhere/core/protocols/component/component_configuration.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 
-/// Configuration for TTS synthesis.
-class TTSConfiguration implements ComponentConfiguration {
+/// Dart-layer validation config for the TTS bridge. Not a data-transfer
+/// object — proto's [TTSConfiguration] from tts_options.pb.dart is the
+/// canonical type. This exists only to run pre-FFI validation.
+class TTSComponentConfig implements ComponentConfiguration {
   final String voice;
   final String language;
   final double speakingRate;
@@ -10,7 +12,7 @@ class TTSConfiguration implements ComponentConfiguration {
   final double volume;
   final String audioFormat;
 
-  const TTSConfiguration({
+  const TTSComponentConfig({
     this.voice = 'system',
     this.language = 'en-US',
     this.speakingRate = 1.0,
@@ -22,19 +24,19 @@ class TTSConfiguration implements ComponentConfiguration {
   @override
   void validate() {
     if (!speakingRate.isFinite || speakingRate < 0.5 || speakingRate > 2.0) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Speaking rate must be between 0.5 and 2.0',
       );
     }
 
     if (!pitch.isFinite || pitch < 0.5 || pitch > 2.0) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Pitch must be between 0.5 and 2.0',
       );
     }
 
     if (!volume.isFinite || volume < 0.0 || volume > 1.0) {
-      throw SDKError.validationFailed(
+      throw SDKException.validationFailed(
         'Volume must be between 0.0 and 1.0',
       );
     }

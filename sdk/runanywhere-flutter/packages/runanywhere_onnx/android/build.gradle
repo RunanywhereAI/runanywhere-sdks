@@ -36,7 +36,8 @@ android {
     compileSdk 34
 
     // Use NDK for native library support
-    ndkVersion "25.2.9519653"
+    // v3.1: NDK pin hoisted to root gradle.properties (racFlutterNdkVersion). Fallback keeps the previous value if root prop missing.
+    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "25.2.9519653"
 
     defaultConfig {
         minSdk 24
@@ -70,6 +71,13 @@ android {
     buildTypes {
         release {
             minifyEnabled false
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Keep only one copy of libs that ship from multiple Flutter plugins.
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
         }
     }
 }
@@ -120,8 +128,11 @@ task downloadNativeLibs {
                 into tempDir
             }
 
-            // Common libs that should NOT be duplicated (they're in the core SDK)
-            def commonLibs = ['libc++_shared.so', 'librac_commons.so', 'librac_commons_jni.so']
+            // Common libs that should NOT be duplicated (they're shipped by the
+            // core `runanywhere` Flutter plugin). The JNI bridge filename was
+            // renamed from librac_commons_jni.so → librunanywhere_jni.so; the
+            // old entry never excluded anything.
+            def commonLibs = ['libc++_shared.so', 'librac_commons.so', 'librunanywhere_jni.so']
 
             // Copy .so files from jniLibs structure (excluding common libs)
             tempDir.eachFileRecurse { file ->

@@ -1,20 +1,23 @@
 /**
- * RunAnywhere Web SDK - Data Models
+ * RunAnywhere Web SDK - Model and environment types.
  *
- * Mirrored from: sdk/runanywhere-react-native/packages/core/src/types/models.ts
- * Source of truth: sdk/runanywhere-swift/Sources/RunAnywhere/
+ * Wave 2: Proto-aligned types live in `@runanywhere/proto-ts/*` and are
+ * re-exported from `types/index.ts`. Generated model/storage shapes are
+ * aliases here; browser-only environment and storage summary types remain
+ * Web-local.
  */
 
 import type {
   AccelerationPreference,
-  ConfigurationSource,
-  ExecutionTarget,
-  HardwareAcceleration,
-  LLMFramework,
-  ModelCategory,
-  ModelFormat,
   SDKEnvironment,
 } from './enums';
+import type {
+  ModelInfo as ProtoModelInfo,
+} from '@runanywhere/proto-ts/model_types';
+import type {
+  StorageInfo as ProtoStorageInfo,
+  StoredModel as ProtoStoredModel,
+} from '@runanywhere/proto-ts/storage_types';
 
 export interface ThinkingTagPattern {
   openTag: string;
@@ -29,115 +32,8 @@ export interface ModelInfoMetadata {
   version?: string;
 }
 
-export interface ModelInfo {
-  id: string;
-  name: string;
-  category: ModelCategory;
-  format: ModelFormat;
-  downloadURL?: string;
-  localPath?: string;
-  downloadSize?: number;
-  memoryRequired?: number;
-  compatibleFrameworks: LLMFramework[];
-  preferredFramework?: LLMFramework;
-  contextLength?: number;
-  supportsThinking: boolean;
-  thinkingPattern?: ThinkingTagPattern;
-  metadata?: ModelInfoMetadata;
-  source: ConfigurationSource;
-  createdAt: string;
-  updatedAt: string;
-  syncPending: boolean;
-  lastUsed?: string;
-  usageCount: number;
-  isDownloaded: boolean;
-  isAvailable: boolean;
-}
+export type ModelInfo = ProtoModelInfo;
 
-export interface PerformanceMetrics {
-  timeToFirstTokenMs?: number;
-  tokensPerSecond?: number;
-  inferenceTimeMs: number;
-}
-
-export interface GenerationResult {
-  text: string;
-  thinkingContent?: string;
-  tokensUsed: number;
-  modelUsed: string;
-  latencyMs: number;
-  executionTarget: ExecutionTarget;
-  savedAmount: number;
-  framework?: LLMFramework;
-  hardwareUsed: HardwareAcceleration;
-  memoryUsed: number;
-  performanceMetrics: PerformanceMetrics;
-  thinkingTokens?: number;
-  responseTokens: number;
-}
-
-export interface GenerationOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  stopSequences?: string[];
-  streamingEnabled?: boolean;
-  preferredExecutionTarget?: ExecutionTarget;
-  preferredFramework?: LLMFramework;
-  systemPrompt?: string;
-}
-
-export interface STTOptions {
-  language?: string;
-  punctuation?: boolean;
-  diarization?: boolean;
-  wordTimestamps?: boolean;
-  sampleRate?: number;
-}
-
-export interface STTResult {
-  text: string;
-  segments: STTSegment[];
-  language?: string;
-  confidence: number;
-  duration: number;
-  alternatives: STTAlternative[];
-  [key: string]: unknown;
-}
-
-export interface STTSegment {
-  text: string;
-  startTime: number;
-  endTime: number;
-  speakerId?: string;
-  confidence: number;
-}
-
-export interface STTAlternative {
-  text: string;
-  confidence: number;
-}
-
-export interface TTSConfiguration {
-  voice?: string;
-  rate?: number;
-  pitch?: number;
-  volume?: number;
-}
-
-export interface TTSResult {
-  audio: string;
-  sampleRate: number;
-  numSamples: number;
-  duration: number;
-}
-
-export interface VADConfiguration {
-  energyThreshold?: number;
-  sampleRate?: number;
-  frameLength?: number;
-  autoCalibration?: boolean;
-}
 
 export interface SDKInitOptions {
   apiKey?: string;
@@ -153,20 +49,8 @@ export interface SDKInitOptions {
   webgpuWasmUrl?: string;
 }
 
-export interface StorageInfo {
-  totalSpace: number;
-  usedSpace: number;
-  freeSpace: number;
-  modelsPath: string;
-}
-
-export interface StoredModel {
-  id: string;
-  name: string;
-  sizeOnDisk: number;
-  downloadedAt: string;
-  lastUsed?: string;
-}
+export type StorageInfo = ProtoStorageInfo;
+export type StoredModel = ProtoStoredModel;
 
 export interface DeviceInfoData {
   model: string;

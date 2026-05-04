@@ -7,14 +7,35 @@
  * Events are emitted by C++ layer via CppEventBridge.
  *
  * Mirrors Swift RunAnywhere+TTS.swift exactly.
+ *
+ * Round 2 KOTLIN: Added loadTTSModel/unloadTTSModel public surface,
+ * changed synthesizeStream to return Flow<ByteArray>, changed
+ * availableTTSVoices to return List<TTSVoiceInfo>.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.TTSOptions
+import ai.runanywhere.proto.v1.TTSOutput
+import ai.runanywhere.proto.v1.TTSSpeakResult
+import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
-import com.runanywhere.sdk.public.extensions.TTS.TTSOutput
-import com.runanywhere.sdk.public.extensions.TTS.TTSSpeakResult
+import kotlinx.coroutines.flow.Flow
+
+// MARK: - Model Loading
+
+/**
+ * Load a TTS model.
+ *
+ * @param modelId The model identifier
+ * @throws Error if loading fails
+ */
+expect suspend fun RunAnywhere.loadTTSModel(modelId: String)
+
+/**
+ * Unload the currently loaded TTS model.
+ */
+expect suspend fun RunAnywhere.unloadTTSModel()
 
 // MARK: - Voice Loading
 
@@ -33,8 +54,10 @@ expect suspend fun RunAnywhere.unloadTTSVoice()
 
 /**
  * Check if a TTS voice is loaded.
+ *
+ * Sync property — reads cached state from the component layer without suspension.
  */
-expect suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean
+expect val RunAnywhere.isTTSVoiceLoaded: Boolean
 
 /**
  * Get the currently loaded TTS voice ID.
@@ -48,13 +71,16 @@ expect val RunAnywhere.currentTTSVoiceId: String?
  * Check if a TTS voice is loaded (non-suspend version for quick checks).
  *
  * This accesses cached state and doesn't require suspension.
+ * @deprecated Use isTTSVoiceLoaded directly.
  */
 expect val RunAnywhere.isTTSVoiceLoadedSync: Boolean
 
 /**
  * Get available TTS voices.
+ *
+ * @return List of [TTSVoiceInfo] proto objects describing each available voice
  */
-expect suspend fun RunAnywhere.availableTTSVoices(): List<String>
+expect suspend fun RunAnywhere.availableTTSVoices(): List<TTSVoiceInfo>
 
 // MARK: - Synthesis
 
@@ -71,18 +97,18 @@ expect suspend fun RunAnywhere.synthesize(
 ): TTSOutput
 
 /**
- * Stream synthesis for long text.
+ * Stream audio chunks for long text synthesis.
+ *
+ * Returns a [Flow] that emits raw audio [ByteArray] chunks as they are synthesized.
  *
  * @param text Text to synthesize
  * @param options Synthesis options
- * @param onAudioChunk Callback for each audio chunk
- * @return TTS output with full audio data
+ * @return Flow of audio chunks
  */
-expect suspend fun RunAnywhere.synthesizeStream(
+expect fun RunAnywhere.synthesizeStream(
     text: String,
     options: TTSOptions = TTSOptions(),
-    onAudioChunk: (ByteArray) -> Unit,
-): TTSOutput
+): Flow<ByteArray>
 
 /**
  * Stop current TTS synthesis.
@@ -119,8 +145,10 @@ expect suspend fun RunAnywhere.speak(
 
 /**
  * Whether speech is currently playing.
+ *
+ * Sync property — reads cached state from the playback layer without suspension.
  */
-expect suspend fun RunAnywhere.isSpeaking(): Boolean
+expect val RunAnywhere.isSpeaking: Boolean
 
 /**
  * Stop current speech playback.

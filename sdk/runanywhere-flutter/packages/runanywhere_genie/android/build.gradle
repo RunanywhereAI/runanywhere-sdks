@@ -1,7 +1,9 @@
 // RunAnywhere Genie Backend - Android
 //
-// This plugin bundles RABackendGenie native libraries (.so files) for Android.
-// RABackendGenie provides LLM text generation capabilities using Qualcomm Genie NPU.
+// This experimental plugin can bundle RABackendGenie native libraries (.so files)
+// for Android/Snapdragon devices. Functional LLM routing is disabled by default
+// and requires Qualcomm Genie SDK-backed native ops; missing/incomplete binaries
+// are treated as backend-unavailable.
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
@@ -36,7 +38,8 @@ android {
     compileSdk 34
 
     // Use NDK for native library support
-    ndkVersion "25.2.9519653"
+    // v3.1: NDK pin hoisted to root gradle.properties (racFlutterNdkVersion). Fallback keeps the previous value if root prop missing.
+    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "25.2.9519653"
 
     defaultConfig {
         minSdk 24
@@ -72,6 +75,13 @@ android {
             minifyEnabled false
         }
     }
+
+    packaging {
+        jniLibs {
+            // Keep only one copy of libs that ship from multiple Flutter plugins.
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
+        }
+    }
 }
 
 dependencies {
@@ -83,11 +93,11 @@ dependencies {
 // =============================================================================
 task downloadNativeLibs {
     group = 'runanywhere'
-    description = 'Download RABackendGenie native libraries from GitHub releases'
+    description = 'Download experimental RABackendGenie Android native library shell from GitHub releases'
 
     doLast {
         if (shouldDownloadAndroidLibs()) {
-            println "📦 Remote mode: Downloading RABackendGenie Android native libraries..."
+            println "📦 Remote mode: Downloading experimental RABackendGenie Android native libraries..."
 
             def jniLibsDir = file('build/jniLibs')
             if (jniLibsDir.exists()) {
@@ -115,7 +125,7 @@ task downloadNativeLibs {
             } catch (Exception e) {
                 println "⚠️  Could not download RABackendGenie native libraries: ${e.message}"
                 println "⚠️  Continuing without Genie binaries — loadLibrary will fail gracefully at runtime."
-                println "⚠️  To build with the engine, either host the release at ${downloadUrl} or set testLocal=true with local .so files."
+                println "⚠️  To enable the engine, either host the release at ${downloadUrl} or set testLocal=true with Qualcomm Genie SDK-built local .so files."
                 return
             }
 
@@ -131,8 +141,11 @@ task downloadNativeLibs {
                 into tempDir
             }
 
-            // Common libs that should NOT be duplicated (they're in the core SDK)
-            def commonLibs = ['libc++_shared.so', 'librac_commons.so', 'librac_commons_jni.so']
+            // Common libs that should NOT be duplicated (they're shipped by the
+            // core `runanywhere` Flutter plugin). The JNI bridge filename was
+            // renamed from librac_commons_jni.so → librunanywhere_jni.so; the
+            // old entry never excluded anything.
+            def commonLibs = ['libc++_shared.so', 'librac_commons.so', 'librunanywhere_jni.so']
 
             // Copy .so files from jniLibs structure (excluding common libs)
             tempDir.eachFileRecurse { file ->
@@ -162,14 +175,12 @@ task downloadNativeLibs {
             println "🔧 Local mode: Using native libraries from src/main/jniLibs/"
 
             if (!checkLocalLibsExist()) {
-                throw new GradleException("""
-                    ⚠️  Native libraries not found in src/main/jniLibs/!
-                    For local mode, please build and copy the libraries:
-                      1. cd runanywhere-core && ./scripts/build-android.sh --genie
-                      2. Copy the .so files to packages/runanywhere_genie/android/src/main/jniLibs/
-                    Or switch to remote mode by editing binary_config.gradle:
-                      testLocal = false
-                """)
+                // Genie is a closed-source NPU backend; absence is a soft failure
+                // so public developer builds without Genie access still compile.
+                // GeniePlugin.kt wraps System.loadLibrary in try/catch, so missing
+                // .so surfaces as a runtime capability gate, not a build-time error.
+                println "⚠️  No Genie native libraries found in src/main/jniLibs/ — continuing."
+                println "⚠️  Add Qualcomm Genie SDK-built librac_backend_genie_jni.so to enable the NPU backend at runtime."
             } else {
                 println "✅ Using local native libraries"
             }

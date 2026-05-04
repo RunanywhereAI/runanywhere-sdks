@@ -314,9 +314,10 @@ public final class Logging: @unchecked Sendable {
 extension LoggingConfiguration {
     static func forEnvironment(_ environment: SDKEnvironment) -> LoggingConfiguration {
         switch environment {
-        case .development: return .development
-        case .staging: return .staging
-        case .production: return .production
+        case .development:  return .development
+        case .staging:      return .staging
+        case .production:   return .production
+        default:            return .development
         }
     }
 }
@@ -374,7 +375,7 @@ public struct SDKLogger: Sendable {
         function: String = #function
     ) {
         let fileName = (file as NSString).lastPathComponent
-        let errorDesc = (error as? SDKError)?.errorDescription ?? error.localizedDescription
+        let errorDesc = (error as? SDKException)?.errorDescription ?? error.localizedDescription
 
         var message = "\(errorDesc) at \(fileName):\(line) in \(function)"
         if let info = additionalInfo {
@@ -387,7 +388,7 @@ public struct SDKLogger: Sendable {
             "source_function": function
         ]
 
-        if let sdkError = error as? SDKError {
+        if let sdkError = error as? SDKException {
             metadata["error_code"] = sdkError.code.rawValue
             metadata["error_category"] = sdkError.category.rawValue
         }

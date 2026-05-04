@@ -12,6 +12,14 @@ const workspaceRoot = path.resolve(__dir, '../../..');
 // SDK WASM directories (each backend ships its own WASM)
 const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
 const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm/sherpa');
+const webCoreSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts');
+const llamacppSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/index.ts');
+const onnxSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/src/index.ts');
+const vlmWorkerSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/workers/vlm-worker.ts');
+
+// Local source alias for proto-ts keeps the example on package-root import
+// paths while avoiding direct `dist/*` imports in application code/config.
+const protoTsSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-proto-ts/src');
 
 /**
  * Vite plugin to copy WASM binaries into the build output.
@@ -51,12 +59,17 @@ function copyWasmPlugin(): Plugin {
 export default defineConfig({
   plugins: [copyWasmPlugin()],
   resolve: {
-    alias: {
+    alias: [
       // Ensure all packages resolve to the same source modules during development.
-      // Without this, @runanywhere/web imports from llamacpp/onnx packages resolve
-      // to dist/ while main.ts imports from src/, creating duplicate singletons.
-      '@runanywhere/web': path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts'),
-    },
+      // Without this, package-root imports can resolve to dist/ and create
+      // duplicate singletons while the demo runs against local source.
+      { find: /^@runanywhere\/web-llamacpp\/vlm-worker(.*)$/, replacement: `${vlmWorkerSrc}$1` },
+      { find: /^@runanywhere\/web-llamacpp$/, replacement: llamacppSrc },
+      { find: /^@runanywhere\/web-onnx$/, replacement: onnxSrc },
+      { find: /^@runanywhere\/web$/, replacement: webCoreSrc },
+      { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: protoTsSrc + '/$1.ts' },
+      { find: '@runanywhere/proto-ts', replacement: protoTsSrc + '/index.ts' },
+    ],
   },
   server: {
     headers: {
@@ -74,7 +87,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@runanywhere/web'],
+    exclude: ['@runanywhere/web', '@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
   },
   assetsInclude: ['**/*.wasm'],
 });

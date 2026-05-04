@@ -271,13 +271,8 @@ export class LoggingManager {
     return LoggingManager.sharedInstance;
   }
 
-  /**
-   * Get current log level
-   * @deprecated Use configuration.minLogLevel instead
-   */
-  public getLogLevel(): LogLevel {
-    return this.config.minLogLevel;
-  }
+  // v3.1: getLogLevel() DELETED. Read `config.minLogLevel` directly (or
+  // access the `configuration` getter if that exists on the public surface).
 
   // ============================================================================
   // Destination Management (matches iOS)

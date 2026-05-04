@@ -22,7 +22,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
 
 # Path to pre-built native libraries (downloaded from runanywhere-sdks)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
@@ -36,13 +36,8 @@ set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/include)
 # RACommons is REQUIRED - it's downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_commons.so")
-    message(WARNING "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
-                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_core:downloadNativeLibs\n"
-                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
-    # Create a minimal stub library so the build can proceed for other ABIs
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
-    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
-    return()
+    message(FATAL_ERROR "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
+                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_commons SHARED IMPORTED)
@@ -53,21 +48,32 @@ set_target_properties(rac_commons PROPERTIES
 message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_commons.so")
 
 # =============================================================================
+# HTTP transport vtable: bundled librac_commons.so (post-Stage-5) always
+# exports rac_http_transport_register, so the OkHttp adapter is wired in
+# unconditionally. No auto-detect fallback — commons v0.2.0+ is required.
+# =============================================================================
+set(RAC_HAS_HTTP_TRANSPORT ON)
+message(STATUS "[RunAnywhereCore] OkHttp HTTP transport adapter ENABLED (RAC_HAS_HTTP_TRANSPORT=1)")
+
+# =============================================================================
 # Source files - Core bridges only (no LLM/STT/TTS/VAD)
 # =============================================================================
 # Collect core bridge source files
 file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-# TODO: Re-enable ToolCallingBridge when commons library includes rac_tool_call_* functions
-# Currently disabled because these functions aren't in commons v0.1.4
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*ToolCallingBridge\\.cpp$")
-# TODO: Re-enable RAGBridge when commons library includes rac_rag_* functions
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*RAGBridge\\.cpp$")
-# TODO: Re-enable CompatibilityBridge when commons library includes rac_model_check_compatibility
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*CompatibilityBridge\\.cpp$")
+file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
+    # OkHttp platform HTTP transport JNI bridge (v2 close-out Phase H6).
+    # Registers a rac_http_transport_ops vtable that routes HTTP through
+    # the duplicated Kotlin `com.runanywhere.sdk.foundation.http.OkHttpTransport`
+    # so Android consumers get the system CA store + HTTP/2 + proxies via OkHttp
+    # instead of libcurl. Copy of commons' src/jni/okhttp_transport_adapter.cpp.
+    src/main/cpp/okhttp_transport_adapter.cpp
+    ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
+    ${HYBRID_CORE_DOMAIN_SOURCES}
+    ../cpp/HybridVoiceAgent.cpp
     ${BRIDGE_SOURCES}
 )
 
@@ -96,6 +102,8 @@ include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywherecore+autoli
 # =============================================================================
 include_directories(
     "src/main/cpp"
+    # Local headers (rac_http_transport.h, etc.) searched BEFORE
+    # jniLibs/include so our copy wins where needed.
     "../cpp"
     "../cpp/bridges"
     "../cpp/third_party"
@@ -135,17 +143,24 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
 )
 
 # Link RACommons - REQUIRED for core functionality
 target_link_libraries(${PACKAGE_NAME} rac_commons)
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 
+# OkHttp adapter is always compiled in — commons v0.2.0+ is required and
+# the bundled librac_commons.so always exports rac_http_transport_register.
+target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_HAS_HTTP_TRANSPORT=1)
+
 # Link nlohmann_json for ToolCallingBridge
 target_link_libraries(${PACKAGE_NAME} nlohmann_json::nlohmann_json)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
-target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)
+target_link_options(${PACKAGE_NAME} PRIVATE
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384)
 
 # NOTE: No LlamaCPP or ONNX linking here
 # Those are in @runanywhere/llamacpp and @runanywhere/onnx packages respectively

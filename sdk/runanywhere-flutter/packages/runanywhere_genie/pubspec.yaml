@@ -1,5 +1,5 @@
 name: runanywhere_genie
-description: Qualcomm Genie NPU backend for RunAnywhere Flutter SDK. On-device LLM inference on Snapdragon NPU.
+description: Experimental Android-only Qualcomm Genie backend shell for RunAnywhere. Disabled by default; requires Qualcomm Genie SDK-backed native ops to enable LLM routing.
 version: 0.19.13
 homepage: https://runanywhere.ai
 repository: https://github.com/RunanywhereAI/runanywhere-sdks
@@ -12,8 +12,10 @@ topics:
   - on-device
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: '>=3.10.0'
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
 
 dependencies:
   flutter:
@@ -30,8 +32,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Native plugin configuration
-  # RABackendGenie binaries are bundled in android/ directory (Android/Snapdragon only)
+  # Native plugin configuration.
+  # Experimental Android-only backend shell. It remains non-routable until
+  # Qualcomm Genie SDK-backed native ops are present on Snapdragon devices.
   plugin:
     platforms:
       android:

@@ -25,37 +25,59 @@
 
 ---
 
-## 🚀 Running This App (Local Development)
+## Running This App (Local Development)
 
-> **Important:** This sample app consumes the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/) as local workspace dependencies. Before opening this project, you must first build the SDK's native libraries.
+> **Important:** This sample app consumes the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/) through local `file:` packages. A clean clone needs JavaScript dependencies, generated Nitro/React Native codegen output, CocoaPods, and locally staged native binaries before both platforms are reproducible.
 
-### First-Time Setup
+### Clean-Clone Bring-Up
+
+Prerequisites:
+
+- Node.js 18+ and Corepack-enabled Yarn 3 (`corepack enable`; this project uses `nodeLinker: node-modules`).
+- Xcode 15+ with iOS simulator runtimes and command line tools selected.
+- CocoaPods (`pod --version` should succeed).
+- Android Studio with Android SDK 24+, build tools, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+- JDK 17 and enough local disk for native build output plus downloaded AI models.
+
+From a fresh checkout:
 
 ```bash
-# 1. Navigate to the React Native SDK directory
-cd runanywhere-sdks/sdk/runanywhere-react-native
+cd examples/react-native/RunAnywhereAI
+corepack enable
+yarn install --ignore-scripts
 
-# 2. Run the setup script (~15-20 minutes on first run)
-#    This builds the native C++ frameworks/libraries and enables local mode
-./scripts/build-react-native.sh --setup
+# Refresh local file: packages after dependency or package layout changes.
+yarn install --ignore-scripts --force
 
-# 3. Navigate to this sample app
-cd ../../examples/react-native/RunAnywhereAI
+# Build or refresh local SDK native artifacts when the checkout has no staged binaries.
+cd ../../..
+./scripts/build-core-android.sh arm64-v8a
+./scripts/build-core-xcframework.sh
+cd examples/react-native/RunAnywhereAI
 
-# 4. Install dependencies
-npm install
-
-# 5. For iOS: Install pods
+# Generate React Native/Nitro iOS codegen through CocoaPods.
 cd ios && pod install && cd ..
 
-# 6a. Run on iOS
-npx react-native run-ios
+# Android build gate.
+cd android && ./gradlew :app:assembleDebug && cd ..
 
-# 6b. Or run on Android
-npx react-native run-android
-
-# Or open in VS Code / Cursor and run from there
+# iOS build gate.
+xcodebuild \
+  -project ios/RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  build
 ```
+
+Notes:
+
+- The default install command intentionally uses `--ignore-scripts` so `patch-package` postinstall hooks do not hide clean-clone issues. If you need to apply local patches, run `yarn postinstall` after inspecting them.
+- Local iOS XCFrameworks are staged by `scripts/build-core-xcframework.sh` into the Swift SDK and synced into the React Native packages. Missing `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, or `RABackendSherpa.xcframework` usually means the root native artifact step has not run.
+- Generated Nitro and React Native codegen files are produced during `pod install`; remove stale `ios/build/generated` output if schema changes are not reflected.
+- If formatting tools disagree after a dependency refresh, use the existing workaround: run `yarn format:fix` from this sample and review the diff before committing.
+- `scripts/verify.sh` runs the reproducible build gates; set `RUN_IOS=1` to include the optional iOS build.
 
 ### How It Works
 

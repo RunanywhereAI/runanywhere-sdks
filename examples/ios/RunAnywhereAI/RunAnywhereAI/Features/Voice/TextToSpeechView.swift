@@ -72,7 +72,7 @@ struct TextToSpeechView: View {
             }
             .navigationTitle(hasModelSelected ? "Text to Speech" : "")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             .navigationBarHidden(!hasModelSelected)
             #endif
             .toolbar {
@@ -223,7 +223,7 @@ struct TextToSpeechView: View {
         }
     }
 
-    /// Voice settings section with rate and pitch controls
+    /// Voice settings section with speech rate control
     private var voiceSettingsSection: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Voice Settings")
@@ -244,24 +244,6 @@ struct TextToSpeechView: View {
                 Slider(value: $viewModel.speechRate, in: 0.5...2.0, step: 0.1)
                     .tint(AppColors.primaryAccent)
             }
-
-            // swiftlint:disable:next todo
-            // TODO: #2 Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
-
-            // Pitch (not implemented in the current TTS models. Once supported, we can have this back.)
-            // VStack(alignment: .leading, spacing: 10) {
-            //     HStack {
-            //         Text("Pitch")
-            //             .font(.subheadline)
-            //             .foregroundColor(.secondary)
-            //         Spacer()
-            //         Text(String(format: "%.1fx", viewModel.pitch))
-            //             .font(.system(size: 15, weight: .medium, design: .rounded))
-            //             .foregroundColor(.primary)
-            //     }
-            //     Slider(value: $viewModel.pitch, in: 0.5...2.0, step: 0.1)
-            //         .tint(AppColors.primaryPurple)
-            // }
         }
         .padding(20)
         .background(AppColors.backgroundTertiary)
@@ -290,7 +272,7 @@ struct TextToSpeechView: View {
                     metadataRow(
                         icon: "speaker.wave.2",
                         label: "Format",
-                        value: result.format.rawValue.uppercased()
+                        value: result.format.wireString.uppercased()
                     )
                 }
                 metadataRow(

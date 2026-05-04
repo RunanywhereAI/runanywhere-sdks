@@ -55,8 +55,10 @@ android {
     }
 
     packagingOptions {
-        pickFirst 'lib/arm64-v8a/libc++_shared.so'
-        pickFirst 'lib/arm64-v8a/libomp.so'
+        // libc++_shared.so ships from every Flutter plugin that consumes
+        // runanywhere native .so files — AGP needs a tie-breaker.
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libomp.so'
     }
 }
 

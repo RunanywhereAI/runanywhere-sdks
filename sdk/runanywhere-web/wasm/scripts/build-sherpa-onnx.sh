@@ -59,22 +59,50 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check Emscripten
-if [ -z "${EMSCRIPTEN:-}" ]; then
-    if ! command -v emcc &> /dev/null; then
-        echo "ERROR: Emscripten not found. Please install and activate emsdk:"
-        echo "  ./scripts/setup-emsdk.sh"
-        echo "  source <emsdk-path>/emsdk_env.sh"
-        exit 1
+# Check Emscripten and locate the CMake toolchain file.
+#
+# The toolchain file lives in different places depending on how Emscripten
+# was installed:
+#   - emsdk (recommended):  $EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+#   - Homebrew (macOS):     $(brew --prefix emscripten)/libexec/cmake/Modules/Platform/Emscripten.cmake
+#
+# Previously this script derived EMSCRIPTEN from `dirname $(command -v emcc)`,
+# which on a Homebrew install yields /opt/homebrew/bin and produces the bogus
+# toolchain path /opt/homebrew/bin/cmake/Modules/Platform/Emscripten.cmake.
+# Prefer the EMSDK env var (set by `source emsdk_env.sh`) and fall back to
+# brew's libexec layout when emsdk isn't active.
+if [ -n "${EMSDK:-}" ]; then
+    EMSCRIPTEN="${EMSDK}/upstream/emscripten"
+elif [ -n "${EMSCRIPTEN:-}" ]; then
+    : # honor user-provided EMSCRIPTEN as-is
+elif command -v emcc &> /dev/null; then
+    EMCC_PATH="$(command -v emcc)"
+    # Resolve symlinks so e.g. /opt/homebrew/bin/emcc -> .../Cellar/.../bin/emcc.
+    EMCC_REAL="$(readlink -f "${EMCC_PATH}" 2>/dev/null || python3 -c "import os,sys;print(os.path.realpath(sys.argv[1]))" "${EMCC_PATH}")"
+    EMCC_DIR="$(dirname "${EMCC_REAL}")"
+    # Two known layouts:
+    #   emsdk:    .../upstream/emscripten/emcc + .../upstream/emscripten/cmake/...
+    #   Homebrew: .../Cellar/emscripten/X.Y.Z/bin/emcc + .../Cellar/emscripten/X.Y.Z/libexec/cmake/...
+    if [ -f "${EMCC_DIR}/cmake/Modules/Platform/Emscripten.cmake" ]; then
+        EMSCRIPTEN="${EMCC_DIR}"
+    elif [ -f "${EMCC_DIR}/../libexec/cmake/Modules/Platform/Emscripten.cmake" ]; then
+        EMSCRIPTEN="$(cd "${EMCC_DIR}/../libexec" && pwd)"
     else
-        EMSCRIPTEN=$(dirname "$(command -v emcc)")
+        EMSCRIPTEN="${EMCC_DIR}"
     fi
+else
+    echo "ERROR: Emscripten not found. Set EMSDK env var or activate emsdk:"
+    echo "  source <emsdk-path>/emsdk_env.sh"
+    echo "  (or install via ./scripts/setup-emsdk.sh)"
+    exit 1
 fi
 
-if [ ! -f "${EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake" ]; then
+EMSCRIPTEN_TOOLCHAIN="${EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake"
+if [ ! -f "${EMSCRIPTEN_TOOLCHAIN}" ]; then
     echo "ERROR: Cannot find Emscripten CMake toolchain at:"
-    echo "  ${EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake"
-    echo "Hint: emsdk 3.1.51-3.1.53 is known to work."
+    echo "  ${EMSCRIPTEN_TOOLCHAIN}"
+    echo "Hint: activate emsdk (\`source <emsdk>/emsdk_env.sh\`) so EMSDK is set,"
+    echo "      or export EMSCRIPTEN to the directory containing cmake/Modules/."
     exit 1
 fi
 
@@ -126,7 +154,7 @@ cmake \
     -S "${SHERPA_SRC}" \
     -DCMAKE_INSTALL_PREFIX="${BUILD_DIR}/install" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE="${EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake" \
+    -DCMAKE_TOOLCHAIN_FILE="${EMSCRIPTEN_TOOLCHAIN}" \
     \
     -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
     -DSHERPA_ONNX_ENABLE_TESTS=OFF \

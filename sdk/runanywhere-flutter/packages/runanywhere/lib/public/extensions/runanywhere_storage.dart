@@ -1,82 +1,81 @@
-/// RunAnywhere + Storage
-///
-/// Public API for storage and download operations.
-/// Mirrors Swift's RunAnywhere+Storage.swift.
-library runanywhere_storage;
+// SPDX-License-Identifier: Apache-2.0
+//
+// runanywhere_storage.dart — storage + download helpers.
+// Mirrors Swift `RunAnywhere+Storage.swift`.
 
+import 'package:fixnum/fixnum.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:runanywhere/infrastructure/download/download_service.dart';
-import 'package:runanywhere/native/dart_bridge_file_manager.dart';
+import 'package:runanywhere/generated/download_service.pb.dart'
+    show DownloadProgress;
+import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
-import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/runanywhere.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 
-// =============================================================================
-// RunAnywhere Storage Extensions
-// =============================================================================
+/// Static helpers for storage + low-level download operations.
+class RunAnywhereStorage {
+  RunAnywhereStorage._();
 
-/// Extension methods for storage operations
-extension RunAnywhereStorage on RunAnywhere {
-  /// Check if storage is available for a model download
+  /// True if the device has enough free storage for [modelSize].
   ///
-  /// Returns true if sufficient storage is available for the given model size.
-  /// Delegates to C++ file manager for storage checks.
-  static Future<bool> checkStorageAvailable({
+  /// [safetyMargin] pads the check by a fraction (default 10%). Returns
+  /// the rich [StorageAvailability] shape so callers can surface the
+  /// required/available bytes and any warning. Mirrors Swift's
+  /// `checkStorageAvailable(for:safetyMargin:) -> StorageAvailability`.
+  static Future<StorageAvailability> checkStorageAvailable({
     required int modelSize,
     double safetyMargin = 0.1,
   }) async {
-    try {
-      final requiredWithMargin = (modelSize * (1 + safetyMargin)).toInt();
-      return DartBridgeFileManager.checkStorage(requiredWithMargin);
-    } catch (_) {
-      // Default to available if check fails
-      return true;
-    }
+    final result = await checkStorageAvailabilityResult(
+      StorageAvailabilityRequest(
+        requiredBytes: Int64(modelSize),
+        safetyMargin: safetyMargin,
+      ),
+    );
+    return result.hasAvailability()
+        ? result.availability
+        : StorageAvailability(
+            isAvailable: false,
+            requiredBytes: Int64(modelSize),
+            availableBytes: Int64.ZERO,
+            warningMessage: result.errorMessage,
+          );
   }
 
-  /// Get value from storage
-  static Future<String?> getStorageValue(String key) async {
-    return DartBridgeStorage.instance.get(key);
-  }
+  /// Generated-proto storage availability surface.
+  static Future<StorageAvailabilityResult> checkStorageAvailabilityResult(
+    StorageAvailabilityRequest request,
+  ) =>
+      DartBridgeStorage.instance.availabilityProto(request);
 
-  /// Set value in storage
-  static Future<bool> setStorageValue(String key, String value) async {
-    return DartBridgeStorage.instance.set(key, value);
-  }
+  /// Get a value from native storage.
+  static Future<String?> getStorageValue(String key) =>
+      DartBridgeStorage.instance.get(key);
 
-  /// Delete value from storage
-  static Future<bool> deleteStorageValue(String key) async {
-    return DartBridgeStorage.instance.delete(key);
-  }
+  /// Set a value in native storage.
+  static Future<bool> setStorageValue(String key, String value) =>
+      DartBridgeStorage.instance.set(key, value);
 
-  /// Check if key exists in storage
-  static Future<bool> storageKeyExists(String key) async {
-    return DartBridgeStorage.instance.exists(key);
-  }
+  /// Delete a value from native storage.
+  static Future<bool> deleteStorageValue(String key) =>
+      DartBridgeStorage.instance.delete(key);
 
-  /// Clear all storage
+  /// Check if a key exists in native storage.
+  static Future<bool> storageKeyExists(String key) =>
+      DartBridgeStorage.instance.exists(key);
+
+  /// Clear all native storage.
   static Future<void> clearStorage() async {
     await DartBridgeStorage.instance.clear();
-    EventBus.shared.publish(SDKStorageEvent.cacheCleared());
   }
 
-  /// Get base directory URL for SDK files
+  /// Base directory for SDK files (`.../<documents>/runanywhere`).
   static Future<String> getBaseDirectoryPath() async {
     final directory = await getApplicationDocumentsDirectory();
     return '${directory.path}/runanywhere';
   }
 
-  /// Download a model by ID with progress tracking
-  ///
-  /// ```dart
-  /// final stream = RunAnywhereStorage.downloadModel('my-model-id');
-  /// await for (final progress in stream) {
-  ///   print('Progress: ${(progress.overallProgress * 100).toStringAsFixed(0)}%');
-  /// }
-  /// ```
-  static Stream<ModelDownloadProgress> downloadModel(String modelId) {
-    return ModelDownloadService.shared.downloadModel(modelId);
-  }
-
+  /// Low-level download stream. Emits proto-generated `DownloadProgress`
+  /// events driven by the C++ `rac_download_orchestrate` state machine.
+  static Stream<DownloadProgress> downloadModel(String modelId) =>
+      RunAnywhereDownloads.shared.start(modelId);
 }

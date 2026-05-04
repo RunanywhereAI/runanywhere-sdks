@@ -16,9 +16,12 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
-#include "rac/backends/rac_vad_onnx.h"
+#include "rac/backends/rac_vad_onnx.h"  // for typedefs and rac_backend_onnx_register()
 #include "rac/backends/rac_stt_onnx.h"
 #include "rac/backends/rac_tts_onnx.h"
+#include "rac_stt_sherpa.h"  // engines/sherpa: rac_stt_sherpa_* function declarations
+#include "rac_tts_sherpa.h"
+#include "rac_vad_sherpa.h"
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 
@@ -407,15 +410,15 @@ static TestResult test_transcribe_tts_audio() {
     std::string tts_path = test_config::get_tts_model_path();
     rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_path.c_str(), &tts_cfg, &tts_handle);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_onnx_create should succeed for separate TTS handle");
+    rac_result_t rc = rac_tts_sherpa_create(tts_path.c_str(), &tts_cfg, &tts_handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_create should succeed for separate TTS handle");
 
     rac_tts_result_t tts_result = {};
     {
         ScopedTimer timer("tts_synthesize_hello_world");
-        rc = rac_tts_onnx_synthesize(tts_handle, "Hello world", nullptr, &tts_result);
+        rc = rac_tts_sherpa_synthesize(tts_handle, "Hello world", nullptr, &tts_result);
     }
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_onnx_synthesize should succeed");
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_synthesize should succeed");
     ASSERT_TRUE(tts_result.audio_data != nullptr, "TTS audio_data should not be NULL");
     ASSERT_TRUE(tts_result.audio_size > 0, "TTS audio_size should be > 0");
 
@@ -446,7 +449,7 @@ static TestResult test_transcribe_tts_audio() {
 
     rac_free(transcription);
     rac_tts_result_free(&tts_result);
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
     return TEST_PASS();
 }
 
@@ -462,16 +465,16 @@ static TestResult test_process_voice_turn_tts() {
     std::string tts_path = test_config::get_tts_model_path();
     rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_path.c_str(), &tts_cfg, &tts_handle);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_onnx_create should succeed for separate TTS handle");
+    rac_result_t rc = rac_tts_sherpa_create(tts_path.c_str(), &tts_cfg, &tts_handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_create should succeed for separate TTS handle");
 
     rac_tts_result_t tts_result = {};
     {
         ScopedTimer timer("tts_synthesize_question");
-        rc = rac_tts_onnx_synthesize(tts_handle, "What is the capital of France", nullptr,
+        rc = rac_tts_sherpa_synthesize(tts_handle, "What is the capital of France", nullptr,
                                      &tts_result);
     }
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_onnx_synthesize should succeed");
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_synthesize should succeed");
 
     // Resample 22050→16000 and convert to int16
     const float* tts_float = static_cast<const float*>(tts_result.audio_data);
@@ -503,7 +506,7 @@ static TestResult test_process_voice_turn_tts() {
 
     rac_voice_agent_result_free(&va_result);
     rac_tts_result_free(&tts_result);
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
     return TEST_PASS();
 }
 
@@ -568,15 +571,15 @@ static TestResult test_process_stream_events() {
     std::string tts_path = test_config::get_tts_model_path();
     rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_path.c_str(), &tts_cfg, &tts_handle);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_onnx_create should succeed for separate TTS handle");
+    rac_result_t rc = rac_tts_sherpa_create(tts_path.c_str(), &tts_cfg, &tts_handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_create should succeed for separate TTS handle");
 
     rac_tts_result_t tts_result = {};
     {
         ScopedTimer timer("tts_synthesize_hello");
-        rc = rac_tts_onnx_synthesize(tts_handle, "Hello", nullptr, &tts_result);
+        rc = rac_tts_sherpa_synthesize(tts_handle, "Hello", nullptr, &tts_result);
     }
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_onnx_synthesize should succeed");
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_synthesize should succeed");
 
     // Resample 22050→16000 and convert to int16
     const float* tts_float = static_cast<const float*>(tts_result.audio_data);
@@ -603,7 +606,7 @@ static TestResult test_process_stream_events() {
     std::cout << "  Got audio event: " << (event_data.got_audio ? "yes" : "no") << "\n";
 
     rac_tts_result_free(&tts_result);
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
     return TEST_PASS();
 }
 

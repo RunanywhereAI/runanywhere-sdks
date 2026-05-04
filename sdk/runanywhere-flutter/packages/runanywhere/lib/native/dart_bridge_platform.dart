@@ -22,7 +22,23 @@ const int _exceptionalReturnInt32 = -183; // RAC_ERROR_FILE_NOT_FOUND
 const int _exceptionalReturnFalse = 0;
 
 /// Exceptional return value for int64 operations
+// ignore: unused_element
 const int _exceptionalReturnInt64 = 0;
+
+typedef _SysctlByNameNative = Int32 Function(
+  Pointer<Utf8>,
+  Pointer<Void>,
+  Pointer<Uint64>,
+  Pointer<Void>,
+  Uint64,
+);
+typedef _SysctlByNameDart = int Function(
+  Pointer<Utf8>,
+  Pointer<Void>,
+  Pointer<Uint64>,
+  Pointer<Void>,
+  int,
+);
 
 // =============================================================================
 // Platform Adapter Bridge
@@ -125,13 +141,13 @@ class DartBridgePlatform {
         _exceptionalReturnInt32,
       );
 
-      // Clock - returns int64, use 0 as exceptional return
-      adapter.ref.nowMs = Pointer.fromFunction<RacNowMsCallbackNative>(
-        _platformNowMsCallback,
-        _exceptionalReturnInt64,
-      );
+      // Clock — leave null so C++ falls back to std::chrono.
+      // Pointer.fromFunction is not thread-safe and rac_get_current_time_ms
+      // is called from C++ worker threads (download orchestrator, OkHttp
+      // transport) that are not attached to the Dart VM isolate.
+      adapter.ref.nowMs = nullptr;
 
-      // Memory info callback - returns errorNotImplemented (platform-specific)
+      // Memory info callback
       adapter.ref.getMemoryInfo =
           Pointer.fromFunction<RacGetMemoryInfoCallbackNative>(
         _platformGetMemoryInfoCallback,
@@ -144,17 +160,11 @@ class DartBridgePlatform {
         _platformTrackErrorCallback,
       );
 
-      // Optional callbacks (handled by Dart directly)
-      adapter.ref.httpDownload =
-          Pointer.fromFunction<RacHttpDownloadCallbackNative>(
-        _platformHttpDownloadCallback,
-        _exceptionalReturnInt32,
-      ).cast<Void>();
-      adapter.ref.httpDownloadCancel =
-          Pointer.fromFunction<RacHttpDownloadCancelCallbackNative>(
-        _platformHttpDownloadCancelCallback,
-        _exceptionalReturnInt32,
-      ).cast<Void>();
+      // HTTP download callbacks — disabled because OkHttp transport vtable
+      // handles all HTTP. Pointer.fromFunction trampolines are not safe to
+      // call from the C++ worker thread spawned by the download orchestrator.
+      adapter.ref.httpDownload = nullptr;
+      adapter.ref.httpDownloadCancel = nullptr;
       adapter.ref.extractArchive = nullptr;
       adapter.ref.userData = nullptr;
 
@@ -214,7 +224,7 @@ class DartBridgePlatform {
 // =============================================================================
 
 /// Logging callback - routes C++ logs to Dart logger
-/// 
+///
 /// NOTE: This callback is registered with NativeCallable.listener for thread safety.
 /// It runs asynchronously on the main isolate's event loop, which means by the time
 /// it executes, the C++ log message memory may have been freed. We handle this by
@@ -231,8 +241,9 @@ void _platformLogCallback(
     // Try to decode the message - may fail if memory was freed
     final msgString = message.toDartString();
     if (msgString.isEmpty) return;
-    
-    final categoryString = category != nullptr ? category.toDartString() : 'RAC';
+
+    final categoryString =
+        category != nullptr ? category.toDartString() : 'RAC';
 
     final logger = SDKLogger(categoryString);
 
@@ -483,17 +494,121 @@ Future<void> _deleteSecureStorage(String key) async {
 }
 
 /// Clock callback - returns current time in milliseconds
+// ignore: unused_element
 int _platformNowMsCallback(Pointer<Void> userData) {
   return DateTime.now().millisecondsSinceEpoch;
 }
 
-/// Memory info callback - returns errorNotImplemented.
-/// Memory info requires platform-specific APIs (iOS: mach_task_info, Android: ActivityManager).
+Map<String, int>? _readProcMemInfo() {
+  try {
+    final memInfo = <String, int>{};
+    final contents = File('/proc/meminfo').readAsLinesSync();
+
+    for (final line in contents) {
+      final match = RegExp(r'^([A-Za-z_]+):\s+(\d+)\s+kB$').firstMatch(line);
+      if (match == null) {
+        continue;
+      }
+
+      memInfo[match.group(1)!] = int.parse(match.group(2)!) * 1024;
+    }
+
+    return memInfo;
+  } catch (_) {
+    return null;
+  }
+}
+
+int _getDarwinPhysicalMemoryBytes() {
+  Pointer<Utf8>? namePtr;
+  Pointer<Uint64>? outPtr;
+  Pointer<Uint64>? sizePtr;
+
+  try {
+    final sysctlByName = DynamicLibrary.process()
+        .lookupFunction<_SysctlByNameNative, _SysctlByNameDart>('sysctlbyname');
+
+    namePtr = 'hw.memsize'.toNativeUtf8();
+    outPtr = calloc<Uint64>();
+    sizePtr = calloc<Uint64>()..value = sizeOf<Uint64>();
+
+    final result =
+        sysctlByName(namePtr, outPtr.cast<Void>(), sizePtr, nullptr, 0);
+    if (result == 0 && sizePtr.value >= sizeOf<Uint64>()) {
+      return outPtr.value;
+    }
+  } catch (_) {
+    // Fall through to the generic RSS-based estimate below.
+  } finally {
+    if (namePtr != null) {
+      calloc.free(namePtr);
+    }
+    if (outPtr != null) {
+      calloc.free(outPtr);
+    }
+    if (sizePtr != null) {
+      calloc.free(sizePtr);
+    }
+  }
+
+  return 0;
+}
+
+int _getTotalMemoryBytes(int usedBytes) {
+  if (Platform.isAndroid) {
+    final memInfo = _readProcMemInfo();
+    final totalBytes = memInfo?['MemTotal'] ?? 0;
+    if (totalBytes > 0) {
+      return totalBytes;
+    }
+  }
+
+  if (Platform.isIOS || Platform.isMacOS) {
+    final totalBytes = _getDarwinPhysicalMemoryBytes();
+    if (totalBytes > 0) {
+      return totalBytes;
+    }
+  }
+
+  final peakBytes = ProcessInfo.maxRss;
+  return peakBytes > usedBytes ? peakBytes : usedBytes;
+}
+
+int _getAvailableMemoryBytes(int totalBytes, int usedBytes) {
+  if (Platform.isAndroid) {
+    final memInfo = _readProcMemInfo();
+    final availableBytes = memInfo?['MemAvailable'] ?? 0;
+    if (availableBytes > 0) {
+      return availableBytes > totalBytes ? totalBytes : availableBytes;
+    }
+  }
+
+  if (totalBytes <= usedBytes) {
+    return 0;
+  }
+
+  return totalBytes - usedBytes;
+}
+
+/// Memory info callback - returns best-effort process and device RAM metrics.
 int _platformGetMemoryInfoCallback(
   Pointer<Void> outInfo,
   Pointer<Void> userData,
 ) {
-  return RacResultCode.errorNotImplemented;
+  if (outInfo == nullptr) {
+    return RacResultCode.errorInvalidParameter;
+  }
+
+  final usedBytes = ProcessInfo.currentRss;
+  final totalBytes = _getTotalMemoryBytes(usedBytes);
+  final availableBytes = _getAvailableMemoryBytes(totalBytes, usedBytes);
+  final memoryInfo = outInfo.cast<RacMemoryInfoStruct>().ref;
+
+  memoryInfo.totalBytes = totalBytes;
+  memoryInfo.availableBytes = availableBytes;
+  memoryInfo.usedBytes = usedBytes;
+
+  return RacResultCode.success;
 }
 
 /// Error tracking callback - sends to Sentry
@@ -523,6 +638,7 @@ void _platformTrackErrorCallback(
 
 int _httpDownloadCounter = 0;
 
+// ignore: unused_element
 int _platformHttpDownloadCallback(
   Pointer<Utf8> url,
   Pointer<Utf8> destinationPath,
@@ -546,8 +662,10 @@ int _platformHttpDownloadCallback(
     final taskId = 'http_${_httpDownloadCounter++}';
     outTaskId.value = taskId.toNativeUtf8();
 
-    final progressAddress = progressCallback == nullptr ? 0 : progressCallback.address;
-    final completeAddress = completeCallback == nullptr ? 0 : completeCallback.address;
+    final progressAddress =
+        progressCallback == nullptr ? 0 : progressCallback.address;
+    final completeAddress =
+        completeCallback == nullptr ? 0 : completeCallback.address;
     final userDataAddress = callbackUserData.address;
 
     unawaited(
@@ -568,6 +686,7 @@ int _platformHttpDownloadCallback(
   }
 }
 
+// ignore: unused_element
 int _platformHttpDownloadCancelCallback(
   Pointer<Utf8> taskId,
   Pointer<Void> userData,

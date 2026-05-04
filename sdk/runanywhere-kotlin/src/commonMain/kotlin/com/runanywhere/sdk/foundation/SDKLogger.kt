@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.foundation
 
+import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.utils.SimpleInstant
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -146,20 +147,12 @@ data class LoggingConfiguration(
          */
         fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
             when (environment) {
-                SDKEnvironment.DEVELOPMENT -> development
-                SDKEnvironment.STAGING -> staging
-                SDKEnvironment.PRODUCTION -> production
+                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> development
+                SDKEnvironment.SDK_ENVIRONMENT_STAGING -> staging
+                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> production
+                SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> development
             }
     }
-}
-
-/**
- * SDK Environment for configuration selection.
- */
-enum class SDKEnvironment {
-    DEVELOPMENT,
-    STAGING,
-    PRODUCTION,
 }
 
 // =============================================================================

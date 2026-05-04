@@ -13,6 +13,13 @@ import UIKit
 public class RunAnywherePlugin: NSObject, FlutterPlugin {
 
     public static func register(with registrar: FlutterPluginRegistrar) {
+        // Install the URLSession-backed platform HTTP transport BEFORE any
+        // Dart FFI call has a chance to fire HTTP through libcurl. Routes
+        // every `rac_http_request_*` through URLSession so iOS consumers
+        // inherit the system trust store, proxies, HTTP/2, and ATS instead
+        // of libcurl. Idempotent.
+        URLSessionHttpTransport.register()
+
         let channel = FlutterMethodChannel(
             name: "runanywhere",
             binaryMessenger: registrar.messenger()

@@ -96,8 +96,13 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
   const displayDescription = description || getDefaultDescription(modality);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
+    // B-RN-8-001 fix: pointerEvents="box-none" lets the absolutely-positioned
+    // overlay container pass touches through empty regions, so the parent
+    // ChatScreen header (rendered as a sibling beneath the overlay) still
+    // receives the History / New / Info icon taps. The inner button captures
+    // its own touch via pointerEvents="auto".
+    <View style={styles.container} pointerEvents="box-none">
+      <View style={styles.content} pointerEvents="auto">
         {/* Icon */}
         <View style={styles.iconContainer}>
           <Icon
@@ -118,6 +123,9 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
           style={styles.button}
           onPress={onSelectModel}
           activeOpacity={0.8}
+          accessible={true}
+          accessibilityLabel="Select a Model"
+          accessibilityRole="button"
         >
           <Icon name="add-circle" size={20} color={Colors.textWhite} />
           <Text style={styles.buttonText}>Select a Model</Text>

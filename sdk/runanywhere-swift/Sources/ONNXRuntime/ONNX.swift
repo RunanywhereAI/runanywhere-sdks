@@ -74,7 +74,7 @@ public enum ONNX: RunAnywhereModule {
     /// Safe to call multiple times - subsequent calls are no-ops.
     ///
     /// - Parameter priority: Ignored (C++ uses its own priority system)
-    /// - Throws: SDKError if registration fails
+    /// - Throws: SDKException if registration fails
     @MainActor
     public static func register(priority _: Int = 100) {
         guard !isRegistered else {

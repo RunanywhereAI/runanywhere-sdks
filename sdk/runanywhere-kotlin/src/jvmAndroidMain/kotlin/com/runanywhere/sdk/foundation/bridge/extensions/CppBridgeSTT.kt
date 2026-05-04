@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -158,9 +158,6 @@ object CppBridgeSTT {
                 else -> "UNKNOWN($reason)"
             }
     }
-
-    @Volatile
-    private var isRegistered: Boolean = false
 
     @Volatile
     private var state: Int = STTState.NOT_CREATED
@@ -423,46 +420,16 @@ object CppBridgeSTT {
     }
 
     /**
-     * Register the STT callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetSTTCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "STT callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the STT callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
-
-    /**
      * Get the current component handle.
      *
      * @return The native handle, or throws if not created
-     * @throws SDKError if the component is not created
+     * @throws SDKException if the component is not created
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun getHandle(): Long {
         synchronized(lock) {
             if (handle == 0L) {
-                throw SDKError.notInitialized("STT component not created")
+                throw SDKException.notInitialized("STT component not created")
             }
             return handle
         }
@@ -522,7 +489,7 @@ object CppBridgeSTT {
                     TAG,
                     "Native library not loaded. STT inference requires native libraries to be bundled.",
                 )
-                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+                throw SDKException.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create STT component via RunAnywhereBridge
@@ -535,7 +502,7 @@ object CppBridgeSTT {
                         TAG,
                         "STT component creation failed. Native method not available: ${e.message}",
                     )
-                    throw SDKError.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
+                    throw SDKException.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
                 }
 
             if (result == 0L) {
@@ -658,13 +625,13 @@ object CppBridgeSTT {
      * @param audioData Raw audio data bytes
      * @param config Transcription configuration (optional)
      * @return The transcription result
-     * @throws SDKError if transcription fails
+     * @throws SDKException if transcription fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun transcribe(audioData: ByteArray, config: TranscriptionConfig = TranscriptionConfig.DEFAULT): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
-                throw SDKError.stt("STT component not ready for transcription")
+                throw SDKException.stt("STT component not ready for transcription")
             }
 
             isCancelled = false
@@ -687,7 +654,7 @@ object CppBridgeSTT {
             try {
                 val resultJson =
                     RunAnywhereBridge.racSttComponentTranscribe(handle, audioData, config.toJson())
-                        ?: throw SDKError.stt("Transcription failed: null result")
+                        ?: throw SDKException.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -708,7 +675,7 @@ object CppBridgeSTT {
                 return result
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.stt("Transcription failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.stt("Transcription failed: ${e.message}")
             }
         }
     }
@@ -719,13 +686,13 @@ object CppBridgeSTT {
      * @param audioPath Path to the audio file
      * @param config Transcription configuration (optional)
      * @return The transcription result
-     * @throws SDKError if transcription fails
+     * @throws SDKException if transcription fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun transcribeFile(audioPath: String, config: TranscriptionConfig = TranscriptionConfig.DEFAULT): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
-                throw SDKError.stt("STT component not ready for transcription")
+                throw SDKException.stt("STT component not ready for transcription")
             }
 
             isCancelled = false
@@ -748,7 +715,7 @@ object CppBridgeSTT {
             try {
                 val resultJson =
                     RunAnywhereBridge.racSttComponentTranscribeFile(handle, audioPath, config.toJson())
-                        ?: throw SDKError.stt("Transcription failed: null result")
+                        ?: throw SDKException.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -769,7 +736,7 @@ object CppBridgeSTT {
                 return result
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.stt("File transcription failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.stt("File transcription failed: ${e.message}")
             }
         }
     }
@@ -781,9 +748,9 @@ object CppBridgeSTT {
      * @param config Transcription configuration (optional)
      * @param callback Callback for partial results
      * @return The final transcription result
-     * @throws SDKError if transcription fails
+     * @throws SDKException if transcription fails
      */
-    @Throws(SDKError::class)
+    @Throws(SDKException::class)
     fun transcribeStream(
         audioData: ByteArray,
         config: TranscriptionConfig = TranscriptionConfig.DEFAULT,
@@ -791,7 +758,7 @@ object CppBridgeSTT {
     ): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
-                throw SDKError.stt("STT component not ready for transcription")
+                throw SDKException.stt("STT component not ready for transcription")
             }
 
             isCancelled = false
@@ -815,7 +782,7 @@ object CppBridgeSTT {
             try {
                 val resultJson =
                     RunAnywhereBridge.racSttComponentTranscribeStream(handle, audioData, config.toJson())
-                        ?: throw SDKError.stt("Streaming transcription failed: null result")
+                        ?: throw SDKException.stt("Streaming transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -838,7 +805,7 @@ object CppBridgeSTT {
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.stt("Streaming transcription failed: ${e.message}")
+                throw if (e is SDKException) e else SDKException.stt("Streaming transcription failed: ${e.message}")
             }
         }
     }
@@ -1044,178 +1011,6 @@ object CppBridgeSTT {
     }
 
     // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the STT callbacks with C++ core.
-     *
-     * Registers [streamPartialCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_stt_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetSTTCallbacks()
-
-    /**
-     * Native method to unset the STT callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_stt_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetSTTCallbacks()
-
-    /**
-     * Native method to create the STT component.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_stt_component_create()
-     */
-    @JvmStatic
-    external fun nativeCreate(): Long
-
-    /**
-     * Native method to load a model.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_stt_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun nativeLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Native method to transcribe audio data.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_stt_component_transcribe(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun nativeTranscribe(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Native method to transcribe audio file.
-     *
-     * @param handle The component handle
-     * @param audioPath Path to the audio file
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_stt_component_transcribe_file(handle, audio_path, config)
-     */
-    @JvmStatic
-    external fun nativeTranscribeFile(handle: Long, audioPath: String, configJson: String): String?
-
-    /**
-     * Native method to transcribe audio with streaming.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_stt_component_transcribe_stream(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun nativeTranscribeStream(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Native method to cancel transcription.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_stt_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun nativeCancel(handle: Long)
-
-    /**
-     * Native method to unload the model.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_stt_component_unload(handle)
-     */
-    @JvmStatic
-    external fun nativeUnload(handle: Long)
-
-    /**
-     * Native method to destroy the component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_stt_component_destroy(handle)
-     */
-    @JvmStatic
-    external fun nativeDestroy(handle: Long)
-
-    /**
-     * Native method to get supported languages.
-     *
-     * @param handle The component handle
-     * @return JSON array of supported language codes
-     *
-     * C API: rac_stt_component_get_languages(handle)
-     */
-    @JvmStatic
-    external fun nativeGetLanguages(handle: Long): String?
-
-    /**
-     * Native method to detect language from audio.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @return Detected language code
-     *
-     * C API: rac_stt_component_detect_language(handle, audio_data, audio_size)
-     */
-    @JvmStatic
-    external fun nativeDetectLanguage(handle: Long, audioData: ByteArray): String?
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the STT callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetSTTCallbacks()
-
-            sttListener = null
-            streamCallback = null
-            isRegistered = false
-        }
-    }
-
-    // ========================================================================
     // UTILITY FUNCTIONS
     // ========================================================================
 
@@ -1302,8 +1097,62 @@ object CppBridgeSTT {
             completionReason = completionReason,
             confidence = confidence,
             processingTimeMs = elapsedMs,
-            wordTimestamps = emptyList(), // TODO: Parse word timestamps if present
+            wordTimestamps = parseWordTimestamps(json),
         )
+    }
+
+    /**
+     * Parse the optional `word_timestamps` array out of the STT JSON
+     * payload. The JNI layer emits seconds; this bridge represents word
+     * timing in milliseconds so we multiply by 1000.
+     *
+     * Format (matches sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp):
+     *   "word_timestamps": [
+     *     {"word": "hello", "start_time": 0.0, "end_time": 0.5, "confidence": 0.95},
+     *     ...
+     *   ]
+     */
+    private fun parseWordTimestamps(json: String): List<WordTimestamp> {
+        val arrayRegex = Regex("\"word_timestamps\"\\s*:\\s*\\[(.*?)\\]", RegexOption.DOT_MATCHES_ALL)
+        val arrayBody = arrayRegex.find(json)?.groupValues?.get(1) ?: return emptyList()
+
+        val objectRegex = Regex("\\{[^{}]*\\}")
+        val results = mutableListOf<WordTimestamp>()
+        for (match in objectRegex.findAll(arrayBody)) {
+            val obj = match.value
+            val word =
+                Regex("\"word\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.let { unescapeJson(it) } ?: continue
+            val startSeconds =
+                Regex("\"start_time\"\\s*:\\s*(-?[\\d.]+)")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toDoubleOrNull() ?: 0.0
+            val endSeconds =
+                Regex("\"end_time\"\\s*:\\s*(-?[\\d.]+)")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toDoubleOrNull() ?: 0.0
+            val conf =
+                Regex("\"confidence\"\\s*:\\s*(-?[\\d.]+)")
+                    .find(obj)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toFloatOrNull() ?: 0f
+            results +=
+                WordTimestamp(
+                    word = word,
+                    startMs = (startSeconds * 1000.0).toLong(),
+                    endMs = (endSeconds * 1000.0).toLong(),
+                    confidence = conf,
+                )
+        }
+        return results
     }
 
     /**
@@ -1350,15 +1199,27 @@ object CppBridgeSTT {
     /**
      * Detect language from audio sample.
      *
-     * @param audioData Raw audio data bytes
-     * @return Detected language code, or Language.AUTO if detection fails
+     * Returns [Language.AUTO] only when the STT component is not ready — this
+     * keeps callers out of the native path when there's no model loaded yet.
+     *
+     * When the component is ready, we surface the native failure instead of
+     * silently falling back to AUTO: a null JNI result means the backend
+     * rejected the call (not supported / bad audio / decode failure) and
+     * callers must know about it so they can retry or report.
+     *
+     * @throws IllegalStateException when the native bridge returns null while
+     *         the component is loaded.
      */
     fun detectLanguage(audioData: ByteArray): String {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
                 return Language.AUTO
             }
-            return RunAnywhereBridge.racSttComponentDetectLanguage(handle, audioData) ?: Language.AUTO
+            return RunAnywhereBridge.racSttComponentDetectLanguage(handle, audioData)
+                ?: throw IllegalStateException(
+                    "STT backend returned no language (handle=$handle, bytes=${audioData.size}). " +
+                        "The loaded model may not support language detection.",
+                )
         }
     }
 

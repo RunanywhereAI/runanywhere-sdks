@@ -20,7 +20,7 @@
  * for sherpa-onnx-glue.js (see SherpaONNXBridge._doLoad).
  */
 
-import { SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { SDKException, SDKErrorCode, SDKLogger } from '@runanywhere/web';
 import { SherpaONNXBridge } from './SherpaONNXBridge';
 import type { SherpaONNXModule } from './SherpaONNXBridge';
 
@@ -102,9 +102,10 @@ async function doLoad<T>(
     : new URL(`../../wasm/sherpa/${filename}`, import.meta.url).href;
   logger.info(`Loading sherpa helper: ${filename}`);
 
-  const response = await fetch(url);
+  // HTTP_FETCH_CARVE_OUTS.browserOnlyBlobImport: the JS wrapper must be patched as text before Blob import.
+  const response = await fetch(url); // fetch() carve-out: browser-only blob import.
   if (!response.ok) {
-    throw new SDKError(
+    throw new SDKException(
       SDKErrorCode.WASMLoadFailed,
       `Failed to fetch ${filename}: ${response.status} ${response.statusText}`,
     );
@@ -127,7 +128,7 @@ async function doLoad<T>(
     return mod;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    throw new SDKError(
+    throw new SDKException(
       SDKErrorCode.WASMLoadFailed,
       `Failed to load sherpa helper ${filename}: ${msg}`,
     );

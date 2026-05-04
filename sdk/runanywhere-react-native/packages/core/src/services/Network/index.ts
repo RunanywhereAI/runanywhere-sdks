@@ -1,28 +1,28 @@
 /**
  * Network Services
  *
- * Centralized network layer for RunAnywhere React Native SDK.
- * Uses React Native's built-in fetch API for HTTP requests.
+ * HTTP transport is implemented entirely in native C++ (libcurl via
+ * rac_http_client_*). This module only exposes the high-level configuration
+ * types and telemetry facade the TypeScript layer still owns.
  */
 
-// Core HTTP service
-export { HTTPService, SDKEnvironment } from './HTTPService';
-export type { HTTPServiceConfig, DevModeConfig } from './HTTPService';
-
-// Configuration utilities
 export {
   createNetworkConfig,
   getEnvironmentName,
+  looksLikePlaceholder,
+  isUsableHttpUrl,
+  isUsableCredential,
+  hasUsableBackendConfig,
+  hasUsableSupabaseConfig,
   isDevelopment,
   isProduction,
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
+  SDKEnvironment,
 } from './NetworkConfiguration';
 export type { NetworkConfig } from './NetworkConfiguration';
 
-// API endpoints
 export { APIEndpoints } from './APIEndpoints';
 export type { APIEndpointKey, APIEndpointValue } from './APIEndpoints';
 
-// Telemetry
 export { TelemetryService, TelemetryCategory } from './TelemetryService';

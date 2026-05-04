@@ -1,42 +1,46 @@
 #
-# RunAnywhere Genie Backend - iOS
+# RunAnywhere Genie Backend - iOS compatibility shim
 #
-# This is a stub podspec for the Flutter plugin system.
-# Genie NPU backend is Android/Snapdragon only - no iOS binary is provided.
-# This podspec exists solely to satisfy Flutter's iOS plugin registration requirements.
+# Genie is an experimental Android/Snapdragon-only backend shell. Functional
+# routing requires Qualcomm Genie SDK-backed native ops. No iOS binary is
+# provided; this podspec only lets Flutter register the package and link the
+# example app while keeping the backend unavailable on Apple platforms.
 #
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_genie'
   s.version          = '0.16.0'
-  s.summary          = 'RunAnywhere Genie: NPU LLM inference for Flutter (Android/Snapdragon only)'
+  s.summary          = 'RunAnywhere Genie: experimental Android-only Qualcomm Genie backend shell'
   s.description      = <<-DESC
-Qualcomm Genie NPU backend for RunAnywhere Flutter SDK. Provides LLM text generation
-on Snapdragon NPU hardware. This is an Android-only backend; the iOS pod is a stub
-for Flutter plugin system compatibility.
+Experimental Qualcomm Genie backend shell for RunAnywhere Flutter SDK. LLM
+routing is disabled by default and requires Android/Snapdragon hardware plus
+native ops built with the Qualcomm Genie SDK. The iOS pod only provides package
+registration metadata on unsupported Apple platforms.
                        DESC
   s.homepage         = 'https://runanywhere.ai'
   s.license          = { :type => 'MIT' }
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '14.0'
+  s.ios.deployment_target = '15.1'
   s.swift_version = '5.0'
 
-  # Source files (minimal stub - Genie is Android-only)
   s.source_files = 'Classes/**/*'
 
-  # Flutter dependency
   s.dependency 'Flutter'
 
-  # No vendored_frameworks - Genie has no iOS binary (Android/Snapdragon only)
+  # No vendored_frameworks — Genie has no iOS binary.
 
-  # Build settings
+  # Match the x86_64 exclusion used by sibling plugins so the whole dependency
+  # graph stays consistent on Intel simulators.
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'x86_64',
   }
 
-  # Mark static framework for proper linking
+  s.user_target_xcconfig = {
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'x86_64',
+  }
+
   s.static_framework = true
 end

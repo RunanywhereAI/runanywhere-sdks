@@ -60,7 +60,7 @@ public actor DiffusionPlatformService {
 
         // Verify the directory exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelURL.lastPathComponent)")
+            throw SDKException.diffusion(.modelNotFound, "Model directory not found: \(modelURL.lastPathComponent)")
         }
 
         // Find the actual model directory (handles nested directory structure from zip extraction)
@@ -97,7 +97,7 @@ public actor DiffusionPlatformService {
             logger.info("✅ Diffusion pipeline initialized successfully")
         } catch {
             logger.error("❌ Failed to initialize pipeline: \(error)")
-            throw SDKError.diffusion(.initializationFailed, "Failed to initialize: \(error.localizedDescription)")
+            throw SDKException.diffusion(.initializationFailed, "Failed to initialize: \(error.localizedDescription)")
         }
     }
 
@@ -164,24 +164,17 @@ public actor DiffusionPlatformService {
             logger.info("Downloading missing tokenizer file: \(filename) from \(source.description)")
 
             guard let remoteURL = URL(string: "\(source.baseURL)/\(filename)") else {
-                throw SDKError.diffusion(.initializationFailed, "Invalid tokenizer URL for: \(filename)")
+                throw SDKException.diffusion(.initializationFailed, "Invalid tokenizer URL for: \(filename)")
             }
 
             do {
-                let (data, response) = try await URLSession.shared.data(from: remoteURL)
-
-                guard let httpResponse = response as? HTTPURLResponse,
-                      httpResponse.statusCode == 200 else {
-                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    throw SDKError.diffusion(.initializationFailed, "Failed to download \(filename): HTTP \(statusCode)")
-                }
-
+                let data = try await HTTPClientAdapter.fetchURL(remoteURL)
                 try data.write(to: fileURL)
                 logger.info("Downloaded tokenizer file: \(filename) (\(data.count) bytes)")
-            } catch let error as SDKError {
+            } catch let error as SDKException {
                 throw error
             } catch {
-                throw SDKError.diffusion(.initializationFailed, "Failed to download \(filename): \(error.localizedDescription)")
+                throw SDKException.diffusion(.initializationFailed, "Failed to download \(filename): \(error.localizedDescription)")
             }
         }
     }
@@ -217,7 +210,7 @@ public actor DiffusionPlatformService {
         progressHandler: ((DiffusionProgressInfo) -> Bool)? = nil
     ) async throws -> DiffusionGenerationResult {
         guard let pipeline = pipeline else {
-            throw SDKError.diffusion(.notInitialized, "Pipeline not initialized")
+            throw SDKException.diffusion(.notInitialized, "Pipeline not initialized")
         }
 
         isCancelled = false
@@ -263,12 +256,12 @@ public actor DiffusionPlatformService {
 
             // Check if cancelled
             if isCancelled {
-                throw SDKError.diffusion(.cancelled, "Generation was cancelled")
+                throw SDKException.diffusion(.cancelled, "Generation was cancelled")
             }
 
             // Get the first image
             guard let cgImage = images.first else {
-                throw SDKError.diffusion(.generationFailed, "No image generated")
+                throw SDKException.diffusion(.generationFailed, "No image generated")
             }
 
             // Check if image was filtered by safety checker
@@ -295,11 +288,11 @@ public actor DiffusionPlatformService {
                 safetyTriggered: safetyTriggered
             )
 
-        } catch let error as SDKError {
+        } catch let error as SDKException {
             throw error
         } catch {
             logger.error("Generation failed: \(error)")
-            throw SDKError.diffusion(.generationFailed, error.localizedDescription)
+            throw SDKException.diffusion(.generationFailed, error.localizedDescription)
         }
     }
 
@@ -331,7 +324,7 @@ public actor DiffusionPlatformService {
                 space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             ) else {
-                throw SDKError.diffusion(.generationFailed, "Failed to create graphics context")
+                throw SDKException.diffusion(.generationFailed, "Failed to create graphics context")
             }
 
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -397,4 +390,4 @@ public struct DiffusionGenerationResult: Sendable {
     }
 }
 
-// MARK: - SDKError Extension (uses DiffusionErrorCode from DiffusionTypes.swift)
+// MARK: - SDKException Extension (uses DiffusionErrorCode from DiffusionTypes.swift)

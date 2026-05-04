@@ -1,20 +1,26 @@
-/// Model Types
+/// Model Types.
 ///
-/// Public types for model management.
-/// Matches Swift ModelTypes.swift from Public/Extensions/Models/
-/// These are thin wrappers over C++ types in rac_model_types.h
+/// Public types for model management. Thin wrappers over C++ types in
+/// `rac_model_types.h`, matching Swift `ModelTypes.swift`.
+///
+/// GAP 01 Phase 4: every enum below carries `toProto()` / `fromProto()`
+/// bridges to the IDL-generated Wire equivalents in
+/// `package:runanywhere/generated/model_types.pbenum.dart`. Adding a case
+/// here without updating `idl/model_types.proto` fails the CI drift-check.
 library model_types;
 
 import 'dart:io';
+
+import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
 
 // MARK: - Model Source
 
 /// Source of model data (where the model info came from)
 enum ModelSource {
-  /// Model info came from remote API (backend model catalog)
+  /// Model info came from remote API (backend model catalog).
   remote('remote'),
 
-  /// Model info was provided locally via SDK input (addModel calls)
+  /// Model info was provided locally via SDK input (addModel calls).
   local('local');
 
   final String rawValue;
@@ -25,6 +31,20 @@ enum ModelSource {
       (s) => s.rawValue == value,
       orElse: () => ModelSource.remote,
     );
+  }
+
+  pb.ModelSource toProto() {
+    switch (this) {
+      case ModelSource.remote:
+        return pb.ModelSource.MODEL_SOURCE_REMOTE;
+      case ModelSource.local:
+        return pb.ModelSource.MODEL_SOURCE_LOCAL;
+    }
+  }
+
+  static ModelSource fromProto(pb.ModelSource proto) {
+    if (proto == pb.ModelSource.MODEL_SOURCE_LOCAL) return ModelSource.local;
+    return ModelSource.remote;
   }
 }
 
@@ -47,6 +67,29 @@ enum ModelFormat {
       orElse: () => ModelFormat.unknown,
     );
   }
+
+  pb.ModelFormat toProto() {
+    switch (this) {
+      case ModelFormat.onnx:
+        return pb.ModelFormat.MODEL_FORMAT_ONNX;
+      case ModelFormat.ort:
+        return pb.ModelFormat.MODEL_FORMAT_ORT;
+      case ModelFormat.gguf:
+        return pb.ModelFormat.MODEL_FORMAT_GGUF;
+      case ModelFormat.bin:
+        return pb.ModelFormat.MODEL_FORMAT_BIN;
+      case ModelFormat.unknown:
+        return pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
+    }
+  }
+
+  static ModelFormat fromProto(pb.ModelFormat proto) {
+    if (proto == pb.ModelFormat.MODEL_FORMAT_ONNX) return ModelFormat.onnx;
+    if (proto == pb.ModelFormat.MODEL_FORMAT_ORT) return ModelFormat.ort;
+    if (proto == pb.ModelFormat.MODEL_FORMAT_GGUF) return ModelFormat.gguf;
+    if (proto == pb.ModelFormat.MODEL_FORMAT_BIN) return ModelFormat.bin;
+    return ModelFormat.unknown;
+  }
 }
 
 // MARK: - Model Category
@@ -60,7 +103,9 @@ enum ModelCategory {
   imageGeneration('image-generation', 'Image Generation'),
   multimodal('multimodal', 'Multimodal'),
   audio('audio', 'Audio Processing'),
-  embedding('embedding', 'Embedding Model');
+  embedding('embedding', 'Embedding Model'),
+  voiceActivityDetection(
+      'voice-activity-detection', 'Voice Activity Detection');
 
   final String rawValue;
   final String displayName;
@@ -98,6 +143,57 @@ enum ModelCategory {
         return false;
     }
   }
+
+  pb.ModelCategory toProto() {
+    switch (this) {
+      case ModelCategory.language:
+        return pb.ModelCategory.MODEL_CATEGORY_LANGUAGE;
+      case ModelCategory.speechRecognition:
+        return pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
+      case ModelCategory.speechSynthesis:
+        return pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
+      case ModelCategory.vision:
+        return pb.ModelCategory.MODEL_CATEGORY_VISION;
+      case ModelCategory.imageGeneration:
+        return pb.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION;
+      case ModelCategory.multimodal:
+        return pb.ModelCategory.MODEL_CATEGORY_MULTIMODAL;
+      case ModelCategory.audio:
+        return pb.ModelCategory.MODEL_CATEGORY_AUDIO;
+      case ModelCategory.embedding:
+        return pb.ModelCategory.MODEL_CATEGORY_EMBEDDING;
+      case ModelCategory.voiceActivityDetection:
+        return pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+    }
+  }
+
+  static ModelCategory fromProto(pb.ModelCategory proto) {
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_LANGUAGE) {
+      return ModelCategory.language;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION) {
+      return ModelCategory.speechRecognition;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS) {
+      return ModelCategory.speechSynthesis;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_VISION) {
+      return ModelCategory.vision;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION) {
+      return ModelCategory.imageGeneration;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_MULTIMODAL) {
+      return ModelCategory.multimodal;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_EMBEDDING) {
+      return ModelCategory.embedding;
+    }
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION) {
+      return ModelCategory.voiceActivityDetection;
+    }
+    return ModelCategory.audio;
+  }
 }
 
 // MARK: - Inference Framework
@@ -106,6 +202,7 @@ enum ModelCategory {
 enum InferenceFramework {
   // Model-based frameworks
   onnx('ONNX', 'ONNX Runtime', 'onnx'),
+  sherpa('Sherpa', 'Sherpa-ONNX', 'sherpa'),
   llamaCpp('LlamaCpp', 'llama.cpp', 'llama_cpp'),
   foundationModels(
       'FoundationModels', 'Foundation Models', 'foundation_models'),
@@ -132,6 +229,62 @@ enum InferenceFramework {
           f.analyticsKey == lowercased,
       orElse: () => InferenceFramework.unknown,
     );
+  }
+
+  pb.InferenceFramework toProto() {
+    switch (this) {
+      case InferenceFramework.onnx:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
+      case InferenceFramework.sherpa:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
+      case InferenceFramework.llamaCpp:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
+      case InferenceFramework.foundationModels:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS;
+      case InferenceFramework.systemTTS:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
+      case InferenceFramework.fluidAudio:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO;
+      case InferenceFramework.genie:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_GENIE;
+      case InferenceFramework.builtIn:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN;
+      case InferenceFramework.none:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_NONE;
+      case InferenceFramework.unknown:
+        return pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+    }
+  }
+
+  static InferenceFramework fromProto(pb.InferenceFramework proto) {
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX) {
+      return InferenceFramework.onnx;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA) {
+      return InferenceFramework.sherpa;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP) {
+      return InferenceFramework.llamaCpp;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
+      return InferenceFramework.foundationModels;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS) {
+      return InferenceFramework.systemTTS;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO) {
+      return InferenceFramework.fluidAudio;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_GENIE) {
+      return InferenceFramework.genie;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN) {
+      return InferenceFramework.builtIn;
+    }
+    if (proto == pb.InferenceFramework.INFERENCE_FRAMEWORK_NONE) {
+      return InferenceFramework.none;
+    }
+    return InferenceFramework.unknown;
   }
 }
 
@@ -164,6 +317,27 @@ enum ArchiveType {
     }
     return null;
   }
+
+  pb.ArchiveType toProto() {
+    switch (this) {
+      case ArchiveType.zip:
+        return pb.ArchiveType.ARCHIVE_TYPE_ZIP;
+      case ArchiveType.tarBz2:
+        return pb.ArchiveType.ARCHIVE_TYPE_TAR_BZ2;
+      case ArchiveType.tarGz:
+        return pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ;
+      case ArchiveType.tarXz:
+        return pb.ArchiveType.ARCHIVE_TYPE_TAR_XZ;
+    }
+  }
+
+  static ArchiveType? fromProto(pb.ArchiveType proto) {
+    if (proto == pb.ArchiveType.ARCHIVE_TYPE_ZIP) return ArchiveType.zip;
+    if (proto == pb.ArchiveType.ARCHIVE_TYPE_TAR_BZ2) return ArchiveType.tarBz2;
+    if (proto == pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ) return ArchiveType.tarGz;
+    if (proto == pb.ArchiveType.ARCHIVE_TYPE_TAR_XZ) return ArchiveType.tarXz;
+    return null;
+  }
 }
 
 /// Describes the internal structure of an archive after extraction
@@ -175,6 +349,32 @@ enum ArchiveStructure {
 
   final String rawValue;
   const ArchiveStructure(this.rawValue);
+
+  pb.ArchiveStructure toProto() {
+    switch (this) {
+      case ArchiveStructure.singleFileNested:
+        return pb.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
+      case ArchiveStructure.directoryBased:
+        return pb.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED;
+      case ArchiveStructure.nestedDirectory:
+        return pb.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY;
+      case ArchiveStructure.unknown:
+        return pb.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN;
+    }
+  }
+
+  static ArchiveStructure fromProto(pb.ArchiveStructure proto) {
+    if (proto == pb.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED) {
+      return ArchiveStructure.singleFileNested;
+    }
+    if (proto == pb.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED) {
+      return ArchiveStructure.directoryBased;
+    }
+    if (proto == pb.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY) {
+      return ArchiveStructure.nestedDirectory;
+    }
+    return ArchiveStructure.unknown;
+  }
 }
 
 // MARK: - Expected Model Files
@@ -235,11 +435,17 @@ class ModelFileDescriptor {
   /// the URL from the parent model's downloadURL.
   final Uri? url;
 
+  /// Optional lowercase hex SHA-256 checksum of the downloaded bytes.
+  /// When populated, the native download runner verifies the hash
+  /// inline and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on mismatch.
+  final String? checksumSha256;
+
   const ModelFileDescriptor({
     required this.relativePath,
     required this.destinationPath,
     this.isRequired = true,
     this.url,
+    this.checksumSha256,
   });
 
   Map<String, dynamic> toJson() => {
@@ -247,6 +453,7 @@ class ModelFileDescriptor {
         'destinationPath': destinationPath,
         'isRequired': isRequired,
         if (url != null) 'url': url.toString(),
+        if (checksumSha256 != null) 'checksumSha256': checksumSha256,
       };
 
   factory ModelFileDescriptor.fromJson(Map<String, dynamic> json) {
@@ -255,6 +462,7 @@ class ModelFileDescriptor {
       destinationPath: json['destinationPath'] as String,
       isRequired: json['isRequired'] as bool? ?? true,
       url: json['url'] != null ? Uri.parse(json['url'] as String) : null,
+      checksumSha256: json['checksumSha256'] as String?,
     );
   }
 }
@@ -526,6 +734,12 @@ class ModelInfo {
   // Optional metadata
   final String? description;
 
+  /// Optional lowercase hex SHA-256 checksum of the downloaded artifact.
+  /// When populated, the native download runner
+  /// (`rac_http_download_execute`) verifies the hash inline on the write
+  /// path and fails with `RAC_HTTP_DL_CHECKSUM_FAILED` on mismatch.
+  final String? checksumSha256;
+
   // Tracking fields
   final ModelSource source;
   final DateTime createdAt;
@@ -545,6 +759,7 @@ class ModelInfo {
     bool supportsThinking = false,
     ThinkingTagPattern? thinkingPattern,
     this.description,
+    this.checksumSha256,
     ModelSource? source,
     DateTime? createdAt,
     DateTime? updatedAt,

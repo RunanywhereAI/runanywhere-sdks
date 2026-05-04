@@ -57,7 +57,7 @@ typedef enum rac_diffusion_model_variant {
  * @brief Generation mode
  */
 typedef enum rac_diffusion_mode {
-    RAC_DIFFUSION_MODE_TEXT_TO_IMAGE = 0, /**< Generate image from text prompt */
+    RAC_DIFFUSION_MODE_TEXT_TO_IMAGE = 0,  /**< Generate image from text prompt */
     RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE = 1, /**< Transform input image with prompt */
     RAC_DIFFUSION_MODE_INPAINTING = 2,     /**< Edit specific regions with mask */
 } rac_diffusion_mode_t;
@@ -167,7 +167,7 @@ typedef struct rac_diffusion_config {
  */
 static const rac_diffusion_config_t RAC_DIFFUSION_CONFIG_DEFAULT = {
     .model_id = RAC_NULL,
-    .preferred_framework = 99, // RAC_FRAMEWORK_UNKNOWN
+    .preferred_framework = 99,  // RAC_FRAMEWORK_UNKNOWN
     .model_variant = RAC_DIFFUSION_MODEL_SD_1_5,
     .enable_safety_checker = RAC_TRUE,
     .reduce_memory = RAC_FALSE,

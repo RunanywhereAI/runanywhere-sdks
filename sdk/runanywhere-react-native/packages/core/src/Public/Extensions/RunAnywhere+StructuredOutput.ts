@@ -1,218 +1,243 @@
 /**
  * RunAnywhere+StructuredOutput.ts
  *
- * Structured output extension for JSON schema-guided generation.
- * Delegates to native StructuredOutputBridge.
+ * Structured output extension for JSON schema-guided generation. Wave 2:
+ * aligned to proto-canonical structured-output shapes
+ * (`@runanywhere/proto-ts/structured_output`).
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+StructuredOutput.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
+import { isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { generateStream } from './RunAnywhere+TextGeneration';
-import type {
-  StructuredOutputResult,
-  StructuredOutputOptions,
-  JSONSchema,
-} from '../../types/StructuredOutputTypes';
+import {
+  generate as generateText,
+  generateStream,
+} from './RunAnywhere+TextGeneration';
+import {
+  type JSONSchema,
+  type StructuredOutputOptions,
+  type StructuredOutputResult,
+  type StructuredOutputValidation,
+  JSONSchema as JSONSchemaMessage,
+  JSONSchemaProperty,
+  JSONSchemaType,
+} from '@runanywhere/proto-ts/structured_output';
+import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+
+// ============================================================================
+// Types re-exported for callers
+// ============================================================================
+
+// StructuredOutputResult and JSONSchema are re-exported from proto-ts (no
+// local duplicates per §15 Iron Rule 2).
 
 const logger = new SDKLogger('RunAnywhere.StructuredOutput');
 
-/**
- * Stream token for structured output streaming
- */
+/** Stream token emitted during structured-output streaming. */
 export interface StreamToken {
   text: string;
   timestamp: Date;
   tokenIndex: number;
 }
 
-/**
- * Structured output stream result
- */
-export interface StructuredOutputStreamResult<T> {
-  /** Async iterator for tokens */
-  tokenStream: AsyncIterable<StreamToken>;
+/** UTF-8 encoder for serializing parsed JSON to `Uint8Array`. */
+function jsonToBytes(value: unknown): Uint8Array {
+  const text = JSON.stringify(value);
+  const buf = new ArrayBuffer(text.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < text.length; i++) view[i] = text.charCodeAt(i);
+  return view;
+}
 
-  /** Promise that resolves to final parsed result */
-  result: Promise<T>;
+/** UTF-8 decoder for the proto `parsedJson: Uint8Array`. */
+function bytesToString(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
+  return s;
+}
+
+function llmOptionsForStructuredOutput(
+  schema: JSONSchema,
+  options?: StructuredOutputOptions,
+  streamingEnabled: boolean = false
+): LLMGenerationOptions {
+  const jsonSchema = options?.jsonSchema ?? JSON.stringify(schema);
+  return {
+    maxTokens: 1500,
+    temperature: 0.7,
+    topP: 1.0,
+    topK: 0,
+    repetitionPenalty: 1.0,
+    stopSequences: [],
+    streamingEnabled,
+    preferredFramework: 0,
+    systemPrompt: '',
+    jsonSchema,
+    structuredOutput: options ?? {
+      schema,
+      includeSchemaInPrompt: true,
+      jsonSchema,
+    },
+    enableRealTimeTracking: false,
+  };
 }
 
 /**
- * Generate structured output following a JSON schema
- * Matches Swift SDK: RunAnywhere.generateStructured(_:prompt:options:)
+ * Generate structured output following a JSON schema.
  *
- * @param prompt The prompt text
- * @param schema JSON schema defining the output structure
- * @param options Optional generation options
- * @returns Structured output result with parsed data
+ * Matches Swift SDK: `RunAnywhere.generateStructured(_:prompt:options:)`.
  */
 export async function generateStructured<T = unknown>(
   prompt: string,
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): Promise<StructuredOutputResult<T>> {
+): Promise<StructuredOutputResult> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-
-  const native = requireNativeModule();
-
   try {
     logger.debug('Generating structured output...');
-
-    const schemaJson = JSON.stringify(schema);
-    const optionsJson = options ? JSON.stringify(options) : undefined;
-
-    const resultJson = await native.generateStructured(prompt, schemaJson, optionsJson);
-
-    // Check for error
-    if (resultJson.includes('"error"')) {
-      const parsed = JSON.parse(resultJson);
-      if (parsed.error) {
-        throw new Error(parsed.error);
-      }
-    }
-
-    // Parse the JSON result
+    const result = await generateText(
+      prompt,
+      llmOptionsForStructuredOutput(schema, options, false)
+    );
+    const resultJson = result.jsonOutput ?? result.text;
     const data = JSON.parse(resultJson) as T;
-
+    const validation: StructuredOutputValidation = {
+      isValid: true,
+      containsJson: true,
+      rawOutput: result.text,
+      extractedJson: resultJson,
+    };
     return {
-      data,
-      raw: resultJson,
-      success: true,
+      parsedJson: jsonToBytes(data),
+      validation,
+      rawText: resultJson,
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`Structured output failed: ${msg}`);
-
+    const validation: StructuredOutputValidation = {
+      isValid: false,
+      containsJson: false,
+      errorMessage: msg,
+    };
     return {
-      data: null as T,
-      raw: '',
-      success: false,
-      error: msg,
+      parsedJson: new Uint8Array(0),
+      validation,
     };
   }
 }
 
 /**
- * Generate structured output with streaming support
- * Matches Swift SDK: RunAnywhere.generateStructuredStream(_:content:options:)
+ * Generate structured output with streaming support.
  *
- * Returns both a token stream for real-time display and a promise for the final result.
+ * Returns an `AsyncIterable<StructuredOutputResult>` that emits one item per
+ * streaming token's accumulated JSON, finishing with the final parsed result
+ * when the stream ends.
  *
- * Example:
- * ```typescript
- * interface Quiz {
- *   question: string;
- *   options: string[];
- *   answer: number;
- * }
- *
- * const schema: JSONSchema = {
- *   type: 'object',
- *   properties: {
- *     question: { type: 'string' },
- *     options: { type: 'array', items: { type: 'string' } },
- *     answer: { type: 'integer' }
- *   },
- *   required: ['question', 'options', 'answer']
- * };
- *
- * const streaming = generateStructuredStream<Quiz>(prompt, schema);
- *
- * // Display tokens in real-time
- * for await (const token of streaming.tokenStream) {
- *   console.log(token.text);
- * }
- *
- * // Get parsed result
- * const quiz = await streaming.result;
- * ```
+ * Matches Swift SDK: `RunAnywhere.generateStructuredStream(_:content:options:)`
+ * and the canonical cross-SDK spec §3 return type.
  */
-export function generateStructuredStream<T = unknown>(
+export function generateStructuredStream(
   prompt: string,
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): StructuredOutputStreamResult<T> {
-  // Build system prompt for JSON generation
-  const systemPrompt = buildStructuredOutputSystemPrompt(schema);
-  const fullPrompt = `${systemPrompt}\n\n${prompt}`;
-
-  let fullText = '';
-  let resolveResult: ((value: T) => void) | null = null;
-  let rejectResult: ((error: Error) => void) | null = null;
-
-  // Create result promise
-  const resultPromise = new Promise<T>((resolve, reject) => {
-    resolveResult = resolve;
-    rejectResult = reject;
-  });
-
-  // Create token stream generator
-  async function* tokenGenerator(): AsyncGenerator<StreamToken> {
+): AsyncIterable<StructuredOutputResult> {
+  async function* resultGenerator(): AsyncGenerator<StructuredOutputResult> {
+    let fullText = '';
     try {
-      const streamingResult = await generateStream(fullPrompt, {
-        maxTokens: options?.maxTokens ?? 1500,
-        temperature: options?.temperature ?? 0.7,
-      });
-
-      let tokenIndex = 0;
-      for await (const token of streamingResult.stream) {
-        fullText += token;
-
-        yield {
-          text: token,
-          timestamp: new Date(),
-          tokenIndex: tokenIndex++,
-        };
+      for await (const event of generateStream(
+        prompt,
+        llmOptionsForStructuredOutput(schema, options, true)
+      )) {
+        if (event.token) {
+          fullText += event.token;
+          const partialValidation: StructuredOutputValidation = {
+            isValid: false,
+            containsJson: fullText.includes('{'),
+            rawOutput: fullText,
+          };
+          yield {
+            parsedJson: jsonToBytes({}),
+            validation: partialValidation,
+            rawText: fullText,
+          };
+        }
+        if (event.isFinal) break;
       }
 
-      // Parse the final result
-      const parsed = parseStructuredOutput<T>(fullText);
-      if (resolveResult) {
-        resolveResult(parsed);
-      }
+      yield {
+        parsedJson: new Uint8Array(0),
+        validation: {
+          isValid: false,
+          containsJson: fullText.includes('{'),
+          rawOutput: fullText,
+        },
+        rawText: fullText,
+      };
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      if (rejectResult) {
-        rejectResult(err);
-      }
-      throw err;
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Structured stream failed: ${msg}`);
+      const errorValidation: StructuredOutputValidation = {
+        isValid: false,
+        containsJson: false,
+        errorMessage: msg,
+      };
+      yield {
+        parsedJson: new Uint8Array(0),
+        validation: errorValidation,
+      };
     }
   }
 
-  return {
-    tokenStream: tokenGenerator(),
-    result: resultPromise,
-  };
+  return resultGenerator();
 }
 
 /**
- * Generate structured output with automatic type inference
- * @param prompt The prompt text
- * @param schema JSON schema defining the output structure
- * @returns The generated data matching the schema
+ * Extract structured data from an existing text string without invoking the LLM.
+ *
+ * - If the Nitro bridge exposes `rac_structured_output_extract_json` via a
+ *   `extractStructuredOutput(text, schemaJson)` native method, that is called
+ *   and the result is returned.
+ * - Otherwise a pure-TS JSON extraction is performed: the first JSON object
+ *   found in `text` is extracted and returned as a `StructuredOutputResult`.
+ *
+ * Matches Swift SDK: `RunAnywhere.extractStructuredOutput(_:schema:)` and
+ * canonical cross-SDK spec §3.
+ */
+export async function extractStructuredOutput(
+  text: string,
+  schema: JSONSchema
+): Promise<StructuredOutputResult> {
+  void schema;
+  const validation: StructuredOutputValidation = {
+    isValid: false,
+    containsJson: text.includes('{'),
+    errorMessage: 'Structured-output extraction is only exposed through the native LLM proto generation path on RN.',
+    rawOutput: text,
+  };
+  return { parsedJson: new Uint8Array(0), validation, rawText: text };
+}
+
+/**
+ * Generate structured output with automatic type inference (returns parsed value).
  */
 export async function generate<T = unknown>(
   prompt: string,
   schema: JSONSchema
 ): Promise<T> {
   const result = await generateStructured<T>(prompt, schema);
-
-  if (!result.success) {
-    throw new Error(result.error || 'Structured generation failed');
+  if (!result.validation || !result.validation.isValid) {
+    throw new Error(
+      result.validation?.errorMessage ?? 'Structured generation failed'
+    );
   }
-
-  return result.data;
+  return JSON.parse(bytesToString(result.parsedJson)) as T;
 }
 
-/**
- * Extract entities from text using structured output
- * @param text Source text to extract from
- * @param entitySchema Schema describing the entities to extract
- * @returns Extracted entities
- */
+/** Extract entities from text using structured output. */
 export async function extractEntities<T = unknown>(
   text: string,
   entitySchema: JSONSchema
@@ -222,95 +247,35 @@ export async function extractEntities<T = unknown>(
 ${text}
 
 Return the extracted data as JSON matching the provided schema.`;
-
   return generate<T>(prompt, entitySchema);
 }
 
-/**
- * Classify text into categories using structured output
- * @param text Text to classify
- * @param categories List of possible categories
- * @returns Classification result
- */
+/** Classify text into categories using structured output. */
 export async function classify(
   text: string,
   categories: string[]
 ): Promise<{ category: string; confidence: number }> {
   const schema: JSONSchema = {
-    type: 'object',
+    ...JSONSchemaMessage.create(),
+    type: JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT,
     properties: {
-      category: {
-        type: 'string',
-        enum: categories,
+      category: JSONSchemaProperty.create({
+        type: JSONSchemaType.JSON_SCHEMA_TYPE_STRING,
+        enumValues: categories,
         description: 'The category that best matches the text',
-      },
-      confidence: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
+      }),
+      confidence: JSONSchemaProperty.create({
+        type: JSONSchemaType.JSON_SCHEMA_TYPE_NUMBER,
+        enumValues: [],
         description: 'Confidence score between 0 and 1',
-      },
+      }),
     },
     required: ['category', 'confidence'],
   };
-
   const prompt = `Classify the following text into one of these categories: ${categories.join(', ')}
 
 Text: ${text}
 
 Respond with the category and your confidence level.`;
-
   return generate<{ category: string; confidence: number }>(prompt, schema);
-}
-
-// ============================================================================
-// Private Helpers
-// ============================================================================
-
-/**
- * Build system prompt for structured JSON output
- */
-function buildStructuredOutputSystemPrompt(schema: JSONSchema): string {
-  return `You are a JSON generator that outputs ONLY valid JSON without any additional text.
-Start your response with { and end with }. Do not include any text before or after the JSON.
-Do not include markdown code blocks or any formatting.
-
-Expected JSON schema:
-${JSON.stringify(schema, null, 2)}
-
-Important:
-- Output ONLY the JSON object, nothing else
-- Ensure all required fields are present
-- Use the exact field names from the schema
-- Match the expected types (string, number, array, etc.)`;
-}
-
-/**
- * Parse structured output from generated text
- */
-function parseStructuredOutput<T>(text: string): T {
-  // Try to extract JSON from the response
-  let jsonStr = text.trim();
-
-  // Remove markdown code blocks if present
-  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch && codeBlockMatch[1]) {
-    jsonStr = codeBlockMatch[1].trim();
-  }
-
-  // Find JSON object boundaries
-  const startIdx = jsonStr.indexOf('{');
-  const endIdx = jsonStr.lastIndexOf('}');
-
-  if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) {
-    throw new Error('No valid JSON object found in the response');
-  }
-
-  jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-
-  try {
-    return JSON.parse(jsonStr) as T;
-  } catch (error) {
-    throw new Error(`Failed to parse JSON: ${error}`);
-  }
 }

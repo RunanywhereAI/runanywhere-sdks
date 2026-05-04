@@ -5,10 +5,12 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'dart:typed_data';
+
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
-import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -58,6 +60,15 @@ class DartBridgeTelemetry {
     _logger.debug('Telemetry sync init for ${environment.name}');
   }
 
+  /// Detect unfilled .env / dart-define template placeholders.
+  /// Returns true for strings like "YOUR_SUPABASE_PROJECT_URL",
+  /// "<your-key>", "REPLACE_ME", etc. (B-FL-1-004 / B-WEB-9-001).
+  static bool _looksLikePlaceholder(String? value) {
+    if (value == null) return false;
+    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+        .hasMatch(value);
+  }
+
   /// Flush any queued telemetry events.
   /// Static method that delegates to instance if initialized.
   /// Matches Swift: CppBridge.Telemetry.flush()
@@ -84,6 +95,18 @@ class DartBridgeTelemetry {
   }) async {
     if (_isInitialized) {
       _logger.debug('Telemetry already initialized');
+      return;
+    }
+
+    // B-FL-1-004: bail out if the example app forwarded an unfilled
+    // .env / dart-define placeholder. We don't want to POST telemetry
+    // to a literal "YOUR_SUPABASE_PROJECT_URL" string.
+    if (_looksLikePlaceholder(baseURL) || _looksLikePlaceholder(accessToken)) {
+      _logger.warning(
+        'Telemetry skipped — baseURL/accessToken looks like a placeholder. '
+        'Set real values via dart-define or runtime config.',
+      );
+      _isInitialized = true; // Suppress retry.
       return;
     }
 
@@ -636,7 +659,7 @@ Future<void> _sendTelemetryHttp(
   try {
     final baseURL =
         DartBridgeTelemetry._baseURL ?? 'https://api.runanywhere.ai';
-    final url = Uri.parse('$baseURL$endpoint');
+    final url = '$baseURL$endpoint';
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -647,11 +670,15 @@ Future<void> _sendTelemetryHttp(
       headers['Authorization'] = 'Bearer ${DartBridgeTelemetry._accessToken}';
     }
 
-    final response = await http.post(url, headers: headers, body: body);
+    final response = await HTTPClientAdapter.shared.rawRequest(
+      method: 'POST',
+      url: url,
+      headers: headers,
+      body: Uint8List.fromList(utf8.encode(body)),
+    );
 
-    // Notify C++ of completion (optional - for retry logic)
     _notifyHttpComplete(
-      response.statusCode >= 200 && response.statusCode < 300,
+      response.isSuccess,
       response.body,
       null,
     );

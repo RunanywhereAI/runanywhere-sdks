@@ -61,7 +61,7 @@ struct AddModelFromURLView: View {
             #endif
             .navigationTitle("Add Model from URL")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 #if os(iOS)
@@ -189,6 +189,7 @@ struct AddModelFromURLView: View {
                 supportsThinking: supportsThinking
             )
         }
+        await RunAnywhere.flushPendingRegistrations()
 
         await MainActor.run {
             onModelAdded(modelInfo)

@@ -15,13 +15,11 @@ JavaVM* g_javaVM = nullptr;
 // PlatformAdapterBridge class and methods for secure storage (used by InitBridge.cpp)
 // NOT static - needs to be accessible from InitBridge.cpp
 jclass g_platformAdapterBridgeClass = nullptr;
-jclass g_httpResponseClass = nullptr;  // Inner class for httpPostSync response
 jmethodID g_secureSetMethod = nullptr;
 jmethodID g_secureGetMethod = nullptr;
 jmethodID g_secureDeleteMethod = nullptr;
 jmethodID g_secureExistsMethod = nullptr;
 jmethodID g_getPersistentDeviceUUIDMethod = nullptr;
-jmethodID g_httpPostSyncMethod = nullptr;
 jmethodID g_getDeviceModelMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
 jmethodID g_getChipNameMethod = nullptr;
@@ -33,11 +31,6 @@ jmethodID g_getGPUFamilyMethod = nullptr;
 jmethodID g_isTabletMethod = nullptr;
 jmethodID g_httpDownloadMethod = nullptr;
 jmethodID g_httpDownloadCancelMethod = nullptr;
-// HttpResponse field IDs
-jfieldID g_httpResponse_successField = nullptr;
-jfieldID g_httpResponse_statusCodeField = nullptr;
-jfieldID g_httpResponse_responseBodyField = nullptr;
-jfieldID g_httpResponse_errorMessageField = nullptr;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
   g_javaVM = vm;
@@ -57,7 +50,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_secureDeleteMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
       g_secureExistsMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureExists", "(Ljava/lang/String;)Z");
       g_getPersistentDeviceUUIDMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
-      g_httpPostSyncMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpPostSync", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse;");
       g_getDeviceModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceModel", "()Ljava/lang/String;");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
       g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
@@ -78,29 +70,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         LOGI("PlatformAdapterBridge class and methods cached successfully");
       } else {
         LOGE("Failed to cache some PlatformAdapterBridge methods");
-        if (env->ExceptionCheck()) {
-          env->ExceptionClear();
-        }
-      }
-
-      // Cache HttpResponse inner class and its fields
-      jclass responseClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse");
-      if (responseClass != nullptr) {
-        g_httpResponseClass = (jclass)env->NewGlobalRef(responseClass);
-        env->DeleteLocalRef(responseClass);
-
-        g_httpResponse_successField = env->GetFieldID(g_httpResponseClass, "success", "Z");
-        g_httpResponse_statusCodeField = env->GetFieldID(g_httpResponseClass, "statusCode", "I");
-        g_httpResponse_responseBodyField = env->GetFieldID(g_httpResponseClass, "responseBody", "Ljava/lang/String;");
-        g_httpResponse_errorMessageField = env->GetFieldID(g_httpResponseClass, "errorMessage", "Ljava/lang/String;");
-
-        if (g_httpResponse_successField && g_httpResponse_statusCodeField) {
-          LOGI("HttpResponse class and fields cached successfully");
-        } else {
-          LOGE("Failed to cache HttpResponse fields");
-        }
-      } else {
-        LOGE("Failed to find HttpResponse inner class at JNI_OnLoad");
         if (env->ExceptionCheck()) {
           env->ExceptionClear();
         }

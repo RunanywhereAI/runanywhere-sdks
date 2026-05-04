@@ -6,9 +6,7 @@ module.exports = {
         packageImportPath: 'import com.margelo.nitro.runanywhere.RunAnywhereCorePackage;',
         packageInstance: 'new RunAnywhereCorePackage()',
       },
-      ios: {
-        podspecPath: './RunAnywhereCore.podspec',
-      },
+      ios: {},
     },
   },
 };

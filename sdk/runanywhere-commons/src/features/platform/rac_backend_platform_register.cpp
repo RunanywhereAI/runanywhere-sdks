@@ -142,8 +142,35 @@ static void platform_llm_vtable_destroy(void* impl) {
     }
 }
 
-// Static vtable for Platform LLM
-static const rac_llm_service_ops_t g_platform_llm_ops = {
+// v3 Phase B7: Platform LLM `create` adapter (Apple Foundation Models).
+// Delegates to the Swift-side create callback.
+static rac_result_t platform_llm_create_impl(const char* model_id,
+                                             const char* /*config_json*/,
+                                             void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+
+    const auto* callbacks = rac_platform_llm_get_callbacks();
+    if (!callbacks || !callbacks->create) {
+        RAC_LOG_ERROR(LOG_CAT, "LLM create: Swift callbacks not registered");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Creating Foundation Models LLM service via Swift: model=%s",
+                 model_id ? model_id : "(default)");
+
+    rac_llm_platform_config_t config = {};
+    rac_handle_t backend_handle = callbacks->create(model_id, &config, callbacks->user_data);
+    if (!backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
+        return RAC_ERROR_UNKNOWN;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+}  // namespace
+
+extern "C" const rac_llm_service_ops_t g_platform_llm_ops = {
     .initialize = platform_llm_vtable_initialize,
     .generate = platform_llm_vtable_generate,
     .generate_stream = platform_llm_vtable_generate_stream,
@@ -151,7 +178,10 @@ static const rac_llm_service_ops_t g_platform_llm_ops = {
     .cancel = platform_llm_vtable_cancel,
     .cleanup = platform_llm_vtable_cleanup,
     .destroy = platform_llm_vtable_destroy,
+    .create = platform_llm_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // TTS VTABLE IMPLEMENTATION - System TTS
@@ -262,8 +292,35 @@ static void platform_tts_vtable_destroy(void* impl) {
     }
 }
 
-// Static vtable for Platform TTS
-static const rac_tts_service_ops_t g_platform_tts_ops = {
+// v3 Phase B7: Platform TTS `create` adapter (System TTS).
+static rac_result_t platform_tts_create_impl(const char* model_id,
+                                             const char* /*config_json*/,
+                                             void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+
+    const auto* callbacks = rac_platform_tts_get_callbacks();
+    if (!callbacks || !callbacks->create) {
+        RAC_LOG_ERROR(LOG_CAT, "TTS create: Swift callbacks not registered");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Creating System TTS service via Swift: voice=%s",
+                 model_id ? model_id : "(default)");
+
+    rac_tts_platform_config_t config = {};
+    config.voice_id = model_id;
+    rac_handle_t backend_handle = callbacks->create(&config, callbacks->user_data);
+    if (!backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift TTS create callback returned null");
+        return RAC_ERROR_UNKNOWN;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+}  // namespace
+
+extern "C" const rac_tts_service_ops_t g_platform_tts_ops = {
     .initialize = platform_tts_vtable_initialize,
     .synthesize = platform_tts_vtable_synthesize,
     .synthesize_stream = platform_tts_vtable_synthesize_stream,
@@ -271,7 +328,10 @@ static const rac_tts_service_ops_t g_platform_tts_ops = {
     .get_info = platform_tts_vtable_get_info,
     .cleanup = platform_tts_vtable_cleanup,
     .destroy = platform_tts_vtable_destroy,
+    .create = platform_tts_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // DIFFUSION VTABLE IMPLEMENTATION - ml-stable-diffusion
@@ -442,8 +502,39 @@ static void platform_diffusion_vtable_destroy(void* impl) {
     }
 }
 
-// Static vtable for Platform Diffusion
-static const rac_diffusion_service_ops_t g_platform_diffusion_ops = {
+// v3 Phase B7: Platform Diffusion `create` adapter (CoreML Diffusion).
+static rac_result_t platform_diffusion_create_impl(const char* model_id,
+                                                   const char* /*config_json*/,
+                                                   void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+
+    const auto* callbacks = rac_platform_diffusion_get_callbacks();
+    if (!callbacks || !callbacks->create) {
+        RAC_LOG_ERROR(LOG_CAT, "Diffusion create: Swift callbacks not registered");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    RAC_LOG_INFO(LOG_CAT,
+                 "Creating CoreML Diffusion service via Swift: model=%s",
+                 model_id ? model_id : "(default)");
+
+    rac_diffusion_platform_config_t config = {};
+    config.model_variant = RAC_DIFFUSION_MODEL_SD_1_5;
+    config.enable_safety_checker = RAC_TRUE;
+    config.reduce_memory = RAC_FALSE;
+    config.compute_units = 0;
+    rac_handle_t backend_handle = callbacks->create(model_id, &config, callbacks->user_data);
+    if (!backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift diffusion create callback returned null");
+        return RAC_ERROR_UNKNOWN;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+}  // namespace
+
+extern "C" const rac_diffusion_service_ops_t g_platform_diffusion_ops = {
     .initialize = platform_diffusion_vtable_initialize,
     .generate = platform_diffusion_vtable_generate,
     .generate_with_progress = platform_diffusion_vtable_generate_with_progress,
@@ -452,7 +543,10 @@ static const rac_diffusion_service_ops_t g_platform_diffusion_ops = {
     .cancel = platform_diffusion_vtable_cancel,
     .cleanup = platform_diffusion_vtable_cleanup,
     .destroy = platform_diffusion_vtable_destroy,
+    .create = platform_diffusion_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // REGISTRY STATE
@@ -461,9 +555,6 @@ static const rac_diffusion_service_ops_t g_platform_diffusion_ops = {
 struct PlatformRegistryState {
     std::mutex mutex;
     bool registered = false;
-    char provider_llm_name[32] = "AppleFoundationModels";
-    char provider_tts_name[32] = "SystemTTS";
-    char provider_diffusion_name[32] = "CoreMLDiffusion";
     char module_id[16] = "platform";
 };
 
@@ -472,325 +563,17 @@ PlatformRegistryState& get_state() {
     return state;
 }
 
-// =============================================================================
-// LLM SERVICE PROVIDER - Apple Foundation Models
-// =============================================================================
-
-rac_bool_t platform_llm_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    // Check framework hint first
-    if (request->framework == RAC_FRAMEWORK_FOUNDATION_MODELS) {
-        RAC_LOG_DEBUG(LOG_CAT, "LLM can_handle: framework match -> true");
-        return RAC_TRUE;
-    }
-
-    // If framework explicitly set to something else, don't handle
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
-        return RAC_FALSE;
-    }
-
-    // Check if Swift callbacks are available
-    const auto* callbacks = rac_platform_llm_get_callbacks();
-    if (callbacks == nullptr || callbacks->can_handle == nullptr) {
-        return RAC_FALSE;
-    }
-
-    // Delegate to Swift
-    return callbacks->can_handle(request->identifier, callbacks->user_data);
-}
-
-/**
- * Create Foundation Models LLM service with vtable.
- * Returns an rac_llm_service_t* that the generic API can dispatch through.
- */
-rac_handle_t platform_llm_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "LLM create: null request");
-        return nullptr;
-    }
-
-    const auto* callbacks = rac_platform_llm_get_callbacks();
-    if (callbacks == nullptr || callbacks->create == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "LLM create: Swift callbacks not registered");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating Foundation Models LLM service via Swift");
-
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    rac_llm_platform_config_t config = {};
-
-    // Create backend-specific handle via Swift
-    rac_handle_t backend_handle = callbacks->create(model_path, &config, callbacks->user_data);
-    if (!backend_handle) {
-        RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
-        return nullptr;
-    }
-
-    // Allocate service struct with vtable
-    auto* service = static_cast<rac_llm_service_t*>(malloc(sizeof(rac_llm_service_t)));
-    if (!service) {
-        rac_llm_platform_destroy(static_cast<rac_llm_platform_handle_t>(backend_handle));
-        return nullptr;
-    }
-
-    service->ops = &g_platform_llm_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "Foundation Models LLM service created successfully");
-    return service;
-}
-
-// =============================================================================
-// TTS SERVICE PROVIDER - System TTS
-// =============================================================================
-
-rac_bool_t platform_tts_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    // Check framework hint first
-    if (request->framework == RAC_FRAMEWORK_SYSTEM_TTS) {
-        RAC_LOG_DEBUG(LOG_CAT, "TTS can_handle: framework match -> true");
-        return RAC_TRUE;
-    }
-
-    // If framework explicitly set to something else, don't handle
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
-        return RAC_FALSE;
-    }
-
-    // Check if Swift callbacks are available
-    const auto* callbacks = rac_platform_tts_get_callbacks();
-    if (callbacks == nullptr || callbacks->can_handle == nullptr) {
-        return RAC_FALSE;
-    }
-
-    // Delegate to Swift
-    return callbacks->can_handle(request->identifier, callbacks->user_data);
-}
-
-/**
- * Create System TTS service with vtable.
- * Returns an rac_tts_service_t* that the generic API can dispatch through.
- */
-rac_handle_t platform_tts_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    const auto* callbacks = rac_platform_tts_get_callbacks();
-    if (callbacks == nullptr || callbacks->create == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "TTS create: Swift callbacks not registered");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating System TTS service via Swift");
-
-    rac_tts_platform_config_t config = {};
-    if (request != nullptr && request->identifier != nullptr) {
-        config.voice_id = request->identifier;
-    }
-
-    // Create backend-specific handle via Swift
-    rac_handle_t backend_handle = callbacks->create(&config, callbacks->user_data);
-    if (!backend_handle) {
-        RAC_LOG_ERROR(LOG_CAT, "Swift TTS create callback returned null");
-        return nullptr;
-    }
-
-    // Allocate service struct with vtable
-    auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
-    if (!service) {
-        if (callbacks->destroy) {
-            callbacks->destroy(backend_handle, callbacks->user_data);
-        }
-        return nullptr;
-    }
-
-    service->ops = &g_platform_tts_ops;
-    service->impl = backend_handle;
-    service->model_id = (request && request->identifier) ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "System TTS service created successfully");
-    return service;
-}
-
-// =============================================================================
-// DIFFUSION SERVICE PROVIDER - CoreML Diffusion
-// =============================================================================
-
-rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: ENTRY");
-
-    if (request == nullptr) {
-        RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: null request -> FALSE");
-        return RAC_FALSE;
-    }
-
-    // Get the model path - prefer model_path over identifier
-    const char* path_str = request->model_path ? request->model_path : request->identifier;
-
-    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: path=%s, framework=%d",
-                 path_str ? path_str : "NULL", request->framework);
-
-    // CRITICAL: Check for CoreML model files FIRST, before framework hint
-    // This prevents incorrectly handling ONNX models when registry lookup fails
-    if (path_str != nullptr) {
-        fs::path model_path(path_str);
-
-        // Check if the path itself is a .mlmodelc or .mlpackage
-        std::string extension = model_path.extension().string();
-        if (extension == ".mlmodelc" || extension == ".mlpackage") {
-            if (fs::exists(model_path) && fs::is_directory(model_path)) {
-                RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model at path -> true");
-                return RAC_TRUE;
-            }
-        }
-
-        // Check if directory contains CoreML model subdirectories (Unet.mlmodelc, etc.)
-        if (fs::exists(model_path) && fs::is_directory(model_path)) {
-            try {
-                bool has_coreml_files = false;
-                bool has_onnx_files = false;
-
-                for (const auto& entry : fs::directory_iterator(model_path)) {
-                    std::string name = entry.path().filename().string();
-
-                    // Check for CoreML model directories
-                    if (entry.is_directory()) {
-                        if (name.find(".mlmodelc") != std::string::npos ||
-                            name.find(".mlpackage") != std::string::npos) {
-                            has_coreml_files = true;
-                        }
-                    }
-
-                    // Check for ONNX files - if present, this is NOT a CoreML model
-                    if (entry.path().extension() == ".onnx") {
-                        has_onnx_files = true;
-                    }
-
-                    // Check subdirectories for ONNX files (unet/, text_encoder/, etc.)
-                    if (entry.is_directory() && !has_onnx_files) {
-                        try {
-                            for (const auto& subentry : fs::directory_iterator(entry.path())) {
-                                if (subentry.path().extension() == ".onnx") {
-                                    has_onnx_files = true;
-                                    break;
-                                }
-                            }
-                        } catch (const fs::filesystem_error&) {
-                            // Ignore
-                        }
-                    }
-                }
-
-                // If we found ONNX files, this is NOT a CoreML model - let ONNX backend handle it
-                if (has_onnx_files) {
-                    RAC_LOG_DEBUG(LOG_CAT,
-                                  "Diffusion can_handle: found .onnx files, deferring to ONNX "
-                                  "backend -> false");
-                    return RAC_FALSE;
-                }
-
-                if (has_coreml_files) {
-                    RAC_LOG_DEBUG(LOG_CAT,
-                                  "Diffusion can_handle: found CoreML model in directory -> true");
-                    return RAC_TRUE;
-                }
-            } catch (const fs::filesystem_error&) {
-                // Ignore filesystem errors
-            }
-        }
-    }
-
-    // Only accept framework hint if explicitly set to CoreML AND no path was provided
-    // (this handles built-in models that don't have a path)
-    if (request->framework == RAC_FRAMEWORK_COREML && path_str == nullptr) {
-        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework hint COREML with no path -> true");
-        return RAC_TRUE;
-    }
-
-    // If framework explicitly set to something other than CoreML or Unknown, don't handle
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN && request->framework != RAC_FRAMEWORK_COREML) {
-        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework mismatch (%d) -> false",
-                      request->framework);
-        return RAC_FALSE;
-    }
-
-    // Check if Swift callbacks are available for additional checks
-    const auto* callbacks = rac_platform_diffusion_get_callbacks();
-    if (callbacks == nullptr || callbacks->can_handle == nullptr) {
-        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: no Swift callbacks -> false");
-        return RAC_FALSE;
-    }
-
-    // Delegate to Swift for additional checks (e.g., model ID patterns)
-    rac_bool_t swift_result = callbacks->can_handle(request->identifier, callbacks->user_data);
-    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: Swift callback returned %d", swift_result);
-    return swift_result;
-}
-
-/**
- * Create CoreML Diffusion service with vtable.
- * Returns an rac_diffusion_service_t* that the generic API can dispatch through.
- */
-rac_handle_t platform_diffusion_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "Diffusion create: null request");
-        return nullptr;
-    }
-
-    const auto* callbacks = rac_platform_diffusion_get_callbacks();
-    if (callbacks == nullptr || callbacks->create == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "Diffusion create: Swift callbacks not registered");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating CoreML Diffusion service via Swift");
-
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    rac_diffusion_platform_config_t config = {};
-    config.model_variant = RAC_DIFFUSION_MODEL_SD_1_5;
-    config.enable_safety_checker = RAC_TRUE;
-    config.reduce_memory = RAC_FALSE;
-    config.compute_units = 0;  // Auto
-
-    // Create backend-specific handle via Swift
-    rac_handle_t backend_handle = callbacks->create(model_path, &config, callbacks->user_data);
-    if (!backend_handle) {
-        RAC_LOG_ERROR(LOG_CAT, "Swift diffusion create callback returned null");
-        return nullptr;
-    }
-
-    // Allocate service struct with vtable
-    auto* service = static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
-    if (!service) {
-        rac_diffusion_platform_destroy(
-            static_cast<rac_diffusion_platform_handle_t>(backend_handle));
-        return nullptr;
-    }
-
-    service->ops = &g_platform_diffusion_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "CoreML Diffusion service created successfully");
-    return service;
-}
+// v3 Phase B7: 3 legacy rac_service_request_t can_handle/create factories
+// removed (platform_llm_can_handle/create, platform_tts_can_handle/create,
+// platform_diffusion_can_handle/create). Framework/model-format gating for
+// RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS, and
+// RAC_FRAMEWORK_COREML (.mlmodelc / .mlpackage) is now encoded in
+// g_platform_engine_vtable.metadata in rac_plugin_entry_platform.cpp.
+// Backend impl allocation goes through the per-ops create adapters
+// above (platform_{llm,tts,diffusion}_create_impl). The CoreML-vs-ONNX
+// directory-scan disambiguation previously in platform_diffusion_can_handle
+// is now redundant because the router picks via model format — .mlmodelc
+// maps to coreml, .onnx maps to onnx, so the two plugins don't collide.
 
 // =============================================================================
 // BUILT-IN MODEL REGISTRATION
@@ -952,7 +735,6 @@ rac_result_t rac_backend_platform_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module
     rac_module_info_t module_info = {};
     module_info.id = state.module_id;
     module_info.name = "Platform Services";
@@ -970,64 +752,16 @@ rac_result_t rac_backend_platform_register(void) {
         return result;
     }
 
-    // Register LLM provider
-    rac_service_provider_t llm_provider = {};
-    llm_provider.name = state.provider_llm_name;
-    llm_provider.capability = RAC_CAPABILITY_TEXT_GENERATION;
-    llm_provider.priority = 50;
-    llm_provider.can_handle = platform_llm_can_handle;
-    llm_provider.create = platform_llm_create;
-    llm_provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&llm_provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(state.module_id);
-        return result;
-    }
-
-    // Register TTS provider
-    rac_service_provider_t tts_provider = {};
-    tts_provider.name = state.provider_tts_name;
-    tts_provider.capability = RAC_CAPABILITY_TTS;
-    tts_provider.priority = 10;
-    tts_provider.can_handle = platform_tts_can_handle;
-    tts_provider.create = platform_tts_create;
-    tts_provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&tts_provider);
-    if (result != RAC_SUCCESS) {
-        rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
-        rac_module_unregister(state.module_id);
-        return result;
-    }
-
-    // Register Diffusion provider
-    RAC_LOG_INFO(LOG_CAT, "Registering CoreMLDiffusion provider with priority=100...");
-    rac_service_provider_t diffusion_provider = {};
-    diffusion_provider.name = state.provider_diffusion_name;
-    diffusion_provider.capability = RAC_CAPABILITY_DIFFUSION;
-    diffusion_provider.priority = 100;  // High priority for platform provider
-    diffusion_provider.can_handle = platform_diffusion_can_handle;
-    diffusion_provider.create = platform_diffusion_create;
-    diffusion_provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&diffusion_provider);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to register CoreMLDiffusion provider: %d", result);
-        rac_service_unregister_provider(state.provider_tts_name, RAC_CAPABILITY_TTS);
-        rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
-        rac_module_unregister(state.module_id);
-        return result;
-    }
-    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion provider registered successfully");
-
-    // Register built-in models
+    // v3 Phase B7: plugin registration for the 3 platform primitives
+    // (LLM, TTS, Diffusion) via rac_plugin_entry_platform() — see
+    // sdk/runanywhere-commons/src/features/platform/rac_plugin_entry_platform.cpp.
     register_foundation_models_entry();
     register_system_tts_entry();
     register_coreml_diffusion_entry();
 
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Platform backend registered successfully");
+    RAC_LOG_INFO(LOG_CAT, "Platform backend registered successfully (module_register + "
+                          "built-in models; plugin registration via rac_plugin_entry_platform)");
     return RAC_SUCCESS;
 }
 
@@ -1039,9 +773,6 @@ rac_result_t rac_backend_platform_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_service_unregister_provider(state.provider_diffusion_name, RAC_CAPABILITY_DIFFUSION);
-    rac_service_unregister_provider(state.provider_tts_name, RAC_CAPABILITY_TTS);
-    rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
     rac_module_unregister(state.module_id);
 
     state.registered = false;

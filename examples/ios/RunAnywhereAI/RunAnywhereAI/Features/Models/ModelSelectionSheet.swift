@@ -109,14 +109,21 @@ struct ModelSelectionSheet: View {
                 }
                 return true
             }
-            .sorted { modelPriority($0) != modelPriority($1)
-                ? modelPriority($0) < modelPriority($1)
-                : $0.name < $1.name
+            .sorted {
+                let lhsPriority = modelPriority($0)
+                let rhsPriority = modelPriority($1)
+                return lhsPriority != rhsPriority ? lhsPriority < rhsPriority : $0.name < $1.name
             }
     }
 
     private func modelPriority(_ model: ModelInfo) -> Int {
-        model.framework == .foundationModels ? 0 : (model.localPath != nil ? 1 : 2)
+        if unavailableReason(for: model) != nil { return 3 }
+        return model.framework == .foundationModels ? 0 : (model.localPath != nil ? 1 : 2)
+    }
+
+    private func unavailableReason(for model: ModelInfo) -> String? {
+        guard model.framework == .foundationModels else { return nil }
+        return SystemFoundationModels.unavailableReason
     }
 
     var body: some View {
@@ -132,7 +139,7 @@ struct ModelSelectionSheet: View {
             }
             .navigationTitle(context.title)
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar { toolbarContent }
         }
@@ -240,6 +247,7 @@ extension ModelSelectionSheet {
         ForEach(availableModels, id: \.id) { model in
             FlatModelRow(
                 model: model,
+                availabilityReason: unavailableReason(for: model),
                 isSelected: selectedModel?.id == model.id,
                 isLoading: isLoadingModel,
                 onDownloadCompleted: { Task { await viewModel.loadModels() } },
@@ -254,6 +262,14 @@ extension ModelSelectionSheet {
 
 extension ModelSelectionSheet {
     private func selectAndLoadModel(_ model: ModelInfo) async {
+        if let reason = unavailableReason(for: model) {
+            await MainActor.run {
+                viewModel.errorMessage = reason
+                selectedModel = nil
+            }
+            return
+        }
+
         if model.framework != .foundationModels {
             guard model.localPath != nil else { return }
         }

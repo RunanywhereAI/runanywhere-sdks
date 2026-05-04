@@ -14,6 +14,7 @@
 #include "rag_chunker.h"
 #include "vector_store_usearch.h"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -72,13 +73,16 @@ class RAGBackend {
     std::vector<SearchResult> search(const std::string& query_text, size_t top_k) const;
 
     /**
-     * @brief End-to-end RAG query with adaptive context accumulation
+     * @brief End-to-end RAG query.
+     *
+     * GAP 05 / T4.6: this method now constructs a per-call GraphScheduler-driven
+     * DAG (Embed → Retrieve → ContextAssembly → LLM) via `run_rag_query()`
+     * instead of running the steps imperatively. When `on_token` is non-null,
+     * tokens are forwarded as the LLM streams them.
      */
     rac_result_t query(const std::string& question, const rac_llm_options_t* options,
-                       rac_llm_result_t* out_result, nlohmann::json& out_metadata);
-
-    std::string build_context(const std::vector<SearchResult>& results) const;
-    std::string format_prompt(const std::string& query, const std::string& context) const;
+                       rac_llm_result_t* out_result, nlohmann::json& out_metadata,
+                       std::function<bool(const std::string&)> on_token = nullptr);
 
     void clear();
     nlohmann::json get_statistics() const;

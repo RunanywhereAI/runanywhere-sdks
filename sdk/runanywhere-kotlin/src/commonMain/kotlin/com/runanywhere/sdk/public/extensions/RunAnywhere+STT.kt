@@ -11,10 +11,11 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.STTOptions
+import ai.runanywhere.proto.v1.STTOutput
+import ai.runanywhere.proto.v1.STTPartialResult
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.STT.STTOptions
-import com.runanywhere.sdk.public.extensions.STT.STTOutput
-import com.runanywhere.sdk.public.extensions.STT.STTTranscriptionResult
+import kotlinx.coroutines.flow.Flow
 
 // MARK: - Simple Transcription
 
@@ -35,8 +36,10 @@ expect suspend fun RunAnywhere.unloadSTTModel()
 
 /**
  * Check if an STT model is loaded.
+ *
+ * Sync property — reads cached state from the component layer without suspension.
  */
-expect suspend fun RunAnywhere.isSTTModelLoaded(): Boolean
+expect val RunAnywhere.isSTTModelLoaded: Boolean
 
 /**
  * Get the currently loaded STT model ID.
@@ -50,6 +53,7 @@ expect val RunAnywhere.currentSTTModelId: String?
  * Check if an STT model is loaded (non-suspend version for quick checks).
  *
  * This accesses cached state and doesn't require suspension.
+ * @deprecated Use isSTTModelLoaded directly.
  */
 expect val RunAnywhere.isSTTModelLoadedSync: Boolean
 
@@ -67,28 +71,40 @@ expect suspend fun RunAnywhere.transcribeWithOptions(
     options: STTOptions,
 ): STTOutput
 
+/** Canonical cross-SDK signature: transcribe(audio, options) → STTOutput */
+suspend fun RunAnywhere.transcribe(
+    audio: ByteArray,
+    options: STTOptions,
+): STTOutput = transcribeWithOptions(audio, options)
+
 // MARK: - Streaming Transcription
 
 /**
- * Transcribe audio with streaming callbacks.
+ * Stream transcription results from audio data.
+ *
+ * Returns a [Flow] that emits [STTPartialResult] for each partial
+ * transcription chunk. The flow completes when transcription is done.
  *
  * @param audioData Audio data to transcribe
  * @param options Transcription options
- * @param onPartialResult Callback for partial results
- * @return Final transcription output
+ * @return Flow of partial transcription results
  */
-expect suspend fun RunAnywhere.transcribeStream(
+expect fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions = STTOptions(),
-    onPartialResult: (STTTranscriptionResult) -> Unit,
-): STTOutput
+): Flow<STTPartialResult>
+
+/**
+ * Whether a streaming STT session is currently active.
+ */
+expect val RunAnywhere.isStreamingSTT: Boolean
 
 /**
  * Process audio samples for streaming transcription.
  *
- * @param samples Audio samples as float array
+ * @param samples Audio samples as raw bytes (PCM 16-bit little-endian)
  */
-expect suspend fun RunAnywhere.processStreamingAudio(samples: FloatArray)
+expect suspend fun RunAnywhere.processStreamingAudio(samples: ByteArray)
 
 /**
  * Stop streaming transcription.

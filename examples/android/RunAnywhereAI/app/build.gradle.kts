@@ -7,11 +7,39 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+val genieAar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val genieRuntimeClassesJar =
+    layout.buildDirectory.file("generated/genie-runtime-classes/runanywhere-genie-android-0.2.1-classes.jar")
+
+val extractGenieClassesJar by tasks.registering {
+    inputs.files(genieAar)
+    outputs.file(genieRuntimeClassesJar)
+
+    doLast {
+        copy {
+            from(zipTree(genieAar.singleFile)) {
+                include("classes.jar")
+                rename { _: String -> genieRuntimeClassesJar.get().asFile.name }
+            }
+            into(genieRuntimeClassesJar.get().asFile.parentFile)
+        }
+    }
+}
+
+val genieRuntimeClasses =
+    files(genieRuntimeClassesJar) {
+        builtBy(extractGenieClassesJar)
+    }
+
 android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
-    ndkVersion = "27.0.12077973"
+    ndkVersion = (project.findProperty("racNdkVersion") as? String) ?: "27.0.12077973"
 
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")
@@ -149,6 +177,20 @@ android {
             // libraries (libc++_shared, libomp, librac_commons). Use a wildcard
             // to safely pick the first copy for any ABI.
             pickFirsts += listOf("lib/**/*.so")
+
+            // runanywhere-genie-android:0.2.1 bundles closed-source Qualcomm
+            // Genie/QNN prebuilts with 4KB LOAD segment alignment. Keep the
+            // Kotlin API dependency for compile-time model registration, but
+            // do not package those natives until a 16KB-compatible AAR exists.
+            excludes +=
+                listOf(
+                    "**/libGenie.so",
+                    "**/libQnn*.so",
+                    "**/librac_backend_genie*.so",
+                    "lib/**/libGenie.so",
+                    "lib/**/libQnn*.so",
+                    "lib/**/librac_backend_genie*.so",
+                )
         }
     }
 
@@ -220,8 +262,13 @@ dependencies {
     implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
     implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
     // RAG pipeline is now part of the core SDK (not a separate module)
-    // Genie: closed-source AAR from Maven Central (Qualcomm NPU backend)
-    implementation("io.github.sanchitmonga22:runanywhere-genie-android:0.2.1")
+    // Genie: closed-source AAR from Maven Central (Qualcomm NPU backend).
+    // Use only its classes.jar until a 16KB-compatible native AAR is available.
+    // The bundled QNN/Genie .so files have 4KB LOAD segment alignment.
+    genieAar("io.github.sanchitmonga22:runanywhere-genie-android:0.2.1@aar") {
+        isTransitive = false
+    }
+    implementation(genieRuntimeClasses)
 
     // AndroidX Core & Lifecycle
     implementation(libs.androidx.core.ktx)

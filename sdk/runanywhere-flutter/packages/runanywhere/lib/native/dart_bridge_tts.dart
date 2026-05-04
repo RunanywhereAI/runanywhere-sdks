@@ -4,13 +4,18 @@
 /// Mirrors Swift's CppBridge+TTS.swift pattern.
 library dart_bridge_tts;
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/features/tts/tts_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/tts_options.pb.dart'
+    show TTSOptions, TTSOutput, TTSVoiceInfo;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -109,7 +114,8 @@ class DartBridgeTTS {
     final namePtr = voiceName.toNativeUtf8();
 
     try {
-      final result = NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
+      final result =
+          NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -153,12 +159,162 @@ class DartBridgeTTS {
 
   // MARK: - Synthesis
 
+  /// Enumerate voices via the generated-proto ABI.
+  Future<List<TTSVoiceInfo>> listVoicesProto() async {
+    final handle = getHandle();
+    final fn = RacNative.bindings.rac_tts_component_list_voices_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_tts_component_list_voices_proto is unavailable');
+    }
+
+    final voices = <TTSVoiceInfo>[];
+    NativeCallable<RacTtsProtoVoiceCallbackNative>? callback;
+
+    try {
+      callback = NativeCallable<RacTtsProtoVoiceCallbackNative>.listener((
+        Pointer<Uint8> bytesPtr,
+        int bytesLen,
+        Pointer<Void> _,
+      ) {
+        if (bytesPtr == nullptr || bytesLen <= 0) return;
+        final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+        voices.add(TTSVoiceInfo.fromBuffer(copy));
+      });
+      final rc = fn(handle, callback.nativeFunction, nullptr);
+      if (rc != RAC_SUCCESS) {
+        throw StateError(
+          'rac_tts_component_list_voices_proto failed: '
+          '${RacResultCode.getMessage(rc)}',
+        );
+      }
+      return voices;
+    } finally {
+      callback?.close();
+    }
+  }
+
+  /// Synthesize speech with serialized runanywhere.v1.TTSOptions.
+  Future<TTSOutput> synthesizeProto(String text, TTSOptions options) async {
+    final handle = getHandle();
+    if (!isLoaded) {
+      throw StateError('No TTS voice loaded. Call loadVoice() first.');
+    }
+
+    final fn = RacNative.bindings.rac_tts_component_synthesize_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_tts_component_synthesize_proto is unavailable');
+    }
+
+    final textPtr = text.toNativeUtf8();
+    final optionBytes = options.writeToBuffer();
+    final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(handle, textPtr, optionPtr, optionBytes.length, out);
+      DartBridgeProtoUtils.ensureSuccess(
+        out,
+        code,
+        'rac_tts_component_synthesize_proto',
+      );
+      return DartBridgeProtoUtils.decodeBuffer(out, TTSOutput.fromBuffer);
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(textPtr);
+      calloc.free(optionPtr);
+      calloc.free(out);
+    }
+  }
+
+  /// Stream synthesized speech chunks through serialized TTSOutput messages.
+  Stream<TTSOutput> synthesizeStreamProto(String text, TTSOptions options) {
+    if (!isLoaded) {
+      return Stream<TTSOutput>.error(
+        StateError('No TTS voice loaded. Call loadVoice() first.'),
+      );
+    }
+    final fn = RacNative.bindings.rac_tts_component_synthesize_stream_proto;
+    if (fn == null) {
+      return Stream<TTSOutput>.error(
+        UnsupportedError(
+            'rac_tts_component_synthesize_stream_proto is unavailable'),
+      );
+    }
+
+    final controller = StreamController<TTSOutput>(sync: false);
+    NativeCallable<RacTtsProtoChunkCallbackNative>? callback;
+
+    Future<void> run() async {
+      final textPtr = text.toNativeUtf8();
+      final optionBytes = options.writeToBuffer();
+      final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
+
+      try {
+        callback = NativeCallable<RacTtsProtoChunkCallbackNative>.listener((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+            return;
+          }
+          try {
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            controller.add(TTSOutput.fromBuffer(copy));
+          } catch (e, st) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+        });
+        final rc = fn(
+          getHandle(),
+          textPtr,
+          optionPtr,
+          optionBytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_tts_component_synthesize_stream_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+        }
+        if (!controller.isClosed) {
+          await controller.close();
+        }
+      } finally {
+        calloc.free(textPtr);
+        calloc.free(optionPtr);
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
+    return controller.stream;
+  }
+
   /// Synthesize speech from text.
   ///
   /// [text] - Text to synthesize.
   /// [rate] - Speech rate (0.5 to 2.0, 1.0 is normal).
   /// [pitch] - Speech pitch (0.5 to 2.0, 1.0 is normal).
   /// [volume] - Speech volume (0.0 to 1.0).
+  /// [language] - BCP-47 language tag (default "en-US").
+  /// [audioFormat] - Output audio format constant (default PCM).
+  /// [sampleRate] - Output sample rate (default 22050).
+  /// [useSsml] - Whether the input is SSML (default false).
+  /// [voiceId] - Override the loaded voice (rarely needed; default null).
   ///
   /// Returns audio data and metadata.
   /// Runs in a background isolate to prevent UI blocking.
@@ -167,8 +323,13 @@ class DartBridgeTTS {
     double rate = 1.0,
     double pitch = 1.0,
     double volume = 1.0,
+    String language = 'en-US',
+    int audioFormat = racAudioFormatPcm,
+    int sampleRate = 22050,
+    bool useSsml = false,
+    String? voiceId,
   }) async {
-    TTSConfiguration(
+    TTSComponentConfig(
       speakingRate: rate,
       pitch: pitch,
       volume: volume,
@@ -190,6 +351,11 @@ class DartBridgeTTS {
           rate,
           pitch,
           volume,
+          language,
+          audioFormat,
+          sampleRate,
+          useSsml,
+          voiceId,
         ));
 
     _logger.info(
@@ -206,6 +372,11 @@ class DartBridgeTTS {
     double rate,
     double pitch,
     double volume,
+    String language,
+    int audioFormat,
+    int sampleRate,
+    bool useSsml,
+    String? voiceId,
   ) {
     final lib = PlatformLoader.loadCommons();
     final handle = RacHandle.fromAddress(handleAddress);
@@ -214,18 +385,19 @@ class DartBridgeTTS {
     final textPtr = text.toNativeUtf8();
     final optionsPtr = calloc<RacTtsOptionsStruct>();
     final resultPtr = calloc<RacTtsResultStruct>();
+    final voicePtr = voiceId?.toNativeUtf8();
 
     try {
-      // Set up options (matches Swift's TTSOptions)
-      final languagePtr = 'en-US'.toNativeUtf8();
-      optionsPtr.ref.voice = nullptr; // Use default voice
+      // Set up options (matches Swift's TTSOptions wire shape).
+      final languagePtr = language.toNativeUtf8();
+      optionsPtr.ref.voice = voicePtr ?? nullptr;
       optionsPtr.ref.language = languagePtr;
       optionsPtr.ref.rate = rate;
       optionsPtr.ref.pitch = pitch;
       optionsPtr.ref.volume = volume;
-      optionsPtr.ref.audioFormat = racAudioFormatPcm;
-      optionsPtr.ref.sampleRate = 22050; // Piper default
-      optionsPtr.ref.useSsml = RAC_FALSE;
+      optionsPtr.ref.audioFormat = audioFormat;
+      optionsPtr.ref.sampleRate = sampleRate;
+      optionsPtr.ref.useSsml = useSsml ? RAC_TRUE : RAC_FALSE;
 
       // Get synthesize function
       final synthesizeFn = lib.lookupFunction<
@@ -261,7 +433,7 @@ class DartBridgeTTS {
       // Extract result before freeing
       final result = resultPtr.ref;
       final audioSize = result.audioSize;
-      final sampleRate = result.sampleRate;
+      final outputSampleRate = result.sampleRate;
       final durationMs = result.durationMs;
 
       // Convert audio data to Float32List
@@ -271,29 +443,75 @@ class DartBridgeTTS {
         // Audio size is in bytes, each float is 4 bytes
         final numSamples = audioSize ~/ 4;
         final floatPtr = result.audioData.cast<Float>();
+        // `Float32List.fromList` performs an element-by-element copy out of
+        // the native buffer so the returned list is owned by the Dart heap.
         samples = Float32List.fromList(floatPtr.asTypedList(numSamples));
       } else {
         samples = Float32List(0);
       }
 
+      // B-FL-12-002: the C ABI is "callee allocates audio_data via malloc(),
+      // caller MUST free via rac_tts_result_free()" (see rac_tts_service.h
+      // line 115). Skipping this leaks ~1 MiB per synthesis and — combined
+      // with the Cleaner-thread sweep that runs on the libc heap — eventually
+      // trips Scudo's corrupted-chunk-header detector inside
+      // BinderProxy_destroy / Binder_destroy on the ReferenceQueueDaemon
+      // thread, killing the process via SIGABRT. Calling
+      // rac_tts_result_free after the copy returns the buffer to libc through
+      // the same allocator that produced it (Sherpa malloc -> libc free) and
+      // matches the contract every other binding (Swift / Kotlin / RN) honors.
+      try {
+        final freeFn = lib.lookupFunction<
+            Void Function(Pointer<RacTtsResultStruct>),
+            void Function(Pointer<RacTtsResultStruct>)>('rac_tts_result_free');
+        freeFn(resultPtr);
+      } catch (_) {
+        // If the symbol isn't exported on this build, fall back silently —
+        // we still surface the synthesized samples to the caller.
+      }
+
       return TTSComponentResult(
         samples: samples,
-        sampleRate: sampleRate,
+        sampleRate: outputSampleRate,
         durationMs: durationMs,
       );
     } finally {
       calloc.free(textPtr);
       calloc.free(optionsPtr);
       calloc.free(resultPtr);
+      if (voicePtr != null) {
+        calloc.free(voicePtr);
+      }
     }
   }
 
   /// Synthesize with streaming.
   ///
-  /// Returns a stream of audio chunks.
-  Stream<TTSStreamResult> synthesizeStream(String text) async* {
-    // For now, generate all audio and emit in chunks
-    final result = await synthesize(text);
+  /// Returns a stream of audio chunks. Until the underlying C bridge
+  /// supports per-chunk callbacks, this fans out the synchronous
+  /// result in ~100 ms slices.
+  Stream<TTSStreamResult> synthesizeStream(
+    String text, {
+    double rate = 1.0,
+    double pitch = 1.0,
+    double volume = 1.0,
+    String language = 'en-US',
+    int audioFormat = racAudioFormatPcm,
+    int sampleRate = 22050,
+    bool useSsml = false,
+    String? voiceId,
+  }) async* {
+    final result = await synthesize(
+      text,
+      rate: rate,
+      pitch: pitch,
+      volume: volume,
+      language: language,
+      audioFormat: audioFormat,
+      sampleRate: sampleRate,
+      useSsml: useSsml,
+      voiceId: voiceId,
+    );
 
     // Emit in ~100ms chunks
     final samplesPerChunk = (result.sampleRate * 0.1).round();

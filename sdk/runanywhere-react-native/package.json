@@ -4,7 +4,8 @@
   "private": true,
   "description": "RunAnywhere React Native SDK - Multi-Package Monorepo",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "../runanywhere-proto-ts"
   ],
   "scripts": {
     "build": "yarn workspaces foreach -A run build",

@@ -42,41 +42,15 @@ export * from './types';
 // =============================================================================
 
 export {
-  // Error Codes
+  // Canonical proto error types (numeric codes + categories).
   ErrorCode,
-  getErrorCodeMessage,
-  // Error Category
   ErrorCategory,
-  allErrorCategories,
-  getCategoryFromCode,
-  inferCategoryFromError,
-  // Error Context
-  type ErrorContext,
-  createErrorContext,
-  formatStackTrace,
-  formatLocation,
-  formatContext,
-  ContextualError,
-  withContext,
-  getErrorContext,
-  getUnderlyingError,
-  // SDKError
-  SDKErrorCode,
-  type SDKErrorProtocol,
-  SDKError,
-  asSDKError,
-  isSDKError,
-  captureAndThrow,
-  notInitializedError,
-  alreadyInitializedError,
-  invalidInputError,
-  modelNotFoundError,
-  modelLoadError,
-  networkError,
-  authenticationError,
-  generationError,
-  storageError,
+  // Sole throwable surface — proto-backed `Error` subclass.
+  SDKException,
+  isSDKException,
+  asSDKException,
 } from './Foundation/ErrorTypes';
+export type { ErrorContext } from './Foundation/ErrorTypes';
 
 // =============================================================================
 // Foundation - Initialization
@@ -156,11 +130,6 @@ export {
   MultiFileModelCache,
   DownloadService,
   DownloadState,
-  SystemTTSService,
-  getVoicesByLanguage,
-  getDefaultVoice,
-  getPlatformDefaultVoice,
-  PlatformVoices,
   type ModelCriteria,
   type AddModelFromURLOptions,
   type ModelFileDescriptor,
@@ -171,30 +140,29 @@ export {
 } from './services';
 
 // =============================================================================
-// Network Layer - Using axios (industry standard HTTP library)
+// Network Layer — HTTP transport is owned by native C++ (rac_http_client_*).
+// These exports are for configuration / telemetry / endpoints only.
 // =============================================================================
 
 export {
-  // HTTP Service
-  HTTPService,
-  // Configuration
   SDKEnvironment,
   createNetworkConfig,
   getEnvironmentName,
+  looksLikePlaceholder,
+  isUsableHttpUrl,
+  isUsableCredential,
+  hasUsableBackendConfig,
+  hasUsableSupabaseConfig,
   isDevelopment,
   isProduction,
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
-  // Telemetry
   TelemetryService,
   TelemetryCategory,
-  // Endpoints
   APIEndpoints,
 } from './services';
 
 export type {
-  HTTPServiceConfig,
-  DevModeConfig,
   NetworkConfig,
   APIEndpointKey,
   APIEndpointValue,
@@ -207,8 +175,6 @@ export type {
 export {
   AudioCaptureManager,
   AudioPlaybackManager,
-  VoiceSessionHandle,
-  DEFAULT_VOICE_SESSION_CONFIG,
 } from './Features';
 export type {
   AudioDataCallback,
@@ -219,12 +185,18 @@ export type {
   PlaybackCompletionCallback,
   PlaybackErrorCallback,
   PlaybackConfig,
-  VoiceSessionConfig,
-  VoiceSessionEvent,
-  VoiceSessionEventType,
-  VoiceSessionEventCallback,
-  VoiceSessionState,
 } from './Features';
+// v3.1: VoiceSessionHandle + DEFAULT_VOICE_SESSION_CONFIG +
+// VoiceSessionConfig/Event/EventType/EventCallback/State DELETED.
+
+// v3.1: proto-stream VoiceAgentStreamAdapter (canonical path).
+export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
+
+// Canonical public streaming method for voice agent (§10 spec).
+export { streamVoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
+
+// G-A2: proto-stream LLMStreamAdapter (canonical path) — mirrors Web's adapter.
+export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
 
 // =============================================================================
 // Native Module (now part of core)
@@ -257,9 +229,32 @@ export {
   downloadModel,
   cancelDownload,
   deleteModel,
+  deleteAllModels,
   registerModel,
   registerMultiFileModel,
+  refreshModelRegistry,
 } from './Public/Extensions/RunAnywhere+Models';
+
+export {
+  checkStorageAvailability,
+  deleteStorage,
+  getStorageInfoProto,
+  planStorageDelete,
+} from './Public/Extensions/RunAnywhere+Storage';
+
+export {
+  pollSDKEvent,
+  publishSDKEvent,
+  publishSDKFailure,
+  subscribeSDKEvents,
+} from './Public/Extensions/RunAnywhere+Events';
+
+export {
+  getComponentLifecycleSnapshot,
+  getCurrentModel,
+  loadModelLifecycle,
+  unloadModelLifecycle,
+} from './Public/Extensions/RunAnywhere+Lifecycle';
 
 // =============================================================================
 // Device / NPU Chip Detection
@@ -273,6 +268,19 @@ export {
   getNPUDownloadUrl,
   npuChipFromSocModel,
 } from './types/NPUChip';
+
+// =============================================================================
+// Hardware Profile (CANONICAL_API §14)
+// =============================================================================
+
+export {
+  Hardware,
+  getHardwareProfile,
+  getHardwareChip,
+  hardwareHasNeuralEngine,
+  hardwareAccelerationMode,
+} from './Public/Extensions';
+export type { HardwareProfileResult } from './Public/Extensions';
 
 // =============================================================================
 // RAG Pipeline
@@ -304,7 +312,116 @@ export {
   processImage,
   processImageStream,
   cancelVLMGeneration,
-} from './Public/Extensions/RunAnywhere+VLM';
+} from './Public/Extensions/RunAnywhere+VisionLanguage';
+
+// =============================================================================
+// LoRA Adapter Management — canonical `RunAnywhere.lora.*` namespace
+// =============================================================================
+
+export { lora } from './Public/Extensions/RunAnywhere+LoRA';
+
+export type {
+  LoRAAdapterConfig,
+  LoRAAdapterInfo,
+  LoraAdapterCatalogEntry,
+  LoraCompatibilityResult,
+} from '@runanywhere/proto-ts/lora_options';
+
+// =============================================================================
+// Diffusion / Image Generation
+// =============================================================================
+
+export {
+  generateImage,
+  generateImageStream,
+  loadDiffusionModel,
+  unloadDiffusionModel,
+  isDiffusionModelLoaded,
+  currentDiffusionModelId,
+  currentDiffusionFramework,
+  cancelImageGeneration,
+  getDiffusionCapabilities,
+} from './Public/Extensions/RunAnywhere+Diffusion';
+
+export {
+  DiffusionModelVariant,
+  DiffusionScheduler,
+  DiffusionMode,
+  DiffusionTokenizerSourceKind,
+} from '@runanywhere/proto-ts/diffusion_options';
+
+export type {
+  DiffusionConfiguration,
+  DiffusionGenerationOptions,
+  DiffusionProgress,
+  DiffusionResult,
+  DiffusionCapabilities,
+  DiffusionTokenizerSource,
+} from '@runanywhere/proto-ts/diffusion_options';
+
+// Streaming wrapper (RN-local, AsyncIterable shape — no proto counterpart).
+export type { DiffusionStreamingResult } from './Public/Extensions/RunAnywhere+Diffusion';
+
+// =============================================================================
+// Live Transcription Session
+// =============================================================================
+
+export {
+  LiveTranscriptionSession,
+  LiveTranscriptionError,
+  startLiveTranscription,
+} from './Public/Sessions/LiveTranscriptionSession';
+export type { LiveTranscriptionListener } from './Public/Sessions/LiveTranscriptionSession';
+
+// =============================================================================
+// Streaming type re-exports for newly aligned AsyncIterable shapes
+// =============================================================================
+
+export type { STTStreamingResult } from './Public/Extensions/RunAnywhere+STT';
+export type { TTSStreamingResult } from './Public/Extensions/RunAnywhere+TTS';
+export type { VLMStreamingResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
+
+// =============================================================================
+// Phase D namespace extensions (new). Mirror Swift `+Frameworks`,
+// `+ModelAssignments`, `+ModelManagement`, `+PluginLoader`, `+VLMModels`.
+// =============================================================================
+
+export {
+  getRegisteredFrameworks,
+  getFrameworks,
+  getModelsForFramework as getModelsForFrameworkExt,
+} from './Public/Extensions/RunAnywhere+Frameworks';
+
+export {
+  fetchModelAssignments,
+  getModelsForFramework as getModelsForFrameworkAssignment,
+  getModelsForCategory,
+} from './Public/Extensions/RunAnywhere+ModelAssignments';
+
+export {
+  loadModelByCategory,
+  resolveModelFilePath,
+  ensureModelDownloaded,
+} from './Public/Extensions/RunAnywhere+ModelManagement';
+
+export {
+  pluginApiVersion,
+  loadPlugin,
+  unloadPlugin,
+  registeredPluginCount,
+  registeredPluginNames,
+} from './Public/Extensions/RunAnywhere+PluginLoader';
+
+export {
+  loadVLMModel as loadVLMModelByInfo,
+} from './Public/Extensions/RunAnywhere+VLMModels';
+
+// =============================================================================
+// Phase C-prime ergonomic helpers — proto factory defaults + predicates
+// =============================================================================
+
+import * as helpers from './helpers';
+export { helpers };
 
 export type {
   RAGConfiguration,
@@ -312,7 +429,7 @@ export type {
   RAGResult,
   RAGSearchResult,
   RAGStatistics,
-} from './types/RAGTypes';
+} from '@runanywhere/proto-ts/rag';
 
 // =============================================================================
 // Nitrogen Spec Types

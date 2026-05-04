@@ -31,14 +31,16 @@
 /// ```
 library runanywhere_llamacpp;
 
-import 'dart:async' show unawaited;
+import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework, ModelCategory;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/public/runanywhere.dart' show RunAnywhere;
+import 'package:runanywhere/public/runanywhere_v4.dart' show RunAnywhereSDK;
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 
 // Re-export for backward compatibility
@@ -80,13 +82,17 @@ class LlamaCpp implements RunAnywhereModule {
   String get moduleName => 'LlamaCPP';
 
   @override
-  Set<SDKComponent> get capabilities => {SDKComponent.llm, SDKComponent.vlm};
+  Set<SDKComponent> get capabilities => {
+        SDKComponent.SDK_COMPONENT_LLM,
+        SDKComponent.SDK_COMPONENT_VLM,
+      };
 
   @override
   int get defaultPriority => 100;
 
   @override
-  InferenceFramework get inferenceFramework => InferenceFramework.llamaCpp;
+  InferenceFramework get inferenceFramework =>
+      InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
 
   // ============================================================================
   // Registration State
@@ -185,7 +191,8 @@ class LlamaCpp implements RunAnywhereModule {
       _isVlmRegistered = true;
       _logger.info('LlamaCpp VLM backend registered successfully');
     } catch (e) {
-      _logger.warning('VLM registration failed: $e (VLM features may not be available)');
+      _logger.warning(
+          'VLM registration failed: $e (VLM features may not be available)');
     }
   }
 
@@ -248,12 +255,12 @@ class LlamaCpp implements RunAnywhereModule {
         id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
 
     // Register with the global SDK registry (matches Swift pattern)
-    final model = RunAnywhere.registerModel(
+    final model = RunAnywhereSDK.instance.models.register(
       id: modelId,
       name: name,
       url: uri,
-      framework: InferenceFramework.llamaCpp,
-      modality: ModelCategory.language,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
       memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,
     );

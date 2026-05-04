@@ -14,12 +14,12 @@ import { SDKLogger } from '../Foundation/SDKLogger';
 import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
 import type { LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader, ModelLoadContext } from './ModelLoaderTypes';
 import { OPFSStorage } from './OPFSStorage';
-import type { MetadataMap } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
 import { ModelDownloader } from './ModelDownloader';
 import type { QuotaCheckResult } from './ModelDownloader';
 import type { LocalFileStorage } from './LocalFileStorage';
 import { inferModelFromFilename, sanitizeId } from './ModelFileInference';
+import { ModelStateStore } from './ModelStateStore';
 import type {
   ManagedModel,
   CompactModelDef,
@@ -71,15 +71,7 @@ class ModelManagerImpl {
   private readonly registry = new ModelRegistry();
   private readonly storage = new OPFSStorage();
   private readonly downloader: ModelDownloader;
-
-  /**
-   * Tracks loaded models per category — allows STT + LLM + TTS simultaneously
-   * for the voice pipeline. Key = ModelCategory, Value = model id.
-   */
-  private loadedByCategory: Map<ModelCategory, string> = new Map();
-
-  /** LRU metadata: lastUsedAt timestamps persisted in OPFS */
-  private metadata: MetadataMap = {};
+  private readonly state = new ModelStateStore();
 
   /** Pluggable VLM loader (set by the app via setVLMLoader) */
   private vlmLoader: VLMLoader | null = null;
@@ -103,10 +95,42 @@ class ModelManagerImpl {
 
   // --- Registration API ---
 
-  registerModels(models: CompactModelDef[]): void {
-    this.registry.registerModels(models);
-    // Fire-and-forget — status refresh errors are logged internally.
+  /**
+   * Register a single model (canonical: `RunAnywhere.registerModel`).
+   * Multi-file models (mmproj sidecars, sherpa-onnx archive bundles) should
+   * use `registerMultiFileModel(model)` so the catalog records the extra
+   * artifacts properly.
+   */
+  registerModel(model: CompactModelDef): void {
+    this.registry.registerModels([model]);
     void this.refreshDownloadStatus();
+  }
+
+  /**
+   * Register a multi-file model (additional GGUF files / sidecars / archive
+   * extraction). Today the schema is identical to `registerModel`; the
+   * separate verb exists so callers can express intent and so future
+   * multi-file-only metadata can be enforced statically.
+   */
+  registerMultiFileModel(model: CompactModelDef): void {
+    this.registry.registerModels([model]);
+    void this.refreshDownloadStatus();
+  }
+
+  /**
+   * Internal-only batch helper used by the example app to register a
+   * predefined catalog. Public callers must use `registerModel` /
+   * `registerMultiFileModel`.
+   */
+  registerCatalog(models: CompactModelDef[]): void {
+    this.registry.registerModels(models);
+    void this.refreshDownloadStatus();
+  }
+
+  unregisterModel(modelId: string): void {
+    this.state.removeLoadedModel(modelId);
+    this.registry.removeModel(modelId);
+    this.removeMetadata(modelId);
   }
 
   setVLMLoader(loader: VLMLoader): void {
@@ -148,7 +172,8 @@ class ModelManagerImpl {
     // initStorage() is idempotent — returns immediately if already done.
     await this.storage.initialize();
 
-    this.metadata = await this.storage.loadMetadata();
+    this.state.setMetadata(await this.storage.loadMetadata());
+    const metadata = this.state.getMetadata();
 
     for (const model of this.registry.getModels()) {
       if (model.status !== ModelStatus.Registered) continue;
@@ -157,10 +182,10 @@ class ModelManagerImpl {
         if (size !== null && size > 0) {
           this.registry.updateModel(model.id, { status: ModelStatus.Downloaded, sizeBytes: size });
 
-          if (!this.metadata[model.id]) {
+          if (!metadata[model.id]) {
             const stored = await this.storage.listModels();
             const entry = stored.find((s) => s.id === model.id);
-            this.metadata[model.id] = {
+            metadata[model.id] = {
               lastUsedAt: entry?.lastModified ?? Date.now(),
               sizeBytes: size,
             };
@@ -171,12 +196,13 @@ class ModelManagerImpl {
       }
     }
 
-    await this.storage.saveMetadata(this.metadata);
+    await this.storage.saveMetadata(metadata);
   }
 
   // --- Queries ---
 
   getModels(): ManagedModel[] { return this.registry.getModels(); }
+  getModel(modelId: string): ManagedModel | undefined { return this.registry.getModel(modelId); }
   getModelsByCategory(category: ModelCategory): ManagedModel[] { return this.registry.getModelsByCategory(category); }
   getModelsByFramework(framework: LLMFramework): ManagedModel[] { return this.registry.getModelsByFramework(framework); }
   getLLMModels(): ManagedModel[] { return this.registry.getLLMModels(); }
@@ -187,7 +213,7 @@ class ModelManagerImpl {
 
   getLoadedModel(category?: ModelCategory): ManagedModel | null {
     if (category) {
-      const id = this.loadedByCategory.get(category);
+      const id = this.state.getLoadedModelId(category);
       return id ? this.registry.getModel(id) ?? null : null;
     }
     return this.registry.getModels().find((m) => m.status === ModelStatus.Loaded) ?? null;
@@ -195,13 +221,13 @@ class ModelManagerImpl {
 
   getLoadedModelId(category?: ModelCategory): string | null {
     if (category) {
-      return this.loadedByCategory.get(category) ?? null;
+      return this.state.getLoadedModelId(category);
     }
     return this.registry.getModels().find((m) => m.status === ModelStatus.Loaded)?.id ?? null;
   }
 
   areAllLoaded(categories: ModelCategory[]): boolean {
-    return categories.every((c) => this.loadedByCategory.has(c));
+    return this.state.areAllLoaded(categories);
   }
 
   async ensureLoaded(category: ModelCategory, options?: { coexist?: boolean }): Promise<ManagedModel | null> {
@@ -224,12 +250,16 @@ class ModelManagerImpl {
     const model = this.registry.getModel(modelId);
     if (!model) return { fits: true, availableBytes: 0, neededBytes: 0, evictionCandidates: [] };
 
-    const loadedId = this.loadedByCategory.get(model.modality ?? ModelCategory.Language);
-    return this.downloader.checkStorageQuota(model, this.metadata, loadedId ?? undefined);
+    const loadedId = this.state.getLoadedModelId(model.modality ?? ModelCategory.Language);
+    return this.downloader.checkStorageQuota(model, this.state.getMetadata(), loadedId ?? undefined);
   }
 
   async downloadModel(modelId: string): Promise<void> {
     return this.downloader.downloadModel(modelId);
+  }
+
+  cancelDownload(modelId: string): boolean {
+    return this.downloader.cancelDownload(modelId);
   }
 
   // --- Model Import (file picker / drag-drop) ---
@@ -302,7 +332,7 @@ class ModelManagerImpl {
     const category = model.modality ?? ModelCategory.Language;
 
     if (options?.coexist) {
-      const currentId = this.loadedByCategory.get(category);
+      const currentId = this.state.getLoadedModelId(category);
       if (currentId && currentId !== modelId) {
         logger.info(`Swapping ${category} model: ${currentId} → ${modelId}`);
         await this.unloadModelByCategory(category);
@@ -325,7 +355,7 @@ class ModelManagerImpl {
         const data = await this.downloader.loadFromOPFS(modelId);
         if (!data) throw new Error('Model not downloaded — please download the model first.');
         await this.loadTTSModel(model, data);
-      } else if (model.modality === ModelCategory.Audio) {
+      } else if (model.modality === ModelCategory.VoiceActivityDetection) {
         const data = await this.downloader.loadFromOPFS(modelId);
         if (!data) throw new Error('Model not downloaded — please download the model first.');
         await this.loadVADModel(model, data);
@@ -350,7 +380,7 @@ class ModelManagerImpl {
         await this.loadLLMModel(model, modelId, data, dataStream, file ?? undefined);
       }
 
-      this.loadedByCategory.set(category, modelId);
+      this.state.markLoaded(category, modelId);
       this.registry.updateModel(modelId, { status: ModelStatus.Loaded });
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, { modelId, category });
 
@@ -376,7 +406,7 @@ class ModelManagerImpl {
   }
 
   async unloadAll(exceptModelId?: string): Promise<void> {
-    const loaded = [...this.loadedByCategory.entries()];
+    const loaded = this.state.getLoadedEntries();
     if (loaded.length === 0) return;
 
     for (const [category, loadedId] of loaded) {
@@ -387,12 +417,7 @@ class ModelManagerImpl {
   }
 
   async deleteModel(modelId: string): Promise<void> {
-    for (const [category, id] of this.loadedByCategory) {
-      if (id === modelId) {
-        this.loadedByCategory.delete(category);
-        break;
-      }
-    }
+    this.state.removeLoadedModel(modelId);
 
     await this.downloader.deleteFromOPFS(modelId);
 
@@ -409,8 +434,7 @@ class ModelManagerImpl {
 
   async clearAll(): Promise<void> {
     await this.storage.clearAll();
-    this.metadata = {};
-    this.loadedByCategory.clear();
+    this.state.reset();
     for (const model of this.registry.getModels()) {
       if (model.status !== ModelStatus.Registered) {
         this.registry.updateModel(model.id, {
@@ -420,6 +444,10 @@ class ModelManagerImpl {
         });
       }
     }
+  }
+
+  async deleteAllModels(): Promise<void> {
+    return this.clearAll();
   }
 
   async getStorageInfo(): Promise<{ modelCount: number; totalSize: number; available: number }> {
@@ -453,17 +481,17 @@ class ModelManagerImpl {
   // --- LRU Metadata ---
 
   getModelLastUsedAt(modelId: string): number {
-    return this.metadata[modelId]?.lastUsedAt ?? 0;
+    return this.state.getModelLastUsedAt(modelId);
   }
 
   private touchLastUsed(modelId: string, sizeBytes: number): void {
-    this.metadata[modelId] = { lastUsedAt: Date.now(), sizeBytes };
-    this.storage.saveMetadata(this.metadata).catch(() => { /* non-critical */ });
+    this.state.touchLastUsed(modelId, sizeBytes);
+    this.storage.saveMetadata(this.state.getMetadata()).catch(() => { /* non-critical */ });
   }
 
   private removeMetadata(modelId: string): void {
-    delete this.metadata[modelId];
-    this.storage.saveMetadata(this.metadata).catch(() => { /* non-critical */ });
+    this.state.removeMetadata(modelId);
+    this.storage.saveMetadata(this.state.getMetadata()).catch(() => { /* non-critical */ });
   }
 
   // --- Subscriptions ---
@@ -623,7 +651,7 @@ class ModelManagerImpl {
 
   /** Unload the currently loaded model for a specific category */
   private async unloadModelByCategory(category: ModelCategory): Promise<void> {
-    const modelId = this.loadedByCategory.get(category);
+    const modelId = this.state.getLoadedModelId(category);
     if (!modelId) return;
 
     logger.info(`Unloading ${category} model: ${modelId}`);
@@ -633,7 +661,7 @@ class ModelManagerImpl {
         await this.sttLoader?.unloadModel();
       } else if (category === ModelCategory.SpeechSynthesis) {
         await this.ttsLoader?.unloadVoice();
-      } else if (category === ModelCategory.Audio) {
+      } else if (category === ModelCategory.VoiceActivityDetection) {
         this.vadLoader?.cleanup();
       } else if (category === ModelCategory.Multimodal) {
         await this.vlmLoader?.unloadModel();
@@ -650,7 +678,7 @@ class ModelManagerImpl {
     }
 
     this.registry.updateModel(modelId, { status: ModelStatus.Downloaded });
-    this.loadedByCategory.delete(category);
+    this.state.clearLoaded(category);
     EventBus.shared.emit('model.unloaded', SDKEventType.Model, { modelId, category });
   }
 }

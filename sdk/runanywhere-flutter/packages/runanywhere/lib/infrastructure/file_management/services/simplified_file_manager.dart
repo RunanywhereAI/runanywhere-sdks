@@ -7,10 +7,11 @@ library simplified_file_manager;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:fixnum/fixnum.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 
 /// File manager for RunAnywhere SDK
@@ -172,10 +173,10 @@ class SimplifiedFileManager {
   DeviceStorageInfo getDeviceStorageInfo() {
     // Get device storage stats
     // Note: This is a simplified implementation
-    return const DeviceStorageInfo(
-      totalSpace: 0,
-      freeSpace: 0,
-      usedSpace: 0,
+    return DeviceStorageInfo(
+      totalBytes: Int64.ZERO,
+      freeBytes: Int64.ZERO,
+      usedBytes: Int64.ZERO,
     );
   }
 

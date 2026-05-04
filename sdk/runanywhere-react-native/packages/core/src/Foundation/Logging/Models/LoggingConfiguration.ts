@@ -101,6 +101,8 @@ export function getConfigurationForEnvironment(
       return { ...stagingConfig };
     case SDKEnvironment.Production:
       return { ...productionConfig };
+    default:
+      return { ...developmentConfig };
   }
 }
 

@@ -25,8 +25,16 @@ extern "C" {
 
 #include <sstream>
 #include <chrono>
+#include <cctype>
+#include <cstring>
+#include <fstream>
+#include <optional>
 #include <vector>
 #include <stdexcept>
+
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
 // Category for ONNX module logging
 static const char* LOG_CATEGORY = "ONNX";
@@ -102,6 +110,37 @@ std::string extractStringValue(const std::string& json, const std::string& key, 
   size_t endPos = json.find("\"", pos);
   if (endPos == std::string::npos) return defaultValue;
   return json.substr(pos, endPos - pos);
+}
+
+std::optional<double> extractNumericValue(const std::string& json, const std::string& key) {
+  std::string searchKey = "\"" + key + "\":";
+  size_t pos = json.find(searchKey);
+  if (pos == std::string::npos) return std::nullopt;
+
+  pos += searchKey.length();
+  while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
+    ++pos;
+  }
+
+  size_t endPos = pos;
+  while (endPos < json.size()) {
+    char c = json[endPos];
+    if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+') {
+      ++endPos;
+      continue;
+    }
+    break;
+  }
+
+  if (endPos == pos) {
+    return std::nullopt;
+  }
+
+  try {
+    return std::stod(json.substr(pos, endPos - pos));
+  } catch (...) {
+    return std::nullopt;
+  }
 }
 
 std::string buildJsonObject(const std::vector<std::pair<std::string, std::string>>& keyValues) {
@@ -256,8 +295,89 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereONNX::transcribeFile(
       return buildJsonObject({{"error", jsonString("STT model not loaded")}});
     }
 
-    // TODO: Read audio file and transcribe
-    return buildJsonObject({{"error", jsonString("transcribeFile not yet implemented with rac_* API")}});
+    try {
+      std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+      if (!file.is_open()) {
+        return buildJsonObject({{"error", jsonString("Failed to open audio file")}});
+      }
+
+      std::streamsize fileSize = file.tellg();
+      if (fileSize <= 0) {
+        return buildJsonObject({{"error", jsonString("Audio file is empty")}});
+      }
+
+      file.seekg(0, std::ios::beg);
+      std::vector<uint8_t> fileData(static_cast<size_t>(fileSize));
+      if (!file.read(reinterpret_cast<char*>(fileData.data()), fileSize)) {
+        return buildJsonObject({{"error", jsonString("Failed to read audio file")}});
+      }
+
+      const uint8_t* data = fileData.data();
+      size_t dataSize = fileData.size();
+      int32_t sampleRate = 16000;
+
+      if (dataSize < 44) {
+        return buildJsonObject({{"error", jsonString("File too small to be a valid WAV file")}});
+      }
+      if (data[0] != 'R' || data[1] != 'I' || data[2] != 'F' || data[3] != 'F') {
+        return buildJsonObject({{"error", jsonString("Invalid WAV file: missing RIFF header")}});
+      }
+      if (data[8] != 'W' || data[9] != 'A' || data[10] != 'V' || data[11] != 'E') {
+        return buildJsonObject({{"error", jsonString("Invalid WAV file: missing WAVE format")}});
+      }
+
+      size_t pos = 12;
+      size_t audioDataOffset = 0;
+      size_t audioDataSize = 0;
+
+      while (pos + 8 < dataSize) {
+        char chunkId[5] = {0};
+        std::memcpy(chunkId, &data[pos], 4);
+
+        uint32_t chunkSize = 0;
+        std::memcpy(&chunkSize, &data[pos + 4], sizeof(chunkSize));
+
+        if (std::strcmp(chunkId, "fmt ") == 0) {
+          if (pos + 8 + chunkSize <= dataSize && chunkSize >= 16) {
+            std::memcpy(&sampleRate, &data[pos + 12], sizeof(sampleRate));
+            if (sampleRate <= 0 || sampleRate > 48000) {
+              sampleRate = 16000;
+            }
+          }
+        } else if (std::strcmp(chunkId, "data") == 0) {
+          audioDataOffset = pos + 8;
+          audioDataSize = chunkSize;
+          break;
+        }
+
+        pos += 8 + chunkSize;
+        if (chunkSize % 2 != 0) {
+          ++pos;
+        }
+      }
+
+      if (audioDataSize == 0 || audioDataOffset + audioDataSize > dataSize) {
+        return buildJsonObject({{"error", jsonString("Could not find valid audio data in WAV file")}});
+      }
+
+      if (audioDataSize < 3200) {
+        return buildJsonObject({{"error", jsonString("Recording too short to transcribe")}});
+      }
+
+      STTOptions options;
+      options.language = language.value_or("en");
+      options.sampleRate = sampleRate;
+
+      auto result = STTBridge::shared().transcribe(&data[audioDataOffset], audioDataSize, options);
+
+      return buildJsonObject({
+        {"text", jsonString(result.text)},
+        {"confidence", std::to_string(result.confidence)},
+        {"isFinal", result.isFinal ? "true" : "false"}
+      });
+    } catch (const std::exception& e) {
+      return buildJsonObject({{"error", jsonString(e.what())}});
+    }
   });
 }
 
@@ -331,7 +451,16 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereONNX::synthesize(
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereONNX::getTTSVoices() {
   return Promise<std::string>::async([]() {
-    return std::string("[{\"id\":\"default\",\"name\":\"Default Voice\",\"language\":\"en-US\"}]");
+    const std::string voiceId = TTSBridge::shared().currentModelId();
+    if (voiceId.empty()) {
+      return std::string("[]");
+    }
+
+    return std::string("[") + buildJsonObject({
+      {"id", jsonString(voiceId)},
+      {"name", jsonString(voiceId)},
+      {"language", jsonString("unknown")}
+    }) + "]";
   });
 }
 
@@ -372,8 +501,8 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereONNX::processVAD(
     const std::string& audioBase64,
     const std::optional<std::string>& optionsJson) {
   return Promise<std::string>::async([this, audioBase64, optionsJson]() {
-    if (!VADBridge::shared().isLoaded()) {
-      return buildJsonObject({{"error", jsonString("VAD model not loaded")}});
+    if (!VADBridge::shared().isReady()) {
+      return buildJsonObject({{"error", jsonString("VAD not initialized")}});
     }
 
     auto audioBytes = base64Decode(audioBase64);
@@ -397,9 +526,34 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereONNX::resetVAD() {
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::initializeVAD(
     const std::optional<std::string>& configJson) {
-  return Promise<bool>::async([]() {
-    // TODO: Initialize VAD with config
-    return true;
+  return Promise<bool>::async([configJson]() {
+    int sampleRate = 16000;
+    float frameLengthSeconds = 0.1f;
+    float energyThreshold = 0.005f;
+
+    if (configJson.has_value()) {
+      if (const auto parsed =
+              extractNumericValue(*configJson, "sampleRate").value_or(
+                  extractNumericValue(*configJson, "sample_rate").value_or(16000.0));
+          parsed > 0) {
+        sampleRate = static_cast<int>(parsed);
+      }
+      if (const auto parsed =
+              extractNumericValue(*configJson, "frameLength").value_or(
+                  extractNumericValue(*configJson, "frame_length").value_or(0.1));
+          parsed > 0.0) {
+        frameLengthSeconds = static_cast<float>(parsed);
+      }
+      if (const auto parsed =
+              extractNumericValue(*configJson, "energyThreshold").value_or(
+                  extractNumericValue(*configJson, "energy_threshold").value_or(0.005));
+          parsed > 0.0) {
+        energyThreshold = static_cast<float>(parsed);
+      }
+    }
+
+    auto result = VADBridge::shared().initialize(sampleRate, frameLengthSeconds, energyThreshold);
+    return result == RAC_SUCCESS;
   });
 }
 
@@ -411,15 +565,15 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereONNX::cleanupVAD() {
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::startVAD() {
   return Promise<bool>::async([]() {
-    // TODO: Start VAD processing
-    return true;
+    auto result = VADBridge::shared().start();
+    return result == RAC_SUCCESS;
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::stopVAD() {
   return Promise<bool>::async([]() {
-    // TODO: Stop VAD processing
-    return true;
+    auto result = VADBridge::shared().stop();
+    return result == RAC_SUCCESS;
   });
 }
 
@@ -492,8 +646,36 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereONNX::getLastError() {
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereONNX::getMemoryUsage() {
   return Promise<double>::async([]() {
-    // TODO: Get memory usage from ONNX Runtime
-    return 0.0;
+    double memoryUsageMB = 0.0;
+
+#if defined(__APPLE__)
+    mach_task_basic_info_data_t taskInfo;
+    mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
+    kern_return_t result = task_info(
+        mach_task_self(),
+        MACH_TASK_BASIC_INFO,
+        reinterpret_cast<task_info_t>(&taskInfo),
+        &infoCount
+    );
+
+    if (result == KERN_SUCCESS) {
+      memoryUsageMB = static_cast<double>(taskInfo.resident_size) / (1024.0 * 1024.0);
+    }
+#elif defined(__ANDROID__) || defined(ANDROID)
+    std::ifstream statusFile("/proc/self/status");
+    std::string line;
+    while (std::getline(statusFile, line)) {
+      if (line.rfind("VmRSS:", 0) == 0) {
+        std::istringstream iss(line.substr(6));
+        long vmRssKB = 0;
+        iss >> vmRssKB;
+        memoryUsageMB = static_cast<double>(vmRssKB) / 1024.0;
+        break;
+      }
+    }
+#endif
+
+    return memoryUsageMB;
   });
 }
 

@@ -297,6 +297,32 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_voice_agent_destroy');
 
+  // ---------------------------------------------------------------------------
+  // Voice Agent Proto-Byte Callback ABI (v3-readiness Phase A2 / GAP 09 #6)
+  //
+  // `rac_voice_agent_set_proto_callback` is the canonical streaming entry
+  // point for VoiceEvent. The typed instance-method-style facade lives in
+  // `lib/core/native/rac_native.dart`; this `Function` alias is exposed
+  // here for callers that use the `NativeFunctions.voiceAgentSetProtoCallback`
+  // pattern consistent with the rest of this file.
+  // ---------------------------------------------------------------------------
+
+  static final int Function(
+    RacHandle,
+    Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+    Pointer<Void>,
+  ) voiceAgentSetProtoCallback = _lib.lookupFunction<
+      Int32 Function(
+        RacHandle,
+        Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+        Pointer<Void>,
+      ),
+      int Function(
+        RacHandle,
+        Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+        Pointer<Void>,
+      )>('rac_voice_agent_set_proto_callback');
+
   static final void Function(Pointer<Void>)? racFree = (() {
     try {
       return _lib.lookupFunction<Void Function(Pointer<Void>),
@@ -305,4 +331,50 @@ abstract class NativeFunctions {
       return null;
     }
   })();
+
+  // ---------------------------------------------------------------------------
+  // Solutions runtime (rac/solutions/rac_solution.h) — T4.7/T4.8.
+  //
+  // Proto-byte / YAML driven L5 solution runtime. `solutionCreateFromProto`
+  // and `solutionCreateFromYaml` allocate a `rac_solution_handle_t` via
+  // their out-pointer; the lifecycle verbs (start/stop/cancel/feed/
+  // closeInput/destroy) take that handle directly. Every entry point is
+  // wrapped by the higher-level `RunAnywhereSolutions` capability.
+  // ---------------------------------------------------------------------------
+
+  static final int Function(Pointer<Void>, int, Pointer<RacHandle>)
+      solutionCreateFromProto = _lib.lookupFunction<
+              Int32 Function(Pointer<Void>, IntPtr, Pointer<RacHandle>),
+              int Function(Pointer<Void>, int, Pointer<RacHandle>)>(
+          'rac_solution_create_from_proto');
+
+  static final int Function(Pointer<Utf8>, Pointer<RacHandle>)
+      solutionCreateFromYaml = _lib.lookupFunction<
+              Int32 Function(Pointer<Utf8>, Pointer<RacHandle>),
+              int Function(Pointer<Utf8>, Pointer<RacHandle>)>(
+          'rac_solution_create_from_yaml');
+
+  static final int Function(RacHandle) solutionStart =
+      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
+          'rac_solution_start');
+
+  static final int Function(RacHandle) solutionStop =
+      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
+          'rac_solution_stop');
+
+  static final int Function(RacHandle) solutionCancel =
+      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
+          'rac_solution_cancel');
+
+  static final int Function(RacHandle, Pointer<Utf8>) solutionFeed =
+      _lib.lookupFunction<Int32 Function(RacHandle, Pointer<Utf8>),
+          int Function(RacHandle, Pointer<Utf8>)>('rac_solution_feed');
+
+  static final int Function(RacHandle) solutionCloseInput =
+      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
+          'rac_solution_close_input');
+
+  static final void Function(RacHandle) solutionDestroy =
+      _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
+          'rac_solution_destroy');
 }

@@ -18,6 +18,7 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
   SafeAreaView,
@@ -86,48 +87,50 @@ const _getRelevantCategories = (
 ): Set<ModelCategory> => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return new Set([ModelCategory.Language, ModelCategory.Multimodal]);
+      return new Set([ModelCategory.MODEL_CATEGORY_LANGUAGE, ModelCategory.MODEL_CATEGORY_MULTIMODAL]);
     case ModelSelectionContext.STT:
-      return new Set([ModelCategory.SpeechRecognition]);
+      return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION]);
     case ModelSelectionContext.TTS:
-      return new Set([ModelCategory.SpeechSynthesis]);
+      return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS]);
     case ModelSelectionContext.Voice:
       return new Set([
-        ModelCategory.Language,
-        ModelCategory.Multimodal,
-        ModelCategory.SpeechRecognition,
-        ModelCategory.SpeechSynthesis,
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       ]);
     case ModelSelectionContext.VLM:
-      return new Set([ModelCategory.Multimodal, ModelCategory.Vision]);
+      return new Set([ModelCategory.MODEL_CATEGORY_MULTIMODAL, ModelCategory.MODEL_CATEGORY_VISION]);
     case ModelSelectionContext.RagEmbedding:
-      return new Set([ModelCategory.Embedding]);
+      return new Set([ModelCategory.MODEL_CATEGORY_EMBEDDING]);
     case ModelSelectionContext.RagLLM:
-      return new Set([ModelCategory.Language]);
+      return new Set([ModelCategory.MODEL_CATEGORY_LANGUAGE]);
   }
 };
 
 /**
- * Get category string for SDK filtering (uses SDK's ModelCategory enum values)
+ * Get category for SDK filtering (uses SDK's `ModelCategory` proto enum).
+ * Returns the proto-canonical numeric `ModelCategory` value or `null` to mean
+ * "show all".
  */
 const getCategoryForContext = (
   context: ModelSelectionContext
-): string | null => {
+): SDKModelCategory | null => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return SDKModelCategory.Language; // 'language'
+      return SDKModelCategory.MODEL_CATEGORY_LANGUAGE; // 'language'
     case ModelSelectionContext.STT:
-      return SDKModelCategory.SpeechRecognition; // 'speech-recognition'
+      return SDKModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION; // 'speech-recognition'
     case ModelSelectionContext.TTS:
-      return SDKModelCategory.SpeechSynthesis; // 'speech-synthesis'
+      return SDKModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS; // 'speech-synthesis'
     case ModelSelectionContext.Voice:
       return null; // Show all
     case ModelSelectionContext.VLM:
-      return SDKModelCategory.Multimodal; // 'multimodal'
+      return SDKModelCategory.MODEL_CATEGORY_MULTIMODAL; // 'multimodal'
     case ModelSelectionContext.RagEmbedding:
-      return SDKModelCategory.Embedding; // 'embedding'
+      return SDKModelCategory.MODEL_CATEGORY_EMBEDDING; // 'embedding'
     case ModelSelectionContext.RagLLM:
-      return SDKModelCategory.Language; // 'language'
+      return SDKModelCategory.MODEL_CATEGORY_LANGUAGE; // 'language'
   }
 };
 
@@ -190,6 +193,7 @@ const getFrameworkInfo = (
     [LLMFramework.MediaPipe]: Colors.primaryOrange,
     [LLMFramework.OpenAIWhisper]: Colors.primaryGreen,
     [LLMFramework.Genie]: Colors.primaryPurple,
+    [LLMFramework.Sherpa]: Colors.primaryBlue,
   };
 
   const iconMap: Record<LLMFramework, string> = {
@@ -209,6 +213,7 @@ const getFrameworkInfo = (
     [LLMFramework.MediaPipe]: 'videocam-outline',
     [LLMFramework.OpenAIWhisper]: 'ear-outline',
     [LLMFramework.Genie]: 'hardware-chip-outline',
+    [LLMFramework.Sherpa]: 'mic-outline',
   };
 
   return {
@@ -321,7 +326,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         filteredModels = allModels.filter((m: SDKModelInfo) => {
           const modelCategory = m.category;
           return (
-            modelCategory === SDKModelCategory.Vision ||
+            modelCategory === SDKModelCategory.MODEL_CATEGORY_VISION ||
             String(modelCategory).toLowerCase() === 'vision'
           );
         });
@@ -413,6 +418,15 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   }, [visible, loadData]);
 
+
+  // B-RN-Sheet-Routing: clear stale lists when context changes so we don't
+  // briefly render the previous tab's models while loadData is in flight.
+  useEffect(() => {
+    setAvailableModels([]);
+    setExpandedFramework(null);
+    setSelectedModelId(null);
+  }, [context]);
+
   /**
    * Get frameworks with their model counts
    */
@@ -501,26 +515,37 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    (globalThis as any).__testModels = availableModels;
+    (globalThis as any).__testOnModelSelected = onModelSelected;
+  }, [availableModels]);
+
   /**
    * Handle model download with real-time progress
    * Supports multiple concurrent downloads
    */
   const handleDownloadModel = async (model: SDKModelInfo) => {
+    // B-RN-3-002: log entry so a missing call is visible in metro/logcat
+    console.warn('[ModelSelectionSheet] Download tapped:', model.id);
     // Add this model to downloading set
     setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
     try {
-      // Use real download API with progress callback
-      await RunAnywhere.downloadModel(model.id, (progress) => {
-        // Update progress for this specific model
+      // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
+      const dlIter = RunAnywhere.downloadModel(model.id)[Symbol.asyncIterator]();
+      let dlResult = await dlIter.next();
+      while (!dlResult.done) {
+        const progress = dlResult.value;
         setDownloadingModels((prev) => ({
           ...prev,
-          [model.id]: progress.progress,
+          [model.id]: progress.stageProgress ?? 0,
         }));
         console.warn(
-          `[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
+          `[Download] ${model.id}: ${Math.round((progress.stageProgress ?? 0) * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
         );
-      });
+        dlResult = await dlIter.next();
+      }
 
       // Refresh models after download
       await loadData();
@@ -545,7 +570,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       const systemTTSModel = {
         id: 'system-tts',
         name: 'System TTS',
-        category: ModelCategory.SpeechSynthesis,
+        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         preferredFramework: LLMFramework.SystemTTS,
         compatibleFrameworks: [LLMFramework.SystemTTS],
         isDownloaded: true,
@@ -813,7 +838,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
-                {(model.format || 'GGUF').toUpperCase()}
+                {String(model.format || 'GGUF').toUpperCase()}
               </Text>
             </View>
           </View>
@@ -873,21 +898,32 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <ActivityIndicator size="small" color={Colors.primaryBlue} />
             </View>
           ) : canSelect ? (
-            <TouchableOpacity
+            <Pressable
               style={[
                 styles.selectButton,
                 (isLoadingModel || isSelected) && styles.buttonDisabled,
               ]}
               onPress={() => handleSelectModel(model)}
               disabled={isLoadingModel || isSelected}
+              accessible={true}
+              accessibilityLabel={`Select ${model.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.selectButtonText}>Select</Text>
-            </TouchableOpacity>
+            </Pressable>
           ) : (
+            // B-RN-3-002: Removed `disabled={isLoadingModel}` — concurrent
+            // downloads are supported (each model has its own progress entry
+            // in `downloadingModels`), so a load-in-progress on a different
+            // model must not block downloads. Per-model `isDownloading` is
+            // managed via `downloadingModels[model.id]`.
             <TouchableOpacity
               style={styles.downloadButton}
               onPress={() => handleDownloadModel(model)}
-              disabled={isLoadingModel}
+              disabled={downloadingModels[model.id] !== undefined}
+              accessible={true}
+              accessibilityLabel={`Download ${model.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.downloadButtonText}>Download</Text>
             </TouchableOpacity>
@@ -949,7 +985,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         </View>
 
         {/* Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primaryBlue} />
@@ -1019,6 +1059,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  // B-RN-3-004: ensure the last model row's CTA button clears the
+  // bottom tab bar so users on shorter devices don't have to overscroll
+  // to reveal it.
+  contentContainer: {
+    paddingBottom: 80,
   },
   loadingContainer: {
     flex: 1,

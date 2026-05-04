@@ -48,6 +48,16 @@ class ExtensionRegistryImpl {
     }
   }
 
+  /** Return a snapshot of all registered extensions. */
+  getAll(): SDKExtension[] {
+    return [...this.extensions];
+  }
+
+  /** Whether an extension with the given name is registered. */
+  has(name: string): boolean {
+    return this.extensions.some((e) => e.extensionName === name);
+  }
+
   /** Reset the registry (call after full shutdown). */
   reset(): void {
     this.extensions = [];

@@ -98,11 +98,12 @@ class _ModelsViewState extends State<ModelsView> {
                   icon: Icons.memory,
                   value: device.chipName,
                 ),
-                DeviceInfoRow(
-                  label: 'Memory',
-                  icon: Icons.storage,
-                  value: device.totalMemory.formattedFileSize,
-                ),
+                if (device.totalMemory > 0)
+                  DeviceInfoRow(
+                    label: 'Memory',
+                    icon: Icons.storage,
+                    value: device.totalMemory.formattedFileSize,
+                  ),
                 if (device.neuralEngineAvailable) const NeuralEngineRow(),
               ],
             );
@@ -253,10 +254,10 @@ class _ModelsViewState extends State<ModelsView> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => AddModelFromURLView(
-        onModelAdded: (model) async {
+        onModelAdded: () async {
           // Capture navigator before async gap
           final navigator = Navigator.of(sheetContext);
-          await _viewModel.addImportedModel(model);
+          await _viewModel.loadModels();
           if (mounted) navigator.pop();
         },
       ),

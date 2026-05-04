@@ -89,6 +89,6 @@ public struct MessageModelInfo: Codable, Sendable {
     public init(from modelInfo: ModelInfo) {
         self.modelId = modelInfo.id
         self.modelName = modelInfo.name
-        self.framework = modelInfo.framework.rawValue
+        self.framework = modelInfo.framework.wireString
     }
 }
