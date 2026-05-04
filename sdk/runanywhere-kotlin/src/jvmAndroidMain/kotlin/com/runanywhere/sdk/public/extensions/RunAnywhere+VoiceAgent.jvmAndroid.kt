@@ -57,14 +57,19 @@ private val voiceAgentLogger = SDKLogger.voiceAgent
 
 @Volatile private var voiceAgentInitialized: Boolean = false
 
-private fun areAllComponentsLoaded(): Boolean =
-    CppBridgeSTT.isLoaded && CppBridgeLLM.isLoaded && CppBridgeTTS.isLoaded
+// Mirrors iOS: per-modality load is tracked via the lifecycle-snapshot APIs
+// (CppBridgeModelLifecycleProto). Direct CppBridgeSTT/LLM/TTS.isLoaded only
+// reflects loads that went through those bridges, NOT loads dispatched via
+// the proto-backed RunAnywhere.loadSTTModel / loadLLMModel / loadTTSVoice
+// pathways the example apps use.
+private fun RunAnywhere.areAllComponentsLoadedReflectingLifecycle(): Boolean =
+    isSTTModelLoaded && isLLMModelLoaded && isTTSVoiceLoaded
 
-private fun getMissingComponents(): List<String> {
+private fun RunAnywhere.getMissingComponents(): List<String> {
     val missing = mutableListOf<String>()
-    if (!CppBridgeSTT.isLoaded) missing.add("STT")
-    if (!CppBridgeLLM.isLoaded) missing.add("LLM")
-    if (!CppBridgeTTS.isLoaded) missing.add("TTS")
+    if (!isSTTModelLoaded) missing.add("STT")
+    if (!isLLMModelLoaded) missing.add("LLM")
+    if (!isTTSVoiceLoaded) missing.add("TTS")
     return missing
 }
 
@@ -89,16 +94,43 @@ actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
 
 actual suspend fun RunAnywhere.getVoiceAgentComponentStates(): VoiceAgentComponentStates {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle())
+    // Mirrors Swift's RunAnywhere+VoiceAgent.getVoiceAgentComponentStates():
+    // when the composite voice-agent handle is uninitialized (the common
+    // case while the user is still loading individual STT/LLM/TTS models
+    // via the per-modality APIs), the C++ layer returns NOT_LOADED for
+    // everything. Fall back to the per-component lifecycle snapshots so
+    // the UI can gate Start once the three modalities are ready. Use
+    // isSTTModelLoaded / isLLMModelLoaded / isTTSVoiceLoaded which all
+    // query CppBridgeModelLifecycleProto — the same source the per-
+    // modality load APIs feed.
+    val composite = runCatching {
+        CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle())
+    }.getOrNull()
+    val sttLoaded = (composite?.stt_state == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED) ||
+        isSTTModelLoaded
+    val llmLoaded = (composite?.llm_state == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED) ||
+        isLLMModelLoaded
+    val ttsLoaded = (composite?.tts_state == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED) ||
+        isTTSVoiceLoaded
+    fun stateOf(loaded: Boolean, fallback: ComponentLoadState) =
+        if (loaded) ComponentLoadState.COMPONENT_LOAD_STATE_LOADED else fallback
+    return VoiceAgentComponentStates(
+        stt_state = stateOf(sttLoaded, composite?.stt_state ?: ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED),
+        llm_state = stateOf(llmLoaded, composite?.llm_state ?: ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED),
+        tts_state = stateOf(ttsLoaded, composite?.tts_state ?: ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED),
+        vad_state = composite?.vad_state ?: ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
+        ready = sttLoaded && llmLoaded && ttsLoaded,
+        any_loading = composite?.any_loading ?: false,
+    )
 }
 
 actual suspend fun RunAnywhere.isVoiceAgentReady(): Boolean =
-    isInitialized && CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle()).ready
+    isInitialized && getVoiceAgentComponentStates().ready
 
 actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    if (voiceAgentInitialized && areAllComponentsLoaded()) return
-    if (!areAllComponentsLoaded()) {
+    if (voiceAgentInitialized && areAllComponentsLoadedReflectingLifecycle()) return
+    if (!areAllComponentsLoadedReflectingLifecycle()) {
         val missing = getMissingComponents()
         throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
     }

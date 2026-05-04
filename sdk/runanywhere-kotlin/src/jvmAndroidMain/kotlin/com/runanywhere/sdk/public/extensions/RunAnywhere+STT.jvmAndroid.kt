@@ -18,6 +18,7 @@ import ai.runanywhere.proto.v1.STTPartialResult
 import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTTProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -44,6 +45,11 @@ actual suspend fun RunAnywhere.unloadSTTModel() {
     CppBridgeModelLifecycleProto.unload(
         ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
     ) ?: throw SDKException.stt("Native model lifecycle unload proto API unavailable")
+    // Release the parallel standalone bridge instance loaded by loadSTTModel
+    // (see RunAnywhere+ModelManagement.jvmAndroid.kt).
+    if (CppBridgeSTT.isLoaded) {
+        CppBridgeSTT.unload()
+    }
 }
 
 actual val RunAnywhere.isSTTModelLoaded: Boolean

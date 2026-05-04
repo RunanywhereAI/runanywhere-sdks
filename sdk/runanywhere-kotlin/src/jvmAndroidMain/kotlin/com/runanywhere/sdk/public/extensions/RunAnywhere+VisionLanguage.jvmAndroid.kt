@@ -8,6 +8,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMResult
@@ -23,6 +24,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
 private val vlmLogger = SDKLogger("VLM")
+
+// rac_vlm_process_stream_proto bypasses the component-layer stripping done by
+// vlm_strip_special_tokens (vlm_component.cpp), so chat-template control tokens
+// like `<|im_end|>` leak into the per-token stream. Strip them here before
+// yielding to match the non-streaming `processImage` path's user-visible text.
+private val SPECIAL_TOKEN_REGEX = Regex("<\\|[^|]*\\|>")
+private fun stripSpecialTokens(token: String): String = SPECIAL_TOKEN_REGEX.replace(token, "")
 
 // MARK: - Simple API
 
@@ -89,16 +97,33 @@ actual fun RunAnywhere.processImageStream(
             throw SDKException.vlm("VLM model not loaded")
         }
 
-        // Run blocking JNI call on IO dispatcher; callbackFlow handles cancellation
+        // Mirrors Swift RunAnywhere+VisionLanguage processImageStream: parse
+        // proto generation events and yield per-token strings as they arrive
+        // so the UI can render token-by-token. Previously we discarded all
+        // events and only emitted the full result text once at completion.
+        val streamingOptions = (options ?: VLMGenerationOptions()).copy(
+            prompt = prompt,
+            streaming_enabled = true,
+        )
         val job =
             launch(Dispatchers.IO) {
                 try {
-                    val result =
-                        CppBridgeVLMProto.processStream(
-                            image,
-                            (options ?: VLMGenerationOptions()).copy(prompt = prompt),
-                        ) { true }
-                    trySend(result.text)
+                    CppBridgeVLMProto.processStream(image, streamingOptions) { event ->
+                        val gen = event.generation
+                        if (gen != null) {
+                            when (gen.kind) {
+                                GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
+                                GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED -> {
+                                    val cleaned = stripSpecialTokens(gen.token)
+                                    if (cleaned.isNotEmpty()) {
+                                        trySend(cleaned)
+                                    }
+                                }
+                                else -> { /* streaming_update / completed / failed handled by final result */ }
+                            }
+                        }
+                        true
+                    }
                     close()
                 } catch (e: Exception) {
                     close(e)
@@ -127,6 +152,10 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
     }
 
     val resultDeferred = CompletableDeferred<VLMResult>()
+    val streamingOptions = (options ?: VLMGenerationOptions()).copy(
+        prompt = prompt,
+        streaming_enabled = true,
+    )
 
     val tokenStream =
         callbackFlow {
@@ -134,11 +163,20 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
                 launch(Dispatchers.IO) {
                     try {
                         val result =
-                            CppBridgeVLMProto.processStream(
-                                image,
-                                (options ?: VLMGenerationOptions()).copy(prompt = prompt),
-                            ) { true }
-                        trySend(result.text)
+                            CppBridgeVLMProto.processStream(image, streamingOptions) { event ->
+                                val gen = event.generation
+                                if (gen != null) {
+                                    when (gen.kind) {
+                                        GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
+                                        GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED -> {
+                                            val cleaned = stripSpecialTokens(gen.token)
+                                            if (cleaned.isNotEmpty()) trySend(cleaned)
+                                        }
+                                        else -> { /* no-op */ }
+                                    }
+                                }
+                                true
+                            }
                         resultDeferred.complete(result)
                         close()
                     } catch (e: Exception) {

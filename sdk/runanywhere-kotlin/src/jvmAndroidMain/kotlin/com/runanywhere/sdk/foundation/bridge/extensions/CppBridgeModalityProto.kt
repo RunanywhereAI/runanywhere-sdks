@@ -258,11 +258,40 @@ object CppBridgeVLMProto {
     @Synchronized
     fun loadModelById(modelId: String): Int {
         destroy()
+
+        // Resolve model + mmproj paths from registry. The C++ service path
+        // (rac_vlm_create + rac_vlm_initialize) requires explicit file paths;
+        // only the component lifecycle resolves them automatically. Mirror
+        // rac_vlm_component_load_model_by_id's behaviour here so the proto
+        // streaming bridge actually loads weights into the llama.cpp context.
+        val info = CppBridgeModelRegistry.get(modelId)
+            ?: return RunAnywhereBridge.RAC_ERROR_NOT_FOUND
+        val localPath = info.local_path.takeIf { it.isNotBlank() }
+            ?: return RunAnywhereBridge.RAC_ERROR_NOT_FOUND
+        val (modelPath, mmprojPath) = resolveVlmModelFiles(localPath)
+            ?: return RunAnywhereBridge.RAC_ERROR_NOT_FOUND
+
         val serviceHandle = RunAnywhereBridge.racVlmCreate(modelId)
         if (serviceHandle == 0L) return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+        val rc = RunAnywhereBridge.racVlmInitialize(serviceHandle, modelPath, mmprojPath)
+        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+            RunAnywhereBridge.racVlmDestroy(serviceHandle)
+            return rc
+        }
         handle = serviceHandle
         loadedModelId = modelId
         return RunAnywhereBridge.RAC_SUCCESS
+    }
+
+    private fun resolveVlmModelFiles(localPath: String): Pair<String, String?>? {
+        val file = java.io.File(localPath)
+        val dir = if (file.isDirectory) file else file.parentFile ?: return null
+        val ggufFiles = dir.listFiles { f -> f.isFile && f.name.endsWith(".gguf") }
+            ?.toList().orEmpty()
+        if (ggufFiles.isEmpty()) return null
+        val mmproj = ggufFiles.firstOrNull { it.name.startsWith("mmproj", ignoreCase = true) }
+        val model = ggufFiles.firstOrNull { it != mmproj } ?: return null
+        return model.absolutePath to mmproj?.absolutePath
     }
 
     @Synchronized
@@ -555,10 +584,19 @@ object CppBridgeVoiceAgentProto {
             "racVoiceAgentComponentStatesProto",
         )
 
-    fun processVoiceTurn(handle: Long, audioData: ByteArray): VoiceAgentResult =
-        decodeOrThrow(
-            VoiceAgentResult.ADAPTER,
-            RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(handle, audioData),
-            "racVoiceAgentProcessVoiceTurnProto",
-        )
+    // Silent / no-speech audio causes the C++ voice-agent to skip the STT→LLM
+    // →TTS pipeline and return null bytes. That isn't an error — there's just
+    // nothing to say back. Map null to an empty VoiceAgentResult so callers
+    // can treat the "no speech detected" UX without catching SDKException.
+    fun processVoiceTurn(handle: Long, audioData: ByteArray): VoiceAgentResult {
+        val bytes = RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(handle, audioData)
+            ?: return VoiceAgentResult()
+        return try {
+            VoiceAgentResult.ADAPTER.decode(bytes)
+        } catch (e: Exception) {
+            throw SDKException.operation(
+                "Failed to decode racVoiceAgentProcessVoiceTurnProto result: ${e.message}",
+            )
+        }
+    }
 }

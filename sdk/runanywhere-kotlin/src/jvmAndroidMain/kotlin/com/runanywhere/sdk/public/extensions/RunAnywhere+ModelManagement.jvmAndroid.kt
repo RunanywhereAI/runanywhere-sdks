@@ -33,7 +33,9 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
@@ -930,8 +932,33 @@ private suspend fun extractArchive(
 
         val finalPath =
             if (expectedModelDir.exists() && expectedModelDir.isDirectory) {
-                // Standard case: archive root folder name matches modelId
-                expectedModelDir.absolutePath
+                // Standard case: archive root folder name matches modelId.
+                // If `parentDir` is itself the per-model directory (parentDir.name == modelId),
+                // the extracted folder ends up nested as `parentDir/modelId/<files>`. The
+                // C++ filesystem-scan only resolves models to `parentDir` (the modelId-named
+                // dir it knows about), not the nested duplicate, so STT/TTS load fails after
+                // a cold start. Flatten by hoisting the inner files up one level so the
+                // model lives directly under the modelId-named folder.
+                if (parentDir.name == modelId) {
+                    val innerFiles = expectedModelDir.listFiles()?.toList().orEmpty()
+                    var hoisted = 0
+                    innerFiles.forEach { f ->
+                        val dest = File(parentDir, f.name)
+                        if (dest.exists()) {
+                            if (dest.isDirectory) dest.deleteRecursively() else dest.delete()
+                        }
+                        if (!f.renameTo(dest)) {
+                            f.copyRecursively(dest, overwrite = true)
+                            if (f.isDirectory) f.deleteRecursively() else f.delete()
+                        }
+                        hoisted++
+                    }
+                    expectedModelDir.delete()
+                    logger.info("Flattened nested extraction: hoisted $hoisted entries up into '${parentDir.absolutePath}'")
+                    parentDir.absolutePath
+                } else {
+                    expectedModelDir.absolutePath
+                }
             } else if (newDirs.size == 1 && newFiles.isEmpty()) {
                 // Archive had a single root directory with a different name (e.g. Genie NPU
                 // tar.gz containing "llama_v3_2_1b_instruct-genie-w4-qualcomm_snapdragon_8_elite/").
@@ -1197,6 +1224,18 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     if (!result.success) {
         throw SDKException.stt(
             result.error_message.ifBlank { "Failed to load STT model '$modelId' from $localPath" },
+        )
+    }
+    // Lifecycle and the standalone STT component bridge maintain separate
+    // backend impls. The proto-canonical `transcribe` path (CppBridgeSTTProto
+    // → racSttComponentTranscribeProto) reads from the standalone bridge's
+    // handle, so the lifecycle load above leaves it empty and synth fails
+    // with "STT model is not loaded". Mirror the load into the standalone
+    // bridge so transcribe can use it.
+    val bridgeRc = CppBridgeSTT.loadModel(localPath, modelId, model.name)
+    if (bridgeRc != 0) {
+        throw SDKException.stt(
+            "Failed to load STT model into standalone bridge: $modelId (rc=$bridgeRc)",
         )
     }
 }

@@ -23,6 +23,7 @@ import com.runanywhere.sdk.features.tts.TtsAudioPlayback
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTSProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -62,6 +63,17 @@ actual suspend fun RunAnywhere.loadTTSModel(modelId: String) {
             result.error_message.ifBlank { "Failed to load TTS model '$modelId' from $localPath" },
         )
     }
+    // Lifecycle and the standalone TTS component bridge maintain separate
+    // backend impls. The proto-canonical `synthesize` path
+    // (CppBridgeTTSProto → racTtsComponentSynthesizeProto) reads from the
+    // standalone bridge's handle; without this mirror the call returns null
+    // because no model is loaded into that handle.
+    val bridgeRc = CppBridgeTTS.loadModel(localPath, modelId, modelInfo.name)
+    if (bridgeRc != 0) {
+        throw SDKException.tts(
+            "Failed to load TTS model into standalone bridge: $modelId (rc=$bridgeRc)",
+        )
+    }
     ttsLogger.info("TTS model loaded: $modelId")
 }
 
@@ -70,6 +82,9 @@ actual suspend fun RunAnywhere.unloadTTSModel() {
         throw SDKException.notInitialized("SDK not initialized")
     }
     unloadModel(ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
+    if (CppBridgeTTS.isLoaded) {
+        CppBridgeTTS.unload()
+    }
     ttsLogger.info("TTS model unloaded")
 }
 
@@ -101,6 +116,13 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
         ttsLogger.error(message)
         throw SDKException.tts(message)
     }
+    // Mirror into standalone bridge; see comment in loadTTSModel().
+    val bridgeRc = CppBridgeTTS.loadModel(localPath, voiceId, modelInfo.name)
+    if (bridgeRc != 0) {
+        throw SDKException.tts(
+            "Failed to load TTS voice into standalone bridge: $voiceId (rc=$bridgeRc)",
+        )
+    }
     ttsLogger.info("TTS voice loaded: $voiceId")
 }
 
@@ -109,6 +131,9 @@ actual suspend fun RunAnywhere.unloadTTSVoice() {
         throw SDKException.notInitialized("SDK not initialized")
     }
     unloadModel(ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
+    if (CppBridgeTTS.isLoaded) {
+        CppBridgeTTS.unload()
+    }
 }
 
 actual val RunAnywhere.isTTSVoiceLoaded: Boolean
