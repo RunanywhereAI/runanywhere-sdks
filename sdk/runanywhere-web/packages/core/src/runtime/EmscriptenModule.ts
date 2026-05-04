@@ -23,6 +23,11 @@
  *  live in each backend package".
  */
 
+import { DownloadAdapter } from '../Adapters/DownloadAdapter';
+import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
+import { ModalityProtoAdapter } from '../Adapters/ModalityProtoAdapter';
+import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
+
 /**
  * Minimal subset of the Emscripten Module object that this SDK uses.
  * Add exported-function signatures here as they're wired through the
@@ -70,6 +75,191 @@ export interface EmscriptenRunanywhereModule {
     userData: number,
   ): number;
   _rac_llm_unset_stream_proto_callback(handle: number): number;
+
+  // -----------------------------------------------------------------------------
+  // Generated-proto modality ABI
+  // -----------------------------------------------------------------------------
+  _rac_llm_generate_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_llm_generate_stream_proto?(
+    requestBytes: number,
+    requestSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_llm_cancel_proto?(outEvent: number): number;
+
+  _rac_stt_component_transcribe_proto?(
+    handle: number,
+    audioData: number,
+    audioSize: number,
+    optionsBytes: number,
+    optionsSize: number,
+    outResult: number,
+  ): number;
+  _rac_stt_component_transcribe_stream_proto?(
+    handle: number,
+    audioData: number,
+    audioSize: number,
+    optionsBytes: number,
+    optionsSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+
+  _rac_tts_component_list_voices_proto?(
+    handle: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_tts_component_synthesize_proto?(
+    handle: number,
+    text: number,
+    optionsBytes: number,
+    optionsSize: number,
+    outResult: number,
+  ): number;
+  _rac_tts_component_synthesize_stream_proto?(
+    handle: number,
+    text: number,
+    optionsBytes: number,
+    optionsSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+
+  _rac_vad_component_configure_proto?(
+    handle: number,
+    configBytes: number,
+    configSize: number,
+  ): number;
+  _rac_vad_component_process_proto?(
+    handle: number,
+    samples: number,
+    numSamples: number,
+    optionsBytes: number,
+    optionsSize: number,
+    outResult: number,
+  ): number;
+  _rac_vad_component_get_statistics_proto?(
+    handle: number,
+    outResult: number,
+  ): number;
+  _rac_vad_component_set_activity_proto_callback?(
+    handle: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+
+  _rac_voice_agent_initialize_proto?(
+    handle: number,
+    configBytes: number,
+    configSize: number,
+    outComponentStates: number,
+  ): number;
+  _rac_voice_agent_component_states_proto?(
+    handle: number,
+    outComponentStates: number,
+  ): number;
+  _rac_voice_agent_process_voice_turn_proto?(
+    handle: number,
+    audioData: number,
+    audioSize: number,
+    outResult: number,
+  ): number;
+
+  _rac_vlm_process_proto?(
+    handle: number,
+    imageBytes: number,
+    imageSize: number,
+    optionsBytes: number,
+    optionsSize: number,
+    outResult: number,
+  ): number;
+  _rac_vlm_process_stream_proto?(
+    handle: number,
+    imageBytes: number,
+    imageSize: number,
+    optionsBytes: number,
+    optionsSize: number,
+    callbackPtr: number,
+    userData: number,
+    outResult: number,
+  ): number;
+  _rac_vlm_cancel_proto?(handle: number): number;
+
+  _rac_embeddings_embed_batch_proto?(
+    handle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
+  _rac_diffusion_generate_proto?(
+    handle: number,
+    optionsBytes: number,
+    optionsSize: number,
+    outResult: number,
+  ): number;
+  _rac_diffusion_generate_with_progress_proto?(
+    handle: number,
+    optionsBytes: number,
+    optionsSize: number,
+    callbackPtr: number,
+    userData: number,
+    outResult: number,
+  ): number;
+  _rac_diffusion_cancel_proto?(handle: number): number;
+
+  _rac_rag_session_create_proto?(
+    configBytes: number,
+    configSize: number,
+    outSession: number,
+  ): number;
+  _rac_rag_session_destroy_proto?(session: number): void;
+  _rac_rag_ingest_proto?(
+    session: number,
+    documentBytes: number,
+    documentSize: number,
+    outStats: number,
+  ): number;
+  _rac_rag_query_proto?(
+    session: number,
+    queryBytes: number,
+    querySize: number,
+    outResult: number,
+  ): number;
+  _rac_rag_clear_proto?(session: number, outStats: number): number;
+  _rac_rag_stats_proto?(session: number, outStats: number): number;
+
+  _rac_lora_register_proto?(
+    registry: number,
+    entryBytes: number,
+    entrySize: number,
+    outEntry: number,
+  ): number;
+  _rac_lora_compatibility_proto?(
+    llmComponent: number,
+    configBytes: number,
+    configSize: number,
+    outResult: number,
+  ): number;
+  _rac_lora_load_proto?(
+    llmComponent: number,
+    configBytes: number,
+    configSize: number,
+    outInfo: number,
+  ): number;
+  _rac_lora_remove_proto?(
+    llmComponent: number,
+    configBytes: number,
+    configSize: number,
+    outInfo: number,
+  ): number;
+  _rac_lora_clear_proto?(llmComponent: number, outInfo: number): number;
 
   // -----------------------------------------------------------------------------
   // LLM Thinking (v3 Phase A11 / GAP 08 #6)
@@ -178,6 +368,170 @@ export interface EmscriptenRunanywhereModule {
     requestResumePtr: number,
   ): number;
 
+  // -----------------------------------------------------------------------------
+  // Model registry proto-byte ABI
+  // -----------------------------------------------------------------------------
+  // Optional because older Web WASM builds may only export the legacy struct
+  // registry functions. ModelRegistryAdapter checks presence before calling.
+  _rac_get_model_registry?(): number;
+  _rac_model_registry_register_proto?(
+    handle: number,
+    protoBytes: number,
+    protoSize: number,
+  ): number;
+  _rac_model_registry_update_proto?(
+    handle: number,
+    protoBytes: number,
+    protoSize: number,
+  ): number;
+  _rac_model_registry_get_proto?(
+    handle: number,
+    modelId: number,
+    protoBytesOut: number,
+    protoSizeOut: number,
+  ): number;
+  _rac_model_registry_list_proto?(
+    handle: number,
+    protoBytesOut: number,
+    protoSizeOut: number,
+  ): number;
+  _rac_model_registry_query_proto?(
+    handle: number,
+    queryProtoBytes: number,
+    queryProtoSize: number,
+    protoBytesOut: number,
+    protoSizeOut: number,
+  ): number;
+  _rac_model_registry_list_downloaded_proto?(
+    handle: number,
+    protoBytesOut: number,
+    protoSizeOut: number,
+  ): number;
+  _rac_model_registry_remove_proto?(
+    handle: number,
+    modelId: number,
+  ): number;
+  _rac_model_registry_proto_free?(protoBytes: number): void;
+
+  // -----------------------------------------------------------------------------
+  // Model lifecycle proto-byte ABI
+  // -----------------------------------------------------------------------------
+  _rac_model_lifecycle_load_proto?(
+    registryHandle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_model_lifecycle_unload_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_model_lifecycle_current_model_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_component_lifecycle_snapshot_proto?(
+    component: number,
+    outSnapshot: number,
+  ): number;
+  _rac_model_lifecycle_reset?(): void;
+
+  // -----------------------------------------------------------------------------
+  // Shared proto-buffer ABI
+  // -----------------------------------------------------------------------------
+  _rac_proto_buffer_init?(bufferPtr: number): void;
+  _rac_proto_buffer_free?(bufferPtr: number): void;
+  _rac_wasm_sizeof_proto_buffer?(): number;
+  _rac_wasm_offsetof_proto_buffer_data?(): number;
+  _rac_wasm_offsetof_proto_buffer_size?(): number;
+  _rac_wasm_offsetof_proto_buffer_status?(): number;
+  _rac_wasm_offsetof_proto_buffer_error_message?(): number;
+
+  // -----------------------------------------------------------------------------
+  // Storage analyzer proto-byte ABI
+  // -----------------------------------------------------------------------------
+  _rac_storage_analyzer_create?(callbacksPtr: number, outHandlePtr: number): number;
+  _rac_storage_analyzer_destroy?(handle: number): void;
+  _rac_storage_analyzer_info_proto?(
+    handle: number,
+    registryHandle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_storage_analyzer_availability_proto?(
+    handle: number,
+    registryHandle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_storage_analyzer_delete_plan_proto?(
+    handle: number,
+    registryHandle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_storage_analyzer_delete_proto?(
+    handle: number,
+    registryHandle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
+  // -----------------------------------------------------------------------------
+  // Download proto-byte ABI
+  // -----------------------------------------------------------------------------
+  _rac_download_set_progress_proto_callback?(
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_download_plan_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_download_start_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_download_cancel_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_download_resume_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_download_progress_poll_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
+  // -----------------------------------------------------------------------------
+  // SDKEvent proto-byte event stream ABI
+  // -----------------------------------------------------------------------------
+  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): number | bigint;
+  _rac_sdk_event_unsubscribe?(subscriptionId: number | bigint): void;
+  _rac_sdk_event_publish_proto?(protoBytes: number, protoSize: number): number;
+  _rac_sdk_event_poll?(outEvent: number): number;
+  _rac_sdk_event_publish_failure?(
+    errorCode: number,
+    message: number,
+    component: number,
+    operation: number,
+    recoverable: number,
+  ): number;
+  _rac_sdk_event_clear_queue?(): void;
+
   // =============================================================================
   // Emscripten runtime helpers
   // =============================================================================
@@ -234,10 +588,18 @@ let _module: EmscriptenRunanywhereModule | null = null;
  */
 export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
   _module = mod;
+  DownloadAdapter.setDefaultModule(mod);
+  ModelLifecycleAdapter.setDefaultModule(mod);
+  ModalityProtoAdapter.setDefaultModule(mod);
+  SDKEventStreamAdapter.setDefaultModule(mod);
 }
 
 /** Clear the singleton module during backend shutdown. */
 export function clearRunanywhereModule(): void {
+  DownloadAdapter.clearDefaultModule();
+  ModelLifecycleAdapter.clearDefaultModule();
+  ModalityProtoAdapter.clearDefaultModule();
+  SDKEventStreamAdapter.clearDefaultModule();
   _module = null;
 }
 

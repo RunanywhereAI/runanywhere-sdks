@@ -11,9 +11,9 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.ModelEvent
-import com.runanywhere.sdk.public.events.TTSEvent
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
+import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.TTSOptions
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.isTTSVoiceLoadedSync
@@ -159,13 +159,9 @@ class TextToSpeechViewModel(
         // Subscribe to SDK events for TTS model state
         viewModelScope.launch {
             EventBus.events.collect { event ->
-                // Handle TTS-specific events
-                if (event is TTSEvent) {
-                    handleTTSEvent(event)
-                }
                 // Handle model events with TTS category
-                if (event is ModelEvent && event.category == EventCategory.TTS) {
-                    handleModelEvent(event)
+                if (event.category == EVENT_CATEGORY_TTS) {
+                    event.model?.let { handleModelEvent(it) }
                 }
             }
         }
@@ -175,54 +171,24 @@ class TextToSpeechViewModel(
     }
 
     /**
-     * Handle TTS events from SDK EventBus
-     * iOS Reference: Event subscription in TTSViewModel
-     */
-    private fun handleTTSEvent(event: TTSEvent) {
-        when (event.eventType) {
-            TTSEvent.TTSEventType.SYNTHESIS_STARTED -> {
-                Timber.d("Synthesis started")
-            }
-            TTSEvent.TTSEventType.SYNTHESIS_COMPLETED -> {
-                Timber.i("Synthesis completed: ${event.durationMs}ms")
-            }
-            TTSEvent.TTSEventType.SYNTHESIS_FAILED -> {
-                Timber.e("Synthesis failed: ${event.error}")
-                _uiState.update {
-                    it.copy(
-                        isGenerating = false,
-                        errorMessage = "Synthesis failed: ${event.error}",
-                    )
-                }
-            }
-            TTSEvent.TTSEventType.PLAYBACK_STARTED -> {
-                Timber.d("Playback started")
-            }
-            TTSEvent.TTSEventType.PLAYBACK_COMPLETED -> {
-                Timber.d("Playback completed")
-            }
-        }
-    }
-
-    /**
      * Handle model events for TTS
      */
     private fun handleModelEvent(event: ModelEvent) {
-        when (event.eventType) {
-            ModelEvent.ModelEventType.LOADED -> {
-                Timber.i("✅ TTS model loaded: ${event.modelId}")
+        when (event.kind) {
+            ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED -> {
+                Timber.i("✅ TTS model loaded: ${event.model_id}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
-                        selectedModelId = event.modelId,
-                        selectedModelName = event.modelId,
+                        selectedModelId = event.model_id,
+                        selectedModelName = event.model_id,
                     )
                 }
                 // Shuffle sample text when model is first loaded
                 shuffleSampleText()
             }
-            ModelEvent.ModelEventType.UNLOADED -> {
-                Timber.d("TTS model unloaded: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED -> {
+                Timber.d("TTS model unloaded: ${event.model_id}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,
@@ -231,14 +197,14 @@ class TextToSpeechViewModel(
                     )
                 }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
-                Timber.d("TTS model download started: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED -> {
+                Timber.d("TTS model download started: ${event.model_id}")
             }
-            ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                Timber.d("TTS model download completed: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED -> {
+                Timber.d("TTS model download completed: ${event.model_id}")
             }
-            ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                Timber.e("TTS model download failed: ${event.modelId} - ${event.error}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED -> {
+                Timber.e("TTS model download failed: ${event.model_id} - ${event.error}")
                 _uiState.update {
                     it.copy(
                         errorMessage = "Download failed: ${event.error}",

@@ -9,6 +9,16 @@
 import { EventBus } from '../Foundation/EventBus';
 import { ModelCategory, LLMFramework, ModelStatus, SDKEventType } from '../types/enums';
 import { DownloadProgress as ProtoDownloadProgress } from '@runanywhere/proto-ts/download_service';
+import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
+import {
+  AccelerationPreference as ProtoAccelerationPreference,
+  ArchiveStructure as ProtoArchiveStructure,
+  ArchiveType as ProtoArchiveType,
+  ModelArtifactType as ProtoModelArtifactType,
+  ModelFormat as ProtoModelFormat,
+  ModelSource as ProtoModelSource,
+  type ModelInfo as ProtoModelInfo,
+} from '@runanywhere/proto-ts/model_types';
 
 // Re-export SDK enums for convenience (consumers can import from either location)
 export { ModelCategory, LLMFramework, ModelStatus };
@@ -194,6 +204,148 @@ function resolveModelDef(def: CompactModelDef): Omit<ManagedModel, 'status'> {
   };
 }
 
+function managedModelToProto(model: ManagedModel): ProtoModelInfo {
+  const now = Date.now();
+  const archiveType = inferArchiveType(model.url);
+  const base: ProtoModelInfo = {
+    id: model.id,
+    name: model.name,
+    category: model.modality ?? ModelCategory.Language,
+    format: inferModelFormat(model),
+    framework: model.framework,
+    downloadUrl: model.url,
+    localPath: '',
+    downloadSizeBytes: model.sizeBytes ?? 0,
+    contextLength: 0,
+    supportsThinking: false,
+    supportsLora: false,
+    description: '',
+    source: model.url ? ProtoModelSource.MODEL_SOURCE_REMOTE : ProtoModelSource.MODEL_SOURCE_LOCAL,
+    createdAtUnixMs: now,
+    updatedAtUnixMs: now,
+    singleFile: undefined,
+    archive: undefined,
+    multiFile: undefined,
+    customStrategyId: undefined,
+    builtIn: undefined,
+    artifactType: ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+    expectedFiles: undefined,
+    accelerationPreference: model.requiresCPU
+      ? ProtoAccelerationPreference.ACCELERATION_PREFERENCE_CPU
+      : undefined,
+    routingPolicy: undefined,
+  };
+
+  if (model.isArchive) {
+    return {
+      ...base,
+      archive: {
+        type: archiveType,
+        structure: ProtoArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
+        requiredPatterns: [],
+        optionalPatterns: [],
+      },
+      artifactType: archiveType === ProtoArchiveType.ARCHIVE_TYPE_ZIP
+        ? ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
+        : ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    };
+  }
+
+  if (model.additionalFiles && model.additionalFiles.length > 0) {
+    return {
+      ...base,
+      multiFile: {
+        files: model.additionalFiles.map((file) => ({
+          url: file.url,
+          filename: file.filename,
+          isRequired: true,
+          sizeBytes: file.sizeBytes,
+          checksum: file.checksumSha256,
+        })),
+      },
+      artifactType: ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+    };
+  }
+
+  return {
+    ...base,
+    singleFile: { requiredPatterns: [], optionalPatterns: [] },
+  };
+}
+
+function protoToManagedModel(proto: ProtoModelInfo, previous?: ManagedModel): ManagedModel {
+  const additionalFiles = proto.multiFile?.files.map((file) => ({
+    url: file.url,
+    filename: file.filename,
+    sizeBytes: file.sizeBytes,
+    checksumSha256: file.checksum,
+  })) ?? previous?.additionalFiles;
+  const isArchive = proto.archive !== undefined ||
+    proto.artifactType === ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE ||
+    proto.artifactType === ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE ||
+    previous?.isArchive === true;
+
+  return {
+    id: proto.id,
+    name: proto.name || previous?.name || proto.id,
+    url: proto.downloadUrl || previous?.url || '',
+    framework: proto.framework,
+    modality: proto.category || previous?.modality,
+    memoryRequirement: previous?.memoryRequirement,
+    status: previous?.status ?? ModelStatus.Registered,
+    downloadProgress: previous?.downloadProgress,
+    error: previous?.error,
+    sizeBytes: proto.downloadSizeBytes || previous?.sizeBytes,
+    checksumSha256: previous?.checksumSha256,
+    ...(additionalFiles && additionalFiles.length > 0 ? { additionalFiles } : {}),
+    ...(isArchive ? { isArchive: true } : {}),
+    ...(previous?.extractedPaths ? { extractedPaths: previous.extractedPaths } : {}),
+    ...(proto.accelerationPreference === ProtoAccelerationPreference.ACCELERATION_PREFERENCE_CPU ||
+      previous?.requiresCPU ? { requiresCPU: true } : {}),
+  };
+}
+
+function inferModelFormat(model: ManagedModel): ProtoModelFormat {
+  const candidate = `${model.url} ${model.additionalFiles?.map((f) => f.filename).join(' ') ?? ''}`.toLowerCase();
+  if (candidate.includes('.gguf')) return ProtoModelFormat.MODEL_FORMAT_GGUF;
+  if (candidate.includes('.ggml')) return ProtoModelFormat.MODEL_FORMAT_GGML;
+  if (candidate.includes('.onnx')) return ProtoModelFormat.MODEL_FORMAT_ONNX;
+  if (candidate.includes('.ort')) return ProtoModelFormat.MODEL_FORMAT_ORT;
+  if (candidate.includes('.bin')) return ProtoModelFormat.MODEL_FORMAT_BIN;
+  if (candidate.includes('.zip')) return ProtoModelFormat.MODEL_FORMAT_ZIP;
+  if (
+    model.framework === LLMFramework.ONNX ||
+    model.framework === LLMFramework.Sherpa ||
+    model.modality === ModelCategory.SpeechRecognition ||
+    model.modality === ModelCategory.SpeechSynthesis ||
+    model.modality === ModelCategory.VoiceActivityDetection
+  ) {
+    return ProtoModelFormat.MODEL_FORMAT_ONNX;
+  }
+  if (model.framework === LLMFramework.LlamaCpp) return ProtoModelFormat.MODEL_FORMAT_GGUF;
+  return ProtoModelFormat.MODEL_FORMAT_UNKNOWN;
+}
+
+function inferArchiveType(url: string): ProtoArchiveType {
+  const lower = url.toLowerCase();
+  if (lower.endsWith('.zip')) return ProtoArchiveType.ARCHIVE_TYPE_ZIP;
+  if (lower.endsWith('.tar.bz2')) return ProtoArchiveType.ARCHIVE_TYPE_TAR_BZ2;
+  if (lower.endsWith('.tar.xz')) return ProtoArchiveType.ARCHIVE_TYPE_TAR_XZ;
+  return ProtoArchiveType.ARCHIVE_TYPE_TAR_GZ;
+}
+
+function patchTouchesProtoMetadata(patch: Partial<ManagedModel>): boolean {
+  return 'name' in patch ||
+    'url' in patch ||
+    'framework' in patch ||
+    'modality' in patch ||
+    'sizeBytes' in patch ||
+    'checksumSha256' in patch ||
+    'additionalFiles' in patch ||
+    'isArchive' in patch ||
+    'requiresCPU' in patch;
+}
+
 // ---------------------------------------------------------------------------
 // Model Registry
 // ---------------------------------------------------------------------------
@@ -205,6 +357,13 @@ function resolveModelDef(def: CompactModelDef): Omit<ManagedModel, 'status'> {
 export class ModelRegistry {
   private models: ManagedModel[] = [];
   private listeners: ModelChangeCallback[] = [];
+  private refreshingFromProtoRegistry = false;
+
+  constructor() {
+    ModelRegistryAdapter.onDefaultModuleReady((adapter) => {
+      this.syncToProtoRegistry(adapter);
+    });
+  }
 
   // --- Registration ---
 
@@ -231,6 +390,7 @@ export class ModelRegistry {
       byId.set(r.id, { ...r, status: ModelStatus.Registered });
     }
     this.models = Array.from(byId.values());
+    this.registerModelsWithProtoRegistry(this.models.filter((m) => defs.some((def) => def.id === m.id)));
     this.notifyListeners();
     EventBus.shared.emit('model.registered', SDKEventType.Model, { count: defs.length });
     return this.getModels();
@@ -244,51 +404,64 @@ export class ModelRegistry {
   addModel(model: ManagedModel): void {
     if (this.models.some((m) => m.id === model.id)) return;
     this.models.push(model);
+    this.registerModelsWithProtoRegistry([model]);
     this.notifyListeners();
   }
 
   // --- Queries ---
 
   getModels(): ManagedModel[] {
+    this.refreshFromProtoRegistry(false);
     return [...this.models];
   }
 
   getModel(id: string): ManagedModel | undefined {
+    this.refreshModelFromProtoRegistry(id);
     return this.models.find((m) => m.id === id);
   }
 
   getModelsByCategory(category: ModelCategory): ManagedModel[] {
-    return this.models.filter((m) => m.modality === category);
+    return this.getModels().filter((m) => m.modality === category);
   }
 
   getModelsByFramework(framework: LLMFramework): ManagedModel[] {
-    return this.models.filter((m) => m.framework === framework);
+    return this.getModels().filter((m) => m.framework === framework);
   }
 
   getLLMModels(): ManagedModel[] {
-    return this.models.filter((m) => m.modality === ModelCategory.Language);
+    return this.getModels().filter((m) => m.modality === ModelCategory.Language);
   }
 
   getVLMModels(): ManagedModel[] {
-    return this.models.filter((m) => m.modality === ModelCategory.Multimodal);
+    return this.getModels().filter((m) => m.modality === ModelCategory.Multimodal);
   }
 
   getSTTModels(): ManagedModel[] {
-    return this.models.filter((m) => m.modality === ModelCategory.SpeechRecognition);
+    return this.getModels().filter((m) => m.modality === ModelCategory.SpeechRecognition);
   }
 
   getTTSModels(): ManagedModel[] {
-    return this.models.filter((m) => m.modality === ModelCategory.SpeechSynthesis);
+    return this.getModels().filter((m) => m.modality === ModelCategory.SpeechSynthesis);
   }
 
   getVADModels(): ManagedModel[] {
-    return this.models.filter((m) => m.modality === ModelCategory.Audio);
+    return this.getModels().filter((m) => m.modality === ModelCategory.VoiceActivityDetection);
   }
 
   // --- Status tracking ---
 
   updateModel(id: string, patch: Partial<ManagedModel>): void {
     this.models = this.models.map((m) => (m.id === id ? { ...m, ...patch } : m));
+    const updated = this.models.find((m) => m.id === id);
+    if (updated && patchTouchesProtoMetadata(patch)) this.updateModelWithProtoRegistry(updated);
+    this.notifyListeners();
+  }
+
+  removeModel(id: string): void {
+    const before = this.models.length;
+    this.models = this.models.filter((m) => m.id !== id);
+    if (this.models.length === before) return;
+    this.protoAdapter()?.remove(id);
     this.notifyListeners();
   }
 
@@ -302,8 +475,94 @@ export class ModelRegistry {
   }
 
   private notifyListeners(): void {
+    const snapshot = [...this.models];
     for (const listener of this.listeners) {
-      listener(this.getModels());
+      listener(snapshot);
+    }
+  }
+
+  private protoAdapter(): ModelRegistryAdapter | null {
+    const adapter = ModelRegistryAdapter.tryDefault();
+    if (!adapter?.supportsProtoRegistry()) return null;
+    return adapter;
+  }
+
+  private registerModelsWithProtoRegistry(models: ManagedModel[]): void {
+    const adapter = this.protoAdapter();
+    if (!adapter) return;
+    for (const model of models) {
+      adapter.register(managedModelToProto(model));
+    }
+    this.refreshFromProtoRegistry(false, adapter);
+  }
+
+  private updateModelWithProtoRegistry(model: ManagedModel): void {
+    const adapter = this.protoAdapter();
+    if (!adapter) return;
+    if (!adapter.update(managedModelToProto(model))) {
+      adapter.register(managedModelToProto(model));
+    }
+  }
+
+  private syncToProtoRegistry(adapter: ModelRegistryAdapter): void {
+    if (!adapter.supportsProtoRegistry()) return;
+    for (const model of this.models) {
+      adapter.register(managedModelToProto(model));
+    }
+    this.refreshFromProtoRegistry(true, adapter);
+  }
+
+  private refreshModelFromProtoRegistry(id: string): void {
+    const adapter = this.protoAdapter();
+    if (!adapter) return;
+    const proto = adapter.get(id);
+    if (!proto) return;
+
+    const index = this.models.findIndex((m) => m.id === id);
+    const previous = index >= 0 ? this.models[index] : undefined;
+    const managed = protoToManagedModel(proto, previous);
+    if (index >= 0) {
+      this.models[index] = managed;
+    } else {
+      this.models.push(managed);
+    }
+  }
+
+  private refreshFromProtoRegistry(notify: boolean, adapter = this.protoAdapter()): boolean {
+    if (!adapter) return false;
+    if (this.refreshingFromProtoRegistry) return false;
+
+    this.refreshingFromProtoRegistry = true;
+    try {
+      const list = adapter.list();
+      if (!list) return false;
+
+      const previousById = new Map(this.models.map((m) => [m.id, m]));
+      const protoById = new Map(list.models.map((m) => [m.id, m]));
+      const seen = new Set<string>();
+      const next: ManagedModel[] = [];
+
+      for (const existing of this.models) {
+        const proto = protoById.get(existing.id);
+        if (!proto) {
+          next.push(existing);
+          continue;
+        }
+        next.push(protoToManagedModel(proto, existing));
+        seen.add(existing.id);
+      }
+
+      for (const proto of list.models) {
+        if (!seen.has(proto.id)) {
+          next.push(protoToManagedModel(proto, previousById.get(proto.id)));
+        }
+      }
+
+      this.models = next;
+      if (notify) this.notifyListeners();
+      return true;
+    } finally {
+      this.refreshingFromProtoRegistry = false;
     }
   }
 }

@@ -13,6 +13,8 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -25,6 +27,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -65,8 +68,50 @@ public class STTPartialResult(
     schemaIndex = 2,
   )
   public val stability: Float = 0f,
+  /**
+   * Additional partial-hypothesis fields carried by Dart/RN live streams.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val confidence: Float = 0f,
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timestampMs",
+    schemaIndex = 5,
+  )
+  public val timestamp_ms: Long = 0L,
+  alternatives: List<TranscriptionAlternative> = emptyList(),
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "languageCode",
+    schemaIndex = 7,
+  )
+  public val language_code: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTPartialResult, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.TranscriptionAlternative#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 6,
+  )
+  public val alternatives: List<TranscriptionAlternative> = immutableCopyOf("alternatives",
+      alternatives)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -81,6 +126,11 @@ public class STTPartialResult(
     if (text != other.text) return false
     if (is_final != other.is_final) return false
     if (stability != other.stability) return false
+    if (confidence != other.confidence) return false
+    if (language != other.language) return false
+    if (timestamp_ms != other.timestamp_ms) return false
+    if (alternatives != other.alternatives) return false
+    if (language_code != other.language_code) return false
     return true
   }
 
@@ -91,6 +141,11 @@ public class STTPartialResult(
       result = result * 37 + text.hashCode()
       result = result * 37 + is_final.hashCode()
       result = result * 37 + stability.hashCode()
+      result = result * 37 + confidence.hashCode()
+      result = result * 37 + language.hashCode()
+      result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + alternatives.hashCode()
+      result = result * 37 + (language_code?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -101,6 +156,11 @@ public class STTPartialResult(
     result += """text=${sanitize(text)}"""
     result += """is_final=$is_final"""
     result += """stability=$stability"""
+    result += """confidence=$confidence"""
+    result += """language=$language"""
+    result += """timestamp_ms=$timestamp_ms"""
+    if (alternatives.isNotEmpty()) result += """alternatives=$alternatives"""
+    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
     return result.joinToString(prefix = "STTPartialResult{", separator = ", ", postfix = "}")
   }
 
@@ -108,8 +168,14 @@ public class STTPartialResult(
     text: String = this.text,
     is_final: Boolean = this.is_final,
     stability: Float = this.stability,
+    confidence: Float = this.confidence,
+    language: STTLanguage = this.language,
+    timestamp_ms: Long = this.timestamp_ms,
+    alternatives: List<TranscriptionAlternative> = this.alternatives,
+    language_code: String? = this.language_code,
     unknownFields: ByteString = this.unknownFields,
-  ): STTPartialResult = STTPartialResult(text, is_final, stability, unknownFields)
+  ): STTPartialResult = STTPartialResult(text, is_final, stability, confidence, language,
+      timestamp_ms, alternatives, language_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -127,6 +193,15 @@ public class STTPartialResult(
         if (value.is_final != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.is_final)
         if (!value.stability.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(3,
             value.stability)
+        if (!value.confidence.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(4,
+            value.confidence)
+        if (value.language != STTLanguage.STT_LANGUAGE_UNSPECIFIED) size +=
+            STTLanguage.ADAPTER.encodedSizeWithTag(5, value.language)
+        if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(6,
+            value.timestamp_ms)
+        size += TranscriptionAlternative.ADAPTER.asRepeated().encodedSizeWithTag(7,
+            value.alternatives)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.language_code)
         return size
       }
 
@@ -135,11 +210,27 @@ public class STTPartialResult(
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_final)
         if (!value.stability.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
             value.stability)
+        if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
+            value.confidence)
+        if (value.language != STTLanguage.STT_LANGUAGE_UNSPECIFIED)
+            STTLanguage.ADAPTER.encodeWithTag(writer, 5, value.language)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
+            value.timestamp_ms)
+        TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 7, value.alternatives)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTPartialResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
+        TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 7, value.alternatives)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
+            value.timestamp_ms)
+        if (value.language != STTLanguage.STT_LANGUAGE_UNSPECIFIED)
+            STTLanguage.ADAPTER.encodeWithTag(writer, 5, value.language)
+        if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
+            value.confidence)
         if (!value.stability.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
             value.stability)
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_final)
@@ -150,11 +241,25 @@ public class STTPartialResult(
         var text: String = ""
         var is_final: Boolean = false
         var stability: Float = 0f
+        var confidence: Float = 0f
+        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
+        var timestamp_ms: Long = 0L
+        val alternatives = mutableListOf<TranscriptionAlternative>()
+        var language_code: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> is_final = ProtoAdapter.BOOL.decode(reader)
             3 -> stability = ProtoAdapter.FLOAT.decode(reader)
+            4 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            5 -> try {
+              language = STTLanguage.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            6 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> alternatives.add(TranscriptionAlternative.ADAPTER.decode(reader))
+            8 -> language_code = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -162,11 +267,17 @@ public class STTPartialResult(
           text = text,
           is_final = is_final,
           stability = stability,
+          confidence = confidence,
+          language = language,
+          timestamp_ms = timestamp_ms,
+          alternatives = alternatives,
+          language_code = language_code,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: STTPartialResult): STTPartialResult = value.copy(
+        alternatives = value.alternatives.redactElements(TranscriptionAlternative.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

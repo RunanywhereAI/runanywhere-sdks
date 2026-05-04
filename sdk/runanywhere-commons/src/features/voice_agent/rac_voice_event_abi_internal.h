@@ -12,6 +12,10 @@
 
 #include "rac/features/voice_agent/rac_voice_agent.h"
 
+namespace runanywhere::v1 {
+class VoiceEvent;
+}  // namespace runanywhere::v1
+
 namespace rac::voice_agent {
 
 /**
@@ -24,6 +28,14 @@ namespace rac::voice_agent {
  */
 void dispatch_proto_event(rac_voice_agent_handle_t       handle,
                           const rac_voice_agent_event_t* event);
+
+/**
+ * Fan a generated VoiceEvent message out to the proto-byte callback registered
+ * for @p handle. The dispatcher fills seq/timestamp if the caller left them
+ * at proto defaults. No-op when no callback is registered.
+ */
+void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
+                                const runanywhere::v1::VoiceEvent& event);
 
 }  // namespace rac::voice_agent
 

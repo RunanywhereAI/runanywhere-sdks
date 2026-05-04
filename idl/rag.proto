@@ -93,6 +93,35 @@ message RAGConfiguration {
 
     // Overlap tokens between consecutive chunks. Must be < chunk_size.
     int32  chunk_overlap         = 7;
+
+    // Maximum tokens of retrieved context passed to the LLM.
+    int32  max_context_tokens    = 8;
+
+    // Prompt template with `{context}` and `{query}` placeholders.
+    optional string prompt_template = 9;
+
+    // Backend-specific config JSON passed to the embedding model/provider.
+    optional string embedding_config_json = 10;
+
+    // Backend-specific config JSON passed to the LLM provider.
+    optional string llm_config_json = 11;
+}
+
+// ---------------------------------------------------------------------------
+// RAGDocument — batch-ingest input item.
+// ---------------------------------------------------------------------------
+message RAGDocument {
+    // Optional caller-supplied document id.
+    string id = 1;
+
+    // Plain text content to chunk/embed.
+    string text = 2;
+
+    // Legacy metadata JSON blob.
+    optional string metadata_json = 3;
+
+    // Typed metadata map for generated-proto callers.
+    map<string, string> metadata = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +168,10 @@ message RAGSearchResult {
     // ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
     // canonicalized here as a typed map so consumers don't re-parse.
     map<string, string> metadata = 5;
+
+    // Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
+    // pass metadata without parsing it.
+    optional string metadata_json = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,4 +222,11 @@ message RAGStatistics {
     // Filesystem path to the on-disk index, when applicable. Unset for
     // in-memory-only indexes.
     optional string index_path   = 5;
+
+    // Raw backend statistics JSON for implementations that cannot yet project
+    // every counter into typed fields.
+    optional string stats_json   = 6;
+
+    // Approximate vector-store footprint in bytes, when known.
+    int64 vector_store_size_bytes = 7;
 }

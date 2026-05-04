@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -232,12 +233,47 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           setState(() {
             _isSpeechDetected = true;
           });
-        } else if (vad.type == sdk.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
+        } else if (vad.type ==
+            sdk.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
           setState(() {
             _isSpeechDetected = false;
             _sessionState = VoiceSessionState.processing;
           });
         }
+        break;
+
+      case sdk.VoiceEvent_Payload.speechTurnDetection:
+        final turn = event.speechTurnDetection;
+        switch (turn.kind) {
+          case proto.SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
+            setState(() {
+              _isSpeechDetected = true;
+              _sessionState = VoiceSessionState.listening;
+            });
+            break;
+          case proto.SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
+            setState(() {
+              _isSpeechDetected = false;
+              _sessionState = VoiceSessionState.processing;
+            });
+            break;
+          case proto.SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED:
+          case proto.SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS:
+          case proto.SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED:
+            break;
+        }
+        break;
+
+      case sdk.VoiceEvent_Payload.wakewordDetected:
+        setState(() {
+          _sessionState = VoiceSessionState.listening;
+          _isSpeechDetected = false;
+        });
         break;
 
       case sdk.VoiceEvent_Payload.userSaid:
@@ -286,6 +322,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.sessionStopped:
       case sdk.VoiceEvent_Payload.agentResponseStarted:
       case sdk.VoiceEvent_Payload.agentResponseCompleted:
+      case sdk.VoiceEvent_Payload.turnLifecycle:
       case sdk.VoiceEvent_Payload.notSet:
         // No UX impact today.
         break;

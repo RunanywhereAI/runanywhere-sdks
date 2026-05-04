@@ -19,6 +19,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -75,6 +76,46 @@ public class VLMConfiguration(
     schemaIndex = 2,
   )
   public val max_tokens: Int = 0,
+  /**
+   * Additional component-level fields from rac_vlm_config_t.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "contextLength",
+    schemaIndex = 3,
+  )
+  public val context_length: Int = 0,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val temperature: Float = 0f,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "systemPrompt",
+    schemaIndex = 5,
+  )
+  public val system_prompt: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "streamingEnabled",
+    schemaIndex = 6,
+  )
+  public val streaming_enabled: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    jsonName = "preferredFramework",
+    schemaIndex = 7,
+  )
+  public val preferred_framework: InferenceFramework? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -91,6 +132,11 @@ public class VLMConfiguration(
     if (model_id != other.model_id) return false
     if (max_image_size_px != other.max_image_size_px) return false
     if (max_tokens != other.max_tokens) return false
+    if (context_length != other.context_length) return false
+    if (temperature != other.temperature) return false
+    if (system_prompt != other.system_prompt) return false
+    if (streaming_enabled != other.streaming_enabled) return false
+    if (preferred_framework != other.preferred_framework) return false
     return true
   }
 
@@ -101,6 +147,11 @@ public class VLMConfiguration(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + max_image_size_px.hashCode()
       result = result * 37 + max_tokens.hashCode()
+      result = result * 37 + context_length.hashCode()
+      result = result * 37 + temperature.hashCode()
+      result = result * 37 + (system_prompt?.hashCode() ?: 0)
+      result = result * 37 + streaming_enabled.hashCode()
+      result = result * 37 + (preferred_framework?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -111,6 +162,11 @@ public class VLMConfiguration(
     result += """model_id=${sanitize(model_id)}"""
     result += """max_image_size_px=$max_image_size_px"""
     result += """max_tokens=$max_tokens"""
+    result += """context_length=$context_length"""
+    result += """temperature=$temperature"""
+    if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
+    result += """streaming_enabled=$streaming_enabled"""
+    if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
     return result.joinToString(prefix = "VLMConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -118,8 +174,14 @@ public class VLMConfiguration(
     model_id: String = this.model_id,
     max_image_size_px: Int = this.max_image_size_px,
     max_tokens: Int = this.max_tokens,
+    context_length: Int = this.context_length,
+    temperature: Float = this.temperature,
+    system_prompt: String? = this.system_prompt,
+    streaming_enabled: Boolean = this.streaming_enabled,
+    preferred_framework: InferenceFramework? = this.preferred_framework,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMConfiguration = VLMConfiguration(model_id, max_image_size_px, max_tokens, unknownFields)
+  ): VLMConfiguration = VLMConfiguration(model_id, max_image_size_px, max_tokens, context_length,
+      temperature, system_prompt, streaming_enabled, preferred_framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -138,6 +200,14 @@ public class VLMConfiguration(
             value.max_image_size_px)
         if (value.max_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(3,
             value.max_tokens)
+        if (value.context_length != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
+            value.context_length)
+        if (!value.temperature.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(5,
+            value.temperature)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.system_prompt)
+        if (value.streaming_enabled != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.streaming_enabled)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(8, value.preferred_framework)
         return size
       }
 
@@ -146,11 +216,27 @@ public class VLMConfiguration(
         if (value.max_image_size_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 2,
             value.max_image_size_px)
         if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_tokens)
+        if (value.context_length != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
+            value.context_length)
+        if (!value.temperature.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5,
+            value.temperature)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.system_prompt)
+        if (value.streaming_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.streaming_enabled)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 8, value.preferred_framework)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMConfiguration) {
         writer.writeBytes(value.unknownFields)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 8, value.preferred_framework)
+        if (value.streaming_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.streaming_enabled)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.system_prompt)
+        if (!value.temperature.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5,
+            value.temperature)
+        if (value.context_length != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
+            value.context_length)
         if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_tokens)
         if (value.max_image_size_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 2,
             value.max_image_size_px)
@@ -161,11 +247,25 @@ public class VLMConfiguration(
         var model_id: String = ""
         var max_image_size_px: Int = 0
         var max_tokens: Int = 0
+        var context_length: Int = 0
+        var temperature: Float = 0f
+        var system_prompt: String? = null
+        var streaming_enabled: Boolean = false
+        var preferred_framework: InferenceFramework? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> max_image_size_px = ProtoAdapter.INT32.decode(reader)
             3 -> max_tokens = ProtoAdapter.INT32.decode(reader)
+            4 -> context_length = ProtoAdapter.INT32.decode(reader)
+            5 -> temperature = ProtoAdapter.FLOAT.decode(reader)
+            6 -> system_prompt = ProtoAdapter.STRING.decode(reader)
+            7 -> streaming_enabled = ProtoAdapter.BOOL.decode(reader)
+            8 -> try {
+              preferred_framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -173,6 +273,11 @@ public class VLMConfiguration(
           model_id = model_id,
           max_image_size_px = max_image_size_px,
           max_tokens = max_tokens,
+          context_length = context_length,
+          temperature = temperature,
+          system_prompt = system_prompt,
+          streaming_enabled = streaming_enabled,
+          preferred_framework = preferred_framework,
           unknownFields = unknownFields
         )
       }

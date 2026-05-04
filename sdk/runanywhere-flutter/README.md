@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.10+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.10+" /></a>
-  <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.0+-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.0+" /></a>
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.24+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.24+" /></a>
+  <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.5+-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/iOS-14.0+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 14.0+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-API%2024+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 24+" /></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" /></a>
@@ -625,7 +625,7 @@ Contributions are welcome. This section explains how to set up your development 
 
 ### Prerequisites
 
-- **Flutter** 3.10.0 or later
+- **Flutter** 3.24.0 or later
 - **Xcode** 14+ (for iOS builds)
 - **Android Studio** with NDK (for Android builds)
 - **CMake** 3.21+
@@ -642,7 +642,7 @@ cd runanywhere-sdks/sdk/runanywhere-flutter
 # 2. Run first-time setup (~10-20 minutes)
 ./scripts/build-flutter.sh --setup
 
-# 3. Bootstrap Flutter packages
+# 3. Bootstrap the Flutter workspace
 melos bootstrap   # If melos is installed
 # OR manually:
 cd packages/runanywhere && flutter pub get && cd ..

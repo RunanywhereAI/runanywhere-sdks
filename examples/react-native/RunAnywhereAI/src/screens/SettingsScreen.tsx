@@ -42,6 +42,7 @@ import { Spacing, Padding, BorderRadius } from '../theme/spacing';
 import type { StorageInfo } from '../types/settings';
 import {
   RoutingPolicy,
+  ROUTING_POLICY_OPTIONS,
   RoutingPolicyDisplayNames,
   SETTINGS_CONSTRAINTS,
   GENERATION_SETTINGS_KEYS,
@@ -55,6 +56,7 @@ import {
   ToolParameterType,
   Hardware,
   requireDeviceInfoModule,
+  hasUsableBackendConfig,
   type ModelInfo,
   type HardwareProfileResult,
 } from '@runanywhere/core';
@@ -102,7 +104,7 @@ export const getStoredBaseURL = async (): Promise<string | null> => {
 export const hasCustomConfiguration = async (): Promise<boolean> => {
   const apiKey = await getStoredApiKey();
   const baseURL = await getStoredBaseURL();
-  return apiKey !== null && baseURL !== null && apiKey !== '' && baseURL !== '';
+  return hasUsableBackendConfig({ apiKey, baseURL });
 };
 
 // Default storage info
@@ -134,7 +136,7 @@ export const SettingsScreen: React.FC = () => {
   // settings UI (routing policy, capability flags, etc.). Prefixed with `_`
   // to silence unused-vars warnings until the UI consumes them.
   const [_routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
-    RoutingPolicy.Automatic
+    RoutingPolicy.ROUTING_POLICY_UNSPECIFIED
   );
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(10000);
@@ -337,6 +339,7 @@ export const SettingsScreen: React.FC = () => {
             description:
               'City name or location (e.g., "Tokyo", "New York", "London")',
             required: true,
+            enumValues: [],
           },
         ],
       },
@@ -391,6 +394,7 @@ export const SettingsScreen: React.FC = () => {
             type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
             description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
             required: true,
+            enumValues: [],
           },
         ],
       },
@@ -604,11 +608,10 @@ export const SettingsScreen: React.FC = () => {
 
   // Kept for upcoming routing-policy UI; not rendered yet in the settings screen.
   const _handleRoutingPolicyChange = useCallback(() => {
-    const policies = Object.values(RoutingPolicy);
     Alert.alert(
       'Routing Policy',
       'Choose how requests are routed',
-      policies.map((policy) => ({
+      ROUTING_POLICY_OPTIONS.map((policy) => ({
         text: RoutingPolicyDisplayNames[policy],
         onPress: () => {
           setRoutingPolicy(policy);
@@ -1221,7 +1224,7 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.apiConfigRow}>
             <Text style={styles.apiConfigLabel}>Chip</Text>
             <Text style={styles.settingValue}>
-              {hardwareProfile?.chip ?? '—'}
+              {hardwareProfile?.profile?.chip ?? '—'}
             </Text>
           </View>
           <View style={styles.apiConfigDivider} />
@@ -1231,14 +1234,14 @@ export const SettingsScreen: React.FC = () => {
               style={[
                 styles.apiConfigValue,
                 {
-                  color: hardwareProfile?.hasNeuralEngine
+                  color: hardwareProfile?.profile?.hasNeuralEngine
                     ? Colors.primaryGreen
                     : Colors.textSecondary,
                 },
               ]}
             >
               {hardwareProfile
-                ? hardwareProfile.hasNeuralEngine
+                ? hardwareProfile.profile?.hasNeuralEngine
                   ? 'Available'
                   : 'Unavailable'
                 : '—'}
@@ -1248,7 +1251,7 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.apiConfigRow}>
             <Text style={styles.apiConfigLabel}>Acceleration</Text>
             <Text style={styles.settingValue}>
-              {hardwareProfile?.accelerationMode ?? '—'}
+              {hardwareProfile?.profile?.accelerationMode ?? '—'}
             </Text>
           </View>
           <View style={styles.apiConfigDivider} />
@@ -1269,7 +1272,7 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.apiConfigRow}>
             <Text style={styles.apiConfigLabel}>Platform</Text>
             <Text style={styles.settingValue}>
-              {hardwareProfile?.platform ?? '—'}
+              {hardwareProfile?.profile?.platform ?? '—'}
             </Text>
           </View>
         </View>

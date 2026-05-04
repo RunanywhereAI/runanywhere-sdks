@@ -19,6 +19,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -94,6 +95,18 @@ public class TTSSynthesisMetadata(
     schemaIndex = 4,
   )
   public val audio_duration_ms: Long = 0L,
+  /**
+   * Characters processed per second. Some native paths expose this directly;
+   * consumers may also compute it from character_count / processing_time_ms.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "charactersPerSecond",
+    schemaIndex = 5,
+  )
+  public val characters_per_second: Float = 0f,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSSynthesisMetadata, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -112,6 +125,7 @@ public class TTSSynthesisMetadata(
     if (processing_time_ms != other.processing_time_ms) return false
     if (character_count != other.character_count) return false
     if (audio_duration_ms != other.audio_duration_ms) return false
+    if (characters_per_second != other.characters_per_second) return false
     return true
   }
 
@@ -124,6 +138,7 @@ public class TTSSynthesisMetadata(
       result = result * 37 + processing_time_ms.hashCode()
       result = result * 37 + character_count.hashCode()
       result = result * 37 + audio_duration_ms.hashCode()
+      result = result * 37 + characters_per_second.hashCode()
       super.hashCode = result
     }
     return result
@@ -136,6 +151,7 @@ public class TTSSynthesisMetadata(
     result += """processing_time_ms=$processing_time_ms"""
     result += """character_count=$character_count"""
     result += """audio_duration_ms=$audio_duration_ms"""
+    result += """characters_per_second=$characters_per_second"""
     return result.joinToString(prefix = "TTSSynthesisMetadata{", separator = ", ", postfix = "}")
   }
 
@@ -145,9 +161,10 @@ public class TTSSynthesisMetadata(
     processing_time_ms: Long = this.processing_time_ms,
     character_count: Int = this.character_count,
     audio_duration_ms: Long = this.audio_duration_ms,
+    characters_per_second: Float = this.characters_per_second,
     unknownFields: ByteString = this.unknownFields,
   ): TTSSynthesisMetadata = TTSSynthesisMetadata(voice_id, language_code, processing_time_ms,
-      character_count, audio_duration_ms, unknownFields)
+      character_count, audio_duration_ms, characters_per_second, unknownFields)
 
   public companion object {
     @JvmField
@@ -171,6 +188,8 @@ public class TTSSynthesisMetadata(
             value.character_count)
         if (value.audio_duration_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(5,
             value.audio_duration_ms)
+        if (!value.characters_per_second.equals(0f)) size +=
+            ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.characters_per_second)
         return size
       }
 
@@ -184,11 +203,15 @@ public class TTSSynthesisMetadata(
             value.character_count)
         if (value.audio_duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 5,
             value.audio_duration_ms)
+        if (!value.characters_per_second.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 6,
+            value.characters_per_second)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSSynthesisMetadata) {
         writer.writeBytes(value.unknownFields)
+        if (!value.characters_per_second.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 6,
+            value.characters_per_second)
         if (value.audio_duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 5,
             value.audio_duration_ms)
         if (value.character_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
@@ -206,6 +229,7 @@ public class TTSSynthesisMetadata(
         var processing_time_ms: Long = 0L
         var character_count: Int = 0
         var audio_duration_ms: Long = 0L
+        var characters_per_second: Float = 0f
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> voice_id = ProtoAdapter.STRING.decode(reader)
@@ -213,6 +237,7 @@ public class TTSSynthesisMetadata(
             3 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             4 -> character_count = ProtoAdapter.INT32.decode(reader)
             5 -> audio_duration_ms = ProtoAdapter.INT64.decode(reader)
+            6 -> characters_per_second = ProtoAdapter.FLOAT.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -222,6 +247,7 @@ public class TTSSynthesisMetadata(
           processing_time_ms = processing_time_ms,
           character_count = character_count,
           audio_duration_ms = audio_duration_ms,
+          characters_per_second = characters_per_second,
           unknownFields = unknownFields
         )
       }

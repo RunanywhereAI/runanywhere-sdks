@@ -162,6 +162,87 @@ RAC_API rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* mode
                                                     char* out_path, size_t path_size);
 
 // =============================================================================
+// MODEL ARTIFACT RESOLUTION
+// =============================================================================
+
+/**
+ * @brief Role assigned to a resolved on-disk model file.
+ */
+typedef enum rac_resolved_model_file_role {
+    RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN = 0,
+    RAC_RESOLVED_MODEL_FILE_ROLE_PRIMARY = 1,
+    RAC_RESOLVED_MODEL_FILE_ROLE_COMPANION = 2,
+    RAC_RESOLVED_MODEL_FILE_ROLE_MMPROJ = 3,
+    RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER = 4,
+    RAC_RESOLVED_MODEL_FILE_ROLE_CONFIG = 5,
+    RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY = 6,
+    RAC_RESOLVED_MODEL_FILE_ROLE_MERGES = 7
+} rac_resolved_model_file_role_t;
+
+/**
+ * @brief One resolved file inside a model artifact.
+ *
+ * Strings are owned by the containing rac_model_path_resolution_t and released
+ * by rac_model_path_resolution_free().
+ */
+typedef struct rac_resolved_model_file {
+    char* relative_path;
+    char* path;
+    rac_resolved_model_file_role_t role;
+    rac_bool_t is_required;
+    rac_bool_t exists;
+} rac_resolved_model_file_t;
+
+/**
+ * @brief Centralized model artifact resolution result.
+ *
+ * This is the C++ source of truth for archive/multi-file/single-file model
+ * selection. SDKs should pass stable roots/files and consume these resolved
+ * paths instead of inferring filenames or companion files locally.
+ */
+typedef struct rac_model_path_resolution {
+    char* root_path;
+    char* primary_model_path;
+    char* mmproj_path;
+    char* tokenizer_path;
+    char* config_path;
+
+    rac_resolved_model_file_t* files;
+    size_t file_count;
+
+    char** missing_required_files;
+    size_t missing_required_file_count;
+
+    rac_bool_t is_directory_based;
+    rac_bool_t is_complete;
+    rac_bool_t checksum_validated;
+    rac_bool_t checksum_matched;
+} rac_model_path_resolution_t;
+
+/**
+ * @brief Resolve final model paths and companion files from a file or directory.
+ *
+ * @param model_info Model metadata including framework/format/artifact metadata
+ * @param artifact_root File or directory to inspect after download/extraction
+ * @param expected_primary_sha256 Optional lowercase/uppercase SHA-256 for the
+ *        selected primary file. NULL or empty skips checksum validation.
+ * @param out_resolution Output resolution. Must be freed with
+ *        rac_model_path_resolution_free().
+ * @return RAC_SUCCESS when all required files are present and checksum matches;
+ *         RAC_ERROR_MODEL_VALIDATION_FAILED for missing required files or
+ *         checksum mismatch; RAC_ERROR_NOT_FOUND when no primary model can be
+ *         selected.
+ */
+RAC_API rac_result_t rac_model_paths_resolve_artifact(
+    const rac_model_info_t* model_info, const char* artifact_root,
+    const char* expected_primary_sha256, rac_model_path_resolution_t* out_resolution);
+
+/**
+ * @brief Release memory owned by a model path resolution result.
+ */
+RAC_API void rac_model_path_resolution_free(rac_model_path_resolution_t* resolution);
+
+// =============================================================================
 // OTHER DIRECTORIES - Mirrors ModelPathUtils other directory methods
 // =============================================================================
 

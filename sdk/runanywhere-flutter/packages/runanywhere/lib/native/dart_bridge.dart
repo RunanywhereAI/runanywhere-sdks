@@ -10,6 +10,7 @@ import 'package:runanywhere/native/dart_bridge_auth.dart'
     hide RacSdkConfigStruct;
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
+import 'package:runanywhere/native/dart_bridge_embeddings.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart'
     show RacSdkConfigStruct;
 import 'package:runanywhere/native/dart_bridge_events.dart';
@@ -18,6 +19,7 @@ import 'package:runanywhere/native/dart_bridge_http.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
 import 'package:runanywhere/native/dart_bridge_model_assignment.dart';
+import 'package:runanywhere/native/dart_bridge_model_lifecycle.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_platform.dart';
@@ -270,6 +272,9 @@ class DartBridge {
   /// HTTP bridge
   static DartBridgeHTTP get http => DartBridgeHTTP.instance;
 
+  /// Embeddings bridge
+  static DartBridgeEmbeddings get embeddings => DartBridgeEmbeddings.shared;
+
   /// LLM bridge
   static DartBridgeLLM get llm => DartBridgeLLM.shared;
 
@@ -283,6 +288,10 @@ class DartBridge {
   /// Model registry bridge
   static DartBridgeModelRegistry get modelRegistry =>
       DartBridgeModelRegistry.instance;
+
+  /// Model lifecycle bridge
+  static DartBridgeModelLifecycle get modelLifecycle =>
+      DartBridgeModelLifecycle.instance;
 
   /// Platform bridge
   static DartBridgePlatform get platform => DartBridgePlatform.instance;

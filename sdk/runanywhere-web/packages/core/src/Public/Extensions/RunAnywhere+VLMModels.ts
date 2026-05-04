@@ -14,7 +14,7 @@ import { ModelCategory } from '../../types/enums';
 export const VLMModels = {
   list(): ModelInfo[] {
     return ModelManager.getModels()
-      .filter((m) => m.modality === ModelCategory.Vision)
+      .filter((m) => m.modality === ModelCategory.Vision || m.modality === ModelCategory.Multimodal)
       .map((m) => ({ id: m.id, name: m.name }) as unknown as ModelInfo);
   },
 

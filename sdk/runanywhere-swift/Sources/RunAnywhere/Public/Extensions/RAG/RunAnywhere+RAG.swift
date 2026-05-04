@@ -22,12 +22,17 @@ public extension RunAnywhere {
     /// - Parameter config: RAG pipeline configuration (model paths, tuning parameters)
     /// - Throws: `SDKException` if the SDK is not initialized or pipeline creation fails
     static func ragCreatePipeline(config: RAGConfiguration) async throws {
+        try await ragCreatePipeline(config: config.toRARAGConfiguration())
+    }
+
+    /// Create the RAG pipeline through the generated-proto C++ RAG ABI.
+    static func ragCreatePipeline(config: RARAGConfiguration) async throws {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        try await CppBridge.RAG.shared.createPipeline(swiftConfig: config)
+        try await CppBridge.RAG.shared.createPipeline(config: config)
         EventBus.shared.publish(RAGEvent.pipelineCreated())
     }
 
@@ -49,19 +54,26 @@ public extension RunAnywhere {
     ///   - metadataJSON: Optional JSON string attached to all chunks from this document
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails
     static func ragIngest(text: String, metadataJSON: String? = nil) async throws {
+        try await ragIngest(RAGDocument(text: text, metadataJSON: metadataJSON).toRARAGDocument())
+    }
+
+    /// Ingest a generated-proto document through the C++ RAG ABI.
+    @discardableResult
+    static func ragIngest(_ document: RARAGDocument) async throws -> RARAGStatistics {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: text.count))
+        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: document.text.count))
         let startTime = Date()
 
-        try await CppBridge.RAG.shared.addDocument(text: text, metadataJSON: metadataJSON)
+        let stats = try await CppBridge.RAG.shared.ingest(document)
 
         let durationMs = Date().timeIntervalSince(startTime) * 1000
-        let chunkCount = await CppBridge.RAG.shared.documentCount
+        let chunkCount = Int(stats.indexedChunks)
         EventBus.shared.publish(RAGEvent.ingestionComplete(chunkCount: chunkCount, durationMs: durationMs))
+        return stats
     }
 
     /// Ingest multiple text documents into the RAG pipeline in a single batch.
@@ -78,16 +90,17 @@ public extension RunAnywhere {
         guard !documents.isEmpty else { return }
         try await ensureServicesReady()
 
-        let texts = documents.map { $0.text }
-        let metas: [String?] = documents.map { $0.metadataJSON }
-
-        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: texts.joined().count))
+        let totalLength = documents.reduce(0) { $0 + $1.text.count }
+        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: totalLength))
         let startTime = Date()
 
-        try await CppBridge.RAG.shared.addDocumentsBatch(texts: texts, metadataJSONs: metas)
+        var latestStats = RARAGStatistics()
+        for document in documents {
+            latestStats = try await CppBridge.RAG.shared.ingest(document.toRARAGDocument())
+        }
 
         let durationMs = Date().timeIntervalSince(startTime) * 1000
-        let chunkCount = await CppBridge.RAG.shared.documentCount
+        let chunkCount = Int(latestStats.indexedChunks)
         EventBus.shared.publish(RAGEvent.ingestionComplete(chunkCount: chunkCount, durationMs: durationMs))
     }
 
@@ -98,7 +111,10 @@ public extension RunAnywhere {
     ///
     /// - Returns: Number of indexed chunks in the pipeline, or 0 if not initialized.
     static func ragGetDocumentCount() async -> Int {
-        await CppBridge.RAG.shared.documentCount
+        if let stats = try? await CppBridge.RAG.shared.statsProto() {
+            return Int(stats.indexedChunks)
+        }
+        return await CppBridge.RAG.shared.documentCount
     }
 
     /// Get RAG pipeline statistics.
@@ -111,7 +127,7 @@ public extension RunAnywhere {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
-        return try await CppBridge.RAG.shared.getStatistics()
+        return try await CppBridge.RAG.shared.statsProto()
     }
 
     /// Clear all previously ingested documents from the pipeline.
@@ -121,13 +137,13 @@ public extension RunAnywhere {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
-        try await CppBridge.RAG.shared.clearDocuments()
+        _ = try await CppBridge.RAG.shared.clearProto()
     }
 
     /// The current number of indexed document chunks in the pipeline.
     static var ragDocumentCount: Int {
         get async {
-            await CppBridge.RAG.shared.documentCount
+            await ragGetDocumentCount()
         }
     }
 
@@ -145,17 +161,23 @@ public extension RunAnywhere {
     /// - Returns: A `RAGResult` containing the generated answer and retrieved chunks
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or the query fails
     static func ragQuery(question: String, options: RAGQueryOptions? = nil) async throws -> RAGResult {
+        let queryOptions = options ?? RAGQueryOptions(question: question)
+        let result = try await ragQuery(queryOptions.toRARAGQueryOptions())
+        return RAGResult(from: result)
+    }
+
+    /// Query through the generated-proto C++ RAG ABI.
+    static func ragQuery(_ options: RARAGQueryOptions) async throws -> RARAGResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        let queryOptions = options ?? RAGQueryOptions(question: question)
-        EventBus.shared.publish(RAGEvent.queryStarted(question: question))
+        EventBus.shared.publish(RAGEvent.queryStarted(question: options.question))
 
-        let result = try await CppBridge.RAG.shared.query(swiftOptions: queryOptions)
+        let result = try await CppBridge.RAG.shared.query(options)
 
-        EventBus.shared.publish(RAGEvent.queryComplete(result: result))
+        EventBus.shared.publish(RAGEvent.queryComplete(result: RAGResult(from: result)))
         return result
     }
 }

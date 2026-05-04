@@ -188,6 +188,65 @@ public class GenerationEvent(
     schemaIndex = 15,
   )
   public val routing_reason: String = "",
+  /**
+   * For cancellation / tool / structured-output / thinking events.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "cancelReason",
+    schemaIndex = 16,
+  )
+  public val cancel_reason: String = "",
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "toolCallId",
+    schemaIndex = 17,
+  )
+  public val tool_call_id: String = "",
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "toolName",
+    schemaIndex = 18,
+  )
+  public val tool_name: String = "",
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "toolPayloadJson",
+    schemaIndex = 19,
+  )
+  public val tool_payload_json: String = "",
+  @field:WireField(
+    tag = 21,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "structuredSchemaJson",
+    schemaIndex = 20,
+  )
+  public val structured_schema_json: String = "",
+  @field:WireField(
+    tag = 22,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "structuredOutputJson",
+    schemaIndex = 21,
+  )
+  public val structured_output_json: String = "",
+  @field:WireField(
+    tag = 23,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "thinkingText",
+    schemaIndex = 22,
+  )
+  public val thinking_text: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<GenerationEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -217,6 +276,13 @@ public class GenerationEvent(
     if (cost_saved_amount != other.cost_saved_amount) return false
     if (routing_target != other.routing_target) return false
     if (routing_reason != other.routing_reason) return false
+    if (cancel_reason != other.cancel_reason) return false
+    if (tool_call_id != other.tool_call_id) return false
+    if (tool_name != other.tool_name) return false
+    if (tool_payload_json != other.tool_payload_json) return false
+    if (structured_schema_json != other.structured_schema_json) return false
+    if (structured_output_json != other.structured_output_json) return false
+    if (thinking_text != other.thinking_text) return false
     return true
   }
 
@@ -240,6 +306,13 @@ public class GenerationEvent(
       result = result * 37 + cost_saved_amount.hashCode()
       result = result * 37 + routing_target.hashCode()
       result = result * 37 + routing_reason.hashCode()
+      result = result * 37 + cancel_reason.hashCode()
+      result = result * 37 + tool_call_id.hashCode()
+      result = result * 37 + tool_name.hashCode()
+      result = result * 37 + tool_payload_json.hashCode()
+      result = result * 37 + structured_schema_json.hashCode()
+      result = result * 37 + structured_output_json.hashCode()
+      result = result * 37 + thinking_text.hashCode()
       super.hashCode = result
     }
     return result
@@ -263,6 +336,13 @@ public class GenerationEvent(
     result += """cost_saved_amount=$cost_saved_amount"""
     result += """routing_target=${sanitize(routing_target)}"""
     result += """routing_reason=${sanitize(routing_reason)}"""
+    result += """cancel_reason=${sanitize(cancel_reason)}"""
+    result += """tool_call_id=${sanitize(tool_call_id)}"""
+    result += """tool_name=${sanitize(tool_name)}"""
+    result += """tool_payload_json=${sanitize(tool_payload_json)}"""
+    result += """structured_schema_json=${sanitize(structured_schema_json)}"""
+    result += """structured_output_json=${sanitize(structured_output_json)}"""
+    result += """thinking_text=${sanitize(thinking_text)}"""
     return result.joinToString(prefix = "GenerationEvent{", separator = ", ", postfix = "}")
   }
 
@@ -283,10 +363,19 @@ public class GenerationEvent(
     cost_saved_amount: Double = this.cost_saved_amount,
     routing_target: String = this.routing_target,
     routing_reason: String = this.routing_reason,
+    cancel_reason: String = this.cancel_reason,
+    tool_call_id: String = this.tool_call_id,
+    tool_name: String = this.tool_name,
+    tool_payload_json: String = this.tool_payload_json,
+    structured_schema_json: String = this.structured_schema_json,
+    structured_output_json: String = this.structured_output_json,
+    thinking_text: String = this.thinking_text,
     unknownFields: ByteString = this.unknownFields,
   ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text,
       tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id,
-      cost_amount, cost_saved_amount, routing_target, routing_reason, unknownFields)
+      cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id,
+      tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -327,6 +416,20 @@ public class GenerationEvent(
             value.routing_target)
         if (value.routing_reason != "") size += ProtoAdapter.STRING.encodedSizeWithTag(16,
             value.routing_reason)
+        if (value.cancel_reason != "") size += ProtoAdapter.STRING.encodedSizeWithTag(17,
+            value.cancel_reason)
+        if (value.tool_call_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(18,
+            value.tool_call_id)
+        if (value.tool_name != "") size += ProtoAdapter.STRING.encodedSizeWithTag(19,
+            value.tool_name)
+        if (value.tool_payload_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(20,
+            value.tool_payload_json)
+        if (value.structured_schema_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(21,
+            value.structured_schema_json)
+        if (value.structured_output_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(22,
+            value.structured_output_json)
+        if (value.thinking_text != "") size += ProtoAdapter.STRING.encodedSizeWithTag(23,
+            value.thinking_text)
         return size
       }
 
@@ -354,11 +457,37 @@ public class GenerationEvent(
             value.routing_target)
         if (value.routing_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 16,
             value.routing_reason)
+        if (value.cancel_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 17,
+            value.cancel_reason)
+        if (value.tool_call_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 18,
+            value.tool_call_id)
+        if (value.tool_name != "") ProtoAdapter.STRING.encodeWithTag(writer, 19, value.tool_name)
+        if (value.tool_payload_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 20,
+            value.tool_payload_json)
+        if (value.structured_schema_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 21,
+            value.structured_schema_json)
+        if (value.structured_output_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 22,
+            value.structured_output_json)
+        if (value.thinking_text != "") ProtoAdapter.STRING.encodeWithTag(writer, 23,
+            value.thinking_text)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: GenerationEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.thinking_text != "") ProtoAdapter.STRING.encodeWithTag(writer, 23,
+            value.thinking_text)
+        if (value.structured_output_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 22,
+            value.structured_output_json)
+        if (value.structured_schema_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 21,
+            value.structured_schema_json)
+        if (value.tool_payload_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 20,
+            value.tool_payload_json)
+        if (value.tool_name != "") ProtoAdapter.STRING.encodeWithTag(writer, 19, value.tool_name)
+        if (value.tool_call_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 18,
+            value.tool_call_id)
+        if (value.cancel_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 17,
+            value.cancel_reason)
         if (value.routing_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 16,
             value.routing_reason)
         if (value.routing_target != "") ProtoAdapter.STRING.encodeWithTag(writer, 15,
@@ -401,6 +530,13 @@ public class GenerationEvent(
         var cost_saved_amount: Double = 0.0
         var routing_target: String = ""
         var routing_reason: String = ""
+        var cancel_reason: String = ""
+        var tool_call_id: String = ""
+        var tool_name: String = ""
+        var tool_payload_json: String = ""
+        var structured_schema_json: String = ""
+        var structured_output_json: String = ""
+        var thinking_text: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -423,6 +559,13 @@ public class GenerationEvent(
             14 -> cost_saved_amount = ProtoAdapter.DOUBLE.decode(reader)
             15 -> routing_target = ProtoAdapter.STRING.decode(reader)
             16 -> routing_reason = ProtoAdapter.STRING.decode(reader)
+            17 -> cancel_reason = ProtoAdapter.STRING.decode(reader)
+            18 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
+            19 -> tool_name = ProtoAdapter.STRING.decode(reader)
+            20 -> tool_payload_json = ProtoAdapter.STRING.decode(reader)
+            21 -> structured_schema_json = ProtoAdapter.STRING.decode(reader)
+            22 -> structured_output_json = ProtoAdapter.STRING.decode(reader)
+            23 -> thinking_text = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -443,6 +586,13 @@ public class GenerationEvent(
           cost_saved_amount = cost_saved_amount,
           routing_target = routing_target,
           routing_reason = routing_reason,
+          cancel_reason = cancel_reason,
+          tool_call_id = tool_call_id,
+          tool_name = tool_name,
+          tool_payload_json = tool_payload_json,
+          structured_schema_json = structured_schema_json,
+          structured_output_json = structured_output_json,
+          thinking_text = thinking_text,
           unknownFields = unknownFields
         )
       }

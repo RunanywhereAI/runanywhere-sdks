@@ -29,6 +29,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "model_types.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -94,6 +96,7 @@ enum DiffusionScheduler {
     DIFFUSION_SCHEDULER_PNDM             = 7;   // Swift/Kotlin/RN/Web/C-ABI
     DIFFUSION_SCHEDULER_LMS              = 8;   // Swift/Kotlin/RN/Web/C-ABI
     DIFFUSION_SCHEDULER_LCM              = 9;   // forward-looking — pairs with the LCM model variant
+    DIFFUSION_SCHEDULER_DPMPP_2M_SDE     = 10;  // Swift/Kotlin/RN/Web/C-ABI
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +147,10 @@ message DiffusionTokenizerSource {
     // Only set when kind == DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM. Empty /
     // unset for the bundled presets.
     optional string              custom_path = 2;
+
+    // Automatically download missing tokenizer files. Defaults to backend
+    // policy when unset/false.
+    bool                         auto_download = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +191,25 @@ message DiffusionConfiguration {
     // in MiB. 0 = no cap (engine default). Generalizes the pre-IDL
     // `reduceMemory` bool flag.
     int32                    max_memory_mb         = 4;
+
+    // C ABI / SDK component fields that identify and route the component.
+    optional string          model_id              = 5;
+    optional InferenceFramework preferred_framework = 6;
+
+    // Legacy low-memory boolean. Backends may translate true to an internal
+    // memory cap when max_memory_mb is unset.
+    bool                     reduce_memory         = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Canonical load-model wrapper used by SDKs that require a single argument
+// for diffusion model lifecycle calls.
+// ---------------------------------------------------------------------------
+message DiffusionConfig {
+    string model_path = 1;
+    string model_id   = 2;
+    string model_name = 3;
+    optional DiffusionConfiguration configuration = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +264,20 @@ message DiffusionGenerationOptions {
     // Generation mode (txt2img / img2img / inpainting). UNSPECIFIED =
     // TEXT_TO_IMAGE.
     DiffusionMode      mode                = 9;
+
+    // Image-to-image / inpainting payloads from rac_diffusion_options_t.
+    optional bytes     input_image         = 10;
+    optional bytes     mask_image          = 11;
+    float              denoise_strength    = 12;
+
+    // Progress reporting controls.
+    bool               report_intermediate_images = 13;
+    int32              progress_stride     = 14;
+
+    // Dimensions for raw input_image payloads when the backend cannot infer
+    // them from an encoded container.
+    int32              input_image_width   = 15;
+    int32              input_image_height  = 16;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +306,10 @@ message DiffusionProgress {
     // when the caller requested intermediate-image reporting and the
     // engine has produced one for this step.
     optional bytes intermediate_image_data = 5;
+
+    // Dimensions for intermediate_image_data when it is raw pixel data.
+    int32  intermediate_image_width        = 6;
+    int32  intermediate_image_height       = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +353,10 @@ message DiffusionResult {
     // Scheduler the engine actually ran. Useful when the caller passed
     // DIFFUSION_SCHEDULER_UNSPECIFIED.
     DiffusionScheduler used_scheduler  = 7;
+
+    // Failure details for result-envelope APIs.
+    optional string     error_message   = 8;
+    int32               error_code      = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -345,4 +393,17 @@ message DiffusionCapabilities {
     // Largest image edge (in pixels) the backend can produce in a single
     // generation. 0 = unknown / not advertised.
     int32                          max_resolution_px    = 3;
+
+    // Generation modes this backend supports.
+    repeated DiffusionMode         supported_modes      = 4;
+
+    // Asymmetric maximum dimensions when known. 0 = unknown.
+    int32                          max_width_px         = 5;
+    int32                          max_height_px        = 6;
+
+    bool                           supports_intermediate_images = 7;
+    bool                           supports_safety_checker      = 8;
+    bool                           is_ready                     = 9;
+    optional string                current_model                = 10;
+    bool                           safety_checker_enabled       = 11;
 }

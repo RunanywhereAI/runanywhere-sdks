@@ -5,8 +5,8 @@
  * Allows LLMs to request external actions (API calls, device functions, etc.)
  *
  * ARCHITECTURE:
- * - C++ (ToolCallingBridge) handles: parsing <tool_call> tags (single source of truth)
- * - TypeScript handles: tool registration, executor storage, prompt formatting, orchestration
+ * - C++ (ToolCallingBridge) handles: parsing <tool_call> tags and prompt formatting
+ * - TypeScript handles: tool registration, executor storage, and JS execution adapters
  *
  * Wave-4 §15 cleanup: Canonical tool-calling shapes now come from
  * `@runanywhere/proto-ts/tool_calling`. RN-only helpers (`ToolExecutor`,
@@ -97,18 +97,6 @@ function parameterTypeToWireString(type: ToolParameterType): string {
   }
 }
 
-type SerializedToolDefinition = {
-  name: string;
-  description: string;
-  parameters: Array<{
-    name: string;
-    type: string;
-    description: string;
-    required: boolean;
-    enumValues?: string[];
-  }>;
-};
-
 function serializeToolsForCpp(toolsToFormat: ToolDefinition[]): string {
   return JSON.stringify(toolsToFormat.map((tool) => ({
     name: tool.name,
@@ -123,83 +111,6 @@ function serializeToolsForCpp(toolsToFormat: ToolDefinition[]): string {
         : {}),
     })),
   })));
-}
-
-function getFormatInstructions(format: string): string {
-  switch (format) {
-    case 'lfm2':
-      return [
-        'TOOL CALLING FORMAT (LFM2):',
-        'When you need to use a tool, output ONLY this format:',
-        '<|tool_call_start|>[TOOL_NAME(param="VALUE_FROM_USER_QUERY")]<|tool_call_end|>',
-        '',
-        "CRITICAL: Extract the EXACT value from the user's question:",
-        '- User asks \'weather in Tokyo\' -> <|tool_call_start|>[get_weather(location="Tokyo")]<|tool_call_end|>',
-        '- User asks \'weather in sf\' -> <|tool_call_start|>[get_weather(location="San Francisco")]<|tool_call_end|>',
-        '',
-        'RULES:',
-        '1. For greetings or general chat, respond normally without tools',
-        '2. Use Python-style function call syntax inside the tags',
-        '3. String values MUST be quoted with double quotes',
-        '4. Multiple arguments are separated by commas',
-      ].join('\n');
-    case 'default':
-    default:
-      return [
-        'TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:',
-        'When you need to use a tool, output ONLY this (no other text before or after):',
-        '<tool_call>{"tool": "TOOL_NAME", "arguments": {"PARAM_NAME": "VALUE_FROM_USER_QUERY"}}</tool_call>',
-        '',
-        "CRITICAL: Extract the EXACT value from the user's question:",
-        '- User asks \'weather in Tokyo\' -> <tool_call>{"tool": "get_weather", "arguments": {"location": "Tokyo"}}</tool_call>',
-        '- User asks \'weather in sf\' -> <tool_call>{"tool": "get_weather", "arguments": {"location": "San Francisco"}}</tool_call>',
-        '',
-        'RULES:',
-        '1. For greetings or general chat, respond normally without tools',
-        '2. When using a tool, output ONLY the <tool_call> tag, nothing else',
-        '3. Use the exact parameter names shown in the tool definitions above',
-      ].join('\n');
-  }
-}
-
-function formatToolsForPromptFallback(
-  toolsToFormat: SerializedToolDefinition[],
-  format: string
-): string {
-  if (toolsToFormat.length === 0) {
-    return '';
-  }
-
-  let prompt = 'You have access to these tools:\n\n';
-
-  for (const tool of toolsToFormat) {
-    prompt += `- ${tool.name}: ${tool.description ?? ''}\n`;
-
-    if (tool.parameters.length > 0) {
-      prompt += '  Parameters:\n';
-      for (const param of tool.parameters) {
-        prompt += `    - ${param.name} (${param.type}${param.required ? ', required' : ''}): ${param.description ?? ''}\n`;
-      }
-    }
-
-    prompt += '\n';
-  }
-
-  prompt += getFormatInstructions(format);
-  return prompt;
-}
-
-function formatSerializedToolsJsonFallback(
-  toolsJson: string,
-  format: string
-): string {
-  try {
-    const parsed = JSON.parse(toolsJson) as SerializedToolDefinition[];
-    return formatToolsForPromptFallback(parsed, format);
-  } catch (error) {
-    logger.error(`Failed to parse tools JSON for fallback formatting: ${error}`);
-    return toolsJson;
-  }
 }
 
 // =============================================================================
@@ -256,62 +167,33 @@ async function parseToolCallViaCpp(llmOutput: string): Promise<{
   toolCall: ToolCall | null;
 }> {
   if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available for parseToolCall');
-    return { text: llmOutput, toolCall: null };
+    throw new Error('Native module not available for parseToolCall');
   }
 
-  try {
-    const native = requireNativeModule();
-    const resultJson = await native.parseToolCallFromOutput(llmOutput);
-    const result = JSON.parse(resultJson);
+  const native = requireNativeModule();
+  const resultJson = await native.parseToolCallFromOutput(llmOutput);
+  const result = JSON.parse(resultJson);
 
-    if (!result.hasToolCall) {
-      return { text: result.cleanText || llmOutput, toolCall: null };
-    }
-
-    // Normalise C++ output into the proto `ToolCall` shape: an `id`,
-    // a `name`, a JSON-encoded `argumentsJson`, and a `type` discriminator.
-    const argumentsJson =
-      typeof result.argumentsJson === 'string'
-        ? result.argumentsJson
-        : JSON.stringify(result.argumentsJson ?? {});
-
-    const toolCall: ToolCall = {
-      id: `call_${result.callId || Date.now()}`,
-      name: result.toolName,
-      argumentsJson,
-      type: 'function',
-    };
-
-    return { text: result.cleanText || '', toolCall };
-  } catch (error) {
-    logger.error(`C++ parseToolCall failed: ${error}`);
-    return { text: llmOutput, toolCall: null };
-  }
-}
-
-/**
- * Format tool definitions for LLM prompt
- * Creates a system prompt describing available tools
- *
- * Uses C++ single source of truth via native module.
- * Falls back to synchronous TypeScript implementation if native unavailable.
- *
- * @param tools - Tool definitions (defaults to registered tools)
- * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
- */
-export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string): string {
-  const toolsToFormat = tools || getRegisteredTools();
-  const toolFormat = format?.toLowerCase() || 'default';
-
-  if (toolsToFormat.length === 0) {
-    return '';
+  if (!result.hasToolCall) {
+    return { text: result.cleanText || llmOutput, toolCall: null };
   }
 
-  return formatToolsForPromptFallback(
-    JSON.parse(serializeToolsForCpp(toolsToFormat)) as SerializedToolDefinition[],
-    toolFormat
-  );
+  // Normalise C++ output into the proto `ToolCall` shape: an `id`,
+  // a `name`, a JSON-encoded `argumentsJson`, and a `type` discriminator.
+  const argumentsJson =
+    typeof result.argumentsJson === 'string'
+      ? result.argumentsJson
+      : JSON.stringify(result.argumentsJson ?? {});
+
+  const toolCall: ToolCall = {
+    id: `call_${result.callId || Date.now()}`,
+    name: result.toolName,
+    argumentsJson,
+    arguments: {},
+    type: 'function',
+  };
+
+  return { text: result.cleanText || '', toolCall };
 }
 
 /**
@@ -332,17 +214,11 @@ export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format
   const toolsJson = serializeToolsForCpp(toolsToFormat);
 
   if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available, using TypeScript tool prompt formatter');
-    return formatSerializedToolsJsonFallback(toolsJson, toolFormat);
+    throw new Error('Native module not available for formatToolsForPrompt');
   }
 
-  try {
-    const native = requireNativeModule();
-    return await native.formatToolsForPrompt(toolsJson, toolFormat);
-  } catch (error) {
-    logger.error(`C++ formatToolsForPrompt failed: ${error}`);
-    return formatSerializedToolsJsonFallback(toolsJson, toolFormat);
-  }
+  const native = requireNativeModule();
+  return native.formatToolsForPrompt(toolsJson, toolFormat);
 }
 
 // =============================================================================
@@ -365,6 +241,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: `Unknown tool: ${toolCall.name}`,
+      success: false,
+      result: {},
     };
   }
 
@@ -381,6 +259,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: `Failed to parse tool arguments: ${errorMessage}`,
+      success: false,
+      result: {},
     };
   }
 
@@ -392,6 +272,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: JSON.stringify(result),
+      success: true,
+      result: {},
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -402,6 +284,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: errorMessage,
+      success: false,
+      result: {},
     };
   }
 }
@@ -411,8 +295,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 // =============================================================================
 
 /**
- * Build initial prompt using C++ bridge
- * Falls back to simple concatenation if native unavailable
+ * Build initial prompt using C++ bridge.
  */
 async function buildInitialPromptViaCpp(
   userPrompt: string,
@@ -421,33 +304,25 @@ async function buildInitialPromptViaCpp(
 ): Promise<string> {
   const formatHint = (options?.formatHint || 'default').toLowerCase();
   if (!isNativeModuleAvailable()) {
-    const toolsPrompt = formatSerializedToolsJsonFallback(toolsJson, formatHint);
-    return `${toolsPrompt}\n\nUser: ${userPrompt}`;
+    throw new Error('Native module not available for buildInitialPrompt');
   }
 
-  try {
-    const native = requireNativeModule();
-    const optionsJson = JSON.stringify({
-      maxToolCalls: options?.maxIterations ?? 5,
-      autoExecute: options?.autoExecute ?? true,
-      temperature: options?.temperature ?? 0.7,
-      maxTokens: options?.maxTokens ?? 1024,
-      format: formatHint,
-      replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
-      keepToolsAvailable: options?.keepToolsAvailable ?? false,
-      systemPrompt: options?.systemPrompt,
-    });
-    return await native.buildInitialPrompt(userPrompt, toolsJson, optionsJson);
-  } catch (error) {
-    logger.error(`C++ buildInitialPrompt failed: ${error}`);
-    const toolsPrompt = formatSerializedToolsJsonFallback(toolsJson, formatHint);
-    return `${toolsPrompt}\n\nUser: ${userPrompt}`;
-  }
+  const native = requireNativeModule();
+  const optionsJson = JSON.stringify({
+    maxToolCalls: options?.maxIterations ?? 5,
+    autoExecute: options?.autoExecute ?? true,
+    temperature: options?.temperature ?? 0.7,
+    maxTokens: options?.maxTokens ?? 1024,
+    format: formatHint,
+    replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
+    keepToolsAvailable: options?.keepToolsAvailable ?? false,
+    systemPrompt: options?.systemPrompt,
+  });
+  return native.buildInitialPrompt(userPrompt, toolsJson, optionsJson);
 }
 
 /**
- * Build follow-up prompt using C++ bridge
- * Falls back to template string if native unavailable
+ * Build follow-up prompt using C++ bridge.
  */
 async function buildFollowupPromptViaCpp(
   originalPrompt: string,
@@ -457,26 +332,17 @@ async function buildFollowupPromptViaCpp(
   keepToolsAvailable: boolean
 ): Promise<string> {
   if (!isNativeModuleAvailable()) {
-    // Fallback: simple template
-    if (keepToolsAvailable) {
-      return `${toolsPrompt}\n\nUser: ${originalPrompt}\n\nTool ${toolName} returned: ${resultJson}`;
-    }
-    return `The user asked: "${originalPrompt}"\n\nYou used ${toolName} and got: ${resultJson}\n\nRespond naturally.`;
+    throw new Error('Native module not available for buildFollowupPrompt');
   }
 
-  try {
-    const native = requireNativeModule();
-    return await native.buildFollowupPrompt(
-      originalPrompt,
-      toolsPrompt,
-      toolName,
-      resultJson,
-      keepToolsAvailable
-    );
-  } catch (error) {
-    logger.error(`C++ buildFollowupPrompt failed: ${error}`);
-    return `The user asked: "${originalPrompt}"\n\nYou used ${toolName} and got: ${resultJson}`;
-  }
+  const native = requireNativeModule();
+  return native.buildFollowupPrompt(
+    originalPrompt,
+    toolsPrompt,
+    toolName,
+    resultJson,
+    keepToolsAvailable
+  );
 }
 
 /**
@@ -533,6 +399,7 @@ export async function generateWithTools(
       stopSequences: [],
       streamingEnabled: true,
       preferredFramework: 0,
+      enableRealTimeTracking: false,
     })) {
       if (event.token) responseText += event.token;
       if (event.isFinal) break;

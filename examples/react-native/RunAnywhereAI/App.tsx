@@ -44,6 +44,7 @@ import {
   initializeNitroModulesGlobally,
   getChip,
   getNPUDownloadUrl,
+  hasUsableBackendConfig,
 } from '@runanywhere/core';
 
 /**
@@ -425,7 +426,12 @@ const App: React.FC = () => {
       const customBaseURL = await getStoredBaseURL();
       const hasCustomConfig = await hasCustomConfiguration();
 
-      if (hasCustomConfig && customApiKey && customBaseURL) {
+      if (
+        hasCustomConfig &&
+        customApiKey &&
+        customBaseURL &&
+        hasUsableBackendConfig({ apiKey: customApiKey, baseURL: customBaseURL })
+      ) {
         console.log('[App] Found custom API configuration');
         await RunAnywhere.initialize({
           apiKey: customApiKey,

@@ -148,6 +148,70 @@ public class DiffusionGenerationOptions(
     schemaIndex = 8,
   )
   public val mode: DiffusionMode = DiffusionMode.DIFFUSION_MODE_UNSPECIFIED,
+  /**
+   * Image-to-image / inpainting payloads from rac_diffusion_options_t.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    jsonName = "inputImage",
+    schemaIndex = 9,
+  )
+  public val input_image: ByteString? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    jsonName = "maskImage",
+    schemaIndex = 10,
+  )
+  public val mask_image: ByteString? = null,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "denoiseStrength",
+    schemaIndex = 11,
+  )
+  public val denoise_strength: Float = 0f,
+  /**
+   * Progress reporting controls.
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "reportIntermediateImages",
+    schemaIndex = 12,
+  )
+  public val report_intermediate_images: Boolean = false,
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "progressStride",
+    schemaIndex = 13,
+  )
+  public val progress_stride: Int = 0,
+  /**
+   * Dimensions for raw input_image payloads when the backend cannot infer
+   * them from an encoded container.
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "inputImageWidth",
+    schemaIndex = 14,
+  )
+  public val input_image_width: Int = 0,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "inputImageHeight",
+    schemaIndex = 15,
+  )
+  public val input_image_height: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -170,6 +234,13 @@ public class DiffusionGenerationOptions(
     if (seed != other.seed) return false
     if (scheduler != other.scheduler) return false
     if (mode != other.mode) return false
+    if (input_image != other.input_image) return false
+    if (mask_image != other.mask_image) return false
+    if (denoise_strength != other.denoise_strength) return false
+    if (report_intermediate_images != other.report_intermediate_images) return false
+    if (progress_stride != other.progress_stride) return false
+    if (input_image_width != other.input_image_width) return false
+    if (input_image_height != other.input_image_height) return false
     return true
   }
 
@@ -186,6 +257,13 @@ public class DiffusionGenerationOptions(
       result = result * 37 + seed.hashCode()
       result = result * 37 + scheduler.hashCode()
       result = result * 37 + mode.hashCode()
+      result = result * 37 + (input_image?.hashCode() ?: 0)
+      result = result * 37 + (mask_image?.hashCode() ?: 0)
+      result = result * 37 + denoise_strength.hashCode()
+      result = result * 37 + report_intermediate_images.hashCode()
+      result = result * 37 + progress_stride.hashCode()
+      result = result * 37 + input_image_width.hashCode()
+      result = result * 37 + input_image_height.hashCode()
       super.hashCode = result
     }
     return result
@@ -202,6 +280,13 @@ public class DiffusionGenerationOptions(
     result += """seed=$seed"""
     result += """scheduler=$scheduler"""
     result += """mode=$mode"""
+    if (input_image != null) result += """input_image=$input_image"""
+    if (mask_image != null) result += """mask_image=$mask_image"""
+    result += """denoise_strength=$denoise_strength"""
+    result += """report_intermediate_images=$report_intermediate_images"""
+    result += """progress_stride=$progress_stride"""
+    result += """input_image_width=$input_image_width"""
+    result += """input_image_height=$input_image_height"""
     return result.joinToString(prefix = "DiffusionGenerationOptions{", separator = ", ", postfix =
         "}")
   }
@@ -216,9 +301,18 @@ public class DiffusionGenerationOptions(
     seed: Long = this.seed,
     scheduler: DiffusionScheduler = this.scheduler,
     mode: DiffusionMode = this.mode,
+    input_image: ByteString? = this.input_image,
+    mask_image: ByteString? = this.mask_image,
+    denoise_strength: Float = this.denoise_strength,
+    report_intermediate_images: Boolean = this.report_intermediate_images,
+    progress_stride: Int = this.progress_stride,
+    input_image_width: Int = this.input_image_width,
+    input_image_height: Int = this.input_image_height,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionGenerationOptions = DiffusionGenerationOptions(prompt, negative_prompt, width, height,
-      num_inference_steps, guidance_scale, seed, scheduler, mode, unknownFields)
+      num_inference_steps, guidance_scale, seed, scheduler, mode, input_image, mask_image,
+      denoise_strength, report_intermediate_images, progress_stride, input_image_width,
+      input_image_height, unknownFields)
 
   public companion object {
     @JvmField
@@ -247,6 +341,18 @@ public class DiffusionGenerationOptions(
             DiffusionScheduler.ADAPTER.encodedSizeWithTag(8, value.scheduler)
         if (value.mode != DiffusionMode.DIFFUSION_MODE_UNSPECIFIED) size +=
             DiffusionMode.ADAPTER.encodedSizeWithTag(9, value.mode)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(10, value.input_image)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(11, value.mask_image)
+        if (!value.denoise_strength.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(12,
+            value.denoise_strength)
+        if (value.report_intermediate_images != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(13, value.report_intermediate_images)
+        if (value.progress_stride != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(14,
+            value.progress_stride)
+        if (value.input_image_width != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(15,
+            value.input_image_width)
+        if (value.input_image_height != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(16,
+            value.input_image_height)
         return size
       }
 
@@ -265,11 +371,35 @@ public class DiffusionGenerationOptions(
             DiffusionScheduler.ADAPTER.encodeWithTag(writer, 8, value.scheduler)
         if (value.mode != DiffusionMode.DIFFUSION_MODE_UNSPECIFIED)
             DiffusionMode.ADAPTER.encodeWithTag(writer, 9, value.mode)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 10, value.input_image)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 11, value.mask_image)
+        if (!value.denoise_strength.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 12,
+            value.denoise_strength)
+        if (value.report_intermediate_images != false) ProtoAdapter.BOOL.encodeWithTag(writer, 13,
+            value.report_intermediate_images)
+        if (value.progress_stride != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
+            value.progress_stride)
+        if (value.input_image_width != 0) ProtoAdapter.INT32.encodeWithTag(writer, 15,
+            value.input_image_width)
+        if (value.input_image_height != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
+            value.input_image_height)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.input_image_height != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
+            value.input_image_height)
+        if (value.input_image_width != 0) ProtoAdapter.INT32.encodeWithTag(writer, 15,
+            value.input_image_width)
+        if (value.progress_stride != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
+            value.progress_stride)
+        if (value.report_intermediate_images != false) ProtoAdapter.BOOL.encodeWithTag(writer, 13,
+            value.report_intermediate_images)
+        if (!value.denoise_strength.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 12,
+            value.denoise_strength)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 11, value.mask_image)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 10, value.input_image)
         if (value.mode != DiffusionMode.DIFFUSION_MODE_UNSPECIFIED)
             DiffusionMode.ADAPTER.encodeWithTag(writer, 9, value.mode)
         if (value.scheduler != DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED)
@@ -296,6 +426,13 @@ public class DiffusionGenerationOptions(
         var seed: Long = 0L
         var scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
         var mode: DiffusionMode = DiffusionMode.DIFFUSION_MODE_UNSPECIFIED
+        var input_image: ByteString? = null
+        var mask_image: ByteString? = null
+        var denoise_strength: Float = 0f
+        var report_intermediate_images: Boolean = false
+        var progress_stride: Int = 0
+        var input_image_width: Int = 0
+        var input_image_height: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -315,6 +452,13 @@ public class DiffusionGenerationOptions(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            10 -> input_image = ProtoAdapter.BYTES.decode(reader)
+            11 -> mask_image = ProtoAdapter.BYTES.decode(reader)
+            12 -> denoise_strength = ProtoAdapter.FLOAT.decode(reader)
+            13 -> report_intermediate_images = ProtoAdapter.BOOL.decode(reader)
+            14 -> progress_stride = ProtoAdapter.INT32.decode(reader)
+            15 -> input_image_width = ProtoAdapter.INT32.decode(reader)
+            16 -> input_image_height = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -328,6 +472,13 @@ public class DiffusionGenerationOptions(
           seed = seed,
           scheduler = scheduler,
           mode = mode,
+          input_image = input_image,
+          mask_image = mask_image,
+          denoise_strength = denoise_strength,
+          report_intermediate_images = report_intermediate_images,
+          progress_stride = progress_stride,
+          input_image_width = input_image_width,
+          input_image_height = input_image_height,
           unknownFields = unknownFields
         )
       }

@@ -303,6 +303,82 @@ public struct RAJSONSchema: @unchecked Sendable {
   /// Clears the value of `additionalProperties`. Subsequent reads from it will return its default value.
   public mutating func clearAdditionalProperties() {_uniqueStorage()._additionalProperties = nil}
 
+  /// JSON Schema document metadata / composition fields. Field names avoid
+  /// `$` in generated APIs while preserving JSON names for serializers.
+  public var schemaUri: String {
+    get {_storage._schemaUri ?? String()}
+    set {_uniqueStorage()._schemaUri = newValue}
+  }
+  /// Returns true if `schemaUri` has been explicitly set.
+  public var hasSchemaUri: Bool {_storage._schemaUri != nil}
+  /// Clears the value of `schemaUri`. Subsequent reads from it will return its default value.
+  public mutating func clearSchemaUri() {_uniqueStorage()._schemaUri = nil}
+
+  public var idUri: String {
+    get {_storage._idUri ?? String()}
+    set {_uniqueStorage()._idUri = newValue}
+  }
+  /// Returns true if `idUri` has been explicitly set.
+  public var hasIDUri: Bool {_storage._idUri != nil}
+  /// Clears the value of `idUri`. Subsequent reads from it will return its default value.
+  public mutating func clearIDUri() {_uniqueStorage()._idUri = nil}
+
+  public var title: String {
+    get {_storage._title ?? String()}
+    set {_uniqueStorage()._title = newValue}
+  }
+  /// Returns true if `title` has been explicitly set.
+  public var hasTitle: Bool {_storage._title != nil}
+  /// Clears the value of `title`. Subsequent reads from it will return its default value.
+  public mutating func clearTitle() {_uniqueStorage()._title = nil}
+
+  public var description_p: String {
+    get {_storage._description_p ?? String()}
+    set {_uniqueStorage()._description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {_storage._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {_uniqueStorage()._description_p = nil}
+
+  public var definitions: Dictionary<String,RAJSONSchema> {
+    get {_storage._definitions}
+    set {_uniqueStorage()._definitions = newValue}
+  }
+
+  public var ref: String {
+    get {_storage._ref ?? String()}
+    set {_uniqueStorage()._ref = newValue}
+  }
+  /// Returns true if `ref` has been explicitly set.
+  public var hasRef: Bool {_storage._ref != nil}
+  /// Clears the value of `ref`. Subsequent reads from it will return its default value.
+  public mutating func clearRef() {_uniqueStorage()._ref = nil}
+
+  public var allOf: [RAJSONSchema] {
+    get {_storage._allOf}
+    set {_uniqueStorage()._allOf = newValue}
+  }
+
+  public var anyOf: [RAJSONSchema] {
+    get {_storage._anyOf}
+    set {_uniqueStorage()._anyOf = newValue}
+  }
+
+  public var oneOf: [RAJSONSchema] {
+    get {_storage._oneOf}
+    set {_uniqueStorage()._oneOf = newValue}
+  }
+
+  public var notSchema: RAJSONSchema {
+    get {_storage._notSchema ?? RAJSONSchema()}
+    set {_uniqueStorage()._notSchema = newValue}
+  }
+  /// Returns true if `notSchema` has been explicitly set.
+  public var hasNotSchema: Bool {_storage._notSchema != nil}
+  /// Clears the value of `notSchema`. Subsequent reads from it will return its default value.
+  public mutating func clearNotSchema() {_uniqueStorage()._notSchema = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -347,12 +423,45 @@ public struct RAStructuredOutputOptions: Sendable {
   /// Clears the value of `strictMode`. Subsequent reads from it will return its default value.
   public mutating func clearStrictMode() {self._strictMode = nil}
 
+  /// Raw JSON Schema string for C ABI and SDKs that already carry schema as
+  /// serialized JSON instead of the typed JSONSchema tree.
+  public var jsonSchema: String {
+    get {_jsonSchema ?? String()}
+    set {_jsonSchema = newValue}
+  }
+  /// Returns true if `jsonSchema` has been explicitly set.
+  public var hasJsonSchema: Bool {self._jsonSchema != nil}
+  /// Clears the value of `jsonSchema`. Subsequent reads from it will return its default value.
+  public mutating func clearJsonSchema() {self._jsonSchema = nil}
+
+  /// Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
+  public var typeName: String {
+    get {_typeName ?? String()}
+    set {_typeName = newValue}
+  }
+  /// Returns true if `typeName` has been explicitly set.
+  public var hasTypeName: Bool {self._typeName != nil}
+  /// Clears the value of `typeName`. Subsequent reads from it will return its default value.
+  public mutating func clearTypeName() {self._typeName = nil}
+
+  public var name: String {
+    get {_name ?? String()}
+    set {_name = newValue}
+  }
+  /// Returns true if `name` has been explicitly set.
+  public var hasName: Bool {self._name != nil}
+  /// Clears the value of `name`. Subsequent reads from it will return its default value.
+  public mutating func clearName() {self._name = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _schema: RAJSONSchema? = nil
   fileprivate var _strictMode: Bool? = nil
+  fileprivate var _jsonSchema: String? = nil
+  fileprivate var _typeName: String? = nil
+  fileprivate var _name: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -393,12 +502,24 @@ public struct RAStructuredOutputValidation: Sendable {
   /// Clears the value of `rawOutput`. Subsequent reads from it will return its default value.
   public mutating func clearRawOutput() {self._rawOutput = nil}
 
+  /// JSON substring extracted from raw_output before validation, when the
+  /// extractor found one.
+  public var extractedJson: String {
+    get {_extractedJson ?? String()}
+    set {_extractedJson = newValue}
+  }
+  /// Returns true if `extractedJson` has been explicitly set.
+  public var hasExtractedJson: Bool {self._extractedJson != nil}
+  /// Clears the value of `extractedJson`. Subsequent reads from it will return its default value.
+  public mutating func clearExtractedJson() {self._extractedJson = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _errorMessage: String? = nil
   fileprivate var _rawOutput: String? = nil
+  fileprivate var _extractedJson: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -733,7 +854,7 @@ extension RAJSONSchemaProperty: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".JSONSchema"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}properties\0\u{1}required\0\u{1}items\0\u{3}additional_properties\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}properties\0\u{1}required\0\u{1}items\0\u{3}additional_properties\0\u{5}schema_uri\0$schema\0\u{5}id_uri\0$id\0\u{1}title\0\u{1}description\0\u{1}definitions\0\u{5}ref\0$ref\0\u{3}all_of\0\u{3}any_of\0\u{3}one_of\0\u{3}not_schema\0")
 
   fileprivate class _StorageClass {
     var _type: RAJSONSchemaType = .unspecified
@@ -741,6 +862,16 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     var _required: [String] = []
     var _items: RAJSONSchemaProperty? = nil
     var _additionalProperties: Bool? = nil
+    var _schemaUri: String? = nil
+    var _idUri: String? = nil
+    var _title: String? = nil
+    var _description_p: String? = nil
+    var _definitions: Dictionary<String,RAJSONSchema> = [:]
+    var _ref: String? = nil
+    var _allOf: [RAJSONSchema] = []
+    var _anyOf: [RAJSONSchema] = []
+    var _oneOf: [RAJSONSchema] = []
+    var _notSchema: RAJSONSchema? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -756,6 +887,16 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       _required = source._required
       _items = source._items
       _additionalProperties = source._additionalProperties
+      _schemaUri = source._schemaUri
+      _idUri = source._idUri
+      _title = source._title
+      _description_p = source._description_p
+      _definitions = source._definitions
+      _ref = source._ref
+      _allOf = source._allOf
+      _anyOf = source._anyOf
+      _oneOf = source._oneOf
+      _notSchema = source._notSchema
     }
   }
 
@@ -779,6 +920,16 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
         case 3: try { try decoder.decodeRepeatedStringField(value: &_storage._required) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._items) }()
         case 5: try { try decoder.decodeSingularBoolField(value: &_storage._additionalProperties) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._schemaUri) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._idUri) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._title) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
+        case 10: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAJSONSchema>.self, value: &_storage._definitions) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._ref) }()
+        case 12: try { try decoder.decodeRepeatedMessageField(value: &_storage._allOf) }()
+        case 13: try { try decoder.decodeRepeatedMessageField(value: &_storage._anyOf) }()
+        case 14: try { try decoder.decodeRepeatedMessageField(value: &_storage._oneOf) }()
+        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._notSchema) }()
         default: break
         }
       }
@@ -806,6 +957,36 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       try { if let v = _storage._additionalProperties {
         try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
       } }()
+      try { if let v = _storage._schemaUri {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._idUri {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._title {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._description_p {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+      } }()
+      if !_storage._definitions.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAJSONSchema>.self, value: _storage._definitions, fieldNumber: 10)
+      }
+      try { if let v = _storage._ref {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+      } }()
+      if !_storage._allOf.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._allOf, fieldNumber: 12)
+      }
+      if !_storage._anyOf.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._anyOf, fieldNumber: 13)
+      }
+      if !_storage._oneOf.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._oneOf, fieldNumber: 14)
+      }
+      try { if let v = _storage._notSchema {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -820,6 +1001,16 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
         if _storage._required != rhs_storage._required {return false}
         if _storage._items != rhs_storage._items {return false}
         if _storage._additionalProperties != rhs_storage._additionalProperties {return false}
+        if _storage._schemaUri != rhs_storage._schemaUri {return false}
+        if _storage._idUri != rhs_storage._idUri {return false}
+        if _storage._title != rhs_storage._title {return false}
+        if _storage._description_p != rhs_storage._description_p {return false}
+        if _storage._definitions != rhs_storage._definitions {return false}
+        if _storage._ref != rhs_storage._ref {return false}
+        if _storage._allOf != rhs_storage._allOf {return false}
+        if _storage._anyOf != rhs_storage._anyOf {return false}
+        if _storage._oneOf != rhs_storage._oneOf {return false}
+        if _storage._notSchema != rhs_storage._notSchema {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -831,7 +1022,7 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
 
 extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schema\0\u{3}include_schema_in_prompt\0\u{3}strict_mode\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schema\0\u{3}include_schema_in_prompt\0\u{3}strict_mode\0\u{3}json_schema\0\u{3}type_name\0\u{1}name\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -842,6 +1033,9 @@ extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._Messa
       case 1: try { try decoder.decodeSingularMessageField(value: &self._schema) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.includeSchemaInPrompt) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self._strictMode) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._jsonSchema) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._typeName) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._name) }()
       default: break
       }
     }
@@ -861,6 +1055,15 @@ extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._Messa
     try { if let v = self._strictMode {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
     } }()
+    try { if let v = self._jsonSchema {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._typeName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._name {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -868,6 +1071,9 @@ extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs._schema != rhs._schema {return false}
     if lhs.includeSchemaInPrompt != rhs.includeSchemaInPrompt {return false}
     if lhs._strictMode != rhs._strictMode {return false}
+    if lhs._jsonSchema != rhs._jsonSchema {return false}
+    if lhs._typeName != rhs._typeName {return false}
+    if lhs._name != rhs._name {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -875,7 +1081,7 @@ extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputValidation"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{3}error_message\0\u{3}raw_output\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{3}error_message\0\u{3}raw_output\0\u{3}extracted_json\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -887,6 +1093,7 @@ extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._Me
       case 2: try { try decoder.decodeSingularBoolField(value: &self.containsJson) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._rawOutput) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._extractedJson) }()
       default: break
       }
     }
@@ -909,6 +1116,9 @@ extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._Me
     try { if let v = self._rawOutput {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._extractedJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -917,6 +1127,7 @@ extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._Me
     if lhs.containsJson != rhs.containsJson {return false}
     if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs._rawOutput != rhs._rawOutput {return false}
+    if lhs._extractedJson != rhs._extractedJson {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -47,6 +47,14 @@ public class ExpectedModelFiles(
     schemaIndex = 1,
   )
   public val root_directory: String? = null,
+  required_patterns: List<String> = emptyList(),
+  optional_patterns: List<String> = emptyList(),
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 4,
+  )
+  public val description: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ExpectedModelFiles, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -56,6 +64,26 @@ public class ExpectedModelFiles(
     schemaIndex = 0,
   )
   public val files: List<ModelFileDescriptor> = immutableCopyOf("files", files)
+
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "requiredPatterns",
+    schemaIndex = 2,
+  )
+  public val required_patterns: List<String> = immutableCopyOf("required_patterns",
+      required_patterns)
+
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "optionalPatterns",
+    schemaIndex = 3,
+  )
+  public val optional_patterns: List<String> = immutableCopyOf("optional_patterns",
+      optional_patterns)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -70,6 +98,9 @@ public class ExpectedModelFiles(
     if (unknownFields != other.unknownFields) return false
     if (files != other.files) return false
     if (root_directory != other.root_directory) return false
+    if (required_patterns != other.required_patterns) return false
+    if (optional_patterns != other.optional_patterns) return false
+    if (description != other.description) return false
     return true
   }
 
@@ -79,6 +110,9 @@ public class ExpectedModelFiles(
       result = unknownFields.hashCode()
       result = result * 37 + files.hashCode()
       result = result * 37 + (root_directory?.hashCode() ?: 0)
+      result = result * 37 + required_patterns.hashCode()
+      result = result * 37 + optional_patterns.hashCode()
+      result = result * 37 + (description?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -88,14 +122,23 @@ public class ExpectedModelFiles(
     val result = mutableListOf<String>()
     if (files.isNotEmpty()) result += """files=$files"""
     if (root_directory != null) result += """root_directory=${sanitize(root_directory)}"""
+    if (required_patterns.isNotEmpty()) result +=
+        """required_patterns=${sanitize(required_patterns)}"""
+    if (optional_patterns.isNotEmpty()) result +=
+        """optional_patterns=${sanitize(optional_patterns)}"""
+    if (description != null) result += """description=${sanitize(description)}"""
     return result.joinToString(prefix = "ExpectedModelFiles{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     files: List<ModelFileDescriptor> = this.files,
     root_directory: String? = this.root_directory,
+    required_patterns: List<String> = this.required_patterns,
+    optional_patterns: List<String> = this.optional_patterns,
+    description: String? = this.description,
     unknownFields: ByteString = this.unknownFields,
-  ): ExpectedModelFiles = ExpectedModelFiles(files, root_directory, unknownFields)
+  ): ExpectedModelFiles = ExpectedModelFiles(files, root_directory, required_patterns,
+      optional_patterns, description, unknownFields)
 
   public companion object {
     @JvmField
@@ -112,17 +155,26 @@ public class ExpectedModelFiles(
         var size = value.unknownFields.size
         size += ModelFileDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(1, value.files)
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.root_directory)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.required_patterns)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.optional_patterns)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.description)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ExpectedModelFiles) {
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.files)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.root_directory)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required_patterns)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.optional_patterns)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.description)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ExpectedModelFiles) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.description)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.optional_patterns)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required_patterns)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.root_directory)
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.files)
       }
@@ -130,16 +182,25 @@ public class ExpectedModelFiles(
       override fun decode(reader: ProtoReader): ExpectedModelFiles {
         val files = mutableListOf<ModelFileDescriptor>()
         var root_directory: String? = null
+        val required_patterns = mutableListOf<String>()
+        val optional_patterns = mutableListOf<String>()
+        var description: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> files.add(ModelFileDescriptor.ADAPTER.decode(reader))
             2 -> root_directory = ProtoAdapter.STRING.decode(reader)
+            3 -> required_patterns.add(ProtoAdapter.STRING.decode(reader))
+            4 -> optional_patterns.add(ProtoAdapter.STRING.decode(reader))
+            5 -> description = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ExpectedModelFiles(
           files = files,
           root_directory = root_directory,
+          required_patterns = required_patterns,
+          optional_patterns = optional_patterns,
+          description = description,
           unknownFields = unknownFields
         )
       }

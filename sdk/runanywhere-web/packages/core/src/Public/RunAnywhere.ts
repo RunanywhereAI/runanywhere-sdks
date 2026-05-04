@@ -35,6 +35,10 @@ import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import * as RAGExt from './Extensions/RunAnywhere+RAG';
 import * as VoiceAgentExt from './Extensions/RunAnywhere+VoiceAgent';
 import { Storage as StorageCapability } from './Extensions/RunAnywhere+Storage';
+import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads';
+import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
+import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
+import { ModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
@@ -64,6 +68,10 @@ import { ModelAssignments as ModelAssignmentsCapability } from './Extensions/Run
 import { Frameworks as FrameworksCapability } from './Extensions/RunAnywhere+Frameworks';
 import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
+import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
+import { DownloadAdapter } from '../Adapters/DownloadAdapter';
+import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
+import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { LlmThinking } from '../Features/LLM/LlmThinking';
 
@@ -358,6 +366,10 @@ export const RunAnywhere = {
     ModelManager.registerCatalog(models);
   },
 
+  unregisterModel(modelId: string): void {
+    ModelManager.unregisterModel(modelId);
+  },
+
   setVLMLoader(loader: VLMLoader): void {
     ModelManager.setVLMLoader(loader);
   },
@@ -376,6 +388,10 @@ export const RunAnywhere = {
 
   availableModels(): ManagedModel[] {
     return ModelManager.getModels();
+  },
+
+  getModel(modelId: string): ManagedModel | undefined {
+    return ModelManager.getModel(modelId);
   },
 
   getLoadedModel(category?: ModelCategory): ManagedModel | null {
@@ -409,9 +425,8 @@ export const RunAnywhere = {
 
   /**
    * Fetch server-assigned model assignments (§13). Returns the locally
-   * cached assignment list. A full server-sync requires `rac_model_registry_*`
-   * C ABI which is CPP-BLOCKED on the Web; until that lands this returns the
-   * local assignments as registered via `registerModel`.
+   * cached assignment list, refreshed through the proto-byte registry C ABI
+   * when a Web WASM backend with those exports is loaded.
    */
   fetchModelAssignments(): ManagedModel[] {
     return ModelManager.getModels();
@@ -715,6 +730,8 @@ export const RunAnywhere = {
   ragClearDocuments: RAGExt.ragClearDocuments,
   ragGetDocumentCount: RAGExt.ragGetDocumentCount,
   ragGetStatistics: RAGExt.ragGetStatistics,
+  getRAGAvailability: RAGExt.getRAGAvailability,
+  isRAGAvailable: RAGExt.isRAGAvailable,
 
   // STT model management — canonical flat verbs (§4)
   loadSTTModel: STTCapability.loadSTTModel.bind(STTCapability),
@@ -794,6 +811,18 @@ export const RunAnywhere = {
   /** Storage info / persistence — `RunAnywhere.storage.info()` etc. */
   storage: StorageCapability,
 
+  /** C++-owned download workflow — plan/start/cancel/resume/progress. */
+  downloads: DownloadsCapability,
+
+  /** C++ SDKEvent proto stream — subscribe/publish/poll/failure. */
+  sdkEvents: SDKEventsCapability,
+
+  /** C++ model registry proto bridge — list/query/listDownloaded/get/mutate. */
+  modelRegistry: ModelRegistryCapability,
+
+  /** C++ model lifecycle proto bridge — load/unload/current/snapshot. */
+  modelLifecycle: ModelLifecycleCapability,
+
   /** Plugin/extension management — `RunAnywhere.pluginLoader.register(ext)` etc. */
   pluginLoader: PluginLoaderCapability,
 
@@ -838,6 +867,9 @@ export const RunAnywhere = {
 
   /** LoRA adapter management — `RunAnywhere.lora.load(config)` etc. */
   lora: LoRACapability,
+
+  /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */
+  rag: RAGExt.RAG,
 
   /** Hardware profile — `RunAnywhere.hardware.getProfile()` etc. */
   hardware: HardwareCapability,
@@ -885,6 +917,10 @@ export const RunAnywhere = {
     // Clear WASM adapter singletons so stale module refs don't linger.
     HTTPAdapter.clearDefaultModule();
     ModelRegistryAdapter.clearDefaultModule();
+    ModelLifecycleAdapter.clearDefaultModule();
+    DownloadAdapter.clearDefaultModule();
+    SDKEventStreamAdapter.clearDefaultModule();
+    StorageAdapter.clearDefaultHandles();
 
     // Reset state
     EventBus.reset();

@@ -56,7 +56,7 @@ class JSONSchemaProperty(_message.Message):
     def __init__(self, type: _Optional[_Union[JSONSchemaType, str]] = ..., description: _Optional[str] = ..., enum_values: _Optional[_Iterable[str]] = ..., format: _Optional[str] = ..., items_schema: _Optional[_Union[JSONSchema, _Mapping]] = ..., object_schema: _Optional[_Union[JSONSchema, _Mapping]] = ...) -> None: ...
 
 class JSONSchema(_message.Message):
-    __slots__ = ("type", "properties", "required", "items", "additional_properties")
+    __slots__ = ("type", "properties", "required", "items", "additional_properties", "schema_uri", "id_uri", "title", "description", "definitions", "ref", "all_of", "any_of", "one_of", "not_schema")
     class PropertiesEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -64,39 +64,74 @@ class JSONSchema(_message.Message):
         key: str
         value: JSONSchemaProperty
         def __init__(self, key: _Optional[str] = ..., value: _Optional[_Union[JSONSchemaProperty, _Mapping]] = ...) -> None: ...
+    class DefinitionsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: JSONSchema
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[_Union[JSONSchema, _Mapping]] = ...) -> None: ...
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PROPERTIES_FIELD_NUMBER: _ClassVar[int]
     REQUIRED_FIELD_NUMBER: _ClassVar[int]
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     ADDITIONAL_PROPERTIES_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_URI_FIELD_NUMBER: _ClassVar[int]
+    ID_URI_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    DEFINITIONS_FIELD_NUMBER: _ClassVar[int]
+    REF_FIELD_NUMBER: _ClassVar[int]
+    ALL_OF_FIELD_NUMBER: _ClassVar[int]
+    ANY_OF_FIELD_NUMBER: _ClassVar[int]
+    ONE_OF_FIELD_NUMBER: _ClassVar[int]
+    NOT_SCHEMA_FIELD_NUMBER: _ClassVar[int]
     type: JSONSchemaType
     properties: _containers.MessageMap[str, JSONSchemaProperty]
     required: _containers.RepeatedScalarFieldContainer[str]
     items: JSONSchemaProperty
     additional_properties: bool
-    def __init__(self, type: _Optional[_Union[JSONSchemaType, str]] = ..., properties: _Optional[_Mapping[str, JSONSchemaProperty]] = ..., required: _Optional[_Iterable[str]] = ..., items: _Optional[_Union[JSONSchemaProperty, _Mapping]] = ..., additional_properties: _Optional[bool] = ...) -> None: ...
+    schema_uri: str
+    id_uri: str
+    title: str
+    description: str
+    definitions: _containers.MessageMap[str, JSONSchema]
+    ref: str
+    all_of: _containers.RepeatedCompositeFieldContainer[JSONSchema]
+    any_of: _containers.RepeatedCompositeFieldContainer[JSONSchema]
+    one_of: _containers.RepeatedCompositeFieldContainer[JSONSchema]
+    not_schema: JSONSchema
+    def __init__(self, type: _Optional[_Union[JSONSchemaType, str]] = ..., properties: _Optional[_Mapping[str, JSONSchemaProperty]] = ..., required: _Optional[_Iterable[str]] = ..., items: _Optional[_Union[JSONSchemaProperty, _Mapping]] = ..., additional_properties: _Optional[bool] = ..., schema_uri: _Optional[str] = ..., id_uri: _Optional[str] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., definitions: _Optional[_Mapping[str, JSONSchema]] = ..., ref: _Optional[str] = ..., all_of: _Optional[_Iterable[_Union[JSONSchema, _Mapping]]] = ..., any_of: _Optional[_Iterable[_Union[JSONSchema, _Mapping]]] = ..., one_of: _Optional[_Iterable[_Union[JSONSchema, _Mapping]]] = ..., not_schema: _Optional[_Union[JSONSchema, _Mapping]] = ...) -> None: ...
 
 class StructuredOutputOptions(_message.Message):
-    __slots__ = ("schema", "include_schema_in_prompt", "strict_mode")
+    __slots__ = ("schema", "include_schema_in_prompt", "strict_mode", "json_schema", "type_name", "name")
     SCHEMA_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_SCHEMA_IN_PROMPT_FIELD_NUMBER: _ClassVar[int]
     STRICT_MODE_FIELD_NUMBER: _ClassVar[int]
+    JSON_SCHEMA_FIELD_NUMBER: _ClassVar[int]
+    TYPE_NAME_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
     schema: JSONSchema
     include_schema_in_prompt: bool
     strict_mode: bool
-    def __init__(self, schema: _Optional[_Union[JSONSchema, _Mapping]] = ..., include_schema_in_prompt: _Optional[bool] = ..., strict_mode: _Optional[bool] = ...) -> None: ...
+    json_schema: str
+    type_name: str
+    name: str
+    def __init__(self, schema: _Optional[_Union[JSONSchema, _Mapping]] = ..., include_schema_in_prompt: _Optional[bool] = ..., strict_mode: _Optional[bool] = ..., json_schema: _Optional[str] = ..., type_name: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
 
 class StructuredOutputValidation(_message.Message):
-    __slots__ = ("is_valid", "contains_json", "error_message", "raw_output")
+    __slots__ = ("is_valid", "contains_json", "error_message", "raw_output", "extracted_json")
     IS_VALID_FIELD_NUMBER: _ClassVar[int]
     CONTAINS_JSON_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     RAW_OUTPUT_FIELD_NUMBER: _ClassVar[int]
+    EXTRACTED_JSON_FIELD_NUMBER: _ClassVar[int]
     is_valid: bool
     contains_json: bool
     error_message: str
     raw_output: str
-    def __init__(self, is_valid: _Optional[bool] = ..., contains_json: _Optional[bool] = ..., error_message: _Optional[str] = ..., raw_output: _Optional[str] = ...) -> None: ...
+    extracted_json: str
+    def __init__(self, is_valid: _Optional[bool] = ..., contains_json: _Optional[bool] = ..., error_message: _Optional[str] = ..., raw_output: _Optional[str] = ..., extracted_json: _Optional[str] = ...) -> None: ...
 
 class StructuredOutputResult(_message.Message):
     __slots__ = ("parsed_json", "validation", "raw_text")

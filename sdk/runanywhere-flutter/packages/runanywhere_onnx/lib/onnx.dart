@@ -34,9 +34,11 @@ library runanywhere_onnx;
 import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework, ModelCategory;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/public/runanywhere_v4.dart' show RunAnywhereSDK;
 import 'package:runanywhere_onnx/native/onnx_bindings.dart';
@@ -81,16 +83,17 @@ class Onnx implements RunAnywhereModule {
 
   @override
   Set<SDKComponent> get capabilities => {
-        SDKComponent.stt,
-        SDKComponent.tts,
-        SDKComponent.vad,
+        SDKComponent.SDK_COMPONENT_STT,
+        SDKComponent.SDK_COMPONENT_TTS,
+        SDKComponent.SDK_COMPONENT_VAD,
       };
 
   @override
   int get defaultPriority => 100;
 
   @override
-  InferenceFramework get inferenceFramework => InferenceFramework.onnx;
+  InferenceFramework get inferenceFramework =>
+      InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
 
   // ============================================================================
   // Registration State
@@ -199,7 +202,7 @@ class Onnx implements RunAnywhereModule {
     String? id,
     required String name,
     required String url,
-    ModelCategory modality = ModelCategory.language,
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
     bool supportsThinking = false,
   }) {
@@ -217,7 +220,7 @@ class Onnx implements RunAnywhereModule {
       id: modelId,
       name: name,
       url: uri,
-      framework: InferenceFramework.onnx,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: modality,
       memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,

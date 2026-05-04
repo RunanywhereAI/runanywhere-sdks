@@ -7,7 +7,7 @@
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
-import { StructuredOutputOptions } from "./structured_output";
+import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 export const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -74,6 +74,7 @@ function createBaseLLMGenerationOptions() {
         thinkingPattern: undefined,
         executionTarget: undefined,
         structuredOutput: undefined,
+        enableRealTimeTracking: false,
     };
 }
 export const LLMGenerationOptions = {
@@ -116,6 +117,9 @@ export const LLMGenerationOptions = {
         }
         if (message.structuredOutput !== undefined) {
             StructuredOutputOptions.encode(message.structuredOutput, writer.uint32(106).fork()).ldelim();
+        }
+        if (message.enableRealTimeTracking !== false) {
+            writer.uint32(112).bool(message.enableRealTimeTracking);
         }
         return writer;
     },
@@ -204,6 +208,12 @@ export const LLMGenerationOptions = {
                     }
                     message.structuredOutput = StructuredOutputOptions.decode(reader, reader.uint32());
                     continue;
+                case 14:
+                    if (tag !== 112) {
+                        break;
+                    }
+                    message.enableRealTimeTracking = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -231,6 +241,9 @@ export const LLMGenerationOptions = {
             structuredOutput: isSet(object.structuredOutput)
                 ? StructuredOutputOptions.fromJSON(object.structuredOutput)
                 : undefined,
+            enableRealTimeTracking: isSet(object.enableRealTimeTracking)
+                ? globalThis.Boolean(object.enableRealTimeTracking)
+                : false,
         };
     },
     toJSON(message) {
@@ -274,6 +287,9 @@ export const LLMGenerationOptions = {
         if (message.structuredOutput !== undefined) {
             obj.structuredOutput = StructuredOutputOptions.toJSON(message.structuredOutput);
         }
+        if (message.enableRealTimeTracking !== false) {
+            obj.enableRealTimeTracking = message.enableRealTimeTracking;
+        }
         return obj;
     },
     create(base) {
@@ -298,6 +314,7 @@ export const LLMGenerationOptions = {
         message.structuredOutput = (object.structuredOutput !== undefined && object.structuredOutput !== null)
             ? StructuredOutputOptions.fromPartial(object.structuredOutput)
             : undefined;
+        message.enableRealTimeTracking = object.enableRealTimeTracking ?? false;
         return message;
     },
 };
@@ -318,6 +335,9 @@ function createBaseLLMGenerationResult() {
         jsonOutput: undefined,
         performance: undefined,
         executedOn: undefined,
+        structuredOutputValidation: undefined,
+        totalTokens: 0,
+        errorMessage: undefined,
     };
 }
 export const LLMGenerationResult = {
@@ -366,6 +386,15 @@ export const LLMGenerationResult = {
         }
         if (message.executedOn !== undefined) {
             writer.uint32(120).int32(message.executedOn);
+        }
+        if (message.structuredOutputValidation !== undefined) {
+            StructuredOutputValidation.encode(message.structuredOutputValidation, writer.uint32(130).fork()).ldelim();
+        }
+        if (message.totalTokens !== 0) {
+            writer.uint32(136).int32(message.totalTokens);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(146).string(message.errorMessage);
         }
         return writer;
     },
@@ -466,6 +495,24 @@ export const LLMGenerationResult = {
                     }
                     message.executedOn = reader.int32();
                     continue;
+                case 16:
+                    if (tag !== 130) {
+                        break;
+                    }
+                    message.structuredOutputValidation = StructuredOutputValidation.decode(reader, reader.uint32());
+                    continue;
+                case 17:
+                    if (tag !== 136) {
+                        break;
+                    }
+                    message.totalTokens = reader.int32();
+                    continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -491,6 +538,11 @@ export const LLMGenerationResult = {
             jsonOutput: isSet(object.jsonOutput) ? globalThis.String(object.jsonOutput) : undefined,
             performance: isSet(object.performance) ? PerformanceMetrics.fromJSON(object.performance) : undefined,
             executedOn: isSet(object.executedOn) ? executionTargetFromJSON(object.executedOn) : undefined,
+            structuredOutputValidation: isSet(object.structuredOutputValidation)
+                ? StructuredOutputValidation.fromJSON(object.structuredOutputValidation)
+                : undefined,
+            totalTokens: isSet(object.totalTokens) ? globalThis.Number(object.totalTokens) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
         };
     },
     toJSON(message) {
@@ -540,6 +592,15 @@ export const LLMGenerationResult = {
         if (message.executedOn !== undefined) {
             obj.executedOn = executionTargetToJSON(message.executedOn);
         }
+        if (message.structuredOutputValidation !== undefined) {
+            obj.structuredOutputValidation = StructuredOutputValidation.toJSON(message.structuredOutputValidation);
+        }
+        if (message.totalTokens !== 0) {
+            obj.totalTokens = Math.round(message.totalTokens);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
         return obj;
     },
     create(base) {
@@ -564,11 +625,25 @@ export const LLMGenerationResult = {
             ? PerformanceMetrics.fromPartial(object.performance)
             : undefined;
         message.executedOn = object.executedOn ?? undefined;
+        message.structuredOutputValidation =
+            (object.structuredOutputValidation !== undefined && object.structuredOutputValidation !== null)
+                ? StructuredOutputValidation.fromPartial(object.structuredOutputValidation)
+                : undefined;
+        message.totalTokens = object.totalTokens ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
         return message;
     },
 };
 function createBaseLLMConfiguration() {
-    return { contextLength: 0, temperature: 0, maxTokens: 0, systemPrompt: undefined, streaming: false };
+    return {
+        contextLength: 0,
+        temperature: 0,
+        maxTokens: 0,
+        systemPrompt: undefined,
+        streaming: false,
+        modelId: undefined,
+        preferredFramework: undefined,
+    };
 }
 export const LLMConfiguration = {
     encode(message, writer = _m0.Writer.create()) {
@@ -586,6 +661,12 @@ export const LLMConfiguration = {
         }
         if (message.streaming !== false) {
             writer.uint32(40).bool(message.streaming);
+        }
+        if (message.modelId !== undefined) {
+            writer.uint32(50).string(message.modelId);
+        }
+        if (message.preferredFramework !== undefined) {
+            writer.uint32(56).int32(message.preferredFramework);
         }
         return writer;
     },
@@ -626,6 +707,18 @@ export const LLMConfiguration = {
                     }
                     message.streaming = reader.bool();
                     continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.preferredFramework = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -641,6 +734,10 @@ export const LLMConfiguration = {
             maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
             systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
             streaming: isSet(object.streaming) ? globalThis.Boolean(object.streaming) : false,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : undefined,
+            preferredFramework: isSet(object.preferredFramework)
+                ? inferenceFrameworkFromJSON(object.preferredFramework)
+                : undefined,
         };
     },
     toJSON(message) {
@@ -660,6 +757,12 @@ export const LLMConfiguration = {
         if (message.streaming !== false) {
             obj.streaming = message.streaming;
         }
+        if (message.modelId !== undefined) {
+            obj.modelId = message.modelId;
+        }
+        if (message.preferredFramework !== undefined) {
+            obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+        }
         return obj;
     },
     create(base) {
@@ -672,6 +775,8 @@ export const LLMConfiguration = {
         message.maxTokens = object.maxTokens ?? 0;
         message.systemPrompt = object.systemPrompt ?? undefined;
         message.streaming = object.streaming ?? false;
+        message.modelId = object.modelId ?? undefined;
+        message.preferredFramework = object.preferredFramework ?? undefined;
         return message;
     },
 };

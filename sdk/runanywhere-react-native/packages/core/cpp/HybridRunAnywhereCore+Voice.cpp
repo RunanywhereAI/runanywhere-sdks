@@ -4,10 +4,110 @@
  * Domain implementation for HybridRunAnywhereCore.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
+#include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
 namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
+
+namespace {
+
+std::vector<uint8_t> copyVoiceArrayBufferBytes(const std::shared_ptr<ArrayBuffer>& buffer) {
+    std::vector<uint8_t> bytes;
+    if (!buffer) {
+        return bytes;
+    }
+    uint8_t* data = buffer->data();
+    size_t size = buffer->size();
+    if (!data || size == 0) {
+        return bytes;
+    }
+    bytes.assign(data, data + size);
+    return bytes;
+}
+
+std::shared_ptr<ArrayBuffer> emptyVoiceProtoBuffer() {
+    return ArrayBuffer::allocate(0);
+}
+
+std::shared_ptr<ArrayBuffer> copyVoiceProtoBuffer(rac_proto_buffer_t& protoBuffer,
+                                                  const char* operation) {
+    if (protoBuffer.status != RAC_SUCCESS) {
+        if (protoBuffer.error_message) {
+            LOGE("%s proto error: %s", operation, protoBuffer.error_message);
+        }
+        proto_compat::freeBuffer(&protoBuffer);
+        return emptyVoiceProtoBuffer();
+    }
+    if (!protoBuffer.data || protoBuffer.size == 0) {
+        proto_compat::freeBuffer(&protoBuffer);
+        return emptyVoiceProtoBuffer();
+    }
+    auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
+    proto_compat::freeBuffer(&protoBuffer);
+    return buffer;
+}
+
+void protoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* userData) {
+    if (!protoBytes || protoSize == 0 || !userData) {
+        return;
+    }
+    auto* callback =
+        static_cast<std::function<void(const std::shared_ptr<ArrayBuffer>&)>*>(userData);
+    if (!callback || !(*callback)) {
+        return;
+    }
+    try {
+        (*callback)(ArrayBuffer::copy(protoBytes, protoSize));
+    } catch (...) {
+        LOGE("proto callback dispatch failed");
+    }
+}
+
+std::vector<float> copyVADSamples(const std::vector<uint8_t>& bytes) {
+    std::vector<float> samples;
+    if (bytes.empty()) {
+        return samples;
+    }
+    if (bytes.size() % sizeof(float) == 0) {
+        samples.resize(bytes.size() / sizeof(float));
+        std::memcpy(samples.data(), bytes.data(), bytes.size());
+        return samples;
+    }
+    if (bytes.size() % sizeof(int16_t) == 0) {
+        size_t count = bytes.size() / sizeof(int16_t);
+        samples.resize(count);
+        const auto* pcm = reinterpret_cast<const int16_t*>(bytes.data());
+        for (size_t i = 0; i < count; ++i) {
+            samples[i] = static_cast<float>(pcm[i]) / 32768.0f;
+        }
+    }
+    return samples;
+}
+
+std::mutex g_vadActivityCallbackMutex;
+std::function<void(const std::shared_ptr<ArrayBuffer>&)> g_vadActivityCallback;
+
+void vadActivityProtoCallback(const uint8_t* protoBytes, size_t protoSize, void*) {
+    if (!protoBytes || protoSize == 0) {
+        return;
+    }
+    std::function<void(const std::shared_ptr<ArrayBuffer>&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(g_vadActivityCallbackMutex);
+        callback = g_vadActivityCallback;
+    }
+    if (!callback) {
+        return;
+    }
+    try {
+        callback(ArrayBuffer::copy(protoBytes, protoSize));
+    } catch (...) {
+        LOGE("vad activity callback dispatch failed");
+    }
+}
+
+} // namespace
 
 // LLM/STT/TTS/VAD/Voice Agent
 // ============================================================================
@@ -332,6 +432,163 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStructured(
         // If extraction failed, return the raw text (let the caller handle it)
         LOGI("Could not extract JSON, returning raw: %s", generatedText.substr(0, 100).c_str());
         return generatedText;
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::llmGenerateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        auto fn = proto_compat::symbol<proto_compat::LLMGenerateProtoFn>(
+            "rac_llm_generate_proto");
+        if (!fn) {
+            LOGE("llmGenerateProto: rac_llm_generate_proto unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        rac_result_t rc = fn(data, bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("llmGenerateProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "llmGenerateProto");
+    });
+}
+
+std::shared_ptr<Promise<void>>
+HybridRunAnywhereCore::llmGenerateStreamProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
+        auto fn = proto_compat::symbol<proto_compat::LLMGenerateStreamProtoFn>(
+            "rac_llm_generate_stream_proto");
+        if (!fn) {
+            LOGE("llmGenerateStreamProto: rac_llm_generate_stream_proto unavailable");
+            return;
+        }
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        auto callback = onEventBytes;
+        rac_result_t rc = fn(data, bytes.size(), protoBytesCallback, &callback);
+        if (rc != RAC_SUCCESS) {
+            LOGE("llmGenerateStreamProto: rc=%d", rc);
+        }
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::llmCancelProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        auto fn = proto_compat::symbol<proto_compat::LLMCancelProtoFn>(
+            "rac_llm_cancel_proto");
+        if (!fn) {
+            LOGE("llmCancelProto: rac_llm_cancel_proto unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("llmCancelProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "llmCancelProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraLoadProto(const std::shared_ptr<ArrayBuffer>& configBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        rac_handle_t handle = getGlobalLLMHandle();
+        auto fn = proto_compat::symbol<proto_compat::LoRAConfigProtoFn>(
+            "rac_lora_load_proto");
+        if (!handle || !fn) {
+            LOGE("loraLoadProto: LLM handle or rac_lora_load_proto unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(handle, bytes.data(), bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("loraLoadProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "loraLoadProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraRemoveProto(const std::shared_ptr<ArrayBuffer>& configBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        rac_handle_t handle = getGlobalLLMHandle();
+        auto fn = proto_compat::symbol<proto_compat::LoRAConfigProtoFn>(
+            "rac_lora_remove_proto");
+        if (!handle || !fn) {
+            LOGE("loraRemoveProto: LLM handle or rac_lora_remove_proto unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(handle, bytes.data(), bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("loraRemoveProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "loraRemoveProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraClearProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_handle_t handle = getGlobalLLMHandle();
+        auto fn = proto_compat::symbol<proto_compat::LoRAClearProtoFn>(
+            "rac_lora_clear_proto");
+        if (!handle || !fn) {
+            LOGE("loraClearProto: LLM handle or rac_lora_clear_proto unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(handle, &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("loraClearProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "loraClearProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraCompatibilityProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        rac_handle_t handle = getGlobalLLMHandle();
+        auto fn = proto_compat::symbol<proto_compat::LoRAConfigProtoFn>(
+            "rac_lora_compatibility_proto");
+        if (!handle || !fn) {
+            LOGE("loraCompatibilityProto: LLM handle or rac_lora_compatibility_proto unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(handle, bytes.data(), bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("loraCompatibilityProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "loraCompatibilityProto");
     });
 }
 
@@ -736,6 +993,74 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribeFile(
     });
 }
 
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::sttTranscribeProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
+    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [audio = std::move(audio), options = std::move(options)]() {
+        rac_handle_t handle = getGlobalSTTHandle();
+        auto fn = proto_compat::symbol<proto_compat::STTTranscribeProtoFn>(
+            "rac_stt_component_transcribe_proto");
+        if (!handle || !fn) {
+            LOGE("sttTranscribeProto: STT handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        const void* audioData = audio.empty() ? nullptr : audio.data();
+        rac_result_t rc = fn(
+            handle,
+            audioData,
+            audio.size(),
+            optionsData,
+            options.size(),
+            &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("sttTranscribeProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "sttTranscribeProto");
+    });
+}
+
+std::shared_ptr<Promise<void>>
+HybridRunAnywhereCore::sttTranscribeStreamProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onPartialBytes) {
+    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<void>::async(
+        [audio = std::move(audio), options = std::move(options), onPartialBytes]() {
+        rac_handle_t handle = getGlobalSTTHandle();
+        auto fn = proto_compat::symbol<proto_compat::STTTranscribeStreamProtoFn>(
+            "rac_stt_component_transcribe_stream_proto");
+        if (!handle || !fn) {
+            LOGE("sttTranscribeStreamProto: STT handle or proto ABI unavailable");
+            return;
+        }
+        auto callback = onPartialBytes;
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        const void* audioData = audio.empty() ? nullptr : audio.data();
+        rac_result_t rc = fn(
+            handle,
+            audioData,
+            audio.size(),
+            optionsData,
+            options.size(),
+            protoBytesCallback,
+            &callback);
+        if (rc != RAC_SUCCESS) {
+            LOGE("sttTranscribeStreamProto: rc=%d", rc);
+        }
+    });
+}
+
 // ============================================================================
 // TTS Capability (Backend-Agnostic)
 // Calls rac_tts_component_* APIs - works with any registered backend
@@ -906,6 +1231,82 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cancelTTS() {
     });
 }
 
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ttsListVoicesProto(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onVoiceBytes) {
+    return Promise<bool>::async([onVoiceBytes]() -> bool {
+        rac_handle_t handle = getGlobalTTSHandle();
+        auto fn = proto_compat::symbol<proto_compat::TTSListVoicesProtoFn>(
+            "rac_tts_component_list_voices_proto");
+        if (!handle || !fn) {
+            LOGE("ttsListVoicesProto: TTS handle or proto ABI unavailable");
+            return false;
+        }
+        auto callback = onVoiceBytes;
+        rac_result_t rc = fn(handle, protoBytesCallback, &callback);
+        if (rc != RAC_SUCCESS) {
+            LOGE("ttsListVoicesProto: rc=%d", rc);
+            return false;
+        }
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ttsSynthesizeProto(
+    const std::string& text,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [text, options = std::move(options)]() {
+        rac_handle_t handle = getGlobalTTSHandle();
+        auto fn = proto_compat::symbol<proto_compat::TTSSynthesizeProtoFn>(
+            "rac_tts_component_synthesize_proto");
+        if (!handle || !fn) {
+            LOGE("ttsSynthesizeProto: TTS handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        rac_result_t rc = fn(handle, text.c_str(), optionsData, options.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("ttsSynthesizeProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "ttsSynthesizeProto");
+    });
+}
+
+std::shared_ptr<Promise<void>>
+HybridRunAnywhereCore::ttsSynthesizeStreamProto(
+    const std::string& text,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onChunkBytes) {
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<void>::async([text, options = std::move(options), onChunkBytes]() {
+        rac_handle_t handle = getGlobalTTSHandle();
+        auto fn = proto_compat::symbol<proto_compat::TTSSynthesizeStreamProtoFn>(
+            "rac_tts_component_synthesize_stream_proto");
+        if (!handle || !fn) {
+            LOGE("ttsSynthesizeStreamProto: TTS handle or proto ABI unavailable");
+            return;
+        }
+        auto callback = onChunkBytes;
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        rac_result_t rc = fn(
+            handle,
+            text.c_str(),
+            optionsData,
+            options.size(),
+            protoBytesCallback,
+            &callback);
+        if (rc != RAC_SUCCESS) {
+            LOGE("ttsSynthesizeStreamProto: rc=%d", rc);
+        }
+    });
+}
+
 // ============================================================================
 // VAD Capability (Backend-Agnostic)
 // Calls rac_vad_component_* APIs - works with any registered backend
@@ -1039,6 +1440,111 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::resetVAD() {
         if (handle) {
             rac_vad_component_reset(handle);
         }
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vadConfigureProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+    return Promise<bool>::async([bytes = std::move(bytes)]() -> bool {
+        rac_handle_t handle = getGlobalVADHandle();
+        auto fn = proto_compat::symbol<proto_compat::VADConfigureProtoFn>(
+            "rac_vad_component_configure_proto");
+        if (!handle || !fn) {
+            LOGE("vadConfigureProto: VAD handle or proto ABI unavailable");
+            return false;
+        }
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        rac_result_t rc = fn(handle, data, bytes.size());
+        if (rc != RAC_SUCCESS) {
+            LOGE("vadConfigureProto: rc=%d", rc);
+            return false;
+        }
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::vadProcessProto(
+    const std::shared_ptr<ArrayBuffer>& samplesBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
+    auto sampleBytes = copyVoiceArrayBufferBytes(samplesBytes);
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [sampleBytes = std::move(sampleBytes), options = std::move(options)]() {
+        rac_handle_t handle = getGlobalVADHandle();
+        auto fn = proto_compat::symbol<proto_compat::VADProcessProtoFn>(
+            "rac_vad_component_process_proto");
+        if (!handle || !fn) {
+            LOGE("vadProcessProto: VAD handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        auto samples = copyVADSamples(sampleBytes);
+        if (samples.empty()) {
+            LOGE("vadProcessProto: empty or unsupported audio buffer");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        rac_result_t rc = fn(
+            handle,
+            samples.data(),
+            samples.size(),
+            optionsData,
+            options.size(),
+            &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("vadProcessProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "vadProcessProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::vadGetStatisticsProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_handle_t handle = getGlobalVADHandle();
+        auto fn = proto_compat::symbol<proto_compat::VADStatsProtoFn>(
+            "rac_vad_component_get_statistics_proto");
+        if (!handle || !fn) {
+            LOGE("vadGetStatisticsProto: VAD handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(handle, &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("vadGetStatisticsProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "vadGetStatisticsProto");
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vadSetActivityCallbackProto(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onActivityBytes) {
+    return Promise<bool>::async([onActivityBytes]() -> bool {
+        rac_handle_t handle = getGlobalVADHandle();
+        auto fn = proto_compat::symbol<proto_compat::VADSetActivityProtoCallbackFn>(
+            "rac_vad_component_set_activity_proto_callback");
+        if (!handle || !fn) {
+            LOGE("vadSetActivityCallbackProto: VAD handle or proto ABI unavailable");
+            return false;
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_vadActivityCallbackMutex);
+            g_vadActivityCallback = onActivityBytes;
+        }
+        rac_result_t rc = fn(handle, vadActivityProtoCallback, nullptr);
+        if (rc != RAC_SUCCESS) {
+            LOGE("vadSetActivityCallbackProto: rc=%d", rc);
+            return false;
+        }
+        return true;
     });
 }
 
@@ -1332,6 +1838,78 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::cleanupVoiceAgent() {
 
         // Note: We don't destroy the voice agent handle here - it's reusable
         // The models can be unloaded separately via unloadSTTModel, etc.
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::voiceAgentInitializeProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
+        auto fn = proto_compat::symbol<proto_compat::VoiceAgentInitProtoFn>(
+            "rac_voice_agent_initialize_proto");
+        if (!handle || !fn) {
+            LOGE("voiceAgentInitializeProto: handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        rac_result_t rc = fn(static_cast<void*>(handle), data, bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("voiceAgentInitializeProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "voiceAgentInitializeProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::voiceAgentComponentStatesProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
+        auto fn = proto_compat::symbol<proto_compat::VoiceAgentStatesProtoFn>(
+            "rac_voice_agent_component_states_proto");
+        if (!handle || !fn) {
+            LOGE("voiceAgentComponentStatesProto: handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(static_cast<void*>(handle), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("voiceAgentComponentStatesProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "voiceAgentComponentStatesProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::voiceAgentProcessTurnProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes) {
+    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([audio = std::move(audio)]() {
+        rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
+        auto fn = proto_compat::symbol<proto_compat::VoiceAgentProcessTurnProtoFn>(
+            "rac_voice_agent_process_voice_turn_proto");
+        if (!handle || !fn) {
+            LOGE("voiceAgentProcessTurnProto: handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const void* data = audio.empty() ? nullptr : audio.data();
+        rac_result_t rc = fn(static_cast<void*>(handle), data, audio.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("voiceAgentProcessTurnProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "voiceAgentProcessTurnProto");
     });
 }
 

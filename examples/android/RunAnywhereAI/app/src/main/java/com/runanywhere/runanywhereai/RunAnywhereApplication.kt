@@ -114,7 +114,11 @@ class RunAnywhereApplication : Application() {
         // Check for custom API configuration (stored via Settings screen)
         val customApiKey = SettingsViewModel.getStoredApiKey(this@RunAnywhereApplication)
         val customBaseURL = SettingsViewModel.getStoredBaseURL(this@RunAnywhereApplication)
-        val hasCustomConfig = customApiKey != null && customBaseURL != null
+        val hasCustomConfig =
+            !customApiKey.isNullOrBlank() &&
+                !customBaseURL.isNullOrBlank() &&
+                !looksLikePlaceholder(customApiKey) &&
+                !looksLikePlaceholder(customBaseURL)
 
         if (hasCustomConfig) {
             Timber.i("🔧 Found custom API configuration")
@@ -236,6 +240,11 @@ class RunAnywhereApplication : Application() {
      * Get initialization error if any
      */
     fun getInitializationError(): Throwable? = initializationError
+
+    private fun looksLikePlaceholder(value: String?): Boolean {
+        if (value.isNullOrBlank()) return true
+        return Regex("YOUR_|<your|REPLACE_ME|PLACEHOLDER", RegexOption.IGNORE_CASE).containsMatchIn(value)
+    }
 
     /**
      * Retry SDK initialization

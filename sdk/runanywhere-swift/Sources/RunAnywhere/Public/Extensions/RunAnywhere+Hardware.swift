@@ -13,49 +13,17 @@ import Foundation
 
 // MARK: - Hardware Profile Types
 
-/// A snapshot of the device's hardware capabilities relevant to on-device AI.
-///
-/// Returned by `RunAnywhere.hardware.getProfile()`.
-public struct HardwareProfile: Sendable {
+public typealias HardwareProfile = RAHardwareProfile
+public typealias HardwareProfileResult = RAHardwareProfileResult
+public typealias AcceleratorInfo = RAAcceleratorInfo
+public typealias AcceleratorPreference = RAAcceleratorPreference
 
-    /// Human-readable chip/SoC name (e.g. "A17 Pro", "M4", "Apple Silicon").
-    public let chip: String
-
-    /// Whether the device has a dedicated Neural Engine (ANE).
-    public let hasNeuralEngine: Bool
-
-    /// Recommended acceleration mode for on-device AI on this device.
-    ///
-    /// Possible values:
-    /// - `"ane"` — Apple Neural Engine is available (arm64 with Neural Engine)
-    /// - `"gpu"` — Metal GPU acceleration (arm64 without dedicated ANE)
-    /// - `"cpu"` — CPU-only fallback (x86_64 / unknown)
-    public let accelerationMode: String
-
-    /// Total physical memory in bytes.
-    public let totalMemoryBytes: Int
-
-    /// Number of logical CPU cores.
-    public let coreCount: Int
-
-    /// Number of performance CPU cores.
-    public let performanceCores: Int
-
-    /// Number of efficiency CPU cores.
-    public let efficiencyCores: Int
-
-    /// CPU architecture string (e.g. "arm64", "x86_64").
-    public let architecture: String
-
-    /// Platform string (e.g. "ios", "macos").
-    public let platform: String
+public extension RAHardwareProfile {
+    var hasNeuralEngine: Bool {
+        get { hasNeuralEngine_p }
+        set { hasNeuralEngine_p = newValue }
+    }
 }
-
-/// Canonical alias matching `HardwareProfileResult` from the
-/// generated proto type (`Generated/hardware_profile.pb.swift`). Wave 3
-/// Step 3.2: lets callers spell the type as `HardwareProfileResult` per
-/// CANONICAL_API §14, ahead of the Wave 4 type unification.
-public typealias HardwareProfileResult = HardwareProfile
 
 // MARK: - Hardware Namespace
 
@@ -76,20 +44,28 @@ public extension RunAnywhere {
 
         /// Get a full hardware profile snapshot.
         ///
-        /// - Returns: `HardwareProfile` built from live `DeviceInfo.current` values.
-        public func getProfile() -> HardwareProfile {
+        /// - Returns: generated proto-backed `HardwareProfileResult`.
+        public func getProfile() -> HardwareProfileResult {
             let info = DeviceInfo.current
-            return HardwareProfile(
-                chip: info.chipName,
-                hasNeuralEngine: info.hasNeuralEngine,
-                accelerationMode: accelerationMode,
-                totalMemoryBytes: info.totalMemory,
-                coreCount: info.coreCount,
-                performanceCores: info.performanceCores,
-                efficiencyCores: info.efficiencyCores,
-                architecture: info.architecture,
-                platform: info.platform
-            )
+            var profile = HardwareProfile()
+            profile.chip = info.chipName
+            profile.hasNeuralEngine = info.hasNeuralEngine
+            profile.accelerationMode = accelerationMode
+            profile.totalMemoryBytes = UInt64(max(info.totalMemory, 0))
+            profile.coreCount = UInt32(max(info.coreCount, 0))
+            profile.performanceCores = UInt32(max(info.performanceCores, 0))
+            profile.efficiencyCores = UInt32(max(info.efficiencyCores, 0))
+            profile.architecture = info.architecture
+            profile.platform = info.platform
+
+            var result = HardwareProfileResult()
+            result.profile = profile
+            var accelerator = AcceleratorInfo()
+            accelerator.name = accelerationMode
+            accelerator.type = info.hasNeuralEngine ? .ane : .cpu
+            accelerator.available = true
+            result.accelerators = [accelerator]
+            return result
         }
 
         /// Get the chip/SoC name for the current device.

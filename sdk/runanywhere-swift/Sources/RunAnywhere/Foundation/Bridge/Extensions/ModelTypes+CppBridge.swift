@@ -24,7 +24,7 @@ extension ModelCategory {
         case .audio:                    return RAC_MODEL_CATEGORY_AUDIO
         case .embedding:                return RAC_MODEL_CATEGORY_EMBEDDING
         case .voiceActivityDetection:   return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-        default:                        return RAC_MODEL_CATEGORY_LANGUAGE
+        default:                        return RAC_MODEL_CATEGORY_UNKNOWN
         }
     }
 
@@ -50,7 +50,7 @@ extension ModelCategory {
         case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
             self = .voiceActivityDetection
         default:
-            self = .language  // Default fallback
+            self = .unspecified
         }
     }
 }
@@ -65,7 +65,10 @@ extension ModelFormat {
         case .ort:      return RAC_MODEL_FORMAT_ORT
         case .gguf:     return RAC_MODEL_FORMAT_GGUF
         case .bin:      return RAC_MODEL_FORMAT_BIN
-        case .coreml:   return RAC_MODEL_FORMAT_COREML
+        case .coreml, .mlmodel, .mlpackage:
+            return RAC_MODEL_FORMAT_COREML
+        case .qnnContext:
+            return RAC_MODEL_FORMAT_QNN_CONTEXT
         default:        return RAC_MODEL_FORMAT_UNKNOWN
         }
     }
@@ -83,6 +86,8 @@ extension ModelFormat {
             self = .bin
         case RAC_MODEL_FORMAT_COREML:
             self = .coreml
+        case RAC_MODEL_FORMAT_QNN_CONTEXT:
+            self = .qnnContext
         default:
             self = .unknown
         }

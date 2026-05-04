@@ -11,34 +11,34 @@
 
 import 'dart:typed_data';
 
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
     show
+        DiffusionCapabilities,
         DiffusionConfiguration,
         DiffusionGenerationOptions,
-        DiffusionResult,
-        DiffusionCapabilities,
-        DiffusionProgress;
+        DiffusionProgress,
+        DiffusionResult;
 import 'package:runanywhere/generated/download_service.pb.dart'
     show DownloadProgress;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework;
 import 'package:runanywhere/generated/rag.pb.dart'
     show RAGConfiguration, RAGQueryOptions, RAGResult, RAGStatistics;
-import 'package:runanywhere/generated/stt_options.pb.dart' show STTOutput;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/structured_output.pb.dart'
-    show StructuredOutputResult, JSONSchema;
+    show JSONSchema, StructuredOutputResult;
+import 'package:runanywhere/generated/stt_options.pb.dart' show STTOutput;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show ToolCallingOptions, ToolCallingResult, ToolResult;
+import 'package:runanywhere/generated/tts_options.pb.dart' show TTSOutput;
 import 'package:runanywhere/generated/vad_options.pb.dart'
     show VADResult, VADStatistics;
-import 'package:runanywhere/generated/tts_options.pb.dart' show TTSOutput;
 import 'package:runanywhere/generated/vlm_options.pb.dart' show VLMImage;
 import 'package:runanywhere/generated/voice_events.pb.dart' as voice_proto
     show VoiceAgentComponentStates;
-import 'package:runanywhere/generated/voice_events.pbenum.dart'
-    show ComponentLoadState;
 import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
@@ -102,9 +102,8 @@ extension RunAnywhereSDKFlatAliases on RunAnywhereSDK {
       RunAnywhereStructuredOutput.generate(
         prompt,
         jsonSchema: schema.toProto3Json().toString(),
-        maxTokens: options != null && options.hasMaxTokens()
-            ? options.maxTokens
-            : 512,
+        maxTokens:
+            options != null && options.hasMaxTokens() ? options.maxTokens : 512,
         temperature: options != null && options.hasTemperature()
             ? options.temperature
             : 0.0,
@@ -336,24 +335,13 @@ extension RunAnywhereSDKFlatAliases on RunAnywhereSDK {
       RunAnywhereVoice.shared.initializeWithLoadedModels();
 
   /// Flat alias — cleanup voice agent native resources.
-  Future<void> cleanupVoiceAgent() async =>
-      RunAnywhereVoice.shared.cleanup();
+  Future<void> cleanupVoiceAgent() async => RunAnywhereVoice.shared.cleanup();
 
   /// Flat alias — get voice agent component readiness states.
   /// Returns the proto [voice_proto.VoiceAgentComponentStates] type.
-  voice_proto.VoiceAgentComponentStates getVoiceAgentComponentStates() {
-    final states = RunAnywhereVoice.shared.componentStates();
-    ComponentLoadState _toLoadState(bool loaded) => loaded
-        ? ComponentLoadState.COMPONENT_LOAD_STATE_LOADED
-        : ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED;
-
-    return voice_proto.VoiceAgentComponentStates(
-      sttState: _toLoadState(states.sttLoaded),
-      llmState: _toLoadState(states.llmLoaded),
-      ttsState: _toLoadState(states.ttsLoaded),
-      ready: states.isFullyReady,
-    );
-  }
+  Future<voice_proto.VoiceAgentComponentStates>
+      getVoiceAgentComponentStates() =>
+          RunAnywhereVoice.shared.componentStates();
 
   // =========================================================================
   // §13 Model Manager — flat aliases
@@ -366,8 +354,7 @@ extension RunAnywhereSDKFlatAliases on RunAnywhereSDK {
   /// Flat alias — generic model load. Routes to the LLM bridge by default;
   /// capability-specific loaders (`loadLLMModel`, `loadSTTModel`, etc.) are
   /// preferred when the caller knows the model type.
-  Future<void> loadModel(String modelId) =>
-      RunAnywhereLLM.shared.load(modelId);
+  Future<void> loadModel(String modelId) => RunAnywhereLLM.shared.load(modelId);
 
   /// Flat alias — download a model and stream progress events.
   Stream<DownloadProgress> downloadModel(String modelId) =>
@@ -379,10 +366,13 @@ extension RunAnywhereSDKFlatAliases on RunAnywhereSDK {
 
   /// Flat alias — register a single-file model.
   ModelInfo registerModel(ModelInfo model) {
+    final url = model.downloadUrl.isNotEmpty
+        ? Uri.parse(model.downloadUrl)
+        : Uri.file(model.localPath);
     return RunAnywhereModels.shared.register(
       id: model.id,
       name: model.name,
-      url: model.downloadURL!,
+      url: url,
       framework: model.framework,
       modality: model.category,
       artifactType: model.artifactType,
@@ -392,8 +382,8 @@ extension RunAnywhereSDKFlatAliases on RunAnywhereSDK {
 
   /// Flat alias — register a multi-file model.
   ModelInfo registerMultiFileModel(ModelInfo model) {
-    final artifact = model.artifactType;
-    if (artifact is MultiFileArtifact) {
+    if (model.hasMultiFile()) {
+      final artifact = model.multiFile;
       return RunAnywhereModels.shared.registerMultiFile(
         id: model.id,
         name: model.name,

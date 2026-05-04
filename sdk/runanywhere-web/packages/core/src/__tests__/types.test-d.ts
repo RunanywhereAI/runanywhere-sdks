@@ -10,9 +10,10 @@ import {
   SDKErrorCode,
   isSDKException,
   DownloadStage,
+  DownloadState,
+  MessageRole,
   type GenerateOptions,
   type ChatMessage,
-  type ModelDescriptor,
   type DownloadProgress,
   type IRunAnywhere,
 } from '../index';
@@ -35,32 +36,27 @@ if (isSDKException(e)) {
   expectType<SDKErrorCode>(code);
 }
 
-// ChatMessage role must be a union literal
-const msg: ChatMessage = { role: 'user', content: 'Hello' };
-expectType<'user' | 'assistant' | 'system'>(msg.role);
-
-// role must not accept arbitrary strings
-// @ts-expect-error role must not accept 'admin'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- intentional for type test
-const bad: ChatMessage = { role: 'admin', content: 'x' };
-
-// ModelDescriptor and DownloadProgress are exported
-const desc: ModelDescriptor = {
+const msg: ChatMessage = {
   id: 'm1',
-  name: 'Model',
-  url: 'https://example.com/m.gguf',
-  memoryRequirement: 1e9,
+  role: MessageRole.MESSAGE_ROLE_USER,
+  content: 'Hello',
+  timestampUs: 0,
 };
-expectType<string>(desc.id);
+expectType<MessageRole>(msg.role);
 
 const prog: DownloadProgress = {
   modelId: 'm1',
-  stage: DownloadStage.Downloading,
-  progress: 0.5,
+  stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
   bytesDownloaded: 100,
   totalBytes: 200,
+  stageProgress: 0.5,
+  overallSpeedBps: 1000,
+  etaSeconds: 1,
+  state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+  retryAttempt: 0,
+  errorMessage: '',
 };
-expectType<number>(prog.progress);
+expectType<number>(prog.stageProgress);
 
 // IRunAnywhere must be satisfied by the RunAnywhere export
 const sdk: IRunAnywhere = RunAnywhere;

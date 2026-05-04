@@ -5,11 +5,11 @@
 // statistics, and querying. Mirrors Swift `RunAnywhere+RAG.swift`.
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/generated/rag.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/generated/rag.pb.dart';
 
 /// RAG (Retrieval-Augmented Generation) capability surface.
 ///

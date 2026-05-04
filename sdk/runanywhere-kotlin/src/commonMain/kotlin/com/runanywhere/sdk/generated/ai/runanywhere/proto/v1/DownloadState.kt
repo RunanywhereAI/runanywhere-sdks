@@ -24,6 +24,8 @@ public enum class DownloadState(
   DOWNLOAD_STATE_COMPLETED(5),
   DOWNLOAD_STATE_FAILED(6),
   DOWNLOAD_STATE_CANCELLED(7),
+  DOWNLOAD_STATE_PAUSED(8),
+  DOWNLOAD_STATE_RESUMING(9),
   ;
 
   public companion object {
@@ -46,6 +48,8 @@ public enum class DownloadState(
       5 -> DOWNLOAD_STATE_COMPLETED
       6 -> DOWNLOAD_STATE_FAILED
       7 -> DOWNLOAD_STATE_CANCELLED
+      8 -> DOWNLOAD_STATE_PAUSED
+      9 -> DOWNLOAD_STATE_RESUMING
       else -> null
     }
   }

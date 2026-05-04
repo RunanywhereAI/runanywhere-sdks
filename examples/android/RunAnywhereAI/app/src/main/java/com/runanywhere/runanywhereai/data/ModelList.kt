@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.data
 
+import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
@@ -7,7 +8,6 @@ import com.runanywhere.sdk.core.types.NPUChip
 import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
@@ -216,11 +216,11 @@ object ModelList {
                 id = "abliterated-lora",
                 name = "Abliterated LoRA (F16)",
                 description = "Removes refusal behavior — model answers all questions directly without disclaimers",
-                downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
+                url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
                 filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
-                compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
-                fileSize = 17_600_000,
-                defaultScale = 1.0f,
+                compatible_models = listOf("qwen2.5-0.5b-instruct-q8_0"),
+                size_bytes = 17_600_000,
+                default_scale = 1.0f,
             ),
         )
 

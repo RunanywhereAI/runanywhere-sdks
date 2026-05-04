@@ -19,29 +19,38 @@ extension RunAnywhere {
             throw SDKException.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
 
+        try validateLLMModelCanLoad(modelInfo)
+
+        var request = RAModelLoadRequest()
+        request.modelID = modelId
+        request.category = modelInfo.category
+        request.framework = modelInfo.framework
+
+        let result = await loadModel(request)
+        guard result.success else {
+            let message = result.errorMessage.isEmpty
+                ? "Failed to load model '\(modelId)'"
+                : result.errorMessage
+            throw SDKException.llm(.modelLoadFailed, message)
+        }
+    }
+
+    private static func validateLLMModelCanLoad(_ modelInfo: ModelInfo) throws {
+        if modelInfo.framework == .foundationModels,
+           let reason = SystemFoundationModels.unavailableReason {
+            throw SDKException.llm(.serviceNotAvailable, reason)
+        }
+
         // Handle built-in models (Foundation Models, System TTS) - no file path needed
         // These are platform services that don't require downloaded model files
         if modelInfo.isBuiltIn {
-            // For built-in models, just pass the model ID to C++
-            // The service registry will route to the correct platform provider
-            try await CppBridge.LLM.shared.loadModel(modelId, modelId: modelId, modelName: modelInfo.name)
             return
         }
 
         // For downloaded models, verify they exist and resolve the file path
         guard modelInfo.localPath != nil else {
-            throw SDKException.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
+            throw SDKException.llm(.modelNotFound, "Model '\(modelInfo.id)' is not downloaded")
         }
-
-        // Log model info for debugging
-        let logger = SDKLogger(category: "ModelManagement")
-        let localName = modelInfo.localPath?.lastPathComponent ?? "nil"
-        logger.info("Loading model: id=\(modelId), framework=\(modelInfo.framework), format=\(modelInfo.format), localPath=\(localName)")
-
-        // Resolve actual model file path
-        let modelPath = try resolveModelFilePath(for: modelInfo)
-        logger.info("Resolved model path: \(modelPath.lastPathComponent)")
-        try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
     // MARK: - Private: Model Path Resolution
@@ -264,13 +273,19 @@ extension RunAnywhere {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
+        var request = RAModelUnloadRequest()
+        request.category = .language
+        _ = await unloadModel(request)
         await CppBridge.LLM.shared.unload()
     }
 
     /// Check if an LLM model is loaded
     public static var isModelLoaded: Bool {
         get async {
-            await CppBridge.LLM.shared.isLoaded
+            if let snapshot = componentLifecycleSnapshot(.llm) {
+                return snapshot.state == .ready
+            }
+            return await CppBridge.LLM.shared.isLoaded
         }
     }
 
@@ -283,7 +298,12 @@ extension RunAnywhere {
     /// - Note: Returns `false` if no model is loaded
     public static var supportsLLMStreaming: Bool {
         get async {
-            true  // C++ layer supports streaming
+            guard await isModelLoaded else { return false }
+            if let currentModel = await currentLLMModel,
+               currentModel.framework == .foundationModels {
+                return false
+            }
+            return true
         }
     }
 
@@ -417,6 +437,12 @@ extension RunAnywhere {
     /// - Returns: Currently loaded model ID if any
     public static func getCurrentModelId() async -> String? {
         guard isInitialized else { return nil }
+        var request = RACurrentModelRequest()
+        request.category = .language
+        let result = currentModel(request)
+        if !result.modelID.isEmpty {
+            return result.modelID
+        }
         return await CppBridge.LLM.shared.currentModelId
     }
 

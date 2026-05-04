@@ -230,6 +230,72 @@ export declare function modelArtifactTypeFromJSON(object: any): ModelArtifactTyp
 export declare function modelArtifactTypeToJSON(object: ModelArtifactType): string;
 /**
  * ---------------------------------------------------------------------------
+ * Model registry lifecycle state. This is durable/catalog state, not a live
+ * transfer progress stream. Per-download byte counters and transient progress
+ * events stay in download_service.proto.
+ * Sources pre-IDL:
+ *   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
+ *   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
+ * ---------------------------------------------------------------------------
+ */
+export declare enum ModelRegistryStatus {
+    MODEL_REGISTRY_STATUS_UNSPECIFIED = 0,
+    MODEL_REGISTRY_STATUS_REGISTERED = 1,
+    MODEL_REGISTRY_STATUS_DOWNLOADING = 2,
+    MODEL_REGISTRY_STATUS_DOWNLOADED = 3,
+    MODEL_REGISTRY_STATUS_LOADING = 4,
+    MODEL_REGISTRY_STATUS_LOADED = 5,
+    MODEL_REGISTRY_STATUS_ERROR = 6,
+    UNRECOGNIZED = -1
+}
+export declare function modelRegistryStatusFromJSON(object: any): ModelRegistryStatus;
+export declare function modelRegistryStatusToJSON(object: ModelRegistryStatus): string;
+export declare enum ModelQuerySortField {
+    MODEL_QUERY_SORT_FIELD_UNSPECIFIED = 0,
+    MODEL_QUERY_SORT_FIELD_NAME = 1,
+    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS = 2,
+    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS = 3,
+    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4,
+    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5,
+    MODEL_QUERY_SORT_FIELD_USAGE_COUNT = 6,
+    UNRECOGNIZED = -1
+}
+export declare function modelQuerySortFieldFromJSON(object: any): ModelQuerySortField;
+export declare function modelQuerySortFieldToJSON(object: ModelQuerySortField): string;
+export declare enum ModelQuerySortOrder {
+    MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0,
+    MODEL_QUERY_SORT_ORDER_ASCENDING = 1,
+    MODEL_QUERY_SORT_ORDER_DESCENDING = 2,
+    UNRECOGNIZED = -1
+}
+export declare function modelQuerySortOrderFromJSON(object: any): ModelQuerySortOrder;
+export declare function modelQuerySortOrderToJSON(object: ModelQuerySortOrder): string;
+/**
+ * Role of a file inside a single/multi-file artifact. The generic COMPANION
+ * role covers arbitrary sidecars; specific roles document common public
+ * catalog files such as VLM mmproj files and tokenizer/config assets.
+ */
+export declare enum ModelFileRole {
+    MODEL_FILE_ROLE_UNSPECIFIED = 0,
+    MODEL_FILE_ROLE_PRIMARY_MODEL = 1,
+    MODEL_FILE_ROLE_COMPANION = 2,
+    /** MODEL_FILE_ROLE_VISION_PROJECTOR - llama.cpp VLM mmproj*.gguf */
+    MODEL_FILE_ROLE_VISION_PROJECTOR = 3,
+    /** MODEL_FILE_ROLE_TOKENIZER - tokenizer model/data files */
+    MODEL_FILE_ROLE_TOKENIZER = 4,
+    /** MODEL_FILE_ROLE_CONFIG - config.json or framework config */
+    MODEL_FILE_ROLE_CONFIG = 5,
+    /** MODEL_FILE_ROLE_VOCABULARY - vocab.txt / vocab.json */
+    MODEL_FILE_ROLE_VOCABULARY = 6,
+    /** MODEL_FILE_ROLE_MERGES - merges.txt */
+    MODEL_FILE_ROLE_MERGES = 7,
+    MODEL_FILE_ROLE_LABELS = 8,
+    UNRECOGNIZED = -1
+}
+export declare function modelFileRoleFromJSON(object: any): ModelFileRole;
+export declare function modelFileRoleToJSON(object: ModelFileRole): string;
+/**
+ * ---------------------------------------------------------------------------
  * Hardware acceleration preference for inference. Sources pre-IDL:
  *   Web    enums.ts:165   (Auto / WebGPU / CPU)
  *   Swift  extensions     (CPU / GPU / NPU / Metal)
@@ -273,6 +339,26 @@ export declare enum RoutingPolicy {
 export declare function routingPolicyFromJSON(object: any): RoutingPolicy;
 export declare function routingPolicyToJSON(object: RoutingPolicy): string;
 /**
+ * Model-level thinking tag metadata. This intentionally uses a model-specific
+ * message name because llm_options.proto already owns the generation-options
+ * ThinkingTagPattern message in this proto package.
+ */
+export interface ModelThinkingTagPattern {
+    openTag: string;
+    closeTag: string;
+}
+export interface ModelInfoMetadata {
+    description: string;
+    author: string;
+    license: string;
+    tags: string[];
+    version: string;
+}
+export interface ModelRuntimeCompatibility {
+    compatibleFrameworks: InferenceFramework[];
+    compatibleFormats: ModelFormat[];
+}
+/**
  * ---------------------------------------------------------------------------
  * Core metadata for a model entry.
  * Sources pre-IDL:
@@ -298,6 +384,27 @@ export interface ModelInfo {
     source: ModelSource;
     createdAtUnixMs: number;
     updatedAtUnixMs: number;
+    /**
+     * Separate from download_size_bytes: this is the estimated runtime RAM
+     * requirement used by compatibility checks and model selection UIs.
+     */
+    memoryRequiredBytes?: number | undefined;
+    /**
+     * Lowercase hex SHA-256 checksum for the primary artifact. Per-file
+     * checksums for multi-file artifacts live on ModelFileDescriptor.
+     */
+    checksumSha256?: string | undefined;
+    /**
+     * Thinking/reasoning metadata. `supports_thinking` remains the boolean
+     * capability flag; this optional pattern declares model-specific tags.
+     */
+    thinkingPattern?: ModelThinkingTagPattern | undefined;
+    /**
+     * Structured public catalog metadata. `description` (field 12) is kept for
+     * backward compatibility and should mirror metadata.description when both
+     * are populated.
+     */
+    metadata?: ModelInfoMetadata | undefined;
     singleFile?: SingleFileArtifact | undefined;
     archive?: ArchiveArtifact | undefined;
     multiFile?: MultiFileArtifact | undefined;
@@ -315,6 +422,30 @@ export interface ModelInfo {
     accelerationPreference?: AccelerationPreference | undefined;
     /** Hybrid (on-device vs cloud) routing policy for this entry. */
     routingPolicy?: RoutingPolicy | undefined;
+    /**
+     * Framework/format compatibility declarations. `framework` (field 5) is
+     * the canonical/preferred runtime when no explicit preferred_framework is set.
+     */
+    compatibility?: ModelRuntimeCompatibility | undefined;
+    preferredFramework?: InferenceFramework | undefined;
+    /**
+     * Durable registry state. Live byte progress belongs to
+     * download_service.DownloadProgress, not ModelInfo.
+     */
+    registryStatus?: ModelRegistryStatus | undefined;
+    isDownloaded?: boolean | undefined;
+    isAvailable?: boolean | undefined;
+    lastUsedAtUnixMs?: number | undefined;
+    usageCount?: number | undefined;
+    syncPending?: boolean | undefined;
+    statusMessage?: string | undefined;
+}
+/**
+ * Repeated model registry responses use this wrapper because protobuf cannot
+ * serialize a bare repeated field as a top-level message.
+ */
+export interface ModelInfoList {
+    models: ModelInfo[];
 }
 export interface SingleFileArtifact {
     requiredPatterns: string[];
@@ -338,6 +469,15 @@ export interface ModelFileDescriptor {
      */
     sizeBytes?: number | undefined;
     checksum?: string | undefined;
+    /**
+     * Path fields used by SDK-local wrappers/catalogs. `filename` is the
+     * storage name for simple cases; relative_path/destination_path preserve
+     * directory layouts for archive and multi-file artifacts.
+     */
+    relativePath?: string | undefined;
+    destinationPath?: string | undefined;
+    role?: ModelFileRole | undefined;
+    localPath?: string | undefined;
 }
 export interface MultiFileArtifact {
     files: ModelFileDescriptor[];
@@ -354,7 +494,199 @@ export interface MultiFileArtifact {
 export interface ExpectedModelFiles {
     files: ModelFileDescriptor[];
     rootDirectory?: string | undefined;
+    requiredPatterns: string[];
+    optionalPatterns: string[];
+    description?: string | undefined;
 }
+/**
+ * Registry/query filters shared by SDK model-management APIs. UI-only
+ * presentation state and platform filesystem handles are intentionally not
+ * represented here.
+ */
+export interface ModelQuery {
+    framework?: InferenceFramework | undefined;
+    category?: ModelCategory | undefined;
+    format?: ModelFormat | undefined;
+    downloadedOnly?: boolean | undefined;
+    availableOnly?: boolean | undefined;
+    maxSizeBytes?: number | undefined;
+    searchQuery: string;
+    source?: ModelSource | undefined;
+    sortField?: ModelQuerySortField | undefined;
+    sortOrder?: ModelQuerySortOrder | undefined;
+}
+export interface ModelCompatibilityResult {
+    isCompatible: boolean;
+    canRun: boolean;
+    canFit: boolean;
+    requiredMemoryBytes: number;
+    availableMemoryBytes: number;
+    requiredStorageBytes: number;
+    availableStorageBytes: number;
+    reasons: string[];
+}
+export interface ModelRegistryRefreshRequest {
+    /** Fetch or merge a remote catalog through the platform/network adapter. */
+    includeRemoteCatalog: boolean;
+    /** Scan managed model directories and link valid on-disk artifacts. */
+    rescanLocal: boolean;
+    /** Clear downloaded/available state for registry rows whose files vanished. */
+    pruneOrphans: boolean;
+    /** Optional post-refresh filter for the returned model list. */
+    query?: ModelQuery | undefined;
+}
+export interface ModelRegistryRefreshResult {
+    success: boolean;
+    models?: ModelInfoList | undefined;
+    registeredCount: number;
+    updatedCount: number;
+    discoveredCount: number;
+    prunedCount: number;
+    refreshedAtUnixMs: number;
+    warnings: string[];
+    errorMessage: string;
+}
+export interface ModelListRequest {
+    /** Set query.downloaded_only for downloaded-only lists. */
+    query?: ModelQuery | undefined;
+}
+export interface ModelListResult {
+    success: boolean;
+    models?: ModelInfoList | undefined;
+    errorMessage: string;
+}
+export interface ModelGetRequest {
+    modelId: string;
+}
+export interface ModelGetResult {
+    found: boolean;
+    model?: ModelInfo | undefined;
+    errorMessage: string;
+}
+export interface ModelImportRequest {
+    /**
+     * Catalog metadata to register or merge. If absent, discovery may infer a
+     * minimal ModelInfo from the file name and detected format.
+     */
+    model?: ModelInfo | undefined;
+    /**
+     * Normalized path under platform control. Do not place transient OS file
+     * picker handles in this field; adapters should first copy/link/authorize
+     * them and provide a stable path visible to the C++ workflow.
+     */
+    sourcePath: string;
+    copyIntoManagedStorage: boolean;
+    overwriteExisting: boolean;
+    files: ModelFileDescriptor[];
+}
+export interface ModelImportResult {
+    success: boolean;
+    model?: ModelInfo | undefined;
+    localPath: string;
+    importedBytes: number;
+    warnings: string[];
+    errorMessage: string;
+}
+export interface ModelDiscoveryRequest {
+    /**
+     * Platform adapters own permission and sandbox traversal. These are stable
+     * roots that C++ may inspect using registered filesystem callbacks.
+     */
+    searchRoots: string[];
+    recursive: boolean;
+    linkDownloaded: boolean;
+    purgeInvalid: boolean;
+    query?: ModelQuery | undefined;
+}
+export interface DiscoveredModel {
+    modelId: string;
+    localPath: string;
+    matchedRegistry: boolean;
+    model?: ModelInfo | undefined;
+    sizeBytes: number;
+    warnings: string[];
+}
+export interface ModelDiscoveryResult {
+    success: boolean;
+    discoveredModels: DiscoveredModel[];
+    linkedCount: number;
+    purgedCount: number;
+    warnings: string[];
+    errorMessage: string;
+}
+export interface ModelLoadRequest {
+    modelId: string;
+    category?: ModelCategory | undefined;
+    framework?: InferenceFramework | undefined;
+    forceReload: boolean;
+}
+export interface ModelLoadResult {
+    success: boolean;
+    modelId: string;
+    category: ModelCategory;
+    framework: InferenceFramework;
+    resolvedPath: string;
+    loadedAtUnixMs: number;
+    errorMessage: string;
+}
+export interface ModelUnloadRequest {
+    modelId: string;
+    category?: ModelCategory | undefined;
+    unloadAll: boolean;
+}
+export interface ModelUnloadResult {
+    success: boolean;
+    unloadedModelIds: string[];
+    errorMessage: string;
+}
+export interface CurrentModelRequest {
+    category?: ModelCategory | undefined;
+    framework?: InferenceFramework | undefined;
+}
+export interface CurrentModelResult {
+    modelId: string;
+    model?: ModelInfo | undefined;
+    loadedAtUnixMs: number;
+}
+export interface ModelDeleteRequest {
+    modelId: string;
+    deleteFiles: boolean;
+    unregister: boolean;
+    unloadIfLoaded: boolean;
+}
+export interface ModelDeleteResult {
+    success: boolean;
+    modelId: string;
+    deletedBytes: number;
+    filesDeleted: boolean;
+    registryUpdated: boolean;
+    wasLoaded: boolean;
+    errorMessage: string;
+}
+export declare const ModelThinkingTagPattern: {
+    encode(message: ModelThinkingTagPattern, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelThinkingTagPattern;
+    fromJSON(object: any): ModelThinkingTagPattern;
+    toJSON(message: ModelThinkingTagPattern): unknown;
+    create<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(base?: I): ModelThinkingTagPattern;
+    fromPartial<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(object: I): ModelThinkingTagPattern;
+};
+export declare const ModelInfoMetadata: {
+    encode(message: ModelInfoMetadata, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMetadata;
+    fromJSON(object: any): ModelInfoMetadata;
+    toJSON(message: ModelInfoMetadata): unknown;
+    create<I extends Exact<DeepPartial<ModelInfoMetadata>, I>>(base?: I): ModelInfoMetadata;
+    fromPartial<I extends Exact<DeepPartial<ModelInfoMetadata>, I>>(object: I): ModelInfoMetadata;
+};
+export declare const ModelRuntimeCompatibility: {
+    encode(message: ModelRuntimeCompatibility, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRuntimeCompatibility;
+    fromJSON(object: any): ModelRuntimeCompatibility;
+    toJSON(message: ModelRuntimeCompatibility): unknown;
+    create<I extends Exact<DeepPartial<ModelRuntimeCompatibility>, I>>(base?: I): ModelRuntimeCompatibility;
+    fromPartial<I extends Exact<DeepPartial<ModelRuntimeCompatibility>, I>>(object: I): ModelRuntimeCompatibility;
+};
 export declare const ModelInfo: {
     encode(message: ModelInfo, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfo;
@@ -362,6 +694,14 @@ export declare const ModelInfo: {
     toJSON(message: ModelInfo): unknown;
     create<I extends Exact<DeepPartial<ModelInfo>, I>>(base?: I): ModelInfo;
     fromPartial<I extends Exact<DeepPartial<ModelInfo>, I>>(object: I): ModelInfo;
+};
+export declare const ModelInfoList: {
+    encode(message: ModelInfoList, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoList;
+    fromJSON(object: any): ModelInfoList;
+    toJSON(message: ModelInfoList): unknown;
+    create<I extends Exact<DeepPartial<ModelInfoList>, I>>(base?: I): ModelInfoList;
+    fromPartial<I extends Exact<DeepPartial<ModelInfoList>, I>>(object: I): ModelInfoList;
 };
 export declare const SingleFileArtifact: {
     encode(message: SingleFileArtifact, writer?: _m0.Writer): _m0.Writer;
@@ -402,6 +742,174 @@ export declare const ExpectedModelFiles: {
     toJSON(message: ExpectedModelFiles): unknown;
     create<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(base?: I): ExpectedModelFiles;
     fromPartial<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(object: I): ExpectedModelFiles;
+};
+export declare const ModelQuery: {
+    encode(message: ModelQuery, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelQuery;
+    fromJSON(object: any): ModelQuery;
+    toJSON(message: ModelQuery): unknown;
+    create<I extends Exact<DeepPartial<ModelQuery>, I>>(base?: I): ModelQuery;
+    fromPartial<I extends Exact<DeepPartial<ModelQuery>, I>>(object: I): ModelQuery;
+};
+export declare const ModelCompatibilityResult: {
+    encode(message: ModelCompatibilityResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult;
+    fromJSON(object: any): ModelCompatibilityResult;
+    toJSON(message: ModelCompatibilityResult): unknown;
+    create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult;
+    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult;
+};
+export declare const ModelRegistryRefreshRequest: {
+    encode(message: ModelRegistryRefreshRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryRefreshRequest;
+    fromJSON(object: any): ModelRegistryRefreshRequest;
+    toJSON(message: ModelRegistryRefreshRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelRegistryRefreshRequest>, I>>(base?: I): ModelRegistryRefreshRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshRequest>, I>>(object: I): ModelRegistryRefreshRequest;
+};
+export declare const ModelRegistryRefreshResult: {
+    encode(message: ModelRegistryRefreshResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryRefreshResult;
+    fromJSON(object: any): ModelRegistryRefreshResult;
+    toJSON(message: ModelRegistryRefreshResult): unknown;
+    create<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(base?: I): ModelRegistryRefreshResult;
+    fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(object: I): ModelRegistryRefreshResult;
+};
+export declare const ModelListRequest: {
+    encode(message: ModelListRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelListRequest;
+    fromJSON(object: any): ModelListRequest;
+    toJSON(message: ModelListRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelListRequest>, I>>(base?: I): ModelListRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelListRequest>, I>>(object: I): ModelListRequest;
+};
+export declare const ModelListResult: {
+    encode(message: ModelListResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelListResult;
+    fromJSON(object: any): ModelListResult;
+    toJSON(message: ModelListResult): unknown;
+    create<I extends Exact<DeepPartial<ModelListResult>, I>>(base?: I): ModelListResult;
+    fromPartial<I extends Exact<DeepPartial<ModelListResult>, I>>(object: I): ModelListResult;
+};
+export declare const ModelGetRequest: {
+    encode(message: ModelGetRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelGetRequest;
+    fromJSON(object: any): ModelGetRequest;
+    toJSON(message: ModelGetRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelGetRequest>, I>>(base?: I): ModelGetRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelGetRequest>, I>>(object: I): ModelGetRequest;
+};
+export declare const ModelGetResult: {
+    encode(message: ModelGetResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelGetResult;
+    fromJSON(object: any): ModelGetResult;
+    toJSON(message: ModelGetResult): unknown;
+    create<I extends Exact<DeepPartial<ModelGetResult>, I>>(base?: I): ModelGetResult;
+    fromPartial<I extends Exact<DeepPartial<ModelGetResult>, I>>(object: I): ModelGetResult;
+};
+export declare const ModelImportRequest: {
+    encode(message: ModelImportRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelImportRequest;
+    fromJSON(object: any): ModelImportRequest;
+    toJSON(message: ModelImportRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelImportRequest>, I>>(base?: I): ModelImportRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelImportRequest>, I>>(object: I): ModelImportRequest;
+};
+export declare const ModelImportResult: {
+    encode(message: ModelImportResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelImportResult;
+    fromJSON(object: any): ModelImportResult;
+    toJSON(message: ModelImportResult): unknown;
+    create<I extends Exact<DeepPartial<ModelImportResult>, I>>(base?: I): ModelImportResult;
+    fromPartial<I extends Exact<DeepPartial<ModelImportResult>, I>>(object: I): ModelImportResult;
+};
+export declare const ModelDiscoveryRequest: {
+    encode(message: ModelDiscoveryRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDiscoveryRequest;
+    fromJSON(object: any): ModelDiscoveryRequest;
+    toJSON(message: ModelDiscoveryRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelDiscoveryRequest>, I>>(base?: I): ModelDiscoveryRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelDiscoveryRequest>, I>>(object: I): ModelDiscoveryRequest;
+};
+export declare const DiscoveredModel: {
+    encode(message: DiscoveredModel, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DiscoveredModel;
+    fromJSON(object: any): DiscoveredModel;
+    toJSON(message: DiscoveredModel): unknown;
+    create<I extends Exact<DeepPartial<DiscoveredModel>, I>>(base?: I): DiscoveredModel;
+    fromPartial<I extends Exact<DeepPartial<DiscoveredModel>, I>>(object: I): DiscoveredModel;
+};
+export declare const ModelDiscoveryResult: {
+    encode(message: ModelDiscoveryResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDiscoveryResult;
+    fromJSON(object: any): ModelDiscoveryResult;
+    toJSON(message: ModelDiscoveryResult): unknown;
+    create<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(base?: I): ModelDiscoveryResult;
+    fromPartial<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(object: I): ModelDiscoveryResult;
+};
+export declare const ModelLoadRequest: {
+    encode(message: ModelLoadRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelLoadRequest;
+    fromJSON(object: any): ModelLoadRequest;
+    toJSON(message: ModelLoadRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelLoadRequest>, I>>(base?: I): ModelLoadRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelLoadRequest>, I>>(object: I): ModelLoadRequest;
+};
+export declare const ModelLoadResult: {
+    encode(message: ModelLoadResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelLoadResult;
+    fromJSON(object: any): ModelLoadResult;
+    toJSON(message: ModelLoadResult): unknown;
+    create<I extends Exact<DeepPartial<ModelLoadResult>, I>>(base?: I): ModelLoadResult;
+    fromPartial<I extends Exact<DeepPartial<ModelLoadResult>, I>>(object: I): ModelLoadResult;
+};
+export declare const ModelUnloadRequest: {
+    encode(message: ModelUnloadRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelUnloadRequest;
+    fromJSON(object: any): ModelUnloadRequest;
+    toJSON(message: ModelUnloadRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelUnloadRequest>, I>>(base?: I): ModelUnloadRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelUnloadRequest>, I>>(object: I): ModelUnloadRequest;
+};
+export declare const ModelUnloadResult: {
+    encode(message: ModelUnloadResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelUnloadResult;
+    fromJSON(object: any): ModelUnloadResult;
+    toJSON(message: ModelUnloadResult): unknown;
+    create<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(base?: I): ModelUnloadResult;
+    fromPartial<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(object: I): ModelUnloadResult;
+};
+export declare const CurrentModelRequest: {
+    encode(message: CurrentModelRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): CurrentModelRequest;
+    fromJSON(object: any): CurrentModelRequest;
+    toJSON(message: CurrentModelRequest): unknown;
+    create<I extends Exact<DeepPartial<CurrentModelRequest>, I>>(base?: I): CurrentModelRequest;
+    fromPartial<I extends Exact<DeepPartial<CurrentModelRequest>, I>>(object: I): CurrentModelRequest;
+};
+export declare const CurrentModelResult: {
+    encode(message: CurrentModelResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): CurrentModelResult;
+    fromJSON(object: any): CurrentModelResult;
+    toJSON(message: CurrentModelResult): unknown;
+    create<I extends Exact<DeepPartial<CurrentModelResult>, I>>(base?: I): CurrentModelResult;
+    fromPartial<I extends Exact<DeepPartial<CurrentModelResult>, I>>(object: I): CurrentModelResult;
+};
+export declare const ModelDeleteRequest: {
+    encode(message: ModelDeleteRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDeleteRequest;
+    fromJSON(object: any): ModelDeleteRequest;
+    toJSON(message: ModelDeleteRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(base?: I): ModelDeleteRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(object: I): ModelDeleteRequest;
+};
+export declare const ModelDeleteResult: {
+    encode(message: ModelDeleteResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDeleteResult;
+    fromJSON(object: any): ModelDeleteResult;
+    toJSON(message: ModelDeleteResult): unknown;
+    create<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(base?: I): ModelDeleteResult;
+    fromPartial<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(object: I): ModelDeleteResult;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

@@ -268,30 +268,32 @@ export function isVADReady(): boolean {
  *   - A JSON Schema string + a generic type parameter (caller asserts T)
  *   - A type-tagged object whose runtime parser the caller provides
  *
- * The native call still goes through the LLM provider's `generate(prompt)`;
- * the response text is JSON-parsed and returned typed as `T`.
+ * The native LLM service owns schema prompting, extraction, and validation.
+ * Web only deserializes the generated JSON payload into the caller's type.
  */
 export async function generateStructured<T = unknown>(
   prompt: string,
   schema: { jsonSchema: string; parse?: (text: string) => T },
   options?: Partial<LLMGenerationOptions>,
 ): Promise<T> {
-  const fullPrompt =
-    `Respond ONLY with JSON matching this JSON Schema. ` +
-    `Do not include explanations or markdown.\n` +
-    `Schema:\n${schema.jsonSchema}\n\n` +
-    `Prompt:\n${prompt}`;
-  const result = await generate(fullPrompt, options);
-  const text = result.text.trim();
+  const result = await generate(prompt, {
+    ...options,
+    jsonSchema: schema.jsonSchema,
+  });
+  if (result.structuredOutputValidation && !result.structuredOutputValidation.isValid) {
+    throw SDKException.generationFailed(
+      result.structuredOutputValidation.errorMessage ?? 'Structured output validation failed',
+    );
+  }
+  const text = result.jsonOutput
+    ?? result.structuredOutputValidation?.extractedJson
+    ?? result.text;
   if (typeof schema.parse === 'function') {
     return schema.parse(text);
   }
-  // Default: best-effort JSON.parse, stripping common markdown fences.
-  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
   try {
-    return JSON.parse(cleaned) as T;
+    return JSON.parse(text) as T;
   } catch (err) {
-    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
     throw SDKException.generationFailed(
       `Structured output JSON parse failed: ${(err as Error).message}; raw: ${text.slice(0, 200)}`,
     );

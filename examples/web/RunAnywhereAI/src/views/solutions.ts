@@ -7,7 +7,7 @@
  * embedded inline as string constants (no asset bundling). Each lifecycle
  * transition is appended to a simple scrolling log.
  */
-import { RunAnywhere } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { RunAnywhere } from '@runanywhere/web';
 import type { TabLifecycle } from '../app';
 
 const VOICE_AGENT_YAML = `voice_agent:
@@ -75,8 +75,27 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
     logEl.scrollTop = logEl.scrollHeight;
   };
 
+  const updateRAGCapabilityState = () => {
+    const availability = RunAnywhere.rag.availability();
+    ragBtn.title = availability.available
+      ? 'Run RAG solution'
+      : availability.reason;
+  };
+
   const runSolution = async (name: string, yaml: string) => {
     if (running) return;
+
+    if (name === 'RAG') {
+      const availability = RunAnywhere.rag.availability();
+      if (!availability.available) {
+        append(`N/A RAG: ${availability.reason}`);
+        if (availability.missingExports.length > 0) {
+          append(`N/A RAG: missing ${availability.missingExports.join(', ')}`);
+        }
+        return;
+      }
+    }
+
     running = true;
     voiceBtn.disabled = true;
     ragBtn.disabled = true;
@@ -94,8 +113,11 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
       running = false;
       voiceBtn.disabled = false;
       ragBtn.disabled = false;
+      updateRAGCapabilityState();
     }
   };
+
+  updateRAGCapabilityState();
 
   voiceBtn.addEventListener('click', () => runSolution('Voice Agent', VOICE_AGENT_YAML));
   ragBtn.addEventListener('click', () => runSolution('RAG', RAG_YAML));

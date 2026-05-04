@@ -267,6 +267,12 @@ else()
         rac_backend_llamacpp
         rac_commons
     )
+    if(RAC_PLATFORM_ANDROID)
+        target_link_options(runanywhere_llamacpp PRIVATE
+            -Wl,--gc-sections
+            -Wl,-z,max-page-size=16384
+            -Wl,-z,common-page-size=16384)
+    endif()
     install(TARGETS runanywhere_llamacpp LIBRARY DESTINATION lib)
 endif()
 
@@ -290,7 +296,10 @@ elseif(RAC_PLATFORM_ANDROID)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
     target_compile_options(rac_backend_llamacpp PRIVATE -O3 -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(rac_backend_llamacpp PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    target_link_options(rac_backend_llamacpp PRIVATE
+        -Wl,--gc-sections
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
 
 elseif(RAC_PLATFORM_MACOS)
     message(STATUS "Configuring LlamaCPP backend for macOS")
@@ -352,7 +361,10 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
 
     target_compile_options(rac_backend_llamacpp_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(rac_backend_llamacpp_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    target_link_options(rac_backend_llamacpp_jni PRIVATE
+        -Wl,--gc-sections
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
 endif()
 
 # =============================================================================

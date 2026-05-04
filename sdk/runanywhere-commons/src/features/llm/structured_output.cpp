@@ -191,53 +191,21 @@ extern "C" rac_bool_t rac_structured_output_find_complete_json(const char* text,
         return RAC_FALSE;
     }
 
-    // Try to find JSON object or array
-    const char start_chars[] = {'{', '['};
-    const char end_chars[] = {'}', ']'};
-
-    for (int type = 0; type < 2; type++) {
-        char start_char = start_chars[type];
-        char end_char = end_chars[type];
-
-        size_t start_pos;
-        if (!find_char(text, start_char, 0, &start_pos)) {
-            continue;
+    // Scan left-to-right so arrays containing objects are returned as the
+    // complete top-level JSON value instead of the first nested object.
+    for (size_t i = 0; i < len; i++) {
+        size_t end_pos = 0;
+        if (text[i] == '{' &&
+            rac_structured_output_find_matching_brace(text, i, &end_pos) != 0) {
+            *out_start = i;
+            *out_end = end_pos + 1;  // Exclusive end
+            return RAC_TRUE;
         }
-
-        int depth = 0;
-        bool in_string = false;
-        bool escaped = false;
-
-        for (size_t i = start_pos; i < len; i++) {
-            char ch = text[i];
-
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-
-            if (ch == '\\') {
-                escaped = true;
-                continue;
-            }
-
-            if (ch == '"' && !escaped) {
-                in_string = !in_string;
-                continue;
-            }
-
-            if (!in_string) {
-                if (ch == start_char) {
-                    depth++;
-                } else if (ch == end_char) {
-                    depth--;
-                    if (depth == 0) {
-                        *out_start = start_pos;
-                        *out_end = i + 1;  // Exclusive end
-                        return RAC_TRUE;
-                    }
-                }
-            }
+        if (text[i] == '[' &&
+            rac_structured_output_find_matching_bracket(text, i, &end_pos) != 0) {
+            *out_start = i;
+            *out_end = end_pos + 1;  // Exclusive end
+            return RAC_TRUE;
         }
     }
 

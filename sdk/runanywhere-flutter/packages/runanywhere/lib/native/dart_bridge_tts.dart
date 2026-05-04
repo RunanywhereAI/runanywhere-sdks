@@ -4,13 +4,18 @@
 /// Mirrors Swift's CppBridge+TTS.swift pattern.
 library dart_bridge_tts;
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/features/tts/tts_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/tts_options.pb.dart'
+    show TTSOptions, TTSOutput, TTSVoiceInfo;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -109,7 +114,8 @@ class DartBridgeTTS {
     final namePtr = voiceName.toNativeUtf8();
 
     try {
-      final result = NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
+      final result =
+          NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -152,6 +158,151 @@ class DartBridgeTTS {
   }
 
   // MARK: - Synthesis
+
+  /// Enumerate voices via the generated-proto ABI.
+  Future<List<TTSVoiceInfo>> listVoicesProto() async {
+    final handle = getHandle();
+    final fn = RacNative.bindings.rac_tts_component_list_voices_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_tts_component_list_voices_proto is unavailable');
+    }
+
+    final voices = <TTSVoiceInfo>[];
+    NativeCallable<RacTtsProtoVoiceCallbackNative>? callback;
+
+    try {
+      callback = NativeCallable<RacTtsProtoVoiceCallbackNative>.listener((
+        Pointer<Uint8> bytesPtr,
+        int bytesLen,
+        Pointer<Void> _,
+      ) {
+        if (bytesPtr == nullptr || bytesLen <= 0) return;
+        final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+        voices.add(TTSVoiceInfo.fromBuffer(copy));
+      });
+      final rc = fn(handle, callback.nativeFunction, nullptr);
+      if (rc != RAC_SUCCESS) {
+        throw StateError(
+          'rac_tts_component_list_voices_proto failed: '
+          '${RacResultCode.getMessage(rc)}',
+        );
+      }
+      return voices;
+    } finally {
+      callback?.close();
+    }
+  }
+
+  /// Synthesize speech with serialized runanywhere.v1.TTSOptions.
+  Future<TTSOutput> synthesizeProto(String text, TTSOptions options) async {
+    final handle = getHandle();
+    if (!isLoaded) {
+      throw StateError('No TTS voice loaded. Call loadVoice() first.');
+    }
+
+    final fn = RacNative.bindings.rac_tts_component_synthesize_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_tts_component_synthesize_proto is unavailable');
+    }
+
+    final textPtr = text.toNativeUtf8();
+    final optionBytes = options.writeToBuffer();
+    final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(handle, textPtr, optionPtr, optionBytes.length, out);
+      DartBridgeProtoUtils.ensureSuccess(
+        out,
+        code,
+        'rac_tts_component_synthesize_proto',
+      );
+      return DartBridgeProtoUtils.decodeBuffer(out, TTSOutput.fromBuffer);
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(textPtr);
+      calloc.free(optionPtr);
+      calloc.free(out);
+    }
+  }
+
+  /// Stream synthesized speech chunks through serialized TTSOutput messages.
+  Stream<TTSOutput> synthesizeStreamProto(String text, TTSOptions options) {
+    if (!isLoaded) {
+      return Stream<TTSOutput>.error(
+        StateError('No TTS voice loaded. Call loadVoice() first.'),
+      );
+    }
+    final fn = RacNative.bindings.rac_tts_component_synthesize_stream_proto;
+    if (fn == null) {
+      return Stream<TTSOutput>.error(
+        UnsupportedError(
+            'rac_tts_component_synthesize_stream_proto is unavailable'),
+      );
+    }
+
+    final controller = StreamController<TTSOutput>(sync: false);
+    NativeCallable<RacTtsProtoChunkCallbackNative>? callback;
+
+    Future<void> run() async {
+      final textPtr = text.toNativeUtf8();
+      final optionBytes = options.writeToBuffer();
+      final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
+
+      try {
+        callback = NativeCallable<RacTtsProtoChunkCallbackNative>.listener((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+            return;
+          }
+          try {
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            controller.add(TTSOutput.fromBuffer(copy));
+          } catch (e, st) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+        });
+        final rc = fn(
+          getHandle(),
+          textPtr,
+          optionPtr,
+          optionBytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_tts_component_synthesize_stream_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+        }
+        if (!controller.isClosed) {
+          await controller.close();
+        }
+      } finally {
+        calloc.free(textPtr);
+        calloc.free(optionPtr);
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
+    return controller.stream;
+  }
 
   /// Synthesize speech from text.
   ///

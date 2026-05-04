@@ -43,13 +43,24 @@ public actor HTTPClientAdapter: NetworkService {
     // MARK: - Configuration
 
     public func configure(baseURL: URL, apiKey: String) {
+        let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString),
+              CppBridge.DevConfig.isUsableCredential(trimmedAPIKey) else {
+            self.baseURL = nil
+            self.apiKey = nil
+            logger.info("HTTP adapter not configured: no usable external config")
+            return
+        }
+
         self.baseURL = baseURL
-        self.apiKey = apiKey
+        self.apiKey = trimmedAPIKey
         logger.info("HTTP adapter configured with base URL: \(baseURL.host ?? "unknown")")
     }
 
     public func configure(baseURL: String, apiKey: String) {
         guard let url = URL(string: baseURL) else {
+            self.baseURL = nil
+            self.apiKey = nil
             logger.error("Invalid base URL: \(baseURL)")
             return
         }
@@ -59,6 +70,12 @@ public actor HTTPClientAdapter: NetworkService {
     public var isConfigured: Bool { baseURL != nil }
 
     public var currentBaseURL: URL? { baseURL }
+
+    public var hasUsableConfiguration: Bool {
+        guard let baseURL else { return false }
+        return CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) &&
+            CppBridge.DevConfig.isUsableCredential(apiKey)
+    }
 
     // MARK: - NetworkService Protocol
 

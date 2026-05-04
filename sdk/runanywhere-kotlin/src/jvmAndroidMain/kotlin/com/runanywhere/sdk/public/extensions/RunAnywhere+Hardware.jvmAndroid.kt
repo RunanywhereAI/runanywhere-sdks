@@ -11,40 +11,35 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.HardwareProfile
+import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 
 actual class Hardware {
-    actual fun getProfile(): HardwareProfile {
+    actual fun getProfile(): HardwareProfileResult {
         return try {
-            // Try the C++ native path first (rac_hardware_profile_get).
-            val buf = ByteArray(4096)
-            val sizeOut = IntArray(1)
-            val rc = RunAnywhereBridge.racHardwareProfileGet(buf, sizeOut)
-            if (rc == 0 && sizeOut[0] > 0) {
-                // Parse the proto if we had a generated HardwareProfileResult class.
-                // For now return the platform-derived profile since the proto type
-                // may not be generated yet.
-                buildPlatformProfile()
+            val bytes = RunAnywhereBridge.racHardwareProfileGet()
+            if (bytes != null && bytes.isNotEmpty()) {
+                HardwareProfileResult.ADAPTER.decode(bytes)
             } else {
                 buildPlatformProfile()
             }
         } catch (e: UnsatisfiedLinkError) {
-            // C++ thunk not wired yet — fall back to platform info.
             buildPlatformProfile()
         }
     }
 
-    actual fun getChip(): String = getProfile().chipName
+    actual fun getChip(): String = getProfile().profile?.chip?.ifBlank { "Unknown" } ?: "Unknown"
 
     actual val hasNeuralEngine: Boolean
-        get() = getProfile().hasNeuralEngine
+        get() = getProfile().profile?.has_neural_engine ?: false
 
     actual val accelerationMode: String
-        get() = getProfile().accelerationMode
+        get() = getProfile().profile?.acceleration_mode?.ifBlank { "cpu" } ?: "cpu"
 
-    private fun buildPlatformProfile(): HardwareProfile {
+    private fun buildPlatformProfile(): HardwareProfileResult {
         val runtime = Runtime.getRuntime()
         val cpuCores = runtime.availableProcessors()
         // G-DV20: Report physical device RAM. Runtime.maxMemory() returns the
@@ -63,18 +58,20 @@ actual class Hardware {
             } catch (e: Throwable) {
                 "Unknown"
             }
-        // Heuristic: treat Snapdragon X Elite / Apple Silicon as having a neural engine.
-        val hasNpu =
-            chipName.contains("apple", ignoreCase = true) ||
-                chipName.contains("snapdragon", ignoreCase = true) ||
-                chipName.contains("tensor", ignoreCase = true) ||
-                chipName.contains("exynos", ignoreCase = true)
-        return HardwareProfile(
-            chipName = chipName,
-            hasNeuralEngine = hasNpu,
-            accelerationMode = if (hasNpu) "NPU" else "CPU",
-            totalMemoryMB = totalMemoryMB,
-            cpuCores = cpuCores,
+        // Fallback reports platform facts only. Accelerator/routing capability
+        // must come from rac_hardware_profile_get when the native bridge is
+        // available, not from Kotlin chip-name heuristics.
+        return HardwareProfileResult(
+            profile =
+                HardwareProfile(
+                    chip = chipName,
+                    has_neural_engine = false,
+                    acceleration_mode = "cpu",
+                    total_memory_bytes = totalMemoryMB * 1024L * 1024L,
+                    core_count = cpuCores,
+                    architecture = System.getProperty("os.arch") ?: "",
+                    platform = "android",
+                ),
         )
     }
 }

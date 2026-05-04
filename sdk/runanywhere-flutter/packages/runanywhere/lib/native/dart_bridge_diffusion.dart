@@ -1,194 +1,260 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// dart_bridge_diffusion.dart — FFI helpers for the `rac_diffusion_*`
-// C ABI. Public capability code calls into this bridge so
-// `lib/public/capabilities/runanywhere_diffusion.dart` stays free of
-// `dart:ffi` imports (canonical §15 type-discipline).
+// Generated-proto diffusion service bridge.
 
-import 'dart:ffi';
-import 'dart:typed_data';
+import 'dart:async';
+import 'dart:ffi' as ffi;
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/generated/diffusion_options.pb.dart'
+    show
+        DiffusionCapabilities,
+        DiffusionGenerationOptions,
+        DiffusionProgress,
+        DiffusionResult;
+import 'package:runanywhere/generated/diffusion_options.pbenum.dart'
+    show DiffusionMode;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
+import 'package:runanywhere/native/ffi_types.dart';
 
-import 'package:runanywhere/native/types/basic_types.dart';
-import 'package:runanywhere/native/platform_loader.dart';
+const _capTextToImage = 1 << 0;
+const _capImageToImage = 1 << 1;
+const _capInpainting = 1 << 2;
+const _capIntermediateImages = 1 << 3;
+const _capSafetyChecker = 1 << 4;
 
-/// Result of a diffusion FFI call: payload bytes (proto-encoded) +
-/// return code (0 ok, non-zero RAC error).
-class DiffusionFfiResult {
-  DiffusionFfiResult({this.payload, required this.resultCode});
-  final Uint8List? payload;
-  final int resultCode;
-  bool get success => resultCode == RAC_SUCCESS;
-}
-
-/// FFI bridge to the `rac_diffusion_*` C ABI. Owns the diffusion
-/// component handle so the public capability layer never has to
-/// touch `dart:ffi`.
+/// FFI bridge to the generated-proto `rac_diffusion_*` service ABI.
 class DartBridgeDiffusion {
   DartBridgeDiffusion._();
 
   static RacHandle? _handle;
+  static String? _modelId;
 
-  /// Whether the bridge currently holds a created component handle.
+  /// Whether the bridge currently holds a diffusion service handle.
   static bool get hasHandle => _handle != null;
 
-  /// True when a diffusion model is currently loaded.
-  static bool isLoaded() {
-    final h = _handle;
-    if (h == null) return false;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(RacHandle),
-        int Function(RacHandle)>('rac_diffusion_component_is_loaded');
-    return fn(h) == RAC_TRUE;
-  }
+  /// True when a diffusion model service is currently initialized.
+  static bool isLoaded() => _handle != null;
 
-  /// Lazily create the diffusion component handle. Returns the
-  /// resulting RAC code; 0 on success.
-  static int ensureHandle() {
-    if (_handle != null) return RAC_SUCCESS;
-    final lib = PlatformLoader.loadCommons();
-    final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
-        int Function(Pointer<RacHandle>)>('rac_diffusion_component_create');
-    final outPtr = calloc<RacHandle>();
-    try {
-      final rc = create(outPtr);
-      if (rc != RAC_SUCCESS) return rc;
-      _handle = outPtr.value;
-      return RAC_SUCCESS;
-    } finally {
-      calloc.free(outPtr);
+  static String? get currentModelId => _modelId;
+
+  /// Load and initialize a diffusion service for [modelId].
+  static void loadModel(
+    String modelId,
+    String modelPath, {
+    ffi.Pointer<ffi.Void>? config,
+  }) {
+    unload();
+
+    final create = config == null
+        ? RacNative.bindings.rac_diffusion_create
+        : RacNative.bindings.rac_diffusion_create_with_config;
+    final initialize = RacNative.bindings.rac_diffusion_initialize;
+    if (create == null || initialize == null) {
+      throw UnsupportedError('Diffusion service proto ABI is unavailable');
     }
-  }
 
-  /// Load a diffusion model by ID.
-  static int loadModel(String modelId) {
-    final h = _handle;
-    if (h == null) return RacResultCode.errorInvalidParameter;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(RacHandle, Pointer<Utf8>),
-        int Function(RacHandle, Pointer<Utf8>)>(
-      'rac_diffusion_component_load_model',
-    );
-    final idPtr = modelId.toNativeUtf8();
+    final modelIdPtr = modelId.toNativeUtf8();
+    final modelPathPtr = modelPath.toNativeUtf8();
+    final out = calloc<RacHandle>();
+
     try {
-      return fn(h, idPtr);
-    } finally {
-      calloc.free(idPtr);
-    }
-  }
-
-  /// Unload the currently-loaded diffusion model.
-  static int unload() {
-    final h = _handle;
-    if (h == null) return RAC_SUCCESS;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(RacHandle),
-        int Function(RacHandle)>('rac_diffusion_component_unload');
-    return fn(h);
-  }
-
-  /// Generate an image. Returns proto-encoded `DiffusionResult` bytes.
-  static DiffusionFfiResult generate(
-    String prompt,
-    Uint8List optionsBytes,
-  ) {
-    final h = _handle;
-    if (h == null) {
-      return DiffusionFfiResult(resultCode: RacResultCode.errorInvalidParameter);
-    }
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(
-          RacHandle,
-          Pointer<Utf8>,
-          Pointer<Uint8>,
-          IntPtr,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        ),
-        int Function(
-          RacHandle,
-          Pointer<Utf8>,
-          Pointer<Uint8>,
-          int,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        )>('rac_diffusion_component_generate');
-
-    final promptPtr = prompt.toNativeUtf8();
-    final optsPtr = optionsBytes.isEmpty
-        ? nullptr
-        : (calloc<Uint8>(optionsBytes.length)
-          ..asTypedList(optionsBytes.length).setAll(0, optionsBytes));
-    final outBytesPtr = calloc<Pointer<Uint8>>();
-    final outLenPtr = calloc<IntPtr>();
-    try {
-      final rc = fn(
-        h,
-        promptPtr,
-        optsPtr,
-        optionsBytes.length,
-        outBytesPtr,
-        outLenPtr,
-      );
+      final rc = config == null
+          ? RacNative.bindings.rac_diffusion_create!(modelIdPtr, out)
+          : RacNative.bindings.rac_diffusion_create_with_config!(
+              modelIdPtr,
+              config,
+              out,
+            );
       if (rc != RAC_SUCCESS) {
-        return DiffusionFfiResult(resultCode: rc);
+        throw StateError(
+          'rac_diffusion_create failed: ${RacResultCode.getMessage(rc)}',
+        );
       }
-      final len = outLenPtr.value;
-      final bytes = Uint8List.fromList(outBytesPtr.value.asTypedList(len));
-      return DiffusionFfiResult(payload: bytes, resultCode: rc);
+
+      final initRc = initialize(out.value, modelPathPtr, config ?? ffi.nullptr);
+      if (initRc != RAC_SUCCESS) {
+        RacNative.bindings.rac_diffusion_destroy?.call(out.value);
+        throw StateError(
+          'rac_diffusion_initialize failed: '
+          '${RacResultCode.getMessage(initRc)}',
+        );
+      }
+
+      _handle = out.value;
+      _modelId = modelId;
     } finally {
-      calloc.free(promptPtr);
-      if (optsPtr != nullptr) calloc.free(optsPtr);
-      calloc.free(outBytesPtr);
-      calloc.free(outLenPtr);
+      calloc.free(modelIdPtr);
+      calloc.free(modelPathPtr);
+      calloc.free(out);
     }
+  }
+
+  /// Destroy the active diffusion service.
+  static int unload() {
+    final handle = _handle;
+    if (handle == null) return RAC_SUCCESS;
+    RacNative.bindings.rac_diffusion_destroy?.call(handle);
+    _handle = null;
+    _modelId = null;
+    return RAC_SUCCESS;
+  }
+
+  /// Generate an image from canonical proto options.
+  static DiffusionResult generateProto(DiffusionGenerationOptions options) {
+    final handle = _requireHandle();
+    final fn = RacNative.bindings.rac_diffusion_generate_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_diffusion_generate_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callRequestWithHandle<DiffusionResult>(
+      handle: handle,
+      request: options,
+      invoke: fn,
+      decode: DiffusionResult.fromBuffer,
+      symbol: 'rac_diffusion_generate_proto',
+    );
+  }
+
+  /// Generate with native progress callbacks.
+  static Stream<DiffusionProgress> generateWithProgressProto(
+    DiffusionGenerationOptions options,
+  ) {
+    final handle = _requireHandle();
+    final fn = RacNative.bindings.rac_diffusion_generate_with_progress_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_diffusion_generate_with_progress_proto is unavailable',
+      );
+    }
+
+    final controller = StreamController<DiffusionProgress>();
+    ffi.NativeCallable<RacDiffusionProgressProtoCallbackNative>? callback;
+
+    unawaited(Future<void>(() {
+      final requestBytes = options.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+      final out = calloc<RacProtoBuffer>();
+      final bindings = RacNative.bindings;
+
+      try {
+        bindings.rac_proto_buffer_init(out);
+        callback = ffi.NativeCallable<
+            RacDiffusionProgressProtoCallbackNative>.isolateLocal(
+          (
+            ffi.Pointer<ffi.Uint8> data,
+            int size,
+            ffi.Pointer<ffi.Void> userData,
+          ) {
+            try {
+              if (!controller.isClosed) {
+                controller.add(
+                  DiffusionProgress.fromBuffer(data.asTypedList(size)),
+                );
+              }
+              return RAC_TRUE;
+            } catch (e, st) {
+              if (!controller.isClosed) {
+                controller.addError(e, st);
+              }
+              return RAC_FALSE;
+            }
+          },
+          exceptionalReturn: RAC_FALSE,
+        );
+
+        final code = fn(
+          handle,
+          requestPtr,
+          requestBytes.length,
+          callback!.nativeFunction,
+          ffi.nullptr,
+          out,
+        );
+        DartBridgeProtoUtils.ensureSuccess(
+          out,
+          code,
+          'rac_diffusion_generate_with_progress_proto',
+        );
+        final result =
+            DartBridgeProtoUtils.decodeBuffer(out, DiffusionResult.fromBuffer);
+        if (!controller.isClosed) {
+          controller.add(
+            DiffusionProgress(
+              progressPercent: 1.0,
+              stage: 'completed',
+              intermediateImageData: result.imageData,
+              intermediateImageWidth: result.width,
+              intermediateImageHeight: result.height,
+            ),
+          );
+        }
+      } catch (e, st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+        }
+      } finally {
+        bindings.rac_proto_buffer_free(out);
+        calloc.free(requestPtr);
+        calloc.free(out);
+        callback?.close();
+        callback = null;
+        if (!controller.isClosed) {
+          unawaited(controller.close());
+        }
+      }
+    }));
+
+    controller.onCancel = () {
+      cancel();
+      callback?.close();
+      callback = null;
+    };
+    return controller.stream;
   }
 
   /// Cancel any in-flight generation.
   static int cancel() {
-    final h = _handle;
-    if (h == null) return RAC_SUCCESS;
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(RacHandle),
-        int Function(RacHandle)>('rac_diffusion_component_cancel');
-    return fn(h);
+    final handle = _handle;
+    if (handle == null) return RAC_SUCCESS;
+    final fn = RacNative.bindings.rac_diffusion_cancel_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_diffusion_cancel_proto is unavailable');
+    }
+    return fn(handle);
   }
 
-  /// Backend capability discovery. Returns proto-encoded bytes.
-  static DiffusionFfiResult capabilities() {
-    final h = _handle;
-    if (h == null) {
-      return DiffusionFfiResult(resultCode: RacResultCode.errorInvalidParameter);
+  /// Adapter for the service capability bitmask. There is no capability
+  /// proto C ABI yet, so this keeps the public return type generated.
+  static DiffusionCapabilities capabilitiesProto() {
+    final handle = _requireHandle();
+    final fn = RacNative.bindings.rac_diffusion_get_capabilities;
+    if (fn == null) {
+      throw UnsupportedError('rac_diffusion_get_capabilities is unavailable');
     }
-    final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(
-          RacHandle,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        ),
-        int Function(
-          RacHandle,
-          Pointer<Pointer<Uint8>>,
-          Pointer<IntPtr>,
-        )>('rac_diffusion_component_get_capabilities');
+    final caps = fn(handle);
+    return DiffusionCapabilities(
+      supportedModes: [
+        if ((caps & _capTextToImage) != 0)
+          DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
+        if ((caps & _capImageToImage) != 0)
+          DiffusionMode.DIFFUSION_MODE_IMAGE_TO_IMAGE,
+        if ((caps & _capInpainting) != 0)
+          DiffusionMode.DIFFUSION_MODE_INPAINTING,
+      ],
+      supportsIntermediateImages: (caps & _capIntermediateImages) != 0,
+      supportsSafetyChecker: (caps & _capSafetyChecker) != 0,
+      isReady: true,
+      currentModel: _modelId ?? '',
+    );
+  }
 
-    final outBytesPtr = calloc<Pointer<Uint8>>();
-    final outLenPtr = calloc<IntPtr>();
-    try {
-      final rc = fn(h, outBytesPtr, outLenPtr);
-      if (rc != RAC_SUCCESS) {
-        return DiffusionFfiResult(resultCode: rc);
-      }
-      final len = outLenPtr.value;
-      final bytes = Uint8List.fromList(outBytesPtr.value.asTypedList(len));
-      return DiffusionFfiResult(payload: bytes, resultCode: rc);
-    } finally {
-      calloc.free(outBytesPtr);
-      calloc.free(outLenPtr);
+  static RacHandle _requireHandle() {
+    final handle = _handle;
+    if (handle == null) {
+      throw StateError('No diffusion model loaded. Call load() first.');
     }
+    return handle;
   }
 }

@@ -174,6 +174,18 @@ public class LLMGenerationOptions(
     schemaIndex = 12,
   )
   public val structured_output: StructuredOutputOptions? = null,
+  /**
+   * Enable per-token/cost dashboard tracking for SDKs that surface live
+   * generation telemetry. No-op for backends without a telemetry sink.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "enableRealTimeTracking",
+    schemaIndex = 13,
+  )
+  public val enable_real_time_tracking: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -213,6 +225,7 @@ public class LLMGenerationOptions(
     if (thinking_pattern != other.thinking_pattern) return false
     if (execution_target != other.execution_target) return false
     if (structured_output != other.structured_output) return false
+    if (enable_real_time_tracking != other.enable_real_time_tracking) return false
     return true
   }
 
@@ -233,6 +246,7 @@ public class LLMGenerationOptions(
       result = result * 37 + (thinking_pattern?.hashCode() ?: 0)
       result = result * 37 + (execution_target?.hashCode() ?: 0)
       result = result * 37 + (structured_output?.hashCode() ?: 0)
+      result = result * 37 + enable_real_time_tracking.hashCode()
       super.hashCode = result
     }
     return result
@@ -253,6 +267,7 @@ public class LLMGenerationOptions(
     if (thinking_pattern != null) result += """thinking_pattern=$thinking_pattern"""
     if (execution_target != null) result += """execution_target=$execution_target"""
     if (structured_output != null) result += """structured_output=$structured_output"""
+    result += """enable_real_time_tracking=$enable_real_time_tracking"""
     return result.joinToString(prefix = "LLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
@@ -270,10 +285,12 @@ public class LLMGenerationOptions(
     thinking_pattern: ThinkingTagPattern? = this.thinking_pattern,
     execution_target: ExecutionTarget? = this.execution_target,
     structured_output: StructuredOutputOptions? = this.structured_output,
+    enable_real_time_tracking: Boolean = this.enable_real_time_tracking,
     unknownFields: ByteString = this.unknownFields,
   ): LLMGenerationOptions = LLMGenerationOptions(max_tokens, temperature, top_p, top_k,
       repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, system_prompt,
-      json_schema, thinking_pattern, execution_target, structured_output, unknownFields)
+      json_schema, thinking_pattern, execution_target, structured_output, enable_real_time_tracking,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -306,6 +323,8 @@ public class LLMGenerationOptions(
         size += ThinkingTagPattern.ADAPTER.encodedSizeWithTag(11, value.thinking_pattern)
         size += ExecutionTarget.ADAPTER.encodedSizeWithTag(12, value.execution_target)
         size += StructuredOutputOptions.ADAPTER.encodedSizeWithTag(13, value.structured_output)
+        if (value.enable_real_time_tracking != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(14, value.enable_real_time_tracking)
         return size
       }
 
@@ -327,11 +346,15 @@ public class LLMGenerationOptions(
         ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 11, value.thinking_pattern)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 12, value.execution_target)
         StructuredOutputOptions.ADAPTER.encodeWithTag(writer, 13, value.structured_output)
+        if (value.enable_real_time_tracking != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
+            value.enable_real_time_tracking)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.enable_real_time_tracking != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
+            value.enable_real_time_tracking)
         StructuredOutputOptions.ADAPTER.encodeWithTag(writer, 13, value.structured_output)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 12, value.execution_target)
         ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 11, value.thinking_pattern)
@@ -366,6 +389,7 @@ public class LLMGenerationOptions(
         var thinking_pattern: ThinkingTagPattern? = null
         var execution_target: ExecutionTarget? = null
         var structured_output: StructuredOutputOptions? = null
+        var enable_real_time_tracking: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> max_tokens = ProtoAdapter.INT32.decode(reader)
@@ -389,6 +413,7 @@ public class LLMGenerationOptions(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             13 -> structured_output = StructuredOutputOptions.ADAPTER.decode(reader)
+            14 -> enable_real_time_tracking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -406,6 +431,7 @@ public class LLMGenerationOptions(
           thinking_pattern = thinking_pattern,
           execution_target = execution_target,
           structured_output = structured_output,
+          enable_real_time_tracking = enable_real_time_tracking,
           unknownFields = unknownFields
         )
       }

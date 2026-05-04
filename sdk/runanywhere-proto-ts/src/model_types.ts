@@ -799,6 +799,266 @@ export function modelArtifactTypeToJSON(object: ModelArtifactType): string {
 
 /**
  * ---------------------------------------------------------------------------
+ * Model registry lifecycle state. This is durable/catalog state, not a live
+ * transfer progress stream. Per-download byte counters and transient progress
+ * events stay in download_service.proto.
+ * Sources pre-IDL:
+ *   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
+ *   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
+ * ---------------------------------------------------------------------------
+ */
+export enum ModelRegistryStatus {
+  MODEL_REGISTRY_STATUS_UNSPECIFIED = 0,
+  MODEL_REGISTRY_STATUS_REGISTERED = 1,
+  MODEL_REGISTRY_STATUS_DOWNLOADING = 2,
+  MODEL_REGISTRY_STATUS_DOWNLOADED = 3,
+  MODEL_REGISTRY_STATUS_LOADING = 4,
+  MODEL_REGISTRY_STATUS_LOADED = 5,
+  MODEL_REGISTRY_STATUS_ERROR = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function modelRegistryStatusFromJSON(object: any): ModelRegistryStatus {
+  switch (object) {
+    case 0:
+    case "MODEL_REGISTRY_STATUS_UNSPECIFIED":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED;
+    case 1:
+    case "MODEL_REGISTRY_STATUS_REGISTERED":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED;
+    case 2:
+    case "MODEL_REGISTRY_STATUS_DOWNLOADING":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADING;
+    case 3:
+    case "MODEL_REGISTRY_STATUS_DOWNLOADED":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED;
+    case 4:
+    case "MODEL_REGISTRY_STATUS_LOADING":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADING;
+    case 5:
+    case "MODEL_REGISTRY_STATUS_LOADED":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+    case 6:
+    case "MODEL_REGISTRY_STATUS_ERROR":
+      return ModelRegistryStatus.MODEL_REGISTRY_STATUS_ERROR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ModelRegistryStatus.UNRECOGNIZED;
+  }
+}
+
+export function modelRegistryStatusToJSON(object: ModelRegistryStatus): string {
+  switch (object) {
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED:
+      return "MODEL_REGISTRY_STATUS_UNSPECIFIED";
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED:
+      return "MODEL_REGISTRY_STATUS_REGISTERED";
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADING:
+      return "MODEL_REGISTRY_STATUS_DOWNLOADING";
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED:
+      return "MODEL_REGISTRY_STATUS_DOWNLOADED";
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADING:
+      return "MODEL_REGISTRY_STATUS_LOADING";
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED:
+      return "MODEL_REGISTRY_STATUS_LOADED";
+    case ModelRegistryStatus.MODEL_REGISTRY_STATUS_ERROR:
+      return "MODEL_REGISTRY_STATUS_ERROR";
+    case ModelRegistryStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ModelQuerySortField {
+  MODEL_QUERY_SORT_FIELD_UNSPECIFIED = 0,
+  MODEL_QUERY_SORT_FIELD_NAME = 1,
+  MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS = 2,
+  MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS = 3,
+  MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4,
+  MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5,
+  MODEL_QUERY_SORT_FIELD_USAGE_COUNT = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function modelQuerySortFieldFromJSON(object: any): ModelQuerySortField {
+  switch (object) {
+    case 0:
+    case "MODEL_QUERY_SORT_FIELD_UNSPECIFIED":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED;
+    case 1:
+    case "MODEL_QUERY_SORT_FIELD_NAME":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_NAME;
+    case 2:
+    case "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS;
+    case 3:
+    case "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS;
+    case 4:
+    case "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES;
+    case 5:
+    case "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS;
+    case 6:
+    case "MODEL_QUERY_SORT_FIELD_USAGE_COUNT":
+      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_USAGE_COUNT;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ModelQuerySortField.UNRECOGNIZED;
+  }
+}
+
+export function modelQuerySortFieldToJSON(object: ModelQuerySortField): string {
+  switch (object) {
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED:
+      return "MODEL_QUERY_SORT_FIELD_UNSPECIFIED";
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_NAME:
+      return "MODEL_QUERY_SORT_FIELD_NAME";
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS:
+      return "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS";
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS:
+      return "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS";
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES:
+      return "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES";
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS:
+      return "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS";
+    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_USAGE_COUNT:
+      return "MODEL_QUERY_SORT_FIELD_USAGE_COUNT";
+    case ModelQuerySortField.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ModelQuerySortOrder {
+  MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0,
+  MODEL_QUERY_SORT_ORDER_ASCENDING = 1,
+  MODEL_QUERY_SORT_ORDER_DESCENDING = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function modelQuerySortOrderFromJSON(object: any): ModelQuerySortOrder {
+  switch (object) {
+    case 0:
+    case "MODEL_QUERY_SORT_ORDER_UNSPECIFIED":
+      return ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_UNSPECIFIED;
+    case 1:
+    case "MODEL_QUERY_SORT_ORDER_ASCENDING":
+      return ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_ASCENDING;
+    case 2:
+    case "MODEL_QUERY_SORT_ORDER_DESCENDING":
+      return ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_DESCENDING;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ModelQuerySortOrder.UNRECOGNIZED;
+  }
+}
+
+export function modelQuerySortOrderToJSON(object: ModelQuerySortOrder): string {
+  switch (object) {
+    case ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_UNSPECIFIED:
+      return "MODEL_QUERY_SORT_ORDER_UNSPECIFIED";
+    case ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_ASCENDING:
+      return "MODEL_QUERY_SORT_ORDER_ASCENDING";
+    case ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_DESCENDING:
+      return "MODEL_QUERY_SORT_ORDER_DESCENDING";
+    case ModelQuerySortOrder.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * Role of a file inside a single/multi-file artifact. The generic COMPANION
+ * role covers arbitrary sidecars; specific roles document common public
+ * catalog files such as VLM mmproj files and tokenizer/config assets.
+ */
+export enum ModelFileRole {
+  MODEL_FILE_ROLE_UNSPECIFIED = 0,
+  MODEL_FILE_ROLE_PRIMARY_MODEL = 1,
+  MODEL_FILE_ROLE_COMPANION = 2,
+  /** MODEL_FILE_ROLE_VISION_PROJECTOR - llama.cpp VLM mmproj*.gguf */
+  MODEL_FILE_ROLE_VISION_PROJECTOR = 3,
+  /** MODEL_FILE_ROLE_TOKENIZER - tokenizer model/data files */
+  MODEL_FILE_ROLE_TOKENIZER = 4,
+  /** MODEL_FILE_ROLE_CONFIG - config.json or framework config */
+  MODEL_FILE_ROLE_CONFIG = 5,
+  /** MODEL_FILE_ROLE_VOCABULARY - vocab.txt / vocab.json */
+  MODEL_FILE_ROLE_VOCABULARY = 6,
+  /** MODEL_FILE_ROLE_MERGES - merges.txt */
+  MODEL_FILE_ROLE_MERGES = 7,
+  MODEL_FILE_ROLE_LABELS = 8,
+  UNRECOGNIZED = -1,
+}
+
+export function modelFileRoleFromJSON(object: any): ModelFileRole {
+  switch (object) {
+    case 0:
+    case "MODEL_FILE_ROLE_UNSPECIFIED":
+      return ModelFileRole.MODEL_FILE_ROLE_UNSPECIFIED;
+    case 1:
+    case "MODEL_FILE_ROLE_PRIMARY_MODEL":
+      return ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL;
+    case 2:
+    case "MODEL_FILE_ROLE_COMPANION":
+      return ModelFileRole.MODEL_FILE_ROLE_COMPANION;
+    case 3:
+    case "MODEL_FILE_ROLE_VISION_PROJECTOR":
+      return ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR;
+    case 4:
+    case "MODEL_FILE_ROLE_TOKENIZER":
+      return ModelFileRole.MODEL_FILE_ROLE_TOKENIZER;
+    case 5:
+    case "MODEL_FILE_ROLE_CONFIG":
+      return ModelFileRole.MODEL_FILE_ROLE_CONFIG;
+    case 6:
+    case "MODEL_FILE_ROLE_VOCABULARY":
+      return ModelFileRole.MODEL_FILE_ROLE_VOCABULARY;
+    case 7:
+    case "MODEL_FILE_ROLE_MERGES":
+      return ModelFileRole.MODEL_FILE_ROLE_MERGES;
+    case 8:
+    case "MODEL_FILE_ROLE_LABELS":
+      return ModelFileRole.MODEL_FILE_ROLE_LABELS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ModelFileRole.UNRECOGNIZED;
+  }
+}
+
+export function modelFileRoleToJSON(object: ModelFileRole): string {
+  switch (object) {
+    case ModelFileRole.MODEL_FILE_ROLE_UNSPECIFIED:
+      return "MODEL_FILE_ROLE_UNSPECIFIED";
+    case ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL:
+      return "MODEL_FILE_ROLE_PRIMARY_MODEL";
+    case ModelFileRole.MODEL_FILE_ROLE_COMPANION:
+      return "MODEL_FILE_ROLE_COMPANION";
+    case ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR:
+      return "MODEL_FILE_ROLE_VISION_PROJECTOR";
+    case ModelFileRole.MODEL_FILE_ROLE_TOKENIZER:
+      return "MODEL_FILE_ROLE_TOKENIZER";
+    case ModelFileRole.MODEL_FILE_ROLE_CONFIG:
+      return "MODEL_FILE_ROLE_CONFIG";
+    case ModelFileRole.MODEL_FILE_ROLE_VOCABULARY:
+      return "MODEL_FILE_ROLE_VOCABULARY";
+    case ModelFileRole.MODEL_FILE_ROLE_MERGES:
+      return "MODEL_FILE_ROLE_MERGES";
+    case ModelFileRole.MODEL_FILE_ROLE_LABELS:
+      return "MODEL_FILE_ROLE_LABELS";
+    case ModelFileRole.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * Hardware acceleration preference for inference. Sources pre-IDL:
  *   Web    enums.ts:165   (Auto / WebGPU / CPU)
  *   Swift  extensions     (CPU / GPU / NPU / Metal)
@@ -944,6 +1204,29 @@ export function routingPolicyToJSON(object: RoutingPolicy): string {
 }
 
 /**
+ * Model-level thinking tag metadata. This intentionally uses a model-specific
+ * message name because llm_options.proto already owns the generation-options
+ * ThinkingTagPattern message in this proto package.
+ */
+export interface ModelThinkingTagPattern {
+  openTag: string;
+  closeTag: string;
+}
+
+export interface ModelInfoMetadata {
+  description: string;
+  author: string;
+  license: string;
+  tags: string[];
+  version: string;
+}
+
+export interface ModelRuntimeCompatibility {
+  compatibleFrameworks: InferenceFramework[];
+  compatibleFormats: ModelFormat[];
+}
+
+/**
  * ---------------------------------------------------------------------------
  * Core metadata for a model entry.
  * Sources pre-IDL:
@@ -969,6 +1252,33 @@ export interface ModelInfo {
   source: ModelSource;
   createdAtUnixMs: number;
   updatedAtUnixMs: number;
+  /**
+   * Separate from download_size_bytes: this is the estimated runtime RAM
+   * requirement used by compatibility checks and model selection UIs.
+   */
+  memoryRequiredBytes?:
+    | number
+    | undefined;
+  /**
+   * Lowercase hex SHA-256 checksum for the primary artifact. Per-file
+   * checksums for multi-file artifacts live on ModelFileDescriptor.
+   */
+  checksumSha256?:
+    | string
+    | undefined;
+  /**
+   * Thinking/reasoning metadata. `supports_thinking` remains the boolean
+   * capability flag; this optional pattern declares model-specific tags.
+   */
+  thinkingPattern?:
+    | ModelThinkingTagPattern
+    | undefined;
+  /**
+   * Structured public catalog metadata. `description` (field 12) is kept for
+   * backward compatibility and should mirror metadata.description when both
+   * are populated.
+   */
+  metadata?: ModelInfoMetadata | undefined;
   singleFile?: SingleFileArtifact | undefined;
   archive?: ArchiveArtifact | undefined;
   multiFile?: MultiFileArtifact | undefined;
@@ -993,7 +1303,36 @@ export interface ModelInfo {
     | AccelerationPreference
     | undefined;
   /** Hybrid (on-device vs cloud) routing policy for this entry. */
-  routingPolicy?: RoutingPolicy | undefined;
+  routingPolicy?:
+    | RoutingPolicy
+    | undefined;
+  /**
+   * Framework/format compatibility declarations. `framework` (field 5) is
+   * the canonical/preferred runtime when no explicit preferred_framework is set.
+   */
+  compatibility?: ModelRuntimeCompatibility | undefined;
+  preferredFramework?:
+    | InferenceFramework
+    | undefined;
+  /**
+   * Durable registry state. Live byte progress belongs to
+   * download_service.DownloadProgress, not ModelInfo.
+   */
+  registryStatus?: ModelRegistryStatus | undefined;
+  isDownloaded?: boolean | undefined;
+  isAvailable?: boolean | undefined;
+  lastUsedAtUnixMs?: number | undefined;
+  usageCount?: number | undefined;
+  syncPending?: boolean | undefined;
+  statusMessage?: string | undefined;
+}
+
+/**
+ * Repeated model registry responses use this wrapper because protobuf cannot
+ * serialize a bare repeated field as a top-level message.
+ */
+export interface ModelInfoList {
+  models: ModelInfo[];
 }
 
 export interface SingleFileArtifact {
@@ -1019,7 +1358,18 @@ export interface ModelFileDescriptor {
    * newer SDK sources maps onto it (default true, mirrored in Swift).
    */
   sizeBytes?: number | undefined;
-  checksum?: string | undefined;
+  checksum?:
+    | string
+    | undefined;
+  /**
+   * Path fields used by SDK-local wrappers/catalogs. `filename` is the
+   * storage name for simple cases; relative_path/destination_path preserve
+   * directory layouts for archive and multi-file artifacts.
+   */
+  relativePath?: string | undefined;
+  destinationPath?: string | undefined;
+  role?: ModelFileRole | undefined;
+  localPath?: string | undefined;
 }
 
 export interface MultiFileArtifact {
@@ -1038,7 +1388,493 @@ export interface MultiFileArtifact {
 export interface ExpectedModelFiles {
   files: ModelFileDescriptor[];
   rootDirectory?: string | undefined;
+  requiredPatterns: string[];
+  optionalPatterns: string[];
+  description?: string | undefined;
 }
+
+/**
+ * Registry/query filters shared by SDK model-management APIs. UI-only
+ * presentation state and platform filesystem handles are intentionally not
+ * represented here.
+ */
+export interface ModelQuery {
+  framework?: InferenceFramework | undefined;
+  category?: ModelCategory | undefined;
+  format?: ModelFormat | undefined;
+  downloadedOnly?: boolean | undefined;
+  availableOnly?: boolean | undefined;
+  maxSizeBytes?: number | undefined;
+  searchQuery: string;
+  source?: ModelSource | undefined;
+  sortField?: ModelQuerySortField | undefined;
+  sortOrder?: ModelQuerySortOrder | undefined;
+}
+
+export interface ModelCompatibilityResult {
+  isCompatible: boolean;
+  canRun: boolean;
+  canFit: boolean;
+  requiredMemoryBytes: number;
+  availableMemoryBytes: number;
+  requiredStorageBytes: number;
+  availableStorageBytes: number;
+  reasons: string[];
+}
+
+export interface ModelRegistryRefreshRequest {
+  /** Fetch or merge a remote catalog through the platform/network adapter. */
+  includeRemoteCatalog: boolean;
+  /** Scan managed model directories and link valid on-disk artifacts. */
+  rescanLocal: boolean;
+  /** Clear downloaded/available state for registry rows whose files vanished. */
+  pruneOrphans: boolean;
+  /** Optional post-refresh filter for the returned model list. */
+  query?: ModelQuery | undefined;
+}
+
+export interface ModelRegistryRefreshResult {
+  success: boolean;
+  models?: ModelInfoList | undefined;
+  registeredCount: number;
+  updatedCount: number;
+  discoveredCount: number;
+  prunedCount: number;
+  refreshedAtUnixMs: number;
+  warnings: string[];
+  errorMessage: string;
+}
+
+export interface ModelListRequest {
+  /** Set query.downloaded_only for downloaded-only lists. */
+  query?: ModelQuery | undefined;
+}
+
+export interface ModelListResult {
+  success: boolean;
+  models?: ModelInfoList | undefined;
+  errorMessage: string;
+}
+
+export interface ModelGetRequest {
+  modelId: string;
+}
+
+export interface ModelGetResult {
+  found: boolean;
+  model?: ModelInfo | undefined;
+  errorMessage: string;
+}
+
+export interface ModelImportRequest {
+  /**
+   * Catalog metadata to register or merge. If absent, discovery may infer a
+   * minimal ModelInfo from the file name and detected format.
+   */
+  model?:
+    | ModelInfo
+    | undefined;
+  /**
+   * Normalized path under platform control. Do not place transient OS file
+   * picker handles in this field; adapters should first copy/link/authorize
+   * them and provide a stable path visible to the C++ workflow.
+   */
+  sourcePath: string;
+  copyIntoManagedStorage: boolean;
+  overwriteExisting: boolean;
+  files: ModelFileDescriptor[];
+}
+
+export interface ModelImportResult {
+  success: boolean;
+  model?: ModelInfo | undefined;
+  localPath: string;
+  importedBytes: number;
+  warnings: string[];
+  errorMessage: string;
+}
+
+export interface ModelDiscoveryRequest {
+  /**
+   * Platform adapters own permission and sandbox traversal. These are stable
+   * roots that C++ may inspect using registered filesystem callbacks.
+   */
+  searchRoots: string[];
+  recursive: boolean;
+  linkDownloaded: boolean;
+  purgeInvalid: boolean;
+  query?: ModelQuery | undefined;
+}
+
+export interface DiscoveredModel {
+  modelId: string;
+  localPath: string;
+  matchedRegistry: boolean;
+  model?: ModelInfo | undefined;
+  sizeBytes: number;
+  warnings: string[];
+}
+
+export interface ModelDiscoveryResult {
+  success: boolean;
+  discoveredModels: DiscoveredModel[];
+  linkedCount: number;
+  purgedCount: number;
+  warnings: string[];
+  errorMessage: string;
+}
+
+export interface ModelLoadRequest {
+  modelId: string;
+  category?: ModelCategory | undefined;
+  framework?: InferenceFramework | undefined;
+  forceReload: boolean;
+}
+
+export interface ModelLoadResult {
+  success: boolean;
+  modelId: string;
+  category: ModelCategory;
+  framework: InferenceFramework;
+  resolvedPath: string;
+  loadedAtUnixMs: number;
+  errorMessage: string;
+}
+
+export interface ModelUnloadRequest {
+  modelId: string;
+  category?: ModelCategory | undefined;
+  unloadAll: boolean;
+}
+
+export interface ModelUnloadResult {
+  success: boolean;
+  unloadedModelIds: string[];
+  errorMessage: string;
+}
+
+export interface CurrentModelRequest {
+  category?: ModelCategory | undefined;
+  framework?: InferenceFramework | undefined;
+}
+
+export interface CurrentModelResult {
+  modelId: string;
+  model?: ModelInfo | undefined;
+  loadedAtUnixMs: number;
+}
+
+export interface ModelDeleteRequest {
+  modelId: string;
+  deleteFiles: boolean;
+  unregister: boolean;
+  unloadIfLoaded: boolean;
+}
+
+export interface ModelDeleteResult {
+  success: boolean;
+  modelId: string;
+  deletedBytes: number;
+  filesDeleted: boolean;
+  registryUpdated: boolean;
+  wasLoaded: boolean;
+  errorMessage: string;
+}
+
+function createBaseModelThinkingTagPattern(): ModelThinkingTagPattern {
+  return { openTag: "", closeTag: "" };
+}
+
+export const ModelThinkingTagPattern = {
+  encode(message: ModelThinkingTagPattern, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.openTag !== "") {
+      writer.uint32(10).string(message.openTag);
+    }
+    if (message.closeTag !== "") {
+      writer.uint32(18).string(message.closeTag);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelThinkingTagPattern {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelThinkingTagPattern();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.openTag = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.closeTag = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelThinkingTagPattern {
+    return {
+      openTag: isSet(object.openTag) ? globalThis.String(object.openTag) : "",
+      closeTag: isSet(object.closeTag) ? globalThis.String(object.closeTag) : "",
+    };
+  },
+
+  toJSON(message: ModelThinkingTagPattern): unknown {
+    const obj: any = {};
+    if (message.openTag !== "") {
+      obj.openTag = message.openTag;
+    }
+    if (message.closeTag !== "") {
+      obj.closeTag = message.closeTag;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(base?: I): ModelThinkingTagPattern {
+    return ModelThinkingTagPattern.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(object: I): ModelThinkingTagPattern {
+    const message = createBaseModelThinkingTagPattern();
+    message.openTag = object.openTag ?? "";
+    message.closeTag = object.closeTag ?? "";
+    return message;
+  },
+};
+
+function createBaseModelInfoMetadata(): ModelInfoMetadata {
+  return { description: "", author: "", license: "", tags: [], version: "" };
+}
+
+export const ModelInfoMetadata = {
+  encode(message: ModelInfoMetadata, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.description !== "") {
+      writer.uint32(10).string(message.description);
+    }
+    if (message.author !== "") {
+      writer.uint32(18).string(message.author);
+    }
+    if (message.license !== "") {
+      writer.uint32(26).string(message.license);
+    }
+    for (const v of message.tags) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.version !== "") {
+      writer.uint32(42).string(message.version);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMetadata {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelInfoMetadata();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.author = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.license = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tags.push(reader.string());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.version = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelInfoMetadata {
+    return {
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      author: isSet(object.author) ? globalThis.String(object.author) : "",
+      license: isSet(object.license) ? globalThis.String(object.license) : "",
+      tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e: any) => globalThis.String(e)) : [],
+      version: isSet(object.version) ? globalThis.String(object.version) : "",
+    };
+  },
+
+  toJSON(message: ModelInfoMetadata): unknown {
+    const obj: any = {};
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.author !== "") {
+      obj.author = message.author;
+    }
+    if (message.license !== "") {
+      obj.license = message.license;
+    }
+    if (message.tags?.length) {
+      obj.tags = message.tags;
+    }
+    if (message.version !== "") {
+      obj.version = message.version;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelInfoMetadata>, I>>(base?: I): ModelInfoMetadata {
+    return ModelInfoMetadata.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelInfoMetadata>, I>>(object: I): ModelInfoMetadata {
+    const message = createBaseModelInfoMetadata();
+    message.description = object.description ?? "";
+    message.author = object.author ?? "";
+    message.license = object.license ?? "";
+    message.tags = object.tags?.map((e) => e) || [];
+    message.version = object.version ?? "";
+    return message;
+  },
+};
+
+function createBaseModelRuntimeCompatibility(): ModelRuntimeCompatibility {
+  return { compatibleFrameworks: [], compatibleFormats: [] };
+}
+
+export const ModelRuntimeCompatibility = {
+  encode(message: ModelRuntimeCompatibility, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    writer.uint32(10).fork();
+    for (const v of message.compatibleFrameworks) {
+      writer.int32(v);
+    }
+    writer.ldelim();
+    writer.uint32(18).fork();
+    for (const v of message.compatibleFormats) {
+      writer.int32(v);
+    }
+    writer.ldelim();
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelRuntimeCompatibility {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelRuntimeCompatibility();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag === 8) {
+            message.compatibleFrameworks.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.compatibleFrameworks.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        case 2:
+          if (tag === 16) {
+            message.compatibleFormats.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 18) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.compatibleFormats.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelRuntimeCompatibility {
+    return {
+      compatibleFrameworks: globalThis.Array.isArray(object?.compatibleFrameworks)
+        ? object.compatibleFrameworks.map((e: any) => inferenceFrameworkFromJSON(e))
+        : [],
+      compatibleFormats: globalThis.Array.isArray(object?.compatibleFormats)
+        ? object.compatibleFormats.map((e: any) => modelFormatFromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ModelRuntimeCompatibility): unknown {
+    const obj: any = {};
+    if (message.compatibleFrameworks?.length) {
+      obj.compatibleFrameworks = message.compatibleFrameworks.map((e) => inferenceFrameworkToJSON(e));
+    }
+    if (message.compatibleFormats?.length) {
+      obj.compatibleFormats = message.compatibleFormats.map((e) => modelFormatToJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelRuntimeCompatibility>, I>>(base?: I): ModelRuntimeCompatibility {
+    return ModelRuntimeCompatibility.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelRuntimeCompatibility>, I>>(object: I): ModelRuntimeCompatibility {
+    const message = createBaseModelRuntimeCompatibility();
+    message.compatibleFrameworks = object.compatibleFrameworks?.map((e) => e) || [];
+    message.compatibleFormats = object.compatibleFormats?.map((e) => e) || [];
+    return message;
+  },
+};
 
 function createBaseModelInfo(): ModelInfo {
   return {
@@ -1057,6 +1893,10 @@ function createBaseModelInfo(): ModelInfo {
     source: 0,
     createdAtUnixMs: 0,
     updatedAtUnixMs: 0,
+    memoryRequiredBytes: undefined,
+    checksumSha256: undefined,
+    thinkingPattern: undefined,
+    metadata: undefined,
     singleFile: undefined,
     archive: undefined,
     multiFile: undefined,
@@ -1066,6 +1906,15 @@ function createBaseModelInfo(): ModelInfo {
     expectedFiles: undefined,
     accelerationPreference: undefined,
     routingPolicy: undefined,
+    compatibility: undefined,
+    preferredFramework: undefined,
+    registryStatus: undefined,
+    isDownloaded: undefined,
+    isAvailable: undefined,
+    lastUsedAtUnixMs: undefined,
+    usageCount: undefined,
+    syncPending: undefined,
+    statusMessage: undefined,
   };
 }
 
@@ -1116,6 +1965,18 @@ export const ModelInfo = {
     if (message.updatedAtUnixMs !== 0) {
       writer.uint32(120).int64(message.updatedAtUnixMs);
     }
+    if (message.memoryRequiredBytes !== undefined) {
+      writer.uint32(128).int64(message.memoryRequiredBytes);
+    }
+    if (message.checksumSha256 !== undefined) {
+      writer.uint32(138).string(message.checksumSha256);
+    }
+    if (message.thinkingPattern !== undefined) {
+      ModelThinkingTagPattern.encode(message.thinkingPattern, writer.uint32(146).fork()).ldelim();
+    }
+    if (message.metadata !== undefined) {
+      ModelInfoMetadata.encode(message.metadata, writer.uint32(154).fork()).ldelim();
+    }
     if (message.singleFile !== undefined) {
       SingleFileArtifact.encode(message.singleFile, writer.uint32(162).fork()).ldelim();
     }
@@ -1142,6 +2003,33 @@ export const ModelInfo = {
     }
     if (message.routingPolicy !== undefined) {
       writer.uint32(224).int32(message.routingPolicy);
+    }
+    if (message.compatibility !== undefined) {
+      ModelRuntimeCompatibility.encode(message.compatibility, writer.uint32(234).fork()).ldelim();
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(240).int32(message.preferredFramework);
+    }
+    if (message.registryStatus !== undefined) {
+      writer.uint32(248).int32(message.registryStatus);
+    }
+    if (message.isDownloaded !== undefined) {
+      writer.uint32(256).bool(message.isDownloaded);
+    }
+    if (message.isAvailable !== undefined) {
+      writer.uint32(264).bool(message.isAvailable);
+    }
+    if (message.lastUsedAtUnixMs !== undefined) {
+      writer.uint32(272).int64(message.lastUsedAtUnixMs);
+    }
+    if (message.usageCount !== undefined) {
+      writer.uint32(280).int32(message.usageCount);
+    }
+    if (message.syncPending !== undefined) {
+      writer.uint32(288).bool(message.syncPending);
+    }
+    if (message.statusMessage !== undefined) {
+      writer.uint32(298).string(message.statusMessage);
     }
     return writer;
   },
@@ -1258,6 +2146,34 @@ export const ModelInfo = {
 
           message.updatedAtUnixMs = longToNumber(reader.int64() as Long);
           continue;
+        case 16:
+          if (tag !== 128) {
+            break;
+          }
+
+          message.memoryRequiredBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 17:
+          if (tag !== 138) {
+            break;
+          }
+
+          message.checksumSha256 = reader.string();
+          continue;
+        case 18:
+          if (tag !== 146) {
+            break;
+          }
+
+          message.thinkingPattern = ModelThinkingTagPattern.decode(reader, reader.uint32());
+          continue;
+        case 19:
+          if (tag !== 154) {
+            break;
+          }
+
+          message.metadata = ModelInfoMetadata.decode(reader, reader.uint32());
+          continue;
         case 20:
           if (tag !== 162) {
             break;
@@ -1321,6 +2237,69 @@ export const ModelInfo = {
 
           message.routingPolicy = reader.int32() as any;
           continue;
+        case 29:
+          if (tag !== 234) {
+            break;
+          }
+
+          message.compatibility = ModelRuntimeCompatibility.decode(reader, reader.uint32());
+          continue;
+        case 30:
+          if (tag !== 240) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
+        case 31:
+          if (tag !== 248) {
+            break;
+          }
+
+          message.registryStatus = reader.int32() as any;
+          continue;
+        case 32:
+          if (tag !== 256) {
+            break;
+          }
+
+          message.isDownloaded = reader.bool();
+          continue;
+        case 33:
+          if (tag !== 264) {
+            break;
+          }
+
+          message.isAvailable = reader.bool();
+          continue;
+        case 34:
+          if (tag !== 272) {
+            break;
+          }
+
+          message.lastUsedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 35:
+          if (tag !== 280) {
+            break;
+          }
+
+          message.usageCount = reader.int32();
+          continue;
+        case 36:
+          if (tag !== 288) {
+            break;
+          }
+
+          message.syncPending = reader.bool();
+          continue;
+        case 37:
+          if (tag !== 298) {
+            break;
+          }
+
+          message.statusMessage = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1347,6 +2326,14 @@ export const ModelInfo = {
       source: isSet(object.source) ? modelSourceFromJSON(object.source) : 0,
       createdAtUnixMs: isSet(object.createdAtUnixMs) ? globalThis.Number(object.createdAtUnixMs) : 0,
       updatedAtUnixMs: isSet(object.updatedAtUnixMs) ? globalThis.Number(object.updatedAtUnixMs) : 0,
+      memoryRequiredBytes: isSet(object.memoryRequiredBytes)
+        ? globalThis.Number(object.memoryRequiredBytes)
+        : undefined,
+      checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : undefined,
+      thinkingPattern: isSet(object.thinkingPattern)
+        ? ModelThinkingTagPattern.fromJSON(object.thinkingPattern)
+        : undefined,
+      metadata: isSet(object.metadata) ? ModelInfoMetadata.fromJSON(object.metadata) : undefined,
       singleFile: isSet(object.singleFile) ? SingleFileArtifact.fromJSON(object.singleFile) : undefined,
       archive: isSet(object.archive) ? ArchiveArtifact.fromJSON(object.archive) : undefined,
       multiFile: isSet(object.multiFile) ? MultiFileArtifact.fromJSON(object.multiFile) : undefined,
@@ -1358,6 +2345,17 @@ export const ModelInfo = {
         ? accelerationPreferenceFromJSON(object.accelerationPreference)
         : undefined,
       routingPolicy: isSet(object.routingPolicy) ? routingPolicyFromJSON(object.routingPolicy) : undefined,
+      compatibility: isSet(object.compatibility) ? ModelRuntimeCompatibility.fromJSON(object.compatibility) : undefined,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
+      registryStatus: isSet(object.registryStatus) ? modelRegistryStatusFromJSON(object.registryStatus) : undefined,
+      isDownloaded: isSet(object.isDownloaded) ? globalThis.Boolean(object.isDownloaded) : undefined,
+      isAvailable: isSet(object.isAvailable) ? globalThis.Boolean(object.isAvailable) : undefined,
+      lastUsedAtUnixMs: isSet(object.lastUsedAtUnixMs) ? globalThis.Number(object.lastUsedAtUnixMs) : undefined,
+      usageCount: isSet(object.usageCount) ? globalThis.Number(object.usageCount) : undefined,
+      syncPending: isSet(object.syncPending) ? globalThis.Boolean(object.syncPending) : undefined,
+      statusMessage: isSet(object.statusMessage) ? globalThis.String(object.statusMessage) : undefined,
     };
   },
 
@@ -1408,6 +2406,18 @@ export const ModelInfo = {
     if (message.updatedAtUnixMs !== 0) {
       obj.updatedAtUnixMs = Math.round(message.updatedAtUnixMs);
     }
+    if (message.memoryRequiredBytes !== undefined) {
+      obj.memoryRequiredBytes = Math.round(message.memoryRequiredBytes);
+    }
+    if (message.checksumSha256 !== undefined) {
+      obj.checksumSha256 = message.checksumSha256;
+    }
+    if (message.thinkingPattern !== undefined) {
+      obj.thinkingPattern = ModelThinkingTagPattern.toJSON(message.thinkingPattern);
+    }
+    if (message.metadata !== undefined) {
+      obj.metadata = ModelInfoMetadata.toJSON(message.metadata);
+    }
     if (message.singleFile !== undefined) {
       obj.singleFile = SingleFileArtifact.toJSON(message.singleFile);
     }
@@ -1435,6 +2445,33 @@ export const ModelInfo = {
     if (message.routingPolicy !== undefined) {
       obj.routingPolicy = routingPolicyToJSON(message.routingPolicy);
     }
+    if (message.compatibility !== undefined) {
+      obj.compatibility = ModelRuntimeCompatibility.toJSON(message.compatibility);
+    }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
+    if (message.registryStatus !== undefined) {
+      obj.registryStatus = modelRegistryStatusToJSON(message.registryStatus);
+    }
+    if (message.isDownloaded !== undefined) {
+      obj.isDownloaded = message.isDownloaded;
+    }
+    if (message.isAvailable !== undefined) {
+      obj.isAvailable = message.isAvailable;
+    }
+    if (message.lastUsedAtUnixMs !== undefined) {
+      obj.lastUsedAtUnixMs = Math.round(message.lastUsedAtUnixMs);
+    }
+    if (message.usageCount !== undefined) {
+      obj.usageCount = Math.round(message.usageCount);
+    }
+    if (message.syncPending !== undefined) {
+      obj.syncPending = message.syncPending;
+    }
+    if (message.statusMessage !== undefined) {
+      obj.statusMessage = message.statusMessage;
+    }
     return obj;
   },
 
@@ -1458,6 +2495,14 @@ export const ModelInfo = {
     message.source = object.source ?? 0;
     message.createdAtUnixMs = object.createdAtUnixMs ?? 0;
     message.updatedAtUnixMs = object.updatedAtUnixMs ?? 0;
+    message.memoryRequiredBytes = object.memoryRequiredBytes ?? undefined;
+    message.checksumSha256 = object.checksumSha256 ?? undefined;
+    message.thinkingPattern = (object.thinkingPattern !== undefined && object.thinkingPattern !== null)
+      ? ModelThinkingTagPattern.fromPartial(object.thinkingPattern)
+      : undefined;
+    message.metadata = (object.metadata !== undefined && object.metadata !== null)
+      ? ModelInfoMetadata.fromPartial(object.metadata)
+      : undefined;
     message.singleFile = (object.singleFile !== undefined && object.singleFile !== null)
       ? SingleFileArtifact.fromPartial(object.singleFile)
       : undefined;
@@ -1475,6 +2520,76 @@ export const ModelInfo = {
       : undefined;
     message.accelerationPreference = object.accelerationPreference ?? undefined;
     message.routingPolicy = object.routingPolicy ?? undefined;
+    message.compatibility = (object.compatibility !== undefined && object.compatibility !== null)
+      ? ModelRuntimeCompatibility.fromPartial(object.compatibility)
+      : undefined;
+    message.preferredFramework = object.preferredFramework ?? undefined;
+    message.registryStatus = object.registryStatus ?? undefined;
+    message.isDownloaded = object.isDownloaded ?? undefined;
+    message.isAvailable = object.isAvailable ?? undefined;
+    message.lastUsedAtUnixMs = object.lastUsedAtUnixMs ?? undefined;
+    message.usageCount = object.usageCount ?? undefined;
+    message.syncPending = object.syncPending ?? undefined;
+    message.statusMessage = object.statusMessage ?? undefined;
+    return message;
+  },
+};
+
+function createBaseModelInfoList(): ModelInfoList {
+  return { models: [] };
+}
+
+export const ModelInfoList = {
+  encode(message: ModelInfoList, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.models) {
+      ModelInfo.encode(v!, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoList {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelInfoList();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.models.push(ModelInfo.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelInfoList {
+    return {
+      models: globalThis.Array.isArray(object?.models) ? object.models.map((e: any) => ModelInfo.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: ModelInfoList): unknown {
+    const obj: any = {};
+    if (message.models?.length) {
+      obj.models = message.models.map((e) => ModelInfo.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelInfoList>, I>>(base?: I): ModelInfoList {
+    return ModelInfoList.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelInfoList>, I>>(object: I): ModelInfoList {
+    const message = createBaseModelInfoList();
+    message.models = object.models?.map((e) => ModelInfo.fromPartial(e)) || [];
     return message;
   },
 };
@@ -1666,7 +2781,17 @@ export const ArchiveArtifact = {
 };
 
 function createBaseModelFileDescriptor(): ModelFileDescriptor {
-  return { url: "", filename: "", isRequired: false, sizeBytes: undefined, checksum: undefined };
+  return {
+    url: "",
+    filename: "",
+    isRequired: false,
+    sizeBytes: undefined,
+    checksum: undefined,
+    relativePath: undefined,
+    destinationPath: undefined,
+    role: undefined,
+    localPath: undefined,
+  };
 }
 
 export const ModelFileDescriptor = {
@@ -1685,6 +2810,18 @@ export const ModelFileDescriptor = {
     }
     if (message.checksum !== undefined) {
       writer.uint32(42).string(message.checksum);
+    }
+    if (message.relativePath !== undefined) {
+      writer.uint32(50).string(message.relativePath);
+    }
+    if (message.destinationPath !== undefined) {
+      writer.uint32(58).string(message.destinationPath);
+    }
+    if (message.role !== undefined) {
+      writer.uint32(64).int32(message.role);
+    }
+    if (message.localPath !== undefined) {
+      writer.uint32(74).string(message.localPath);
     }
     return writer;
   },
@@ -1731,6 +2868,34 @@ export const ModelFileDescriptor = {
 
           message.checksum = reader.string();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.relativePath = reader.string();
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.destinationPath = reader.string();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.role = reader.int32() as any;
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.localPath = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1747,6 +2912,10 @@ export const ModelFileDescriptor = {
       isRequired: isSet(object.isRequired) ? globalThis.Boolean(object.isRequired) : false,
       sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : undefined,
       checksum: isSet(object.checksum) ? globalThis.String(object.checksum) : undefined,
+      relativePath: isSet(object.relativePath) ? globalThis.String(object.relativePath) : undefined,
+      destinationPath: isSet(object.destinationPath) ? globalThis.String(object.destinationPath) : undefined,
+      role: isSet(object.role) ? modelFileRoleFromJSON(object.role) : undefined,
+      localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : undefined,
     };
   },
 
@@ -1767,6 +2936,18 @@ export const ModelFileDescriptor = {
     if (message.checksum !== undefined) {
       obj.checksum = message.checksum;
     }
+    if (message.relativePath !== undefined) {
+      obj.relativePath = message.relativePath;
+    }
+    if (message.destinationPath !== undefined) {
+      obj.destinationPath = message.destinationPath;
+    }
+    if (message.role !== undefined) {
+      obj.role = modelFileRoleToJSON(message.role);
+    }
+    if (message.localPath !== undefined) {
+      obj.localPath = message.localPath;
+    }
     return obj;
   },
 
@@ -1780,6 +2961,10 @@ export const ModelFileDescriptor = {
     message.isRequired = object.isRequired ?? false;
     message.sizeBytes = object.sizeBytes ?? undefined;
     message.checksum = object.checksum ?? undefined;
+    message.relativePath = object.relativePath ?? undefined;
+    message.destinationPath = object.destinationPath ?? undefined;
+    message.role = object.role ?? undefined;
+    message.localPath = object.localPath ?? undefined;
     return message;
   },
 };
@@ -1846,7 +3031,7 @@ export const MultiFileArtifact = {
 };
 
 function createBaseExpectedModelFiles(): ExpectedModelFiles {
-  return { files: [], rootDirectory: undefined };
+  return { files: [], rootDirectory: undefined, requiredPatterns: [], optionalPatterns: [], description: undefined };
 }
 
 export const ExpectedModelFiles = {
@@ -1856,6 +3041,15 @@ export const ExpectedModelFiles = {
     }
     if (message.rootDirectory !== undefined) {
       writer.uint32(18).string(message.rootDirectory);
+    }
+    for (const v of message.requiredPatterns) {
+      writer.uint32(26).string(v!);
+    }
+    for (const v of message.optionalPatterns) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.description !== undefined) {
+      writer.uint32(42).string(message.description);
     }
     return writer;
   },
@@ -1881,6 +3075,27 @@ export const ExpectedModelFiles = {
 
           message.rootDirectory = reader.string();
           continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requiredPatterns.push(reader.string());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.optionalPatterns.push(reader.string());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1896,6 +3111,13 @@ export const ExpectedModelFiles = {
         ? object.files.map((e: any) => ModelFileDescriptor.fromJSON(e))
         : [],
       rootDirectory: isSet(object.rootDirectory) ? globalThis.String(object.rootDirectory) : undefined,
+      requiredPatterns: globalThis.Array.isArray(object?.requiredPatterns)
+        ? object.requiredPatterns.map((e: any) => globalThis.String(e))
+        : [],
+      optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
+        ? object.optionalPatterns.map((e: any) => globalThis.String(e))
+        : [],
+      description: isSet(object.description) ? globalThis.String(object.description) : undefined,
     };
   },
 
@@ -1907,6 +3129,15 @@ export const ExpectedModelFiles = {
     if (message.rootDirectory !== undefined) {
       obj.rootDirectory = message.rootDirectory;
     }
+    if (message.requiredPatterns?.length) {
+      obj.requiredPatterns = message.requiredPatterns;
+    }
+    if (message.optionalPatterns?.length) {
+      obj.optionalPatterns = message.optionalPatterns;
+    }
+    if (message.description !== undefined) {
+      obj.description = message.description;
+    }
     return obj;
   },
 
@@ -1917,6 +3148,2507 @@ export const ExpectedModelFiles = {
     const message = createBaseExpectedModelFiles();
     message.files = object.files?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
     message.rootDirectory = object.rootDirectory ?? undefined;
+    message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
+    message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
+    message.description = object.description ?? undefined;
+    return message;
+  },
+};
+
+function createBaseModelQuery(): ModelQuery {
+  return {
+    framework: undefined,
+    category: undefined,
+    format: undefined,
+    downloadedOnly: undefined,
+    availableOnly: undefined,
+    maxSizeBytes: undefined,
+    searchQuery: "",
+    source: undefined,
+    sortField: undefined,
+    sortOrder: undefined,
+  };
+}
+
+export const ModelQuery = {
+  encode(message: ModelQuery, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.framework !== undefined) {
+      writer.uint32(8).int32(message.framework);
+    }
+    if (message.category !== undefined) {
+      writer.uint32(16).int32(message.category);
+    }
+    if (message.format !== undefined) {
+      writer.uint32(24).int32(message.format);
+    }
+    if (message.downloadedOnly !== undefined) {
+      writer.uint32(32).bool(message.downloadedOnly);
+    }
+    if (message.availableOnly !== undefined) {
+      writer.uint32(40).bool(message.availableOnly);
+    }
+    if (message.maxSizeBytes !== undefined) {
+      writer.uint32(48).int64(message.maxSizeBytes);
+    }
+    if (message.searchQuery !== "") {
+      writer.uint32(58).string(message.searchQuery);
+    }
+    if (message.source !== undefined) {
+      writer.uint32(64).int32(message.source);
+    }
+    if (message.sortField !== undefined) {
+      writer.uint32(72).int32(message.sortField);
+    }
+    if (message.sortOrder !== undefined) {
+      writer.uint32(80).int32(message.sortOrder);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelQuery {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelQuery();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.framework = reader.int32() as any;
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.format = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.downloadedOnly = reader.bool();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.availableOnly = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.maxSizeBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.searchQuery = reader.string();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.source = reader.int32() as any;
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.sortField = reader.int32() as any;
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.sortOrder = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelQuery {
+    return {
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+      format: isSet(object.format) ? modelFormatFromJSON(object.format) : undefined,
+      downloadedOnly: isSet(object.downloadedOnly) ? globalThis.Boolean(object.downloadedOnly) : undefined,
+      availableOnly: isSet(object.availableOnly) ? globalThis.Boolean(object.availableOnly) : undefined,
+      maxSizeBytes: isSet(object.maxSizeBytes) ? globalThis.Number(object.maxSizeBytes) : undefined,
+      searchQuery: isSet(object.searchQuery) ? globalThis.String(object.searchQuery) : "",
+      source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+      sortField: isSet(object.sortField) ? modelQuerySortFieldFromJSON(object.sortField) : undefined,
+      sortOrder: isSet(object.sortOrder) ? modelQuerySortOrderFromJSON(object.sortOrder) : undefined,
+    };
+  },
+
+  toJSON(message: ModelQuery): unknown {
+    const obj: any = {};
+    if (message.framework !== undefined) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
+    }
+    if (message.category !== undefined) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.format !== undefined) {
+      obj.format = modelFormatToJSON(message.format);
+    }
+    if (message.downloadedOnly !== undefined) {
+      obj.downloadedOnly = message.downloadedOnly;
+    }
+    if (message.availableOnly !== undefined) {
+      obj.availableOnly = message.availableOnly;
+    }
+    if (message.maxSizeBytes !== undefined) {
+      obj.maxSizeBytes = Math.round(message.maxSizeBytes);
+    }
+    if (message.searchQuery !== "") {
+      obj.searchQuery = message.searchQuery;
+    }
+    if (message.source !== undefined) {
+      obj.source = modelSourceToJSON(message.source);
+    }
+    if (message.sortField !== undefined) {
+      obj.sortField = modelQuerySortFieldToJSON(message.sortField);
+    }
+    if (message.sortOrder !== undefined) {
+      obj.sortOrder = modelQuerySortOrderToJSON(message.sortOrder);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelQuery>, I>>(base?: I): ModelQuery {
+    return ModelQuery.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelQuery>, I>>(object: I): ModelQuery {
+    const message = createBaseModelQuery();
+    message.framework = object.framework ?? undefined;
+    message.category = object.category ?? undefined;
+    message.format = object.format ?? undefined;
+    message.downloadedOnly = object.downloadedOnly ?? undefined;
+    message.availableOnly = object.availableOnly ?? undefined;
+    message.maxSizeBytes = object.maxSizeBytes ?? undefined;
+    message.searchQuery = object.searchQuery ?? "";
+    message.source = object.source ?? undefined;
+    message.sortField = object.sortField ?? undefined;
+    message.sortOrder = object.sortOrder ?? undefined;
+    return message;
+  },
+};
+
+function createBaseModelCompatibilityResult(): ModelCompatibilityResult {
+  return {
+    isCompatible: false,
+    canRun: false,
+    canFit: false,
+    requiredMemoryBytes: 0,
+    availableMemoryBytes: 0,
+    requiredStorageBytes: 0,
+    availableStorageBytes: 0,
+    reasons: [],
+  };
+}
+
+export const ModelCompatibilityResult = {
+  encode(message: ModelCompatibilityResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.isCompatible !== false) {
+      writer.uint32(8).bool(message.isCompatible);
+    }
+    if (message.canRun !== false) {
+      writer.uint32(16).bool(message.canRun);
+    }
+    if (message.canFit !== false) {
+      writer.uint32(24).bool(message.canFit);
+    }
+    if (message.requiredMemoryBytes !== 0) {
+      writer.uint32(32).int64(message.requiredMemoryBytes);
+    }
+    if (message.availableMemoryBytes !== 0) {
+      writer.uint32(40).int64(message.availableMemoryBytes);
+    }
+    if (message.requiredStorageBytes !== 0) {
+      writer.uint32(48).int64(message.requiredStorageBytes);
+    }
+    if (message.availableStorageBytes !== 0) {
+      writer.uint32(56).int64(message.availableStorageBytes);
+    }
+    for (const v of message.reasons) {
+      writer.uint32(66).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelCompatibilityResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.isCompatible = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.canRun = reader.bool();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.canFit = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.requiredMemoryBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.availableMemoryBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.requiredStorageBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.availableStorageBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.reasons.push(reader.string());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelCompatibilityResult {
+    return {
+      isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
+      canRun: isSet(object.canRun) ? globalThis.Boolean(object.canRun) : false,
+      canFit: isSet(object.canFit) ? globalThis.Boolean(object.canFit) : false,
+      requiredMemoryBytes: isSet(object.requiredMemoryBytes) ? globalThis.Number(object.requiredMemoryBytes) : 0,
+      availableMemoryBytes: isSet(object.availableMemoryBytes) ? globalThis.Number(object.availableMemoryBytes) : 0,
+      requiredStorageBytes: isSet(object.requiredStorageBytes) ? globalThis.Number(object.requiredStorageBytes) : 0,
+      availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
+      reasons: globalThis.Array.isArray(object?.reasons) ? object.reasons.map((e: any) => globalThis.String(e)) : [],
+    };
+  },
+
+  toJSON(message: ModelCompatibilityResult): unknown {
+    const obj: any = {};
+    if (message.isCompatible !== false) {
+      obj.isCompatible = message.isCompatible;
+    }
+    if (message.canRun !== false) {
+      obj.canRun = message.canRun;
+    }
+    if (message.canFit !== false) {
+      obj.canFit = message.canFit;
+    }
+    if (message.requiredMemoryBytes !== 0) {
+      obj.requiredMemoryBytes = Math.round(message.requiredMemoryBytes);
+    }
+    if (message.availableMemoryBytes !== 0) {
+      obj.availableMemoryBytes = Math.round(message.availableMemoryBytes);
+    }
+    if (message.requiredStorageBytes !== 0) {
+      obj.requiredStorageBytes = Math.round(message.requiredStorageBytes);
+    }
+    if (message.availableStorageBytes !== 0) {
+      obj.availableStorageBytes = Math.round(message.availableStorageBytes);
+    }
+    if (message.reasons?.length) {
+      obj.reasons = message.reasons;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult {
+    return ModelCompatibilityResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult {
+    const message = createBaseModelCompatibilityResult();
+    message.isCompatible = object.isCompatible ?? false;
+    message.canRun = object.canRun ?? false;
+    message.canFit = object.canFit ?? false;
+    message.requiredMemoryBytes = object.requiredMemoryBytes ?? 0;
+    message.availableMemoryBytes = object.availableMemoryBytes ?? 0;
+    message.requiredStorageBytes = object.requiredStorageBytes ?? 0;
+    message.availableStorageBytes = object.availableStorageBytes ?? 0;
+    message.reasons = object.reasons?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseModelRegistryRefreshRequest(): ModelRegistryRefreshRequest {
+  return { includeRemoteCatalog: false, rescanLocal: false, pruneOrphans: false, query: undefined };
+}
+
+export const ModelRegistryRefreshRequest = {
+  encode(message: ModelRegistryRefreshRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.includeRemoteCatalog !== false) {
+      writer.uint32(8).bool(message.includeRemoteCatalog);
+    }
+    if (message.rescanLocal !== false) {
+      writer.uint32(16).bool(message.rescanLocal);
+    }
+    if (message.pruneOrphans !== false) {
+      writer.uint32(24).bool(message.pruneOrphans);
+    }
+    if (message.query !== undefined) {
+      ModelQuery.encode(message.query, writer.uint32(34).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryRefreshRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelRegistryRefreshRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.includeRemoteCatalog = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.rescanLocal = reader.bool();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pruneOrphans = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.query = ModelQuery.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelRegistryRefreshRequest {
+    return {
+      includeRemoteCatalog: isSet(object.includeRemoteCatalog)
+        ? globalThis.Boolean(object.includeRemoteCatalog)
+        : false,
+      rescanLocal: isSet(object.rescanLocal) ? globalThis.Boolean(object.rescanLocal) : false,
+      pruneOrphans: isSet(object.pruneOrphans) ? globalThis.Boolean(object.pruneOrphans) : false,
+      query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined,
+    };
+  },
+
+  toJSON(message: ModelRegistryRefreshRequest): unknown {
+    const obj: any = {};
+    if (message.includeRemoteCatalog !== false) {
+      obj.includeRemoteCatalog = message.includeRemoteCatalog;
+    }
+    if (message.rescanLocal !== false) {
+      obj.rescanLocal = message.rescanLocal;
+    }
+    if (message.pruneOrphans !== false) {
+      obj.pruneOrphans = message.pruneOrphans;
+    }
+    if (message.query !== undefined) {
+      obj.query = ModelQuery.toJSON(message.query);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelRegistryRefreshRequest>, I>>(base?: I): ModelRegistryRefreshRequest {
+    return ModelRegistryRefreshRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshRequest>, I>>(object: I): ModelRegistryRefreshRequest {
+    const message = createBaseModelRegistryRefreshRequest();
+    message.includeRemoteCatalog = object.includeRemoteCatalog ?? false;
+    message.rescanLocal = object.rescanLocal ?? false;
+    message.pruneOrphans = object.pruneOrphans ?? false;
+    message.query = (object.query !== undefined && object.query !== null)
+      ? ModelQuery.fromPartial(object.query)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseModelRegistryRefreshResult(): ModelRegistryRefreshResult {
+  return {
+    success: false,
+    models: undefined,
+    registeredCount: 0,
+    updatedCount: 0,
+    discoveredCount: 0,
+    prunedCount: 0,
+    refreshedAtUnixMs: 0,
+    warnings: [],
+    errorMessage: "",
+  };
+}
+
+export const ModelRegistryRefreshResult = {
+  encode(message: ModelRegistryRefreshResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.models !== undefined) {
+      ModelInfoList.encode(message.models, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.registeredCount !== 0) {
+      writer.uint32(24).int32(message.registeredCount);
+    }
+    if (message.updatedCount !== 0) {
+      writer.uint32(32).int32(message.updatedCount);
+    }
+    if (message.discoveredCount !== 0) {
+      writer.uint32(40).int32(message.discoveredCount);
+    }
+    if (message.prunedCount !== 0) {
+      writer.uint32(48).int32(message.prunedCount);
+    }
+    if (message.refreshedAtUnixMs !== 0) {
+      writer.uint32(56).int64(message.refreshedAtUnixMs);
+    }
+    for (const v of message.warnings) {
+      writer.uint32(66).string(v!);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(74).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryRefreshResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelRegistryRefreshResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.models = ModelInfoList.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.registeredCount = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.updatedCount = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.discoveredCount = reader.int32();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.prunedCount = reader.int32();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.refreshedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.warnings.push(reader.string());
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelRegistryRefreshResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
+      registeredCount: isSet(object.registeredCount) ? globalThis.Number(object.registeredCount) : 0,
+      updatedCount: isSet(object.updatedCount) ? globalThis.Number(object.updatedCount) : 0,
+      discoveredCount: isSet(object.discoveredCount) ? globalThis.Number(object.discoveredCount) : 0,
+      prunedCount: isSet(object.prunedCount) ? globalThis.Number(object.prunedCount) : 0,
+      refreshedAtUnixMs: isSet(object.refreshedAtUnixMs) ? globalThis.Number(object.refreshedAtUnixMs) : 0,
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelRegistryRefreshResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.models !== undefined) {
+      obj.models = ModelInfoList.toJSON(message.models);
+    }
+    if (message.registeredCount !== 0) {
+      obj.registeredCount = Math.round(message.registeredCount);
+    }
+    if (message.updatedCount !== 0) {
+      obj.updatedCount = Math.round(message.updatedCount);
+    }
+    if (message.discoveredCount !== 0) {
+      obj.discoveredCount = Math.round(message.discoveredCount);
+    }
+    if (message.prunedCount !== 0) {
+      obj.prunedCount = Math.round(message.prunedCount);
+    }
+    if (message.refreshedAtUnixMs !== 0) {
+      obj.refreshedAtUnixMs = Math.round(message.refreshedAtUnixMs);
+    }
+    if (message.warnings?.length) {
+      obj.warnings = message.warnings;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(base?: I): ModelRegistryRefreshResult {
+    return ModelRegistryRefreshResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(object: I): ModelRegistryRefreshResult {
+    const message = createBaseModelRegistryRefreshResult();
+    message.success = object.success ?? false;
+    message.models = (object.models !== undefined && object.models !== null)
+      ? ModelInfoList.fromPartial(object.models)
+      : undefined;
+    message.registeredCount = object.registeredCount ?? 0;
+    message.updatedCount = object.updatedCount ?? 0;
+    message.discoveredCount = object.discoveredCount ?? 0;
+    message.prunedCount = object.prunedCount ?? 0;
+    message.refreshedAtUnixMs = object.refreshedAtUnixMs ?? 0;
+    message.warnings = object.warnings?.map((e) => e) || [];
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelListRequest(): ModelListRequest {
+  return { query: undefined };
+}
+
+export const ModelListRequest = {
+  encode(message: ModelListRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.query !== undefined) {
+      ModelQuery.encode(message.query, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelListRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelListRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.query = ModelQuery.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelListRequest {
+    return { query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined };
+  },
+
+  toJSON(message: ModelListRequest): unknown {
+    const obj: any = {};
+    if (message.query !== undefined) {
+      obj.query = ModelQuery.toJSON(message.query);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelListRequest>, I>>(base?: I): ModelListRequest {
+    return ModelListRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelListRequest>, I>>(object: I): ModelListRequest {
+    const message = createBaseModelListRequest();
+    message.query = (object.query !== undefined && object.query !== null)
+      ? ModelQuery.fromPartial(object.query)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseModelListResult(): ModelListResult {
+  return { success: false, models: undefined, errorMessage: "" };
+}
+
+export const ModelListResult = {
+  encode(message: ModelListResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.models !== undefined) {
+      ModelInfoList.encode(message.models, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(26).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelListResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelListResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.models = ModelInfoList.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelListResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelListResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.models !== undefined) {
+      obj.models = ModelInfoList.toJSON(message.models);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelListResult>, I>>(base?: I): ModelListResult {
+    return ModelListResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelListResult>, I>>(object: I): ModelListResult {
+    const message = createBaseModelListResult();
+    message.success = object.success ?? false;
+    message.models = (object.models !== undefined && object.models !== null)
+      ? ModelInfoList.fromPartial(object.models)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelGetRequest(): ModelGetRequest {
+  return { modelId: "" };
+}
+
+export const ModelGetRequest = {
+  encode(message: ModelGetRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelGetRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelGetRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelGetRequest {
+    return { modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "" };
+  },
+
+  toJSON(message: ModelGetRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelGetRequest>, I>>(base?: I): ModelGetRequest {
+    return ModelGetRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelGetRequest>, I>>(object: I): ModelGetRequest {
+    const message = createBaseModelGetRequest();
+    message.modelId = object.modelId ?? "";
+    return message;
+  },
+};
+
+function createBaseModelGetResult(): ModelGetResult {
+  return { found: false, model: undefined, errorMessage: "" };
+}
+
+export const ModelGetResult = {
+  encode(message: ModelGetResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.found !== false) {
+      writer.uint32(8).bool(message.found);
+    }
+    if (message.model !== undefined) {
+      ModelInfo.encode(message.model, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(26).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelGetResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelGetResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.found = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.model = ModelInfo.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelGetResult {
+    return {
+      found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
+      model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelGetResult): unknown {
+    const obj: any = {};
+    if (message.found !== false) {
+      obj.found = message.found;
+    }
+    if (message.model !== undefined) {
+      obj.model = ModelInfo.toJSON(message.model);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelGetResult>, I>>(base?: I): ModelGetResult {
+    return ModelGetResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelGetResult>, I>>(object: I): ModelGetResult {
+    const message = createBaseModelGetResult();
+    message.found = object.found ?? false;
+    message.model = (object.model !== undefined && object.model !== null)
+      ? ModelInfo.fromPartial(object.model)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelImportRequest(): ModelImportRequest {
+  return { model: undefined, sourcePath: "", copyIntoManagedStorage: false, overwriteExisting: false, files: [] };
+}
+
+export const ModelImportRequest = {
+  encode(message: ModelImportRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.model !== undefined) {
+      ModelInfo.encode(message.model, writer.uint32(10).fork()).ldelim();
+    }
+    if (message.sourcePath !== "") {
+      writer.uint32(18).string(message.sourcePath);
+    }
+    if (message.copyIntoManagedStorage !== false) {
+      writer.uint32(24).bool(message.copyIntoManagedStorage);
+    }
+    if (message.overwriteExisting !== false) {
+      writer.uint32(32).bool(message.overwriteExisting);
+    }
+    for (const v of message.files) {
+      ModelFileDescriptor.encode(v!, writer.uint32(42).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelImportRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelImportRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.model = ModelInfo.decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sourcePath = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.copyIntoManagedStorage = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.overwriteExisting = reader.bool();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.files.push(ModelFileDescriptor.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelImportRequest {
+    return {
+      model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      sourcePath: isSet(object.sourcePath) ? globalThis.String(object.sourcePath) : "",
+      copyIntoManagedStorage: isSet(object.copyIntoManagedStorage)
+        ? globalThis.Boolean(object.copyIntoManagedStorage)
+        : false,
+      overwriteExisting: isSet(object.overwriteExisting) ? globalThis.Boolean(object.overwriteExisting) : false,
+      files: globalThis.Array.isArray(object?.files)
+        ? object.files.map((e: any) => ModelFileDescriptor.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ModelImportRequest): unknown {
+    const obj: any = {};
+    if (message.model !== undefined) {
+      obj.model = ModelInfo.toJSON(message.model);
+    }
+    if (message.sourcePath !== "") {
+      obj.sourcePath = message.sourcePath;
+    }
+    if (message.copyIntoManagedStorage !== false) {
+      obj.copyIntoManagedStorage = message.copyIntoManagedStorage;
+    }
+    if (message.overwriteExisting !== false) {
+      obj.overwriteExisting = message.overwriteExisting;
+    }
+    if (message.files?.length) {
+      obj.files = message.files.map((e) => ModelFileDescriptor.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelImportRequest>, I>>(base?: I): ModelImportRequest {
+    return ModelImportRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelImportRequest>, I>>(object: I): ModelImportRequest {
+    const message = createBaseModelImportRequest();
+    message.model = (object.model !== undefined && object.model !== null)
+      ? ModelInfo.fromPartial(object.model)
+      : undefined;
+    message.sourcePath = object.sourcePath ?? "";
+    message.copyIntoManagedStorage = object.copyIntoManagedStorage ?? false;
+    message.overwriteExisting = object.overwriteExisting ?? false;
+    message.files = object.files?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseModelImportResult(): ModelImportResult {
+  return { success: false, model: undefined, localPath: "", importedBytes: 0, warnings: [], errorMessage: "" };
+}
+
+export const ModelImportResult = {
+  encode(message: ModelImportResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.model !== undefined) {
+      ModelInfo.encode(message.model, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.localPath !== "") {
+      writer.uint32(26).string(message.localPath);
+    }
+    if (message.importedBytes !== 0) {
+      writer.uint32(32).int64(message.importedBytes);
+    }
+    for (const v of message.warnings) {
+      writer.uint32(42).string(v!);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelImportResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelImportResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.model = ModelInfo.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.localPath = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.importedBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.warnings.push(reader.string());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelImportResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
+      importedBytes: isSet(object.importedBytes) ? globalThis.Number(object.importedBytes) : 0,
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelImportResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.model !== undefined) {
+      obj.model = ModelInfo.toJSON(message.model);
+    }
+    if (message.localPath !== "") {
+      obj.localPath = message.localPath;
+    }
+    if (message.importedBytes !== 0) {
+      obj.importedBytes = Math.round(message.importedBytes);
+    }
+    if (message.warnings?.length) {
+      obj.warnings = message.warnings;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelImportResult>, I>>(base?: I): ModelImportResult {
+    return ModelImportResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelImportResult>, I>>(object: I): ModelImportResult {
+    const message = createBaseModelImportResult();
+    message.success = object.success ?? false;
+    message.model = (object.model !== undefined && object.model !== null)
+      ? ModelInfo.fromPartial(object.model)
+      : undefined;
+    message.localPath = object.localPath ?? "";
+    message.importedBytes = object.importedBytes ?? 0;
+    message.warnings = object.warnings?.map((e) => e) || [];
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelDiscoveryRequest(): ModelDiscoveryRequest {
+  return { searchRoots: [], recursive: false, linkDownloaded: false, purgeInvalid: false, query: undefined };
+}
+
+export const ModelDiscoveryRequest = {
+  encode(message: ModelDiscoveryRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.searchRoots) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.recursive !== false) {
+      writer.uint32(16).bool(message.recursive);
+    }
+    if (message.linkDownloaded !== false) {
+      writer.uint32(24).bool(message.linkDownloaded);
+    }
+    if (message.purgeInvalid !== false) {
+      writer.uint32(32).bool(message.purgeInvalid);
+    }
+    if (message.query !== undefined) {
+      ModelQuery.encode(message.query, writer.uint32(42).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelDiscoveryRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelDiscoveryRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.searchRoots.push(reader.string());
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.recursive = reader.bool();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.linkDownloaded = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.purgeInvalid = reader.bool();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.query = ModelQuery.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelDiscoveryRequest {
+    return {
+      searchRoots: globalThis.Array.isArray(object?.searchRoots)
+        ? object.searchRoots.map((e: any) => globalThis.String(e))
+        : [],
+      recursive: isSet(object.recursive) ? globalThis.Boolean(object.recursive) : false,
+      linkDownloaded: isSet(object.linkDownloaded) ? globalThis.Boolean(object.linkDownloaded) : false,
+      purgeInvalid: isSet(object.purgeInvalid) ? globalThis.Boolean(object.purgeInvalid) : false,
+      query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined,
+    };
+  },
+
+  toJSON(message: ModelDiscoveryRequest): unknown {
+    const obj: any = {};
+    if (message.searchRoots?.length) {
+      obj.searchRoots = message.searchRoots;
+    }
+    if (message.recursive !== false) {
+      obj.recursive = message.recursive;
+    }
+    if (message.linkDownloaded !== false) {
+      obj.linkDownloaded = message.linkDownloaded;
+    }
+    if (message.purgeInvalid !== false) {
+      obj.purgeInvalid = message.purgeInvalid;
+    }
+    if (message.query !== undefined) {
+      obj.query = ModelQuery.toJSON(message.query);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelDiscoveryRequest>, I>>(base?: I): ModelDiscoveryRequest {
+    return ModelDiscoveryRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelDiscoveryRequest>, I>>(object: I): ModelDiscoveryRequest {
+    const message = createBaseModelDiscoveryRequest();
+    message.searchRoots = object.searchRoots?.map((e) => e) || [];
+    message.recursive = object.recursive ?? false;
+    message.linkDownloaded = object.linkDownloaded ?? false;
+    message.purgeInvalid = object.purgeInvalid ?? false;
+    message.query = (object.query !== undefined && object.query !== null)
+      ? ModelQuery.fromPartial(object.query)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDiscoveredModel(): DiscoveredModel {
+  return { modelId: "", localPath: "", matchedRegistry: false, model: undefined, sizeBytes: 0, warnings: [] };
+}
+
+export const DiscoveredModel = {
+  encode(message: DiscoveredModel, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.localPath !== "") {
+      writer.uint32(18).string(message.localPath);
+    }
+    if (message.matchedRegistry !== false) {
+      writer.uint32(24).bool(message.matchedRegistry);
+    }
+    if (message.model !== undefined) {
+      ModelInfo.encode(message.model, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.sizeBytes !== 0) {
+      writer.uint32(40).int64(message.sizeBytes);
+    }
+    for (const v of message.warnings) {
+      writer.uint32(50).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DiscoveredModel {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDiscoveredModel();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.localPath = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.matchedRegistry = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.model = ModelInfo.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.sizeBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.warnings.push(reader.string());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DiscoveredModel {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
+      matchedRegistry: isSet(object.matchedRegistry) ? globalThis.Boolean(object.matchedRegistry) : false,
+      model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : 0,
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+    };
+  },
+
+  toJSON(message: DiscoveredModel): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.localPath !== "") {
+      obj.localPath = message.localPath;
+    }
+    if (message.matchedRegistry !== false) {
+      obj.matchedRegistry = message.matchedRegistry;
+    }
+    if (message.model !== undefined) {
+      obj.model = ModelInfo.toJSON(message.model);
+    }
+    if (message.sizeBytes !== 0) {
+      obj.sizeBytes = Math.round(message.sizeBytes);
+    }
+    if (message.warnings?.length) {
+      obj.warnings = message.warnings;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DiscoveredModel>, I>>(base?: I): DiscoveredModel {
+    return DiscoveredModel.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DiscoveredModel>, I>>(object: I): DiscoveredModel {
+    const message = createBaseDiscoveredModel();
+    message.modelId = object.modelId ?? "";
+    message.localPath = object.localPath ?? "";
+    message.matchedRegistry = object.matchedRegistry ?? false;
+    message.model = (object.model !== undefined && object.model !== null)
+      ? ModelInfo.fromPartial(object.model)
+      : undefined;
+    message.sizeBytes = object.sizeBytes ?? 0;
+    message.warnings = object.warnings?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseModelDiscoveryResult(): ModelDiscoveryResult {
+  return { success: false, discoveredModels: [], linkedCount: 0, purgedCount: 0, warnings: [], errorMessage: "" };
+}
+
+export const ModelDiscoveryResult = {
+  encode(message: ModelDiscoveryResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    for (const v of message.discoveredModels) {
+      DiscoveredModel.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.linkedCount !== 0) {
+      writer.uint32(24).int32(message.linkedCount);
+    }
+    if (message.purgedCount !== 0) {
+      writer.uint32(32).int32(message.purgedCount);
+    }
+    for (const v of message.warnings) {
+      writer.uint32(42).string(v!);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelDiscoveryResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelDiscoveryResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.discoveredModels.push(DiscoveredModel.decode(reader, reader.uint32()));
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.linkedCount = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.purgedCount = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.warnings.push(reader.string());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelDiscoveryResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      discoveredModels: globalThis.Array.isArray(object?.discoveredModels)
+        ? object.discoveredModels.map((e: any) => DiscoveredModel.fromJSON(e))
+        : [],
+      linkedCount: isSet(object.linkedCount) ? globalThis.Number(object.linkedCount) : 0,
+      purgedCount: isSet(object.purgedCount) ? globalThis.Number(object.purgedCount) : 0,
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelDiscoveryResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.discoveredModels?.length) {
+      obj.discoveredModels = message.discoveredModels.map((e) => DiscoveredModel.toJSON(e));
+    }
+    if (message.linkedCount !== 0) {
+      obj.linkedCount = Math.round(message.linkedCount);
+    }
+    if (message.purgedCount !== 0) {
+      obj.purgedCount = Math.round(message.purgedCount);
+    }
+    if (message.warnings?.length) {
+      obj.warnings = message.warnings;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(base?: I): ModelDiscoveryResult {
+    return ModelDiscoveryResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(object: I): ModelDiscoveryResult {
+    const message = createBaseModelDiscoveryResult();
+    message.success = object.success ?? false;
+    message.discoveredModels = object.discoveredModels?.map((e) => DiscoveredModel.fromPartial(e)) || [];
+    message.linkedCount = object.linkedCount ?? 0;
+    message.purgedCount = object.purgedCount ?? 0;
+    message.warnings = object.warnings?.map((e) => e) || [];
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelLoadRequest(): ModelLoadRequest {
+  return { modelId: "", category: undefined, framework: undefined, forceReload: false };
+}
+
+export const ModelLoadRequest = {
+  encode(message: ModelLoadRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.category !== undefined) {
+      writer.uint32(16).int32(message.category);
+    }
+    if (message.framework !== undefined) {
+      writer.uint32(24).int32(message.framework);
+    }
+    if (message.forceReload !== false) {
+      writer.uint32(32).bool(message.forceReload);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelLoadRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelLoadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.framework = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.forceReload = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelLoadRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+      forceReload: isSet(object.forceReload) ? globalThis.Boolean(object.forceReload) : false,
+    };
+  },
+
+  toJSON(message: ModelLoadRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.category !== undefined) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.framework !== undefined) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
+    }
+    if (message.forceReload !== false) {
+      obj.forceReload = message.forceReload;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelLoadRequest>, I>>(base?: I): ModelLoadRequest {
+    return ModelLoadRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelLoadRequest>, I>>(object: I): ModelLoadRequest {
+    const message = createBaseModelLoadRequest();
+    message.modelId = object.modelId ?? "";
+    message.category = object.category ?? undefined;
+    message.framework = object.framework ?? undefined;
+    message.forceReload = object.forceReload ?? false;
+    return message;
+  },
+};
+
+function createBaseModelLoadResult(): ModelLoadResult {
+  return {
+    success: false,
+    modelId: "",
+    category: 0,
+    framework: 0,
+    resolvedPath: "",
+    loadedAtUnixMs: 0,
+    errorMessage: "",
+  };
+}
+
+export const ModelLoadResult = {
+  encode(message: ModelLoadResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.category !== 0) {
+      writer.uint32(24).int32(message.category);
+    }
+    if (message.framework !== 0) {
+      writer.uint32(32).int32(message.framework);
+    }
+    if (message.resolvedPath !== "") {
+      writer.uint32(42).string(message.resolvedPath);
+    }
+    if (message.loadedAtUnixMs !== 0) {
+      writer.uint32(48).int64(message.loadedAtUnixMs);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(58).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelLoadResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelLoadResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.framework = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.resolvedPath = reader.string();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.loadedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelLoadResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : 0,
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
+      resolvedPath: isSet(object.resolvedPath) ? globalThis.String(object.resolvedPath) : "",
+      loadedAtUnixMs: isSet(object.loadedAtUnixMs) ? globalThis.Number(object.loadedAtUnixMs) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelLoadResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.category !== 0) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.framework !== 0) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
+    }
+    if (message.resolvedPath !== "") {
+      obj.resolvedPath = message.resolvedPath;
+    }
+    if (message.loadedAtUnixMs !== 0) {
+      obj.loadedAtUnixMs = Math.round(message.loadedAtUnixMs);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelLoadResult>, I>>(base?: I): ModelLoadResult {
+    return ModelLoadResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelLoadResult>, I>>(object: I): ModelLoadResult {
+    const message = createBaseModelLoadResult();
+    message.success = object.success ?? false;
+    message.modelId = object.modelId ?? "";
+    message.category = object.category ?? 0;
+    message.framework = object.framework ?? 0;
+    message.resolvedPath = object.resolvedPath ?? "";
+    message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelUnloadRequest(): ModelUnloadRequest {
+  return { modelId: "", category: undefined, unloadAll: false };
+}
+
+export const ModelUnloadRequest = {
+  encode(message: ModelUnloadRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.category !== undefined) {
+      writer.uint32(16).int32(message.category);
+    }
+    if (message.unloadAll !== false) {
+      writer.uint32(24).bool(message.unloadAll);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelUnloadRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelUnloadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.unloadAll = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelUnloadRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+      unloadAll: isSet(object.unloadAll) ? globalThis.Boolean(object.unloadAll) : false,
+    };
+  },
+
+  toJSON(message: ModelUnloadRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.category !== undefined) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.unloadAll !== false) {
+      obj.unloadAll = message.unloadAll;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelUnloadRequest>, I>>(base?: I): ModelUnloadRequest {
+    return ModelUnloadRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelUnloadRequest>, I>>(object: I): ModelUnloadRequest {
+    const message = createBaseModelUnloadRequest();
+    message.modelId = object.modelId ?? "";
+    message.category = object.category ?? undefined;
+    message.unloadAll = object.unloadAll ?? false;
+    return message;
+  },
+};
+
+function createBaseModelUnloadResult(): ModelUnloadResult {
+  return { success: false, unloadedModelIds: [], errorMessage: "" };
+}
+
+export const ModelUnloadResult = {
+  encode(message: ModelUnloadResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    for (const v of message.unloadedModelIds) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(26).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelUnloadResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelUnloadResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.unloadedModelIds.push(reader.string());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelUnloadResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      unloadedModelIds: globalThis.Array.isArray(object?.unloadedModelIds)
+        ? object.unloadedModelIds.map((e: any) => globalThis.String(e))
+        : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelUnloadResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.unloadedModelIds?.length) {
+      obj.unloadedModelIds = message.unloadedModelIds;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(base?: I): ModelUnloadResult {
+    return ModelUnloadResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(object: I): ModelUnloadResult {
+    const message = createBaseModelUnloadResult();
+    message.success = object.success ?? false;
+    message.unloadedModelIds = object.unloadedModelIds?.map((e) => e) || [];
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseCurrentModelRequest(): CurrentModelRequest {
+  return { category: undefined, framework: undefined };
+}
+
+export const CurrentModelRequest = {
+  encode(message: CurrentModelRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.category !== undefined) {
+      writer.uint32(8).int32(message.category);
+    }
+    if (message.framework !== undefined) {
+      writer.uint32(16).int32(message.framework);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CurrentModelRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCurrentModelRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.framework = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CurrentModelRequest {
+    return {
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+    };
+  },
+
+  toJSON(message: CurrentModelRequest): unknown {
+    const obj: any = {};
+    if (message.category !== undefined) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.framework !== undefined) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CurrentModelRequest>, I>>(base?: I): CurrentModelRequest {
+    return CurrentModelRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CurrentModelRequest>, I>>(object: I): CurrentModelRequest {
+    const message = createBaseCurrentModelRequest();
+    message.category = object.category ?? undefined;
+    message.framework = object.framework ?? undefined;
+    return message;
+  },
+};
+
+function createBaseCurrentModelResult(): CurrentModelResult {
+  return { modelId: "", model: undefined, loadedAtUnixMs: 0 };
+}
+
+export const CurrentModelResult = {
+  encode(message: CurrentModelResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.model !== undefined) {
+      ModelInfo.encode(message.model, writer.uint32(26).fork()).ldelim();
+    }
+    if (message.loadedAtUnixMs !== 0) {
+      writer.uint32(32).int64(message.loadedAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CurrentModelResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCurrentModelResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.model = ModelInfo.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.loadedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CurrentModelResult {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      loadedAtUnixMs: isSet(object.loadedAtUnixMs) ? globalThis.Number(object.loadedAtUnixMs) : 0,
+    };
+  },
+
+  toJSON(message: CurrentModelResult): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.model !== undefined) {
+      obj.model = ModelInfo.toJSON(message.model);
+    }
+    if (message.loadedAtUnixMs !== 0) {
+      obj.loadedAtUnixMs = Math.round(message.loadedAtUnixMs);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CurrentModelResult>, I>>(base?: I): CurrentModelResult {
+    return CurrentModelResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CurrentModelResult>, I>>(object: I): CurrentModelResult {
+    const message = createBaseCurrentModelResult();
+    message.modelId = object.modelId ?? "";
+    message.model = (object.model !== undefined && object.model !== null)
+      ? ModelInfo.fromPartial(object.model)
+      : undefined;
+    message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
+    return message;
+  },
+};
+
+function createBaseModelDeleteRequest(): ModelDeleteRequest {
+  return { modelId: "", deleteFiles: false, unregister: false, unloadIfLoaded: false };
+}
+
+export const ModelDeleteRequest = {
+  encode(message: ModelDeleteRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.deleteFiles !== false) {
+      writer.uint32(16).bool(message.deleteFiles);
+    }
+    if (message.unregister !== false) {
+      writer.uint32(24).bool(message.unregister);
+    }
+    if (message.unloadIfLoaded !== false) {
+      writer.uint32(32).bool(message.unloadIfLoaded);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelDeleteRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelDeleteRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.deleteFiles = reader.bool();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.unregister = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.unloadIfLoaded = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelDeleteRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      deleteFiles: isSet(object.deleteFiles) ? globalThis.Boolean(object.deleteFiles) : false,
+      unregister: isSet(object.unregister) ? globalThis.Boolean(object.unregister) : false,
+      unloadIfLoaded: isSet(object.unloadIfLoaded) ? globalThis.Boolean(object.unloadIfLoaded) : false,
+    };
+  },
+
+  toJSON(message: ModelDeleteRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.deleteFiles !== false) {
+      obj.deleteFiles = message.deleteFiles;
+    }
+    if (message.unregister !== false) {
+      obj.unregister = message.unregister;
+    }
+    if (message.unloadIfLoaded !== false) {
+      obj.unloadIfLoaded = message.unloadIfLoaded;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(base?: I): ModelDeleteRequest {
+    return ModelDeleteRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(object: I): ModelDeleteRequest {
+    const message = createBaseModelDeleteRequest();
+    message.modelId = object.modelId ?? "";
+    message.deleteFiles = object.deleteFiles ?? false;
+    message.unregister = object.unregister ?? false;
+    message.unloadIfLoaded = object.unloadIfLoaded ?? false;
+    return message;
+  },
+};
+
+function createBaseModelDeleteResult(): ModelDeleteResult {
+  return {
+    success: false,
+    modelId: "",
+    deletedBytes: 0,
+    filesDeleted: false,
+    registryUpdated: false,
+    wasLoaded: false,
+    errorMessage: "",
+  };
+}
+
+export const ModelDeleteResult = {
+  encode(message: ModelDeleteResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.deletedBytes !== 0) {
+      writer.uint32(24).int64(message.deletedBytes);
+    }
+    if (message.filesDeleted !== false) {
+      writer.uint32(32).bool(message.filesDeleted);
+    }
+    if (message.registryUpdated !== false) {
+      writer.uint32(40).bool(message.registryUpdated);
+    }
+    if (message.wasLoaded !== false) {
+      writer.uint32(48).bool(message.wasLoaded);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(58).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelDeleteResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelDeleteResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.deletedBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.filesDeleted = reader.bool();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.registryUpdated = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.wasLoaded = reader.bool();
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelDeleteResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      deletedBytes: isSet(object.deletedBytes) ? globalThis.Number(object.deletedBytes) : 0,
+      filesDeleted: isSet(object.filesDeleted) ? globalThis.Boolean(object.filesDeleted) : false,
+      registryUpdated: isSet(object.registryUpdated) ? globalThis.Boolean(object.registryUpdated) : false,
+      wasLoaded: isSet(object.wasLoaded) ? globalThis.Boolean(object.wasLoaded) : false,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelDeleteResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.deletedBytes !== 0) {
+      obj.deletedBytes = Math.round(message.deletedBytes);
+    }
+    if (message.filesDeleted !== false) {
+      obj.filesDeleted = message.filesDeleted;
+    }
+    if (message.registryUpdated !== false) {
+      obj.registryUpdated = message.registryUpdated;
+    }
+    if (message.wasLoaded !== false) {
+      obj.wasLoaded = message.wasLoaded;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(base?: I): ModelDeleteResult {
+    return ModelDeleteResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(object: I): ModelDeleteResult {
+    const message = createBaseModelDeleteResult();
+    message.success = object.success ?? false;
+    message.modelId = object.modelId ?? "";
+    message.deletedBytes = object.deletedBytes ?? 0;
+    message.filesDeleted = object.filesDeleted ?? false;
+    message.registryUpdated = object.registryUpdated ?? false;
+    message.wasLoaded = object.wasLoaded ?? false;
+    message.errorMessage = object.errorMessage ?? "";
     return message;
   },
 };

@@ -18,6 +18,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 // =============================================================================
 // Internal C++ State Class
@@ -41,14 +42,18 @@ class SDKState {
 
     rac_result_t initialize(rac_environment_t env, const char* api_key, const char* base_url,
                             const char* device_id) {
-        std::lock_guard<std::mutex> lock(mutex_);
+        rac::events::publish_initialization_started();
 
-        environment_ = env;
-        api_key_ = api_key ? api_key : "";
-        base_url_ = base_url ? base_url : "";
-        device_id_ = device_id ? device_id : "";
-        is_initialized_ = true;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            environment_ = env;
+            api_key_ = api_key ? api_key : "";
+            base_url_ = base_url ? base_url : "";
+            device_id_ = device_id ? device_id : "";
+            is_initialized_ = true;
+        }
 
+        rac::events::publish_initialization_completed();
         return RAC_SUCCESS;
     }
 
@@ -64,15 +69,19 @@ class SDKState {
     }
 
     void shutdown() {
-        std::lock_guard<std::mutex> lock(mutex_);
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
 
-        // Clear everything
-        is_device_registered_ = false;
-        is_initialized_ = false;
-        environment_ = RAC_ENV_DEVELOPMENT;
-        api_key_.clear();
-        base_url_.clear();
-        device_id_.clear();
+            // Clear everything
+            is_device_registered_ = false;
+            is_initialized_ = false;
+            environment_ = RAC_ENV_DEVELOPMENT;
+            api_key_.clear();
+            base_url_.clear();
+            device_id_.clear();
+        }
+
+        rac::events::publish_shutdown();
     }
 
     // ==========================================================================
@@ -104,8 +113,14 @@ class SDKState {
     // ==========================================================================
 
     void setDeviceRegistered(bool registered) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        is_device_registered_ = registered;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (is_device_registered_ == registered) {
+                return;
+            }
+            is_device_registered_ = registered;
+        }
+        rac::events::publish_device_registration_state_changed(registered);
     }
 
     bool isDeviceRegistered() const {

@@ -95,6 +95,17 @@ public class VoiceSessionConfig(
     schemaIndex = 4,
   )
   public val thinking_mode_enabled: Boolean = false,
+  /**
+   * Optional per-turn LLM max token limit. 0 = LLM/default.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxTokens",
+    schemaIndex = 5,
+  )
+  public val max_tokens: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceSessionConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -113,6 +124,7 @@ public class VoiceSessionConfig(
     if (auto_play_tts != other.auto_play_tts) return false
     if (continuous_mode != other.continuous_mode) return false
     if (thinking_mode_enabled != other.thinking_mode_enabled) return false
+    if (max_tokens != other.max_tokens) return false
     return true
   }
 
@@ -125,6 +137,7 @@ public class VoiceSessionConfig(
       result = result * 37 + auto_play_tts.hashCode()
       result = result * 37 + continuous_mode.hashCode()
       result = result * 37 + thinking_mode_enabled.hashCode()
+      result = result * 37 + max_tokens.hashCode()
       super.hashCode = result
     }
     return result
@@ -137,6 +150,7 @@ public class VoiceSessionConfig(
     result += """auto_play_tts=$auto_play_tts"""
     result += """continuous_mode=$continuous_mode"""
     result += """thinking_mode_enabled=$thinking_mode_enabled"""
+    result += """max_tokens=$max_tokens"""
     return result.joinToString(prefix = "VoiceSessionConfig{", separator = ", ", postfix = "}")
   }
 
@@ -146,9 +160,10 @@ public class VoiceSessionConfig(
     auto_play_tts: Boolean = this.auto_play_tts,
     continuous_mode: Boolean = this.continuous_mode,
     thinking_mode_enabled: Boolean = this.thinking_mode_enabled,
+    max_tokens: Int = this.max_tokens,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceSessionConfig = VoiceSessionConfig(silence_duration_ms, speech_threshold, auto_play_tts,
-      continuous_mode, thinking_mode_enabled, unknownFields)
+      continuous_mode, thinking_mode_enabled, max_tokens, unknownFields)
 
   public companion object {
     @JvmField
@@ -173,6 +188,8 @@ public class VoiceSessionConfig(
             value.continuous_mode)
         if (value.thinking_mode_enabled != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
             value.thinking_mode_enabled)
+        if (value.max_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.max_tokens)
         return size
       }
 
@@ -187,11 +204,13 @@ public class VoiceSessionConfig(
             value.continuous_mode)
         if (value.thinking_mode_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.thinking_mode_enabled)
+        if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.max_tokens)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceSessionConfig) {
         writer.writeBytes(value.unknownFields)
+        if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.max_tokens)
         if (value.thinking_mode_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.thinking_mode_enabled)
         if (value.continuous_mode != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
@@ -210,6 +229,7 @@ public class VoiceSessionConfig(
         var auto_play_tts: Boolean = false
         var continuous_mode: Boolean = false
         var thinking_mode_enabled: Boolean = false
+        var max_tokens: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> silence_duration_ms = ProtoAdapter.INT32.decode(reader)
@@ -217,6 +237,7 @@ public class VoiceSessionConfig(
             3 -> auto_play_tts = ProtoAdapter.BOOL.decode(reader)
             4 -> continuous_mode = ProtoAdapter.BOOL.decode(reader)
             5 -> thinking_mode_enabled = ProtoAdapter.BOOL.decode(reader)
+            6 -> max_tokens = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -226,6 +247,7 @@ public class VoiceSessionConfig(
           auto_play_tts = auto_play_tts,
           continuous_mode = continuous_mode,
           thinking_mode_enabled = thinking_mode_enabled,
+          max_tokens = max_tokens,
           unknownFields = unknownFields
         )
       }

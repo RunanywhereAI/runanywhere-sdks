@@ -383,7 +383,7 @@ public class DownloadAdapter: @unchecked Sendable {
     private func updateModelMetadata(model: ModelInfo, localPath: URL) async throws {
         var updatedModel = model
         updatedModel.localPath = localPath
-        try await CppBridge.ModelRegistry.shared.save(updatedModel)
+        try await CppBridge.ModelRegistry.shared.update(updatedModel)
         logger.info("Model metadata saved successfully for: \(model.id)")
     }
 

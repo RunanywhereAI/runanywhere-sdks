@@ -8,7 +8,7 @@
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
-import { StructuredOutputOptions } from "./structured_output";
+import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -127,7 +127,14 @@ export interface LLMGenerationOptions {
    * structured_output.proto so the schema/format details aren't duplicated
    * here. When set, supersedes the simpler `json_schema` string above.
    */
-  structuredOutput?: StructuredOutputOptions | undefined;
+  structuredOutput?:
+    | StructuredOutputOptions
+    | undefined;
+  /**
+   * Enable per-token/cost dashboard tracking for SDKs that surface live
+   * generation telemetry. No-op for backends without a telemetry sink.
+   */
+  enableRealTimeTracking: boolean;
 }
 
 /**
@@ -193,7 +200,26 @@ export interface LLMGenerationResult {
    * Where the generation actually ran (on-device, cloud, etc.). Useful
    * when execution_target was AUTO and the SDK picked the route.
    */
-  executedOn?: ExecutionTarget | undefined;
+  executedOn?:
+    | ExecutionTarget
+    | undefined;
+  /**
+   * Structured-output validation details, when a structured-output request
+   * was used. Mirrors the Swift/RN validation payload.
+   */
+  structuredOutputValidation?:
+    | StructuredOutputValidation
+    | undefined;
+  /**
+   * Total tokens consumed (prompt + completion). Some C ABI paths expose
+   * this directly; consumers may also compute it from the per-field counts.
+   */
+  totalTokens: number;
+  /**
+   * Backend error text for result-producing APIs that return a terminal
+   * result envelope instead of throwing through the host language.
+   */
+  errorMessage?: string | undefined;
 }
 
 /**
@@ -216,6 +242,18 @@ export interface LLMConfiguration {
     | undefined;
   /** Whether streaming generation is enabled by default for this component. */
   streaming: boolean;
+  /**
+   * Model identifier/path resolved by the component loader. Present in the
+   * C ABI rac_llm_config_t and needed for generated-proto service handles.
+   */
+  modelId?:
+    | string
+    | undefined;
+  /**
+   * Preferred inference framework for this component. UNSPECIFIED / absent
+   * means "auto".
+   */
+  preferredFramework?: InferenceFramework | undefined;
 }
 
 /**
@@ -301,6 +339,7 @@ function createBaseLLMGenerationOptions(): LLMGenerationOptions {
     thinkingPattern: undefined,
     executionTarget: undefined,
     structuredOutput: undefined,
+    enableRealTimeTracking: false,
   };
 }
 
@@ -344,6 +383,9 @@ export const LLMGenerationOptions = {
     }
     if (message.structuredOutput !== undefined) {
       StructuredOutputOptions.encode(message.structuredOutput, writer.uint32(106).fork()).ldelim();
+    }
+    if (message.enableRealTimeTracking !== false) {
+      writer.uint32(112).bool(message.enableRealTimeTracking);
     }
     return writer;
   },
@@ -446,6 +488,13 @@ export const LLMGenerationOptions = {
 
           message.structuredOutput = StructuredOutputOptions.decode(reader, reader.uint32());
           continue;
+        case 14:
+          if (tag !== 112) {
+            break;
+          }
+
+          message.enableRealTimeTracking = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -474,6 +523,9 @@ export const LLMGenerationOptions = {
       structuredOutput: isSet(object.structuredOutput)
         ? StructuredOutputOptions.fromJSON(object.structuredOutput)
         : undefined,
+      enableRealTimeTracking: isSet(object.enableRealTimeTracking)
+        ? globalThis.Boolean(object.enableRealTimeTracking)
+        : false,
     };
   },
 
@@ -518,6 +570,9 @@ export const LLMGenerationOptions = {
     if (message.structuredOutput !== undefined) {
       obj.structuredOutput = StructuredOutputOptions.toJSON(message.structuredOutput);
     }
+    if (message.enableRealTimeTracking !== false) {
+      obj.enableRealTimeTracking = message.enableRealTimeTracking;
+    }
     return obj;
   },
 
@@ -543,6 +598,7 @@ export const LLMGenerationOptions = {
     message.structuredOutput = (object.structuredOutput !== undefined && object.structuredOutput !== null)
       ? StructuredOutputOptions.fromPartial(object.structuredOutput)
       : undefined;
+    message.enableRealTimeTracking = object.enableRealTimeTracking ?? false;
     return message;
   },
 };
@@ -564,6 +620,9 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
     jsonOutput: undefined,
     performance: undefined,
     executedOn: undefined,
+    structuredOutputValidation: undefined,
+    totalTokens: 0,
+    errorMessage: undefined,
   };
 }
 
@@ -613,6 +672,15 @@ export const LLMGenerationResult = {
     }
     if (message.executedOn !== undefined) {
       writer.uint32(120).int32(message.executedOn);
+    }
+    if (message.structuredOutputValidation !== undefined) {
+      StructuredOutputValidation.encode(message.structuredOutputValidation, writer.uint32(130).fork()).ldelim();
+    }
+    if (message.totalTokens !== 0) {
+      writer.uint32(136).int32(message.totalTokens);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(146).string(message.errorMessage);
     }
     return writer;
   },
@@ -729,6 +797,27 @@ export const LLMGenerationResult = {
 
           message.executedOn = reader.int32() as any;
           continue;
+        case 16:
+          if (tag !== 130) {
+            break;
+          }
+
+          message.structuredOutputValidation = StructuredOutputValidation.decode(reader, reader.uint32());
+          continue;
+        case 17:
+          if (tag !== 136) {
+            break;
+          }
+
+          message.totalTokens = reader.int32();
+          continue;
+        case 18:
+          if (tag !== 146) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -755,6 +844,11 @@ export const LLMGenerationResult = {
       jsonOutput: isSet(object.jsonOutput) ? globalThis.String(object.jsonOutput) : undefined,
       performance: isSet(object.performance) ? PerformanceMetrics.fromJSON(object.performance) : undefined,
       executedOn: isSet(object.executedOn) ? executionTargetFromJSON(object.executedOn) : undefined,
+      structuredOutputValidation: isSet(object.structuredOutputValidation)
+        ? StructuredOutputValidation.fromJSON(object.structuredOutputValidation)
+        : undefined,
+      totalTokens: isSet(object.totalTokens) ? globalThis.Number(object.totalTokens) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
     };
   },
 
@@ -805,6 +899,15 @@ export const LLMGenerationResult = {
     if (message.executedOn !== undefined) {
       obj.executedOn = executionTargetToJSON(message.executedOn);
     }
+    if (message.structuredOutputValidation !== undefined) {
+      obj.structuredOutputValidation = StructuredOutputValidation.toJSON(message.structuredOutputValidation);
+    }
+    if (message.totalTokens !== 0) {
+      obj.totalTokens = Math.round(message.totalTokens);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
     return obj;
   },
 
@@ -830,12 +933,26 @@ export const LLMGenerationResult = {
       ? PerformanceMetrics.fromPartial(object.performance)
       : undefined;
     message.executedOn = object.executedOn ?? undefined;
+    message.structuredOutputValidation =
+      (object.structuredOutputValidation !== undefined && object.structuredOutputValidation !== null)
+        ? StructuredOutputValidation.fromPartial(object.structuredOutputValidation)
+        : undefined;
+    message.totalTokens = object.totalTokens ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
     return message;
   },
 };
 
 function createBaseLLMConfiguration(): LLMConfiguration {
-  return { contextLength: 0, temperature: 0, maxTokens: 0, systemPrompt: undefined, streaming: false };
+  return {
+    contextLength: 0,
+    temperature: 0,
+    maxTokens: 0,
+    systemPrompt: undefined,
+    streaming: false,
+    modelId: undefined,
+    preferredFramework: undefined,
+  };
 }
 
 export const LLMConfiguration = {
@@ -854,6 +971,12 @@ export const LLMConfiguration = {
     }
     if (message.streaming !== false) {
       writer.uint32(40).bool(message.streaming);
+    }
+    if (message.modelId !== undefined) {
+      writer.uint32(50).string(message.modelId);
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(56).int32(message.preferredFramework);
     }
     return writer;
   },
@@ -900,6 +1023,20 @@ export const LLMConfiguration = {
 
           message.streaming = reader.bool();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -916,6 +1053,10 @@ export const LLMConfiguration = {
       maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
       systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
       streaming: isSet(object.streaming) ? globalThis.Boolean(object.streaming) : false,
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : undefined,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
     };
   },
 
@@ -936,6 +1077,12 @@ export const LLMConfiguration = {
     if (message.streaming !== false) {
       obj.streaming = message.streaming;
     }
+    if (message.modelId !== undefined) {
+      obj.modelId = message.modelId;
+    }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
     return obj;
   },
 
@@ -949,6 +1096,8 @@ export const LLMConfiguration = {
     message.maxTokens = object.maxTokens ?? 0;
     message.systemPrompt = object.systemPrompt ?? undefined;
     message.streaming = object.streaming ?? false;
+    message.modelId = object.modelId ?? undefined;
+    message.preferredFramework = object.preferredFramework ?? undefined;
     return message;
   },
 };

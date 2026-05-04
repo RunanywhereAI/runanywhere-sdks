@@ -464,7 +464,7 @@ endif()
 # All shared libraries must have PT_LOAD segments aligned to 16KB
 # =============================================================================
 if(ANDROID)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
     message(STATUS "Enabled 16KB page alignment for Android (Google Play requirement)")
 endif()
 
@@ -509,7 +509,9 @@ set(RAC_CORE_SOURCES
     src/core/sdk_state.cpp
     src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
+    src/core/model_lifecycle.cpp
     src/core/rac_error_model.cpp
+    src/foundation/rac_proto_buffer.cpp
 )
 
 # Infrastructure sources - registry, model management, network, telemetry
@@ -584,11 +586,25 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/graph/graph_scheduler.cpp
 )
 
+# Built-in CPU runtime. The runtime registry explicitly calls
+# rac_runtime_entry_cpu() during bootstrap. Standalone commons builds compile
+# the TU directly; root monorepo builds fold in the runtimes/cpu OBJECT target
+# after add_subdirectory(runtimes), so compiling it here as well duplicates
+# rac_runtime_entry_cpu and the CPU provider symbols.
+set(RAC_CPU_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../runtimes/cpu")
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
+   AND EXISTS "${RAC_CPU_RUNTIME_DIR}/rac_runtime_cpu.cpp")
+    list(APPEND RAC_INFRASTRUCTURE_SOURCES
+        "${RAC_CPU_RUNTIME_DIR}/rac_runtime_cpu.cpp"
+    )
+endif()
+
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
     src/features/llm/rac_llm_service.cpp
+    src/features/llm/rac_llm_proto_service.cpp
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
@@ -624,15 +640,23 @@ set(RAC_FEATURES_SOURCES
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
+    src/features/vlm/rac_vlm_proto_abi.cpp
     # Diffusion
     src/features/diffusion/diffusion_component.cpp
     src/features/diffusion/rac_diffusion_service.cpp
+    src/features/diffusion/rac_diffusion_proto_abi.cpp
     src/features/diffusion/diffusion_model_registry.cpp
     src/features/diffusion/diffusion_json.cpp
     src/features/diffusion/rac_diffusion_tokenizer.cpp
     # Embeddings
     src/features/embeddings/rac_embeddings_service.cpp
+    src/features/embeddings/rac_embeddings_proto_abi.cpp
     src/features/embeddings/embeddings_component.cpp
+    # Platform service availability callback registry (always built; platform
+    # implementations remain Apple-gated below).
+    src/features/platform/rac_platform_services.cpp
+    # LoRA
+    src/features/lora/rac_lora_service.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
@@ -670,15 +694,15 @@ endif()
 # T4.7 Solutions C ABI — always-built fallback.
 #
 # The full SolutionRunner implementation (rac_solution.cpp + companions)
-# requires Protobuf and is added to rac_commons inside the Protobuf_FOUND
-# block below. On cross-compilation targets (iOS / Android / WASM) Protobuf
-# is typically not discoverable, so without this stub TU every downstream
-# binding (Swift facade, JNI thunks, RN HybridRunAnywhereCore, Flutter FFI,
-# Web exports) would fail to link against the rac_solution_* symbols.
+# requires the Solutions runtime and is added to rac_commons only when
+# RAC_ENABLE_SOLUTIONS=ON. Artifacts may still ship the core protobuf ABI
+# without Solutions, so without this stub TU every downstream binding (Swift
+# facade, JNI thunks, RN HybridRunAnywhereCore, Flutter FFI, Web exports) would
+# fail to link against the rac_solution_* symbols.
 #
-# rac_solution_stub.cpp is gated on `#ifndef RAC_HAVE_PROTOBUF`, so when the
-# Protobuf branch defines RAC_HAVE_PROTOBUF=1 the stub TU compiles to an
-# empty object and the real symbols from rac_solution.cpp win at link time.
+# rac_solution_stub.cpp is gated on `#ifndef RAC_HAVE_SOLUTIONS`, so protobuf
+# can be enabled for the core proto ABI without accidentally dropping the
+# solution fallback symbols when RAC_ENABLE_SOLUTIONS=OFF.
 set(RAC_SOLUTIONS_STUB_SOURCES
     src/solutions/rac_solution_stub.cpp
 )
@@ -712,6 +736,11 @@ target_include_directories(rac_commons PUBLIC
 target_include_directories(rac_commons PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+if(EXISTS "${RAC_CPU_RUNTIME_DIR}/rac_runtime_entry_cpu.h")
+    target_include_directories(rac_commons PRIVATE
+        "${RAC_CPU_RUNTIME_DIR}"
+    )
+endif()
 
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)
@@ -837,86 +866,164 @@ if(RAC_REGENERATE_PROTO)
 endif()
 
 # =============================================================================
-# Protobuf — optional, gates RAC_HAVE_PROTOBUF
+# Protobuf runtime — gates RAC_HAVE_PROTOBUF
 #
-# v2 close-out Phase 2: when Protobuf is available, link the generated
-# voice_events / model_types / pipeline / solutions C++ classes into
-# rac_commons + define RAC_HAVE_PROTOBUF so rac_voice_event_abi.cpp can
-# serialize VoiceEvent and dispatch the proto-byte callback wired up by
-# the GAP 09 Phase 15 ABI. When Protobuf is missing, the same source files
-# fall back to the FEATURE_NOT_AVAILABLE path declared in the header.
+# Protobuf-backed native ABIs are used directly by Swift/Flutter/Kotlin/RN/Web
+# bindings for registry, storage, downloads, lifecycle, LLM, speech, vision, and
+# other serialized-byte calls. Keep this independent from the Solutions API:
+# Solutions consume protobuf too, but disabling Solutions must not silently turn
+# every exported proto ABI symbol into a RAC_ERROR_FEATURE_NOT_AVAILABLE stub.
 # =============================================================================
 
-# Solutions API protobuf — gated to avoid Abseil/protobuf cross-compile failures
-# on NDK 27 / emscripten. Default: ON for desktop (macOS/Linux/Windows),
-# OFF for mobile (Android/iOS) + WASM. When OFF, src/solutions/rac_solution_stub.cpp
-# provides rac_solution_* symbols that return RAC_ERROR_FEATURE_NOT_AVAILABLE.
-# Override with -DRAC_ENABLE_SOLUTIONS=ON/OFF.
-if(ANDROID OR EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(EMSCRIPTEN)
+    set(RAC_ENABLE_PROTOBUF_DEFAULT OFF)
+else()
+    set(RAC_ENABLE_PROTOBUF_DEFAULT ON)
+endif()
+option(RAC_ENABLE_PROTOBUF "Build protobuf-backed native ABI implementations" ${RAC_ENABLE_PROTOBUF_DEFAULT})
+option(RAC_VENDOR_PROTOBUF "Fetch/build protobuf when RAC_ENABLE_PROTOBUF=ON and find_package(Protobuf) fails" ON)
+
+if(EMSCRIPTEN)
     set(RAC_ENABLE_SOLUTIONS_DEFAULT OFF)
 else()
-    set(RAC_ENABLE_SOLUTIONS_DEFAULT ON)
+    set(RAC_ENABLE_SOLUTIONS_DEFAULT ${RAC_ENABLE_PROTOBUF})
 endif()
 option(RAC_ENABLE_SOLUTIONS "Build Solutions API (requires protobuf+absl)" ${RAC_ENABLE_SOLUTIONS_DEFAULT})
 
-if(RAC_ENABLE_SOLUTIONS)
-    message(STATUS "RAC_ENABLE_SOLUTIONS=ON — building full Solutions API (protobuf+absl)")
+set(RAC_PROTOBUF_RUNTIME_ENABLED OFF CACHE INTERNAL "rac_commons protobuf runtime enabled" FORCE)
+set(RAC_SOLUTIONS_RUNTIME_ENABLED OFF CACHE INTERNAL "rac_commons Solutions runtime enabled" FORCE)
+set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
+set(_RAC_PROTO_GENERATED_SOURCES
+    ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/sdk_events.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/download_service.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/model_types.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/pipeline.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/solutions.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/hardware_profile.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/llm_service.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/llm_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/chat.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/tool_calling.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/structured_output.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/stt_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/diffusion_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/embeddings_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/rag.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/storage_types.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/lora_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/voice_agent_service.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
+)
+set(RAC_PROTOBUF_COMPILE_OPTIONS "")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    list(APPEND RAC_PROTOBUF_COMPILE_OPTIONS -Wno-nullability-extension)
+endif()
 
-    find_package(Protobuf QUIET)
+if(RAC_ENABLE_PROTOBUF)
+    message(STATUS "RAC_ENABLE_PROTOBUF=ON — building generated-proto native ABI implementations")
+    if(RAC_VENDOR_PROTOBUF)
+        find_package(Protobuf 34.1 EXACT CONFIG QUIET)
+    else()
+        find_package(Protobuf 34.1 EXACT QUIET)
+    endif()
 
-    # Fallback: on Android/iOS/WASM cross-compiles there is no system protobuf,
-    # so find_package returns nothing, RAC_HAVE_PROTOBUF never gets defined, and
-    # the full Solutions API implementation is linked OUT — only the stub that
-    # returns RAC_ERROR_FEATURE_NOT_AVAILABLE ships. Vendor libprotobuf via
-    # FetchContent (same pattern mbedTLS uses for Android curl TLS above) so
-    # the proto-backed Solutions / Pipeline / VoiceEvent code compiles on every
-    # mobile + WASM target.
-    if(NOT Protobuf_FOUND)
-        if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS" OR EMSCRIPTEN)
-            include(FetchContent)
-            set(protobuf_BUILD_TESTS           OFF CACHE INTERNAL "")
-            set(protobuf_BUILD_PROTOC_BINARIES OFF CACHE INTERNAL "")
-            set(protobuf_BUILD_EXAMPLES        OFF CACHE INTERNAL "")
-            set(protobuf_INSTALL               OFF CACHE INTERNAL "")
-            set(protobuf_BUILD_SHARED_LIBS     OFF CACHE INTERNAL "")
-            # protobuf v28+ depends on abseil; "module" tells protobuf to fetch
-            # and build absl as a subproject instead of requiring it on the
-            # sysroot.
-            set(protobuf_ABSL_PROVIDER         "module" CACHE STRING   "")
-            set(ABSL_PROPAGATE_CXX_STD         ON       CACHE BOOL     "")
-            FetchContent_Declare(
-                protobuf_fetched
-                GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-                GIT_TAG        v28.3
-                GIT_SHALLOW    TRUE
-            )
-            FetchContent_MakeAvailable(protobuf_fetched)
-            # Aliases so downstream `if(TARGET protobuf::libprotobuf)` branches
-            # pick up the vendored targets.
-            if(TARGET libprotobuf AND NOT TARGET protobuf::libprotobuf)
-                add_library(protobuf::libprotobuf ALIAS libprotobuf)
-            endif()
-            if(TARGET libprotobuf-lite AND NOT TARGET protobuf::libprotobuf-lite)
-                add_library(protobuf::libprotobuf-lite ALIAS libprotobuf-lite)
-            endif()
+    if(NOT Protobuf_FOUND AND RAC_VENDOR_PROTOBUF)
+        include(FetchContent)
+        set(protobuf_BUILD_TESTS           OFF CACHE BOOL "" FORCE)
+        set(protobuf_BUILD_PROTOC_BINARIES OFF CACHE BOOL "" FORCE)
+        set(protobuf_BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
+        set(protobuf_INSTALL               OFF CACHE BOOL "" FORCE)
+        set(protobuf_BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
+        set(protobuf_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
+        # protobuf v28+ depends on abseil. "module" keeps mobile/xcompile
+        # builds self-contained instead of relying on host/sysroot packages.
+        set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
+        set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
+        FetchContent_Declare(
+            protobuf_fetched
+            GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
+            GIT_TAG        v34.1
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(protobuf_fetched)
+        if(TARGET libprotobuf AND NOT TARGET protobuf::libprotobuf)
+            add_library(protobuf::libprotobuf ALIAS libprotobuf)
+        endif()
+        if(TARGET libprotobuf-lite AND NOT TARGET protobuf::libprotobuf-lite)
+            add_library(protobuf::libprotobuf-lite ALIAS libprotobuf-lite)
+        endif()
+        if(TARGET protobuf::libprotobuf OR TARGET libprotobuf)
             set(Protobuf_FOUND TRUE)
-            # The vendored source tree exports its include dirs via the imported
-            # target, so Protobuf_INCLUDE_DIRS is not strictly required — but
-            # the `if(Protobuf_FOUND)` block below still references it on the
-            # PRIVATE include path. Pull the absolute path off the target.
-            if(TARGET libprotobuf)
-                get_target_property(_rac_pb_inc libprotobuf INTERFACE_INCLUDE_DIRECTORIES)
-                if(_rac_pb_inc)
-                    set(Protobuf_INCLUDE_DIRS "${_rac_pb_inc}")
-                endif()
-            endif()
-            message(STATUS "RunAnywhere: vendored libprotobuf v28.3 via FetchContent (absl=module)")
+            message(STATUS "RunAnywhere: vendored libprotobuf v34.1 via FetchContent (absl=module)")
         endif()
     endif()
 
-    # v2 close-out: SHARED builds need absl symbols (see cmake/protobuf.cmake).
-    # Find absl independently here too for standalone-commons builds that
-    # bypass the root CMake.
+    if(RAC_PROTOBUF_COMPILE_OPTIONS)
+        foreach(_rac_pb_build_target libprotobuf libprotobuf-lite)
+            if(TARGET ${_rac_pb_build_target})
+                target_compile_options(${_rac_pb_build_target} PRIVATE
+                    ${RAC_PROTOBUF_COMPILE_OPTIONS}
+                )
+            endif()
+        endforeach()
+    endif()
+
+    if(NOT Protobuf_FOUND)
+        message(FATAL_ERROR
+            "RAC_ENABLE_PROTOBUF=ON but Protobuf is unavailable. "
+            "Install Protobuf, leave RAC_VENDOR_PROTOBUF=ON, or configure with "
+            "-DRAC_ENABLE_PROTOBUF=OFF to intentionally build unavailable proto stubs.")
+    endif()
+
+    foreach(_rac_proto_source IN LISTS _RAC_PROTO_GENERATED_SOURCES)
+        if(NOT EXISTS "${_rac_proto_source}")
+            message(FATAL_ERROR
+                "RAC_ENABLE_PROTOBUF=ON but generated proto source is missing: "
+                "${_rac_proto_source}. Run idl/codegen/generate_cpp.sh or disable "
+                "RAC_ENABLE_PROTOBUF.")
+        endif()
+    endforeach()
+
+    if(NOT Protobuf_INCLUDE_DIRS)
+        foreach(_rac_pb_target protobuf::libprotobuf libprotobuf)
+            if(TARGET ${_rac_pb_target})
+                get_target_property(_rac_pb_inc ${_rac_pb_target} INTERFACE_INCLUDE_DIRECTORIES)
+                if(_rac_pb_inc)
+                    list(APPEND Protobuf_INCLUDE_DIRS ${_rac_pb_inc})
+                endif()
+            endif()
+        endforeach()
+    endif()
+    if(NOT Protobuf_INCLUDE_DIRS AND DEFINED protobuf_fetched_SOURCE_DIR)
+        set(Protobuf_INCLUDE_DIRS "${protobuf_fetched_SOURCE_DIR}/src")
+    endif()
+
+    target_sources(rac_commons PRIVATE
+        ${_RAC_PROTO_GENERATED_SOURCES}
+        src/foundation/rac_proto_adapters.cpp
+    )
+    if(RAC_PROTOBUF_COMPILE_OPTIONS)
+        target_compile_options(rac_commons PRIVATE ${RAC_PROTOBUF_COMPILE_OPTIONS})
+    endif()
+    # Keep generated proto headers and protobuf includes PRIVATE. The C ABI
+    # exposes byte buffers, not `runanywhere::v1::*` C++ types.
+    target_include_directories(rac_commons PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
+        ${Protobuf_INCLUDE_DIRS}
+    )
+    if(TARGET protobuf::libprotobuf)
+        target_link_libraries(rac_commons PRIVATE protobuf::libprotobuf)
+    else()
+        target_link_libraries(rac_commons PRIVATE ${Protobuf_LIBRARIES})
+    endif()
+
+    # Shared builds with some system protobuf packages still need explicit absl
+    # link targets. Vendored protobuf normally propagates these transitively.
     if(NOT DEFINED RAC_ABSL_LIBS)
         find_package(absl QUIET CONFIG)
         if(absl_FOUND)
@@ -925,91 +1032,36 @@ if(RAC_ENABLE_SOLUTIONS)
             set(RAC_ABSL_LIBS "")
         endif()
     endif()
-    if(Protobuf_FOUND)
-        set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
-        if(EXISTS ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc)
-            target_sources(rac_commons PRIVATE
-                ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/model_types.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/pipeline.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/solutions.pb.cc
-                # v2 close-out Phase G-2: LLMStreamEvent for the proto-byte
-                # LLM stream ABI (rac_llm_stream.cpp).
-                ${_RAC_PROTO_GEN_DIR}/llm_service.pb.cc
-                # Phase C6: per-modality option / event protos consumed by the
-                # foundation/rac_proto_adapters layer.
-                ${_RAC_PROTO_GEN_DIR}/stt_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/diffusion_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/embeddings_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/rag.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/storage_types.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/lora_options.pb.cc
-                ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
-                # Phase C6: proto <-> C ABI adapter functions (foundation layer).
-                src/foundation/rac_proto_adapters.cpp
-            )
-            # MF-3 (AG-V3): the generated proto headers and the protobuf
-            # include path must stay PRIVATE — they are an implementation
-            # detail of rac_commons (consumed only by rac_proto_adapters.cpp
-            # and the Solutions T4.7 sources below). Exposing them via
-            # PUBLIC leaks `runanywhere::v1::*` proto types and the entire
-            # google::protobuf / absl transitive include set into every L5
-            # consumer (Swift CRACommons, Kotlin JNI, Web/Flutter/RN).
-            target_include_directories(rac_commons PRIVATE
-                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>
-                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
-                ${Protobuf_INCLUDE_DIRS}
-            )
-            # Prefer the modern imported target when available so transitive deps
-            # (absl, etc.) flow through without us listing them by hand.
-            # PRIVATE: protobuf is an implementation detail of rac_commons
-            # (Wave 5 Step 5.1 / RC-12 — solution headers forward-decl proto
-            # types; consumers must not be forced to link libprotobuf).
-            if(TARGET protobuf::libprotobuf)
-                target_link_libraries(rac_commons PRIVATE protobuf::libprotobuf)
-            else()
-                target_link_libraries(rac_commons PRIVATE ${Protobuf_LIBRARIES})
-            endif()
-            # v2 close-out: when SHARED, absl symbols must resolve at link
-            # time. RAC_ABSL_LIBS comes from cmake/protobuf.cmake (or the
-            # block above for standalone-commons). PUBLIC so consumers
-            # (engine plugins built as SHARED) inherit the deps.
-            if(RAC_ABSL_LIBS)
-                target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
-            endif()
-            # MF-3 (AG-V3): RAC_HAVE_PROTOBUF must stay PRIVATE so the proto
-            # `#ifdef` guard inside rac/foundation/rac_proto_adapters.h does
-            # not activate for L5 consumers. Only rac_commons internal TUs
-            # (rac_proto_adapters.cpp, the Solutions/Pipeline sources, the
-            # rac_llm_stream proto-byte ABI) need the definition.
-            target_compile_definitions(rac_commons PRIVATE RAC_HAVE_PROTOBUF=1)
-            message(STATUS "Protobuf: linked voice_events.pb + RAC_HAVE_PROTOBUF=1 (Phase 2)")
-
-            # T4.7: SolutionRunner + PipelineExecutor + C ABI. Gated on
-            # Protobuf because the implementation walks PipelineSpec /
-            # SolutionConfig messages directly. The neutral operator
-            # registry keeps the subsystem engine-agnostic; real backends
-            # register their factories at startup.
-            target_sources(rac_commons PRIVATE
-                src/solutions/operator_registry.cpp
-                src/solutions/pipeline_executor.cpp
-                src/solutions/solution_converter.cpp
-                src/solutions/solution_runner.cpp
-                src/solutions/config_loader.cpp
-                src/solutions/rac_solution.cpp
-            )
-            message(STATUS "T4.7: SolutionRunner + PipelineExecutor compiled into rac_commons")
-        else()
-            message(STATUS "Protobuf found but src/generated/proto/*.pb.cc absent — proto event ABI inactive")
-        endif()
-    else()
-        message(STATUS "Protobuf not found — rac_voice_agent_set_proto_callback / rac_llm_set_stream_proto_callback fall back to hand-encoded wire format (no libprotobuf dependency)")
+    if(RAC_ABSL_LIBS)
+        target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
     endif()
+
+    target_compile_definitions(rac_commons PRIVATE RAC_HAVE_PROTOBUF=1)
+    set(RAC_PROTOBUF_RUNTIME_ENABLED ON CACHE INTERNAL "rac_commons protobuf runtime enabled" FORCE)
+    message(STATUS "Protobuf runtime: linked generated protos + RAC_HAVE_PROTOBUF=1")
 else()
-    message(STATUS "RAC_ENABLE_SOLUTIONS=OFF — skipping protobuf/absl; rac_solution_* symbols served by rac_solution_stub.cpp (RAC_ERROR_FEATURE_NOT_AVAILABLE)")
+    message(STATUS "RAC_ENABLE_PROTOBUF=OFF — exported proto ABI functions use unavailable stubs")
+endif()
+
+if(RAC_ENABLE_SOLUTIONS)
+    if(NOT RAC_PROTOBUF_RUNTIME_ENABLED)
+        message(FATAL_ERROR
+            "RAC_ENABLE_SOLUTIONS=ON requires RAC_ENABLE_PROTOBUF=ON and a working protobuf runtime.")
+    endif()
+    message(STATUS "RAC_ENABLE_SOLUTIONS=ON — building full Solutions API")
+    target_sources(rac_commons PRIVATE
+        src/solutions/operator_registry.cpp
+        src/solutions/pipeline_executor.cpp
+        src/solutions/solution_converter.cpp
+        src/solutions/solution_runner.cpp
+        src/solutions/config_loader.cpp
+        src/solutions/rac_solution.cpp
+    )
+    target_compile_definitions(rac_commons PRIVATE RAC_HAVE_SOLUTIONS=1)
+    set(RAC_SOLUTIONS_RUNTIME_ENABLED ON CACHE INTERNAL "rac_commons Solutions runtime enabled" FORCE)
+    message(STATUS "T4.7: SolutionRunner + PipelineExecutor compiled into rac_commons")
+else()
+    message(STATUS "RAC_ENABLE_SOLUTIONS=OFF — rac_solution_* symbols served by rac_solution_stub.cpp (RAC_ERROR_FEATURE_NOT_AVAILABLE)")
 endif()
 
 # Platform-specific linking
@@ -1217,5 +1269,7 @@ endif()
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
 message(STATUS "HTTP Server:    ${RAC_BUILD_SERVER}")
+message(STATUS "Protobuf ABI:   ${RAC_PROTOBUF_RUNTIME_ENABLED}")
+message(STATUS "Solutions API:  ${RAC_SOLUTIONS_RUNTIME_ENABLED}")
 message(STATUS "====================================")
 message(STATUS "")

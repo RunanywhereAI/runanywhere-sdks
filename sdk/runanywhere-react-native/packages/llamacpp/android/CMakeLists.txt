@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
 
 # Path to pre-built native libraries (downloaded from runanywhere-binaries)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
@@ -135,4 +135,6 @@ target_link_libraries(
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_LLAMACPP=1 HAS_RACOMMONS=1)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
-target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)
+target_link_options(${PACKAGE_NAME} PRIVATE
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384)

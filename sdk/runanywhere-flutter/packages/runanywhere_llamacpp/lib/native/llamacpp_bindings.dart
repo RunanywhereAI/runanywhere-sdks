@@ -148,7 +148,7 @@ class LlamaCppBindings {
     if (_register == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _register!();
+    return _register();
   }
 
   /// Unregister the LlamaCPP backend from C++ registry.
@@ -156,7 +156,7 @@ class LlamaCppBindings {
     if (_unregister == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregister!();
+    return _unregister();
   }
 
   /// Register the LlamaCPP VLM (Vision Language Model) backend.
@@ -168,7 +168,7 @@ class LlamaCppBindings {
     if (_registerVlm == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _registerVlm!();
+    return _registerVlm();
   }
 
   /// Unregister the LlamaCPP VLM backend from C++ registry.
@@ -176,6 +176,6 @@ class LlamaCppBindings {
     if (_unregisterVlm == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregisterVlm!();
+    return _unregisterVlm();
   }
 }

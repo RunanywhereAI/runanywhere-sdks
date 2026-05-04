@@ -16,6 +16,42 @@ option objc_class_prefix         = "RAV1";
 option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 
+enum VoiceEventCategory {
+    VOICE_EVENT_CATEGORY_UNSPECIFIED   = 0;
+    VOICE_EVENT_CATEGORY_VOICE_AGENT   = 1;
+    VOICE_EVENT_CATEGORY_STT           = 2;
+    VOICE_EVENT_CATEGORY_ASR           = 3;
+    VOICE_EVENT_CATEGORY_TTS           = 4;
+    VOICE_EVENT_CATEGORY_VAD           = 5;
+    VOICE_EVENT_CATEGORY_STD           = 6;
+    VOICE_EVENT_CATEGORY_LLM           = 7;
+    VOICE_EVENT_CATEGORY_AUDIO         = 8;
+    VOICE_EVENT_CATEGORY_METRICS       = 9;
+    VOICE_EVENT_CATEGORY_ERROR         = 10;
+    VOICE_EVENT_CATEGORY_WAKEWORD      = 11;
+}
+
+enum VoiceEventSeverity {
+    VOICE_EVENT_SEVERITY_DEBUG    = 0;
+    VOICE_EVENT_SEVERITY_INFO     = 1;
+    VOICE_EVENT_SEVERITY_WARNING  = 2;
+    VOICE_EVENT_SEVERITY_ERROR    = 3;
+    VOICE_EVENT_SEVERITY_CRITICAL = 4;
+}
+
+enum VoicePipelineComponent {
+    VOICE_PIPELINE_COMPONENT_UNSPECIFIED = 0;
+    VOICE_PIPELINE_COMPONENT_AGENT       = 1;
+    VOICE_PIPELINE_COMPONENT_STT         = 2;
+    VOICE_PIPELINE_COMPONENT_ASR         = 3;
+    VOICE_PIPELINE_COMPONENT_TTS         = 4;
+    VOICE_PIPELINE_COMPONENT_VAD         = 5;
+    VOICE_PIPELINE_COMPONENT_STD         = 6;
+    VOICE_PIPELINE_COMPONENT_LLM         = 7;
+    VOICE_PIPELINE_COMPONENT_AUDIO       = 8;
+    VOICE_PIPELINE_COMPONENT_WAKEWORD    = 9;
+}
+
 // ---------------------------------------------------------------------------
 // Sum type emitted on the output edge of the VoiceAgent pipeline.
 // ---------------------------------------------------------------------------
@@ -27,6 +63,10 @@ message VoiceEvent {
     // Wall-clock timestamp captured at the C++ edge, in microseconds since
     // Unix epoch. Frontends may re-timestamp for UI display.
     int64  timestamp_us   = 2;
+
+    VoiceEventCategory  category  = 3;
+    VoiceEventSeverity  severity  = 4;
+    VoicePipelineComponent component = 5;
 
     // Exactly one of the following is populated on every event.
     oneof payload {
@@ -51,6 +91,9 @@ message VoiceEvent {
         SessionStoppedEvent       session_stopped         = 21;
         AgentResponseStartedEvent agent_response_started  = 22;
         AgentResponseCompletedEvent agent_response_completed = 23;
+        SpeechTurnDetectionEvent  speech_turn_detection   = 24;
+        TurnLifecycleEvent        turn_lifecycle          = 25;
+        WakeWordDetectedEvent     wakeword_detected       = 26;
     }
 }
 
@@ -85,6 +128,9 @@ message AudioFrameEvent {
     int32 sample_rate_hz  = 2;    // usually 24000 for Kokoro, 22050 for Piper
     int32 channels        = 3;    // 1 for mono
     AudioEncoding encoding = 4;
+
+    // True for the final audio chunk in a TTS/voice-agent audio stream.
+    bool  is_final        = 5;
 }
 
 enum AudioEncoding {
@@ -98,6 +144,11 @@ enum AudioEncoding {
 message VADEvent {
     VADEventType type     = 1;
     int64  frame_offset_us = 2;
+    float  confidence      = 3;
+    bool   is_speech       = 4;
+    double speech_duration_ms = 5;
+    double silence_duration_ms = 6;
+    double noise_floor_db  = 7;
 }
 
 enum VADEventType {
@@ -106,6 +157,8 @@ enum VADEventType {
     VAD_EVENT_VOICE_END_OF_UTTERANCE = 2;
     VAD_EVENT_BARGE_IN           = 3;
     VAD_EVENT_SILENCE            = 4;
+    VAD_EVENT_STATISTICS         = 5;
+    VAD_EVENT_STATE_CHANGED      = 6;
 }
 
 // Assistant playback was interrupted by a barge-in. The reason distinguishes
@@ -136,6 +189,12 @@ enum PipelineState {
     PIPELINE_STATE_THINKING  = 3;
     PIPELINE_STATE_SPEAKING  = 4;
     PIPELINE_STATE_STOPPED   = 5;
+    PIPELINE_STATE_WAITING_WAKEWORD = 6;
+    PIPELINE_STATE_PROCESSING_SPEECH = 7;
+    PIPELINE_STATE_GENERATING_RESPONSE = 8;
+    PIPELINE_STATE_PLAYING_TTS = 9;
+    PIPELINE_STATE_COOLDOWN = 10;
+    PIPELINE_STATE_ERROR = 11;
 }
 
 // Terminal or recoverable error in the pipeline. Frontends map these to
@@ -248,3 +307,52 @@ message SessionStoppedEvent {}
 message AgentResponseStartedEvent {}
 
 message AgentResponseCompletedEvent {}
+
+message SpeechTurnDetectionEvent {
+    SpeechTurnDetectionEventKind kind = 1;
+    string speaker_id = 2;
+    int64  turn_start_us = 3;
+    int64  turn_end_us = 4;
+    float  confidence = 5;
+    double speech_duration_ms = 6;
+    double silence_duration_ms = 7;
+}
+
+enum SpeechTurnDetectionEventKind {
+    SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0;
+    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1;
+    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED = 2;
+    SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED = 3;
+    SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS = 4;
+}
+
+message TurnLifecycleEvent {
+    TurnLifecycleEventKind kind = 1;
+    string turn_id = 2;
+    string session_id = 3;
+    string transcript = 4;
+    string response = 5;
+    string error = 6;
+}
+
+message WakeWordDetectedEvent {
+    string wake_word = 1;
+    float confidence = 2;
+    int64 timestamp_ms = 3;
+    string model_id = 4;
+    int32 model_index = 5;
+    int64 duration_ms = 6;
+}
+
+enum TurnLifecycleEventKind {
+    TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0;
+    TURN_LIFECYCLE_EVENT_KIND_STARTED = 1;
+    TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED = 2;
+    TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED = 3;
+    TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL = 4;
+    TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED = 5;
+    TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED = 6;
+    TURN_LIFECYCLE_EVENT_KIND_COMPLETED = 7;
+    TURN_LIFECYCLE_EVENT_KIND_CANCELLED = 8;
+    TURN_LIFECYCLE_EVENT_KIND_FAILED = 9;
+}

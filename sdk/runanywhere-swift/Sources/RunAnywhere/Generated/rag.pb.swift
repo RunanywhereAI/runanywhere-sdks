@@ -105,9 +105,80 @@ public struct RARAGConfiguration: Sendable {
   /// Overlap tokens between consecutive chunks. Must be < chunk_size.
   public var chunkOverlap: Int32 = 0
 
+  /// Maximum tokens of retrieved context passed to the LLM.
+  public var maxContextTokens: Int32 = 0
+
+  /// Prompt template with `{context}` and `{query}` placeholders.
+  public var promptTemplate: String {
+    get {_promptTemplate ?? String()}
+    set {_promptTemplate = newValue}
+  }
+  /// Returns true if `promptTemplate` has been explicitly set.
+  public var hasPromptTemplate: Bool {self._promptTemplate != nil}
+  /// Clears the value of `promptTemplate`. Subsequent reads from it will return its default value.
+  public mutating func clearPromptTemplate() {self._promptTemplate = nil}
+
+  /// Backend-specific config JSON passed to the embedding model/provider.
+  public var embeddingConfigJson: String {
+    get {_embeddingConfigJson ?? String()}
+    set {_embeddingConfigJson = newValue}
+  }
+  /// Returns true if `embeddingConfigJson` has been explicitly set.
+  public var hasEmbeddingConfigJson: Bool {self._embeddingConfigJson != nil}
+  /// Clears the value of `embeddingConfigJson`. Subsequent reads from it will return its default value.
+  public mutating func clearEmbeddingConfigJson() {self._embeddingConfigJson = nil}
+
+  /// Backend-specific config JSON passed to the LLM provider.
+  public var llmConfigJson: String {
+    get {_llmConfigJson ?? String()}
+    set {_llmConfigJson = newValue}
+  }
+  /// Returns true if `llmConfigJson` has been explicitly set.
+  public var hasLlmConfigJson: Bool {self._llmConfigJson != nil}
+  /// Clears the value of `llmConfigJson`. Subsequent reads from it will return its default value.
+  public mutating func clearLlmConfigJson() {self._llmConfigJson = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _promptTemplate: String? = nil
+  fileprivate var _embeddingConfigJson: String? = nil
+  fileprivate var _llmConfigJson: String? = nil
+}
+
+/// ---------------------------------------------------------------------------
+/// RAGDocument — batch-ingest input item.
+/// ---------------------------------------------------------------------------
+public struct RARAGDocument: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Optional caller-supplied document id.
+  public var id: String = String()
+
+  /// Plain text content to chunk/embed.
+  public var text: String = String()
+
+  /// Legacy metadata JSON blob.
+  public var metadataJson: String {
+    get {_metadataJson ?? String()}
+    set {_metadataJson = newValue}
+  }
+  /// Returns true if `metadataJson` has been explicitly set.
+  public var hasMetadataJson: Bool {self._metadataJson != nil}
+  /// Clears the value of `metadataJson`. Subsequent reads from it will return its default value.
+  public mutating func clearMetadataJson() {self._metadataJson = nil}
+
+  /// Typed metadata map for generated-proto callers.
+  public var metadata: Dictionary<String,String> = [:]
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _metadataJson: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -183,11 +254,23 @@ public struct RARAGSearchResult: Sendable {
   /// canonicalized here as a typed map so consumers don't re-parse.
   public var metadata: Dictionary<String,String> = [:]
 
+  /// Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
+  /// pass metadata without parsing it.
+  public var metadataJson: String {
+    get {_metadataJson ?? String()}
+    set {_metadataJson = newValue}
+  }
+  /// Returns true if `metadataJson` has been explicitly set.
+  public var hasMetadataJson: Bool {self._metadataJson != nil}
+  /// Clears the value of `metadataJson`. Subsequent reads from it will return its default value.
+  public mutating func clearMetadataJson() {self._metadataJson = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _sourceDocument: String? = nil
+  fileprivate var _metadataJson: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -258,11 +341,26 @@ public struct RARAGStatistics: Sendable {
   /// Clears the value of `indexPath`. Subsequent reads from it will return its default value.
   public mutating func clearIndexPath() {self._indexPath = nil}
 
+  /// Raw backend statistics JSON for implementations that cannot yet project
+  /// every counter into typed fields.
+  public var statsJson: String {
+    get {_statsJson ?? String()}
+    set {_statsJson = newValue}
+  }
+  /// Returns true if `statsJson` has been explicitly set.
+  public var hasStatsJson: Bool {self._statsJson != nil}
+  /// Clears the value of `statsJson`. Subsequent reads from it will return its default value.
+  public mutating func clearStatsJson() {self._statsJson = nil}
+
+  /// Approximate vector-store footprint in bytes, when known.
+  public var vectorStoreSizeBytes: Int64 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _indexPath: String? = nil
+  fileprivate var _statsJson: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -271,7 +369,7 @@ fileprivate let _protobuf_package = "runanywhere.v1"
 
 extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embedding_model_path\0\u{3}llm_model_path\0\u{3}embedding_dimension\0\u{3}top_k\0\u{3}similarity_threshold\0\u{3}chunk_size\0\u{3}chunk_overlap\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embedding_model_path\0\u{3}llm_model_path\0\u{3}embedding_dimension\0\u{3}top_k\0\u{3}similarity_threshold\0\u{3}chunk_size\0\u{3}chunk_overlap\0\u{3}max_context_tokens\0\u{3}prompt_template\0\u{3}embedding_config_json\0\u{3}llm_config_json\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -286,12 +384,20 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 5: try { try decoder.decodeSingularFloatField(value: &self.similarityThreshold) }()
       case 6: try { try decoder.decodeSingularInt32Field(value: &self.chunkSize) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.chunkOverlap) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self._promptTemplate) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._embeddingConfigJson) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._llmConfigJson) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.embeddingModelPath.isEmpty {
       try visitor.visitSingularStringField(value: self.embeddingModelPath, fieldNumber: 1)
     }
@@ -313,6 +419,18 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if self.chunkOverlap != 0 {
       try visitor.visitSingularInt32Field(value: self.chunkOverlap, fieldNumber: 7)
     }
+    if self.maxContextTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 8)
+    }
+    try { if let v = self._promptTemplate {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._embeddingConfigJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._llmConfigJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -324,6 +442,59 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs.similarityThreshold != rhs.similarityThreshold {return false}
     if lhs.chunkSize != rhs.chunkSize {return false}
     if lhs.chunkOverlap != rhs.chunkOverlap {return false}
+    if lhs.maxContextTokens != rhs.maxContextTokens {return false}
+    if lhs._promptTemplate != rhs._promptTemplate {return false}
+    if lhs._embeddingConfigJson != rhs._embeddingConfigJson {return false}
+    if lhs._llmConfigJson != rhs._llmConfigJson {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{3}metadata_json\0\u{1}metadata\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.text) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._metadataJson) }()
+      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.text.isEmpty {
+      try visitor.visitSingularStringField(value: self.text, fieldNumber: 2)
+    }
+    try { if let v = self._metadataJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if !self.metadata.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RARAGDocument, rhs: RARAGDocument) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.text != rhs.text {return false}
+    if lhs._metadataJson != rhs._metadataJson {return false}
+    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -390,7 +561,7 @@ extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{3}metadata_json\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -403,6 +574,7 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 3: try { try decoder.decodeSingularFloatField(value: &self.similarityScore) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._sourceDocument) }()
       case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._metadataJson) }()
       default: break
       }
     }
@@ -428,6 +600,9 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if !self.metadata.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
     }
+    try { if let v = self._metadataJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -437,6 +612,7 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.similarityScore != rhs.similarityScore {return false}
     if lhs._sourceDocument != rhs._sourceDocument {return false}
     if lhs.metadata != rhs.metadata {return false}
+    if lhs._metadataJson != rhs._metadataJson {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -499,7 +675,7 @@ extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
 
 extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGStatistics"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}indexed_documents\0\u{3}indexed_chunks\0\u{3}total_tokens_indexed\0\u{3}last_updated_ms\0\u{3}index_path\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}indexed_documents\0\u{3}indexed_chunks\0\u{3}total_tokens_indexed\0\u{3}last_updated_ms\0\u{3}index_path\0\u{3}stats_json\0\u{3}vector_store_size_bytes\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -512,6 +688,8 @@ extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.totalTokensIndexed) }()
       case 4: try { try decoder.decodeSingularInt64Field(value: &self.lastUpdatedMs) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._indexPath) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._statsJson) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.vectorStoreSizeBytes) }()
       default: break
       }
     }
@@ -537,6 +715,12 @@ extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     try { if let v = self._indexPath {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
+    try { if let v = self._statsJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    if self.vectorStoreSizeBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.vectorStoreSizeBytes, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -546,6 +730,8 @@ extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     if lhs.totalTokensIndexed != rhs.totalTokensIndexed {return false}
     if lhs.lastUpdatedMs != rhs.lastUpdatedMs {return false}
     if lhs._indexPath != rhs._indexPath {return false}
+    if lhs._statsJson != rhs._statsJson {return false}
+    if lhs.vectorStoreSizeBytes != rhs.vectorStoreSizeBytes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

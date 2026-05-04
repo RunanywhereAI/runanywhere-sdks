@@ -247,6 +247,240 @@ public enum RAEventDestination: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+/// Canonical event category carried by every SDKEvent envelope. The oneof arm
+/// identifies the concrete payload shape; this field preserves the stable bus /
+/// analytics route used by Swift, Kotlin, Dart/Flutter, React Native, Web, and
+/// C++ commons.
+public enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case sdk // = 1
+  case initialization // = 2
+  case shutdown // = 3
+  case session // = 4
+  case auth // = 5
+  case device // = 6
+  case registry // = 7
+  case assignment // = 8
+  case `import` // = 9
+  case discovery // = 10
+  case download // = 11
+  case storage // = 12
+  case hardware // = 13
+  case routing // = 14
+  case framework // = 15
+  case model // = 16
+  case component // = 17
+  case llm // = 18
+  case stt // = 19
+  case asr // = 20
+  case tts // = 21
+  case vad // = 22
+
+  /// speech-turn detection / diarization
+  case std // = 23
+  case voiceAgent // = 24
+  case vlm // = 25
+  case diffusion // = 26
+  case embeddings // = 27
+  case rag // = 28
+  case lora // = 29
+  case telemetry // = 30
+  case performance // = 31
+  case cancellation // = 32
+  case failure // = 33
+  case network // = 34
+  case error // = 35
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .sdk
+    case 2: self = .initialization
+    case 3: self = .shutdown
+    case 4: self = .session
+    case 5: self = .auth
+    case 6: self = .device
+    case 7: self = .registry
+    case 8: self = .assignment
+    case 9: self = .import
+    case 10: self = .discovery
+    case 11: self = .download
+    case 12: self = .storage
+    case 13: self = .hardware
+    case 14: self = .routing
+    case 15: self = .framework
+    case 16: self = .model
+    case 17: self = .component
+    case 18: self = .llm
+    case 19: self = .stt
+    case 20: self = .asr
+    case 21: self = .tts
+    case 22: self = .vad
+    case 23: self = .std
+    case 24: self = .voiceAgent
+    case 25: self = .vlm
+    case 26: self = .diffusion
+    case 27: self = .embeddings
+    case 28: self = .rag
+    case 29: self = .lora
+    case 30: self = .telemetry
+    case 31: self = .performance
+    case 32: self = .cancellation
+    case 33: self = .failure
+    case 34: self = .network
+    case 35: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .sdk: return 1
+    case .initialization: return 2
+    case .shutdown: return 3
+    case .session: return 4
+    case .auth: return 5
+    case .device: return 6
+    case .registry: return 7
+    case .assignment: return 8
+    case .import: return 9
+    case .discovery: return 10
+    case .download: return 11
+    case .storage: return 12
+    case .hardware: return 13
+    case .routing: return 14
+    case .framework: return 15
+    case .model: return 16
+    case .component: return 17
+    case .llm: return 18
+    case .stt: return 19
+    case .asr: return 20
+    case .tts: return 21
+    case .vad: return 22
+    case .std: return 23
+    case .voiceAgent: return 24
+    case .vlm: return 25
+    case .diffusion: return 26
+    case .embeddings: return 27
+    case .rag: return 28
+    case .lora: return 29
+    case .telemetry: return 30
+    case .performance: return 31
+    case .cancellation: return 32
+    case .failure: return 33
+    case .network: return 34
+    case .error: return 35
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAEventCategory] = [
+    .unspecified,
+    .sdk,
+    .initialization,
+    .shutdown,
+    .session,
+    .auth,
+    .device,
+    .registry,
+    .assignment,
+    .import,
+    .discovery,
+    .download,
+    .storage,
+    .hardware,
+    .routing,
+    .framework,
+    .model,
+    .component,
+    .llm,
+    .stt,
+    .asr,
+    .tts,
+    .vad,
+    .std,
+    .voiceAgent,
+    .vlm,
+    .diffusion,
+    .embeddings,
+    .rag,
+    .lora,
+    .telemetry,
+    .performance,
+    .cancellation,
+    .failure,
+    .network,
+    .error,
+  ]
+
+}
+
+/// Component runtime lifecycle state for model-backed SDK components. This is
+/// distinct from voice_events.proto's ComponentLoadState, which is scoped to
+/// the voice-agent sub-pipeline. Platform adapters own native component handles;
+/// this enum carries the C++ lifecycle state every SDK can expose uniformly.
+public enum RAComponentLifecycleState: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case notLoaded // = 1
+  case loading // = 2
+  case ready // = 3
+  case unloading // = 4
+  case error // = 5
+  case shutdown // = 6
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .notLoaded
+    case 2: self = .loading
+    case 3: self = .ready
+    case 4: self = .unloading
+    case 5: self = .error
+    case 6: self = .shutdown
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .notLoaded: return 1
+    case .loading: return 2
+    case .ready: return 3
+    case .unloading: return 4
+    case .error: return 5
+    case .shutdown: return 6
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAComponentLifecycleState] = [
+    .unspecified,
+    .notLoaded,
+    .loading,
+    .ready,
+    .unloading,
+    .error,
+    .shutdown,
+  ]
+
+}
+
 public enum RAInitializationStage: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -425,6 +659,17 @@ public enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
   /// Kotlin LLMEvent.STREAM_COMPLETED
   case streamCompleted // = 13
+  case cancelRequested // = 14
+  case cancelled // = 15
+  case toolCallStarted // = 16
+  case toolCallCompleted // = 17
+  case toolCallFailed // = 18
+  case structuredOutputStarted // = 19
+  case structuredOutputCompleted // = 20
+  case structuredOutputFailed // = 21
+  case thinkingStarted // = 22
+  case thinkingDelta // = 23
+  case thinkingCompleted // = 24
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -447,6 +692,17 @@ public enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 11: self = .costCalculated
     case 12: self = .routingDecision
     case 13: self = .streamCompleted
+    case 14: self = .cancelRequested
+    case 15: self = .cancelled
+    case 16: self = .toolCallStarted
+    case 17: self = .toolCallCompleted
+    case 18: self = .toolCallFailed
+    case 19: self = .structuredOutputStarted
+    case 20: self = .structuredOutputCompleted
+    case 21: self = .structuredOutputFailed
+    case 22: self = .thinkingStarted
+    case 23: self = .thinkingDelta
+    case 24: self = .thinkingCompleted
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -467,6 +723,17 @@ public enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .costCalculated: return 11
     case .routingDecision: return 12
     case .streamCompleted: return 13
+    case .cancelRequested: return 14
+    case .cancelled: return 15
+    case .toolCallStarted: return 16
+    case .toolCallCompleted: return 17
+    case .toolCallFailed: return 18
+    case .structuredOutputStarted: return 19
+    case .structuredOutputCompleted: return 20
+    case .structuredOutputFailed: return 21
+    case .thinkingStarted: return 22
+    case .thinkingDelta: return 23
+    case .thinkingCompleted: return 24
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -487,6 +754,17 @@ public enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     .costCalculated,
     .routingDecision,
     .streamCompleted,
+    .cancelRequested,
+    .cancelled,
+    .toolCallStarted,
+    .toolCallCompleted,
+    .toolCallFailed,
+    .structuredOutputStarted,
+    .structuredOutputCompleted,
+    .structuredOutputFailed,
+    .thinkingStarted,
+    .thinkingDelta,
+    .thinkingCompleted,
   ]
 
 }
@@ -1291,6 +1569,600 @@ public enum RAComponentInitializationEventKind: SwiftProtobuf.Enum, Swift.CaseIt
 
 }
 
+public enum RASessionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case created // = 1
+  case started // = 2
+  case resumed // = 3
+  case paused // = 4
+  case ended // = 5
+  case expired // = 6
+  case failed // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .created
+    case 2: self = .started
+    case 3: self = .resumed
+    case 4: self = .paused
+    case 5: self = .ended
+    case 6: self = .expired
+    case 7: self = .failed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .created: return 1
+    case .started: return 2
+    case .resumed: return 3
+    case .paused: return 4
+    case .ended: return 5
+    case .expired: return 6
+    case .failed: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RASessionEventKind] = [
+    .unspecified,
+    .created,
+    .started,
+    .resumed,
+    .paused,
+    .ended,
+    .expired,
+    .failed,
+  ]
+
+}
+
+public enum RAAuthEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case requested // = 1
+  case succeeded // = 2
+  case failed // = 3
+  case tokenRefreshed // = 4
+  case tokenExpired // = 5
+  case deviceRegistered // = 6
+  case deviceRegistrationFailed // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .requested
+    case 2: self = .succeeded
+    case 3: self = .failed
+    case 4: self = .tokenRefreshed
+    case 5: self = .tokenExpired
+    case 6: self = .deviceRegistered
+    case 7: self = .deviceRegistrationFailed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .requested: return 1
+    case .succeeded: return 2
+    case .failed: return 3
+    case .tokenRefreshed: return 4
+    case .tokenExpired: return 5
+    case .deviceRegistered: return 6
+    case .deviceRegistrationFailed: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAAuthEventKind] = [
+    .unspecified,
+    .requested,
+    .succeeded,
+    .failed,
+    .tokenRefreshed,
+    .tokenExpired,
+    .deviceRegistered,
+    .deviceRegistrationFailed,
+  ]
+
+}
+
+public enum RAModelRegistryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case refreshStarted // = 1
+  case refreshCompleted // = 2
+  case refreshFailed // = 3
+  case assignmentStarted // = 4
+  case assignmentCompleted // = 5
+  case assignmentFailed // = 6
+  case importStarted // = 7
+  case importCompleted // = 8
+  case importFailed // = 9
+  case discoveryStarted // = 10
+  case discoveryCompleted // = 11
+  case discoveryFailed // = 12
+  case currentModelChanged // = 13
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .refreshStarted
+    case 2: self = .refreshCompleted
+    case 3: self = .refreshFailed
+    case 4: self = .assignmentStarted
+    case 5: self = .assignmentCompleted
+    case 6: self = .assignmentFailed
+    case 7: self = .importStarted
+    case 8: self = .importCompleted
+    case 9: self = .importFailed
+    case 10: self = .discoveryStarted
+    case 11: self = .discoveryCompleted
+    case 12: self = .discoveryFailed
+    case 13: self = .currentModelChanged
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .refreshStarted: return 1
+    case .refreshCompleted: return 2
+    case .refreshFailed: return 3
+    case .assignmentStarted: return 4
+    case .assignmentCompleted: return 5
+    case .assignmentFailed: return 6
+    case .importStarted: return 7
+    case .importCompleted: return 8
+    case .importFailed: return 9
+    case .discoveryStarted: return 10
+    case .discoveryCompleted: return 11
+    case .discoveryFailed: return 12
+    case .currentModelChanged: return 13
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAModelRegistryEventKind] = [
+    .unspecified,
+    .refreshStarted,
+    .refreshCompleted,
+    .refreshFailed,
+    .assignmentStarted,
+    .assignmentCompleted,
+    .assignmentFailed,
+    .importStarted,
+    .importCompleted,
+    .importFailed,
+    .discoveryStarted,
+    .discoveryCompleted,
+    .discoveryFailed,
+    .currentModelChanged,
+  ]
+
+}
+
+public enum RADownloadEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case planStarted // = 1
+  case planCompleted // = 2
+  case planFailed // = 3
+  case started // = 4
+  case progress // = 5
+  case cancelRequested // = 6
+  case cancelled // = 7
+  case resumeRequested // = 8
+  case resumed // = 9
+  case completed // = 10
+  case failed // = 11
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .planStarted
+    case 2: self = .planCompleted
+    case 3: self = .planFailed
+    case 4: self = .started
+    case 5: self = .progress
+    case 6: self = .cancelRequested
+    case 7: self = .cancelled
+    case 8: self = .resumeRequested
+    case 9: self = .resumed
+    case 10: self = .completed
+    case 11: self = .failed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .planStarted: return 1
+    case .planCompleted: return 2
+    case .planFailed: return 3
+    case .started: return 4
+    case .progress: return 5
+    case .cancelRequested: return 6
+    case .cancelled: return 7
+    case .resumeRequested: return 8
+    case .resumed: return 9
+    case .completed: return 10
+    case .failed: return 11
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RADownloadEventKind] = [
+    .unspecified,
+    .planStarted,
+    .planCompleted,
+    .planFailed,
+    .started,
+    .progress,
+    .cancelRequested,
+    .cancelled,
+    .resumeRequested,
+    .resumed,
+    .completed,
+    .failed,
+  ]
+
+}
+
+public enum RAStorageLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case infoStarted // = 1
+  case infoCompleted // = 2
+  case availabilityChecked // = 3
+  case deletePlanCreated // = 4
+  case deleteStarted // = 5
+  case deleteCompleted // = 6
+  case deleteFailed // = 7
+  case cacheCleanupStarted // = 8
+  case cacheCleanupCompleted // = 9
+  case cacheCleanupFailed // = 10
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .infoStarted
+    case 2: self = .infoCompleted
+    case 3: self = .availabilityChecked
+    case 4: self = .deletePlanCreated
+    case 5: self = .deleteStarted
+    case 6: self = .deleteCompleted
+    case 7: self = .deleteFailed
+    case 8: self = .cacheCleanupStarted
+    case 9: self = .cacheCleanupCompleted
+    case 10: self = .cacheCleanupFailed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .infoStarted: return 1
+    case .infoCompleted: return 2
+    case .availabilityChecked: return 3
+    case .deletePlanCreated: return 4
+    case .deleteStarted: return 5
+    case .deleteCompleted: return 6
+    case .deleteFailed: return 7
+    case .cacheCleanupStarted: return 8
+    case .cacheCleanupCompleted: return 9
+    case .cacheCleanupFailed: return 10
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAStorageLifecycleEventKind] = [
+    .unspecified,
+    .infoStarted,
+    .infoCompleted,
+    .availabilityChecked,
+    .deletePlanCreated,
+    .deleteStarted,
+    .deleteCompleted,
+    .deleteFailed,
+    .cacheCleanupStarted,
+    .cacheCleanupCompleted,
+    .cacheCleanupFailed,
+  ]
+
+}
+
+public enum RAHardwareRoutingEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case profileStarted // = 1
+  case profileCompleted // = 2
+  case profileFailed // = 3
+  case routeSelected // = 4
+  case routeChanged // = 5
+  case frameworkCapabilityDetected // = 6
+  case frameworkCapabilityMissing // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .profileStarted
+    case 2: self = .profileCompleted
+    case 3: self = .profileFailed
+    case 4: self = .routeSelected
+    case 5: self = .routeChanged
+    case 6: self = .frameworkCapabilityDetected
+    case 7: self = .frameworkCapabilityMissing
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .profileStarted: return 1
+    case .profileCompleted: return 2
+    case .profileFailed: return 3
+    case .routeSelected: return 4
+    case .routeChanged: return 5
+    case .frameworkCapabilityDetected: return 6
+    case .frameworkCapabilityMissing: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAHardwareRoutingEventKind] = [
+    .unspecified,
+    .profileStarted,
+    .profileCompleted,
+    .profileFailed,
+    .routeSelected,
+    .routeChanged,
+    .frameworkCapabilityDetected,
+    .frameworkCapabilityMissing,
+  ]
+
+}
+
+public enum RACapabilityOperationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case vlmStarted // = 1
+  case vlmCompleted // = 2
+  case vlmFailed // = 3
+  case diffusionStarted // = 4
+  case diffusionProgress // = 5
+  case diffusionCompleted // = 6
+  case diffusionFailed // = 7
+  case embeddingsStarted // = 8
+  case embeddingsCompleted // = 9
+  case embeddingsFailed // = 10
+  case ragIngestionStarted // = 11
+  case ragIngestionCompleted // = 12
+  case ragQueryStarted // = 13
+  case ragQueryCompleted // = 14
+  case ragFailed // = 15
+  case loraAttached // = 16
+  case loraDetached // = 17
+  case loraFailed // = 18
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .vlmStarted
+    case 2: self = .vlmCompleted
+    case 3: self = .vlmFailed
+    case 4: self = .diffusionStarted
+    case 5: self = .diffusionProgress
+    case 6: self = .diffusionCompleted
+    case 7: self = .diffusionFailed
+    case 8: self = .embeddingsStarted
+    case 9: self = .embeddingsCompleted
+    case 10: self = .embeddingsFailed
+    case 11: self = .ragIngestionStarted
+    case 12: self = .ragIngestionCompleted
+    case 13: self = .ragQueryStarted
+    case 14: self = .ragQueryCompleted
+    case 15: self = .ragFailed
+    case 16: self = .loraAttached
+    case 17: self = .loraDetached
+    case 18: self = .loraFailed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .vlmStarted: return 1
+    case .vlmCompleted: return 2
+    case .vlmFailed: return 3
+    case .diffusionStarted: return 4
+    case .diffusionProgress: return 5
+    case .diffusionCompleted: return 6
+    case .diffusionFailed: return 7
+    case .embeddingsStarted: return 8
+    case .embeddingsCompleted: return 9
+    case .embeddingsFailed: return 10
+    case .ragIngestionStarted: return 11
+    case .ragIngestionCompleted: return 12
+    case .ragQueryStarted: return 13
+    case .ragQueryCompleted: return 14
+    case .ragFailed: return 15
+    case .loraAttached: return 16
+    case .loraDetached: return 17
+    case .loraFailed: return 18
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RACapabilityOperationEventKind] = [
+    .unspecified,
+    .vlmStarted,
+    .vlmCompleted,
+    .vlmFailed,
+    .diffusionStarted,
+    .diffusionProgress,
+    .diffusionCompleted,
+    .diffusionFailed,
+    .embeddingsStarted,
+    .embeddingsCompleted,
+    .embeddingsFailed,
+    .ragIngestionStarted,
+    .ragIngestionCompleted,
+    .ragQueryStarted,
+    .ragQueryCompleted,
+    .ragFailed,
+    .loraAttached,
+    .loraDetached,
+    .loraFailed,
+  ]
+
+}
+
+public enum RATelemetryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case counter // = 1
+  case gauge // = 2
+  case histogram // = 3
+  case trace // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .counter
+    case 2: self = .gauge
+    case 3: self = .histogram
+    case 4: self = .trace
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .counter: return 1
+    case .gauge: return 2
+    case .histogram: return 3
+    case .trace: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RATelemetryEventKind] = [
+    .unspecified,
+    .counter,
+    .gauge,
+    .histogram,
+    .trace,
+  ]
+
+}
+
+public enum RACancellationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case requested // = 1
+  case acknowledged // = 2
+  case completed // = 3
+  case failed // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .requested
+    case 2: self = .acknowledged
+    case 3: self = .completed
+    case 4: self = .failed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .requested: return 1
+    case .acknowledged: return 2
+    case .completed: return 3
+    case .failed: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RACancellationEventKind] = [
+    .unspecified,
+    .requested,
+    .acknowledged,
+    .completed,
+    .failed,
+  ]
+
+}
+
 /// ---------------------------------------------------------------------------
 /// SDK lifecycle / initialization stage events. Mirrors
 ///   RN  events.ts:38-43 (SDKInitializationEvent: 5 variants)
@@ -1372,56 +2244,142 @@ public struct RAConfigurationEvent: Sendable {
 ///   events.ts:72-89 (SDKGenerationEvent: 12 variants).
 /// Plus Kotlin LLMEvent (5 variants), Dart SDKGenerationEvent (4 factories).
 /// ---------------------------------------------------------------------------
-public struct RAGenerationEvent: Sendable {
+public struct RAGenerationEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var kind: RAGenerationEventKind = .unspecified
+  public var kind: RAGenerationEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
 
   /// Optional session id (RN voiceSession_*, generationStarted.sessionId).
-  public var sessionID: String = String()
+  public var sessionID: String {
+    get {_storage._sessionID}
+    set {_uniqueStorage()._sessionID = newValue}
+  }
 
   /// For STARTED — the prompt text (RN events.ts:75).
-  public var prompt: String = String()
+  public var prompt: String {
+    get {_storage._prompt}
+    set {_uniqueStorage()._prompt = newValue}
+  }
 
   /// For TOKEN_GENERATED / FIRST_TOKEN_GENERATED — single token text.
-  public var token: String = String()
+  public var token: String {
+    get {_storage._token}
+    set {_uniqueStorage()._token = newValue}
+  }
 
   /// For STREAMING_UPDATE — the running response text and token count.
-  public var streamingText: String = String()
+  public var streamingText: String {
+    get {_storage._streamingText}
+    set {_uniqueStorage()._streamingText = newValue}
+  }
 
-  public var tokensCount: Int32 = 0
+  public var tokensCount: Int32 {
+    get {_storage._tokensCount}
+    set {_uniqueStorage()._tokensCount = newValue}
+  }
 
   /// For COMPLETED — full response, usage stats, latency.
-  public var response: String = String()
+  public var response: String {
+    get {_storage._response}
+    set {_uniqueStorage()._response = newValue}
+  }
 
-  public var tokensUsed: Int32 = 0
+  public var tokensUsed: Int32 {
+    get {_storage._tokensUsed}
+    set {_uniqueStorage()._tokensUsed = newValue}
+  }
 
-  public var latencyMs: Int64 = 0
+  public var latencyMs: Int64 {
+    get {_storage._latencyMs}
+    set {_uniqueStorage()._latencyMs = newValue}
+  }
 
   /// For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76).
-  public var firstTokenLatencyMs: Int64 = 0
+  public var firstTokenLatencyMs: Int64 {
+    get {_storage._firstTokenLatencyMs}
+    set {_uniqueStorage()._firstTokenLatencyMs = newValue}
+  }
 
   /// For FAILED.
-  public var error: String = String()
+  public var error: String {
+    get {_storage._error}
+    set {_uniqueStorage()._error = newValue}
+  }
 
   /// For MODEL_LOADED / MODEL_UNLOADED — bound model.
-  public var modelID: String = String()
+  public var modelID: String {
+    get {_storage._modelID}
+    set {_uniqueStorage()._modelID = newValue}
+  }
 
   /// For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated.
-  public var costAmount: Double = 0
+  public var costAmount: Double {
+    get {_storage._costAmount}
+    set {_uniqueStorage()._costAmount = newValue}
+  }
 
-  public var costSavedAmount: Double = 0
+  public var costSavedAmount: Double {
+    get {_storage._costSavedAmount}
+    set {_uniqueStorage()._costSavedAmount = newValue}
+  }
 
   /// For ROUTING_DECISION — RN events.ts:89.
-  public var routingTarget: String = String()
+  public var routingTarget: String {
+    get {_storage._routingTarget}
+    set {_uniqueStorage()._routingTarget = newValue}
+  }
 
-  public var routingReason: String = String()
+  public var routingReason: String {
+    get {_storage._routingReason}
+    set {_uniqueStorage()._routingReason = newValue}
+  }
+
+  /// For cancellation / tool / structured-output / thinking events.
+  public var cancelReason: String {
+    get {_storage._cancelReason}
+    set {_uniqueStorage()._cancelReason = newValue}
+  }
+
+  public var toolCallID: String {
+    get {_storage._toolCallID}
+    set {_uniqueStorage()._toolCallID = newValue}
+  }
+
+  public var toolName: String {
+    get {_storage._toolName}
+    set {_uniqueStorage()._toolName = newValue}
+  }
+
+  public var toolPayloadJson: String {
+    get {_storage._toolPayloadJson}
+    set {_uniqueStorage()._toolPayloadJson = newValue}
+  }
+
+  public var structuredSchemaJson: String {
+    get {_storage._structuredSchemaJson}
+    set {_uniqueStorage()._structuredSchemaJson = newValue}
+  }
+
+  public var structuredOutputJson: String {
+    get {_storage._structuredOutputJson}
+    set {_uniqueStorage()._structuredOutputJson = newValue}
+  }
+
+  public var thinkingText: String {
+    get {_storage._thinkingText}
+    set {_uniqueStorage()._thinkingText = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// ---------------------------------------------------------------------------
@@ -1776,9 +2734,598 @@ public struct RAComponentInitializationEvent: Sendable {
 
   public var failedCount: Int32 = 0
 
+  /// Typed equivalents of old_state/new_state for SDKs that want generated
+  /// enum-backed component lifecycle state instead of parsing strings.
+  public var previousLifecycleState: RAComponentLifecycleState = .unspecified
+
+  public var currentLifecycleState: RAComponentLifecycleState = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+/// Snapshot of a component's current model-backed lifecycle state.
+public struct RAComponentLifecycleSnapshot: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var component: RASDKComponent = .unspecified
+
+  public var state: RAComponentLifecycleState = .unspecified
+
+  public var modelID: String = String()
+
+  public var updatedAtMs: Int64 = 0
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Operation-aware lifecycle event. The oneof arms intentionally reference the
+/// operation result/progress protos from this contract slice instead of adding
+/// another broad event taxonomy.
+public struct RAComponentLifecycleEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var component: RASDKComponent {
+    get {_storage._component}
+    set {_uniqueStorage()._component = newValue}
+  }
+
+  public var previousState: RAComponentLifecycleState {
+    get {_storage._previousState}
+    set {_uniqueStorage()._previousState = newValue}
+  }
+
+  public var currentState: RAComponentLifecycleState {
+    get {_storage._currentState}
+    set {_uniqueStorage()._currentState = newValue}
+  }
+
+  public var modelID: String {
+    get {_storage._modelID}
+    set {_uniqueStorage()._modelID = newValue}
+  }
+
+  public var timestampMs: Int64 {
+    get {_storage._timestampMs}
+    set {_uniqueStorage()._timestampMs = newValue}
+  }
+
+  public var payload: OneOf_Payload? {
+    get {return _storage._payload}
+    set {_uniqueStorage()._payload = newValue}
+  }
+
+  public var modelLoadResult: RAModelLoadResult {
+    get {
+      if case .modelLoadResult(let v)? = _storage._payload {return v}
+      return RAModelLoadResult()
+    }
+    set {_uniqueStorage()._payload = .modelLoadResult(newValue)}
+  }
+
+  public var modelUnloadResult: RAModelUnloadResult {
+    get {
+      if case .modelUnloadResult(let v)? = _storage._payload {return v}
+      return RAModelUnloadResult()
+    }
+    set {_uniqueStorage()._payload = .modelUnloadResult(newValue)}
+  }
+
+  public var modelDeleteResult: RAModelDeleteResult {
+    get {
+      if case .modelDeleteResult(let v)? = _storage._payload {return v}
+      return RAModelDeleteResult()
+    }
+    set {_uniqueStorage()._payload = .modelDeleteResult(newValue)}
+  }
+
+  public var downloadProgress: RADownloadProgress {
+    get {
+      if case .downloadProgress(let v)? = _storage._payload {return v}
+      return RADownloadProgress()
+    }
+    set {_uniqueStorage()._payload = .downloadProgress(newValue)}
+  }
+
+  public var storageAvailability: RAStorageAvailabilityResult {
+    get {
+      if case .storageAvailability(let v)? = _storage._payload {return v}
+      return RAStorageAvailabilityResult()
+    }
+    set {_uniqueStorage()._payload = .storageAvailability(newValue)}
+  }
+
+  public var storageDeleteResult: RAStorageDeleteResult {
+    get {
+      if case .storageDeleteResult(let v)? = _storage._payload {return v}
+      return RAStorageDeleteResult()
+    }
+    set {_uniqueStorage()._payload = .storageDeleteResult(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Payload: Equatable, Sendable {
+    case modelLoadResult(RAModelLoadResult)
+    case modelUnloadResult(RAModelUnloadResult)
+    case modelDeleteResult(RAModelDeleteResult)
+    case downloadProgress(RADownloadProgress)
+    case storageAvailability(RAStorageAvailabilityResult)
+    case storageDeleteResult(RAStorageDeleteResult)
+
+  }
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+/// SDK session lifecycle independent of voice-agent turn sessions.
+public struct RASessionEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RASessionEventKind = .unspecified
+
+  public var sessionID: String = String()
+
+  public var userID: String = String()
+
+  public var reason: String = String()
+
+  public var error: String = String()
+
+  public var startedAtMs: Int64 = 0
+
+  public var endedAtMs: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAAuthEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RAAuthEventKind = .unspecified
+
+  public var provider: String = String()
+
+  public var subjectID: String = String()
+
+  public var scope: String = String()
+
+  public var error: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAModelRegistryEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RAModelRegistryEventKind = .unspecified
+
+  public var modelID: String = String()
+
+  public var assignmentID: String = String()
+
+  public var assignedComponent: RASDKComponent = .unspecified
+
+  public var framework: RAInferenceFramework = .unspecified
+
+  public var sourcePath: String = String()
+
+  public var error: String = String()
+
+  public var result: RAModelRegistryEvent.OneOf_Result? = nil
+
+  public var refreshResult: RAModelRegistryRefreshResult {
+    get {
+      if case .refreshResult(let v)? = result {return v}
+      return RAModelRegistryRefreshResult()
+    }
+    set {result = .refreshResult(newValue)}
+  }
+
+  public var listResult: RAModelListResult {
+    get {
+      if case .listResult(let v)? = result {return v}
+      return RAModelListResult()
+    }
+    set {result = .listResult(newValue)}
+  }
+
+  public var getResult: RAModelGetResult {
+    get {
+      if case .getResult(let v)? = result {return v}
+      return RAModelGetResult()
+    }
+    set {result = .getResult(newValue)}
+  }
+
+  public var importResult: RAModelImportResult {
+    get {
+      if case .importResult(let v)? = result {return v}
+      return RAModelImportResult()
+    }
+    set {result = .importResult(newValue)}
+  }
+
+  public var discoveryResult: RAModelDiscoveryResult {
+    get {
+      if case .discoveryResult(let v)? = result {return v}
+      return RAModelDiscoveryResult()
+    }
+    set {result = .discoveryResult(newValue)}
+  }
+
+  public var compatibilityResult: RAModelCompatibilityResult {
+    get {
+      if case .compatibilityResult(let v)? = result {return v}
+      return RAModelCompatibilityResult()
+    }
+    set {result = .compatibilityResult(newValue)}
+  }
+
+  public var currentModelResult: RACurrentModelResult {
+    get {
+      if case .currentModelResult(let v)? = result {return v}
+      return RACurrentModelResult()
+    }
+    set {result = .currentModelResult(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Result: Equatable, Sendable {
+    case refreshResult(RAModelRegistryRefreshResult)
+    case listResult(RAModelListResult)
+    case getResult(RAModelGetResult)
+    case importResult(RAModelImportResult)
+    case discoveryResult(RAModelDiscoveryResult)
+    case compatibilityResult(RAModelCompatibilityResult)
+    case currentModelResult(RACurrentModelResult)
+
+  }
+
+  public init() {}
+}
+
+public struct RADownloadEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RADownloadEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var modelID: String {
+    get {_storage._modelID}
+    set {_uniqueStorage()._modelID = newValue}
+  }
+
+  public var taskID: String {
+    get {_storage._taskID}
+    set {_uniqueStorage()._taskID = newValue}
+  }
+
+  public var error: String {
+    get {_storage._error}
+    set {_uniqueStorage()._error = newValue}
+  }
+
+  public var payload: OneOf_Payload? {
+    get {return _storage._payload}
+    set {_uniqueStorage()._payload = newValue}
+  }
+
+  public var planResult: RADownloadPlanResult {
+    get {
+      if case .planResult(let v)? = _storage._payload {return v}
+      return RADownloadPlanResult()
+    }
+    set {_uniqueStorage()._payload = .planResult(newValue)}
+  }
+
+  public var startResult: RADownloadStartResult {
+    get {
+      if case .startResult(let v)? = _storage._payload {return v}
+      return RADownloadStartResult()
+    }
+    set {_uniqueStorage()._payload = .startResult(newValue)}
+  }
+
+  public var progress: RADownloadProgress {
+    get {
+      if case .progress(let v)? = _storage._payload {return v}
+      return RADownloadProgress()
+    }
+    set {_uniqueStorage()._payload = .progress(newValue)}
+  }
+
+  public var cancelResult: RADownloadCancelResult {
+    get {
+      if case .cancelResult(let v)? = _storage._payload {return v}
+      return RADownloadCancelResult()
+    }
+    set {_uniqueStorage()._payload = .cancelResult(newValue)}
+  }
+
+  public var resumeResult: RADownloadResumeResult {
+    get {
+      if case .resumeResult(let v)? = _storage._payload {return v}
+      return RADownloadResumeResult()
+    }
+    set {_uniqueStorage()._payload = .resumeResult(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Payload: Equatable, Sendable {
+    case planResult(RADownloadPlanResult)
+    case startResult(RADownloadStartResult)
+    case progress(RADownloadProgress)
+    case cancelResult(RADownloadCancelResult)
+    case resumeResult(RADownloadResumeResult)
+
+  }
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RAStorageLifecycleEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RAStorageLifecycleEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var modelID: String {
+    get {_storage._modelID}
+    set {_uniqueStorage()._modelID = newValue}
+  }
+
+  public var cacheKey: String {
+    get {_storage._cacheKey}
+    set {_uniqueStorage()._cacheKey = newValue}
+  }
+
+  public var bytes: Int64 {
+    get {_storage._bytes}
+    set {_uniqueStorage()._bytes = newValue}
+  }
+
+  public var error: String {
+    get {_storage._error}
+    set {_uniqueStorage()._error = newValue}
+  }
+
+  public var result: OneOf_Result? {
+    get {return _storage._result}
+    set {_uniqueStorage()._result = newValue}
+  }
+
+  public var infoResult: RAStorageInfoResult {
+    get {
+      if case .infoResult(let v)? = _storage._result {return v}
+      return RAStorageInfoResult()
+    }
+    set {_uniqueStorage()._result = .infoResult(newValue)}
+  }
+
+  public var availabilityResult: RAStorageAvailabilityResult {
+    get {
+      if case .availabilityResult(let v)? = _storage._result {return v}
+      return RAStorageAvailabilityResult()
+    }
+    set {_uniqueStorage()._result = .availabilityResult(newValue)}
+  }
+
+  public var deletePlan: RAStorageDeletePlan {
+    get {
+      if case .deletePlan(let v)? = _storage._result {return v}
+      return RAStorageDeletePlan()
+    }
+    set {_uniqueStorage()._result = .deletePlan(newValue)}
+  }
+
+  public var deleteResult: RAStorageDeleteResult {
+    get {
+      if case .deleteResult(let v)? = _storage._result {return v}
+      return RAStorageDeleteResult()
+    }
+    set {_uniqueStorage()._result = .deleteResult(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Result: Equatable, Sendable {
+    case infoResult(RAStorageInfoResult)
+    case availabilityResult(RAStorageAvailabilityResult)
+    case deletePlan(RAStorageDeletePlan)
+    case deleteResult(RAStorageDeleteResult)
+
+  }
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RAHardwareRoutingEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RAHardwareRoutingEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var component: RASDKComponent {
+    get {_storage._component}
+    set {_uniqueStorage()._component = newValue}
+  }
+
+  public var framework: RAInferenceFramework {
+    get {_storage._framework}
+    set {_uniqueStorage()._framework = newValue}
+  }
+
+  public var capability: String {
+    get {_storage._capability}
+    set {_uniqueStorage()._capability = newValue}
+  }
+
+  public var route: String {
+    get {_storage._route}
+    set {_uniqueStorage()._route = newValue}
+  }
+
+  public var reason: String {
+    get {_storage._reason}
+    set {_uniqueStorage()._reason = newValue}
+  }
+
+  public var error: String {
+    get {_storage._error}
+    set {_uniqueStorage()._error = newValue}
+  }
+
+  public var hardwareProfile: RAHardwareProfileResult {
+    get {_storage._hardwareProfile ?? RAHardwareProfileResult()}
+    set {_uniqueStorage()._hardwareProfile = newValue}
+  }
+  /// Returns true if `hardwareProfile` has been explicitly set.
+  public var hasHardwareProfile: Bool {_storage._hardwareProfile != nil}
+  /// Clears the value of `hardwareProfile`. Subsequent reads from it will return its default value.
+  public mutating func clearHardwareProfile() {_uniqueStorage()._hardwareProfile = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RACapabilityOperationEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RACapabilityOperationEventKind = .unspecified
+
+  public var component: RASDKComponent = .unspecified
+
+  public var modelID: String = String()
+
+  public var operationID: String = String()
+
+  public var operation: String = String()
+
+  public var progress: Float = 0
+
+  public var inputCount: Int64 = 0
+
+  public var outputCount: Int64 = 0
+
+  public var resultJson: String = String()
+
+  public var error: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RATelemetryEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RATelemetryEventKind = .unspecified
+
+  public var name: String = String()
+
+  public var attributes: Dictionary<String,String> = [:]
+
+  public var value: Double = 0
+
+  public var unit: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RACancellationEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RACancellationEventKind = .unspecified
+
+  public var component: RASDKComponent = .unspecified
+
+  public var operationID: String = String()
+
+  public var reason: String = String()
+
+  public var userInitiated: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAFailureEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var component: RASDKComponent = .unspecified
+
+  public var operation: String = String()
+
+  public var error: RASDKError {
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
+
+  public var recoverable: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _error: RASDKError? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -1806,6 +3353,27 @@ public struct RASDKEvent: @unchecked Sendable {
     get {_storage._severity}
     set {_uniqueStorage()._severity = newValue}
   }
+
+  public var category: RAEventCategory {
+    get {_storage._category}
+    set {_uniqueStorage()._category = newValue}
+  }
+
+  public var component: RASDKComponent {
+    get {_storage._component}
+    set {_uniqueStorage()._component = newValue}
+  }
+
+  /// Typed failure details for any failed event. When the event itself is
+  /// only an error notification, use the failure oneof arm below.
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   /// Event identifier (UUID). Required by Swift SDKEvent.id /
   /// Kotlin SDKEvent.id / Dart SDKEvent.id for de-duplication.
@@ -1937,6 +3505,94 @@ public struct RASDKEvent: @unchecked Sendable {
     set {_uniqueStorage()._event = .voicePipeline(newValue)}
   }
 
+  public var componentLifecycle: RAComponentLifecycleEvent {
+    get {
+      if case .componentLifecycle(let v)? = _storage._event {return v}
+      return RAComponentLifecycleEvent()
+    }
+    set {_uniqueStorage()._event = .componentLifecycle(newValue)}
+  }
+
+  public var session: RASessionEvent {
+    get {
+      if case .session(let v)? = _storage._event {return v}
+      return RASessionEvent()
+    }
+    set {_uniqueStorage()._event = .session(newValue)}
+  }
+
+  public var auth: RAAuthEvent {
+    get {
+      if case .auth(let v)? = _storage._event {return v}
+      return RAAuthEvent()
+    }
+    set {_uniqueStorage()._event = .auth(newValue)}
+  }
+
+  public var modelRegistry: RAModelRegistryEvent {
+    get {
+      if case .modelRegistry(let v)? = _storage._event {return v}
+      return RAModelRegistryEvent()
+    }
+    set {_uniqueStorage()._event = .modelRegistry(newValue)}
+  }
+
+  public var download: RADownloadEvent {
+    get {
+      if case .download(let v)? = _storage._event {return v}
+      return RADownloadEvent()
+    }
+    set {_uniqueStorage()._event = .download(newValue)}
+  }
+
+  public var storageLifecycle: RAStorageLifecycleEvent {
+    get {
+      if case .storageLifecycle(let v)? = _storage._event {return v}
+      return RAStorageLifecycleEvent()
+    }
+    set {_uniqueStorage()._event = .storageLifecycle(newValue)}
+  }
+
+  public var hardwareRouting: RAHardwareRoutingEvent {
+    get {
+      if case .hardwareRouting(let v)? = _storage._event {return v}
+      return RAHardwareRoutingEvent()
+    }
+    set {_uniqueStorage()._event = .hardwareRouting(newValue)}
+  }
+
+  public var capability: RACapabilityOperationEvent {
+    get {
+      if case .capability(let v)? = _storage._event {return v}
+      return RACapabilityOperationEvent()
+    }
+    set {_uniqueStorage()._event = .capability(newValue)}
+  }
+
+  public var telemetry: RATelemetryEvent {
+    get {
+      if case .telemetry(let v)? = _storage._event {return v}
+      return RATelemetryEvent()
+    }
+    set {_uniqueStorage()._event = .telemetry(newValue)}
+  }
+
+  public var cancellation: RACancellationEvent {
+    get {
+      if case .cancellation(let v)? = _storage._event {return v}
+      return RACancellationEvent()
+    }
+    set {_uniqueStorage()._event = .cancellation(newValue)}
+  }
+
+  public var failure: RAFailureEvent {
+    get {
+      if case .failure(let v)? = _storage._event {return v}
+      return RAFailureEvent()
+    }
+    set {_uniqueStorage()._event = .failure(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum OneOf_Event: Equatable, Sendable {
@@ -1953,6 +3609,17 @@ public struct RASDKEvent: @unchecked Sendable {
     case voice(RAVoiceLifecycleEvent)
     /// from voice_events.proto
     case voicePipeline(RAVoiceEvent)
+    case componentLifecycle(RAComponentLifecycleEvent)
+    case session(RASessionEvent)
+    case auth(RAAuthEvent)
+    case modelRegistry(RAModelRegistryEvent)
+    case download(RADownloadEvent)
+    case storageLifecycle(RAStorageLifecycleEvent)
+    case hardwareRouting(RAHardwareRoutingEvent)
+    case capability(RACapabilityOperationEvent)
+    case telemetry(RATelemetryEvent)
+    case cancellation(RACancellationEvent)
+    case failure(RAFailureEvent)
 
   }
 
@@ -1977,6 +3644,14 @@ extension RAEventDestination: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_DESTINATION_UNSPECIFIED\0\u{1}EVENT_DESTINATION_ALL\0\u{1}EVENT_DESTINATION_PUBLIC_ONLY\0\u{1}EVENT_DESTINATION_ANALYTICS_ONLY\0")
 }
 
+extension RAEventCategory: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_CATEGORY_UNSPECIFIED\0\u{1}EVENT_CATEGORY_SDK\0\u{1}EVENT_CATEGORY_INITIALIZATION\0\u{1}EVENT_CATEGORY_SHUTDOWN\0\u{1}EVENT_CATEGORY_SESSION\0\u{1}EVENT_CATEGORY_AUTH\0\u{1}EVENT_CATEGORY_DEVICE\0\u{1}EVENT_CATEGORY_REGISTRY\0\u{1}EVENT_CATEGORY_ASSIGNMENT\0\u{1}EVENT_CATEGORY_IMPORT\0\u{1}EVENT_CATEGORY_DISCOVERY\0\u{1}EVENT_CATEGORY_DOWNLOAD\0\u{1}EVENT_CATEGORY_STORAGE\0\u{1}EVENT_CATEGORY_HARDWARE\0\u{1}EVENT_CATEGORY_ROUTING\0\u{1}EVENT_CATEGORY_FRAMEWORK\0\u{1}EVENT_CATEGORY_MODEL\0\u{1}EVENT_CATEGORY_COMPONENT\0\u{1}EVENT_CATEGORY_LLM\0\u{1}EVENT_CATEGORY_STT\0\u{1}EVENT_CATEGORY_ASR\0\u{1}EVENT_CATEGORY_TTS\0\u{1}EVENT_CATEGORY_VAD\0\u{1}EVENT_CATEGORY_STD\0\u{1}EVENT_CATEGORY_VOICE_AGENT\0\u{1}EVENT_CATEGORY_VLM\0\u{1}EVENT_CATEGORY_DIFFUSION\0\u{1}EVENT_CATEGORY_EMBEDDINGS\0\u{1}EVENT_CATEGORY_RAG\0\u{1}EVENT_CATEGORY_LORA\0\u{1}EVENT_CATEGORY_TELEMETRY\0\u{1}EVENT_CATEGORY_PERFORMANCE\0\u{1}EVENT_CATEGORY_CANCELLATION\0\u{1}EVENT_CATEGORY_FAILURE\0\u{1}EVENT_CATEGORY_NETWORK\0\u{1}EVENT_CATEGORY_ERROR\0")
+}
+
+extension RAComponentLifecycleState: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_LIFECYCLE_STATE_UNSPECIFIED\0\u{1}COMPONENT_LIFECYCLE_STATE_NOT_LOADED\0\u{1}COMPONENT_LIFECYCLE_STATE_LOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_READY\0\u{1}COMPONENT_LIFECYCLE_STATE_UNLOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_ERROR\0\u{1}COMPONENT_LIFECYCLE_STATE_SHUTDOWN\0")
+}
+
 extension RAInitializationStage: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INITIALIZATION_STAGE_UNSPECIFIED\0\u{1}INITIALIZATION_STAGE_STARTED\0\u{1}INITIALIZATION_STAGE_CONFIGURATION_LOADED\0\u{1}INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED\0\u{1}INITIALIZATION_STAGE_COMPLETED\0\u{1}INITIALIZATION_STAGE_FAILED\0\u{1}INITIALIZATION_STAGE_SHUTDOWN\0")
 }
@@ -1986,7 +3661,7 @@ extension RAConfigurationEventKind: SwiftProtobuf._ProtoNameProviding {
 }
 
 extension RAGenerationEventKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0GENERATION_EVENT_KIND_UNSPECIFIED\0\u{1}GENERATION_EVENT_KIND_SESSION_STARTED\0\u{1}GENERATION_EVENT_KIND_SESSION_ENDED\0\u{1}GENERATION_EVENT_KIND_STARTED\0\u{1}GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED\0\u{1}GENERATION_EVENT_KIND_TOKEN_GENERATED\0\u{1}GENERATION_EVENT_KIND_STREAMING_UPDATE\0\u{1}GENERATION_EVENT_KIND_COMPLETED\0\u{1}GENERATION_EVENT_KIND_FAILED\0\u{1}GENERATION_EVENT_KIND_MODEL_LOADED\0\u{1}GENERATION_EVENT_KIND_MODEL_UNLOADED\0\u{1}GENERATION_EVENT_KIND_COST_CALCULATED\0\u{1}GENERATION_EVENT_KIND_ROUTING_DECISION\0\u{1}GENERATION_EVENT_KIND_STREAM_COMPLETED\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0GENERATION_EVENT_KIND_UNSPECIFIED\0\u{1}GENERATION_EVENT_KIND_SESSION_STARTED\0\u{1}GENERATION_EVENT_KIND_SESSION_ENDED\0\u{1}GENERATION_EVENT_KIND_STARTED\0\u{1}GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED\0\u{1}GENERATION_EVENT_KIND_TOKEN_GENERATED\0\u{1}GENERATION_EVENT_KIND_STREAMING_UPDATE\0\u{1}GENERATION_EVENT_KIND_COMPLETED\0\u{1}GENERATION_EVENT_KIND_FAILED\0\u{1}GENERATION_EVENT_KIND_MODEL_LOADED\0\u{1}GENERATION_EVENT_KIND_MODEL_UNLOADED\0\u{1}GENERATION_EVENT_KIND_COST_CALCULATED\0\u{1}GENERATION_EVENT_KIND_ROUTING_DECISION\0\u{1}GENERATION_EVENT_KIND_STREAM_COMPLETED\0\u{1}GENERATION_EVENT_KIND_CANCEL_REQUESTED\0\u{1}GENERATION_EVENT_KIND_CANCELLED\0\u{1}GENERATION_EVENT_KIND_TOOL_CALL_STARTED\0\u{1}GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED\0\u{1}GENERATION_EVENT_KIND_TOOL_CALL_FAILED\0\u{1}GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED\0\u{1}GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED\0\u{1}GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED\0\u{1}GENERATION_EVENT_KIND_THINKING_STARTED\0\u{1}GENERATION_EVENT_KIND_THINKING_DELTA\0\u{1}GENERATION_EVENT_KIND_THINKING_COMPLETED\0")
 }
 
 extension RAModelEventKind: SwiftProtobuf._ProtoNameProviding {
@@ -2019,6 +3694,42 @@ extension RADeviceEventKind: SwiftProtobuf._ProtoNameProviding {
 
 extension RAComponentInitializationEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_INIT_EVENT_KIND_UNSPECIFIED\0\u{1}COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_READY\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED\0\u{1}COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY\0\u{1}COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY\0")
+}
+
+extension RASessionEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SESSION_EVENT_KIND_UNSPECIFIED\0\u{1}SESSION_EVENT_KIND_CREATED\0\u{1}SESSION_EVENT_KIND_STARTED\0\u{1}SESSION_EVENT_KIND_RESUMED\0\u{1}SESSION_EVENT_KIND_PAUSED\0\u{1}SESSION_EVENT_KIND_ENDED\0\u{1}SESSION_EVENT_KIND_EXPIRED\0\u{1}SESSION_EVENT_KIND_FAILED\0")
+}
+
+extension RAAuthEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUTH_EVENT_KIND_UNSPECIFIED\0\u{1}AUTH_EVENT_KIND_REQUESTED\0\u{1}AUTH_EVENT_KIND_SUCCEEDED\0\u{1}AUTH_EVENT_KIND_FAILED\0\u{1}AUTH_EVENT_KIND_TOKEN_REFRESHED\0\u{1}AUTH_EVENT_KIND_TOKEN_EXPIRED\0\u{1}AUTH_EVENT_KIND_DEVICE_REGISTERED\0\u{1}AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED\0")
+}
+
+extension RAModelRegistryEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED\0\u{1}MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED\0")
+}
+
+extension RADownloadEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_EVENT_KIND_UNSPECIFIED\0\u{1}DOWNLOAD_EVENT_KIND_PLAN_STARTED\0\u{1}DOWNLOAD_EVENT_KIND_PLAN_COMPLETED\0\u{1}DOWNLOAD_EVENT_KIND_PLAN_FAILED\0\u{1}DOWNLOAD_EVENT_KIND_STARTED\0\u{1}DOWNLOAD_EVENT_KIND_PROGRESS\0\u{1}DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED\0\u{1}DOWNLOAD_EVENT_KIND_CANCELLED\0\u{1}DOWNLOAD_EVENT_KIND_RESUME_REQUESTED\0\u{1}DOWNLOAD_EVENT_KIND_RESUMED\0\u{1}DOWNLOAD_EVENT_KIND_COMPLETED\0\u{1}DOWNLOAD_EVENT_KIND_FAILED\0")
+}
+
+extension RAStorageLifecycleEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED\0")
+}
+
+extension RAHardwareRoutingEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING\0")
+}
+
+extension RACapabilityOperationEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED\0")
+}
+
+extension RATelemetryEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TELEMETRY_EVENT_KIND_UNSPECIFIED\0\u{1}TELEMETRY_EVENT_KIND_COUNTER\0\u{1}TELEMETRY_EVENT_KIND_GAUGE\0\u{1}TELEMETRY_EVENT_KIND_HISTOGRAM\0\u{1}TELEMETRY_EVENT_KIND_TRACE\0")
+}
+
+extension RACancellationEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CANCELLATION_EVENT_KIND_UNSPECIFIED\0\u{1}CANCELLATION_EVENT_KIND_REQUESTED\0\u{1}CANCELLATION_EVENT_KIND_ACKNOWLEDGED\0\u{1}CANCELLATION_EVENT_KIND_COMPLETED\0\u{1}CANCELLATION_EVENT_KIND_FAILED\0")
 }
 
 extension RAInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -2143,104 +3854,219 @@ extension RAConfigurationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GenerationEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0")
+
+  fileprivate class _StorageClass {
+    var _kind: RAGenerationEventKind = .unspecified
+    var _sessionID: String = String()
+    var _prompt: String = String()
+    var _token: String = String()
+    var _streamingText: String = String()
+    var _tokensCount: Int32 = 0
+    var _response: String = String()
+    var _tokensUsed: Int32 = 0
+    var _latencyMs: Int64 = 0
+    var _firstTokenLatencyMs: Int64 = 0
+    var _error: String = String()
+    var _modelID: String = String()
+    var _costAmount: Double = 0
+    var _costSavedAmount: Double = 0
+    var _routingTarget: String = String()
+    var _routingReason: String = String()
+    var _cancelReason: String = String()
+    var _toolCallID: String = String()
+    var _toolName: String = String()
+    var _toolPayloadJson: String = String()
+    var _structuredSchemaJson: String = String()
+    var _structuredOutputJson: String = String()
+    var _thinkingText: String = String()
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _kind = source._kind
+      _sessionID = source._sessionID
+      _prompt = source._prompt
+      _token = source._token
+      _streamingText = source._streamingText
+      _tokensCount = source._tokensCount
+      _response = source._response
+      _tokensUsed = source._tokensUsed
+      _latencyMs = source._latencyMs
+      _firstTokenLatencyMs = source._firstTokenLatencyMs
+      _error = source._error
+      _modelID = source._modelID
+      _costAmount = source._costAmount
+      _costSavedAmount = source._costSavedAmount
+      _routingTarget = source._routingTarget
+      _routingReason = source._routingReason
+      _cancelReason = source._cancelReason
+      _toolCallID = source._toolCallID
+      _toolName = source._toolName
+      _toolPayloadJson = source._toolPayloadJson
+      _structuredSchemaJson = source._structuredSchemaJson
+      _structuredOutputJson = source._structuredOutputJson
+      _thinkingText = source._thinkingText
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.token) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.streamingText) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.tokensCount) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.response) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.tokensUsed) }()
-      case 9: try { try decoder.decodeSingularInt64Field(value: &self.latencyMs) }()
-      case 10: try { try decoder.decodeSingularInt64Field(value: &self.firstTokenLatencyMs) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.error) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 13: try { try decoder.decodeSingularDoubleField(value: &self.costAmount) }()
-      case 14: try { try decoder.decodeSingularDoubleField(value: &self.costSavedAmount) }()
-      case 15: try { try decoder.decodeSingularStringField(value: &self.routingTarget) }()
-      case 16: try { try decoder.decodeSingularStringField(value: &self.routingReason) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._sessionID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._prompt) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._streamingText) }()
+        case 6: try { try decoder.decodeSingularInt32Field(value: &_storage._tokensCount) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._response) }()
+        case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._tokensUsed) }()
+        case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._latencyMs) }()
+        case 10: try { try decoder.decodeSingularInt64Field(value: &_storage._firstTokenLatencyMs) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
+        case 12: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
+        case 13: try { try decoder.decodeSingularDoubleField(value: &_storage._costAmount) }()
+        case 14: try { try decoder.decodeSingularDoubleField(value: &_storage._costSavedAmount) }()
+        case 15: try { try decoder.decodeSingularStringField(value: &_storage._routingTarget) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._routingReason) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._cancelReason) }()
+        case 18: try { try decoder.decodeSingularStringField(value: &_storage._toolCallID) }()
+        case 19: try { try decoder.decodeSingularStringField(value: &_storage._toolName) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._toolPayloadJson) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._structuredSchemaJson) }()
+        case 22: try { try decoder.decodeSingularStringField(value: &_storage._structuredOutputJson) }()
+        case 23: try { try decoder.decodeSingularStringField(value: &_storage._thinkingText) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.kind != .unspecified {
-      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
-    }
-    if !self.sessionID.isEmpty {
-      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
-    }
-    if !self.prompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 3)
-    }
-    if !self.token.isEmpty {
-      try visitor.visitSingularStringField(value: self.token, fieldNumber: 4)
-    }
-    if !self.streamingText.isEmpty {
-      try visitor.visitSingularStringField(value: self.streamingText, fieldNumber: 5)
-    }
-    if self.tokensCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.tokensCount, fieldNumber: 6)
-    }
-    if !self.response.isEmpty {
-      try visitor.visitSingularStringField(value: self.response, fieldNumber: 7)
-    }
-    if self.tokensUsed != 0 {
-      try visitor.visitSingularInt32Field(value: self.tokensUsed, fieldNumber: 8)
-    }
-    if self.latencyMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.latencyMs, fieldNumber: 9)
-    }
-    if self.firstTokenLatencyMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.firstTokenLatencyMs, fieldNumber: 10)
-    }
-    if !self.error.isEmpty {
-      try visitor.visitSingularStringField(value: self.error, fieldNumber: 11)
-    }
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 12)
-    }
-    if self.costAmount.bitPattern != 0 {
-      try visitor.visitSingularDoubleField(value: self.costAmount, fieldNumber: 13)
-    }
-    if self.costSavedAmount.bitPattern != 0 {
-      try visitor.visitSingularDoubleField(value: self.costSavedAmount, fieldNumber: 14)
-    }
-    if !self.routingTarget.isEmpty {
-      try visitor.visitSingularStringField(value: self.routingTarget, fieldNumber: 15)
-    }
-    if !self.routingReason.isEmpty {
-      try visitor.visitSingularStringField(value: self.routingReason, fieldNumber: 16)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 1)
+      }
+      if !_storage._sessionID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._sessionID, fieldNumber: 2)
+      }
+      if !_storage._prompt.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 3)
+      }
+      if !_storage._token.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._token, fieldNumber: 4)
+      }
+      if !_storage._streamingText.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._streamingText, fieldNumber: 5)
+      }
+      if _storage._tokensCount != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._tokensCount, fieldNumber: 6)
+      }
+      if !_storage._response.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._response, fieldNumber: 7)
+      }
+      if _storage._tokensUsed != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._tokensUsed, fieldNumber: 8)
+      }
+      if _storage._latencyMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._latencyMs, fieldNumber: 9)
+      }
+      if _storage._firstTokenLatencyMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._firstTokenLatencyMs, fieldNumber: 10)
+      }
+      if !_storage._error.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._error, fieldNumber: 11)
+      }
+      if !_storage._modelID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 12)
+      }
+      if _storage._costAmount.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._costAmount, fieldNumber: 13)
+      }
+      if _storage._costSavedAmount.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._costSavedAmount, fieldNumber: 14)
+      }
+      if !_storage._routingTarget.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._routingTarget, fieldNumber: 15)
+      }
+      if !_storage._routingReason.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._routingReason, fieldNumber: 16)
+      }
+      if !_storage._cancelReason.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._cancelReason, fieldNumber: 17)
+      }
+      if !_storage._toolCallID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._toolCallID, fieldNumber: 18)
+      }
+      if !_storage._toolName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._toolName, fieldNumber: 19)
+      }
+      if !_storage._toolPayloadJson.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._toolPayloadJson, fieldNumber: 20)
+      }
+      if !_storage._structuredSchemaJson.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._structuredSchemaJson, fieldNumber: 21)
+      }
+      if !_storage._structuredOutputJson.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._structuredOutputJson, fieldNumber: 22)
+      }
+      if !_storage._thinkingText.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._thinkingText, fieldNumber: 23)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAGenerationEvent, rhs: RAGenerationEvent) -> Bool {
-    if lhs.kind != rhs.kind {return false}
-    if lhs.sessionID != rhs.sessionID {return false}
-    if lhs.prompt != rhs.prompt {return false}
-    if lhs.token != rhs.token {return false}
-    if lhs.streamingText != rhs.streamingText {return false}
-    if lhs.tokensCount != rhs.tokensCount {return false}
-    if lhs.response != rhs.response {return false}
-    if lhs.tokensUsed != rhs.tokensUsed {return false}
-    if lhs.latencyMs != rhs.latencyMs {return false}
-    if lhs.firstTokenLatencyMs != rhs.firstTokenLatencyMs {return false}
-    if lhs.error != rhs.error {return false}
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.costAmount != rhs.costAmount {return false}
-    if lhs.costSavedAmount != rhs.costSavedAmount {return false}
-    if lhs.routingTarget != rhs.routingTarget {return false}
-    if lhs.routingReason != rhs.routingReason {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._sessionID != rhs_storage._sessionID {return false}
+        if _storage._prompt != rhs_storage._prompt {return false}
+        if _storage._token != rhs_storage._token {return false}
+        if _storage._streamingText != rhs_storage._streamingText {return false}
+        if _storage._tokensCount != rhs_storage._tokensCount {return false}
+        if _storage._response != rhs_storage._response {return false}
+        if _storage._tokensUsed != rhs_storage._tokensUsed {return false}
+        if _storage._latencyMs != rhs_storage._latencyMs {return false}
+        if _storage._firstTokenLatencyMs != rhs_storage._firstTokenLatencyMs {return false}
+        if _storage._error != rhs_storage._error {return false}
+        if _storage._modelID != rhs_storage._modelID {return false}
+        if _storage._costAmount != rhs_storage._costAmount {return false}
+        if _storage._costSavedAmount != rhs_storage._costSavedAmount {return false}
+        if _storage._routingTarget != rhs_storage._routingTarget {return false}
+        if _storage._routingReason != rhs_storage._routingReason {return false}
+        if _storage._cancelReason != rhs_storage._cancelReason {return false}
+        if _storage._toolCallID != rhs_storage._toolCallID {return false}
+        if _storage._toolName != rhs_storage._toolName {return false}
+        if _storage._toolPayloadJson != rhs_storage._toolPayloadJson {return false}
+        if _storage._structuredSchemaJson != rhs_storage._structuredSchemaJson {return false}
+        if _storage._structuredOutputJson != rhs_storage._structuredOutputJson {return false}
+        if _storage._thinkingText != rhs_storage._thinkingText {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2758,7 +4584,7 @@ extension RADeviceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
 
 extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentInitializationEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}model_id\0\u{3}size_bytes\0\u{1}progress\0\u{1}error\0\u{3}old_state\0\u{3}new_state\0\u{1}components\0\u{3}ready_components\0\u{3}pending_components\0\u{3}init_success\0\u{3}ready_count\0\u{3}failed_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}model_id\0\u{3}size_bytes\0\u{1}progress\0\u{1}error\0\u{3}old_state\0\u{3}new_state\0\u{1}components\0\u{3}ready_components\0\u{3}pending_components\0\u{3}init_success\0\u{3}ready_count\0\u{3}failed_count\0\u{3}previous_lifecycle_state\0\u{3}current_lifecycle_state\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2780,6 +4606,8 @@ extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._
       case 12: try { try decoder.decodeSingularBoolField(value: &self.initSuccess) }()
       case 13: try { try decoder.decodeSingularInt32Field(value: &self.readyCount) }()
       case 14: try { try decoder.decodeSingularInt32Field(value: &self.failedCount) }()
+      case 15: try { try decoder.decodeSingularEnumField(value: &self.previousLifecycleState) }()
+      case 16: try { try decoder.decodeSingularEnumField(value: &self.currentLifecycleState) }()
       default: break
       }
     }
@@ -2828,6 +4656,12 @@ extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._
     if self.failedCount != 0 {
       try visitor.visitSingularInt32Field(value: self.failedCount, fieldNumber: 14)
     }
+    if self.previousLifecycleState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.previousLifecycleState, fieldNumber: 15)
+    }
+    if self.currentLifecycleState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.currentLifecycleState, fieldNumber: 16)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2846,6 +4680,1258 @@ extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.initSuccess != rhs.initSuccess {return false}
     if lhs.readyCount != rhs.readyCount {return false}
     if lhs.failedCount != rhs.failedCount {return false}
+    if lhs.previousLifecycleState != rhs.previousLifecycleState {return false}
+    if lhs.currentLifecycleState != rhs.currentLifecycleState {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAComponentLifecycleSnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ComponentLifecycleSnapshot"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{1}state\0\u{3}model_id\0\u{3}updated_at_ms\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.component) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.state) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.updatedAtMs) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.component != .unspecified {
+      try visitor.visitSingularEnumField(value: self.component, fieldNumber: 1)
+    }
+    if self.state != .unspecified {
+      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 2)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 3)
+    }
+    if self.updatedAtMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.updatedAtMs, fieldNumber: 4)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAComponentLifecycleSnapshot, rhs: RAComponentLifecycleSnapshot) -> Bool {
+    if lhs.component != rhs.component {return false}
+    if lhs.state != rhs.state {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.updatedAtMs != rhs.updatedAtMs {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAComponentLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ComponentLifecycleEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{3}previous_state\0\u{3}current_state\0\u{3}model_id\0\u{3}timestamp_ms\0\u{4}\u{5}model_load_result\0\u{3}model_unload_result\0\u{3}model_delete_result\0\u{3}download_progress\0\u{3}storage_availability\0\u{3}storage_delete_result\0")
+
+  fileprivate class _StorageClass {
+    var _component: RASDKComponent = .unspecified
+    var _previousState: RAComponentLifecycleState = .unspecified
+    var _currentState: RAComponentLifecycleState = .unspecified
+    var _modelID: String = String()
+    var _timestampMs: Int64 = 0
+    var _payload: RAComponentLifecycleEvent.OneOf_Payload?
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _component = source._component
+      _previousState = source._previousState
+      _currentState = source._currentState
+      _modelID = source._modelID
+      _timestampMs = source._timestampMs
+      _payload = source._payload
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._component) }()
+        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._previousState) }()
+        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._currentState) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
+        case 5: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampMs) }()
+        case 10: try {
+          var v: RAModelLoadResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .modelLoadResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .modelLoadResult(v)
+          }
+        }()
+        case 11: try {
+          var v: RAModelUnloadResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .modelUnloadResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .modelUnloadResult(v)
+          }
+        }()
+        case 12: try {
+          var v: RAModelDeleteResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .modelDeleteResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .modelDeleteResult(v)
+          }
+        }()
+        case 13: try {
+          var v: RADownloadProgress?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .downloadProgress(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .downloadProgress(v)
+          }
+        }()
+        case 14: try {
+          var v: RAStorageAvailabilityResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .storageAvailability(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .storageAvailability(v)
+          }
+        }()
+        case 15: try {
+          var v: RAStorageDeleteResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .storageDeleteResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .storageDeleteResult(v)
+          }
+        }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._component != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._component, fieldNumber: 1)
+      }
+      if _storage._previousState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._previousState, fieldNumber: 2)
+      }
+      if _storage._currentState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._currentState, fieldNumber: 3)
+      }
+      if !_storage._modelID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 4)
+      }
+      if _storage._timestampMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampMs, fieldNumber: 5)
+      }
+      switch _storage._payload {
+      case .modelLoadResult?: try {
+        guard case .modelLoadResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      }()
+      case .modelUnloadResult?: try {
+        guard case .modelUnloadResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      }()
+      case .modelDeleteResult?: try {
+        guard case .modelDeleteResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      }()
+      case .downloadProgress?: try {
+        guard case .downloadProgress(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      }()
+      case .storageAvailability?: try {
+        guard case .storageAvailability(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+      }()
+      case .storageDeleteResult?: try {
+        guard case .storageDeleteResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+      }()
+      case nil: break
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAComponentLifecycleEvent, rhs: RAComponentLifecycleEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._component != rhs_storage._component {return false}
+        if _storage._previousState != rhs_storage._previousState {return false}
+        if _storage._currentState != rhs_storage._currentState {return false}
+        if _storage._modelID != rhs_storage._modelID {return false}
+        if _storage._timestampMs != rhs_storage._timestampMs {return false}
+        if _storage._payload != rhs_storage._payload {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SessionEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{3}user_id\0\u{1}reason\0\u{1}error\0\u{3}started_at_ms\0\u{3}ended_at_ms\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.userID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.reason) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.error) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.startedAtMs) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.endedAtMs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
+    }
+    if !self.userID.isEmpty {
+      try visitor.visitSingularStringField(value: self.userID, fieldNumber: 3)
+    }
+    if !self.reason.isEmpty {
+      try visitor.visitSingularStringField(value: self.reason, fieldNumber: 4)
+    }
+    if !self.error.isEmpty {
+      try visitor.visitSingularStringField(value: self.error, fieldNumber: 5)
+    }
+    if self.startedAtMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.startedAtMs, fieldNumber: 6)
+    }
+    if self.endedAtMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.endedAtMs, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASessionEvent, rhs: RASessionEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.userID != rhs.userID {return false}
+    if lhs.reason != rhs.reason {return false}
+    if lhs.error != rhs.error {return false}
+    if lhs.startedAtMs != rhs.startedAtMs {return false}
+    if lhs.endedAtMs != rhs.endedAtMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAAuthEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AuthEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}provider\0\u{3}subject_id\0\u{1}scope\0\u{1}error\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.provider) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.subjectID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.scope) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.error) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.provider.isEmpty {
+      try visitor.visitSingularStringField(value: self.provider, fieldNumber: 2)
+    }
+    if !self.subjectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.subjectID, fieldNumber: 3)
+    }
+    if !self.scope.isEmpty {
+      try visitor.visitSingularStringField(value: self.scope, fieldNumber: 4)
+    }
+    if !self.error.isEmpty {
+      try visitor.visitSingularStringField(value: self.error, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAAuthEvent, rhs: RAAuthEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs.subjectID != rhs.subjectID {return false}
+    if lhs.scope != rhs.scope {return false}
+    if lhs.error != rhs.error {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelRegistryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelRegistryEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}assignment_id\0\u{3}assigned_component\0\u{1}framework\0\u{3}source_path\0\u{1}error\0\u{4}\u{d}refresh_result\0\u{3}list_result\0\u{3}get_result\0\u{3}import_result\0\u{3}discovery_result\0\u{3}compatibility_result\0\u{3}current_model_result\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.assignmentID) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.assignedComponent) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.framework) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.sourcePath) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.error) }()
+      case 20: try {
+        var v: RAModelRegistryRefreshResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .refreshResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .refreshResult(v)
+        }
+      }()
+      case 21: try {
+        var v: RAModelListResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .listResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .listResult(v)
+        }
+      }()
+      case 22: try {
+        var v: RAModelGetResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .getResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .getResult(v)
+        }
+      }()
+      case 23: try {
+        var v: RAModelImportResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .importResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .importResult(v)
+        }
+      }()
+      case 24: try {
+        var v: RAModelDiscoveryResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .discoveryResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .discoveryResult(v)
+        }
+      }()
+      case 25: try {
+        var v: RAModelCompatibilityResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .compatibilityResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .compatibilityResult(v)
+        }
+      }()
+      case 26: try {
+        var v: RACurrentModelResult?
+        var hadOneofValue = false
+        if let current = self.result {
+          hadOneofValue = true
+          if case .currentModelResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.result = .currentModelResult(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+    }
+    if !self.assignmentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.assignmentID, fieldNumber: 3)
+    }
+    if self.assignedComponent != .unspecified {
+      try visitor.visitSingularEnumField(value: self.assignedComponent, fieldNumber: 4)
+    }
+    if self.framework != .unspecified {
+      try visitor.visitSingularEnumField(value: self.framework, fieldNumber: 5)
+    }
+    if !self.sourcePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.sourcePath, fieldNumber: 6)
+    }
+    if !self.error.isEmpty {
+      try visitor.visitSingularStringField(value: self.error, fieldNumber: 7)
+    }
+    switch self.result {
+    case .refreshResult?: try {
+      guard case .refreshResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+    }()
+    case .listResult?: try {
+      guard case .listResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+    }()
+    case .getResult?: try {
+      guard case .getResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+    }()
+    case .importResult?: try {
+      guard case .importResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+    }()
+    case .discoveryResult?: try {
+      guard case .discoveryResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+    }()
+    case .compatibilityResult?: try {
+      guard case .compatibilityResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
+    }()
+    case .currentModelResult?: try {
+      guard case .currentModelResult(let v)? = self.result else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelRegistryEvent, rhs: RAModelRegistryEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.assignmentID != rhs.assignmentID {return false}
+    if lhs.assignedComponent != rhs.assignedComponent {return false}
+    if lhs.framework != rhs.framework {return false}
+    if lhs.sourcePath != rhs.sourcePath {return false}
+    if lhs.error != rhs.error {return false}
+    if lhs.result != rhs.result {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RADownloadEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DownloadEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}task_id\0\u{1}error\0\u{4}\u{10}plan_result\0\u{3}start_result\0\u{1}progress\0\u{3}cancel_result\0\u{3}resume_result\0")
+
+  fileprivate class _StorageClass {
+    var _kind: RADownloadEventKind = .unspecified
+    var _modelID: String = String()
+    var _taskID: String = String()
+    var _error: String = String()
+    var _payload: RADownloadEvent.OneOf_Payload?
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _kind = source._kind
+      _modelID = source._modelID
+      _taskID = source._taskID
+      _error = source._error
+      _payload = source._payload
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._taskID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
+        case 20: try {
+          var v: RADownloadPlanResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .planResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .planResult(v)
+          }
+        }()
+        case 21: try {
+          var v: RADownloadStartResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .startResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .startResult(v)
+          }
+        }()
+        case 22: try {
+          var v: RADownloadProgress?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .progress(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .progress(v)
+          }
+        }()
+        case 23: try {
+          var v: RADownloadCancelResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .cancelResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .cancelResult(v)
+          }
+        }()
+        case 24: try {
+          var v: RADownloadResumeResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .resumeResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .resumeResult(v)
+          }
+        }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 1)
+      }
+      if !_storage._modelID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 2)
+      }
+      if !_storage._taskID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._taskID, fieldNumber: 3)
+      }
+      if !_storage._error.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._error, fieldNumber: 4)
+      }
+      switch _storage._payload {
+      case .planResult?: try {
+        guard case .planResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      }()
+      case .startResult?: try {
+        guard case .startResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+      }()
+      case .progress?: try {
+        guard case .progress(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      }()
+      case .cancelResult?: try {
+        guard case .cancelResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+      }()
+      case .resumeResult?: try {
+        guard case .resumeResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+      }()
+      case nil: break
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RADownloadEvent, rhs: RADownloadEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._modelID != rhs_storage._modelID {return false}
+        if _storage._taskID != rhs_storage._taskID {return false}
+        if _storage._error != rhs_storage._error {return false}
+        if _storage._payload != rhs_storage._payload {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageLifecycleEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}cache_key\0\u{1}bytes\0\u{1}error\0\u{4}\u{f}info_result\0\u{3}availability_result\0\u{3}delete_plan\0\u{3}delete_result\0")
+
+  fileprivate class _StorageClass {
+    var _kind: RAStorageLifecycleEventKind = .unspecified
+    var _modelID: String = String()
+    var _cacheKey: String = String()
+    var _bytes: Int64 = 0
+    var _error: String = String()
+    var _result: RAStorageLifecycleEvent.OneOf_Result?
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _kind = source._kind
+      _modelID = source._modelID
+      _cacheKey = source._cacheKey
+      _bytes = source._bytes
+      _error = source._error
+      _result = source._result
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._cacheKey) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._bytes) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
+        case 20: try {
+          var v: RAStorageInfoResult?
+          var hadOneofValue = false
+          if let current = _storage._result {
+            hadOneofValue = true
+            if case .infoResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._result = .infoResult(v)
+          }
+        }()
+        case 21: try {
+          var v: RAStorageAvailabilityResult?
+          var hadOneofValue = false
+          if let current = _storage._result {
+            hadOneofValue = true
+            if case .availabilityResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._result = .availabilityResult(v)
+          }
+        }()
+        case 22: try {
+          var v: RAStorageDeletePlan?
+          var hadOneofValue = false
+          if let current = _storage._result {
+            hadOneofValue = true
+            if case .deletePlan(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._result = .deletePlan(v)
+          }
+        }()
+        case 23: try {
+          var v: RAStorageDeleteResult?
+          var hadOneofValue = false
+          if let current = _storage._result {
+            hadOneofValue = true
+            if case .deleteResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._result = .deleteResult(v)
+          }
+        }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 1)
+      }
+      if !_storage._modelID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 2)
+      }
+      if !_storage._cacheKey.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._cacheKey, fieldNumber: 3)
+      }
+      if _storage._bytes != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._bytes, fieldNumber: 4)
+      }
+      if !_storage._error.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._error, fieldNumber: 5)
+      }
+      switch _storage._result {
+      case .infoResult?: try {
+        guard case .infoResult(let v)? = _storage._result else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      }()
+      case .availabilityResult?: try {
+        guard case .availabilityResult(let v)? = _storage._result else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+      }()
+      case .deletePlan?: try {
+        guard case .deletePlan(let v)? = _storage._result else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      }()
+      case .deleteResult?: try {
+        guard case .deleteResult(let v)? = _storage._result else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+      }()
+      case nil: break
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageLifecycleEvent, rhs: RAStorageLifecycleEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._modelID != rhs_storage._modelID {return false}
+        if _storage._cacheKey != rhs_storage._cacheKey {return false}
+        if _storage._bytes != rhs_storage._bytes {return false}
+        if _storage._error != rhs_storage._error {return false}
+        if _storage._result != rhs_storage._result {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAHardwareRoutingEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".HardwareRoutingEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{1}framework\0\u{1}capability\0\u{1}route\0\u{1}reason\0\u{1}error\0\u{4}\u{d}hardware_profile\0")
+
+  fileprivate class _StorageClass {
+    var _kind: RAHardwareRoutingEventKind = .unspecified
+    var _component: RASDKComponent = .unspecified
+    var _framework: RAInferenceFramework = .unspecified
+    var _capability: String = String()
+    var _route: String = String()
+    var _reason: String = String()
+    var _error: String = String()
+    var _hardwareProfile: RAHardwareProfileResult? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _kind = source._kind
+      _component = source._component
+      _framework = source._framework
+      _capability = source._capability
+      _route = source._route
+      _reason = source._reason
+      _error = source._error
+      _hardwareProfile = source._hardwareProfile
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._component) }()
+        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._framework) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._capability) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._route) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._reason) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
+        case 20: try { try decoder.decodeSingularMessageField(value: &_storage._hardwareProfile) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 1)
+      }
+      if _storage._component != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._component, fieldNumber: 2)
+      }
+      if _storage._framework != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._framework, fieldNumber: 3)
+      }
+      if !_storage._capability.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._capability, fieldNumber: 4)
+      }
+      if !_storage._route.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._route, fieldNumber: 5)
+      }
+      if !_storage._reason.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._reason, fieldNumber: 6)
+      }
+      if !_storage._error.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._error, fieldNumber: 7)
+      }
+      try { if let v = _storage._hardwareProfile {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAHardwareRoutingEvent, rhs: RAHardwareRoutingEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._component != rhs_storage._component {return false}
+        if _storage._framework != rhs_storage._framework {return false}
+        if _storage._capability != rhs_storage._capability {return false}
+        if _storage._route != rhs_storage._route {return false}
+        if _storage._reason != rhs_storage._reason {return false}
+        if _storage._error != rhs_storage._error {return false}
+        if _storage._hardwareProfile != rhs_storage._hardwareProfile {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RACapabilityOperationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CapabilityOperationEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}model_id\0\u{3}operation_id\0\u{1}operation\0\u{1}progress\0\u{3}input_count\0\u{3}output_count\0\u{3}result_json\0\u{1}error\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.component) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.operation) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self.progress) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.inputCount) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self.outputCount) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.resultJson) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.error) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if self.component != .unspecified {
+      try visitor.visitSingularEnumField(value: self.component, fieldNumber: 2)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 3)
+    }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 4)
+    }
+    if !self.operation.isEmpty {
+      try visitor.visitSingularStringField(value: self.operation, fieldNumber: 5)
+    }
+    if self.progress.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.progress, fieldNumber: 6)
+    }
+    if self.inputCount != 0 {
+      try visitor.visitSingularInt64Field(value: self.inputCount, fieldNumber: 7)
+    }
+    if self.outputCount != 0 {
+      try visitor.visitSingularInt64Field(value: self.outputCount, fieldNumber: 8)
+    }
+    if !self.resultJson.isEmpty {
+      try visitor.visitSingularStringField(value: self.resultJson, fieldNumber: 9)
+    }
+    if !self.error.isEmpty {
+      try visitor.visitSingularStringField(value: self.error, fieldNumber: 10)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RACapabilityOperationEvent, rhs: RACapabilityOperationEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.component != rhs.component {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.operation != rhs.operation {return false}
+    if lhs.progress != rhs.progress {return false}
+    if lhs.inputCount != rhs.inputCount {return false}
+    if lhs.outputCount != rhs.outputCount {return false}
+    if lhs.resultJson != rhs.resultJson {return false}
+    if lhs.error != rhs.error {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RATelemetryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TelemetryEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}name\0\u{1}attributes\0\u{1}value\0\u{1}unit\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.attributes) }()
+      case 4: try { try decoder.decodeSingularDoubleField(value: &self.value) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.unit) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if !self.attributes.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.attributes, fieldNumber: 3)
+    }
+    if self.value.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.value, fieldNumber: 4)
+    }
+    if !self.unit.isEmpty {
+      try visitor.visitSingularStringField(value: self.unit, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RATelemetryEvent, rhs: RATelemetryEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.attributes != rhs.attributes {return false}
+    if lhs.value != rhs.value {return false}
+    if lhs.unit != rhs.unit {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RACancellationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CancellationEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}operation_id\0\u{1}reason\0\u{3}user_initiated\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.component) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.operationID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.reason) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.userInitiated) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if self.component != .unspecified {
+      try visitor.visitSingularEnumField(value: self.component, fieldNumber: 2)
+    }
+    if !self.operationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.operationID, fieldNumber: 3)
+    }
+    if !self.reason.isEmpty {
+      try visitor.visitSingularStringField(value: self.reason, fieldNumber: 4)
+    }
+    if self.userInitiated != false {
+      try visitor.visitSingularBoolField(value: self.userInitiated, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RACancellationEvent, rhs: RACancellationEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.component != rhs.component {return false}
+    if lhs.operationID != rhs.operationID {return false}
+    if lhs.reason != rhs.reason {return false}
+    if lhs.userInitiated != rhs.userInitiated {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAFailureEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FailureEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{1}operation\0\u{1}error\0\u{1}recoverable\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.component) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.operation) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.recoverable) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.component != .unspecified {
+      try visitor.visitSingularEnumField(value: self.component, fieldNumber: 1)
+    }
+    if !self.operation.isEmpty {
+      try visitor.visitSingularStringField(value: self.operation, fieldNumber: 2)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    if self.recoverable != false {
+      try visitor.visitSingularBoolField(value: self.recoverable, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAFailureEvent, rhs: RAFailureEvent) -> Bool {
+    if lhs.component != rhs.component {return false}
+    if lhs.operation != rhs.operation {return false}
+    if lhs._error != rhs._error {return false}
+    if lhs.recoverable != rhs.recoverable {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2853,11 +5939,14 @@ extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._
 
 extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}initialization\0\u{1}configuration\0\u{1}generation\0\u{1}model\0\u{1}performance\0\u{1}network\0\u{1}storage\0\u{1}framework\0\u{1}device\0\u{3}component_init\0\u{1}id\0\u{3}session_id\0\u{1}destination\0\u{1}properties\0\u{1}voice\0\u{3}voice_pipeline\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}initialization\0\u{1}configuration\0\u{1}generation\0\u{1}model\0\u{1}performance\0\u{1}network\0\u{1}storage\0\u{1}framework\0\u{1}device\0\u{3}component_init\0\u{1}id\0\u{3}session_id\0\u{1}destination\0\u{1}properties\0\u{1}voice\0\u{3}voice_pipeline\0\u{3}component_lifecycle\0\u{1}category\0\u{1}component\0\u{1}error\0\u{1}session\0\u{1}auth\0\u{3}model_registry\0\u{1}download\0\u{3}storage_lifecycle\0\u{3}hardware_routing\0\u{1}capability\0\u{1}telemetry\0\u{1}cancellation\0\u{1}failure\0")
 
   fileprivate class _StorageClass {
     var _timestampMs: Int64 = 0
     var _severity: RAEventSeverity = .debug
+    var _category: RAEventCategory = .unspecified
+    var _component: RASDKComponent = .unspecified
+    var _error: RASDKError? = nil
     var _id: String = String()
     var _sessionID: String = String()
     var _destination: RAEventDestination = .unspecified
@@ -2875,6 +5964,9 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     init(copying source: _StorageClass) {
       _timestampMs = source._timestampMs
       _severity = source._severity
+      _category = source._category
+      _component = source._component
+      _error = source._error
       _id = source._id
       _sessionID = source._sessionID
       _destination = source._destination
@@ -3060,6 +6152,152 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
             _storage._event = .voicePipeline(v)
           }
         }()
+        case 19: try {
+          var v: RAComponentLifecycleEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .componentLifecycle(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .componentLifecycle(v)
+          }
+        }()
+        case 20: try { try decoder.decodeSingularEnumField(value: &_storage._category) }()
+        case 21: try { try decoder.decodeSingularEnumField(value: &_storage._component) }()
+        case 22: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 23: try {
+          var v: RASessionEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .session(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .session(v)
+          }
+        }()
+        case 24: try {
+          var v: RAAuthEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .auth(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .auth(v)
+          }
+        }()
+        case 25: try {
+          var v: RAModelRegistryEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .modelRegistry(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .modelRegistry(v)
+          }
+        }()
+        case 26: try {
+          var v: RADownloadEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .download(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .download(v)
+          }
+        }()
+        case 27: try {
+          var v: RAStorageLifecycleEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .storageLifecycle(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .storageLifecycle(v)
+          }
+        }()
+        case 28: try {
+          var v: RAHardwareRoutingEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .hardwareRouting(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .hardwareRouting(v)
+          }
+        }()
+        case 29: try {
+          var v: RACapabilityOperationEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .capability(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .capability(v)
+          }
+        }()
+        case 30: try {
+          var v: RATelemetryEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .telemetry(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .telemetry(v)
+          }
+        }()
+        case 31: try {
+          var v: RACancellationEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .cancellation(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .cancellation(v)
+          }
+        }()
+        case 32: try {
+          var v: RAFailureEvent?
+          var hadOneofValue = false
+          if let current = _storage._event {
+            hadOneofValue = true
+            if case .failure(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._event = .failure(v)
+          }
+        }()
         default: break
         }
       }
@@ -3142,6 +6380,62 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
         guard case .voicePipeline(let v)? = _storage._event else { preconditionFailure() }
         try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
       }()
+      case .componentLifecycle?: try {
+        guard case .componentLifecycle(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
+      }()
+      default: break
+      }
+      if _storage._category != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._category, fieldNumber: 20)
+      }
+      if _storage._component != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._component, fieldNumber: 21)
+      }
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      } }()
+      switch _storage._event {
+      case .session?: try {
+        guard case .session(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+      }()
+      case .auth?: try {
+        guard case .auth(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+      }()
+      case .modelRegistry?: try {
+        guard case .modelRegistry(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
+      }()
+      case .download?: try {
+        guard case .download(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
+      }()
+      case .storageLifecycle?: try {
+        guard case .storageLifecycle(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 27)
+      }()
+      case .hardwareRouting?: try {
+        guard case .hardwareRouting(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 28)
+      }()
+      case .capability?: try {
+        guard case .capability(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 29)
+      }()
+      case .telemetry?: try {
+        guard case .telemetry(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 30)
+      }()
+      case .cancellation?: try {
+        guard case .cancellation(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 31)
+      }()
+      case .failure?: try {
+        guard case .failure(let v)? = _storage._event else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 32)
+      }()
       default: break
       }
     }
@@ -3155,6 +6449,9 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
         let rhs_storage = _args.1
         if _storage._timestampMs != rhs_storage._timestampMs {return false}
         if _storage._severity != rhs_storage._severity {return false}
+        if _storage._category != rhs_storage._category {return false}
+        if _storage._component != rhs_storage._component {return false}
+        if _storage._error != rhs_storage._error {return false}
         if _storage._id != rhs_storage._id {return false}
         if _storage._sessionID != rhs_storage._sessionID {return false}
         if _storage._destination != rhs_storage._destination {return false}

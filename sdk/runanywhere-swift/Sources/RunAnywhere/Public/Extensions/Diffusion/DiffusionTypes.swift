@@ -552,6 +552,14 @@ public struct DiffusionProgress: Sendable {
             self.intermediateImage = nil
         }
     }
+
+    init(from proto: RADiffusionProgress) {
+        self.progress = proto.progressPercent
+        self.currentStep = Int(proto.currentStep)
+        self.totalSteps = Int(proto.totalSteps)
+        self.stage = proto.stage
+        self.intermediateImage = proto.hasIntermediateImageData ? proto.intermediateImageData : nil
+    }
 }
 
 // MARK: - Diffusion Result
@@ -605,6 +613,15 @@ public struct DiffusionResult: Sendable {
         self.seedUsed = cResult.seed_used
         self.generationTimeMs = cResult.generation_time_ms
         self.safetyFlagged = cResult.safety_flagged == RAC_TRUE
+    }
+
+    init(from proto: RADiffusionResult) {
+        self.imageData = proto.imageData
+        self.width = Int(proto.width)
+        self.height = Int(proto.height)
+        self.seedUsed = proto.seedUsed
+        self.generationTimeMs = proto.totalTimeMs
+        self.safetyFlagged = proto.safetyFlag
     }
 }
 
@@ -745,9 +762,7 @@ extension DiffusionConfiguration {
 
 extension DiffusionGenerationOptions {
     /// Convert to canonical generated proto `RADiffusionGenerationOptions`.
-    /// Notes: `inputImage`, `maskImage`, `denoiseStrength`,
-    /// `reportIntermediateImages`, `progressStride` are dropped — see the
-    /// proto schema header for rationale.
+    /// Includes img2img/inpainting payloads and progress controls when set.
     public func toRADiffusionGenerationOptions() -> RADiffusionGenerationOptions {
         var proto = RADiffusionGenerationOptions()
         proto.prompt = prompt
@@ -759,6 +774,15 @@ extension DiffusionGenerationOptions {
         proto.seed = seed
         proto.scheduler = scheduler.raScheduler
         proto.mode = mode.raMode
+        if let inputImage {
+            proto.inputImage = inputImage
+        }
+        if let maskImage {
+            proto.maskImage = maskImage
+        }
+        proto.denoiseStrength = denoiseStrength
+        proto.reportIntermediateImages = reportIntermediateImages
+        proto.progressStride = Int32(progressStride)
         return proto
     }
 }

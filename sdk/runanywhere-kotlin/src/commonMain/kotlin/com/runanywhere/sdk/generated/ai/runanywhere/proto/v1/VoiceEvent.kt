@@ -56,11 +56,33 @@ public class VoiceEvent(
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
+    tag = 3,
+    adapter = "ai.runanywhere.proto.v1.VoiceEventCategory#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 2,
+  )
+  public val category: VoiceEventCategory = VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED,
+  @field:WireField(
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.VoiceEventSeverity#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG,
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.VoicePipelineComponent#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val component: VoicePipelineComponent =
+      VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED,
+  @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.UserSaidEvent#ADAPTER",
     jsonName = "userSaid",
     oneofName = "payload",
-    schemaIndex = 2,
+    schemaIndex = 5,
   )
   public val user_said: UserSaidEvent? = null,
   @field:WireField(
@@ -68,49 +90,49 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.AssistantTokenEvent#ADAPTER",
     jsonName = "assistantToken",
     oneofName = "payload",
-    schemaIndex = 3,
+    schemaIndex = 6,
   )
   public val assistant_token: AssistantTokenEvent? = null,
   @field:WireField(
     tag = 12,
     adapter = "ai.runanywhere.proto.v1.AudioFrameEvent#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 4,
+    schemaIndex = 7,
   )
   public val audio: AudioFrameEvent? = null,
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.VADEvent#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 5,
+    schemaIndex = 8,
   )
   public val vad: VADEvent? = null,
   @field:WireField(
     tag = 14,
     adapter = "ai.runanywhere.proto.v1.InterruptedEvent#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 6,
+    schemaIndex = 9,
   )
   public val interrupted: InterruptedEvent? = null,
   @field:WireField(
     tag = 15,
     adapter = "ai.runanywhere.proto.v1.StateChangeEvent#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 7,
+    schemaIndex = 10,
   )
   public val state: StateChangeEvent? = null,
   @field:WireField(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.ErrorEvent#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 8,
+    schemaIndex = 11,
   )
   public val error: ErrorEvent? = null,
   @field:WireField(
     tag = 17,
     adapter = "ai.runanywhere.proto.v1.MetricsEvent#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 9,
+    schemaIndex = 12,
   )
   public val metrics: MetricsEvent? = null,
   /**
@@ -126,7 +148,7 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.VoiceAgentComponentStates#ADAPTER",
     jsonName = "componentStateChanged",
     oneofName = "payload",
-    schemaIndex = 10,
+    schemaIndex = 13,
   )
   public val component_state_changed: VoiceAgentComponentStates? = null,
   @field:WireField(
@@ -134,7 +156,7 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.VoiceSessionError#ADAPTER",
     jsonName = "sessionError",
     oneofName = "payload",
-    schemaIndex = 11,
+    schemaIndex = 14,
   )
   public val session_error: VoiceSessionError? = null,
   @field:WireField(
@@ -142,7 +164,7 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.SessionStartedEvent#ADAPTER",
     jsonName = "sessionStarted",
     oneofName = "payload",
-    schemaIndex = 12,
+    schemaIndex = 15,
   )
   public val session_started: SessionStartedEvent? = null,
   @field:WireField(
@@ -150,7 +172,7 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.SessionStoppedEvent#ADAPTER",
     jsonName = "sessionStopped",
     oneofName = "payload",
-    schemaIndex = 13,
+    schemaIndex = 16,
   )
   public val session_stopped: SessionStoppedEvent? = null,
   @field:WireField(
@@ -158,7 +180,7 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.AgentResponseStartedEvent#ADAPTER",
     jsonName = "agentResponseStarted",
     oneofName = "payload",
-    schemaIndex = 14,
+    schemaIndex = 17,
   )
   public val agent_response_started: AgentResponseStartedEvent? = null,
   @field:WireField(
@@ -166,16 +188,41 @@ public class VoiceEvent(
     adapter = "ai.runanywhere.proto.v1.AgentResponseCompletedEvent#ADAPTER",
     jsonName = "agentResponseCompleted",
     oneofName = "payload",
-    schemaIndex = 15,
+    schemaIndex = 18,
   )
   public val agent_response_completed: AgentResponseCompletedEvent? = null,
+  @field:WireField(
+    tag = 24,
+    adapter = "ai.runanywhere.proto.v1.SpeechTurnDetectionEvent#ADAPTER",
+    jsonName = "speechTurnDetection",
+    oneofName = "payload",
+    schemaIndex = 19,
+  )
+  public val speech_turn_detection: SpeechTurnDetectionEvent? = null,
+  @field:WireField(
+    tag = 25,
+    adapter = "ai.runanywhere.proto.v1.TurnLifecycleEvent#ADAPTER",
+    jsonName = "turnLifecycle",
+    oneofName = "payload",
+    schemaIndex = 20,
+  )
+  public val turn_lifecycle: TurnLifecycleEvent? = null,
+  @field:WireField(
+    tag = 26,
+    adapter = "ai.runanywhere.proto.v1.WakeWordDetectedEvent#ADAPTER",
+    jsonName = "wakewordDetected",
+    oneofName = "payload",
+    schemaIndex = 21,
+  )
+  public val wakeword_detected: WakeWordDetectedEvent? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceEvent, Nothing>(ADAPTER, unknownFields) {
   init {
     require(countNonNull(user_said, assistant_token, audio, vad, interrupted, state, error, metrics,
         component_state_changed, session_error, session_started, session_stopped,
-        agent_response_started, agent_response_completed) <= 1) {
-      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed may be non-null"
+        agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle,
+        wakeword_detected) <= 1) {
+      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected may be non-null"
     }
   }
 
@@ -192,6 +239,9 @@ public class VoiceEvent(
     if (unknownFields != other.unknownFields) return false
     if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
+    if (category != other.category) return false
+    if (severity != other.severity) return false
+    if (component != other.component) return false
     if (user_said != other.user_said) return false
     if (assistant_token != other.assistant_token) return false
     if (audio != other.audio) return false
@@ -206,6 +256,9 @@ public class VoiceEvent(
     if (session_stopped != other.session_stopped) return false
     if (agent_response_started != other.agent_response_started) return false
     if (agent_response_completed != other.agent_response_completed) return false
+    if (speech_turn_detection != other.speech_turn_detection) return false
+    if (turn_lifecycle != other.turn_lifecycle) return false
+    if (wakeword_detected != other.wakeword_detected) return false
     return true
   }
 
@@ -215,6 +268,9 @@ public class VoiceEvent(
       result = unknownFields.hashCode()
       result = result * 37 + seq.hashCode()
       result = result * 37 + timestamp_us.hashCode()
+      result = result * 37 + category.hashCode()
+      result = result * 37 + severity.hashCode()
+      result = result * 37 + component.hashCode()
       result = result * 37 + (user_said?.hashCode() ?: 0)
       result = result * 37 + (assistant_token?.hashCode() ?: 0)
       result = result * 37 + (audio?.hashCode() ?: 0)
@@ -229,6 +285,9 @@ public class VoiceEvent(
       result = result * 37 + (session_stopped?.hashCode() ?: 0)
       result = result * 37 + (agent_response_started?.hashCode() ?: 0)
       result = result * 37 + (agent_response_completed?.hashCode() ?: 0)
+      result = result * 37 + (speech_turn_detection?.hashCode() ?: 0)
+      result = result * 37 + (turn_lifecycle?.hashCode() ?: 0)
+      result = result * 37 + (wakeword_detected?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -238,6 +297,9 @@ public class VoiceEvent(
     val result = mutableListOf<String>()
     result += """seq=$seq"""
     result += """timestamp_us=$timestamp_us"""
+    result += """category=$category"""
+    result += """severity=$severity"""
+    result += """component=$component"""
     if (user_said != null) result += """user_said=$user_said"""
     if (assistant_token != null) result += """assistant_token=$assistant_token"""
     if (audio != null) result += """audio=$audio"""
@@ -255,12 +317,18 @@ public class VoiceEvent(
         """agent_response_started=$agent_response_started"""
     if (agent_response_completed != null) result +=
         """agent_response_completed=$agent_response_completed"""
+    if (speech_turn_detection != null) result += """speech_turn_detection=$speech_turn_detection"""
+    if (turn_lifecycle != null) result += """turn_lifecycle=$turn_lifecycle"""
+    if (wakeword_detected != null) result += """wakeword_detected=$wakeword_detected"""
     return result.joinToString(prefix = "VoiceEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
+    category: VoiceEventCategory = this.category,
+    severity: VoiceEventSeverity = this.severity,
+    component: VoicePipelineComponent = this.component,
     user_said: UserSaidEvent? = this.user_said,
     assistant_token: AssistantTokenEvent? = this.assistant_token,
     audio: AudioFrameEvent? = this.audio,
@@ -275,10 +343,15 @@ public class VoiceEvent(
     session_stopped: SessionStoppedEvent? = this.session_stopped,
     agent_response_started: AgentResponseStartedEvent? = this.agent_response_started,
     agent_response_completed: AgentResponseCompletedEvent? = this.agent_response_completed,
+    speech_turn_detection: SpeechTurnDetectionEvent? = this.speech_turn_detection,
+    turn_lifecycle: TurnLifecycleEvent? = this.turn_lifecycle,
+    wakeword_detected: WakeWordDetectedEvent? = this.wakeword_detected,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceEvent = VoiceEvent(seq, timestamp_us, user_said, assistant_token, audio, vad, interrupted,
-      state, error, metrics, component_state_changed, session_error, session_started,
-      session_stopped, agent_response_started, agent_response_completed, unknownFields)
+  ): VoiceEvent = VoiceEvent(seq, timestamp_us, category, severity, component, user_said,
+      assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed,
+      session_error, session_started, session_stopped, agent_response_started,
+      agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -295,6 +368,12 @@ public class VoiceEvent(
         if (value.seq != 0L) size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
         if (value.timestamp_us != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(2,
             value.timestamp_us)
+        if (value.category != VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED) size +=
+            VoiceEventCategory.ADAPTER.encodedSizeWithTag(3, value.category)
+        if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG) size +=
+            VoiceEventSeverity.ADAPTER.encodedSizeWithTag(4, value.severity)
+        if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED) size +=
+            VoicePipelineComponent.ADAPTER.encodedSizeWithTag(5, value.component)
         size += UserSaidEvent.ADAPTER.encodedSizeWithTag(10, value.user_said)
         size += AssistantTokenEvent.ADAPTER.encodedSizeWithTag(11, value.assistant_token)
         size += AudioFrameEvent.ADAPTER.encodedSizeWithTag(12, value.audio)
@@ -312,6 +391,9 @@ public class VoiceEvent(
             value.agent_response_started)
         size += AgentResponseCompletedEvent.ADAPTER.encodedSizeWithTag(23,
             value.agent_response_completed)
+        size += SpeechTurnDetectionEvent.ADAPTER.encodedSizeWithTag(24, value.speech_turn_detection)
+        size += TurnLifecycleEvent.ADAPTER.encodedSizeWithTag(25, value.turn_lifecycle)
+        size += WakeWordDetectedEvent.ADAPTER.encodedSizeWithTag(26, value.wakeword_detected)
         return size
       }
 
@@ -319,6 +401,12 @@ public class VoiceEvent(
         if (value.seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.timestamp_us)
+        if (value.category != VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED)
+            VoiceEventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
+        if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
+            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
+        if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED)
+            VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
         UserSaidEvent.ADAPTER.encodeWithTag(writer, 10, value.user_said)
         AssistantTokenEvent.ADAPTER.encodeWithTag(writer, 11, value.assistant_token)
         AudioFrameEvent.ADAPTER.encodeWithTag(writer, 12, value.audio)
@@ -334,11 +422,17 @@ public class VoiceEvent(
         AgentResponseStartedEvent.ADAPTER.encodeWithTag(writer, 22, value.agent_response_started)
         AgentResponseCompletedEvent.ADAPTER.encodeWithTag(writer, 23,
             value.agent_response_completed)
+        SpeechTurnDetectionEvent.ADAPTER.encodeWithTag(writer, 24, value.speech_turn_detection)
+        TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 25, value.turn_lifecycle)
+        WakeWordDetectedEvent.ADAPTER.encodeWithTag(writer, 26, value.wakeword_detected)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceEvent) {
         writer.writeBytes(value.unknownFields)
+        WakeWordDetectedEvent.ADAPTER.encodeWithTag(writer, 26, value.wakeword_detected)
+        TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 25, value.turn_lifecycle)
+        SpeechTurnDetectionEvent.ADAPTER.encodeWithTag(writer, 24, value.speech_turn_detection)
         AgentResponseCompletedEvent.ADAPTER.encodeWithTag(writer, 23,
             value.agent_response_completed)
         AgentResponseStartedEvent.ADAPTER.encodeWithTag(writer, 22, value.agent_response_started)
@@ -354,6 +448,12 @@ public class VoiceEvent(
         AudioFrameEvent.ADAPTER.encodeWithTag(writer, 12, value.audio)
         AssistantTokenEvent.ADAPTER.encodeWithTag(writer, 11, value.assistant_token)
         UserSaidEvent.ADAPTER.encodeWithTag(writer, 10, value.user_said)
+        if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED)
+            VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
+        if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
+            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
+        if (value.category != VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED)
+            VoiceEventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.timestamp_us)
         if (value.seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
@@ -362,6 +462,10 @@ public class VoiceEvent(
       override fun decode(reader: ProtoReader): VoiceEvent {
         var seq: Long = 0L
         var timestamp_us: Long = 0L
+        var category: VoiceEventCategory = VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED
+        var severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG
+        var component: VoicePipelineComponent =
+            VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED
         var user_said: UserSaidEvent? = null
         var assistant_token: AssistantTokenEvent? = null
         var audio: AudioFrameEvent? = null
@@ -376,10 +480,28 @@ public class VoiceEvent(
         var session_stopped: SessionStoppedEvent? = null
         var agent_response_started: AgentResponseStartedEvent? = null
         var agent_response_completed: AgentResponseCompletedEvent? = null
+        var speech_turn_detection: SpeechTurnDetectionEvent? = null
+        var turn_lifecycle: TurnLifecycleEvent? = null
+        var wakeword_detected: WakeWordDetectedEvent? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
+            3 -> try {
+              category = VoiceEventCategory.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            4 -> try {
+              severity = VoiceEventSeverity.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            5 -> try {
+              component = VoicePipelineComponent.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             10 -> user_said = UserSaidEvent.ADAPTER.decode(reader)
             11 -> assistant_token = AssistantTokenEvent.ADAPTER.decode(reader)
             12 -> audio = AudioFrameEvent.ADAPTER.decode(reader)
@@ -394,12 +516,18 @@ public class VoiceEvent(
             21 -> session_stopped = SessionStoppedEvent.ADAPTER.decode(reader)
             22 -> agent_response_started = AgentResponseStartedEvent.ADAPTER.decode(reader)
             23 -> agent_response_completed = AgentResponseCompletedEvent.ADAPTER.decode(reader)
+            24 -> speech_turn_detection = SpeechTurnDetectionEvent.ADAPTER.decode(reader)
+            25 -> turn_lifecycle = TurnLifecycleEvent.ADAPTER.decode(reader)
+            26 -> wakeword_detected = WakeWordDetectedEvent.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VoiceEvent(
           seq = seq,
           timestamp_us = timestamp_us,
+          category = category,
+          severity = severity,
+          component = component,
           user_said = user_said,
           assistant_token = assistant_token,
           audio = audio,
@@ -414,6 +542,9 @@ public class VoiceEvent(
           session_stopped = session_stopped,
           agent_response_started = agent_response_started,
           agent_response_completed = agent_response_completed,
+          speech_turn_detection = speech_turn_detection,
+          turn_lifecycle = turn_lifecycle,
+          wakeword_detected = wakeword_detected,
           unknownFields = unknownFields
         )
       }
@@ -436,6 +567,10 @@ public class VoiceEvent(
             value.agent_response_started?.let(AgentResponseStartedEvent.ADAPTER::redact),
         agent_response_completed =
             value.agent_response_completed?.let(AgentResponseCompletedEvent.ADAPTER::redact),
+        speech_turn_detection =
+            value.speech_turn_detection?.let(SpeechTurnDetectionEvent.ADAPTER::redact),
+        turn_lifecycle = value.turn_lifecycle?.let(TurnLifecycleEvent.ADAPTER::redact),
+        wakeword_detected = value.wakeword_detected?.let(WakeWordDetectedEvent.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

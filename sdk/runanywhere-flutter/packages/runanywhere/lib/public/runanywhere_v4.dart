@@ -25,6 +25,16 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
+import 'package:runanywhere/generated/model_types.pb.dart'
+    show
+        CurrentModelRequest,
+        CurrentModelResult,
+        ModelLoadRequest,
+        ModelLoadResult,
+        ModelUnloadRequest,
+        ModelUnloadResult;
+import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/stt_options.pb.dart'
     show STTOptions, STTOutput, STTPartialResult;
 import 'package:runanywhere/generated/tts_options.pb.dart'
@@ -35,12 +45,15 @@ import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
+import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hardware.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_lora.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_plugin_loader.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_rag.dart';
@@ -87,8 +100,7 @@ class RunAnywhereSDK {
 
   /// Cached device id — populated during initialization. Mirrors Swift's
   /// `deviceId: String`.
-  String get deviceId =>
-      DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
+  String get deviceId => DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
 
   /// Authenticated user id, or null if not signed in. Mirrors Swift's
   /// `getUserId()`.
@@ -96,8 +108,7 @@ class RunAnywhereSDK {
 
   /// Authenticated organization id, or null. Mirrors Swift's
   /// `getOrganizationId()`.
-  String? get organizationId =>
-      DartBridgeAuth.instance.getOrganizationId();
+  String? get organizationId => DartBridgeAuth.instance.getOrganizationId();
 
   /// True if the SDK has a valid authentication token.
   bool get isAuthenticated => DartBridgeAuth.instance.isAuthenticated();
@@ -132,6 +143,9 @@ class RunAnywhereSDK {
   /// Event bus for cross-capability SDK events.
   EventBus get events => EventBus.shared;
 
+  /// Canonical generated-proto SDK event stream from commons.
+  Stream<sdk_events_pb.SDKEvent> get sdkEvents => DartBridgeEvents.eventStream;
+
   /// Initialize the SDK with API key + base URL.
   Future<void> initialize({
     String? apiKey,
@@ -141,11 +155,19 @@ class RunAnywhereSDK {
     final SDKInitParams params;
 
     if (environment == SDKEnvironment.development) {
-      params = SDKInitParams(
-        apiKey: apiKey ?? '',
-        baseURL: Uri.parse(baseURL ?? 'https://api.runanywhere.ai'),
-        environment: environment,
-      );
+      if (baseURL == null || baseURL.isEmpty) {
+        params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
+      } else {
+        final uri = Uri.tryParse(baseURL);
+        if (uri == null) {
+          throw SDKException.validationFailed('Invalid base URL: $baseURL');
+        }
+        params = SDKInitParams(
+          apiKey: apiKey ?? '',
+          baseURL: uri,
+          environment: environment,
+        );
+      }
     } else {
       if (apiKey == null || apiKey.isEmpty) {
         throw SDKException.validationFailed(
@@ -268,6 +290,7 @@ class RunAnywhereSDK {
   Future<void> reset() async {
     await TelemetryService.shared.shutdown();
 
+    DartBridge.modelLifecycle.reset();
     SdkState.shared.reset();
     DartBridgeModelRegistry.instance.shutdown();
     ServiceContainer.shared.reset();
@@ -308,6 +331,10 @@ class RunAnywhereSDK {
   /// register, register multi-file, update download status, remove.
   RunAnywhereModels get models => RunAnywhereModels.shared;
 
+  /// Model/component lifecycle — generated proto load/unload/current/snapshot.
+  RunAnywhereModelLifecycle get modelLifecycle =>
+      RunAnywhereModelLifecycle.shared;
+
   /// Downloads — start, delete, storage info, list downloaded.
   RunAnywhereDownloads get downloads => RunAnywhereDownloads.shared;
 
@@ -332,6 +359,9 @@ class RunAnywhereSDK {
   /// surfaces `featureNotAvailable` only when commons indicates so.
   RunAnywhereDiffusion get diffusion => RunAnywhereDiffusion.shared;
 
+  /// Embeddings — load an embeddings model and generate embedding vectors.
+  RunAnywhereEmbeddings get embeddings => RunAnywhereEmbeddings.shared;
+
   /// Runtime plugin loader (parity with Swift `RunAnywhere.PluginLoader`).
   RunAnywherePluginLoaderCapability get pluginLoader =>
       RunAnywherePluginLoaderCapability.shared;
@@ -349,13 +379,15 @@ class RunAnywhereSDK {
   //    code reads identically across SDKs).
 
   /// Flat alias for `llm.load(modelId)`.
-  Future<void> loadLLMModel(String modelId) => RunAnywhereLLM.shared.load(modelId);
+  Future<void> loadLLMModel(String modelId) =>
+      RunAnywhereLLM.shared.load(modelId);
 
   /// Flat alias for `llm.unload()`.
   Future<void> unloadLLMModel() => RunAnywhereLLM.shared.unload();
 
   /// Flat alias for `stt.load(modelId)`.
-  Future<void> loadSTTModel(String modelId) => RunAnywhereSTT.shared.load(modelId);
+  Future<void> loadSTTModel(String modelId) =>
+      RunAnywhereSTT.shared.load(modelId);
 
   /// Flat alias for `stt.unload()`.
   Future<void> unloadSTTModel() => RunAnywhereSTT.shared.unload();
@@ -384,6 +416,24 @@ class RunAnywhereSDK {
   /// Flat alias for `models.refreshModelRegistry()`.
   Future<void> refreshModelRegistry() =>
       RunAnywhereModels.shared.refreshModelRegistry();
+
+  /// Proto-backed model lifecycle load.
+  Future<ModelLoadResult> loadModelLifecycle(ModelLoadRequest request) =>
+      RunAnywhereModelLifecycle.shared.load(request);
+
+  /// Proto-backed model lifecycle unload.
+  Future<ModelUnloadResult> unloadModelLifecycle(ModelUnloadRequest request) =>
+      RunAnywhereModelLifecycle.shared.unload(request);
+
+  /// Proto-backed current-model query.
+  Future<CurrentModelResult> currentModel([CurrentModelRequest? request]) =>
+      RunAnywhereModelLifecycle.shared.current(request);
+
+  /// Proto-backed component lifecycle snapshot.
+  sdk_events_pb.ComponentLifecycleSnapshot? componentLifecycleSnapshot(
+    SDKComponent component,
+  ) =>
+      RunAnywhereModelLifecycle.shared.componentSnapshot(component);
 
   // --- Canonical flat methods (§3-§10 of spec) --------------------------------
 
@@ -414,7 +464,8 @@ class RunAnywhereSDK {
 
   /// Flat streaming alias — real FFI-backed streaming STT.
   /// Mirrors Swift / RN / Web `RunAnywhere.transcribeStream`.
-  Stream<STTPartialResult> transcribeStream(Uint8List audio, {STTOptions? options}) =>
+  Stream<STTPartialResult> transcribeStream(Uint8List audio,
+          {STTOptions? options}) =>
       RunAnywhereSTT.shared.transcribeStream(audio, options: options);
 
   /// Flat alias — synthesize text to proto [TTSOutput].
@@ -449,16 +500,19 @@ class RunAnywhereSDK {
   Future<LLMGenerationResult> generate(
     String prompt, [
     LLMGenerationOptions? options,
-  ]) => RunAnywhereLLM.shared.generate(prompt, options);
+  ]) =>
+      RunAnywhereLLM.shared.generate(prompt, options);
 
   /// Flat streaming generate.
   /// Mirrors Swift / RN / Web `RunAnywhere.generateStream(prompt:options:)`.
   Stream<LLMStreamEvent> generateStream(
     String prompt, [
     LLMGenerationOptions? options,
-  ]) => RunAnywhereLLM.shared.generateStream(prompt, options);
+  ]) =>
+      RunAnywhereLLM.shared.generateStream(prompt, options);
 
   /// Flat streaming voice agent events.
   /// Mirrors Swift `RunAnywhere.streamVoiceAgent()`.
-  Stream<VoiceEvent> streamVoiceAgent() => RunAnywhereVoice.shared.eventStream();
+  Stream<VoiceEvent> streamVoiceAgent() =>
+      RunAnywhereVoice.shared.eventStream();
 }

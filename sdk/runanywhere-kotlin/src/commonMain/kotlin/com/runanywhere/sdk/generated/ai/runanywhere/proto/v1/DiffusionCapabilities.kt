@@ -14,6 +14,7 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -68,6 +69,65 @@ public class DiffusionCapabilities(
     schemaIndex = 2,
   )
   public val max_resolution_px: Int = 0,
+  supported_modes: List<DiffusionMode> = emptyList(),
+  /**
+   * Asymmetric maximum dimensions when known. 0 = unknown.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxWidthPx",
+    schemaIndex = 4,
+  )
+  public val max_width_px: Int = 0,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxHeightPx",
+    schemaIndex = 5,
+  )
+  public val max_height_px: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "supportsIntermediateImages",
+    schemaIndex = 6,
+  )
+  public val supports_intermediate_images: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "supportsSafetyChecker",
+    schemaIndex = 7,
+  )
+  public val supports_safety_checker: Boolean = false,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isReady",
+    schemaIndex = 8,
+  )
+  public val is_ready: Boolean = false,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "currentModel",
+    schemaIndex = 9,
+  )
+  public val current_model: String? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "safetyCheckerEnabled",
+    schemaIndex = 10,
+  )
+  public val safety_checker_enabled: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionCapabilities, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -96,6 +156,19 @@ public class DiffusionCapabilities(
   public val supported_schedulers: List<DiffusionScheduler> =
       immutableCopyOf("supported_schedulers", supported_schedulers)
 
+  /**
+   * Generation modes this backend supports.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.DiffusionMode#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "supportedModes",
+    schemaIndex = 3,
+  )
+  public val supported_modes: List<DiffusionMode> = immutableCopyOf("supported_modes",
+      supported_modes)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -110,6 +183,14 @@ public class DiffusionCapabilities(
     if (supported_variants != other.supported_variants) return false
     if (supported_schedulers != other.supported_schedulers) return false
     if (max_resolution_px != other.max_resolution_px) return false
+    if (supported_modes != other.supported_modes) return false
+    if (max_width_px != other.max_width_px) return false
+    if (max_height_px != other.max_height_px) return false
+    if (supports_intermediate_images != other.supports_intermediate_images) return false
+    if (supports_safety_checker != other.supports_safety_checker) return false
+    if (is_ready != other.is_ready) return false
+    if (current_model != other.current_model) return false
+    if (safety_checker_enabled != other.safety_checker_enabled) return false
     return true
   }
 
@@ -120,6 +201,14 @@ public class DiffusionCapabilities(
       result = result * 37 + supported_variants.hashCode()
       result = result * 37 + supported_schedulers.hashCode()
       result = result * 37 + max_resolution_px.hashCode()
+      result = result * 37 + supported_modes.hashCode()
+      result = result * 37 + max_width_px.hashCode()
+      result = result * 37 + max_height_px.hashCode()
+      result = result * 37 + supports_intermediate_images.hashCode()
+      result = result * 37 + supports_safety_checker.hashCode()
+      result = result * 37 + is_ready.hashCode()
+      result = result * 37 + (current_model?.hashCode() ?: 0)
+      result = result * 37 + safety_checker_enabled.hashCode()
       super.hashCode = result
     }
     return result
@@ -131,6 +220,14 @@ public class DiffusionCapabilities(
     if (supported_schedulers.isNotEmpty()) result +=
         """supported_schedulers=$supported_schedulers"""
     result += """max_resolution_px=$max_resolution_px"""
+    if (supported_modes.isNotEmpty()) result += """supported_modes=$supported_modes"""
+    result += """max_width_px=$max_width_px"""
+    result += """max_height_px=$max_height_px"""
+    result += """supports_intermediate_images=$supports_intermediate_images"""
+    result += """supports_safety_checker=$supports_safety_checker"""
+    result += """is_ready=$is_ready"""
+    if (current_model != null) result += """current_model=${sanitize(current_model)}"""
+    result += """safety_checker_enabled=$safety_checker_enabled"""
     return result.joinToString(prefix = "DiffusionCapabilities{", separator = ", ", postfix = "}")
   }
 
@@ -138,9 +235,18 @@ public class DiffusionCapabilities(
     supported_variants: List<DiffusionModelVariant> = this.supported_variants,
     supported_schedulers: List<DiffusionScheduler> = this.supported_schedulers,
     max_resolution_px: Int = this.max_resolution_px,
+    supported_modes: List<DiffusionMode> = this.supported_modes,
+    max_width_px: Int = this.max_width_px,
+    max_height_px: Int = this.max_height_px,
+    supports_intermediate_images: Boolean = this.supports_intermediate_images,
+    supports_safety_checker: Boolean = this.supports_safety_checker,
+    is_ready: Boolean = this.is_ready,
+    current_model: String? = this.current_model,
+    safety_checker_enabled: Boolean = this.safety_checker_enabled,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionCapabilities = DiffusionCapabilities(supported_variants, supported_schedulers,
-      max_resolution_px, unknownFields)
+      max_resolution_px, supported_modes, max_width_px, max_height_px, supports_intermediate_images,
+      supports_safety_checker, is_ready, current_model, safety_checker_enabled, unknownFields)
 
   public companion object {
     @JvmField
@@ -161,6 +267,19 @@ public class DiffusionCapabilities(
             value.supported_schedulers)
         if (value.max_resolution_px != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(3,
             value.max_resolution_px)
+        size += DiffusionMode.ADAPTER.asRepeated().encodedSizeWithTag(4, value.supported_modes)
+        if (value.max_width_px != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5,
+            value.max_width_px)
+        if (value.max_height_px != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.max_height_px)
+        if (value.supports_intermediate_images != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(7, value.supports_intermediate_images)
+        if (value.supports_safety_checker != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(8,
+            value.supports_safety_checker)
+        if (value.is_ready != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.is_ready)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.current_model)
+        if (value.safety_checker_enabled != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(11,
+            value.safety_checker_enabled)
         return size
       }
 
@@ -170,11 +289,35 @@ public class DiffusionCapabilities(
         DiffusionScheduler.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.supported_schedulers)
         if (value.max_resolution_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3,
             value.max_resolution_px)
+        DiffusionMode.ADAPTER.asRepeated().encodeWithTag(writer, 4, value.supported_modes)
+        if (value.max_width_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5, value.max_width_px)
+        if (value.max_height_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.max_height_px)
+        if (value.supports_intermediate_images != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.supports_intermediate_images)
+        if (value.supports_safety_checker != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.supports_safety_checker)
+        if (value.is_ready != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_ready)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.current_model)
+        if (value.safety_checker_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 11,
+            value.safety_checker_enabled)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionCapabilities) {
         writer.writeBytes(value.unknownFields)
+        if (value.safety_checker_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 11,
+            value.safety_checker_enabled)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.current_model)
+        if (value.is_ready != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_ready)
+        if (value.supports_safety_checker != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.supports_safety_checker)
+        if (value.supports_intermediate_images != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.supports_intermediate_images)
+        if (value.max_height_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.max_height_px)
+        if (value.max_width_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5, value.max_width_px)
+        DiffusionMode.ADAPTER.asRepeated().encodeWithTag(writer, 4, value.supported_modes)
         if (value.max_resolution_px != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3,
             value.max_resolution_px)
         DiffusionScheduler.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.supported_schedulers)
@@ -186,6 +329,14 @@ public class DiffusionCapabilities(
         val supported_variants = mutableListOf<DiffusionModelVariant>()
         val supported_schedulers = mutableListOf<DiffusionScheduler>()
         var max_resolution_px: Int = 0
+        val supported_modes = mutableListOf<DiffusionMode>()
+        var max_width_px: Int = 0
+        var max_height_px: Int = 0
+        var supports_intermediate_images: Boolean = false
+        var supports_safety_checker: Boolean = false
+        var is_ready: Boolean = false
+        var current_model: String? = null
+        var safety_checker_enabled: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -199,6 +350,18 @@ public class DiffusionCapabilities(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             3 -> max_resolution_px = ProtoAdapter.INT32.decode(reader)
+            4 -> try {
+              DiffusionMode.ADAPTER.tryDecode(reader, supported_modes)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            5 -> max_width_px = ProtoAdapter.INT32.decode(reader)
+            6 -> max_height_px = ProtoAdapter.INT32.decode(reader)
+            7 -> supports_intermediate_images = ProtoAdapter.BOOL.decode(reader)
+            8 -> supports_safety_checker = ProtoAdapter.BOOL.decode(reader)
+            9 -> is_ready = ProtoAdapter.BOOL.decode(reader)
+            10 -> current_model = ProtoAdapter.STRING.decode(reader)
+            11 -> safety_checker_enabled = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -206,6 +369,14 @@ public class DiffusionCapabilities(
           supported_variants = supported_variants,
           supported_schedulers = supported_schedulers,
           max_resolution_px = max_resolution_px,
+          supported_modes = supported_modes,
+          max_width_px = max_width_px,
+          max_height_px = max_height_px,
+          supports_intermediate_images = supports_intermediate_images,
+          supports_safety_checker = supports_safety_checker,
+          is_ready = is_ready,
+          current_model = current_model,
+          safety_checker_enabled = safety_checker_enabled,
           unknownFields = unknownFields
         )
       }

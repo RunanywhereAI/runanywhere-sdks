@@ -205,6 +205,8 @@ function createBaseLoraAdapterCatalogEntry() {
         compatibleModels: [],
         sizeBytes: 0,
         author: undefined,
+        defaultScale: 0,
+        checksumSha256: undefined,
     };
 }
 export const LoraAdapterCatalogEntry = {
@@ -232,6 +234,12 @@ export const LoraAdapterCatalogEntry = {
         }
         if (message.author !== undefined) {
             writer.uint32(66).string(message.author);
+        }
+        if (message.defaultScale !== 0) {
+            writer.uint32(77).float(message.defaultScale);
+        }
+        if (message.checksumSha256 !== undefined) {
+            writer.uint32(82).string(message.checksumSha256);
         }
         return writer;
     },
@@ -290,6 +298,18 @@ export const LoraAdapterCatalogEntry = {
                     }
                     message.author = reader.string();
                     continue;
+                case 9:
+                    if (tag !== 77) {
+                        break;
+                    }
+                    message.defaultScale = reader.float();
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.checksumSha256 = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -310,6 +330,8 @@ export const LoraAdapterCatalogEntry = {
                 : [],
             sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : 0,
             author: isSet(object.author) ? globalThis.String(object.author) : undefined,
+            defaultScale: isSet(object.defaultScale) ? globalThis.Number(object.defaultScale) : 0,
+            checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : undefined,
         };
     },
     toJSON(message) {
@@ -338,6 +360,12 @@ export const LoraAdapterCatalogEntry = {
         if (message.author !== undefined) {
             obj.author = message.author;
         }
+        if (message.defaultScale !== 0) {
+            obj.defaultScale = message.defaultScale;
+        }
+        if (message.checksumSha256 !== undefined) {
+            obj.checksumSha256 = message.checksumSha256;
+        }
         return obj;
     },
     create(base) {
@@ -353,6 +381,8 @@ export const LoraAdapterCatalogEntry = {
         message.compatibleModels = object.compatibleModels?.map((e) => e) || [];
         message.sizeBytes = object.sizeBytes ?? 0;
         message.author = object.author ?? undefined;
+        message.defaultScale = object.defaultScale ?? 0;
+        message.checksumSha256 = object.checksumSha256 ?? undefined;
         return message;
     },
 };

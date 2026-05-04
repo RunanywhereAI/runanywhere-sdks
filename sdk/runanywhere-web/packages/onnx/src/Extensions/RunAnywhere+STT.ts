@@ -29,7 +29,7 @@
 
 import {
   RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter,
-  AudioFileLoader,
+  AudioFileLoader, STTLanguage,
 } from '@runanywhere/web';
 import type { STTTranscriptionResult, STTTranscribeOptions, STTStreamingSession } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
@@ -42,6 +42,53 @@ const logger = new SDKLogger('STT');
 
 /** Matches RAC_FRAMEWORK_ONNX in rac_model_types.h */
 const RAC_FRAMEWORK_ONNX = 0;
+
+function toSTTLanguage(value: unknown): STTLanguage {
+  if (typeof value === 'number') return value as STTLanguage;
+  const normalized = typeof value === 'string'
+    ? value.toLowerCase().split(/[-_]/)[0]
+    : '';
+  switch (normalized) {
+    case 'en': return STTLanguage.STT_LANGUAGE_EN;
+    case 'es': return STTLanguage.STT_LANGUAGE_ES;
+    case 'fr': return STTLanguage.STT_LANGUAGE_FR;
+    case 'de': return STTLanguage.STT_LANGUAGE_DE;
+    case 'zh': return STTLanguage.STT_LANGUAGE_ZH;
+    case 'ja': return STTLanguage.STT_LANGUAGE_JA;
+    case 'ko': return STTLanguage.STT_LANGUAGE_KO;
+    case 'it': return STTLanguage.STT_LANGUAGE_IT;
+    case 'pt': return STTLanguage.STT_LANGUAGE_PT;
+    case 'ar': return STTLanguage.STT_LANGUAGE_AR;
+    case 'ru': return STTLanguage.STT_LANGUAGE_RU;
+    case 'hi': return STTLanguage.STT_LANGUAGE_HI;
+    case 'auto': return STTLanguage.STT_LANGUAGE_AUTO;
+    default: return STTLanguage.STT_LANGUAGE_UNSPECIFIED;
+  }
+}
+
+function buildSTTOutput(
+  rawResult: Record<string, unknown>,
+  options: STTTranscribeOptions,
+  modelId: string,
+  processingTimeMs: number,
+  audioLengthMs: number,
+): STTTranscriptionResult {
+  return {
+    text: String(rawResult.text ?? '').trim(),
+    language: toSTTLanguage(rawResult.lang ?? options.language),
+    confidence: typeof rawResult.confidence === 'number' ? rawResult.confidence : 0,
+    words: [],
+    alternatives: [],
+    timestampMs: Date.now(),
+    durationMs: audioLengthMs,
+    metadata: {
+      modelId,
+      processingTimeMs,
+      audioLengthMs,
+      realTimeFactor: processingTimeMs > 0 ? audioLengthMs / processingTimeMs : 0,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // STT Types (re-exported for backward compatibility)
@@ -298,9 +345,6 @@ class STTImpl {
     audioSamples: Float32Array,
     options: STTTranscribeOptions = {},
   ): Promise<STTTranscriptionResult> {
-    const sherpa = requireSherpa();
-    const m = sherpa.module;
-
     if (this._offlineRecognizerHandle === 0) {
       if (this._onlineRecognizerHandle !== 0) {
         // Streaming model: process all at once via online recognizer
@@ -308,6 +352,9 @@ class STTImpl {
       }
       throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
     }
+
+    const sherpa = requireSherpa();
+    const m = sherpa.module;
 
     const startMs = performance.now();
     const sampleRate = options.sampleRate ?? 16000;
@@ -338,25 +385,24 @@ class STTImpl {
 
       const result = JSON.parse(jsonStr || '{}');
       const processingTimeMs = Math.round(performance.now() - startMs);
-
-      const transcription: STTTranscriptionResult = {
-        text: (result.text ?? '').trim(),
-        confidence: result.confidence ?? 0,
-        detectedLanguage: result.lang,
+      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const transcription = buildSTTOutput(
+        result,
+        options,
+        this._currentModelId,
         processingTimeMs,
-      };
+        audioDurationMs,
+      );
 
       EventBus.shared.emit('stt.transcribed', SDKEventType.Voice, {
         text: transcription.text,
         confidence: transcription.confidence,
       });
-      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
       const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
-      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
       AnalyticsEmitter.emitSTTTranscriptionCompleted(
         crypto.randomUUID(), this._currentModelId, transcription.text,
         transcription.confidence, processingTimeMs, audioDurationMs,
-        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+        audioSamples.length * 4, wordCount, transcription.metadata?.realTimeFactor ?? 0, '', sampleRate, RAC_FRAMEWORK_ONNX,
       );
 
       return transcription;
@@ -397,20 +443,19 @@ class STTImpl {
 
       const result = JSON.parse(jsonStr || '{}');
       const processingTimeMs = Math.round(performance.now() - startMs);
-
-      const transcription = {
-        text: (result.text ?? '').trim(),
-        confidence: result.confidence ?? 0,
-        processingTimeMs,
-      };
-
       const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const transcription = buildSTTOutput(
+        result,
+        options,
+        this._currentModelId,
+        processingTimeMs,
+        audioDurationMs,
+      );
       const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
-      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
       AnalyticsEmitter.emitSTTTranscriptionCompleted(
         crypto.randomUUID(), this._currentModelId, transcription.text,
         transcription.confidence, processingTimeMs, audioDurationMs,
-        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+        audioSamples.length * 4, wordCount, transcription.metadata?.realTimeFactor ?? 0, '', sampleRate, RAC_FRAMEWORK_ONNX,
       );
 
       return transcription;
@@ -446,6 +491,10 @@ class STTImpl {
     file: File,
     options: STTTranscribeOptions = {},
   ): Promise<STTTranscriptionResult> {
+    if (!this.isModelLoaded) {
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
+    }
+
     const targetRate = options.sampleRate ?? 16000;
     const { samples, sampleRate } = await AudioFileLoader.toFloat32Array(file, targetRate);
     return this.transcribe(samples, { ...options, sampleRate });

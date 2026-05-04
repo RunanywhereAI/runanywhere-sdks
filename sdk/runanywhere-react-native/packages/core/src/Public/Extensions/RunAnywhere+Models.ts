@@ -79,20 +79,7 @@ export async function getModelsForFramework(
  * Get info for a specific model
  */
 export async function getModelInfo(modelId: string): Promise<ModelInfo | null> {
-  if (!isNativeModuleAvailable()) {
-    return null;
-  }
-  const native = requireNativeModule();
-  const infoJson = await native.getModelInfo(modelId);
-  try {
-    const result = JSON.parse(infoJson);
-    if (result === null || result === 'null' || (typeof result === 'object' && Object.keys(result).length === 0)) {
-      return null;
-    }
-    return result;
-  } catch {
-    return null;
-  }
+  return ModelRegistry.getModel(modelId);
 }
 
 /**
@@ -134,18 +121,7 @@ export async function getMmprojPath(modelId: string): Promise<string | undefined
  * Get list of downloaded models
  */
 export async function getDownloadedModels(): Promise<ModelInfo[]> {
-  if (!isNativeModuleAvailable()) {
-    return [];
-  }
-  // Get all models and filter for downloaded ones
-  const native = requireNativeModule();
-  const modelsJson = await native.getAvailableModels();
-  try {
-    const allModels: ModelInfo[] = JSON.parse(modelsJson);
-    return allModels.filter(m => m.isDownloaded);
-  } catch {
-    return [];
-  }
+  return ModelRegistry.getDownloadedModels();
 }
 
 // ============================================================================
@@ -689,7 +665,7 @@ export async function downloadModel(
         localPath: destFolder,
         isDownloaded: true,
       };
-      await ModelRegistry.registerModel(updatedModel);
+      await ModelRegistry.updateModel(updatedModel);
 
       return destFolder;
     }
@@ -718,7 +694,7 @@ export async function downloadModel(
         localPath: destPath,
         isDownloaded: true,
       };
-      await ModelRegistry.registerModel(updatedModel);
+      await ModelRegistry.updateModel(updatedModel);
       return destPath;
     }
 
@@ -755,7 +731,7 @@ export async function downloadModel(
       localPath: finalPath,
       isDownloaded: true,
     };
-    await ModelRegistry.registerModel(updatedModel);
+    await ModelRegistry.updateModel(updatedModel);
 
     return finalPath;
   } finally {
@@ -825,7 +801,7 @@ export async function deleteModel(modelId: string): Promise<boolean> {
         localPath: undefined,
         isDownloaded: false,
       };
-      await ModelRegistry.registerModel(updatedModel);
+      await ModelRegistry.updateModel(updatedModel);
     }
 
     return true;

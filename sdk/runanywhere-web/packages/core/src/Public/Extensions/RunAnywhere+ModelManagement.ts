@@ -8,6 +8,7 @@
 import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 export type { ModelInfo };
 
+import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
 import { ModelManager, ModelStatus } from '../../Infrastructure/ModelManager';
 import type { ManagedModel } from '../../Infrastructure/ModelManager';
 
@@ -16,7 +17,15 @@ export const ModelManagement = {
     return ModelManager.getModels();
   },
 
+  get(modelId: string): ManagedModel | undefined {
+    return ModelManager.getModel(modelId);
+  },
+
   isLoaded(modelId: string): boolean {
+    const nativeCurrent = ModelLifecycleAdapter.tryDefault()?.currentModel();
+    if (nativeCurrent?.modelId) {
+      return nativeCurrent.modelId === modelId;
+    }
     const found = ModelManager.getModels().find((m) => m.id === modelId);
     return found?.status === ModelStatus.Loaded;
   },
@@ -35,5 +44,9 @@ export const ModelManagement = {
 
   async delete(modelId: string): Promise<void> {
     return ModelManager.deleteModel(modelId);
+  },
+
+  remove(modelId: string): void {
+    ModelManager.unregisterModel(modelId);
   },
 };

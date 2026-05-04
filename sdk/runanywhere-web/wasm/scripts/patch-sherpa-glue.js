@@ -9,7 +9,7 @@
 //
 // Patches applied:
 //   1. ENVIRONMENT_IS_NODE = false           (force browser code paths)
-//   2. require("node:path") → browser shim   (provides isAbsolute/normalize/join/basename/dirname)
+//   2. Node path/tty requires → browser shims
 //   3. NODERAWFS error throw → skip          (avoid "not supported" crash)
 //   4. NODERAWFS FS patching → skip          (use MEMFS instead)
 //   5. ESM default export appended           (for dynamic import() in browser)
@@ -61,7 +61,7 @@ if (envPattern.test(src)) {
 }
 
 // ---------------------------------------------------------------------------
-// Patch 2: Replace require("node:path") with browser-compatible PATH shim
+// Patch 2: Replace Node-only requires with browser-compatible shims
 // ---------------------------------------------------------------------------
 // Emscripten generates (unguarded, top-level):
 //   var nodePath=require("node:path");
@@ -115,6 +115,28 @@ if (nodePathPattern.test(src)) {
   }
 }
 
+const pathFSPattern =
+  /var PATH_FS=\{resolve:\(\.\.\.paths\)=>\{paths\.unshift\(FS\.cwd\(\)\);return nodePath\.posix\.resolve\(\.\.\.paths\)\},relative:\(from,to\)=>nodePath\.posix\.relative\(from\|\|FS\.cwd\(\),to\|\|FS\.cwd\(\)\)\};/;
+
+if (pathFSPattern.test(src)) {
+  const pathFSShim =
+    'var PATH_FS={resolve:(...paths)=>PATH.normalize([FS.cwd(),...paths].filter(Boolean).join("/")),relative:(from,to)=>{from=PATH.normalize(from||FS.cwd());to=PATH.normalize(to||FS.cwd());var f=from.split("/").filter(Boolean);var t=to.split("/").filter(Boolean);while(f.length&&t.length&&f[0]===t[0]){f.shift();t.shift()}return f.map(function(){return ".."}).concat(t).join("/")||"."}};';
+  src = src.replace(pathFSPattern, pathFSShim);
+  console.log('  ✓ Patch 2b: PATH_FS nodePath usage → browser shim');
+  patchCount++;
+} else {
+  console.log('  ⚠ Patch 2b: PATH_FS nodePath usage not found (may not exist in this version)');
+}
+
+const nodeTTYPattern = /var nodeTTY=require\(["']node:tty["']\);/;
+if (nodeTTYPattern.test(src)) {
+  src = src.replace(nodeTTYPattern, 'var nodeTTY={isatty:function(){return false}};');
+  console.log('  ✓ Patch 2c: require("node:tty") → browser TTY shim');
+  patchCount++;
+} else {
+  console.log('  ⚠ Patch 2c: require("node:tty") not found (may not exist in this version)');
+}
+
 // ---------------------------------------------------------------------------
 // Patch 3: Skip NODERAWFS error throw
 // ---------------------------------------------------------------------------
@@ -146,11 +168,17 @@ if (noderawfsThrow.test(src)) {
 
 const noderawfsFS =
   /var VFS=\{\.\.\.FS\};for\(var _key in NODERAWFS\)\{FS\[_key\]=_wrapNodeError\(NODERAWFS\[_key\]\)\}/;
+const noderawfsFSObjectEntries =
+  /var VFS=\{\.\.\.FS\};for\(const\[key,value\]of Object\.entries\(NODERAWFS\)\)\{FS\[key\]=_wrapNodeError\(value\)\}for\(const\[key,value\]of Object\.entries\(NODERAWFS_stream_funcs\)\)\{FS\[key\]=_wrapNodeStreamFunc\(value,FS\[key\]\)\}/;
 
-if (noderawfsFS.test(src)) {
+if (noderawfsFS.test(src) || noderawfsFSObjectEntries.test(src)) {
   src = src.replace(
     noderawfsFS,
-    '/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+  );
+  src = src.replace(
+    noderawfsFSObjectEntries,
+    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
   );
   console.log('  ✓ Patch 4: NODERAWFS FS patching → skipped (MEMFS preserved)');
   patchCount++;

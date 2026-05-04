@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import ai.runanywhere.proto.v1.ModelEventKind
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
@@ -15,7 +16,7 @@ import com.runanywhere.sdk.public.extensions.storageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -224,15 +225,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private fun subscribeToModelEvents() {
         viewModelScope.launch {
             EventBus.events
-                .filterIsInstance<ModelEvent>()
+                .mapNotNull { it.model }
                 .collect { event ->
-                    when (event.eventType) {
-                        ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                            Timber.d("📥 Model download completed: ${event.modelId}, refreshing storage...")
+                    when (event.kind) {
+                        ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED -> {
+                            Timber.d("📥 Model download completed: ${event.model_id}, refreshing storage...")
                             loadStorageData()
                         }
-                        ModelEvent.ModelEventType.DELETED -> {
-                            Timber.d("🗑️ Model deleted: ${event.modelId}, refreshing storage...")
+                        ModelEventKind.MODEL_EVENT_KIND_DELETE_COMPLETED -> {
+                            Timber.d("🗑️ Model deleted: ${event.model_id}, refreshing storage...")
                             loadStorageData()
                         }
                         else -> {

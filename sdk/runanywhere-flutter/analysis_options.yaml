@@ -84,6 +84,7 @@ analyzer:
     - '**/*.g.dart'
     - '**/*.freezed.dart'
     - 'lib/generated/**'
+    - 'packages/*/lib/generated/**'
   language:
     strict-casts: true       # No implicit casts from dynamic
     strict-inference: true   # Infer types strictly

@@ -18,15 +18,13 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
-# MF-3 (AG-V3): rac_commons no longer propagates RAC_HAVE_PROTOBUF=1 via its
+# MF-3 (AG-V3): rac_commons does not propagate RAC_HAVE_PROTOBUF=1 via its
 # PUBLIC interface (it is PRIVATE so it does not leak through the L5 ABI).
-# Tests that intentionally exercise the proto-byte path (test_solution_runner,
-# test_pipeline_executor, test_proto_event_dispatch, test_llm_stream_proto)
-# are internal consumers — re-define the macro here using the same predicate
-# the library uses (`Protobuf_FOUND` + the generated headers exist).
-find_package(Protobuf QUIET)
+# Tests that intentionally exercise the proto-byte path are internal consumers,
+# so re-define the macro here when the parent commons target actually enabled
+# the protobuf runtime.
 set(_RAC_COMMONS_TESTS_HAVE_PROTOBUF 0)
-if(Protobuf_FOUND AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/../src/generated/proto/voice_events.pb.cc)
+if(RAC_PROTOBUF_RUNTIME_ENABLED AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/../src/generated/proto/voice_events.pb.cc)
     set(_RAC_COMMONS_TESTS_HAVE_PROTOBUF 1)
 endif()
 
@@ -41,6 +39,26 @@ function(rac_test_define_have_protobuf target)
             ${CMAKE_CURRENT_LIST_DIR}/../src/generated
             ${Protobuf_INCLUDE_DIRS}
         )
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(${target} PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(${target} PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(${target} PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(RAC_PROTOBUF_COMPILE_OPTIONS)
+            target_compile_options(${target} PRIVATE ${RAC_PROTOBUF_COMPILE_OPTIONS})
+        endif()
+    endif()
+endfunction()
+
+# SolutionRunner / PipelineExecutor tests currently use RAC_HAVE_PROTOBUF as
+# their source-level guard, but the implementation objects are present only
+# when the parent target enabled the full Solutions runtime.
+function(rac_test_define_have_solutions target)
+    if(RAC_SOLUTIONS_RUNTIME_ENABLED)
+        rac_test_define_have_protobuf(${target})
     endif()
 endfunction()
 
@@ -120,10 +138,10 @@ rac_link_archive_deps(test_voice_agent_pipeline)
 target_compile_features(test_voice_agent_pipeline PRIVATE cxx_std_17)
 add_test(NAME voice_agent_pipeline_tests COMMAND test_voice_agent_pipeline)
 
-# --- T4.7: PipelineExecutor + SolutionRunner (Protobuf-gated) ---------------
-# The executor / runner / C ABI live behind RAC_HAVE_PROTOBUF. Each test
+# --- T4.7: PipelineExecutor + SolutionRunner (Solutions-gated) ---------------
+# The executor / runner / C ABI live behind RAC_ENABLE_SOLUTIONS. Each test
 # TU compiles a SKIP-style stub when the symbol is undefined (e.g. CI
-# hosts without system Protobuf), so the test executables always link
+# builds with RAC_ENABLE_SOLUTIONS=OFF), so the test executables always link
 # cleanly.
 add_executable(test_pipeline_executor test_pipeline_executor.cpp)
 target_include_directories(test_pipeline_executor PRIVATE
@@ -133,7 +151,7 @@ target_include_directories(test_pipeline_executor PRIVATE
 target_link_libraries(test_pipeline_executor PRIVATE rac_commons)
 rac_link_archive_deps(test_pipeline_executor)
 target_compile_features(test_pipeline_executor PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_pipeline_executor)
+rac_test_define_have_solutions(test_pipeline_executor)
 add_test(NAME pipeline_executor_tests COMMAND test_pipeline_executor)
 
 add_executable(test_solution_runner test_solution_runner.cpp)
@@ -144,7 +162,7 @@ target_include_directories(test_solution_runner PRIVATE
 target_link_libraries(test_solution_runner PRIVATE rac_commons)
 rac_link_archive_deps(test_solution_runner)
 target_compile_features(test_solution_runner PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_solution_runner)
+rac_test_define_have_solutions(test_solution_runner)
 add_test(NAME solution_runner_tests COMMAND test_solution_runner)
 
 # --- v2 close-out Phase 5: rac_llm_thinking C ABI test -----------------------
@@ -174,6 +192,17 @@ target_link_libraries(test_tool_calling PRIVATE rac_commons)
 rac_link_archive_deps(test_tool_calling)
 target_compile_features(test_tool_calling PRIVATE cxx_std_17)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
+
+# --- CPP-09A: structured-output helper tests --------------------------------
+add_executable(test_structured_output test_structured_output.cpp)
+target_include_directories(test_structured_output PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_structured_output PRIVATE rac_commons)
+rac_link_archive_deps(test_structured_output)
+target_compile_features(test_structured_output PRIVATE cxx_std_17)
+add_test(NAME structured_output_tests COMMAND test_structured_output)
 
 # --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
 # Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
@@ -206,6 +235,32 @@ rac_link_archive_deps(test_llm_stream_proto)
 target_compile_features(test_llm_stream_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_llm_stream_proto)
 add_test(NAME llm_stream_proto_tests COMMAND test_llm_stream_proto)
+
+# --- CPP-09A: lifecycle-owned generated-proto LLM service ABI tests ----------
+add_executable(test_llm_proto_service test_llm_proto_service.cpp)
+target_include_directories(test_llm_proto_service PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_llm_proto_service PRIVATE rac_commons)
+rac_link_archive_deps(test_llm_proto_service)
+target_compile_features(test_llm_proto_service PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_llm_proto_service)
+add_test(NAME llm_proto_service_tests COMMAND test_llm_proto_service)
+
+# --- Proto runtime activation smoke -----------------------------------------
+# Catches exported proto ABI symbols that are linked but compiled into
+# unavailable stubs because RAC_HAVE_PROTOBUF was not active for rac_commons.
+add_executable(test_proto_runtime_smoke test_proto_runtime_smoke.cpp)
+target_include_directories(test_proto_runtime_smoke PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_proto_runtime_smoke PRIVATE rac_commons)
+rac_link_archive_deps(test_proto_runtime_smoke)
+target_compile_features(test_proto_runtime_smoke PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_proto_runtime_smoke)
+add_test(NAME proto_runtime_smoke_tests COMMAND test_proto_runtime_smoke)
 
 # --- GAP 02 Phase 10: unified engine plugin registry tests --------------------
 # No backend dependency; all three link directly against rac_commons.
@@ -259,7 +314,106 @@ target_include_directories(test_hardware_profile PRIVATE
 target_link_libraries(test_hardware_profile PRIVATE rac_commons)
 rac_link_archive_deps(test_hardware_profile)
 target_compile_features(test_hardware_profile PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_hardware_profile)
 add_test(NAME hardware_profile_tests COMMAND test_hardware_profile)
+
+# --- Shared C ABI proto-byte buffer ownership tests -------------------------
+add_executable(test_proto_buffer test_proto_buffer.cpp)
+target_include_directories(test_proto_buffer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_proto_buffer PRIVATE rac_commons)
+rac_link_archive_deps(test_proto_buffer)
+target_compile_features(test_proto_buffer PRIVATE cxx_std_17)
+add_test(NAME proto_buffer_tests COMMAND test_proto_buffer)
+
+# --- Canonical SDKEvent proto-byte stream tests -----------------------------
+add_executable(test_sdk_event_stream test_sdk_event_stream.cpp)
+target_include_directories(test_sdk_event_stream PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_sdk_event_stream PRIVATE rac_commons)
+rac_link_archive_deps(test_sdk_event_stream)
+target_compile_features(test_sdk_event_stream PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_sdk_event_stream)
+add_test(NAME sdk_event_stream_tests COMMAND test_sdk_event_stream)
+
+# --- Model registry proto-byte ABI tests -------------------------------------
+# Exercises register/update/get/list/remove using serialized ModelInfo and
+# ModelInfoList bytes. SKIP-style fallback when Protobuf is unavailable.
+add_executable(test_model_registry_proto test_model_registry_proto.cpp)
+target_include_directories(test_model_registry_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_registry_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_model_registry_proto)
+target_compile_features(test_model_registry_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_registry_proto)
+add_test(NAME model_registry_proto_tests COMMAND test_model_registry_proto)
+
+# --- Model lifecycle proto-byte ABI tests ------------------------------------
+# Exercises ModelLoad/Unload/CurrentModel and ComponentLifecycleSnapshot over
+# serialized generated proto bytes. SKIP-style fallback when Protobuf is
+# unavailable.
+add_executable(test_model_lifecycle_proto test_model_lifecycle_proto.cpp)
+target_include_directories(test_model_lifecycle_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_lifecycle_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_model_lifecycle_proto)
+target_compile_features(test_model_lifecycle_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_lifecycle_proto)
+add_test(NAME model_lifecycle_proto_tests COMMAND test_model_lifecycle_proto)
+
+# --- Advanced modality proto-byte ABI tests ---------------------------------
+# Exercises VLM, embeddings, RAG, LoRA, and diffusion service boundaries over
+# serialized generated protos. RAG symbols are folded into rac_commons only when
+# the RAG object target is enabled, so keep this focused test behind that gate.
+if(TARGET rac_backend_rag)
+    add_executable(test_advanced_modality_proto_abi test_advanced_modality_proto_abi.cpp)
+    target_include_directories(test_advanced_modality_proto_abi PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_advanced_modality_proto_abi PRIVATE rac_commons)
+    rac_link_archive_deps(test_advanced_modality_proto_abi)
+    target_compile_features(test_advanced_modality_proto_abi PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_advanced_modality_proto_abi)
+    add_test(NAME advanced_modality_proto_abi_tests COMMAND test_advanced_modality_proto_abi)
+endif()
+
+# --- Speech/VAD/voice-agent proto-byte ABI tests -----------------------------
+# Exercises STT transcribe/partials, TTS voices/synthesize/stream, VAD
+# process/statistics/activity, and voice-agent turn events over serialized
+# generated proto bytes. SKIP-style fallback when Protobuf is unavailable.
+add_executable(test_speech_proto_abi test_speech_proto_abi.cpp)
+target_include_directories(test_speech_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_speech_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_speech_proto_abi)
+target_compile_features(test_speech_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_speech_proto_abi)
+add_test(NAME speech_proto_abi_tests COMMAND test_speech_proto_abi)
+
+# --- Storage analyzer proto-byte ABI tests -----------------------------------
+# Exercises StorageInfoResult, StorageAvailabilityResult, StorageDeletePlan, and
+# StorageDeleteResult bytes. SKIP-style fallback when Protobuf is unavailable.
+add_executable(test_storage_analyzer_proto test_storage_analyzer_proto.cpp)
+target_include_directories(test_storage_analyzer_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_storage_analyzer_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_storage_analyzer_proto)
+target_compile_features(test_storage_analyzer_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_storage_analyzer_proto)
+add_test(NAME storage_analyzer_proto_tests COMMAND test_storage_analyzer_proto)
 
 # T4.1: L1 runtime-plugin registry tests (always built — no backend dep).
 add_executable(test_runtime_registry test_runtime_registry.cpp)
@@ -279,7 +433,6 @@ add_executable(test_runtime_loader test_runtime_loader.cpp)
 target_include_directories(test_runtime_loader PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
 )
 target_link_libraries(test_runtime_loader PRIVATE rac_commons)
 rac_link_archive_deps(test_runtime_loader)
@@ -292,7 +445,6 @@ add_executable(test_runtime_cpu_session test_runtime_cpu_session.cpp)
 target_include_directories(test_runtime_cpu_session PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
 )
 target_link_libraries(test_runtime_cpu_session PRIVATE rac_commons)
 rac_link_archive_deps(test_runtime_cpu_session)
@@ -305,7 +457,6 @@ add_executable(test_engine_uses_runtime test_engine_uses_runtime.cpp)
 target_include_directories(test_engine_uses_runtime PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}
 )
 target_link_libraries(test_engine_uses_runtime PRIVATE rac_commons)
 rac_link_archive_deps(test_engine_uses_runtime)
@@ -479,10 +630,10 @@ add_test(NAME extraction_tests COMMAND test_extraction --run-all)
 # loopback HTTP/1.1 server and relied on libcurl to actually send the bytes.
 # Stage S5 deleted libcurl. The C ABI now dispatches to whatever platform
 # transport each SDK registers (OkHttp / URLSession / dart:io / fetch). To
-# run these end-to-end the test harness would have to register its own
-# sockets-backed rac_http_transport_ops_t adapter before each test. Until
-# that port lands the tests still compile (so we catch ABI drift) but are
-# NOT registered with ctest.
+# run these end-to-end the test harness has to register its own
+# rac_http_transport_ops_t adapter. test_http_download does this and is
+# registered with ctest; test_http_client still only compiles until its
+# request/response adapter coverage is ported.
 # Unix-only (the loopback server uses POSIX sockets); Windows coverage
 # tracked as follow-up (winsock wrapper).
 if(UNIX)
@@ -508,8 +659,7 @@ if(UNIX)
     target_link_libraries(test_http_download PRIVATE rac_commons)
     rac_link_archive_deps(test_http_download)
     target_compile_features(test_http_download PRIVATE cxx_std_17)
-    # S5: not registered with ctest — same reason as test_http_client above.
-    # add_test(NAME http_download_tests COMMAND test_http_download)
+    add_test(NAME http_download_tests COMMAND test_http_download)
 endif()
 
 # --- test_download_orchestrator: Always built (no backend dependency) ---
@@ -521,6 +671,7 @@ target_include_directories(test_download_orchestrator PRIVATE
 target_link_libraries(test_download_orchestrator PRIVATE rac_commons)
 rac_link_archive_deps(test_download_orchestrator)
 target_compile_features(test_download_orchestrator PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_download_orchestrator)
 add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
 
 # --- Sherpa-ONNX speech tests (VAD, STT, TTS, WakeWord) ---

@@ -34,6 +34,8 @@
 #endif
 
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/router/rac_hardware_profile.h"
 
 // ============================================================================
@@ -313,27 +315,16 @@ rac_result_t rac_hardware_profile_get(uint8_t** proto_bytes_out, size_t* proto_s
         return RAC_ERROR_UNKNOWN;
     }
 
-    if (bytes.empty()) {
-        // Return a single zero byte to distinguish "success with empty message"
-        // from null/error.
-        *proto_bytes_out = static_cast<uint8_t*>(malloc(1));
-        if (!*proto_bytes_out) return RAC_ERROR_OUT_OF_MEMORY;
-        **proto_bytes_out = 0;
-        *proto_size_out = 0;
-        return RAC_SUCCESS;
+    rac_result_t rc = rac_proto_buffer_copy_to_raw(bytes.data(), bytes.size(),
+                                                   proto_bytes_out, proto_size_out);
+    if (rc == RAC_SUCCESS) {
+        rac::events::publish_hardware_profile_completed(bytes.data(), bytes.size());
     }
-
-    *proto_bytes_out = static_cast<uint8_t*>(malloc(bytes.size()));
-    if (!*proto_bytes_out) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    memcpy(*proto_bytes_out, bytes.data(), bytes.size());
-    *proto_size_out = bytes.size();
-    return RAC_SUCCESS;
+    return rc;
 }
 
 void rac_hardware_profile_free(uint8_t* proto_bytes) {
-    free(proto_bytes);
+    rac_proto_buffer_free_data(proto_bytes);
 }
 
 rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out, size_t* proto_size_out) {
@@ -348,13 +339,12 @@ rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out, size_t* pr
         return RAC_ERROR_UNKNOWN;
     }
 
-    *proto_bytes_out = static_cast<uint8_t*>(malloc(bytes.empty() ? 1 : bytes.size()));
-    if (!*proto_bytes_out) return RAC_ERROR_OUT_OF_MEMORY;
-    if (!bytes.empty()) {
-        memcpy(*proto_bytes_out, bytes.data(), bytes.size());
+    rac_result_t rc = rac_proto_buffer_copy_to_raw(bytes.data(), bytes.size(),
+                                                   proto_bytes_out, proto_size_out);
+    if (rc == RAC_SUCCESS) {
+        rac::events::publish_hardware_profile_completed(bytes.data(), bytes.size());
     }
-    *proto_size_out = bytes.size();
-    return RAC_SUCCESS;
+    return rc;
 }
 
 rac_result_t rac_hardware_set_accelerator_preference(int preference_enum) {

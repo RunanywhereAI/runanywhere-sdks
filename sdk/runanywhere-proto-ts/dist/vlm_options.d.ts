@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -53,6 +54,23 @@ export declare function vLMImageFormatFromJSON(object: any): VLMImageFormat;
 export declare function vLMImageFormatToJSON(object: VLMImageFormat): string;
 /**
  * ---------------------------------------------------------------------------
+ * VLM model family for chat-template selection.
+ * Mirrors rac_vlm_model_family_t.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum VLMModelFamily {
+    VLM_MODEL_FAMILY_UNSPECIFIED = 0,
+    VLM_MODEL_FAMILY_AUTO = 1,
+    VLM_MODEL_FAMILY_QWEN2_VL = 2,
+    VLM_MODEL_FAMILY_SMOLVLM = 3,
+    VLM_MODEL_FAMILY_LLAVA = 4,
+    VLM_MODEL_FAMILY_CUSTOM = 99,
+    UNRECOGNIZED = -1
+}
+export declare function vLMModelFamilyFromJSON(object: any): VLMModelFamily;
+export declare function vLMModelFamilyToJSON(object: VLMModelFamily): string;
+/**
+ * ---------------------------------------------------------------------------
  * VLM error codes — canonical SDK-facing surface.
  * Sources pre-IDL:
  *   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
@@ -83,10 +101,26 @@ export declare enum VLMErrorCode {
     VLM_ERROR_CODE_UNSUPPORTED_FORMAT = 3,
     /** VLM_ERROR_CODE_IMAGE_TOO_LARGE - backend cannot decode */
     VLM_ERROR_CODE_IMAGE_TOO_LARGE = 4,
+    /** VLM_ERROR_CODE_NOT_INITIALIZED - VLMConfiguration.max_image_size_px */
+    VLM_ERROR_CODE_NOT_INITIALIZED = 5,
+    VLM_ERROR_CODE_MODEL_LOAD_FAILED = 6,
+    VLM_ERROR_CODE_PROCESSING_FAILED = 7,
+    VLM_ERROR_CODE_CANCELLED = 8,
     UNRECOGNIZED = -1
 }
 export declare function vLMErrorCodeFromJSON(object: any): VLMErrorCode;
 export declare function vLMErrorCodeToJSON(object: VLMErrorCode): string;
+/**
+ * ---------------------------------------------------------------------------
+ * Custom VLM chat template.
+ * Mirrors rac_vlm_chat_template_t.
+ * ---------------------------------------------------------------------------
+ */
+export interface VLMChatTemplate {
+    templateText: string;
+    imageMarker?: string | undefined;
+    defaultSystemPrompt?: string | undefined;
+}
 /**
  * ---------------------------------------------------------------------------
  * VLM image input.
@@ -141,6 +175,12 @@ export interface VLMConfiguration {
     maxImageSizePx: number;
     /** (0 = backend default) */
     maxTokens: number;
+    /** Additional component-level fields from rac_vlm_config_t. */
+    contextLength: number;
+    temperature: number;
+    systemPrompt?: string | undefined;
+    streamingEnabled: boolean;
+    preferredFramework?: InferenceFramework | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -171,6 +211,16 @@ export interface VLMGenerationOptions {
     temperature: number;
     topP: number;
     topK: number;
+    /** Full rac_vlm_options_t coverage. */
+    stopSequences: string[];
+    streamingEnabled: boolean;
+    systemPrompt?: string | undefined;
+    maxImageSize: number;
+    nThreads: number;
+    useGpu: boolean;
+    modelFamily: VLMModelFamily;
+    customChatTemplate?: VLMChatTemplate | undefined;
+    imageMarkerOverride?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -211,7 +261,20 @@ export interface VLMResult {
     processingTimeMs: number;
     /** Swift VLMResult totalTimeMs (Double ms). */
     tokensPerSecond: number;
+    /** Detailed VLM metrics from Kotlin/Web/C ABI. */
+    imageTokens: number;
+    timeToFirstTokenMs: number;
+    imageEncodeTimeMs: number;
+    hardwareUsed?: string | undefined;
 }
+export declare const VLMChatTemplate: {
+    encode(message: VLMChatTemplate, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMChatTemplate;
+    fromJSON(object: any): VLMChatTemplate;
+    toJSON(message: VLMChatTemplate): unknown;
+    create<I extends Exact<DeepPartial<VLMChatTemplate>, I>>(base?: I): VLMChatTemplate;
+    fromPartial<I extends Exact<DeepPartial<VLMChatTemplate>, I>>(object: I): VLMChatTemplate;
+};
 export declare const VLMImage: {
     encode(message: VLMImage, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VLMImage;

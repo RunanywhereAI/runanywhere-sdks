@@ -1,35 +1,17 @@
 /**
- * RunAnywhere Web SDK — Enums.
+ * RunAnywhere Web SDK - enum bridge.
  *
- * Wave 4.5 cleanup (CANONICAL_API.md §15): the proto-canonical wire
- * representation of every enum below lives in `@runanywhere/proto-ts/*`
- * and is re-exported from this file under `Proto*` aliases. The Web SDK
- * preserves a parallel set of *string-valued ergonomic enums* because
- *
- *   1. The Web public API surface has historically exposed
- *      PascalCase/kebab-case string values (e.g. `ModelCategory.Language
- *      === 'language'`) that appear verbatim in persisted model catalog
- *      metadata, `localStorage` entries and URL query params.
- *   2. The generated proto-ts enums are numeric with
- *      `SCREAMING_SNAKE_CASE` keys (proto3 convention). They are not
- *      drop-in replacements for the string surface.
- *
- * For wire transport / proto round-tripping, import the `Proto*` alias
- * below (or go directly to `@runanywhere/proto-ts/*`). For day-to-day
- * in-process Web usage, use the ergonomic enum.
- *
- * ExecutionTarget has been DELETED from this file (CANONICAL §15) — the
- * proto-ts variant is re-exported from `types/index.ts` directly and is
- * the single source of truth.
- *
- * Source of truth (wire shape): idl/*.proto → @runanywhere/proto-ts.
+ * Generated proto-ts enums are the source of truth for public data contracts.
+ * This file keeps short Web-facing member names as aliases to generated enum
+ * values for existing internal call sites, without defining a second enum
+ * value system.
  */
 
 // ---------------------------------------------------------------------------
 // Proto-canonical re-exports (wire transport). Use these when talking
 // to the commons C ABI or serialising to the wire.
 // ---------------------------------------------------------------------------
-export {
+import {
   ModelFormat as ProtoModelFormat,
   ModelCategory as ProtoModelCategory,
   InferenceFramework as ProtoInferenceFramework,
@@ -38,76 +20,83 @@ export {
   SDKEnvironment as ProtoSDKEnvironment,
   AudioFormat as ProtoAudioFormat,
 } from '@runanywhere/proto-ts/model_types';
-export { SDKComponent as ProtoSDKComponent } from '@runanywhere/proto-ts/sdk_events';
+import { SDKComponent as ProtoSDKComponent } from '@runanywhere/proto-ts/sdk_events';
+
+export {
+  ProtoAccelerationPreference,
+  ProtoAudioFormat,
+  ProtoInferenceFramework,
+  ProtoModelCategory,
+  ProtoModelFormat,
+  ProtoRoutingPolicy,
+  ProtoSDKEnvironment,
+};
+export { ProtoSDKComponent };
 export { DownloadStage as ProtoDownloadStage } from '@runanywhere/proto-ts/download_service';
 
 // ---------------------------------------------------------------------------
-// Web-ergonomic string enums. Each comments its proto counterpart.
+// Generated enum aliases with short Web member names.
 // ---------------------------------------------------------------------------
 
-/** Proto counterpart: `SDKEnvironment` / `ProtoSDKEnvironment`. */
-export enum SDKEnvironment {
-  Development = 'development',
-  Staging = 'staging',
-  Production = 'production',
-}
+export const SDKEnvironment = {
+  Development: ProtoSDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+  Staging: ProtoSDKEnvironment.SDK_ENVIRONMENT_STAGING,
+  Production: ProtoSDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+} as const;
+export type SDKEnvironment = ProtoSDKEnvironment;
 
-/**
- * Proto counterpart: `InferenceFramework` / `ProtoInferenceFramework`.
- * Web names this `LLMFramework` for RN/Swift/Flutter label parity.
- */
-export enum LLMFramework {
-  CoreML = 'CoreML',
-  TensorFlowLite = 'TFLite',
-  MLX = 'MLX',
-  SwiftTransformers = 'SwiftTransformers',
-  ONNX = 'ONNX',
-  Sherpa = 'Sherpa', // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
-  ExecuTorch = 'ExecuTorch',
-  LlamaCpp = 'LlamaCpp',
-  FoundationModels = 'FoundationModels',
-  PicoLLM = 'PicoLLM',
-  MLC = 'MLC',
-  MediaPipe = 'MediaPipe',
-  WhisperKit = 'WhisperKit',
-  OpenAIWhisper = 'OpenAIWhisper',
-  SystemTTS = 'SystemTTS',
-  PiperTTS = 'PiperTTS',
-}
+export const LLMFramework = {
+  CoreML: ProtoInferenceFramework.INFERENCE_FRAMEWORK_COREML,
+  TensorFlowLite: ProtoInferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
+  MLX: ProtoInferenceFramework.INFERENCE_FRAMEWORK_MLX,
+  SwiftTransformers: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS,
+  ONNX: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  Sherpa: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  ExecuTorch: ProtoInferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
+  LlamaCpp: ProtoInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  FoundationModels: ProtoInferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS,
+  PicoLLM: ProtoInferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM,
+  MLC: ProtoInferenceFramework.INFERENCE_FRAMEWORK_MLC,
+  MediaPipe: ProtoInferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,
+  WhisperKit: ProtoInferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT,
+  OpenAIWhisper: ProtoInferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER,
+  SystemTTS: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+  PiperTTS: ProtoInferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
+} as const;
+export type LLMFramework = ProtoInferenceFramework;
+export { ProtoInferenceFramework as InferenceFramework };
 
-/** Proto counterpart: `ModelCategory` / `ProtoModelCategory`. */
-export enum ModelCategory {
-  /** Large Language Models (LLM) for text generation. */
-  Language = 'language',
-  /** Speech-to-Text (STT) transcription models (~105 MB+). */
-  SpeechRecognition = 'speech-recognition',
-  /** Text-to-Speech (TTS) synthesis models. */
-  SpeechSynthesis = 'speech-synthesis',
-  /** Vision-Language Models (VLM) for image understanding. */
-  Vision = 'vision',
-  /** Diffusion / image generation models. */
-  ImageGeneration = 'image-generation',
-  /** Models combining multiple modalities. */
-  Multimodal = 'multimodal',
-  /** Voice Activity Detection (VAD) — detects speech boundaries (~5 MB). Not transcription — use SpeechRecognition for STT. */
-  Audio = 'audio',
-}
+export const ModelCategory = {
+  Language: ProtoModelCategory.MODEL_CATEGORY_LANGUAGE,
+  SpeechRecognition: ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  SpeechSynthesis: ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+  Vision: ProtoModelCategory.MODEL_CATEGORY_VISION,
+  ImageGeneration: ProtoModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
+  Multimodal: ProtoModelCategory.MODEL_CATEGORY_MULTIMODAL,
+  Audio: ProtoModelCategory.MODEL_CATEGORY_AUDIO,
+  Embedding: ProtoModelCategory.MODEL_CATEGORY_EMBEDDING,
+  VoiceActivityDetection: ProtoModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+} as const;
+export type ModelCategory = ProtoModelCategory;
 
-/** Proto counterpart: `ModelFormat` / `ProtoModelFormat`. */
-export enum ModelFormat {
-  GGUF = 'gguf',
-  GGML = 'ggml',
-  ONNX = 'onnx',
-  MLModel = 'mlmodel',
-  MLPackage = 'mlpackage',
-  TFLite = 'tflite',
-  SafeTensors = 'safetensors',
-  Bin = 'bin',
-  Zip = 'zip',
-  Folder = 'folder',
-  Proprietary = 'proprietary',
-  Unknown = 'unknown',
-}
+export const ModelFormat = {
+  GGUF: ProtoModelFormat.MODEL_FORMAT_GGUF,
+  GGML: ProtoModelFormat.MODEL_FORMAT_GGML,
+  ONNX: ProtoModelFormat.MODEL_FORMAT_ONNX,
+  ORT: ProtoModelFormat.MODEL_FORMAT_ORT,
+  CoreML: ProtoModelFormat.MODEL_FORMAT_COREML,
+  MLModel: ProtoModelFormat.MODEL_FORMAT_MLMODEL,
+  MLPackage: ProtoModelFormat.MODEL_FORMAT_MLPACKAGE,
+  TFLite: ProtoModelFormat.MODEL_FORMAT_TFLITE,
+  SafeTensors: ProtoModelFormat.MODEL_FORMAT_SAFETENSORS,
+  QNNContext: ProtoModelFormat.MODEL_FORMAT_QNN_CONTEXT,
+  Bin: ProtoModelFormat.MODEL_FORMAT_BIN,
+  Zip: ProtoModelFormat.MODEL_FORMAT_ZIP,
+  Folder: ProtoModelFormat.MODEL_FORMAT_FOLDER,
+  Proprietary: ProtoModelFormat.MODEL_FORMAT_PROPRIETARY,
+  Unknown: ProtoModelFormat.MODEL_FORMAT_UNKNOWN,
+} as const;
+export type ModelFormat = ProtoModelFormat;
 
 /**
  * Framework modality (I/O types). No direct proto counterpart — used by
@@ -135,33 +124,32 @@ export enum ComponentState {
   CleaningUp = 'cleaningUp',
 }
 
-/**
- * Proto counterpart: `SDKComponent` / `ProtoSDKComponent`
- * (sdk_events.proto). Web uses a tighter ergonomic string surface.
- */
-export enum SDKComponent {
-  LLM = 'llm',
-  STT = 'stt',
-  TTS = 'tts',
-  VAD = 'vad',
-  VLM = 'vlm',
-  Embedding = 'embedding',
-  Diffusion = 'diffusion',
-  SpeakerDiarization = 'speakerDiarization',
-  VoiceAgent = 'voice',
-}
+export const SDKComponent = {
+  LLM: ProtoSDKComponent.SDK_COMPONENT_LLM,
+  STT: ProtoSDKComponent.SDK_COMPONENT_STT,
+  TTS: ProtoSDKComponent.SDK_COMPONENT_TTS,
+  VAD: ProtoSDKComponent.SDK_COMPONENT_VAD,
+  VLM: ProtoSDKComponent.SDK_COMPONENT_VLM,
+  Embedding: ProtoSDKComponent.SDK_COMPONENT_EMBEDDINGS,
+  Diffusion: ProtoSDKComponent.SDK_COMPONENT_DIFFUSION,
+  RAG: ProtoSDKComponent.SDK_COMPONENT_RAG,
+  SpeakerDiarization: ProtoSDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION,
+  VoiceAgent: ProtoSDKComponent.SDK_COMPONENT_VOICE_AGENT,
+  WakeWord: ProtoSDKComponent.SDK_COMPONENT_WAKEWORD,
+} as const;
+export type SDKComponent = ProtoSDKComponent;
 
-/** Proto counterpart: `RoutingPolicy` / `ProtoRoutingPolicy`. */
-export enum RoutingPolicy {
-  OnDevicePreferred = 'onDevicePreferred',
-  CloudPreferred = 'cloudPreferred',
-  OnDeviceOnly = 'onDeviceOnly',
-  CloudOnly = 'cloudOnly',
-  Hybrid = 'hybrid',
-  CostOptimized = 'costOptimized',
-  LatencyOptimized = 'latencyOptimized',
-  PrivacyOptimized = 'privacyOptimized',
-}
+export const RoutingPolicy = {
+  OnDevicePreferred: ProtoRoutingPolicy.ROUTING_POLICY_PREFER_LOCAL,
+  CloudPreferred: ProtoRoutingPolicy.ROUTING_POLICY_PREFER_CLOUD,
+  OnDeviceOnly: ProtoRoutingPolicy.ROUTING_POLICY_PREFER_LOCAL,
+  CloudOnly: ProtoRoutingPolicy.ROUTING_POLICY_PREFER_CLOUD,
+  Hybrid: ProtoRoutingPolicy.ROUTING_POLICY_MANUAL,
+  CostOptimized: ProtoRoutingPolicy.ROUTING_POLICY_COST_OPTIMIZED,
+  LatencyOptimized: ProtoRoutingPolicy.ROUTING_POLICY_LATENCY_OPTIMIZED,
+  PrivacyOptimized: ProtoRoutingPolicy.ROUTING_POLICY_PREFER_LOCAL,
+} as const;
+export type RoutingPolicy = ProtoRoutingPolicy;
 
 /**
  * Hardware acceleration targets. No proto counterpart yet (G-B1 adds
@@ -210,7 +198,7 @@ export enum ModelStatus {
  * per-SDK type unification (Task M8). Consumers that need a string form
  * should derive it from the proto enum value.
  */
-export { DownloadStage } from '@runanywhere/proto-ts/download_service';
+export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
 
 /**
  * JS `EventBus` topic category. Maps loosely onto the `category` field
@@ -231,17 +219,13 @@ export enum SDKEventType {
   Network = 'network',
 }
 
-/**
- * Hardware acceleration preference passed to SDK initialization. The
- * proto counterpart (`AccelerationPreference` / `ProtoAccelerationPreference`)
- * covers the mobile/desktop modes; Web adds a browser-specific
- * WebGPU-or-CPU three-way.
- */
-export enum AccelerationPreference {
-  /** Detect WebGPU and use it when available, fall back to CPU. */
-  Auto = 'auto',
-  /** Force WebGPU (fails gracefully to CPU if unavailable). */
-  WebGPU = 'webgpu',
-  /** Always use CPU-only WASM (skip WebGPU detection entirely). */
-  CPU = 'cpu',
-}
+export const AccelerationPreference = {
+  Auto: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_AUTO,
+  WebGPU: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU,
+  CPU: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_CPU,
+  GPU: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_GPU,
+  NPU: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_NPU,
+  Metal: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_METAL,
+  Vulkan: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_VULKAN,
+} as const;
+export type AccelerationPreference = ProtoAccelerationPreference;

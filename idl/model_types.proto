@@ -194,6 +194,55 @@ enum ModelArtifactType {
 }
 
 // ---------------------------------------------------------------------------
+// Model registry lifecycle state. This is durable/catalog state, not a live
+// transfer progress stream. Per-download byte counters and transient progress
+// events stay in download_service.proto.
+// Sources pre-IDL:
+//   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
+//   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
+// ---------------------------------------------------------------------------
+enum ModelRegistryStatus {
+    MODEL_REGISTRY_STATUS_UNSPECIFIED = 0;
+    MODEL_REGISTRY_STATUS_REGISTERED  = 1;
+    MODEL_REGISTRY_STATUS_DOWNLOADING = 2;
+    MODEL_REGISTRY_STATUS_DOWNLOADED  = 3;
+    MODEL_REGISTRY_STATUS_LOADING     = 4;
+    MODEL_REGISTRY_STATUS_LOADED      = 5;
+    MODEL_REGISTRY_STATUS_ERROR       = 6;
+}
+
+enum ModelQuerySortField {
+    MODEL_QUERY_SORT_FIELD_UNSPECIFIED         = 0;
+    MODEL_QUERY_SORT_FIELD_NAME                = 1;
+    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS  = 2;
+    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS  = 3;
+    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4;
+    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5;
+    MODEL_QUERY_SORT_FIELD_USAGE_COUNT         = 6;
+}
+
+enum ModelQuerySortOrder {
+    MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0;
+    MODEL_QUERY_SORT_ORDER_ASCENDING   = 1;
+    MODEL_QUERY_SORT_ORDER_DESCENDING  = 2;
+}
+
+// Role of a file inside a single/multi-file artifact. The generic COMPANION
+// role covers arbitrary sidecars; specific roles document common public
+// catalog files such as VLM mmproj files and tokenizer/config assets.
+enum ModelFileRole {
+    MODEL_FILE_ROLE_UNSPECIFIED      = 0;
+    MODEL_FILE_ROLE_PRIMARY_MODEL    = 1;
+    MODEL_FILE_ROLE_COMPANION        = 2;
+    MODEL_FILE_ROLE_VISION_PROJECTOR = 3;  // llama.cpp VLM mmproj*.gguf
+    MODEL_FILE_ROLE_TOKENIZER        = 4;  // tokenizer model/data files
+    MODEL_FILE_ROLE_CONFIG           = 5;  // config.json or framework config
+    MODEL_FILE_ROLE_VOCABULARY       = 6;  // vocab.txt / vocab.json
+    MODEL_FILE_ROLE_MERGES           = 7;  // merges.txt
+    MODEL_FILE_ROLE_LABELS           = 8;
+}
+
+// ---------------------------------------------------------------------------
 // Hardware acceleration preference for inference. Sources pre-IDL:
 //   Web    enums.ts:165   (Auto / WebGPU / CPU)
 //   Swift  extensions     (CPU / GPU / NPU / Metal)
@@ -229,6 +278,27 @@ enum RoutingPolicy {
     ROUTING_POLICY_MANUAL            = 5;
 }
 
+// Model-level thinking tag metadata. This intentionally uses a model-specific
+// message name because llm_options.proto already owns the generation-options
+// ThinkingTagPattern message in this proto package.
+message ModelThinkingTagPattern {
+    string open_tag  = 1;
+    string close_tag = 2;
+}
+
+message ModelInfoMetadata {
+    string          description = 1;
+    string          author      = 2;
+    string          license     = 3;
+    repeated string tags        = 4;
+    string          version     = 5;
+}
+
+message ModelRuntimeCompatibility {
+    repeated InferenceFramework compatible_frameworks = 1;
+    repeated ModelFormat        compatible_formats    = 2;
+}
+
 // ---------------------------------------------------------------------------
 // Core metadata for a model entry.
 // Sources pre-IDL:
@@ -257,6 +327,23 @@ message ModelInfo {
     int64              created_at_unix_ms  = 14;
     int64              updated_at_unix_ms  = 15;
 
+    // Separate from download_size_bytes: this is the estimated runtime RAM
+    // requirement used by compatibility checks and model selection UIs.
+    optional int64 memory_required_bytes = 16;
+
+    // Lowercase hex SHA-256 checksum for the primary artifact. Per-file
+    // checksums for multi-file artifacts live on ModelFileDescriptor.
+    optional string checksum_sha256 = 17;
+
+    // Thinking/reasoning metadata. `supports_thinking` remains the boolean
+    // capability flag; this optional pattern declares model-specific tags.
+    optional ModelThinkingTagPattern thinking_pattern = 18;
+
+    // Structured public catalog metadata. `description` (field 12) is kept for
+    // backward compatibility and should mirror metadata.description when both
+    // are populated.
+    optional ModelInfoMetadata metadata = 19;
+
     oneof artifact {
         SingleFileArtifact single_file        = 20;
         ArchiveArtifact    archive            = 21;
@@ -278,6 +365,27 @@ message ModelInfo {
 
     // Hybrid (on-device vs cloud) routing policy for this entry.
     optional RoutingPolicy          routing_policy          = 28;
+
+    // Framework/format compatibility declarations. `framework` (field 5) is
+    // the canonical/preferred runtime when no explicit preferred_framework is set.
+    optional ModelRuntimeCompatibility compatibility = 29;
+    optional InferenceFramework        preferred_framework = 30;
+
+    // Durable registry state. Live byte progress belongs to
+    // download_service.DownloadProgress, not ModelInfo.
+    optional ModelRegistryStatus registry_status = 31;
+    optional bool                is_downloaded   = 32;
+    optional bool                is_available    = 33;
+    optional int64               last_used_at_unix_ms = 34;
+    optional int32               usage_count          = 35;
+    optional bool                sync_pending         = 36;
+    optional string              status_message       = 37;
+}
+
+// Repeated model registry responses use this wrapper because protobuf cannot
+// serialize a bare repeated field as a top-level message.
+message ModelInfoList {
+    repeated ModelInfo models = 1;
 }
 
 message SingleFileArtifact {
@@ -303,6 +411,14 @@ message ModelFileDescriptor {
     // newer SDK sources maps onto it (default true, mirrored in Swift).
     optional int64  size_bytes = 4;
     optional string checksum   = 5;
+
+    // Path fields used by SDK-local wrappers/catalogs. `filename` is the
+    // storage name for simple cases; relative_path/destination_path preserve
+    // directory layouts for archive and multi-file artifacts.
+    optional string        relative_path    = 6;
+    optional string        destination_path = 7;
+    optional ModelFileRole role             = 8;
+    optional string        local_path       = 9;
 }
 
 message MultiFileArtifact {
@@ -319,4 +435,203 @@ message MultiFileArtifact {
 message ExpectedModelFiles {
     repeated ModelFileDescriptor files          = 1;
     optional string              root_directory = 2;
+    repeated string              required_patterns = 3;
+    repeated string              optional_patterns = 4;
+    optional string              description = 5;
+}
+
+// Registry/query filters shared by SDK model-management APIs. UI-only
+// presentation state and platform filesystem handles are intentionally not
+// represented here.
+message ModelQuery {
+    optional InferenceFramework framework       = 1;
+    optional ModelCategory      category        = 2;
+    optional ModelFormat        format          = 3;
+    optional bool               downloaded_only = 4;
+    optional bool               available_only  = 5;
+    optional int64              max_size_bytes  = 6;
+    string                      search_query    = 7;
+    optional ModelSource        source          = 8;
+    optional ModelQuerySortField sort_field     = 9;
+    optional ModelQuerySortOrder sort_order     = 10;
+}
+
+message ModelCompatibilityResult {
+    bool  is_compatible          = 1;
+    bool  can_run                = 2;
+    bool  can_fit                = 3;
+    int64 required_memory_bytes  = 4;
+    int64 available_memory_bytes = 5;
+    int64 required_storage_bytes = 6;
+    int64 available_storage_bytes = 7;
+    repeated string reasons      = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Registry and model-lifecycle operation contracts.
+//
+// These messages describe C++-owned workflow decisions and results that SDKs
+// can expose directly as generated public API types. Platform-owned inputs
+// such as Android content URIs, iOS security-scoped bookmarks, browser
+// FileSystemHandle objects, auth/session cookies, and HTTP client handles
+// remain outside this schema. Platform adapters normalize those handles into
+// paths, URLs, manifests, or callbacks before invoking the C++ workflow.
+// ---------------------------------------------------------------------------
+
+message ModelRegistryRefreshRequest {
+    // Fetch or merge a remote catalog through the platform/network adapter.
+    bool include_remote_catalog = 1;
+
+    // Scan managed model directories and link valid on-disk artifacts.
+    bool rescan_local = 2;
+
+    // Clear downloaded/available state for registry rows whose files vanished.
+    bool prune_orphans = 3;
+
+    // Optional post-refresh filter for the returned model list.
+    optional ModelQuery query = 4;
+}
+
+message ModelRegistryRefreshResult {
+    bool          success             = 1;
+    ModelInfoList models              = 2;
+    int32         registered_count    = 3;
+    int32         updated_count       = 4;
+    int32         discovered_count    = 5;
+    int32         pruned_count        = 6;
+    int64         refreshed_at_unix_ms = 7;
+    repeated string warnings          = 8;
+    string        error_message       = 9;
+}
+
+message ModelListRequest {
+    // Set query.downloaded_only for downloaded-only lists.
+    optional ModelQuery query = 1;
+}
+
+message ModelListResult {
+    bool          success       = 1;
+    ModelInfoList models        = 2;
+    string        error_message = 3;
+}
+
+message ModelGetRequest {
+    string model_id = 1;
+}
+
+message ModelGetResult {
+    bool      found         = 1;
+    ModelInfo model         = 2;
+    string    error_message = 3;
+}
+
+message ModelImportRequest {
+    // Catalog metadata to register or merge. If absent, discovery may infer a
+    // minimal ModelInfo from the file name and detected format.
+    optional ModelInfo model = 1;
+
+    // Normalized path under platform control. Do not place transient OS file
+    // picker handles in this field; adapters should first copy/link/authorize
+    // them and provide a stable path visible to the C++ workflow.
+    string source_path = 2;
+
+    bool copy_into_managed_storage = 3;
+    bool overwrite_existing        = 4;
+    repeated ModelFileDescriptor files = 5;
+}
+
+message ModelImportResult {
+    bool      success          = 1;
+    ModelInfo model            = 2;
+    string    local_path       = 3;
+    int64     imported_bytes   = 4;
+    repeated string warnings   = 5;
+    string    error_message    = 6;
+}
+
+message ModelDiscoveryRequest {
+    // Platform adapters own permission and sandbox traversal. These are stable
+    // roots that C++ may inspect using registered filesystem callbacks.
+    repeated string search_roots = 1;
+    bool            recursive    = 2;
+    bool            link_downloaded = 3;
+    bool            purge_invalid   = 4;
+    optional ModelQuery query     = 5;
+}
+
+message DiscoveredModel {
+    string    model_id         = 1;
+    string    local_path       = 2;
+    bool      matched_registry = 3;
+    ModelInfo model            = 4;
+    int64     size_bytes       = 5;
+    repeated string warnings   = 6;
+}
+
+message ModelDiscoveryResult {
+    bool                  success           = 1;
+    repeated DiscoveredModel discovered_models = 2;
+    int32                 linked_count      = 3;
+    int32                 purged_count      = 4;
+    repeated string       warnings          = 5;
+    string                error_message     = 6;
+}
+
+message ModelLoadRequest {
+    string             model_id         = 1;
+    optional ModelCategory category     = 2;
+    optional InferenceFramework framework = 3;
+    bool               force_reload     = 4;
+}
+
+message ModelLoadResult {
+    bool               success          = 1;
+    string             model_id         = 2;
+    ModelCategory      category         = 3;
+    InferenceFramework framework        = 4;
+    string             resolved_path    = 5;
+    int64              loaded_at_unix_ms = 6;
+    string             error_message    = 7;
+}
+
+message ModelUnloadRequest {
+    string             model_id     = 1;
+    optional ModelCategory category = 2;
+    bool               unload_all   = 3;
+}
+
+message ModelUnloadResult {
+    bool            success            = 1;
+    repeated string unloaded_model_ids = 2;
+    string          error_message      = 3;
+}
+
+message CurrentModelRequest {
+    optional ModelCategory      category  = 1;
+    optional InferenceFramework framework = 2;
+}
+
+message CurrentModelResult {
+    reserved 1;
+    reserved "has_model";
+    string    model_id          = 2;
+    ModelInfo model             = 3;
+    int64     loaded_at_unix_ms = 4;
+}
+
+message ModelDeleteRequest {
+    string model_id         = 1;
+    bool   delete_files     = 2;
+    bool   unregister       = 3;
+    bool   unload_if_loaded = 4;
+}
+
+message ModelDeleteResult {
+    bool   success          = 1;
+    string model_id         = 2;
+    int64  deleted_bytes    = 3;
+    bool   files_deleted    = 4;
+    bool   registry_updated = 5;
+    bool   was_loaded       = 6;
+    string error_message    = 7;
 }

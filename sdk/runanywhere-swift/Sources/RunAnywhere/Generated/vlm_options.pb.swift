@@ -208,6 +208,60 @@ public enum RAVLMImageFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
+/// VLM model family for chat-template selection.
+/// Mirrors rac_vlm_model_family_t.
+/// ---------------------------------------------------------------------------
+public enum RAVLMModelFamily: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case auto // = 1
+  case qwen2Vl // = 2
+  case smolvlm // = 3
+  case llava // = 4
+  case custom // = 99
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .auto
+    case 2: self = .qwen2Vl
+    case 3: self = .smolvlm
+    case 4: self = .llava
+    case 99: self = .custom
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .auto: return 1
+    case .qwen2Vl: return 2
+    case .smolvlm: return 3
+    case .llava: return 4
+    case .custom: return 99
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVLMModelFamily] = [
+    .unspecified,
+    .auto,
+    .qwen2Vl,
+    .smolvlm,
+    .llava,
+    .custom,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
 /// VLM error codes — canonical SDK-facing surface.
 /// Sources pre-IDL:
 ///   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
@@ -242,6 +296,12 @@ public enum RAVLMErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
   /// backend cannot decode
   case imageTooLarge // = 4
+
+  /// VLMConfiguration.max_image_size_px
+  case notInitialized // = 5
+  case modelLoadFailed // = 6
+  case processingFailed // = 7
+  case cancelled // = 8
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -255,6 +315,10 @@ public enum RAVLMErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 2: self = .modelNotLoaded
     case 3: self = .unsupportedFormat
     case 4: self = .imageTooLarge
+    case 5: self = .notInitialized
+    case 6: self = .modelLoadFailed
+    case 7: self = .processingFailed
+    case 8: self = .cancelled
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -266,6 +330,10 @@ public enum RAVLMErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .modelNotLoaded: return 2
     case .unsupportedFormat: return 3
     case .imageTooLarge: return 4
+    case .notInitialized: return 5
+    case .modelLoadFailed: return 6
+    case .processingFailed: return 7
+    case .cancelled: return 8
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -277,8 +345,49 @@ public enum RAVLMErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     .modelNotLoaded,
     .unsupportedFormat,
     .imageTooLarge,
+    .notInitialized,
+    .modelLoadFailed,
+    .processingFailed,
+    .cancelled,
   ]
 
+}
+
+/// ---------------------------------------------------------------------------
+/// Custom VLM chat template.
+/// Mirrors rac_vlm_chat_template_t.
+/// ---------------------------------------------------------------------------
+public struct RAVLMChatTemplate: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var templateText: String = String()
+
+  public var imageMarker: String {
+    get {_imageMarker ?? String()}
+    set {_imageMarker = newValue}
+  }
+  /// Returns true if `imageMarker` has been explicitly set.
+  public var hasImageMarker: Bool {self._imageMarker != nil}
+  /// Clears the value of `imageMarker`. Subsequent reads from it will return its default value.
+  public mutating func clearImageMarker() {self._imageMarker = nil}
+
+  public var defaultSystemPrompt: String {
+    get {_defaultSystemPrompt ?? String()}
+    set {_defaultSystemPrompt = newValue}
+  }
+  /// Returns true if `defaultSystemPrompt` has been explicitly set.
+  public var hasDefaultSystemPrompt: Bool {self._defaultSystemPrompt != nil}
+  /// Clears the value of `defaultSystemPrompt`. Subsequent reads from it will return its default value.
+  public mutating func clearDefaultSystemPrompt() {self._defaultSystemPrompt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _imageMarker: String? = nil
+  fileprivate var _defaultSystemPrompt: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -389,9 +498,37 @@ public struct RAVLMConfiguration: Sendable {
   /// (0 = backend default)
   public var maxTokens: Int32 = 0
 
+  /// Additional component-level fields from rac_vlm_config_t.
+  public var contextLength: Int32 = 0
+
+  public var temperature: Float = 0
+
+  public var systemPrompt: String {
+    get {_systemPrompt ?? String()}
+    set {_systemPrompt = newValue}
+  }
+  /// Returns true if `systemPrompt` has been explicitly set.
+  public var hasSystemPrompt: Bool {self._systemPrompt != nil}
+  /// Clears the value of `systemPrompt`. Subsequent reads from it will return its default value.
+  public mutating func clearSystemPrompt() {self._systemPrompt = nil}
+
+  public var streamingEnabled: Bool = false
+
+  public var preferredFramework: RAInferenceFramework {
+    get {_preferredFramework ?? .unspecified}
+    set {_preferredFramework = newValue}
+  }
+  /// Returns true if `preferredFramework` has been explicitly set.
+  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
+  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _systemPrompt: String? = nil
+  fileprivate var _preferredFramework: RAInferenceFramework? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -430,9 +567,53 @@ public struct RAVLMGenerationOptions: Sendable {
 
   public var topK: Int32 = 0
 
+  /// Full rac_vlm_options_t coverage.
+  public var stopSequences: [String] = []
+
+  public var streamingEnabled: Bool = false
+
+  public var systemPrompt: String {
+    get {_systemPrompt ?? String()}
+    set {_systemPrompt = newValue}
+  }
+  /// Returns true if `systemPrompt` has been explicitly set.
+  public var hasSystemPrompt: Bool {self._systemPrompt != nil}
+  /// Clears the value of `systemPrompt`. Subsequent reads from it will return its default value.
+  public mutating func clearSystemPrompt() {self._systemPrompt = nil}
+
+  public var maxImageSize: Int32 = 0
+
+  public var nThreads: Int32 = 0
+
+  public var useGpu: Bool = false
+
+  public var modelFamily: RAVLMModelFamily = .unspecified
+
+  public var customChatTemplate: RAVLMChatTemplate {
+    get {_customChatTemplate ?? RAVLMChatTemplate()}
+    set {_customChatTemplate = newValue}
+  }
+  /// Returns true if `customChatTemplate` has been explicitly set.
+  public var hasCustomChatTemplate: Bool {self._customChatTemplate != nil}
+  /// Clears the value of `customChatTemplate`. Subsequent reads from it will return its default value.
+  public mutating func clearCustomChatTemplate() {self._customChatTemplate = nil}
+
+  public var imageMarkerOverride: String {
+    get {_imageMarkerOverride ?? String()}
+    set {_imageMarkerOverride = newValue}
+  }
+  /// Returns true if `imageMarkerOverride` has been explicitly set.
+  public var hasImageMarkerOverride: Bool {self._imageMarkerOverride != nil}
+  /// Clears the value of `imageMarkerOverride`. Subsequent reads from it will return its default value.
+  public mutating func clearImageMarkerOverride() {self._imageMarkerOverride = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _systemPrompt: String? = nil
+  fileprivate var _customChatTemplate: RAVLMChatTemplate? = nil
+  fileprivate var _imageMarkerOverride: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -482,9 +663,27 @@ public struct RAVLMResult: Sendable {
   /// Swift VLMResult totalTimeMs (Double ms).
   public var tokensPerSecond: Float = 0
 
+  /// Detailed VLM metrics from Kotlin/Web/C ABI.
+  public var imageTokens: Int32 = 0
+
+  public var timeToFirstTokenMs: Int64 = 0
+
+  public var imageEncodeTimeMs: Int64 = 0
+
+  public var hardwareUsed: String {
+    get {_hardwareUsed ?? String()}
+    set {_hardwareUsed = newValue}
+  }
+  /// Returns true if `hardwareUsed` has been explicitly set.
+  public var hasHardwareUsed: Bool {self._hardwareUsed != nil}
+  /// Clears the value of `hardwareUsed`. Subsequent reads from it will return its default value.
+  public mutating func clearHardwareUsed() {self._hardwareUsed = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _hardwareUsed: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -495,8 +694,56 @@ extension RAVLMImageFormat: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_IMAGE_FORMAT_UNSPECIFIED\0\u{1}VLM_IMAGE_FORMAT_JPEG\0\u{1}VLM_IMAGE_FORMAT_PNG\0\u{1}VLM_IMAGE_FORMAT_WEBP\0\u{1}VLM_IMAGE_FORMAT_RAW_RGB\0\u{1}VLM_IMAGE_FORMAT_RAW_RGBA\0\u{1}VLM_IMAGE_FORMAT_BASE64\0\u{1}VLM_IMAGE_FORMAT_FILE_PATH\0")
 }
 
+extension RAVLMModelFamily: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_MODEL_FAMILY_UNSPECIFIED\0\u{1}VLM_MODEL_FAMILY_AUTO\0\u{1}VLM_MODEL_FAMILY_QWEN2_VL\0\u{1}VLM_MODEL_FAMILY_SMOLVLM\0\u{1}VLM_MODEL_FAMILY_LLAVA\0\u{2}_\u{1}VLM_MODEL_FAMILY_CUSTOM\0")
+}
+
 extension RAVLMErrorCode: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_ERROR_CODE_UNSPECIFIED\0\u{1}VLM_ERROR_CODE_INVALID_IMAGE\0\u{1}VLM_ERROR_CODE_MODEL_NOT_LOADED\0\u{1}VLM_ERROR_CODE_UNSUPPORTED_FORMAT\0\u{1}VLM_ERROR_CODE_IMAGE_TOO_LARGE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_ERROR_CODE_UNSPECIFIED\0\u{1}VLM_ERROR_CODE_INVALID_IMAGE\0\u{1}VLM_ERROR_CODE_MODEL_NOT_LOADED\0\u{1}VLM_ERROR_CODE_UNSUPPORTED_FORMAT\0\u{1}VLM_ERROR_CODE_IMAGE_TOO_LARGE\0\u{1}VLM_ERROR_CODE_NOT_INITIALIZED\0\u{1}VLM_ERROR_CODE_MODEL_LOAD_FAILED\0\u{1}VLM_ERROR_CODE_PROCESSING_FAILED\0\u{1}VLM_ERROR_CODE_CANCELLED\0")
+}
+
+extension RAVLMChatTemplate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VLMChatTemplate"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}template_text\0\u{3}image_marker\0\u{3}default_system_prompt\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.templateText) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._imageMarker) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._defaultSystemPrompt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.templateText.isEmpty {
+      try visitor.visitSingularStringField(value: self.templateText, fieldNumber: 1)
+    }
+    try { if let v = self._imageMarker {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._defaultSystemPrompt {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVLMChatTemplate, rhs: RAVLMChatTemplate) -> Bool {
+    if lhs.templateText != rhs.templateText {return false}
+    if lhs._imageMarker != rhs._imageMarker {return false}
+    if lhs._defaultSystemPrompt != rhs._defaultSystemPrompt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -597,7 +844,7 @@ extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
 
 extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}max_image_size_px\0\u{3}max_tokens\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}max_image_size_px\0\u{3}max_tokens\0\u{3}context_length\0\u{1}temperature\0\u{3}system_prompt\0\u{3}streaming_enabled\0\u{3}preferred_framework\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -608,12 +855,21 @@ extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.maxImageSizePx) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.contextLength) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._systemPrompt) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.streamingEnabled) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
@@ -623,6 +879,21 @@ extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if self.maxTokens != 0 {
       try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 3)
     }
+    if self.contextLength != 0 {
+      try visitor.visitSingularInt32Field(value: self.contextLength, fieldNumber: 4)
+    }
+    if self.temperature.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.temperature, fieldNumber: 5)
+    }
+    try { if let v = self._systemPrompt {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    if self.streamingEnabled != false {
+      try visitor.visitSingularBoolField(value: self.streamingEnabled, fieldNumber: 7)
+    }
+    try { if let v = self._preferredFramework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -630,6 +901,11 @@ extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs.modelID != rhs.modelID {return false}
     if lhs.maxImageSizePx != rhs.maxImageSizePx {return false}
     if lhs.maxTokens != rhs.maxTokens {return false}
+    if lhs.contextLength != rhs.contextLength {return false}
+    if lhs.temperature != rhs.temperature {return false}
+    if lhs._systemPrompt != rhs._systemPrompt {return false}
+    if lhs.streamingEnabled != rhs.streamingEnabled {return false}
+    if lhs._preferredFramework != rhs._preferredFramework {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -637,7 +913,7 @@ extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}system_prompt\0\u{3}max_image_size\0\u{3}n_threads\0\u{3}use_gpu\0\u{3}model_family\0\u{3}custom_chat_template\0\u{3}image_marker_override\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -650,12 +926,25 @@ extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 3: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
       case 5: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
+      case 6: try { try decoder.decodeRepeatedStringField(value: &self.stopSequences) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.streamingEnabled) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._systemPrompt) }()
+      case 9: try { try decoder.decodeSingularInt32Field(value: &self.maxImageSize) }()
+      case 10: try { try decoder.decodeSingularInt32Field(value: &self.nThreads) }()
+      case 11: try { try decoder.decodeSingularBoolField(value: &self.useGpu) }()
+      case 12: try { try decoder.decodeSingularEnumField(value: &self.modelFamily) }()
+      case 13: try { try decoder.decodeSingularMessageField(value: &self._customChatTemplate) }()
+      case 14: try { try decoder.decodeSingularStringField(value: &self._imageMarkerOverride) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.prompt.isEmpty {
       try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
     }
@@ -671,6 +960,33 @@ extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if self.topK != 0 {
       try visitor.visitSingularInt32Field(value: self.topK, fieldNumber: 5)
     }
+    if !self.stopSequences.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.stopSequences, fieldNumber: 6)
+    }
+    if self.streamingEnabled != false {
+      try visitor.visitSingularBoolField(value: self.streamingEnabled, fieldNumber: 7)
+    }
+    try { if let v = self._systemPrompt {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    if self.maxImageSize != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxImageSize, fieldNumber: 9)
+    }
+    if self.nThreads != 0 {
+      try visitor.visitSingularInt32Field(value: self.nThreads, fieldNumber: 10)
+    }
+    if self.useGpu != false {
+      try visitor.visitSingularBoolField(value: self.useGpu, fieldNumber: 11)
+    }
+    if self.modelFamily != .unspecified {
+      try visitor.visitSingularEnumField(value: self.modelFamily, fieldNumber: 12)
+    }
+    try { if let v = self._customChatTemplate {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+    } }()
+    try { if let v = self._imageMarkerOverride {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -680,6 +996,15 @@ extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.temperature != rhs.temperature {return false}
     if lhs.topP != rhs.topP {return false}
     if lhs.topK != rhs.topK {return false}
+    if lhs.stopSequences != rhs.stopSequences {return false}
+    if lhs.streamingEnabled != rhs.streamingEnabled {return false}
+    if lhs._systemPrompt != rhs._systemPrompt {return false}
+    if lhs.maxImageSize != rhs.maxImageSize {return false}
+    if lhs.nThreads != rhs.nThreads {return false}
+    if lhs.useGpu != rhs.useGpu {return false}
+    if lhs.modelFamily != rhs.modelFamily {return false}
+    if lhs._customChatTemplate != rhs._customChatTemplate {return false}
+    if lhs._imageMarkerOverride != rhs._imageMarkerOverride {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -687,7 +1012,7 @@ extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}processing_time_ms\0\u{3}tokens_per_second\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}processing_time_ms\0\u{3}tokens_per_second\0\u{3}image_tokens\0\u{3}time_to_first_token_ms\0\u{3}image_encode_time_ms\0\u{3}hardware_used\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -701,12 +1026,20 @@ extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       case 4: try { try decoder.decodeSingularInt64Field(value: &self.totalTokens) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.processingTimeMs) }()
       case 6: try { try decoder.decodeSingularFloatField(value: &self.tokensPerSecond) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.imageTokens) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self.timeToFirstTokenMs) }()
+      case 9: try { try decoder.decodeSingularInt64Field(value: &self.imageEncodeTimeMs) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._hardwareUsed) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.text.isEmpty {
       try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
     }
@@ -725,6 +1058,18 @@ extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     if self.tokensPerSecond.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.tokensPerSecond, fieldNumber: 6)
     }
+    if self.imageTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.imageTokens, fieldNumber: 7)
+    }
+    if self.timeToFirstTokenMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timeToFirstTokenMs, fieldNumber: 8)
+    }
+    if self.imageEncodeTimeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.imageEncodeTimeMs, fieldNumber: 9)
+    }
+    try { if let v = self._hardwareUsed {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -735,6 +1080,10 @@ extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     if lhs.totalTokens != rhs.totalTokens {return false}
     if lhs.processingTimeMs != rhs.processingTimeMs {return false}
     if lhs.tokensPerSecond != rhs.tokensPerSecond {return false}
+    if lhs.imageTokens != rhs.imageTokens {return false}
+    if lhs.timeToFirstTokenMs != rhs.timeToFirstTokenMs {return false}
+    if lhs.imageEncodeTimeMs != rhs.imageEncodeTimeMs {return false}
+    if lhs._hardwareUsed != rhs._hardwareUsed {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

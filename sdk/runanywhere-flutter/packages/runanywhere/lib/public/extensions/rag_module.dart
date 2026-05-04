@@ -28,9 +28,9 @@
 library rag_module;
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart';
+import 'package:runanywhere/generated/sdk_events.pbenum.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 
 /// RAG module for Retrieval-Augmented Generation.
@@ -60,13 +60,17 @@ class RAGModule implements RunAnywhereModule {
   String get moduleName => 'RAG';
 
   @override
-  Set<SDKComponent> get capabilities => {SDKComponent.llm};
+  Set<SDKComponent> get capabilities => {
+        SDKComponent.SDK_COMPONENT_RAG,
+        SDKComponent.SDK_COMPONENT_LLM,
+      };
 
   @override
   int get defaultPriority => 100;
 
   @override
-  InferenceFramework get inferenceFramework => InferenceFramework.onnx;
+  InferenceFramework get inferenceFramework =>
+      InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
 
   // ============================================================================
   // Registration State
@@ -109,6 +113,7 @@ class RAGModule implements RunAnywhereModule {
       return;
     }
 
+    DartBridgeRAG.shared.unregister();
     _isRegistered = false;
     _logger.info('RAG backend unregistered');
   }

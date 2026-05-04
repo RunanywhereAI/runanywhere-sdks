@@ -7,6 +7,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -119,6 +120,69 @@ export function vLMImageFormatToJSON(object: VLMImageFormat): string {
 
 /**
  * ---------------------------------------------------------------------------
+ * VLM model family for chat-template selection.
+ * Mirrors rac_vlm_model_family_t.
+ * ---------------------------------------------------------------------------
+ */
+export enum VLMModelFamily {
+  VLM_MODEL_FAMILY_UNSPECIFIED = 0,
+  VLM_MODEL_FAMILY_AUTO = 1,
+  VLM_MODEL_FAMILY_QWEN2_VL = 2,
+  VLM_MODEL_FAMILY_SMOLVLM = 3,
+  VLM_MODEL_FAMILY_LLAVA = 4,
+  VLM_MODEL_FAMILY_CUSTOM = 99,
+  UNRECOGNIZED = -1,
+}
+
+export function vLMModelFamilyFromJSON(object: any): VLMModelFamily {
+  switch (object) {
+    case 0:
+    case "VLM_MODEL_FAMILY_UNSPECIFIED":
+      return VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED;
+    case 1:
+    case "VLM_MODEL_FAMILY_AUTO":
+      return VLMModelFamily.VLM_MODEL_FAMILY_AUTO;
+    case 2:
+    case "VLM_MODEL_FAMILY_QWEN2_VL":
+      return VLMModelFamily.VLM_MODEL_FAMILY_QWEN2_VL;
+    case 3:
+    case "VLM_MODEL_FAMILY_SMOLVLM":
+      return VLMModelFamily.VLM_MODEL_FAMILY_SMOLVLM;
+    case 4:
+    case "VLM_MODEL_FAMILY_LLAVA":
+      return VLMModelFamily.VLM_MODEL_FAMILY_LLAVA;
+    case 99:
+    case "VLM_MODEL_FAMILY_CUSTOM":
+      return VLMModelFamily.VLM_MODEL_FAMILY_CUSTOM;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return VLMModelFamily.UNRECOGNIZED;
+  }
+}
+
+export function vLMModelFamilyToJSON(object: VLMModelFamily): string {
+  switch (object) {
+    case VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED:
+      return "VLM_MODEL_FAMILY_UNSPECIFIED";
+    case VLMModelFamily.VLM_MODEL_FAMILY_AUTO:
+      return "VLM_MODEL_FAMILY_AUTO";
+    case VLMModelFamily.VLM_MODEL_FAMILY_QWEN2_VL:
+      return "VLM_MODEL_FAMILY_QWEN2_VL";
+    case VLMModelFamily.VLM_MODEL_FAMILY_SMOLVLM:
+      return "VLM_MODEL_FAMILY_SMOLVLM";
+    case VLMModelFamily.VLM_MODEL_FAMILY_LLAVA:
+      return "VLM_MODEL_FAMILY_LLAVA";
+    case VLMModelFamily.VLM_MODEL_FAMILY_CUSTOM:
+      return "VLM_MODEL_FAMILY_CUSTOM";
+    case VLMModelFamily.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * VLM error codes — canonical SDK-facing surface.
  * Sources pre-IDL:
  *   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
@@ -149,6 +213,11 @@ export enum VLMErrorCode {
   VLM_ERROR_CODE_UNSUPPORTED_FORMAT = 3,
   /** VLM_ERROR_CODE_IMAGE_TOO_LARGE - backend cannot decode */
   VLM_ERROR_CODE_IMAGE_TOO_LARGE = 4,
+  /** VLM_ERROR_CODE_NOT_INITIALIZED - VLMConfiguration.max_image_size_px */
+  VLM_ERROR_CODE_NOT_INITIALIZED = 5,
+  VLM_ERROR_CODE_MODEL_LOAD_FAILED = 6,
+  VLM_ERROR_CODE_PROCESSING_FAILED = 7,
+  VLM_ERROR_CODE_CANCELLED = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -169,6 +238,18 @@ export function vLMErrorCodeFromJSON(object: any): VLMErrorCode {
     case 4:
     case "VLM_ERROR_CODE_IMAGE_TOO_LARGE":
       return VLMErrorCode.VLM_ERROR_CODE_IMAGE_TOO_LARGE;
+    case 5:
+    case "VLM_ERROR_CODE_NOT_INITIALIZED":
+      return VLMErrorCode.VLM_ERROR_CODE_NOT_INITIALIZED;
+    case 6:
+    case "VLM_ERROR_CODE_MODEL_LOAD_FAILED":
+      return VLMErrorCode.VLM_ERROR_CODE_MODEL_LOAD_FAILED;
+    case 7:
+    case "VLM_ERROR_CODE_PROCESSING_FAILED":
+      return VLMErrorCode.VLM_ERROR_CODE_PROCESSING_FAILED;
+    case 8:
+    case "VLM_ERROR_CODE_CANCELLED":
+      return VLMErrorCode.VLM_ERROR_CODE_CANCELLED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -188,10 +269,30 @@ export function vLMErrorCodeToJSON(object: VLMErrorCode): string {
       return "VLM_ERROR_CODE_UNSUPPORTED_FORMAT";
     case VLMErrorCode.VLM_ERROR_CODE_IMAGE_TOO_LARGE:
       return "VLM_ERROR_CODE_IMAGE_TOO_LARGE";
+    case VLMErrorCode.VLM_ERROR_CODE_NOT_INITIALIZED:
+      return "VLM_ERROR_CODE_NOT_INITIALIZED";
+    case VLMErrorCode.VLM_ERROR_CODE_MODEL_LOAD_FAILED:
+      return "VLM_ERROR_CODE_MODEL_LOAD_FAILED";
+    case VLMErrorCode.VLM_ERROR_CODE_PROCESSING_FAILED:
+      return "VLM_ERROR_CODE_PROCESSING_FAILED";
+    case VLMErrorCode.VLM_ERROR_CODE_CANCELLED:
+      return "VLM_ERROR_CODE_CANCELLED";
     case VLMErrorCode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Custom VLM chat template.
+ * Mirrors rac_vlm_chat_template_t.
+ * ---------------------------------------------------------------------------
+ */
+export interface VLMChatTemplate {
+  templateText: string;
+  imageMarker?: string | undefined;
+  defaultSystemPrompt?: string | undefined;
 }
 
 /**
@@ -257,6 +358,12 @@ export interface VLMConfiguration {
   maxImageSizePx: number;
   /** (0 = backend default) */
   maxTokens: number;
+  /** Additional component-level fields from rac_vlm_config_t. */
+  contextLength: number;
+  temperature: number;
+  systemPrompt?: string | undefined;
+  streamingEnabled: boolean;
+  preferredFramework?: InferenceFramework | undefined;
 }
 
 /**
@@ -288,6 +395,16 @@ export interface VLMGenerationOptions {
   temperature: number;
   topP: number;
   topK: number;
+  /** Full rac_vlm_options_t coverage. */
+  stopSequences: string[];
+  streamingEnabled: boolean;
+  systemPrompt?: string | undefined;
+  maxImageSize: number;
+  nThreads: number;
+  useGpu: boolean;
+  modelFamily: VLMModelFamily;
+  customChatTemplate?: VLMChatTemplate | undefined;
+  imageMarkerOverride?: string | undefined;
 }
 
 /**
@@ -329,7 +446,103 @@ export interface VLMResult {
   processingTimeMs: number;
   /** Swift VLMResult totalTimeMs (Double ms). */
   tokensPerSecond: number;
+  /** Detailed VLM metrics from Kotlin/Web/C ABI. */
+  imageTokens: number;
+  timeToFirstTokenMs: number;
+  imageEncodeTimeMs: number;
+  hardwareUsed?: string | undefined;
 }
+
+function createBaseVLMChatTemplate(): VLMChatTemplate {
+  return { templateText: "", imageMarker: undefined, defaultSystemPrompt: undefined };
+}
+
+export const VLMChatTemplate = {
+  encode(message: VLMChatTemplate, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.templateText !== "") {
+      writer.uint32(10).string(message.templateText);
+    }
+    if (message.imageMarker !== undefined) {
+      writer.uint32(18).string(message.imageMarker);
+    }
+    if (message.defaultSystemPrompt !== undefined) {
+      writer.uint32(26).string(message.defaultSystemPrompt);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): VLMChatTemplate {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVLMChatTemplate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.templateText = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.imageMarker = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.defaultSystemPrompt = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VLMChatTemplate {
+    return {
+      templateText: isSet(object.templateText) ? globalThis.String(object.templateText) : "",
+      imageMarker: isSet(object.imageMarker) ? globalThis.String(object.imageMarker) : undefined,
+      defaultSystemPrompt: isSet(object.defaultSystemPrompt)
+        ? globalThis.String(object.defaultSystemPrompt)
+        : undefined,
+    };
+  },
+
+  toJSON(message: VLMChatTemplate): unknown {
+    const obj: any = {};
+    if (message.templateText !== "") {
+      obj.templateText = message.templateText;
+    }
+    if (message.imageMarker !== undefined) {
+      obj.imageMarker = message.imageMarker;
+    }
+    if (message.defaultSystemPrompt !== undefined) {
+      obj.defaultSystemPrompt = message.defaultSystemPrompt;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<VLMChatTemplate>, I>>(base?: I): VLMChatTemplate {
+    return VLMChatTemplate.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<VLMChatTemplate>, I>>(object: I): VLMChatTemplate {
+    const message = createBaseVLMChatTemplate();
+    message.templateText = object.templateText ?? "";
+    message.imageMarker = object.imageMarker ?? undefined;
+    message.defaultSystemPrompt = object.defaultSystemPrompt ?? undefined;
+    return message;
+  },
+};
 
 function createBaseVLMImage(): VLMImage {
   return {
@@ -489,7 +702,16 @@ export const VLMImage = {
 };
 
 function createBaseVLMConfiguration(): VLMConfiguration {
-  return { modelId: "", maxImageSizePx: 0, maxTokens: 0 };
+  return {
+    modelId: "",
+    maxImageSizePx: 0,
+    maxTokens: 0,
+    contextLength: 0,
+    temperature: 0,
+    systemPrompt: undefined,
+    streamingEnabled: false,
+    preferredFramework: undefined,
+  };
 }
 
 export const VLMConfiguration = {
@@ -502,6 +724,21 @@ export const VLMConfiguration = {
     }
     if (message.maxTokens !== 0) {
       writer.uint32(24).int32(message.maxTokens);
+    }
+    if (message.contextLength !== 0) {
+      writer.uint32(32).int32(message.contextLength);
+    }
+    if (message.temperature !== 0) {
+      writer.uint32(45).float(message.temperature);
+    }
+    if (message.systemPrompt !== undefined) {
+      writer.uint32(50).string(message.systemPrompt);
+    }
+    if (message.streamingEnabled !== false) {
+      writer.uint32(56).bool(message.streamingEnabled);
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(64).int32(message.preferredFramework);
     }
     return writer;
   },
@@ -534,6 +771,41 @@ export const VLMConfiguration = {
 
           message.maxTokens = reader.int32();
           continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.contextLength = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 45) {
+            break;
+          }
+
+          message.temperature = reader.float();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.systemPrompt = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.streamingEnabled = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -548,6 +820,13 @@ export const VLMConfiguration = {
       modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
       maxImageSizePx: isSet(object.maxImageSizePx) ? globalThis.Number(object.maxImageSizePx) : 0,
       maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+      contextLength: isSet(object.contextLength) ? globalThis.Number(object.contextLength) : 0,
+      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+      systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
+      streamingEnabled: isSet(object.streamingEnabled) ? globalThis.Boolean(object.streamingEnabled) : false,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
     };
   },
 
@@ -562,6 +841,21 @@ export const VLMConfiguration = {
     if (message.maxTokens !== 0) {
       obj.maxTokens = Math.round(message.maxTokens);
     }
+    if (message.contextLength !== 0) {
+      obj.contextLength = Math.round(message.contextLength);
+    }
+    if (message.temperature !== 0) {
+      obj.temperature = message.temperature;
+    }
+    if (message.systemPrompt !== undefined) {
+      obj.systemPrompt = message.systemPrompt;
+    }
+    if (message.streamingEnabled !== false) {
+      obj.streamingEnabled = message.streamingEnabled;
+    }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
     return obj;
   },
 
@@ -573,12 +867,32 @@ export const VLMConfiguration = {
     message.modelId = object.modelId ?? "";
     message.maxImageSizePx = object.maxImageSizePx ?? 0;
     message.maxTokens = object.maxTokens ?? 0;
+    message.contextLength = object.contextLength ?? 0;
+    message.temperature = object.temperature ?? 0;
+    message.systemPrompt = object.systemPrompt ?? undefined;
+    message.streamingEnabled = object.streamingEnabled ?? false;
+    message.preferredFramework = object.preferredFramework ?? undefined;
     return message;
   },
 };
 
 function createBaseVLMGenerationOptions(): VLMGenerationOptions {
-  return { prompt: "", maxTokens: 0, temperature: 0, topP: 0, topK: 0 };
+  return {
+    prompt: "",
+    maxTokens: 0,
+    temperature: 0,
+    topP: 0,
+    topK: 0,
+    stopSequences: [],
+    streamingEnabled: false,
+    systemPrompt: undefined,
+    maxImageSize: 0,
+    nThreads: 0,
+    useGpu: false,
+    modelFamily: 0,
+    customChatTemplate: undefined,
+    imageMarkerOverride: undefined,
+  };
 }
 
 export const VLMGenerationOptions = {
@@ -597,6 +911,33 @@ export const VLMGenerationOptions = {
     }
     if (message.topK !== 0) {
       writer.uint32(40).int32(message.topK);
+    }
+    for (const v of message.stopSequences) {
+      writer.uint32(50).string(v!);
+    }
+    if (message.streamingEnabled !== false) {
+      writer.uint32(56).bool(message.streamingEnabled);
+    }
+    if (message.systemPrompt !== undefined) {
+      writer.uint32(66).string(message.systemPrompt);
+    }
+    if (message.maxImageSize !== 0) {
+      writer.uint32(72).int32(message.maxImageSize);
+    }
+    if (message.nThreads !== 0) {
+      writer.uint32(80).int32(message.nThreads);
+    }
+    if (message.useGpu !== false) {
+      writer.uint32(88).bool(message.useGpu);
+    }
+    if (message.modelFamily !== 0) {
+      writer.uint32(96).int32(message.modelFamily);
+    }
+    if (message.customChatTemplate !== undefined) {
+      VLMChatTemplate.encode(message.customChatTemplate, writer.uint32(106).fork()).ldelim();
+    }
+    if (message.imageMarkerOverride !== undefined) {
+      writer.uint32(114).string(message.imageMarkerOverride);
     }
     return writer;
   },
@@ -643,6 +984,69 @@ export const VLMGenerationOptions = {
 
           message.topK = reader.int32();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.stopSequences.push(reader.string());
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.streamingEnabled = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.systemPrompt = reader.string();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.maxImageSize = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.nThreads = reader.int32();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.useGpu = reader.bool();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.modelFamily = reader.int32() as any;
+          continue;
+        case 13:
+          if (tag !== 106) {
+            break;
+          }
+
+          message.customChatTemplate = VLMChatTemplate.decode(reader, reader.uint32());
+          continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.imageMarkerOverride = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -659,6 +1063,21 @@ export const VLMGenerationOptions = {
       temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
       topP: isSet(object.topP) ? globalThis.Number(object.topP) : 0,
       topK: isSet(object.topK) ? globalThis.Number(object.topK) : 0,
+      stopSequences: globalThis.Array.isArray(object?.stopSequences)
+        ? object.stopSequences.map((e: any) => globalThis.String(e))
+        : [],
+      streamingEnabled: isSet(object.streamingEnabled) ? globalThis.Boolean(object.streamingEnabled) : false,
+      systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
+      maxImageSize: isSet(object.maxImageSize) ? globalThis.Number(object.maxImageSize) : 0,
+      nThreads: isSet(object.nThreads) ? globalThis.Number(object.nThreads) : 0,
+      useGpu: isSet(object.useGpu) ? globalThis.Boolean(object.useGpu) : false,
+      modelFamily: isSet(object.modelFamily) ? vLMModelFamilyFromJSON(object.modelFamily) : 0,
+      customChatTemplate: isSet(object.customChatTemplate)
+        ? VLMChatTemplate.fromJSON(object.customChatTemplate)
+        : undefined,
+      imageMarkerOverride: isSet(object.imageMarkerOverride)
+        ? globalThis.String(object.imageMarkerOverride)
+        : undefined,
     };
   },
 
@@ -679,6 +1098,33 @@ export const VLMGenerationOptions = {
     if (message.topK !== 0) {
       obj.topK = Math.round(message.topK);
     }
+    if (message.stopSequences?.length) {
+      obj.stopSequences = message.stopSequences;
+    }
+    if (message.streamingEnabled !== false) {
+      obj.streamingEnabled = message.streamingEnabled;
+    }
+    if (message.systemPrompt !== undefined) {
+      obj.systemPrompt = message.systemPrompt;
+    }
+    if (message.maxImageSize !== 0) {
+      obj.maxImageSize = Math.round(message.maxImageSize);
+    }
+    if (message.nThreads !== 0) {
+      obj.nThreads = Math.round(message.nThreads);
+    }
+    if (message.useGpu !== false) {
+      obj.useGpu = message.useGpu;
+    }
+    if (message.modelFamily !== 0) {
+      obj.modelFamily = vLMModelFamilyToJSON(message.modelFamily);
+    }
+    if (message.customChatTemplate !== undefined) {
+      obj.customChatTemplate = VLMChatTemplate.toJSON(message.customChatTemplate);
+    }
+    if (message.imageMarkerOverride !== undefined) {
+      obj.imageMarkerOverride = message.imageMarkerOverride;
+    }
     return obj;
   },
 
@@ -692,12 +1138,34 @@ export const VLMGenerationOptions = {
     message.temperature = object.temperature ?? 0;
     message.topP = object.topP ?? 0;
     message.topK = object.topK ?? 0;
+    message.stopSequences = object.stopSequences?.map((e) => e) || [];
+    message.streamingEnabled = object.streamingEnabled ?? false;
+    message.systemPrompt = object.systemPrompt ?? undefined;
+    message.maxImageSize = object.maxImageSize ?? 0;
+    message.nThreads = object.nThreads ?? 0;
+    message.useGpu = object.useGpu ?? false;
+    message.modelFamily = object.modelFamily ?? 0;
+    message.customChatTemplate = (object.customChatTemplate !== undefined && object.customChatTemplate !== null)
+      ? VLMChatTemplate.fromPartial(object.customChatTemplate)
+      : undefined;
+    message.imageMarkerOverride = object.imageMarkerOverride ?? undefined;
     return message;
   },
 };
 
 function createBaseVLMResult(): VLMResult {
-  return { text: "", promptTokens: 0, completionTokens: 0, totalTokens: 0, processingTimeMs: 0, tokensPerSecond: 0 };
+  return {
+    text: "",
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    processingTimeMs: 0,
+    tokensPerSecond: 0,
+    imageTokens: 0,
+    timeToFirstTokenMs: 0,
+    imageEncodeTimeMs: 0,
+    hardwareUsed: undefined,
+  };
 }
 
 export const VLMResult = {
@@ -719,6 +1187,18 @@ export const VLMResult = {
     }
     if (message.tokensPerSecond !== 0) {
       writer.uint32(53).float(message.tokensPerSecond);
+    }
+    if (message.imageTokens !== 0) {
+      writer.uint32(56).int32(message.imageTokens);
+    }
+    if (message.timeToFirstTokenMs !== 0) {
+      writer.uint32(64).int64(message.timeToFirstTokenMs);
+    }
+    if (message.imageEncodeTimeMs !== 0) {
+      writer.uint32(72).int64(message.imageEncodeTimeMs);
+    }
+    if (message.hardwareUsed !== undefined) {
+      writer.uint32(82).string(message.hardwareUsed);
     }
     return writer;
   },
@@ -772,6 +1252,34 @@ export const VLMResult = {
 
           message.tokensPerSecond = reader.float();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.imageTokens = reader.int32();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.timeToFirstTokenMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.imageEncodeTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.hardwareUsed = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -789,6 +1297,10 @@ export const VLMResult = {
       totalTokens: isSet(object.totalTokens) ? globalThis.Number(object.totalTokens) : 0,
       processingTimeMs: isSet(object.processingTimeMs) ? globalThis.Number(object.processingTimeMs) : 0,
       tokensPerSecond: isSet(object.tokensPerSecond) ? globalThis.Number(object.tokensPerSecond) : 0,
+      imageTokens: isSet(object.imageTokens) ? globalThis.Number(object.imageTokens) : 0,
+      timeToFirstTokenMs: isSet(object.timeToFirstTokenMs) ? globalThis.Number(object.timeToFirstTokenMs) : 0,
+      imageEncodeTimeMs: isSet(object.imageEncodeTimeMs) ? globalThis.Number(object.imageEncodeTimeMs) : 0,
+      hardwareUsed: isSet(object.hardwareUsed) ? globalThis.String(object.hardwareUsed) : undefined,
     };
   },
 
@@ -812,6 +1324,18 @@ export const VLMResult = {
     if (message.tokensPerSecond !== 0) {
       obj.tokensPerSecond = message.tokensPerSecond;
     }
+    if (message.imageTokens !== 0) {
+      obj.imageTokens = Math.round(message.imageTokens);
+    }
+    if (message.timeToFirstTokenMs !== 0) {
+      obj.timeToFirstTokenMs = Math.round(message.timeToFirstTokenMs);
+    }
+    if (message.imageEncodeTimeMs !== 0) {
+      obj.imageEncodeTimeMs = Math.round(message.imageEncodeTimeMs);
+    }
+    if (message.hardwareUsed !== undefined) {
+      obj.hardwareUsed = message.hardwareUsed;
+    }
     return obj;
   },
 
@@ -826,6 +1350,10 @@ export const VLMResult = {
     message.totalTokens = object.totalTokens ?? 0;
     message.processingTimeMs = object.processingTimeMs ?? 0;
     message.tokensPerSecond = object.tokensPerSecond ?? 0;
+    message.imageTokens = object.imageTokens ?? 0;
+    message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
+    message.imageEncodeTimeMs = object.imageEncodeTimeMs ?? 0;
+    message.hardwareUsed = object.hardwareUsed ?? undefined;
     return message;
   },
 };

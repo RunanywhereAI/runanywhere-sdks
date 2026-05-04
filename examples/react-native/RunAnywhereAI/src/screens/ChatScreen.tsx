@@ -61,6 +61,7 @@ import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
   RunAnywhere,
+  ToolParameterType,
   type ModelInfo as SDKModelInfo,
   type GenerationOptions,
 } from '@runanywhere/core';
@@ -89,10 +90,11 @@ const registerChatTools = () => {
       parameters: [
         {
           name: 'location',
-          type: 'string',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
           description:
             'City name or location (e.g., "Tokyo", "New York", "London")',
           required: true,
+          enumValues: [],
         },
       ],
     },
@@ -161,9 +163,10 @@ const registerChatTools = () => {
       parameters: [
         {
           name: 'expression',
-          type: 'string',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
           description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
           required: true,
+          enumValues: [],
         },
       ],
     },
@@ -399,16 +402,15 @@ export const ChatScreen: React.FC = () => {
         const fw =
           (model.preferredFramework as unknown as LLMFramework) ??
           LLMFramework.LlamaCpp;
-        const modelInfo = {
-          id: model.id,
-          name: model.name,
+        const modelInfo: ModelInfo = {
+          ...model,
           category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
           compatibleFrameworks:
             (model.compatibleFrameworks as unknown as LLMFramework[]) ?? [fw],
           preferredFramework: fw,
           isDownloaded: true,
           isAvailable: true,
-          supportsThinking: false,
+          supportsThinking: model.supportsThinking ?? false,
         };
         setCurrentModel(modelInfo);
 
@@ -491,6 +493,7 @@ export const ChatScreen: React.FC = () => {
         streamingEnabled: true,
         preferredFramework: 0,
         systemPrompt: options.systemPrompt,
+        enableRealTimeTracking: false,
       };
 
       if (Platform.OS === 'android') {

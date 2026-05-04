@@ -34,15 +34,47 @@ class DownloadStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Plan = channel.unary_unary(
+                '/runanywhere.v1.Download/Plan',
+                request_serializer=download__service__pb2.DownloadPlanRequest.SerializeToString,
+                response_deserializer=download__service__pb2.DownloadPlanResult.FromString,
+                _registered_method=True)
+        self.Start = channel.unary_unary(
+                '/runanywhere.v1.Download/Start',
+                request_serializer=download__service__pb2.DownloadStartRequest.SerializeToString,
+                response_deserializer=download__service__pb2.DownloadStartResult.FromString,
+                _registered_method=True)
         self.Subscribe = channel.unary_stream(
                 '/runanywhere.v1.Download/Subscribe',
                 request_serializer=download__service__pb2.DownloadSubscribeRequest.SerializeToString,
                 response_deserializer=download__service__pb2.DownloadProgress.FromString,
                 _registered_method=True)
+        self.Cancel = channel.unary_unary(
+                '/runanywhere.v1.Download/Cancel',
+                request_serializer=download__service__pb2.DownloadCancelRequest.SerializeToString,
+                response_deserializer=download__service__pb2.DownloadCancelResult.FromString,
+                _registered_method=True)
+        self.Resume = channel.unary_unary(
+                '/runanywhere.v1.Download/Resume',
+                request_serializer=download__service__pb2.DownloadResumeRequest.SerializeToString,
+                response_deserializer=download__service__pb2.DownloadResumeResult.FromString,
+                _registered_method=True)
 
 
 class DownloadServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def Plan(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Start(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def Subscribe(self, request, context):
         """Server-streaming: emits a DownloadProgress message every time
@@ -53,13 +85,45 @@ class DownloadServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Cancel(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Resume(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DownloadServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Plan': grpc.unary_unary_rpc_method_handler(
+                    servicer.Plan,
+                    request_deserializer=download__service__pb2.DownloadPlanRequest.FromString,
+                    response_serializer=download__service__pb2.DownloadPlanResult.SerializeToString,
+            ),
+            'Start': grpc.unary_unary_rpc_method_handler(
+                    servicer.Start,
+                    request_deserializer=download__service__pb2.DownloadStartRequest.FromString,
+                    response_serializer=download__service__pb2.DownloadStartResult.SerializeToString,
+            ),
             'Subscribe': grpc.unary_stream_rpc_method_handler(
                     servicer.Subscribe,
                     request_deserializer=download__service__pb2.DownloadSubscribeRequest.FromString,
                     response_serializer=download__service__pb2.DownloadProgress.SerializeToString,
+            ),
+            'Cancel': grpc.unary_unary_rpc_method_handler(
+                    servicer.Cancel,
+                    request_deserializer=download__service__pb2.DownloadCancelRequest.FromString,
+                    response_serializer=download__service__pb2.DownloadCancelResult.SerializeToString,
+            ),
+            'Resume': grpc.unary_unary_rpc_method_handler(
+                    servicer.Resume,
+                    request_deserializer=download__service__pb2.DownloadResumeRequest.FromString,
+                    response_serializer=download__service__pb2.DownloadResumeResult.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -71,6 +135,60 @@ def add_DownloadServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Download(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Plan(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/runanywhere.v1.Download/Plan',
+            download__service__pb2.DownloadPlanRequest.SerializeToString,
+            download__service__pb2.DownloadPlanResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Start(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/runanywhere.v1.Download/Start',
+            download__service__pb2.DownloadStartRequest.SerializeToString,
+            download__service__pb2.DownloadStartResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def Subscribe(request,
@@ -89,6 +207,60 @@ class Download(object):
             '/runanywhere.v1.Download/Subscribe',
             download__service__pb2.DownloadSubscribeRequest.SerializeToString,
             download__service__pb2.DownloadProgress.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Cancel(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/runanywhere.v1.Download/Cancel',
+            download__service__pb2.DownloadCancelRequest.SerializeToString,
+            download__service__pb2.DownloadCancelResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Resume(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/runanywhere.v1.Download/Resume',
+            download__service__pb2.DownloadResumeRequest.SerializeToString,
+            download__service__pb2.DownloadResumeResult.FromString,
             options,
             channel_credentials,
             insecure,

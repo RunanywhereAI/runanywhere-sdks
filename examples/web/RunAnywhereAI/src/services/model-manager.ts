@@ -14,8 +14,8 @@ import {
   type CompactModelDef,
   type ManagedModel,
   type ModelFileDescriptor,
-} from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
+} from '@runanywhere/web';
+import { VLMWorkerBridge } from '@runanywhere/web-llamacpp';
 import { showToast } from '../components/dialogs';
 
 // Re-export SDK types for existing consumers (ManagedModel aliased as ModelInfo
@@ -137,7 +137,7 @@ const REGISTERED_MODELS: CompactModelDef[] = [
     url: 'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
     files: ['silero_vad.onnx'],
     framework: LLMFramework.ONNX,
-    modality: ModelCategory.Audio,
+    modality: ModelCategory.VoiceActivityDetection,
     memoryRequirement: 5_000_000,
   },
 ];
@@ -153,23 +153,23 @@ const REGISTERED_MODELS: CompactModelDef[] = [
  */
 export async function ensureVADLoaded(): Promise<boolean> {
   // Already loaded?
-  if (ModelManager.getLoadedModel(ModelCategory.Audio)) return true;
+  if (ModelManager.getLoadedModel(ModelCategory.VoiceActivityDetection)) return true;
 
   // VAD is a tiny helper model (~2MB) that must always coexist with
   // pipeline models (STT, LLM, TTS). Never unload other models for it.
   const coexistOpts = { coexist: true };
 
   // Try ensureLoaded (loads an already-downloaded model)
-  const loaded = await ModelManager.ensureLoaded(ModelCategory.Audio, coexistOpts);
+  const loaded = await ModelManager.ensureLoaded(ModelCategory.VoiceActivityDetection, coexistOpts);
   if (loaded) return true;
 
   // Not downloaded yet — find the VAD model and download + load it
-  const vadModel = ModelManager.getModels().find(m => m.modality === ModelCategory.Audio);
+  const vadModel = ModelManager.getModels().find(m => m.modality === ModelCategory.VoiceActivityDetection);
   if (!vadModel) return false;
 
   await ModelManager.downloadModel(vadModel.id);
   await ModelManager.loadModel(vadModel.id, coexistOpts);
-  return !!ModelManager.getLoadedModel(ModelCategory.Audio);
+  return !!ModelManager.getLoadedModel(ModelCategory.VoiceActivityDetection);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ for (const model of REGISTERED_MODELS) {
 // Visibility check for G-DV28 regression watch: if the catalog size drops
 // below what was declared, something silently dropped entries.
 {
-  const registered = RunAnywhere.availableModels();
+  const registered = RunAnywhere.modelManagement.list();
   if (registered.length !== REGISTERED_MODELS.length) {
     console.warn(
       `[model-manager] registered ${registered.length} / ${REGISTERED_MODELS.length} models`,
@@ -203,7 +203,7 @@ for (const model of REGISTERED_MODELS) {
 // Import the VLM worker using Vite's ?worker&url suffix so it gets compiled
 // as a standalone bundle with all dependencies resolved — no raw-source data URLs.
 // @ts-ignore — Vite-specific import query
-import vlmWorkerUrl from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/workers/vlm-worker.ts?worker&url';
+import vlmWorkerUrl from '@runanywhere/web-llamacpp/vlm-worker?worker&url';
 VLMWorkerBridge.shared.workerUrl = vlmWorkerUrl;
 
 // Plug in VLM worker loading using the SDK's VLMWorkerBridge

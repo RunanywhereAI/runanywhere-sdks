@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.lora
 
+import ai.runanywhere.proto.v1.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,8 +52,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import ai.runanywhere.proto.v1.LoRAAdapterInfo
-import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 
 /**
  * Bottom sheet for picking and managing LoRA adapters for the current model.
@@ -277,7 +277,7 @@ private fun CatalogAdapterRow(
     onApply: (Float) -> Unit,
     onRemove: () -> Unit,
 ) {
-    var scale by remember(entry.id, entry.defaultScale) { mutableFloatStateOf(entry.defaultScale) }
+    var scale by remember(entry.id, entry.default_scale) { mutableFloatStateOf(entry.default_scale) }
 
     Column(
         modifier =
@@ -303,7 +303,7 @@ private fun CatalogAdapterRow(
 
         // File size
         Text(
-            "Size: %.1f MB".format(entry.fileSize / (1024.0 * 1024.0)),
+            "Size: %.1f MB".format(entry.size_bytes / (1024.0 * 1024.0)),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

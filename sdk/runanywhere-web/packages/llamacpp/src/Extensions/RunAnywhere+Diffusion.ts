@@ -38,6 +38,78 @@ export {
 
 const logger = new SDKLogger('Diffusion');
 
+const RAC_DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS = 0;
+const RAC_DIFFUSION_SCHEDULER_DPMPP_2M = 1;
+const RAC_DIFFUSION_SCHEDULER_DDIM = 3;
+const RAC_DIFFUSION_SCHEDULER_EULER = 4;
+const RAC_DIFFUSION_SCHEDULER_EULER_ANCESTRAL = 5;
+const RAC_DIFFUSION_SCHEDULER_PNDM = 6;
+const RAC_DIFFUSION_SCHEDULER_LMS = 7;
+
+const RAC_DIFFUSION_MODE_TEXT_TO_IMAGE = 0;
+const RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE = 1;
+const RAC_DIFFUSION_MODE_INPAINTING = 2;
+
+function toRacDiffusionScheduler(scheduler?: DiffusionScheduler): number {
+  switch (scheduler) {
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M:
+      return RAC_DIFFUSION_SCHEDULER_DPMPP_2M;
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_DDIM:
+      return RAC_DIFFUSION_SCHEDULER_DDIM;
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_EULER:
+      return RAC_DIFFUSION_SCHEDULER_EULER;
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_EULER_A:
+      return RAC_DIFFUSION_SCHEDULER_EULER_ANCESTRAL;
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_PNDM:
+      return RAC_DIFFUSION_SCHEDULER_PNDM;
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_LMS:
+      return RAC_DIFFUSION_SCHEDULER_LMS;
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED:
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS:
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_DDPM:
+    case DiffusionScheduler.DIFFUSION_SCHEDULER_LCM:
+    case DiffusionScheduler.UNRECOGNIZED:
+    case undefined:
+    default:
+      return RAC_DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS;
+  }
+}
+
+function fromRacDiffusionScheduler(scheduler: number): DiffusionScheduler {
+  switch (scheduler) {
+    case RAC_DIFFUSION_SCHEDULER_DPMPP_2M:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M;
+    case RAC_DIFFUSION_SCHEDULER_DDIM:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_DDIM;
+    case RAC_DIFFUSION_SCHEDULER_EULER:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_EULER;
+    case RAC_DIFFUSION_SCHEDULER_EULER_ANCESTRAL:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_EULER_A;
+    case RAC_DIFFUSION_SCHEDULER_PNDM:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_PNDM;
+    case RAC_DIFFUSION_SCHEDULER_LMS:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_LMS;
+    case RAC_DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS:
+    default:
+      return DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS;
+  }
+}
+
+function toRacDiffusionMode(mode?: DiffusionMode): number {
+  switch (mode) {
+    case DiffusionMode.DIFFUSION_MODE_IMAGE_TO_IMAGE:
+      return RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE;
+    case DiffusionMode.DIFFUSION_MODE_INPAINTING:
+      return RAC_DIFFUSION_MODE_INPAINTING;
+    case DiffusionMode.DIFFUSION_MODE_UNSPECIFIED:
+    case DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE:
+    case DiffusionMode.UNRECOGNIZED:
+    case undefined:
+    default:
+      return RAC_DIFFUSION_MODE_TEXT_TO_IMAGE;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Diffusion Extension
 // ---------------------------------------------------------------------------
@@ -122,6 +194,10 @@ class DiffusionImpl {
     } catch { return false; }
   }
 
+  get isDiffusionModelLoaded(): boolean {
+    return this.isModelLoaded;
+  }
+
   /**
    * Generate an image from a text prompt.
    */
@@ -150,18 +226,19 @@ class DiffusionImpl {
       negPromptPtr = bridge.allocString(options.negativePrompt);
       m.setValue(optPtr + dOpt.negativePrompt, negPromptPtr, '*');
     }
-    m.setValue(optPtr + dOpt.width, options.width ?? 512, 'i32');
-    m.setValue(optPtr + dOpt.height, options.height ?? 512, 'i32');
-    m.setValue(optPtr + dOpt.steps, options.steps ?? 28, 'i32');
-    m.setValue(optPtr + dOpt.guidanceScale, options.guidanceScale ?? 7.5, 'float');
+    m.setValue(optPtr + dOpt.width, options.width ?? 0, 'i32');
+    m.setValue(optPtr + dOpt.height, options.height ?? 0, 'i32');
+    m.setValue(optPtr + dOpt.steps, options.numInferenceSteps ?? 0, 'i32');
+    m.setValue(optPtr + dOpt.guidanceScale, options.guidanceScale ?? -1, 'float');
     // seed is int64 — write low and high 32-bit halves
     const seed = options.seed ?? -1;
     m.setValue(optPtr + dOpt.seed, seed & 0xFFFFFFFF, 'i32');
     m.setValue(optPtr + dOpt.seed + 4, seed < 0 ? -1 : 0, 'i32');
-    m.setValue(optPtr + dOpt.scheduler, options.scheduler ?? DiffusionScheduler.DPM_PP_2M_Karras, 'i32');
-    m.setValue(optPtr + dOpt.mode, options.mode ?? DiffusionMode.TextToImage, 'i32');
-    m.setValue(optPtr + dOpt.denoiseStrength, options.denoiseStrength ?? 0.75, 'float');
-    m.setValue(optPtr + dOpt.reportIntermediate, options.reportIntermediateImages ? 1 : 0, 'i32');
+    const scheduler = toRacDiffusionScheduler(options.scheduler);
+    m.setValue(optPtr + dOpt.scheduler, scheduler, 'i32');
+    m.setValue(optPtr + dOpt.mode, toRacDiffusionMode(options.mode), 'i32');
+    m.setValue(optPtr + dOpt.denoiseStrength, 0.75, 'float');
+    m.setValue(optPtr + dOpt.reportIntermediate, 0, 'i32');
     m.setValue(optPtr + dOpt.progressStride, 1, 'i32');
 
     // Result struct: rac_diffusion_result_t
@@ -187,7 +264,7 @@ class DiffusionImpl {
       const safetyFlagged = m.getValue(resPtr + dRes.safetyFlagged, 'i32') === 1;
 
       // Copy RGBA image data
-      const imageData = new Uint8ClampedArray(imageSize);
+      const imageData = new Uint8Array(imageSize);
       if (imageDataPtr && imageSize > 0) {
         imageData.set(bridge.readBytes(imageDataPtr, imageSize));
       }
@@ -199,12 +276,33 @@ class DiffusionImpl {
         width, height, generationTimeMs,
       });
 
-      return { imageData, width, height, seedUsed, generationTimeMs, safetyFlagged };
+      return {
+        imageData,
+        width,
+        height,
+        seedUsed,
+        totalTimeMs: generationTimeMs,
+        safetyFlag: safetyFlagged,
+        usedScheduler: fromRacDiffusionScheduler(scheduler),
+        errorMessage: undefined,
+        errorCode: 0,
+      };
     } finally {
       bridge.free(promptPtr);
       if (negPromptPtr) bridge.free(negPromptPtr);
       m._free(optPtr);
     }
+  }
+
+  async generateImage(
+    prompt: string,
+    options: Partial<DiffusionGenerationOptions> = {},
+  ): Promise<DiffusionGenerationResult> {
+    return this.generate({ ...options, prompt });
+  }
+
+  async unloadDiffusionModel(): Promise<void> {
+    return this.unloadModel();
   }
 
   /** Cancel in-progress generation. */
@@ -213,6 +311,10 @@ class DiffusionImpl {
     LlamaCppBridge.shared.module.ccall(
       'rac_diffusion_component_cancel', 'number', ['number'], [this._diffusionComponentHandle],
     );
+  }
+
+  cancelImageGeneration(): void {
+    this.cancel();
   }
 
   /** Clean up the diffusion component. */

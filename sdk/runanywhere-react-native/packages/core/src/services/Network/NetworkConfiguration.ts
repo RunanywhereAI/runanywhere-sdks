@@ -60,6 +60,55 @@ export const DEFAULT_BASE_URL = 'https://api.runanywhere.ai';
  */
 export const DEFAULT_TIMEOUT_MS = 30000;
 
+const PLACEHOLDER_PATTERN = /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i;
+
+/**
+ * True for empty values and template strings such as
+ * `YOUR_SUPABASE_PROJECT_URL`.
+ */
+export function looksLikePlaceholder(value?: string | null): boolean {
+  return !value || value.trim().length === 0 || PLACEHOLDER_PATTERN.test(value);
+}
+
+/**
+ * Validate external HTTP endpoints before handing them to native transport.
+ */
+export function isUsableHttpUrl(value?: string | null): boolean {
+  if (looksLikePlaceholder(value)) {
+    return false;
+  }
+
+  const trimmed = value!.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return false;
+  }
+
+  const withoutScheme = trimmed.replace(/^https?:\/\//i, '');
+  const host = withoutScheme.split(/[/?#]/, 1)[0];
+  return host.length > 0 && !/[\s<>]/.test(host);
+}
+
+export function isUsableCredential(value?: string | null): boolean {
+  return !looksLikePlaceholder(value);
+}
+
+export function hasUsableBackendConfig(options: {
+  baseURL?: string | null;
+  apiKey?: string | null;
+}): boolean {
+  return isUsableHttpUrl(options.baseURL) && isUsableCredential(options.apiKey);
+}
+
+export function hasUsableSupabaseConfig(options: {
+  supabaseURL?: string | null;
+  supabaseKey?: string | null;
+}): boolean {
+  return (
+    isUsableHttpUrl(options.supabaseURL) &&
+    isUsableCredential(options.supabaseKey)
+  );
+}
+
 /**
  * Create network configuration from SDK init options
  */
@@ -79,16 +128,27 @@ export function createNetworkConfig(options: {
   }
 
   const supabase =
-    options.supabaseURL && options.supabaseKey
+    hasUsableSupabaseConfig({
+      supabaseURL: options.supabaseURL,
+      supabaseKey: options.supabaseKey,
+    })
       ? {
-          url: options.supabaseURL,
-          anonKey: options.supabaseKey,
-        }
+          url: options.supabaseURL!.trim(),
+          anonKey: options.supabaseKey!.trim(),
+      }
       : undefined;
 
+  const trimmedBaseURL = options.baseURL?.trim();
+  const baseURL =
+    trimmedBaseURL && trimmedBaseURL.length > 0
+      ? isUsableHttpUrl(trimmedBaseURL)
+        ? trimmedBaseURL
+        : undefined
+      : DEFAULT_BASE_URL;
+
   return {
-    baseURL: options.baseURL || DEFAULT_BASE_URL,
-    apiKey: options.apiKey,
+    baseURL,
+    apiKey: isUsableCredential(options.apiKey) ? options.apiKey.trim() : '',
     environment,
     supabase,
     timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,

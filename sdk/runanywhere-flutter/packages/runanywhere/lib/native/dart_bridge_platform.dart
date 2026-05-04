@@ -22,6 +22,7 @@ const int _exceptionalReturnInt32 = -183; // RAC_ERROR_FILE_NOT_FOUND
 const int _exceptionalReturnFalse = 0;
 
 /// Exceptional return value for int64 operations
+// ignore: unused_element
 const int _exceptionalReturnInt64 = 0;
 
 typedef _SysctlByNameNative = Int32 Function(
@@ -223,7 +224,7 @@ class DartBridgePlatform {
 // =============================================================================
 
 /// Logging callback - routes C++ logs to Dart logger
-/// 
+///
 /// NOTE: This callback is registered with NativeCallable.listener for thread safety.
 /// It runs asynchronously on the main isolate's event loop, which means by the time
 /// it executes, the C++ log message memory may have been freed. We handle this by
@@ -240,8 +241,9 @@ void _platformLogCallback(
     // Try to decode the message - may fail if memory was freed
     final msgString = message.toDartString();
     if (msgString.isEmpty) return;
-    
-    final categoryString = category != nullptr ? category.toDartString() : 'RAC';
+
+    final categoryString =
+        category != nullptr ? category.toDartString() : 'RAC';
 
     final logger = SDKLogger(categoryString);
 
@@ -492,6 +494,7 @@ Future<void> _deleteSecureStorage(String key) async {
 }
 
 /// Clock callback - returns current time in milliseconds
+// ignore: unused_element
 int _platformNowMsCallback(Pointer<Void> userData) {
   return DateTime.now().millisecondsSinceEpoch;
 }
@@ -522,9 +525,8 @@ int _getDarwinPhysicalMemoryBytes() {
   Pointer<Uint64>? sizePtr;
 
   try {
-    final sysctlByName = DynamicLibrary.process().lookupFunction<
-        _SysctlByNameNative,
-        _SysctlByNameDart>('sysctlbyname');
+    final sysctlByName = DynamicLibrary.process()
+        .lookupFunction<_SysctlByNameNative, _SysctlByNameDart>('sysctlbyname');
 
     namePtr = 'hw.memsize'.toNativeUtf8();
     outPtr = calloc<Uint64>();
@@ -636,6 +638,7 @@ void _platformTrackErrorCallback(
 
 int _httpDownloadCounter = 0;
 
+// ignore: unused_element
 int _platformHttpDownloadCallback(
   Pointer<Utf8> url,
   Pointer<Utf8> destinationPath,
@@ -659,8 +662,10 @@ int _platformHttpDownloadCallback(
     final taskId = 'http_${_httpDownloadCounter++}';
     outTaskId.value = taskId.toNativeUtf8();
 
-    final progressAddress = progressCallback == nullptr ? 0 : progressCallback.address;
-    final completeAddress = completeCallback == nullptr ? 0 : completeCallback.address;
+    final progressAddress =
+        progressCallback == nullptr ? 0 : progressCallback.address;
+    final completeAddress =
+        completeCallback == nullptr ? 0 : completeCallback.address;
     final userDataAddress = callbackUserData.address;
 
     unawaited(
@@ -681,6 +686,7 @@ int _platformHttpDownloadCallback(
   }
 }
 
+// ignore: unused_element
 int _platformHttpDownloadCancelCallback(
   Pointer<Utf8> taskId,
   Pointer<Void> userData,

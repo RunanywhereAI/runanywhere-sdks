@@ -11,8 +11,13 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/voice_agent_service.pb.dart'
+    as voice_agent_pb;
+import 'package:runanywhere/generated/voice_events.pb.dart' as voice_events_pb;
 import 'package:runanywhere/native/dart_bridge_llm.dart';
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
@@ -218,8 +223,8 @@ class DartBridgeVoiceAgent {
       }
 
       _logger.info('Voice agent STT model loaded: $modelId');
-      _eventController.add(const VoiceAgentModelLoadedEvent(
-          component: VoiceAgentComponent.stt));
+      _eventController.add(
+          const VoiceAgentModelLoadedEvent(component: VoiceAgentComponent.stt));
     } finally {
       calloc.free(pathPtr);
       calloc.free(idPtr);
@@ -244,8 +249,8 @@ class DartBridgeVoiceAgent {
       }
 
       _logger.info('Voice agent LLM model loaded: $modelId');
-      _eventController.add(const VoiceAgentModelLoadedEvent(
-          component: VoiceAgentComponent.llm));
+      _eventController.add(
+          const VoiceAgentModelLoadedEvent(component: VoiceAgentComponent.llm));
     } finally {
       calloc.free(pathPtr);
       calloc.free(idPtr);
@@ -270,8 +275,8 @@ class DartBridgeVoiceAgent {
       }
 
       _logger.info('Voice agent TTS voice loaded: $voiceId');
-      _eventController.add(const VoiceAgentModelLoadedEvent(
-          component: VoiceAgentComponent.tts));
+      _eventController.add(
+          const VoiceAgentModelLoadedEvent(component: VoiceAgentComponent.tts));
     } finally {
       calloc.free(pathPtr);
       calloc.free(idPtr);
@@ -279,6 +284,57 @@ class DartBridgeVoiceAgent {
   }
 
   // MARK: - Initialization
+
+  Future<voice_events_pb.VoiceAgentComponentStates> initializeProto(
+    voice_agent_pb.VoiceAgentComposeConfig config,
+  ) async {
+    final handle = await getHandle();
+    final fn = RacNative.bindings.rac_voice_agent_initialize_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_voice_agent_initialize_proto is unavailable');
+    }
+
+    final bytes = config.writeToBuffer();
+    final ptr = DartBridgeProtoUtils.copyBytes(bytes);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(handle, ptr, bytes.length, out);
+      DartBridgeProtoUtils.ensureSuccess(
+        out,
+        code,
+        'rac_voice_agent_initialize_proto',
+      );
+      _eventController.add(const VoiceAgentInitializedEvent());
+      return DartBridgeProtoUtils.decodeBuffer(
+        out,
+        voice_events_pb.VoiceAgentComponentStates.fromBuffer,
+      );
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(ptr);
+      calloc.free(out);
+    }
+  }
+
+  Future<voice_events_pb.VoiceAgentComponentStates>
+      componentStatesProto() async {
+    final handle = await getHandle();
+    final fn = RacNative.bindings.rac_voice_agent_component_states_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_voice_agent_component_states_proto is unavailable',
+      );
+    }
+    return DartBridgeProtoUtils.callOut<
+        voice_events_pb.VoiceAgentComponentStates>(
+      invoke: (out) => fn(handle, out),
+      decode: voice_events_pb.VoiceAgentComponentStates.fromBuffer,
+      symbol: 'rac_voice_agent_component_states_proto',
+    );
+  }
 
   /// Initialize voice agent with loaded models.
   ///
@@ -326,6 +382,48 @@ class DartBridgeVoiceAgent {
     final handleAddress = handle.address;
     return Isolate.run(
         () => _processVoiceTurnInIsolate(handleAddress, audioData));
+  }
+
+  Future<voice_agent_pb.VoiceAgentResult> processVoiceTurnProto(
+    Uint8List audioData,
+  ) async {
+    final handle = await getHandle();
+    if (!isReady) {
+      throw StateError(
+          'Voice agent not ready. Load models and initialize first.');
+    }
+
+    final fn = RacNative.bindings.rac_voice_agent_process_voice_turn_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_voice_agent_process_voice_turn_proto is unavailable',
+      );
+    }
+
+    final audioPtr = calloc<Uint8>(audioData.isEmpty ? 1 : audioData.length);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      if (audioData.isNotEmpty) {
+        audioPtr.asTypedList(audioData.length).setAll(0, audioData);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(handle, audioPtr.cast<Void>(), audioData.length, out);
+      DartBridgeProtoUtils.ensureSuccess(
+        out,
+        code,
+        'rac_voice_agent_process_voice_turn_proto',
+      );
+      return DartBridgeProtoUtils.decodeBuffer(
+        out,
+        voice_agent_pb.VoiceAgentResult.fromBuffer,
+      );
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(audioPtr);
+      calloc.free(out);
+    }
   }
 
   /// Static helper for processing voice turn in an isolate.

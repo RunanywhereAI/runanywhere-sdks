@@ -44,7 +44,7 @@ runanywhere-flutter/
 │       ├── ios/                  # RABackendONNX.xcframework + onnxruntime
 │       └── android/              # librac_backend_onnx.so + ONNX Runtime
 │
-├── melos.yaml                    # Multi-package management
+├── pubspec.yaml                  # Dart workspace + Melos management
 ├── scripts/                      # Build scripts
 └── analysis_options.yaml         # Shared lint rules
 ```
@@ -597,14 +597,15 @@ Libraries come from `runanywhere-commons`:
 
 ### 9.3 Melos Workflow
 
-Multi-package management via melos:
+Multi-package management via Melos. The workspace and Melos config live in the
+root `pubspec.yaml`, which is required by Melos 7 and Dart workspaces:
 
 ```bash
 melos bootstrap     # Install all package dependencies
-melos analyze       # Run flutter analyze on all packages
-melos format        # Run dart format on all packages
-melos test          # Run tests on all packages
-melos clean         # Clean all packages
+melos run analyze   # Run flutter analyze --no-pub on all packages
+melos run format    # Run dart format on all packages
+melos run test      # Run tests on all packages
+melos run clean     # Clean all packages
 ```
 
 ---

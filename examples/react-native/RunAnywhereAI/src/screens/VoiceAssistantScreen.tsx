@@ -47,8 +47,8 @@ import {
 import {
   PipelineState as VoiceEventPipelineState,
   VADEventType,
-} from '@runanywhere/proto-ts/dist/voice_events';
-import type { VoiceEvent } from '@runanywhere/proto-ts/dist/voice_events';
+} from '@runanywhere/proto-ts/voice_events';
+import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);

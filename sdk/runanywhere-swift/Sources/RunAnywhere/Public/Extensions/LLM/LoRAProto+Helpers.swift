@@ -55,3 +55,22 @@ extension RALoraCompatibilityResult {
         return r
     }
 }
+
+extension LoRAAdapterInfo {
+    public init(from proto: RALoRAAdapterInfo) {
+        self.init(
+            path: proto.adapterPath,
+            scale: proto.scale,
+            applied: proto.applied
+        )
+    }
+}
+
+extension LoraCompatibilityResult {
+    public init(from proto: RALoraCompatibilityResult) {
+        self.init(
+            isCompatible: proto.isCompatible,
+            error: proto.hasErrorMessage ? proto.errorMessage : nil
+        )
+    }
+}

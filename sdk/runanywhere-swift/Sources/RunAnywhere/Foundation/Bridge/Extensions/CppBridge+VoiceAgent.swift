@@ -51,6 +51,13 @@ extension CppBridge {
             return handle
         }
 
+        func requireExistingHandle() throws -> rac_voice_agent_handle_t {
+            guard let handle else {
+                throw SDKException.voiceAgent(.notInitialized, "Voice agent not initialized")
+            }
+            return handle
+        }
+
         // MARK: - State
 
         /// Check if voice agent is ready

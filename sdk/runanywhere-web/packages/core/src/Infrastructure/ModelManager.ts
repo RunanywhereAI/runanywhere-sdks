@@ -127,6 +127,12 @@ class ModelManagerImpl {
     void this.refreshDownloadStatus();
   }
 
+  unregisterModel(modelId: string): void {
+    this.state.removeLoadedModel(modelId);
+    this.registry.removeModel(modelId);
+    this.removeMetadata(modelId);
+  }
+
   setVLMLoader(loader: VLMLoader): void {
     this.vlmLoader = loader;
   }
@@ -196,6 +202,7 @@ class ModelManagerImpl {
   // --- Queries ---
 
   getModels(): ManagedModel[] { return this.registry.getModels(); }
+  getModel(modelId: string): ManagedModel | undefined { return this.registry.getModel(modelId); }
   getModelsByCategory(category: ModelCategory): ManagedModel[] { return this.registry.getModelsByCategory(category); }
   getModelsByFramework(framework: LLMFramework): ManagedModel[] { return this.registry.getModelsByFramework(framework); }
   getLLMModels(): ManagedModel[] { return this.registry.getLLMModels(); }
@@ -348,7 +355,7 @@ class ModelManagerImpl {
         const data = await this.downloader.loadFromOPFS(modelId);
         if (!data) throw new Error('Model not downloaded — please download the model first.');
         await this.loadTTSModel(model, data);
-      } else if (model.modality === ModelCategory.Audio) {
+      } else if (model.modality === ModelCategory.VoiceActivityDetection) {
         const data = await this.downloader.loadFromOPFS(modelId);
         if (!data) throw new Error('Model not downloaded — please download the model first.');
         await this.loadVADModel(model, data);
@@ -654,7 +661,7 @@ class ModelManagerImpl {
         await this.sttLoader?.unloadModel();
       } else if (category === ModelCategory.SpeechSynthesis) {
         await this.ttsLoader?.unloadVoice();
-      } else if (category === ModelCategory.Audio) {
+      } else if (category === ModelCategory.VoiceActivityDetection) {
         this.vadLoader?.cleanup();
       } else if (category === ModelCategory.Multimodal) {
         await this.vlmLoader?.unloadModel();

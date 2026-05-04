@@ -64,6 +64,231 @@ struct StoredModelDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StoredModelDefaultTypeInternal _StoredModel_default_instance_;
 
+inline constexpr StorageInfoRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        include_device_{false},
+        include_app_{false},
+        include_models_{false} {}
+
+template <typename>
+constexpr StorageInfoRequest::StorageInfoRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageInfoRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageInfoRequestDefaultTypeInternal {
+  constexpr StorageInfoRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageInfoRequestDefaultTypeInternal() {}
+  union {
+    StorageInfoRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageInfoRequestDefaultTypeInternal _StorageInfoRequest_default_instance_;
+
+inline constexpr StorageDeleteResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        deleted_model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.deleted_model_ids_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        deleted_model_ids_ {}
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        failed_model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.failed_model_ids_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        failed_model_ids_ {}
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.warnings_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_ {}
+        #endif
+        ,
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        deleted_bytes_{::int64_t{0}},
+        success_{false} {}
+
+template <typename>
+constexpr StorageDeleteResult::StorageDeleteResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageDeleteResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageDeleteResultDefaultTypeInternal {
+  constexpr StorageDeleteResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageDeleteResultDefaultTypeInternal() {}
+  union {
+    StorageDeleteResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageDeleteResultDefaultTypeInternal _StorageDeleteResult_default_instance_;
+
+inline constexpr StorageDeleteRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.model_ids_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_ {}
+        #endif
+        ,
+        delete_files_{false},
+        clear_registry_paths_{false},
+        unload_if_loaded_{false},
+        dry_run_{false} {}
+
+template <typename>
+constexpr StorageDeleteRequest::StorageDeleteRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageDeleteRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageDeleteRequestDefaultTypeInternal {
+  constexpr StorageDeleteRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageDeleteRequestDefaultTypeInternal() {}
+  union {
+    StorageDeleteRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageDeleteRequestDefaultTypeInternal _StorageDeleteRequest_default_instance_;
+
+inline constexpr StorageDeletePlanRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlanRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.model_ids_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_ {}
+        #endif
+        ,
+        required_bytes_{::int64_t{0}},
+        include_cache_{false},
+        oldest_first_{false} {}
+
+template <typename>
+constexpr StorageDeletePlanRequest::StorageDeletePlanRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageDeletePlanRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageDeletePlanRequestDefaultTypeInternal {
+  constexpr StorageDeletePlanRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageDeletePlanRequestDefaultTypeInternal() {}
+  union {
+    StorageDeletePlanRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageDeletePlanRequestDefaultTypeInternal _StorageDeletePlanRequest_default_instance_;
+
+inline constexpr StorageDeleteCandidate::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        local_path_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        reclaimable_bytes_{::int64_t{0}},
+        last_used_ms_{::int64_t{0}},
+        is_loaded_{false} {}
+
+template <typename>
+constexpr StorageDeleteCandidate::StorageDeleteCandidate(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageDeleteCandidate_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageDeleteCandidateDefaultTypeInternal {
+  constexpr StorageDeleteCandidateDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageDeleteCandidateDefaultTypeInternal() {}
+  union {
+    StorageDeleteCandidate _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageDeleteCandidateDefaultTypeInternal _StorageDeleteCandidate_default_instance_;
+
+inline constexpr StorageAvailabilityRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        required_bytes_{::int64_t{0}},
+        safety_margin_{0},
+        include_existing_model_bytes_{false} {}
+
+template <typename>
+constexpr StorageAvailabilityRequest::StorageAvailabilityRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageAvailabilityRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageAvailabilityRequestDefaultTypeInternal {
+  constexpr StorageAvailabilityRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageAvailabilityRequestDefaultTypeInternal() {}
+  union {
+    StorageAvailabilityRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageAvailabilityRequestDefaultTypeInternal _StorageAvailabilityRequest_default_instance_;
+
 inline constexpr StorageAvailability::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -223,6 +448,124 @@ struct StorageInfoDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageInfoDefaultTypeInternal _StorageInfo_default_instance_;
+
+inline constexpr StorageDeletePlan::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        candidates_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlan,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.candidates_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        candidates_ {}
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlan,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.warnings_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_ {}
+        #endif
+        ,
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        required_bytes_{::int64_t{0}},
+        reclaimable_bytes_{::int64_t{0}},
+        can_reclaim_required_bytes_{false} {}
+
+template <typename>
+constexpr StorageDeletePlan::StorageDeletePlan(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageDeletePlan_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageDeletePlanDefaultTypeInternal {
+  constexpr StorageDeletePlanDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageDeletePlanDefaultTypeInternal() {}
+  union {
+    StorageDeletePlan _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageDeletePlanDefaultTypeInternal _StorageDeletePlan_default_instance_;
+
+inline constexpr StorageAvailabilityResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageAvailabilityResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.warnings_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_ {}
+        #endif
+        ,
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        availability_{nullptr},
+        success_{false} {}
+
+template <typename>
+constexpr StorageAvailabilityResult::StorageAvailabilityResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageAvailabilityResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageAvailabilityResultDefaultTypeInternal {
+  constexpr StorageAvailabilityResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageAvailabilityResultDefaultTypeInternal() {}
+  union {
+    StorageAvailabilityResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageAvailabilityResultDefaultTypeInternal _StorageAvailabilityResult_default_instance_;
+
+inline constexpr StorageInfoResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        info_{nullptr},
+        success_{false} {}
+
+template <typename>
+constexpr StorageInfoResult::StorageInfoResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(StorageInfoResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct StorageInfoResultDefaultTypeInternal {
+  constexpr StorageInfoResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~StorageInfoResultDefaultTypeInternal() {}
+  union {
+    StorageInfoResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StorageInfoResultDefaultTypeInternal _StorageInfoResult_default_instance_;
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
@@ -302,6 +645,113 @@ const ::uint32_t
         3,
         2,
         4,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoRequest, _impl_._has_bits_),
+        6, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoRequest, _impl_.include_device_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoRequest, _impl_.include_app_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoRequest, _impl_.include_models_),
+        0,
+        1,
+        2,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoResult, _impl_._has_bits_),
+        6, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoResult, _impl_.success_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoResult, _impl_.info_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoResult, _impl_.error_message_),
+        2,
+        1,
+        0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.model_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.required_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.safety_margin_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.include_existing_model_bytes_),
+        0,
+        1,
+        2,
+        3,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.success_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.availability_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.warnings_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.error_message_),
+        3,
+        2,
+        0,
+        1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.model_ids_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.required_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.include_cache_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.oldest_first_),
+        0,
+        1,
+        2,
+        3,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.model_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.reclaimable_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.last_used_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.is_loaded_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.local_path_),
+        0,
+        2,
+        3,
+        4,
+        1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_._has_bits_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.can_reclaim_required_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.required_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.reclaimable_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.candidates_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.warnings_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.error_message_),
+        5,
+        3,
+        4,
+        0,
+        1,
+        2,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.model_ids_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.delete_files_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.clear_registry_paths_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.unload_if_loaded_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.dry_run_),
+        0,
+        1,
+        2,
+        3,
+        4,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_._has_bits_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.success_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.deleted_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.deleted_model_ids_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.failed_model_ids_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.warnings_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.error_message_),
+        5,
+        4,
+        0,
+        1,
+        2,
+        3,
 };
 
 static const ::_pbi::MigrationSchema
@@ -312,6 +762,15 @@ static const ::_pbi::MigrationSchema
         {31, sizeof(::runanywhere::v1::StorageInfo)},
         {44, sizeof(::runanywhere::v1::StorageAvailability)},
         {57, sizeof(::runanywhere::v1::StoredModel)},
+        {70, sizeof(::runanywhere::v1::StorageInfoRequest)},
+        {79, sizeof(::runanywhere::v1::StorageInfoResult)},
+        {88, sizeof(::runanywhere::v1::StorageAvailabilityRequest)},
+        {99, sizeof(::runanywhere::v1::StorageAvailabilityResult)},
+        {110, sizeof(::runanywhere::v1::StorageDeletePlanRequest)},
+        {121, sizeof(::runanywhere::v1::StorageDeleteCandidate)},
+        {134, sizeof(::runanywhere::v1::StorageDeletePlan)},
+        {149, sizeof(::runanywhere::v1::StorageDeleteRequest)},
+        {162, sizeof(::runanywhere::v1::StorageDeleteResult)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_DeviceStorageInfo_default_instance_._instance,
@@ -320,6 +779,15 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_StorageInfo_default_instance_._instance,
     &::runanywhere::v1::_StorageAvailability_default_instance_._instance,
     &::runanywhere::v1::_StoredModel_default_instance_._instance,
+    &::runanywhere::v1::_StorageInfoRequest_default_instance_._instance,
+    &::runanywhere::v1::_StorageInfoResult_default_instance_._instance,
+    &::runanywhere::v1::_StorageAvailabilityRequest_default_instance_._instance,
+    &::runanywhere::v1::_StorageAvailabilityResult_default_instance_._instance,
+    &::runanywhere::v1::_StorageDeletePlanRequest_default_instance_._instance,
+    &::runanywhere::v1::_StorageDeleteCandidate_default_instance_._instance,
+    &::runanywhere::v1::_StorageDeletePlan_default_instance_._instance,
+    &::runanywhere::v1::_StorageDeleteRequest_default_instance_._instance,
+    &::runanywhere::v1::_StorageDeleteResult_default_instance_._instance,
 };
 const char descriptor_table_protodef_storage_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -345,29 +813,60 @@ const char descriptor_table_protodef_storage_5ftypes_2eproto[] ABSL_ATTRIBUTE_SE
     "recommendation\"\211\001\n\013StoredModel\022\020\n\010model_"
     "id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\022\n\nsize_bytes\030\003 \001"
     "(\003\022\022\n\nlocal_path\030\004 \001(\t\022\035\n\020downloaded_at_"
-    "ms\030\005 \001(\003H\000\210\001\001B\023\n\021_downloaded_at_ms*\327\001\n\007N"
-    "PUChip\022\030\n\024NPU_CHIP_UNSPECIFIED\020\000\022\021\n\rNPU_"
-    "CHIP_NONE\020\001\022 \n\034NPU_CHIP_APPLE_NEURAL_ENG"
-    "INE\020\002\022\035\n\031NPU_CHIP_QUALCOMM_HEXAGON\020\003\022\031\n\025"
-    "NPU_CHIP_MEDIATEK_APU\020\004\022\027\n\023NPU_CHIP_GOOG"
-    "LE_TPU\020\005\022\026\n\022NPU_CHIP_INTEL_NPU\020\006\022\022\n\016NPU_"
-    "CHIP_OTHER\020cB\214\001\n\027ai.runanywhere.proto.v1"
-    "B\021StorageTypesProtoP\001Z<github.com/runany"
-    "where/runanywhere-sdks/idl/v1;runanywher"
-    "ev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
-    "to3"
+    "ms\030\005 \001(\003H\000\210\001\001B\023\n\021_downloaded_at_ms\"Y\n\022St"
+    "orageInfoRequest\022\026\n\016include_device\030\001 \001(\010"
+    "\022\023\n\013include_app\030\002 \001(\010\022\026\n\016include_models\030"
+    "\003 \001(\010\"f\n\021StorageInfoResult\022\017\n\007success\030\001 "
+    "\001(\010\022)\n\004info\030\002 \001(\0132\033.runanywhere.v1.Stora"
+    "geInfo\022\025\n\rerror_message\030\003 \001(\t\"\203\001\n\032Storag"
+    "eAvailabilityRequest\022\020\n\010model_id\030\001 \001(\t\022\026"
+    "\n\016required_bytes\030\002 \001(\003\022\025\n\rsafety_margin\030"
+    "\003 \001(\001\022$\n\034include_existing_model_bytes\030\004 "
+    "\001(\010\"\220\001\n\031StorageAvailabilityResult\022\017\n\007suc"
+    "cess\030\001 \001(\010\0229\n\014availability\030\002 \001(\0132#.runan"
+    "ywhere.v1.StorageAvailability\022\020\n\010warning"
+    "s\030\003 \003(\t\022\025\n\rerror_message\030\004 \001(\t\"r\n\030Storag"
+    "eDeletePlanRequest\022\021\n\tmodel_ids\030\001 \003(\t\022\026\n"
+    "\016required_bytes\030\002 \001(\003\022\025\n\rinclude_cache\030\003"
+    " \001(\010\022\024\n\014oldest_first\030\004 \001(\010\"\230\001\n\026StorageDe"
+    "leteCandidate\022\020\n\010model_id\030\001 \001(\t\022\031\n\021recla"
+    "imable_bytes\030\002 \001(\003\022\031\n\014last_used_ms\030\003 \001(\003"
+    "H\000\210\001\001\022\021\n\tis_loaded\030\004 \001(\010\022\022\n\nlocal_path\030\005"
+    " \001(\tB\017\n\r_last_used_ms\"\317\001\n\021StorageDeleteP"
+    "lan\022\"\n\032can_reclaim_required_bytes\030\001 \001(\010\022"
+    "\026\n\016required_bytes\030\002 \001(\003\022\031\n\021reclaimable_b"
+    "ytes\030\003 \001(\003\022:\n\ncandidates\030\004 \003(\0132&.runanyw"
+    "here.v1.StorageDeleteCandidate\022\020\n\010warnin"
+    "gs\030\005 \003(\t\022\025\n\rerror_message\030\006 \001(\t\"\210\001\n\024Stor"
+    "ageDeleteRequest\022\021\n\tmodel_ids\030\001 \003(\t\022\024\n\014d"
+    "elete_files\030\002 \001(\010\022\034\n\024clear_registry_path"
+    "s\030\003 \001(\010\022\030\n\020unload_if_loaded\030\004 \001(\010\022\017\n\007dry"
+    "_run\030\005 \001(\010\"\233\001\n\023StorageDeleteResult\022\017\n\007su"
+    "ccess\030\001 \001(\010\022\025\n\rdeleted_bytes\030\002 \001(\003\022\031\n\021de"
+    "leted_model_ids\030\003 \003(\t\022\030\n\020failed_model_id"
+    "s\030\004 \003(\t\022\020\n\010warnings\030\005 \003(\t\022\025\n\rerror_messa"
+    "ge\030\006 \001(\t*\327\001\n\007NPUChip\022\030\n\024NPU_CHIP_UNSPECI"
+    "FIED\020\000\022\021\n\rNPU_CHIP_NONE\020\001\022 \n\034NPU_CHIP_AP"
+    "PLE_NEURAL_ENGINE\020\002\022\035\n\031NPU_CHIP_QUALCOMM"
+    "_HEXAGON\020\003\022\031\n\025NPU_CHIP_MEDIATEK_APU\020\004\022\027\n"
+    "\023NPU_CHIP_GOOGLE_TPU\020\005\022\026\n\022NPU_CHIP_INTEL"
+    "_NPU\020\006\022\022\n\016NPU_CHIP_OTHER\020cB\214\001\n\027ai.runany"
+    "where.proto.v1B\021StorageTypesProtoP\001Z<git"
+    "hub.com/runanywhere/runanywhere-sdks/idl"
+    "/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywher"
+    "e.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_storage_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_storage_5ftypes_2eproto = {
     false,
     false,
-    1283,
+    2537,
     descriptor_table_protodef_storage_5ftypes_2eproto,
     "storage_types.proto",
     &descriptor_table_storage_5ftypes_2eproto_once,
     nullptr,
     0,
-    6,
+    15,
     schemas,
     file_default_instances,
     TableStruct_storage_5ftypes_2eproto::offsets,
@@ -2724,6 +3223,3817 @@ void StoredModel::InternalSwap(StoredModel* PROTOBUF_RESTRICT PROTOBUF_NONNULL o
 }
 
 ::google::protobuf::Metadata StoredModel::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageInfoRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageInfoRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_._has_bits_);
+};
+
+StorageInfoRequest::StorageInfoRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageInfoRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageInfoRequest)
+}
+StorageInfoRequest::StorageInfoRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const StorageInfoRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageInfoRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(from._impl_) {
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+PROTOBUF_NDEBUG_INLINE StorageInfoRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0} {}
+
+inline void StorageInfoRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, include_device_),
+           0,
+           offsetof(Impl_, include_models_) -
+               offsetof(Impl_, include_device_) +
+               sizeof(Impl_::include_models_));
+}
+StorageInfoRequest::~StorageInfoRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageInfoRequest)
+  SharedDtor(*this);
+}
+inline void StorageInfoRequest::SharedDtor(MessageLite& self) {
+  StorageInfoRequest& this_ = static_cast<StorageInfoRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageInfoRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageInfoRequest(arena);
+}
+constexpr auto StorageInfoRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(StorageInfoRequest),
+                                            alignof(StorageInfoRequest));
+}
+constexpr auto StorageInfoRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageInfoRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageInfoRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageInfoRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageInfoRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageInfoRequest>(), &StorageInfoRequest::ByteSizeLong,
+              &StorageInfoRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_._cached_size_),
+          false,
+      },
+      &StorageInfoRequest::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageInfoRequest_class_data_ =
+        StorageInfoRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageInfoRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageInfoRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageInfoRequest_class_data_.tc_table);
+  return StorageInfoRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 3, 0, 0, 2>
+StorageInfoRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    3, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967288,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    3,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    StorageInfoRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfoRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // bool include_device = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageInfoRequest, _impl_.include_device_), 0>(),
+     {8, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_device_)}},
+    // bool include_app = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageInfoRequest, _impl_.include_app_), 1>(),
+     {16, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_app_)}},
+    // bool include_models = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageInfoRequest, _impl_.include_models_), 2>(),
+     {24, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_models_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool include_device = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_device_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool include_app = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_app_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool include_models = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_models_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+PROTOBUF_NOINLINE void StorageInfoRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageInfoRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  ::memset(&_impl_.include_device_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.include_models_) -
+      reinterpret_cast<char*>(&_impl_.include_device_)) + sizeof(_impl_.include_models_));
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageInfoRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageInfoRequest& this_ = static_cast<const StorageInfoRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageInfoRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageInfoRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageInfoRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool include_device = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (this_._internal_include_device() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_include_device(), target);
+    }
+  }
+
+  // bool include_app = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_include_app() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_include_app(), target);
+    }
+  }
+
+  // bool include_models = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_include_models() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          3, this_._internal_include_models(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageInfoRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageInfoRequest::ByteSizeLong(const MessageLite& base) {
+  const StorageInfoRequest& this_ = static_cast<const StorageInfoRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageInfoRequest::ByteSizeLong() const {
+  const StorageInfoRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageInfoRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // bool include_device = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (this_._internal_include_device() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool include_app = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_include_app() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool include_models = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_include_models() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageInfoRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageInfoRequest*>(&to_msg);
+  auto& from = static_cast<const StorageInfoRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageInfoRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (from._internal_include_device() != 0) {
+        _this->_impl_.include_device_ = from._impl_.include_device_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_include_app() != 0) {
+        _this->_impl_.include_app_ = from._impl_.include_app_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_include_models() != 0) {
+        _this->_impl_.include_models_ = from._impl_.include_models_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageInfoRequest::CopyFrom(const StorageInfoRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageInfoRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageInfoRequest::InternalSwap(StorageInfoRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_models_)
+      + sizeof(StorageInfoRequest::_impl_.include_models_)
+      - PROTOBUF_FIELD_OFFSET(StorageInfoRequest, _impl_.include_device_)>(
+          reinterpret_cast<char*>(&_impl_.include_device_),
+          reinterpret_cast<char*>(&other->_impl_.include_device_));
+}
+
+::google::protobuf::Metadata StorageInfoRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageInfoResult::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageInfoResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._has_bits_);
+};
+
+StorageInfoResult::StorageInfoResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageInfoResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageInfoResult)
+}
+PROTOBUF_NDEBUG_INLINE StorageInfoResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageInfoResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        error_message_(arena, from.error_message_) {}
+
+StorageInfoResult::StorageInfoResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageInfoResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageInfoResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageInfoResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.info_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.info_)
+                : nullptr;
+  _impl_.success_ = from._impl_.success_;
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageInfoResult)
+}
+PROTOBUF_NDEBUG_INLINE StorageInfoResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        error_message_(arena) {}
+
+inline void StorageInfoResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, info_),
+           0,
+           offsetof(Impl_, success_) -
+               offsetof(Impl_, info_) +
+               sizeof(Impl_::success_));
+}
+StorageInfoResult::~StorageInfoResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageInfoResult)
+  SharedDtor(*this);
+}
+inline void StorageInfoResult::SharedDtor(MessageLite& self) {
+  StorageInfoResult& this_ = static_cast<StorageInfoResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.info_;
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageInfoResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageInfoResult(arena);
+}
+constexpr auto StorageInfoResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageInfoResult),
+                                            alignof(StorageInfoResult));
+}
+constexpr auto StorageInfoResult::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageInfoResult_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageInfoResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageInfoResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageInfoResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageInfoResult>(), &StorageInfoResult::ByteSizeLong,
+              &StorageInfoResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._cached_size_),
+          false,
+      },
+      &StorageInfoResult::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageInfoResult_class_data_ =
+        StorageInfoResult::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageInfoResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageInfoResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageInfoResult_class_data_.tc_table);
+  return StorageInfoResult_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 3, 1, 54, 2>
+StorageInfoResult::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._has_bits_),
+    0, // no _extensions_
+    3, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967288,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    3,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
+    StorageInfoResult_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfoResult>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // bool success = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageInfoResult, _impl_.success_), 2>(),
+     {8, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.success_)}},
+    // .runanywhere.v1.StorageInfo info = 2;
+    {::_pbi::TcParser::FastMtS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_)}},
+    // string error_message = 3;
+    {::_pbi::TcParser::FastUS1,
+     {26, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.error_message_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool success = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.success_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // .runanywhere.v1.StorageInfo info = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    // string error_message = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  {{
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfo>()},
+  }},
+  {{
+    "\40\0\0\15\0\0\0\0"
+    "runanywhere.v1.StorageInfoResult"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void StorageInfoResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageInfoResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      ABSL_DCHECK(_impl_.info_ != nullptr);
+      _impl_.info_->Clear();
+    }
+  }
+  _impl_.success_ = false;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageInfoResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageInfoResult& this_ = static_cast<const StorageInfoResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageInfoResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageInfoResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageInfoResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool success = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_success() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_success(), target);
+    }
+  }
+
+  // .runanywhere.v1.StorageInfo info = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        2, *this_._impl_.info_, this_._impl_.info_->GetCachedSize(), target,
+        stream);
+  }
+
+  // string error_message = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_error_message().empty()) {
+      const ::std::string& _s = this_._internal_error_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageInfoResult.error_message");
+      target = stream->WriteStringMaybeAliased(3, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageInfoResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageInfoResult::ByteSizeLong(const MessageLite& base) {
+  const StorageInfoResult& this_ = static_cast<const StorageInfoResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageInfoResult::ByteSizeLong() const {
+  const StorageInfoResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageInfoResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // string error_message = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_error_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_error_message());
+      }
+    }
+    // .runanywhere.v1.StorageInfo info = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.info_);
+    }
+    // bool success = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_success() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageInfoResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageInfoResult*>(&to_msg);
+  auto& from = static_cast<const StorageInfoResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageInfoResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_error_message().empty()) {
+        _this->_internal_set_error_message(from._internal_error_message());
+      } else {
+        if (_this->_impl_.error_message_.IsDefault()) {
+          _this->_internal_set_error_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      ABSL_DCHECK(from._impl_.info_ != nullptr);
+      if (_this->_impl_.info_ == nullptr) {
+        _this->_impl_.info_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.info_);
+      } else {
+        _this->_impl_.info_->MergeFrom(*from._impl_.info_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_success() != 0) {
+        _this->_impl_.success_ = from._impl_.success_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageInfoResult::CopyFrom(const StorageInfoResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageInfoResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageInfoResult::InternalSwap(StorageInfoResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.success_)
+      + sizeof(StorageInfoResult::_impl_.success_)
+      - PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_)>(
+          reinterpret_cast<char*>(&_impl_.info_),
+          reinterpret_cast<char*>(&other->_impl_.info_));
+}
+
+::google::protobuf::Metadata StorageInfoResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageAvailabilityRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageAvailabilityRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_._has_bits_);
+};
+
+StorageAvailabilityRequest::StorageAvailabilityRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageAvailabilityRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageAvailabilityRequest)
+}
+PROTOBUF_NDEBUG_INLINE StorageAvailabilityRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageAvailabilityRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        model_id_(arena, from.model_id_) {}
+
+StorageAvailabilityRequest::StorageAvailabilityRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageAvailabilityRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageAvailabilityRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageAvailabilityRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, required_bytes_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, required_bytes_),
+           offsetof(Impl_, include_existing_model_bytes_) -
+               offsetof(Impl_, required_bytes_) +
+               sizeof(Impl_::include_existing_model_bytes_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageAvailabilityRequest)
+}
+PROTOBUF_NDEBUG_INLINE StorageAvailabilityRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        model_id_(arena) {}
+
+inline void StorageAvailabilityRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, required_bytes_),
+           0,
+           offsetof(Impl_, include_existing_model_bytes_) -
+               offsetof(Impl_, required_bytes_) +
+               sizeof(Impl_::include_existing_model_bytes_));
+}
+StorageAvailabilityRequest::~StorageAvailabilityRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageAvailabilityRequest)
+  SharedDtor(*this);
+}
+inline void StorageAvailabilityRequest::SharedDtor(MessageLite& self) {
+  StorageAvailabilityRequest& this_ = static_cast<StorageAvailabilityRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.model_id_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageAvailabilityRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageAvailabilityRequest(arena);
+}
+constexpr auto StorageAvailabilityRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageAvailabilityRequest),
+                                            alignof(StorageAvailabilityRequest));
+}
+constexpr auto StorageAvailabilityRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageAvailabilityRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageAvailabilityRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageAvailabilityRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageAvailabilityRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageAvailabilityRequest>(), &StorageAvailabilityRequest::ByteSizeLong,
+              &StorageAvailabilityRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_._cached_size_),
+          false,
+      },
+      &StorageAvailabilityRequest::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageAvailabilityRequest_class_data_ =
+        StorageAvailabilityRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageAvailabilityRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageAvailabilityRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageAvailabilityRequest_class_data_.tc_table);
+  return StorageAvailabilityRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 58, 2>
+StorageAvailabilityRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    StorageAvailabilityRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageAvailabilityRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // bool include_existing_model_bytes = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageAvailabilityRequest, _impl_.include_existing_model_bytes_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.include_existing_model_bytes_)}},
+    // string model_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.model_id_)}},
+    // int64 required_bytes = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageAvailabilityRequest, _impl_.required_bytes_), 1>(),
+     {16, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_bytes_)}},
+    // double safety_margin = 3;
+    {::_pbi::TcParser::FastF64S1,
+     {25, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.safety_margin_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string model_id = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int64 required_bytes = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_bytes_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // double safety_margin = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.safety_margin_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+    // bool include_existing_model_bytes = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.include_existing_model_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+  }},
+  // no aux_entries
+  {{
+    "\51\10\0\0\0\0\0\0"
+    "runanywhere.v1.StorageAvailabilityRequest"
+    "model_id"
+  }},
+};
+PROTOBUF_NOINLINE void StorageAvailabilityRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageAvailabilityRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.model_id_.ClearNonDefaultToEmpty();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
+    ::memset(&_impl_.required_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.include_existing_model_bytes_) -
+        reinterpret_cast<char*>(&_impl_.required_bytes_)) + sizeof(_impl_.include_existing_model_bytes_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageAvailabilityRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageAvailabilityRequest& this_ = static_cast<const StorageAvailabilityRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageAvailabilityRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageAvailabilityRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageAvailabilityRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string model_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_model_id().empty()) {
+      const ::std::string& _s = this_._internal_model_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageAvailabilityRequest.model_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // int64 required_bytes = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_required_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_required_bytes(), target);
+    }
+  }
+
+  // double safety_margin = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (::absl::bit_cast<::uint64_t>(this_._internal_safety_margin()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
+          3, this_._internal_safety_margin(), target);
+    }
+  }
+
+  // bool include_existing_model_bytes = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_include_existing_model_bytes() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_include_existing_model_bytes(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageAvailabilityRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageAvailabilityRequest::ByteSizeLong(const MessageLite& base) {
+  const StorageAvailabilityRequest& this_ = static_cast<const StorageAvailabilityRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageAvailabilityRequest::ByteSizeLong() const {
+  const StorageAvailabilityRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageAvailabilityRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // string model_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_model_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_model_id());
+      }
+    }
+    // int64 required_bytes = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_required_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_required_bytes());
+      }
+    }
+    // double safety_margin = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (::absl::bit_cast<::uint64_t>(this_._internal_safety_margin()) != 0) {
+        total_size += 9;
+      }
+    }
+    // bool include_existing_model_bytes = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_include_existing_model_bytes() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageAvailabilityRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageAvailabilityRequest*>(&to_msg);
+  auto& from = static_cast<const StorageAvailabilityRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageAvailabilityRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_model_id().empty()) {
+        _this->_internal_set_model_id(from._internal_model_id());
+      } else {
+        if (_this->_impl_.model_id_.IsDefault()) {
+          _this->_internal_set_model_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_required_bytes() != 0) {
+        _this->_impl_.required_bytes_ = from._impl_.required_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (::absl::bit_cast<::uint64_t>(from._internal_safety_margin()) != 0) {
+        _this->_impl_.safety_margin_ = from._impl_.safety_margin_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_include_existing_model_bytes() != 0) {
+        _this->_impl_.include_existing_model_bytes_ = from._impl_.include_existing_model_bytes_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageAvailabilityRequest::CopyFrom(const StorageAvailabilityRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageAvailabilityRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageAvailabilityRequest::InternalSwap(StorageAvailabilityRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.include_existing_model_bytes_)
+      + sizeof(StorageAvailabilityRequest::_impl_.include_existing_model_bytes_)
+      - PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_bytes_)>(
+          reinterpret_cast<char*>(&_impl_.required_bytes_),
+          reinterpret_cast<char*>(&other->_impl_.required_bytes_));
+}
+
+::google::protobuf::Metadata StorageAvailabilityRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageAvailabilityResult::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageAvailabilityResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_._has_bits_);
+};
+
+StorageAvailabilityResult::StorageAvailabilityResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageAvailabilityResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageAvailabilityResult)
+}
+PROTOBUF_NDEBUG_INLINE StorageAvailabilityResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageAvailabilityResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageAvailabilityResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.warnings_)>()
+        , from.warnings_}
+        #else
+        warnings_ { visibility, arena, from.warnings_ }
+        #endif
+        ,
+        error_message_(arena, from.error_message_) {}
+
+StorageAvailabilityResult::StorageAvailabilityResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageAvailabilityResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageAvailabilityResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageAvailabilityResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.availability_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.availability_)
+                : nullptr;
+  _impl_.success_ = from._impl_.success_;
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageAvailabilityResult)
+}
+PROTOBUF_NDEBUG_INLINE StorageAvailabilityResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageAvailabilityResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityResult, _impl_.warnings_)>()
+        }
+        #else
+        warnings_ { visibility, arena }
+        #endif
+        ,
+        error_message_(arena) {}
+
+inline void StorageAvailabilityResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, availability_),
+           0,
+           offsetof(Impl_, success_) -
+               offsetof(Impl_, availability_) +
+               sizeof(Impl_::success_));
+}
+StorageAvailabilityResult::~StorageAvailabilityResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageAvailabilityResult)
+  SharedDtor(*this);
+}
+inline void StorageAvailabilityResult::SharedDtor(MessageLite& self) {
+  StorageAvailabilityResult& this_ = static_cast<StorageAvailabilityResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.availability_;
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageAvailabilityResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageAvailabilityResult(arena);
+}
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageAvailabilityResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageAvailabilityResult),
+                                            alignof(StorageAvailabilityResult));
+}
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageAvailabilityResult::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.warnings_) +
+          decltype(StorageAvailabilityResult::_impl_.warnings_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(StorageAvailabilityResult), alignof(StorageAvailabilityResult), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&StorageAvailabilityResult::PlacementNew_,
+                                 sizeof(StorageAvailabilityResult),
+                                 alignof(StorageAvailabilityResult));
+  }
+}
+#endif
+constexpr auto StorageAvailabilityResult::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageAvailabilityResult_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageAvailabilityResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageAvailabilityResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageAvailabilityResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageAvailabilityResult>(), &StorageAvailabilityResult::ByteSizeLong,
+              &StorageAvailabilityResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_._cached_size_),
+          false,
+      },
+      &StorageAvailabilityResult::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageAvailabilityResult_class_data_ =
+        StorageAvailabilityResult::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageAvailabilityResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageAvailabilityResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageAvailabilityResult_class_data_.tc_table);
+  return StorageAvailabilityResult_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 1, 70, 2>
+StorageAvailabilityResult::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
+    StorageAvailabilityResult_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageAvailabilityResult>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string error_message = 4;
+    {::_pbi::TcParser::FastUS1,
+     {34, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.error_message_)}},
+    // bool success = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageAvailabilityResult, _impl_.success_), 3>(),
+     {8, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.success_)}},
+    // .runanywhere.v1.StorageAvailability availability = 2;
+    {::_pbi::TcParser::FastMtS1,
+     {18, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.availability_)}},
+    // repeated string warnings = 3;
+    {::_pbi::TcParser::FastUR1,
+     {26, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.warnings_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool success = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.success_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // .runanywhere.v1.StorageAvailability availability = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.availability_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    // repeated string warnings = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.warnings_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // string error_message = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  {{
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::StorageAvailability>()},
+  }},
+  {{
+    "\50\0\0\10\15\0\0\0"
+    "runanywhere.v1.StorageAvailabilityResult"
+    "warnings"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void StorageAvailabilityResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageAvailabilityResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.warnings_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      ABSL_DCHECK(_impl_.availability_ != nullptr);
+      _impl_.availability_->Clear();
+    }
+  }
+  _impl_.success_ = false;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageAvailabilityResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageAvailabilityResult& this_ = static_cast<const StorageAvailabilityResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageAvailabilityResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageAvailabilityResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageAvailabilityResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool success = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_success() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_success(), target);
+    }
+  }
+
+  // .runanywhere.v1.StorageAvailability availability = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        2, *this_._impl_.availability_, this_._impl_.availability_->GetCachedSize(), target,
+        stream);
+  }
+
+  // repeated string warnings = 3;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (int i = 0, n = this_._internal_warnings_size(); i < n; ++i) {
+      const auto& s = this_._internal_warnings().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageAvailabilityResult.warnings");
+      target = stream->WriteString(3, s, target);
+    }
+  }
+
+  // string error_message = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_error_message().empty()) {
+      const ::std::string& _s = this_._internal_error_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageAvailabilityResult.error_message");
+      target = stream->WriteStringMaybeAliased(4, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageAvailabilityResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageAvailabilityResult::ByteSizeLong(const MessageLite& base) {
+  const StorageAvailabilityResult& this_ = static_cast<const StorageAvailabilityResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageAvailabilityResult::ByteSizeLong() const {
+  const StorageAvailabilityResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageAvailabilityResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // repeated string warnings = 3;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_warnings().size());
+      for (int i = 0, n = this_._internal_warnings().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_warnings().Get(i));
+      }
+    }
+    // string error_message = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_error_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_error_message());
+      }
+    }
+    // .runanywhere.v1.StorageAvailability availability = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.availability_);
+    }
+    // bool success = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_success() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageAvailabilityResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageAvailabilityResult*>(&to_msg);
+  auto& from = static_cast<const StorageAvailabilityResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageAvailabilityResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_warnings()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_warnings());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_error_message().empty()) {
+        _this->_internal_set_error_message(from._internal_error_message());
+      } else {
+        if (_this->_impl_.error_message_.IsDefault()) {
+          _this->_internal_set_error_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      ABSL_DCHECK(from._impl_.availability_ != nullptr);
+      if (_this->_impl_.availability_ == nullptr) {
+        _this->_impl_.availability_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.availability_);
+      } else {
+        _this->_impl_.availability_->MergeFrom(*from._impl_.availability_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_success() != 0) {
+        _this->_impl_.success_ = from._impl_.success_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageAvailabilityResult::CopyFrom(const StorageAvailabilityResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageAvailabilityResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageAvailabilityResult::InternalSwap(StorageAvailabilityResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.warnings_.InternalSwap(&other->_impl_.warnings_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.success_)
+      + sizeof(StorageAvailabilityResult::_impl_.success_)
+      - PROTOBUF_FIELD_OFFSET(StorageAvailabilityResult, _impl_.availability_)>(
+          reinterpret_cast<char*>(&_impl_.availability_),
+          reinterpret_cast<char*>(&other->_impl_.availability_));
+}
+
+::google::protobuf::Metadata StorageAvailabilityResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageDeletePlanRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageDeletePlanRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_._has_bits_);
+};
+
+StorageDeletePlanRequest::StorageDeletePlanRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeletePlanRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageDeletePlanRequest)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeletePlanRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageDeletePlanRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlanRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.model_ids_)>()
+        , from.model_ids_}
+        #else
+        model_ids_ { visibility, arena, from.model_ids_ }
+        #endif
+     {}
+
+StorageDeletePlanRequest::StorageDeletePlanRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageDeletePlanRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeletePlanRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageDeletePlanRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, required_bytes_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, required_bytes_),
+           offsetof(Impl_, oldest_first_) -
+               offsetof(Impl_, required_bytes_) +
+               sizeof(Impl_::oldest_first_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeletePlanRequest)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeletePlanRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlanRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlanRequest, _impl_.model_ids_)>()
+        }
+        #else
+        model_ids_ { visibility, arena }
+        #endif
+     {}
+
+inline void StorageDeletePlanRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, required_bytes_),
+           0,
+           offsetof(Impl_, oldest_first_) -
+               offsetof(Impl_, required_bytes_) +
+               sizeof(Impl_::oldest_first_));
+}
+StorageDeletePlanRequest::~StorageDeletePlanRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageDeletePlanRequest)
+  SharedDtor(*this);
+}
+inline void StorageDeletePlanRequest::SharedDtor(MessageLite& self) {
+  StorageDeletePlanRequest& this_ = static_cast<StorageDeletePlanRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageDeletePlanRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageDeletePlanRequest(arena);
+}
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeletePlanRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageDeletePlanRequest),
+                                            alignof(StorageDeletePlanRequest));
+}
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeletePlanRequest::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.model_ids_) +
+          decltype(StorageDeletePlanRequest::_impl_.model_ids_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::ZeroInit(
+        sizeof(StorageDeletePlanRequest), alignof(StorageDeletePlanRequest), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&StorageDeletePlanRequest::PlacementNew_,
+                                 sizeof(StorageDeletePlanRequest),
+                                 alignof(StorageDeletePlanRequest));
+  }
+}
+#endif
+constexpr auto StorageDeletePlanRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageDeletePlanRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageDeletePlanRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageDeletePlanRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageDeletePlanRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageDeletePlanRequest>(), &StorageDeletePlanRequest::ByteSizeLong,
+              &StorageDeletePlanRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_._cached_size_),
+          false,
+      },
+      &StorageDeletePlanRequest::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageDeletePlanRequest_class_data_ =
+        StorageDeletePlanRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageDeletePlanRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageDeletePlanRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageDeletePlanRequest_class_data_.tc_table);
+  return StorageDeletePlanRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 57, 2>
+StorageDeletePlanRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    StorageDeletePlanRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageDeletePlanRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // bool oldest_first = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeletePlanRequest, _impl_.oldest_first_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.oldest_first_)}},
+    // repeated string model_ids = 1;
+    {::_pbi::TcParser::FastUR1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.model_ids_)}},
+    // int64 required_bytes = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeletePlanRequest, _impl_.required_bytes_), 1>(),
+     {16, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.required_bytes_)}},
+    // bool include_cache = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeletePlanRequest, _impl_.include_cache_), 2>(),
+     {24, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.include_cache_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // repeated string model_ids = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.model_ids_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // int64 required_bytes = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.required_bytes_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // bool include_cache = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.include_cache_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool oldest_first = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.oldest_first_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+  }},
+  // no aux_entries
+  {{
+    "\47\11\0\0\0\0\0\0"
+    "runanywhere.v1.StorageDeletePlanRequest"
+    "model_ids"
+  }},
+};
+PROTOBUF_NOINLINE void StorageDeletePlanRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageDeletePlanRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    _impl_.model_ids_.Clear();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
+    ::memset(&_impl_.required_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.oldest_first_) -
+        reinterpret_cast<char*>(&_impl_.required_bytes_)) + sizeof(_impl_.oldest_first_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageDeletePlanRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageDeletePlanRequest& this_ = static_cast<const StorageDeletePlanRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageDeletePlanRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageDeletePlanRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageDeletePlanRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // repeated string model_ids = 1;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (int i = 0, n = this_._internal_model_ids_size(); i < n; ++i) {
+      const auto& s = this_._internal_model_ids().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeletePlanRequest.model_ids");
+      target = stream->WriteString(1, s, target);
+    }
+  }
+
+  // int64 required_bytes = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_required_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_required_bytes(), target);
+    }
+  }
+
+  // bool include_cache = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_include_cache() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          3, this_._internal_include_cache(), target);
+    }
+  }
+
+  // bool oldest_first = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_oldest_first() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_oldest_first(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageDeletePlanRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageDeletePlanRequest::ByteSizeLong(const MessageLite& base) {
+  const StorageDeletePlanRequest& this_ = static_cast<const StorageDeletePlanRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageDeletePlanRequest::ByteSizeLong() const {
+  const StorageDeletePlanRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageDeletePlanRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // repeated string model_ids = 1;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_model_ids().size());
+      for (int i = 0, n = this_._internal_model_ids().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_model_ids().Get(i));
+      }
+    }
+    // int64 required_bytes = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_required_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_required_bytes());
+      }
+    }
+    // bool include_cache = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_include_cache() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool oldest_first = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_oldest_first() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageDeletePlanRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageDeletePlanRequest*>(&to_msg);
+  auto& from = static_cast<const StorageDeletePlanRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageDeletePlanRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_model_ids()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_model_ids());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_required_bytes() != 0) {
+        _this->_impl_.required_bytes_ = from._impl_.required_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_include_cache() != 0) {
+        _this->_impl_.include_cache_ = from._impl_.include_cache_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_oldest_first() != 0) {
+        _this->_impl_.oldest_first_ = from._impl_.oldest_first_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageDeletePlanRequest::CopyFrom(const StorageDeletePlanRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageDeletePlanRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageDeletePlanRequest::InternalSwap(StorageDeletePlanRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.model_ids_.InternalSwap(&other->_impl_.model_ids_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.oldest_first_)
+      + sizeof(StorageDeletePlanRequest::_impl_.oldest_first_)
+      - PROTOBUF_FIELD_OFFSET(StorageDeletePlanRequest, _impl_.required_bytes_)>(
+          reinterpret_cast<char*>(&_impl_.required_bytes_),
+          reinterpret_cast<char*>(&other->_impl_.required_bytes_));
+}
+
+::google::protobuf::Metadata StorageDeletePlanRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageDeleteCandidate::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageDeleteCandidate>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_._has_bits_);
+};
+
+StorageDeleteCandidate::StorageDeleteCandidate(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeleteCandidate_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageDeleteCandidate)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeleteCandidate::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageDeleteCandidate& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        model_id_(arena, from.model_id_),
+        local_path_(arena, from.local_path_) {}
+
+StorageDeleteCandidate::StorageDeleteCandidate(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageDeleteCandidate& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeleteCandidate_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageDeleteCandidate* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, reclaimable_bytes_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, reclaimable_bytes_),
+           offsetof(Impl_, is_loaded_) -
+               offsetof(Impl_, reclaimable_bytes_) +
+               sizeof(Impl_::is_loaded_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeleteCandidate)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeleteCandidate::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        model_id_(arena),
+        local_path_(arena) {}
+
+inline void StorageDeleteCandidate::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, reclaimable_bytes_),
+           0,
+           offsetof(Impl_, is_loaded_) -
+               offsetof(Impl_, reclaimable_bytes_) +
+               sizeof(Impl_::is_loaded_));
+}
+StorageDeleteCandidate::~StorageDeleteCandidate() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageDeleteCandidate)
+  SharedDtor(*this);
+}
+inline void StorageDeleteCandidate::SharedDtor(MessageLite& self) {
+  StorageDeleteCandidate& this_ = static_cast<StorageDeleteCandidate&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.model_id_.Destroy();
+  this_._impl_.local_path_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageDeleteCandidate::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageDeleteCandidate(arena);
+}
+constexpr auto StorageDeleteCandidate::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageDeleteCandidate),
+                                            alignof(StorageDeleteCandidate));
+}
+constexpr auto StorageDeleteCandidate::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageDeleteCandidate_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageDeleteCandidate::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageDeleteCandidate>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageDeleteCandidate::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageDeleteCandidate>(), &StorageDeleteCandidate::ByteSizeLong,
+              &StorageDeleteCandidate::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_._cached_size_),
+          false,
+      },
+      &StorageDeleteCandidate::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageDeleteCandidate_class_data_ =
+        StorageDeleteCandidate::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageDeleteCandidate::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageDeleteCandidate_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageDeleteCandidate_class_data_.tc_table);
+  return StorageDeleteCandidate_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 5, 0, 64, 2>
+StorageDeleteCandidate::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_._has_bits_),
+    0, // no _extensions_
+    5, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967264,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    5,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    StorageDeleteCandidate_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageDeleteCandidate>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // string model_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.model_id_)}},
+    // int64 reclaimable_bytes = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeleteCandidate, _impl_.reclaimable_bytes_), 2>(),
+     {16, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.reclaimable_bytes_)}},
+    // optional int64 last_used_ms = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeleteCandidate, _impl_.last_used_ms_), 3>(),
+     {24, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.last_used_ms_)}},
+    // bool is_loaded = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.is_loaded_), 4>(),
+     {32, 4, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.is_loaded_)}},
+    // string local_path = 5;
+    {::_pbi::TcParser::FastUS1,
+     {42, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.local_path_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string model_id = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int64 reclaimable_bytes = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.reclaimable_bytes_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // optional int64 last_used_ms = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.last_used_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // bool is_loaded = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.is_loaded_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // string local_path = 5;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.local_path_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\45\10\0\0\0\12\0\0"
+    "runanywhere.v1.StorageDeleteCandidate"
+    "model_id"
+    "local_path"
+  }},
+};
+PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageDeleteCandidate)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.local_path_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+    ::memset(&_impl_.reclaimable_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.is_loaded_) -
+        reinterpret_cast<char*>(&_impl_.reclaimable_bytes_)) + sizeof(_impl_.is_loaded_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageDeleteCandidate::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageDeleteCandidate& this_ = static_cast<const StorageDeleteCandidate&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageDeleteCandidate::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageDeleteCandidate& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageDeleteCandidate)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string model_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_model_id().empty()) {
+      const ::std::string& _s = this_._internal_model_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteCandidate.model_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // int64 reclaimable_bytes = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_reclaimable_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_reclaimable_bytes(), target);
+    }
+  }
+
+  // optional int64 last_used_ms = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
+            stream, this_._internal_last_used_ms(), target);
+  }
+
+  // bool is_loaded = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_is_loaded() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_is_loaded(), target);
+    }
+  }
+
+  // string local_path = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_local_path().empty()) {
+      const ::std::string& _s = this_._internal_local_path();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteCandidate.local_path");
+      target = stream->WriteStringMaybeAliased(5, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageDeleteCandidate)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageDeleteCandidate::ByteSizeLong(const MessageLite& base) {
+  const StorageDeleteCandidate& this_ = static_cast<const StorageDeleteCandidate&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageDeleteCandidate::ByteSizeLong() const {
+  const StorageDeleteCandidate& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageDeleteCandidate)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // string model_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_model_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_model_id());
+      }
+    }
+    // string local_path = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_local_path().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_local_path());
+      }
+    }
+    // int64 reclaimable_bytes = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_reclaimable_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_reclaimable_bytes());
+      }
+    }
+    // optional int64 last_used_ms = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+          this_._internal_last_used_ms());
+    }
+    // bool is_loaded = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_is_loaded() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageDeleteCandidate::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageDeleteCandidate*>(&to_msg);
+  auto& from = static_cast<const StorageDeleteCandidate&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageDeleteCandidate)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_model_id().empty()) {
+        _this->_internal_set_model_id(from._internal_model_id());
+      } else {
+        if (_this->_impl_.model_id_.IsDefault()) {
+          _this->_internal_set_model_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_local_path().empty()) {
+        _this->_internal_set_local_path(from._internal_local_path());
+      } else {
+        if (_this->_impl_.local_path_.IsDefault()) {
+          _this->_internal_set_local_path("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_reclaimable_bytes() != 0) {
+        _this->_impl_.reclaimable_bytes_ = from._impl_.reclaimable_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _this->_impl_.last_used_ms_ = from._impl_.last_used_ms_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_is_loaded() != 0) {
+        _this->_impl_.is_loaded_ = from._impl_.is_loaded_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageDeleteCandidate::CopyFrom(const StorageDeleteCandidate& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageDeleteCandidate)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageDeleteCandidate::InternalSwap(StorageDeleteCandidate* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.local_path_, &other->_impl_.local_path_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.is_loaded_)
+      + sizeof(StorageDeleteCandidate::_impl_.is_loaded_)
+      - PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.reclaimable_bytes_)>(
+          reinterpret_cast<char*>(&_impl_.reclaimable_bytes_),
+          reinterpret_cast<char*>(&other->_impl_.reclaimable_bytes_));
+}
+
+::google::protobuf::Metadata StorageDeleteCandidate::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageDeletePlan::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageDeletePlan>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_._has_bits_);
+};
+
+StorageDeletePlan::StorageDeletePlan(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeletePlan_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageDeletePlan)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeletePlan::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageDeletePlan& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        candidates_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlan,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.candidates_)>()
+        , from.candidates_}
+        #else
+        candidates_ { visibility, arena, from.candidates_ }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlan,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.warnings_)>()
+        , from.warnings_}
+        #else
+        warnings_ { visibility, arena, from.warnings_ }
+        #endif
+        ,
+        error_message_(arena, from.error_message_) {}
+
+StorageDeletePlan::StorageDeletePlan(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageDeletePlan& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeletePlan_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageDeletePlan* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, required_bytes_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, required_bytes_),
+           offsetof(Impl_, can_reclaim_required_bytes_) -
+               offsetof(Impl_, required_bytes_) +
+               sizeof(Impl_::can_reclaim_required_bytes_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeletePlan)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeletePlan::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        candidates_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlan,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.candidates_)>()
+        }
+        #else
+        candidates_ { visibility, arena }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeletePlan,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.warnings_)>()
+        }
+        #else
+        warnings_ { visibility, arena }
+        #endif
+        ,
+        error_message_(arena) {}
+
+inline void StorageDeletePlan::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, required_bytes_),
+           0,
+           offsetof(Impl_, can_reclaim_required_bytes_) -
+               offsetof(Impl_, required_bytes_) +
+               sizeof(Impl_::can_reclaim_required_bytes_));
+}
+StorageDeletePlan::~StorageDeletePlan() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageDeletePlan)
+  SharedDtor(*this);
+}
+inline void StorageDeletePlan::SharedDtor(MessageLite& self) {
+  StorageDeletePlan& this_ = static_cast<StorageDeletePlan&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageDeletePlan::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageDeletePlan(arena);
+}
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeletePlan::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageDeletePlan),
+                                            alignof(StorageDeletePlan));
+}
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeletePlan::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.candidates_) +
+          decltype(StorageDeletePlan::_impl_.candidates_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.warnings_) +
+          decltype(StorageDeletePlan::_impl_.warnings_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(StorageDeletePlan), alignof(StorageDeletePlan), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&StorageDeletePlan::PlacementNew_,
+                                 sizeof(StorageDeletePlan),
+                                 alignof(StorageDeletePlan));
+  }
+}
+#endif
+constexpr auto StorageDeletePlan::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageDeletePlan_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageDeletePlan::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageDeletePlan>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageDeletePlan::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageDeletePlan>(), &StorageDeletePlan::ByteSizeLong,
+              &StorageDeletePlan::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_._cached_size_),
+          false,
+      },
+      &StorageDeletePlan::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageDeletePlan_class_data_ =
+        StorageDeletePlan::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageDeletePlan::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageDeletePlan_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageDeletePlan_class_data_.tc_table);
+  return StorageDeletePlan_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 6, 1, 62, 2>
+StorageDeletePlan::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_._has_bits_),
+    0, // no _extensions_
+    6, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967232,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    6,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
+    StorageDeletePlan_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageDeletePlan>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // bool can_reclaim_required_bytes = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeletePlan, _impl_.can_reclaim_required_bytes_), 5>(),
+     {8, 5, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.can_reclaim_required_bytes_)}},
+    // int64 required_bytes = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeletePlan, _impl_.required_bytes_), 3>(),
+     {16, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.required_bytes_)}},
+    // int64 reclaimable_bytes = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeletePlan, _impl_.reclaimable_bytes_), 4>(),
+     {24, 4, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.reclaimable_bytes_)}},
+    // repeated .runanywhere.v1.StorageDeleteCandidate candidates = 4;
+    {::_pbi::TcParser::FastMtR1,
+     {34, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.candidates_)}},
+    // repeated string warnings = 5;
+    {::_pbi::TcParser::FastUR1,
+     {42, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.warnings_)}},
+    // string error_message = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.error_message_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool can_reclaim_required_bytes = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.can_reclaim_required_bytes_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // int64 required_bytes = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.required_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // int64 reclaimable_bytes = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.reclaimable_bytes_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // repeated .runanywhere.v1.StorageDeleteCandidate candidates = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.candidates_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // repeated string warnings = 5;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.warnings_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // string error_message = 6;
+    {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  {{
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::StorageDeleteCandidate>()},
+  }},
+  {{
+    "\40\0\0\0\0\10\15\0"
+    "runanywhere.v1.StorageDeletePlan"
+    "warnings"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void StorageDeletePlan::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageDeletePlan)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.candidates_.Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      _impl_.warnings_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000038U)) {
+    ::memset(&_impl_.required_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.can_reclaim_required_bytes_) -
+        reinterpret_cast<char*>(&_impl_.required_bytes_)) + sizeof(_impl_.can_reclaim_required_bytes_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageDeletePlan::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageDeletePlan& this_ = static_cast<const StorageDeletePlan&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageDeletePlan::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageDeletePlan& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageDeletePlan)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool can_reclaim_required_bytes = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_can_reclaim_required_bytes() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_can_reclaim_required_bytes(), target);
+    }
+  }
+
+  // int64 required_bytes = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_required_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_required_bytes(), target);
+    }
+  }
+
+  // int64 reclaimable_bytes = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_reclaimable_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
+              stream, this_._internal_reclaimable_bytes(), target);
+    }
+  }
+
+  // repeated .runanywhere.v1.StorageDeleteCandidate candidates = 4;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_candidates_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_candidates().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              4, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  // repeated string warnings = 5;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+    for (int i = 0, n = this_._internal_warnings_size(); i < n; ++i) {
+      const auto& s = this_._internal_warnings().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeletePlan.warnings");
+      target = stream->WriteString(5, s, target);
+    }
+  }
+
+  // string error_message = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (!this_._internal_error_message().empty()) {
+      const ::std::string& _s = this_._internal_error_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeletePlan.error_message");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageDeletePlan)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageDeletePlan::ByteSizeLong(const MessageLite& base) {
+  const StorageDeletePlan& this_ = static_cast<const StorageDeletePlan&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageDeletePlan::ByteSizeLong() const {
+  const StorageDeletePlan& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageDeletePlan)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // repeated .runanywhere.v1.StorageDeleteCandidate candidates = 4;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size += 1UL * this_._internal_candidates_size();
+      for (const auto& msg : this_._internal_candidates()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
+    // repeated string warnings = 5;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_warnings().size());
+      for (int i = 0, n = this_._internal_warnings().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_warnings().Get(i));
+      }
+    }
+    // string error_message = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!this_._internal_error_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_error_message());
+      }
+    }
+    // int64 required_bytes = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_required_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_required_bytes());
+      }
+    }
+    // int64 reclaimable_bytes = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_reclaimable_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_reclaimable_bytes());
+      }
+    }
+    // bool can_reclaim_required_bytes = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_can_reclaim_required_bytes() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageDeletePlan::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageDeletePlan*>(&to_msg);
+  auto& from = static_cast<const StorageDeletePlan&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageDeletePlan)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_candidates()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_candidates());
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      _this->_internal_mutable_warnings()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_warnings());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!from._internal_error_message().empty()) {
+        _this->_internal_set_error_message(from._internal_error_message());
+      } else {
+        if (_this->_impl_.error_message_.IsDefault()) {
+          _this->_internal_set_error_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_required_bytes() != 0) {
+        _this->_impl_.required_bytes_ = from._impl_.required_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_reclaimable_bytes() != 0) {
+        _this->_impl_.reclaimable_bytes_ = from._impl_.reclaimable_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_can_reclaim_required_bytes() != 0) {
+        _this->_impl_.can_reclaim_required_bytes_ = from._impl_.can_reclaim_required_bytes_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageDeletePlan::CopyFrom(const StorageDeletePlan& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageDeletePlan)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageDeletePlan::InternalSwap(StorageDeletePlan* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.candidates_.InternalSwap(&other->_impl_.candidates_);
+  _impl_.warnings_.InternalSwap(&other->_impl_.warnings_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.can_reclaim_required_bytes_)
+      + sizeof(StorageDeletePlan::_impl_.can_reclaim_required_bytes_)
+      - PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.required_bytes_)>(
+          reinterpret_cast<char*>(&_impl_.required_bytes_),
+          reinterpret_cast<char*>(&other->_impl_.required_bytes_));
+}
+
+::google::protobuf::Metadata StorageDeletePlan::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageDeleteRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageDeleteRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_._has_bits_);
+};
+
+StorageDeleteRequest::StorageDeleteRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeleteRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageDeleteRequest)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeleteRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageDeleteRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.model_ids_)>()
+        , from.model_ids_}
+        #else
+        model_ids_ { visibility, arena, from.model_ids_ }
+        #endif
+     {}
+
+StorageDeleteRequest::StorageDeleteRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageDeleteRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeleteRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageDeleteRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, delete_files_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, delete_files_),
+           offsetof(Impl_, dry_run_) -
+               offsetof(Impl_, delete_files_) +
+               sizeof(Impl_::dry_run_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeleteRequest)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeleteRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.model_ids_)>()
+        }
+        #else
+        model_ids_ { visibility, arena }
+        #endif
+     {}
+
+inline void StorageDeleteRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, delete_files_),
+           0,
+           offsetof(Impl_, dry_run_) -
+               offsetof(Impl_, delete_files_) +
+               sizeof(Impl_::dry_run_));
+}
+StorageDeleteRequest::~StorageDeleteRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageDeleteRequest)
+  SharedDtor(*this);
+}
+inline void StorageDeleteRequest::SharedDtor(MessageLite& self) {
+  StorageDeleteRequest& this_ = static_cast<StorageDeleteRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageDeleteRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageDeleteRequest(arena);
+}
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeleteRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageDeleteRequest),
+                                            alignof(StorageDeleteRequest));
+}
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeleteRequest::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.model_ids_) +
+          decltype(StorageDeleteRequest::_impl_.model_ids_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::ZeroInit(
+        sizeof(StorageDeleteRequest), alignof(StorageDeleteRequest), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&StorageDeleteRequest::PlacementNew_,
+                                 sizeof(StorageDeleteRequest),
+                                 alignof(StorageDeleteRequest));
+  }
+}
+#endif
+constexpr auto StorageDeleteRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageDeleteRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageDeleteRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageDeleteRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageDeleteRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageDeleteRequest>(), &StorageDeleteRequest::ByteSizeLong,
+              &StorageDeleteRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_._cached_size_),
+          false,
+      },
+      &StorageDeleteRequest::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageDeleteRequest_class_data_ =
+        StorageDeleteRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageDeleteRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageDeleteRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageDeleteRequest_class_data_.tc_table);
+  return StorageDeleteRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 5, 0, 53, 2>
+StorageDeleteRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    5, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967264,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    5,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    StorageDeleteRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageDeleteRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // repeated string model_ids = 1;
+    {::_pbi::TcParser::FastUR1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.model_ids_)}},
+    // bool delete_files = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.delete_files_), 1>(),
+     {16, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.delete_files_)}},
+    // bool clear_registry_paths = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.clear_registry_paths_), 2>(),
+     {24, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.clear_registry_paths_)}},
+    // bool unload_if_loaded = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.unload_if_loaded_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.unload_if_loaded_)}},
+    // bool dry_run = 5;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.dry_run_), 4>(),
+     {40, 4, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.dry_run_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // repeated string model_ids = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.model_ids_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // bool delete_files = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.delete_files_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool clear_registry_paths = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.clear_registry_paths_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool unload_if_loaded = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.unload_if_loaded_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool dry_run = 5;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.dry_run_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+  }},
+  // no aux_entries
+  {{
+    "\43\11\0\0\0\0\0\0"
+    "runanywhere.v1.StorageDeleteRequest"
+    "model_ids"
+  }},
+};
+PROTOBUF_NOINLINE void StorageDeleteRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageDeleteRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    _impl_.model_ids_.Clear();
+  }
+  ::memset(&_impl_.delete_files_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.dry_run_) -
+      reinterpret_cast<char*>(&_impl_.delete_files_)) + sizeof(_impl_.dry_run_));
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageDeleteRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageDeleteRequest& this_ = static_cast<const StorageDeleteRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageDeleteRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageDeleteRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageDeleteRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // repeated string model_ids = 1;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (int i = 0, n = this_._internal_model_ids_size(); i < n; ++i) {
+      const auto& s = this_._internal_model_ids().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteRequest.model_ids");
+      target = stream->WriteString(1, s, target);
+    }
+  }
+
+  // bool delete_files = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_delete_files() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_delete_files(), target);
+    }
+  }
+
+  // bool clear_registry_paths = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_clear_registry_paths() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          3, this_._internal_clear_registry_paths(), target);
+    }
+  }
+
+  // bool unload_if_loaded = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_unload_if_loaded() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_unload_if_loaded(), target);
+    }
+  }
+
+  // bool dry_run = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_dry_run() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          5, this_._internal_dry_run(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageDeleteRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageDeleteRequest::ByteSizeLong(const MessageLite& base) {
+  const StorageDeleteRequest& this_ = static_cast<const StorageDeleteRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageDeleteRequest::ByteSizeLong() const {
+  const StorageDeleteRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageDeleteRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // repeated string model_ids = 1;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_model_ids().size());
+      for (int i = 0, n = this_._internal_model_ids().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_model_ids().Get(i));
+      }
+    }
+    // bool delete_files = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_delete_files() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool clear_registry_paths = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_clear_registry_paths() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool unload_if_loaded = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_unload_if_loaded() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool dry_run = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_dry_run() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageDeleteRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageDeleteRequest*>(&to_msg);
+  auto& from = static_cast<const StorageDeleteRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageDeleteRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_model_ids()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_model_ids());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_delete_files() != 0) {
+        _this->_impl_.delete_files_ = from._impl_.delete_files_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_clear_registry_paths() != 0) {
+        _this->_impl_.clear_registry_paths_ = from._impl_.clear_registry_paths_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_unload_if_loaded() != 0) {
+        _this->_impl_.unload_if_loaded_ = from._impl_.unload_if_loaded_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_dry_run() != 0) {
+        _this->_impl_.dry_run_ = from._impl_.dry_run_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageDeleteRequest::CopyFrom(const StorageDeleteRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageDeleteRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageDeleteRequest::InternalSwap(StorageDeleteRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.model_ids_.InternalSwap(&other->_impl_.model_ids_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.dry_run_)
+      + sizeof(StorageDeleteRequest::_impl_.dry_run_)
+      - PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.delete_files_)>(
+          reinterpret_cast<char*>(&_impl_.delete_files_),
+          reinterpret_cast<char*>(&other->_impl_.delete_files_));
+}
+
+::google::protobuf::Metadata StorageDeleteRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class StorageDeleteResult::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<StorageDeleteResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_._has_bits_);
+};
+
+StorageDeleteResult::StorageDeleteResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeleteResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StorageDeleteResult)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeleteResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::StorageDeleteResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        deleted_model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.deleted_model_ids_)>()
+        , from.deleted_model_ids_}
+        #else
+        deleted_model_ids_ { visibility, arena, from.deleted_model_ids_ }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        failed_model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.failed_model_ids_)>()
+        , from.failed_model_ids_}
+        #else
+        failed_model_ids_ { visibility, arena, from.failed_model_ids_ }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.warnings_)>()
+        , from.warnings_}
+        #else
+        warnings_ { visibility, arena, from.warnings_ }
+        #endif
+        ,
+        error_message_(arena, from.error_message_) {}
+
+StorageDeleteResult::StorageDeleteResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const StorageDeleteResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, StorageDeleteResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  StorageDeleteResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, deleted_bytes_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, deleted_bytes_),
+           offsetof(Impl_, success_) -
+               offsetof(Impl_, deleted_bytes_) +
+               sizeof(Impl_::success_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeleteResult)
+}
+PROTOBUF_NDEBUG_INLINE StorageDeleteResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        deleted_model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.deleted_model_ids_)>()
+        }
+        #else
+        deleted_model_ids_ { visibility, arena }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        failed_model_ids_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.failed_model_ids_)>()
+        }
+        #else
+        failed_model_ids_ { visibility, arena }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        warnings_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageDeleteResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteResult, _impl_.warnings_)>()
+        }
+        #else
+        warnings_ { visibility, arena }
+        #endif
+        ,
+        error_message_(arena) {}
+
+inline void StorageDeleteResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, deleted_bytes_),
+           0,
+           offsetof(Impl_, success_) -
+               offsetof(Impl_, deleted_bytes_) +
+               sizeof(Impl_::success_));
+}
+StorageDeleteResult::~StorageDeleteResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.StorageDeleteResult)
+  SharedDtor(*this);
+}
+inline void StorageDeleteResult::SharedDtor(MessageLite& self) {
+  StorageDeleteResult& this_ = static_cast<StorageDeleteResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL StorageDeleteResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageDeleteResult(arena);
+}
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeleteResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageDeleteResult),
+                                            alignof(StorageDeleteResult));
+}
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto StorageDeleteResult::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.deleted_model_ids_) +
+          decltype(StorageDeleteResult::_impl_.deleted_model_ids_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.failed_model_ids_) +
+          decltype(StorageDeleteResult::_impl_.failed_model_ids_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.warnings_) +
+          decltype(StorageDeleteResult::_impl_.warnings_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(StorageDeleteResult), alignof(StorageDeleteResult), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&StorageDeleteResult::PlacementNew_,
+                                 sizeof(StorageDeleteResult),
+                                 alignof(StorageDeleteResult));
+  }
+}
+#endif
+constexpr auto StorageDeleteResult::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_StorageDeleteResult_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &StorageDeleteResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageDeleteResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageDeleteResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageDeleteResult>(), &StorageDeleteResult::ByteSizeLong,
+              &StorageDeleteResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_._cached_size_),
+          false,
+      },
+      &StorageDeleteResult::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull StorageDeleteResult_class_data_ =
+        StorageDeleteResult::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+StorageDeleteResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&StorageDeleteResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(StorageDeleteResult_class_data_.tc_table);
+  return StorageDeleteResult_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 6, 0, 97, 2>
+StorageDeleteResult::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_._has_bits_),
+    0, // no _extensions_
+    6, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967232,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    6,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    StorageDeleteResult_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageDeleteResult>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // bool success = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteResult, _impl_.success_), 5>(),
+     {8, 5, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.success_)}},
+    // int64 deleted_bytes = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeleteResult, _impl_.deleted_bytes_), 4>(),
+     {16, 4, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.deleted_bytes_)}},
+    // repeated string deleted_model_ids = 3;
+    {::_pbi::TcParser::FastUR1,
+     {26, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.deleted_model_ids_)}},
+    // repeated string failed_model_ids = 4;
+    {::_pbi::TcParser::FastUR1,
+     {34, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.failed_model_ids_)}},
+    // repeated string warnings = 5;
+    {::_pbi::TcParser::FastUR1,
+     {42, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.warnings_)}},
+    // string error_message = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 3, 0,
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.error_message_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool success = 1;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.success_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // int64 deleted_bytes = 2;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.deleted_bytes_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // repeated string deleted_model_ids = 3;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.deleted_model_ids_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // repeated string failed_model_ids = 4;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.failed_model_ids_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // repeated string warnings = 5;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.warnings_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // string error_message = 6;
+    {PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.error_message_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\42\0\0\21\20\10\15\0"
+    "runanywhere.v1.StorageDeleteResult"
+    "deleted_model_ids"
+    "failed_model_ids"
+    "warnings"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void StorageDeleteResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StorageDeleteResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.deleted_model_ids_.Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      _impl_.failed_model_ids_.Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+      _impl_.warnings_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000030U)) {
+    ::memset(&_impl_.deleted_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.success_) -
+        reinterpret_cast<char*>(&_impl_.deleted_bytes_)) + sizeof(_impl_.success_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL StorageDeleteResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const StorageDeleteResult& this_ = static_cast<const StorageDeleteResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL StorageDeleteResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const StorageDeleteResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StorageDeleteResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool success = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_success() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_success(), target);
+    }
+  }
+
+  // int64 deleted_bytes = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_deleted_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_deleted_bytes(), target);
+    }
+  }
+
+  // repeated string deleted_model_ids = 3;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (int i = 0, n = this_._internal_deleted_model_ids_size(); i < n; ++i) {
+      const auto& s = this_._internal_deleted_model_ids().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteResult.deleted_model_ids");
+      target = stream->WriteString(3, s, target);
+    }
+  }
+
+  // repeated string failed_model_ids = 4;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+    for (int i = 0, n = this_._internal_failed_model_ids_size(); i < n; ++i) {
+      const auto& s = this_._internal_failed_model_ids().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteResult.failed_model_ids");
+      target = stream->WriteString(4, s, target);
+    }
+  }
+
+  // repeated string warnings = 5;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+    for (int i = 0, n = this_._internal_warnings_size(); i < n; ++i) {
+      const auto& s = this_._internal_warnings().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteResult.warnings");
+      target = stream->WriteString(5, s, target);
+    }
+  }
+
+  // string error_message = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (!this_._internal_error_message().empty()) {
+      const ::std::string& _s = this_._internal_error_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StorageDeleteResult.error_message");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StorageDeleteResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t StorageDeleteResult::ByteSizeLong(const MessageLite& base) {
+  const StorageDeleteResult& this_ = static_cast<const StorageDeleteResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t StorageDeleteResult::ByteSizeLong() const {
+  const StorageDeleteResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StorageDeleteResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // repeated string deleted_model_ids = 3;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_deleted_model_ids().size());
+      for (int i = 0, n = this_._internal_deleted_model_ids().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_deleted_model_ids().Get(i));
+      }
+    }
+    // repeated string failed_model_ids = 4;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_failed_model_ids().size());
+      for (int i = 0, n = this_._internal_failed_model_ids().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_failed_model_ids().Get(i));
+      }
+    }
+    // repeated string warnings = 5;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_warnings().size());
+      for (int i = 0, n = this_._internal_warnings().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_warnings().Get(i));
+      }
+    }
+    // string error_message = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!this_._internal_error_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_error_message());
+      }
+    }
+    // int64 deleted_bytes = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_deleted_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_deleted_bytes());
+      }
+    }
+    // bool success = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_success() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void StorageDeleteResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<StorageDeleteResult*>(&to_msg);
+  auto& from = static_cast<const StorageDeleteResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StorageDeleteResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_deleted_model_ids()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_deleted_model_ids());
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      _this->_internal_mutable_failed_model_ids()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_failed_model_ids());
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+      _this->_internal_mutable_warnings()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_warnings());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!from._internal_error_message().empty()) {
+        _this->_internal_set_error_message(from._internal_error_message());
+      } else {
+        if (_this->_impl_.error_message_.IsDefault()) {
+          _this->_internal_set_error_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_deleted_bytes() != 0) {
+        _this->_impl_.deleted_bytes_ = from._impl_.deleted_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_success() != 0) {
+        _this->_impl_.success_ = from._impl_.success_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void StorageDeleteResult::CopyFrom(const StorageDeleteResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StorageDeleteResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void StorageDeleteResult::InternalSwap(StorageDeleteResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.deleted_model_ids_.InternalSwap(&other->_impl_.deleted_model_ids_);
+  _impl_.failed_model_ids_.InternalSwap(&other->_impl_.failed_model_ids_);
+  _impl_.warnings_.InternalSwap(&other->_impl_.warnings_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.success_)
+      + sizeof(StorageDeleteResult::_impl_.success_)
+      - PROTOBUF_FIELD_OFFSET(StorageDeleteResult, _impl_.deleted_bytes_)>(
+          reinterpret_cast<char*>(&_impl_.deleted_bytes_),
+          reinterpret_cast<char*>(&other->_impl_.deleted_bytes_));
+}
+
+::google::protobuf::Metadata StorageDeleteResult::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

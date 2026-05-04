@@ -31,6 +31,192 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
+public enum RAVoiceEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case voiceAgent // = 1
+  case stt // = 2
+  case asr // = 3
+  case tts // = 4
+  case vad // = 5
+  case std // = 6
+  case llm // = 7
+  case audio // = 8
+  case metrics // = 9
+  case error // = 10
+  case wakeword // = 11
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .voiceAgent
+    case 2: self = .stt
+    case 3: self = .asr
+    case 4: self = .tts
+    case 5: self = .vad
+    case 6: self = .std
+    case 7: self = .llm
+    case 8: self = .audio
+    case 9: self = .metrics
+    case 10: self = .error
+    case 11: self = .wakeword
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .voiceAgent: return 1
+    case .stt: return 2
+    case .asr: return 3
+    case .tts: return 4
+    case .vad: return 5
+    case .std: return 6
+    case .llm: return 7
+    case .audio: return 8
+    case .metrics: return 9
+    case .error: return 10
+    case .wakeword: return 11
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVoiceEventCategory] = [
+    .unspecified,
+    .voiceAgent,
+    .stt,
+    .asr,
+    .tts,
+    .vad,
+    .std,
+    .llm,
+    .audio,
+    .metrics,
+    .error,
+    .wakeword,
+  ]
+
+}
+
+public enum RAVoiceEventSeverity: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case debug // = 0
+  case info // = 1
+  case warning // = 2
+  case error // = 3
+  case critical // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .debug
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .debug
+    case 1: self = .info
+    case 2: self = .warning
+    case 3: self = .error
+    case 4: self = .critical
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .debug: return 0
+    case .info: return 1
+    case .warning: return 2
+    case .error: return 3
+    case .critical: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVoiceEventSeverity] = [
+    .debug,
+    .info,
+    .warning,
+    .error,
+    .critical,
+  ]
+
+}
+
+public enum RAVoicePipelineComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case agent // = 1
+  case stt // = 2
+  case asr // = 3
+  case tts // = 4
+  case vad // = 5
+  case std // = 6
+  case llm // = 7
+  case audio // = 8
+  case wakeword // = 9
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .agent
+    case 2: self = .stt
+    case 3: self = .asr
+    case 4: self = .tts
+    case 5: self = .vad
+    case 6: self = .std
+    case 7: self = .llm
+    case 8: self = .audio
+    case 9: self = .wakeword
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .agent: return 1
+    case .stt: return 2
+    case .asr: return 3
+    case .tts: return 4
+    case .vad: return 5
+    case .std: return 6
+    case .llm: return 7
+    case .audio: return 8
+    case .wakeword: return 9
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVoicePipelineComponent] = [
+    .unspecified,
+    .agent,
+    .stt,
+    .asr,
+    .tts,
+    .vad,
+    .std,
+    .llm,
+    .audio,
+    .wakeword,
+  ]
+
+}
+
 public enum RATokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -124,6 +310,8 @@ public enum RAVADEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
   case vadEventVoiceEndOfUtterance // = 2
   case vadEventBargeIn // = 3
   case vadEventSilence // = 4
+  case vadEventStatistics // = 5
+  case vadEventStateChanged // = 6
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -137,6 +325,8 @@ public enum RAVADEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 2: self = .vadEventVoiceEndOfUtterance
     case 3: self = .vadEventBargeIn
     case 4: self = .vadEventSilence
+    case 5: self = .vadEventStatistics
+    case 6: self = .vadEventStateChanged
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -148,6 +338,8 @@ public enum RAVADEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .vadEventVoiceEndOfUtterance: return 2
     case .vadEventBargeIn: return 3
     case .vadEventSilence: return 4
+    case .vadEventStatistics: return 5
+    case .vadEventStateChanged: return 6
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -159,6 +351,8 @@ public enum RAVADEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
     .vadEventVoiceEndOfUtterance,
     .vadEventBargeIn,
     .vadEventSilence,
+    .vadEventStatistics,
+    .vadEventStateChanged,
   ]
 
 }
@@ -217,6 +411,12 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
   case thinking // = 3
   case speaking // = 4
   case stopped // = 5
+  case waitingWakeword // = 6
+  case processingSpeech // = 7
+  case generatingResponse // = 8
+  case playingTts // = 9
+  case cooldown // = 10
+  case error // = 11
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -231,6 +431,12 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 3: self = .thinking
     case 4: self = .speaking
     case 5: self = .stopped
+    case 6: self = .waitingWakeword
+    case 7: self = .processingSpeech
+    case 8: self = .generatingResponse
+    case 9: self = .playingTts
+    case 10: self = .cooldown
+    case 11: self = .error
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -243,6 +449,12 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .thinking: return 3
     case .speaking: return 4
     case .stopped: return 5
+    case .waitingWakeword: return 6
+    case .processingSpeech: return 7
+    case .generatingResponse: return 8
+    case .playingTts: return 9
+    case .cooldown: return 10
+    case .error: return 11
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -255,6 +467,12 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
     .thinking,
     .speaking,
     .stopped,
+    .waitingWakeword,
+    .processingSpeech,
+    .generatingResponse,
+    .playingTts,
+    .cooldown,
+    .error,
   ]
 
 }
@@ -354,6 +572,118 @@ public enum RAVoiceSessionErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+public enum RASpeechTurnDetectionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case turnStarted // = 1
+  case turnEnded // = 2
+  case speakerChanged // = 3
+  case statistics // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .turnStarted
+    case 2: self = .turnEnded
+    case 3: self = .speakerChanged
+    case 4: self = .statistics
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .turnStarted: return 1
+    case .turnEnded: return 2
+    case .speakerChanged: return 3
+    case .statistics: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RASpeechTurnDetectionEventKind] = [
+    .unspecified,
+    .turnStarted,
+    .turnEnded,
+    .speakerChanged,
+    .statistics,
+  ]
+
+}
+
+public enum RATurnLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case started // = 1
+  case userSpeechStarted // = 2
+  case userSpeechEnded // = 3
+  case transcriptionFinal // = 4
+  case agentResponseStarted // = 5
+  case agentResponseCompleted // = 6
+  case completed // = 7
+  case cancelled // = 8
+  case failed // = 9
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .started
+    case 2: self = .userSpeechStarted
+    case 3: self = .userSpeechEnded
+    case 4: self = .transcriptionFinal
+    case 5: self = .agentResponseStarted
+    case 6: self = .agentResponseCompleted
+    case 7: self = .completed
+    case 8: self = .cancelled
+    case 9: self = .failed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .started: return 1
+    case .userSpeechStarted: return 2
+    case .userSpeechEnded: return 3
+    case .transcriptionFinal: return 4
+    case .agentResponseStarted: return 5
+    case .agentResponseCompleted: return 6
+    case .completed: return 7
+    case .cancelled: return 8
+    case .failed: return 9
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RATurnLifecycleEventKind] = [
+    .unspecified,
+    .started,
+    .userSpeechStarted,
+    .userSpeechEnded,
+    .transcriptionFinal,
+    .agentResponseStarted,
+    .agentResponseCompleted,
+    .completed,
+    .cancelled,
+    .failed,
+  ]
+
+}
+
 /// ---------------------------------------------------------------------------
 /// Sum type emitted on the output edge of the VoiceAgent pipeline.
 /// ---------------------------------------------------------------------------
@@ -369,6 +699,12 @@ public struct RAVoiceEvent: Sendable {
   /// Wall-clock timestamp captured at the C++ edge, in microseconds since
   /// Unix epoch. Frontends may re-timestamp for UI display.
   public var timestampUs: Int64 = 0
+
+  public var category: RAVoiceEventCategory = .unspecified
+
+  public var severity: RAVoiceEventSeverity = .debug
+
+  public var component: RAVoicePipelineComponent = .unspecified
 
   /// Exactly one of the following is populated on every event.
   public var payload: RAVoiceEvent.OneOf_Payload? = nil
@@ -491,6 +827,30 @@ public struct RAVoiceEvent: Sendable {
     set {payload = .agentResponseCompleted(newValue)}
   }
 
+  public var speechTurnDetection: RASpeechTurnDetectionEvent {
+    get {
+      if case .speechTurnDetection(let v)? = payload {return v}
+      return RASpeechTurnDetectionEvent()
+    }
+    set {payload = .speechTurnDetection(newValue)}
+  }
+
+  public var turnLifecycle: RATurnLifecycleEvent {
+    get {
+      if case .turnLifecycle(let v)? = payload {return v}
+      return RATurnLifecycleEvent()
+    }
+    set {payload = .turnLifecycle(newValue)}
+  }
+
+  public var wakewordDetected: RAWakeWordDetectedEvent {
+    get {
+      if case .wakewordDetected(let v)? = payload {return v}
+      return RAWakeWordDetectedEvent()
+    }
+    set {payload = .wakewordDetected(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// Exactly one of the following is populated on every event.
@@ -515,6 +875,9 @@ public struct RAVoiceEvent: Sendable {
     case sessionStopped(RASessionStoppedEvent)
     case agentResponseStarted(RAAgentResponseStartedEvent)
     case agentResponseCompleted(RAAgentResponseCompletedEvent)
+    case speechTurnDetection(RASpeechTurnDetectionEvent)
+    case turnLifecycle(RATurnLifecycleEvent)
+    case wakewordDetected(RAWakeWordDetectedEvent)
 
   }
 
@@ -579,6 +942,9 @@ public struct RAAudioFrameEvent: Sendable {
 
   public var encoding: RAAudioEncoding = .unspecified
 
+  /// True for the final audio chunk in a TTS/voice-agent audio stream.
+  public var isFinal: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -594,6 +960,16 @@ public struct RAVADEvent: Sendable {
   public var type: RAVADEventType = .vadEventUnspecified
 
   public var frameOffsetUs: Int64 = 0
+
+  public var confidence: Float = 0
+
+  public var isSpeech: Bool = false
+
+  public var speechDurationMs: Double = 0
+
+  public var silenceDurationMs: Double = 0
+
+  public var noiseFloorDb: Double = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -784,9 +1160,89 @@ public struct RAAgentResponseCompletedEvent: Sendable {
   public init() {}
 }
 
+public struct RASpeechTurnDetectionEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RASpeechTurnDetectionEventKind = .unspecified
+
+  public var speakerID: String = String()
+
+  public var turnStartUs: Int64 = 0
+
+  public var turnEndUs: Int64 = 0
+
+  public var confidence: Float = 0
+
+  public var speechDurationMs: Double = 0
+
+  public var silenceDurationMs: Double = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RATurnLifecycleEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RATurnLifecycleEventKind = .unspecified
+
+  public var turnID: String = String()
+
+  public var sessionID: String = String()
+
+  public var transcript: String = String()
+
+  public var response: String = String()
+
+  public var error: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAWakeWordDetectedEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var wakeWord: String = String()
+
+  public var confidence: Float = 0
+
+  public var timestampMs: Int64 = 0
+
+  public var modelID: String = String()
+
+  public var modelIndex: Int32 = 0
+
+  public var durationMs: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
+
+extension RAVoiceEventCategory: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_EVENT_CATEGORY_UNSPECIFIED\0\u{1}VOICE_EVENT_CATEGORY_VOICE_AGENT\0\u{1}VOICE_EVENT_CATEGORY_STT\0\u{1}VOICE_EVENT_CATEGORY_ASR\0\u{1}VOICE_EVENT_CATEGORY_TTS\0\u{1}VOICE_EVENT_CATEGORY_VAD\0\u{1}VOICE_EVENT_CATEGORY_STD\0\u{1}VOICE_EVENT_CATEGORY_LLM\0\u{1}VOICE_EVENT_CATEGORY_AUDIO\0\u{1}VOICE_EVENT_CATEGORY_METRICS\0\u{1}VOICE_EVENT_CATEGORY_ERROR\0\u{1}VOICE_EVENT_CATEGORY_WAKEWORD\0")
+}
+
+extension RAVoiceEventSeverity: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_EVENT_SEVERITY_DEBUG\0\u{1}VOICE_EVENT_SEVERITY_INFO\0\u{1}VOICE_EVENT_SEVERITY_WARNING\0\u{1}VOICE_EVENT_SEVERITY_ERROR\0\u{1}VOICE_EVENT_SEVERITY_CRITICAL\0")
+}
+
+extension RAVoicePipelineComponent: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_PIPELINE_COMPONENT_UNSPECIFIED\0\u{1}VOICE_PIPELINE_COMPONENT_AGENT\0\u{1}VOICE_PIPELINE_COMPONENT_STT\0\u{1}VOICE_PIPELINE_COMPONENT_ASR\0\u{1}VOICE_PIPELINE_COMPONENT_TTS\0\u{1}VOICE_PIPELINE_COMPONENT_VAD\0\u{1}VOICE_PIPELINE_COMPONENT_STD\0\u{1}VOICE_PIPELINE_COMPONENT_LLM\0\u{1}VOICE_PIPELINE_COMPONENT_AUDIO\0\u{1}VOICE_PIPELINE_COMPONENT_WAKEWORD\0")
+}
 
 extension RATokenKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOKEN_KIND_UNSPECIFIED\0\u{1}TOKEN_KIND_ANSWER\0\u{1}TOKEN_KIND_THOUGHT\0\u{1}TOKEN_KIND_TOOL_CALL\0")
@@ -797,7 +1253,7 @@ extension RAAudioEncoding: SwiftProtobuf._ProtoNameProviding {
 }
 
 extension RAVADEventType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_EVENT_UNSPECIFIED\0\u{1}VAD_EVENT_VOICE_START\0\u{1}VAD_EVENT_VOICE_END_OF_UTTERANCE\0\u{1}VAD_EVENT_BARGE_IN\0\u{1}VAD_EVENT_SILENCE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_EVENT_UNSPECIFIED\0\u{1}VAD_EVENT_VOICE_START\0\u{1}VAD_EVENT_VOICE_END_OF_UTTERANCE\0\u{1}VAD_EVENT_BARGE_IN\0\u{1}VAD_EVENT_SILENCE\0\u{1}VAD_EVENT_STATISTICS\0\u{1}VAD_EVENT_STATE_CHANGED\0")
 }
 
 extension RAInterruptReason: SwiftProtobuf._ProtoNameProviding {
@@ -805,7 +1261,7 @@ extension RAInterruptReason: SwiftProtobuf._ProtoNameProviding {
 }
 
 extension RAPipelineState: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATE_UNSPECIFIED\0\u{1}PIPELINE_STATE_IDLE\0\u{1}PIPELINE_STATE_LISTENING\0\u{1}PIPELINE_STATE_THINKING\0\u{1}PIPELINE_STATE_SPEAKING\0\u{1}PIPELINE_STATE_STOPPED\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATE_UNSPECIFIED\0\u{1}PIPELINE_STATE_IDLE\0\u{1}PIPELINE_STATE_LISTENING\0\u{1}PIPELINE_STATE_THINKING\0\u{1}PIPELINE_STATE_SPEAKING\0\u{1}PIPELINE_STATE_STOPPED\0\u{1}PIPELINE_STATE_WAITING_WAKEWORD\0\u{1}PIPELINE_STATE_PROCESSING_SPEECH\0\u{1}PIPELINE_STATE_GENERATING_RESPONSE\0\u{1}PIPELINE_STATE_PLAYING_TTS\0\u{1}PIPELINE_STATE_COOLDOWN\0\u{1}PIPELINE_STATE_ERROR\0")
 }
 
 extension RAComponentLoadState: SwiftProtobuf._ProtoNameProviding {
@@ -816,9 +1272,17 @@ extension RAVoiceSessionErrorCode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_SESSION_ERROR_CODE_UNSPECIFIED\0\u{1}VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}VOICE_SESSION_ERROR_CODE_NOT_READY\0\u{1}VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING\0\u{1}VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE\0")
 }
 
+extension RASpeechTurnDetectionEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS\0")
+}
+
+extension RATurnLifecycleEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_STARTED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL\0\u{1}TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_COMPLETED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_CANCELLED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_FAILED\0")
+}
+
 extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{4}\u{8}user_said\0\u{3}assistant_token\0\u{1}audio\0\u{1}vad\0\u{1}interrupted\0\u{1}state\0\u{1}error\0\u{1}metrics\0\u{3}component_state_changed\0\u{3}session_error\0\u{3}session_started\0\u{3}session_stopped\0\u{3}agent_response_started\0\u{3}agent_response_completed\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}category\0\u{1}severity\0\u{1}component\0\u{4}\u{5}user_said\0\u{3}assistant_token\0\u{1}audio\0\u{1}vad\0\u{1}interrupted\0\u{1}state\0\u{1}error\0\u{1}metrics\0\u{3}component_state_changed\0\u{3}session_error\0\u{3}session_started\0\u{3}session_stopped\0\u{3}agent_response_started\0\u{3}agent_response_completed\0\u{3}speech_turn_detection\0\u{3}turn_lifecycle\0\u{3}wakeword_detected\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -828,6 +1292,9 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt64Field(value: &self.seq) }()
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.timestampUs) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.category) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.component) }()
       case 10: try {
         var v: RAUserSaidEvent?
         var hadOneofValue = false
@@ -1010,6 +1477,45 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
           self.payload = .agentResponseCompleted(v)
         }
       }()
+      case 24: try {
+        var v: RASpeechTurnDetectionEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .speechTurnDetection(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .speechTurnDetection(v)
+        }
+      }()
+      case 25: try {
+        var v: RATurnLifecycleEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .turnLifecycle(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .turnLifecycle(v)
+        }
+      }()
+      case 26: try {
+        var v: RAWakeWordDetectedEvent?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .wakewordDetected(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .wakewordDetected(v)
+        }
+      }()
       default: break
       }
     }
@@ -1025,6 +1531,15 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     }
     if self.timestampUs != 0 {
       try visitor.visitSingularInt64Field(value: self.timestampUs, fieldNumber: 2)
+    }
+    if self.category != .unspecified {
+      try visitor.visitSingularEnumField(value: self.category, fieldNumber: 3)
+    }
+    if self.severity != .debug {
+      try visitor.visitSingularEnumField(value: self.severity, fieldNumber: 4)
+    }
+    if self.component != .unspecified {
+      try visitor.visitSingularEnumField(value: self.component, fieldNumber: 5)
     }
     switch self.payload {
     case .userSaid?: try {
@@ -1083,6 +1598,18 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       guard case .agentResponseCompleted(let v)? = self.payload else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
     }()
+    case .speechTurnDetection?: try {
+      guard case .speechTurnDetection(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+    }()
+    case .turnLifecycle?: try {
+      guard case .turnLifecycle(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
+    }()
+    case .wakewordDetected?: try {
+      guard case .wakewordDetected(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
+    }()
     case nil: break
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1091,6 +1618,9 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   public static func ==(lhs: RAVoiceEvent, rhs: RAVoiceEvent) -> Bool {
     if lhs.seq != rhs.seq {return false}
     if lhs.timestampUs != rhs.timestampUs {return false}
+    if lhs.category != rhs.category {return false}
+    if lhs.severity != rhs.severity {return false}
+    if lhs.component != rhs.component {return false}
     if lhs.payload != rhs.payload {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1189,7 +1719,7 @@ extension RAAssistantTokenEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
 
 extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AudioFrameEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pcm\0\u{3}sample_rate_hz\0\u{1}channels\0\u{1}encoding\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pcm\0\u{3}sample_rate_hz\0\u{1}channels\0\u{1}encoding\0\u{3}is_final\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1201,6 +1731,7 @@ extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
       default: break
       }
     }
@@ -1219,6 +1750,9 @@ extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if self.encoding != .unspecified {
       try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 4)
     }
+    if self.isFinal != false {
+      try visitor.visitSingularBoolField(value: self.isFinal, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1227,6 +1761,7 @@ extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.sampleRateHz != rhs.sampleRateHz {return false}
     if lhs.channels != rhs.channels {return false}
     if lhs.encoding != rhs.encoding {return false}
+    if lhs.isFinal != rhs.isFinal {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1234,7 +1769,7 @@ extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{3}frame_offset_us\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{3}frame_offset_us\0\u{1}confidence\0\u{3}is_speech\0\u{3}speech_duration_ms\0\u{3}silence_duration_ms\0\u{3}noise_floor_db\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1244,6 +1779,11 @@ extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.frameOffsetUs) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.isSpeech) }()
+      case 5: try { try decoder.decodeSingularDoubleField(value: &self.speechDurationMs) }()
+      case 6: try { try decoder.decodeSingularDoubleField(value: &self.silenceDurationMs) }()
+      case 7: try { try decoder.decodeSingularDoubleField(value: &self.noiseFloorDb) }()
       default: break
       }
     }
@@ -1256,12 +1796,32 @@ extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if self.frameOffsetUs != 0 {
       try visitor.visitSingularInt64Field(value: self.frameOffsetUs, fieldNumber: 2)
     }
+    if self.confidence.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 3)
+    }
+    if self.isSpeech != false {
+      try visitor.visitSingularBoolField(value: self.isSpeech, fieldNumber: 4)
+    }
+    if self.speechDurationMs.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.speechDurationMs, fieldNumber: 5)
+    }
+    if self.silenceDurationMs.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.silenceDurationMs, fieldNumber: 6)
+    }
+    if self.noiseFloorDb.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.noiseFloorDb, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVADEvent, rhs: RAVADEvent) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs.frameOffsetUs != rhs.frameOffsetUs {return false}
+    if lhs.confidence != rhs.confidence {return false}
+    if lhs.isSpeech != rhs.isSpeech {return false}
+    if lhs.speechDurationMs != rhs.speechDurationMs {return false}
+    if lhs.silenceDurationMs != rhs.silenceDurationMs {return false}
+    if lhs.noiseFloorDb != rhs.noiseFloorDb {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1617,6 +2177,176 @@ extension RAAgentResponseCompletedEvent: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 
   public static func ==(lhs: RAAgentResponseCompletedEvent, rhs: RAAgentResponseCompletedEvent) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASpeechTurnDetectionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SpeechTurnDetectionEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}speaker_id\0\u{3}turn_start_us\0\u{3}turn_end_us\0\u{1}confidence\0\u{3}speech_duration_ms\0\u{3}silence_duration_ms\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.speakerID) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.turnStartUs) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.turnEndUs) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
+      case 6: try { try decoder.decodeSingularDoubleField(value: &self.speechDurationMs) }()
+      case 7: try { try decoder.decodeSingularDoubleField(value: &self.silenceDurationMs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.speakerID.isEmpty {
+      try visitor.visitSingularStringField(value: self.speakerID, fieldNumber: 2)
+    }
+    if self.turnStartUs != 0 {
+      try visitor.visitSingularInt64Field(value: self.turnStartUs, fieldNumber: 3)
+    }
+    if self.turnEndUs != 0 {
+      try visitor.visitSingularInt64Field(value: self.turnEndUs, fieldNumber: 4)
+    }
+    if self.confidence.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 5)
+    }
+    if self.speechDurationMs.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.speechDurationMs, fieldNumber: 6)
+    }
+    if self.silenceDurationMs.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.silenceDurationMs, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASpeechTurnDetectionEvent, rhs: RASpeechTurnDetectionEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.speakerID != rhs.speakerID {return false}
+    if lhs.turnStartUs != rhs.turnStartUs {return false}
+    if lhs.turnEndUs != rhs.turnEndUs {return false}
+    if lhs.confidence != rhs.confidence {return false}
+    if lhs.speechDurationMs != rhs.speechDurationMs {return false}
+    if lhs.silenceDurationMs != rhs.silenceDurationMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RATurnLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TurnLifecycleEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}turn_id\0\u{3}session_id\0\u{1}transcript\0\u{1}response\0\u{1}error\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.turnID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.transcript) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.response) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.error) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    }
+    if !self.turnID.isEmpty {
+      try visitor.visitSingularStringField(value: self.turnID, fieldNumber: 2)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 3)
+    }
+    if !self.transcript.isEmpty {
+      try visitor.visitSingularStringField(value: self.transcript, fieldNumber: 4)
+    }
+    if !self.response.isEmpty {
+      try visitor.visitSingularStringField(value: self.response, fieldNumber: 5)
+    }
+    if !self.error.isEmpty {
+      try visitor.visitSingularStringField(value: self.error, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RATurnLifecycleEvent, rhs: RATurnLifecycleEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.turnID != rhs.turnID {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.transcript != rhs.transcript {return false}
+    if lhs.response != rhs.response {return false}
+    if lhs.error != rhs.error {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAWakeWordDetectedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WakeWordDetectedEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}wake_word\0\u{1}confidence\0\u{3}timestamp_ms\0\u{3}model_id\0\u{3}model_index\0\u{3}duration_ms\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.wakeWord) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.modelIndex) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.durationMs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.wakeWord.isEmpty {
+      try visitor.visitSingularStringField(value: self.wakeWord, fieldNumber: 1)
+    }
+    if self.confidence.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 2)
+    }
+    if self.timestampMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 3)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 4)
+    }
+    if self.modelIndex != 0 {
+      try visitor.visitSingularInt32Field(value: self.modelIndex, fieldNumber: 5)
+    }
+    if self.durationMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.durationMs, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAWakeWordDetectedEvent, rhs: RAWakeWordDetectedEvent) -> Bool {
+    if lhs.wakeWord != rhs.wakeWord {return false}
+    if lhs.confidence != rhs.confidence {return false}
+    if lhs.timestampMs != rhs.timestampMs {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.modelIndex != rhs.modelIndex {return false}
+    if lhs.durationMs != rhs.durationMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

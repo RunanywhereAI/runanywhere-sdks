@@ -79,6 +79,39 @@ public class STTOutput(
     schemaIndex = 5,
   )
   public val metadata: TranscriptionMetadata? = null,
+  /**
+   * Free-form detected language tag, preserving regional variants.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "languageCode",
+    schemaIndex = 6,
+  )
+  public val language_code: String? = null,
+  /**
+   * Wall-clock output timestamp in milliseconds since Unix epoch.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timestampMs",
+    schemaIndex = 7,
+  )
+  public val timestamp_ms: Long = 0L,
+  /**
+   * Audio duration in milliseconds for SDKs that expose duration directly.
+   * Often duplicates metadata.audio_length_ms.
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "durationMs",
+    schemaIndex = 8,
+  )
+  public val duration_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTOutput, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -115,6 +148,9 @@ public class STTOutput(
     if (words != other.words) return false
     if (alternatives != other.alternatives) return false
     if (metadata != other.metadata) return false
+    if (language_code != other.language_code) return false
+    if (timestamp_ms != other.timestamp_ms) return false
+    if (duration_ms != other.duration_ms) return false
     return true
   }
 
@@ -128,6 +164,9 @@ public class STTOutput(
       result = result * 37 + words.hashCode()
       result = result * 37 + alternatives.hashCode()
       result = result * 37 + (metadata?.hashCode() ?: 0)
+      result = result * 37 + (language_code?.hashCode() ?: 0)
+      result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + duration_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -141,6 +180,9 @@ public class STTOutput(
     if (words.isNotEmpty()) result += """words=$words"""
     if (alternatives.isNotEmpty()) result += """alternatives=$alternatives"""
     if (metadata != null) result += """metadata=$metadata"""
+    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
+    result += """timestamp_ms=$timestamp_ms"""
+    result += """duration_ms=$duration_ms"""
     return result.joinToString(prefix = "STTOutput{", separator = ", ", postfix = "}")
   }
 
@@ -151,8 +193,12 @@ public class STTOutput(
     words: List<WordTimestamp> = this.words,
     alternatives: List<TranscriptionAlternative> = this.alternatives,
     metadata: TranscriptionMetadata? = this.metadata,
+    language_code: String? = this.language_code,
+    timestamp_ms: Long = this.timestamp_ms,
+    duration_ms: Long = this.duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): STTOutput = STTOutput(text, language, confidence, words, alternatives, metadata, unknownFields)
+  ): STTOutput = STTOutput(text, language, confidence, words, alternatives, metadata, language_code,
+      timestamp_ms, duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -176,6 +222,11 @@ public class STTOutput(
             value.alternatives)
         if (value.metadata != null) size += TranscriptionMetadata.ADAPTER.encodedSizeWithTag(6,
             value.metadata)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.language_code)
+        if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
+            value.timestamp_ms)
+        if (value.duration_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(9,
+            value.duration_ms)
         return size
       }
 
@@ -189,11 +240,19 @@ public class STTOutput(
         TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.alternatives)
         if (value.metadata != null) TranscriptionMetadata.ADAPTER.encodeWithTag(writer, 6,
             value.metadata)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.language_code)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.timestamp_ms)
+        if (value.duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTOutput) {
         writer.writeBytes(value.unknownFields)
+        if (value.duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.timestamp_ms)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.language_code)
         if (value.metadata != null) TranscriptionMetadata.ADAPTER.encodeWithTag(writer, 6,
             value.metadata)
         TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.alternatives)
@@ -212,6 +271,9 @@ public class STTOutput(
         val words = mutableListOf<WordTimestamp>()
         val alternatives = mutableListOf<TranscriptionAlternative>()
         var metadata: TranscriptionMetadata? = null
+        var language_code: String? = null
+        var timestamp_ms: Long = 0L
+        var duration_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -224,6 +286,9 @@ public class STTOutput(
             4 -> words.add(WordTimestamp.ADAPTER.decode(reader))
             5 -> alternatives.add(TranscriptionAlternative.ADAPTER.decode(reader))
             6 -> metadata = TranscriptionMetadata.ADAPTER.decode(reader)
+            7 -> language_code = ProtoAdapter.STRING.decode(reader)
+            8 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -234,6 +299,9 @@ public class STTOutput(
           words = words,
           alternatives = alternatives,
           metadata = metadata,
+          language_code = language_code,
+          timestamp_ms = timestamp_ms,
+          duration_ms = duration_ms,
           unknownFields = unknownFields
         )
       }

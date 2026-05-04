@@ -37,6 +37,14 @@ fun interface NativeDiffusionProgressListener {
 }
 
 /**
+ * Listener for native proto-byte callbacks. The byte array is an owned copy of
+ * the native callback payload and is safe to decode or dispatch asynchronously.
+ */
+fun interface NativeProtoProgressListener {
+    fun onProgress(progressBytes: ByteArray): Boolean
+}
+
+/**
  * Response descriptor returned by [RunAnywhereBridge.racHttpRequestExecute].
  *
  * Fields are `@JvmField` so the JNI layer can construct this object via a

@@ -383,6 +383,203 @@ public struct RAStoredModel: Sendable {
   fileprivate var _downloadedAtMs: Int64? = nil
 }
 
+public struct RAStorageInfoRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var includeDevice: Bool = false
+
+  public var includeApp: Bool = false
+
+  public var includeModels: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAStorageInfoResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var success: Bool = false
+
+  public var info: RAStorageInfo {
+    get {_info ?? RAStorageInfo()}
+    set {_info = newValue}
+  }
+  /// Returns true if `info` has been explicitly set.
+  public var hasInfo: Bool {self._info != nil}
+  /// Clears the value of `info`. Subsequent reads from it will return its default value.
+  public mutating func clearInfo() {self._info = nil}
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _info: RAStorageInfo? = nil
+}
+
+public struct RAStorageAvailabilityRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var modelID: String = String()
+
+  public var requiredBytes: Int64 = 0
+
+  public var safetyMargin: Double = 0
+
+  public var includeExistingModelBytes: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAStorageAvailabilityResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var success: Bool = false
+
+  public var availability: RAStorageAvailability {
+    get {_availability ?? RAStorageAvailability()}
+    set {_availability = newValue}
+  }
+  /// Returns true if `availability` has been explicitly set.
+  public var hasAvailability: Bool {self._availability != nil}
+  /// Clears the value of `availability`. Subsequent reads from it will return its default value.
+  public mutating func clearAvailability() {self._availability = nil}
+
+  public var warnings: [String] = []
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _availability: RAStorageAvailability? = nil
+}
+
+public struct RAStorageDeletePlanRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var modelIds: [String] = []
+
+  public var requiredBytes: Int64 = 0
+
+  public var includeCache: Bool = false
+
+  public var oldestFirst: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAStorageDeleteCandidate: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var modelID: String = String()
+
+  public var reclaimableBytes: Int64 = 0
+
+  public var lastUsedMs: Int64 {
+    get {_lastUsedMs ?? 0}
+    set {_lastUsedMs = newValue}
+  }
+  /// Returns true if `lastUsedMs` has been explicitly set.
+  public var hasLastUsedMs: Bool {self._lastUsedMs != nil}
+  /// Clears the value of `lastUsedMs`. Subsequent reads from it will return its default value.
+  public mutating func clearLastUsedMs() {self._lastUsedMs = nil}
+
+  public var isLoaded: Bool = false
+
+  public var localPath: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _lastUsedMs: Int64? = nil
+}
+
+public struct RAStorageDeletePlan: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var canReclaimRequiredBytes: Bool = false
+
+  public var requiredBytes: Int64 = 0
+
+  public var reclaimableBytes: Int64 = 0
+
+  public var candidates: [RAStorageDeleteCandidate] = []
+
+  public var warnings: [String] = []
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAStorageDeleteRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var modelIds: [String] = []
+
+  public var deleteFiles: Bool = false
+
+  public var clearRegistryPaths_p: Bool = false
+
+  public var unloadIfLoaded: Bool = false
+
+  public var dryRun: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAStorageDeleteResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var success: Bool = false
+
+  public var deletedBytes: Int64 = 0
+
+  public var deletedModelIds: [String] = []
+
+  public var failedModelIds: [String] = []
+
+  public var warnings: [String] = []
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
@@ -682,6 +879,443 @@ extension RAStoredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if lhs.sizeBytes != rhs.sizeBytes {return false}
     if lhs.localPath != rhs.localPath {return false}
     if lhs._downloadedAtMs != rhs._downloadedAtMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageInfoRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_device\0\u{3}include_app\0\u{3}include_models\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.includeDevice) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeApp) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.includeModels) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.includeDevice != false {
+      try visitor.visitSingularBoolField(value: self.includeDevice, fieldNumber: 1)
+    }
+    if self.includeApp != false {
+      try visitor.visitSingularBoolField(value: self.includeApp, fieldNumber: 2)
+    }
+    if self.includeModels != false {
+      try visitor.visitSingularBoolField(value: self.includeModels, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageInfoRequest, rhs: RAStorageInfoRequest) -> Bool {
+    if lhs.includeDevice != rhs.includeDevice {return false}
+    if lhs.includeApp != rhs.includeApp {return false}
+    if lhs.includeModels != rhs.includeModels {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageInfoResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}info\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._info) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
+    }
+    try { if let v = self._info {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageInfoResult, rhs: RAStorageInfoResult) -> Bool {
+    if lhs.success != rhs.success {return false}
+    if lhs._info != rhs._info {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageAvailabilityRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}required_bytes\0\u{3}safety_margin\0\u{3}include_existing_model_bytes\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.requiredBytes) }()
+      case 3: try { try decoder.decodeSingularDoubleField(value: &self.safetyMargin) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.includeExistingModelBytes) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
+    }
+    if self.requiredBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.requiredBytes, fieldNumber: 2)
+    }
+    if self.safetyMargin.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.safetyMargin, fieldNumber: 3)
+    }
+    if self.includeExistingModelBytes != false {
+      try visitor.visitSingularBoolField(value: self.includeExistingModelBytes, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageAvailabilityRequest, rhs: RAStorageAvailabilityRequest) -> Bool {
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.requiredBytes != rhs.requiredBytes {return false}
+    if lhs.safetyMargin != rhs.safetyMargin {return false}
+    if lhs.includeExistingModelBytes != rhs.includeExistingModelBytes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageAvailabilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageAvailabilityResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}availability\0\u{1}warnings\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._availability) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
+    }
+    try { if let v = self._availability {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 3)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageAvailabilityResult, rhs: RAStorageAvailabilityResult) -> Bool {
+    if lhs.success != rhs.success {return false}
+    if lhs._availability != rhs._availability {return false}
+    if lhs.warnings != rhs.warnings {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageDeletePlanRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}required_bytes\0\u{3}include_cache\0\u{3}oldest_first\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.modelIds) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.requiredBytes) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.includeCache) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.oldestFirst) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.modelIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.modelIds, fieldNumber: 1)
+    }
+    if self.requiredBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.requiredBytes, fieldNumber: 2)
+    }
+    if self.includeCache != false {
+      try visitor.visitSingularBoolField(value: self.includeCache, fieldNumber: 3)
+    }
+    if self.oldestFirst != false {
+      try visitor.visitSingularBoolField(value: self.oldestFirst, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageDeletePlanRequest, rhs: RAStorageDeletePlanRequest) -> Bool {
+    if lhs.modelIds != rhs.modelIds {return false}
+    if lhs.requiredBytes != rhs.requiredBytes {return false}
+    if lhs.includeCache != rhs.includeCache {return false}
+    if lhs.oldestFirst != rhs.oldestFirst {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageDeleteCandidate"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}reclaimable_bytes\0\u{3}last_used_ms\0\u{3}is_loaded\0\u{3}local_path\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.reclaimableBytes) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self._lastUsedMs) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.isLoaded) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.localPath) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
+    }
+    if self.reclaimableBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.reclaimableBytes, fieldNumber: 2)
+    }
+    try { if let v = self._lastUsedMs {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 3)
+    } }()
+    if self.isLoaded != false {
+      try visitor.visitSingularBoolField(value: self.isLoaded, fieldNumber: 4)
+    }
+    if !self.localPath.isEmpty {
+      try visitor.visitSingularStringField(value: self.localPath, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageDeleteCandidate, rhs: RAStorageDeleteCandidate) -> Bool {
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.reclaimableBytes != rhs.reclaimableBytes {return false}
+    if lhs._lastUsedMs != rhs._lastUsedMs {return false}
+    if lhs.isLoaded != rhs.isLoaded {return false}
+    if lhs.localPath != rhs.localPath {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageDeletePlan"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_reclaim_required_bytes\0\u{3}required_bytes\0\u{3}reclaimable_bytes\0\u{1}candidates\0\u{1}warnings\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.canReclaimRequiredBytes) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.requiredBytes) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.reclaimableBytes) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.candidates) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.canReclaimRequiredBytes != false {
+      try visitor.visitSingularBoolField(value: self.canReclaimRequiredBytes, fieldNumber: 1)
+    }
+    if self.requiredBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.requiredBytes, fieldNumber: 2)
+    }
+    if self.reclaimableBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.reclaimableBytes, fieldNumber: 3)
+    }
+    if !self.candidates.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.candidates, fieldNumber: 4)
+    }
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 5)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageDeletePlan, rhs: RAStorageDeletePlan) -> Bool {
+    if lhs.canReclaimRequiredBytes != rhs.canReclaimRequiredBytes {return false}
+    if lhs.requiredBytes != rhs.requiredBytes {return false}
+    if lhs.reclaimableBytes != rhs.reclaimableBytes {return false}
+    if lhs.candidates != rhs.candidates {return false}
+    if lhs.warnings != rhs.warnings {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageDeleteRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}delete_files\0\u{3}clear_registry_paths\0\u{3}unload_if_loaded\0\u{3}dry_run\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.modelIds) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.deleteFiles) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.clearRegistryPaths_p) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.unloadIfLoaded) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.dryRun) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.modelIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.modelIds, fieldNumber: 1)
+    }
+    if self.deleteFiles != false {
+      try visitor.visitSingularBoolField(value: self.deleteFiles, fieldNumber: 2)
+    }
+    if self.clearRegistryPaths_p != false {
+      try visitor.visitSingularBoolField(value: self.clearRegistryPaths_p, fieldNumber: 3)
+    }
+    if self.unloadIfLoaded != false {
+      try visitor.visitSingularBoolField(value: self.unloadIfLoaded, fieldNumber: 4)
+    }
+    if self.dryRun != false {
+      try visitor.visitSingularBoolField(value: self.dryRun, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageDeleteRequest, rhs: RAStorageDeleteRequest) -> Bool {
+    if lhs.modelIds != rhs.modelIds {return false}
+    if lhs.deleteFiles != rhs.deleteFiles {return false}
+    if lhs.clearRegistryPaths_p != rhs.clearRegistryPaths_p {return false}
+    if lhs.unloadIfLoaded != rhs.unloadIfLoaded {return false}
+    if lhs.dryRun != rhs.dryRun {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StorageDeleteResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}deleted_bytes\0\u{3}deleted_model_ids\0\u{3}failed_model_ids\0\u{1}warnings\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.deletedBytes) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.deletedModelIds) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.failedModelIds) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
+    }
+    if self.deletedBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.deletedBytes, fieldNumber: 2)
+    }
+    if !self.deletedModelIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.deletedModelIds, fieldNumber: 3)
+    }
+    if !self.failedModelIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.failedModelIds, fieldNumber: 4)
+    }
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 5)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAStorageDeleteResult, rhs: RAStorageDeleteResult) -> Bool {
+    if lhs.success != rhs.success {return false}
+    if lhs.deletedBytes != rhs.deletedBytes {return false}
+    if lhs.deletedModelIds != rhs.deletedModelIds {return false}
+    if lhs.failedModelIds != rhs.failedModelIds {return false}
+    if lhs.warnings != rhs.warnings {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -11,22 +11,11 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.RAGConfiguration
+import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.public.RunAnywhere
-
-// MARK: - RAG Document
-//
-// Round 1 KOTLIN (G-A4): `RAGDocument` is currently absent from the
-// generated Wire types. Defined here as an SDK-local data shape that
-// mirrors the eventual `idl/rag.proto` :: RAGDocument message; once
-// the proto lands, this declaration is replaced with a re-export.
-public data class RAGDocument(
-    val id: String,
-    val text: String,
-    val metadataJson: String? = null,
-)
 
 // MARK: - Pipeline Lifecycle
 

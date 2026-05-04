@@ -562,6 +562,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSSynthesisMetadata final : public
     kProcessingTimeMsFieldNumber = 3,
     kAudioDurationMsFieldNumber = 5,
     kCharacterCountFieldNumber = 4,
+    kCharactersPerSecondFieldNumber = 6,
   };
   // string voice_id = 1;
   void clear_voice_id() ;
@@ -623,11 +624,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSSynthesisMetadata final : public
   void _internal_set_character_count(::int32_t value);
 
   public:
+  // float characters_per_second = 6;
+  void clear_characters_per_second() ;
+  [[nodiscard]] float characters_per_second() const;
+  void set_characters_per_second(float value);
+
+  private:
+  float _internal_characters_per_second() const;
+  void _internal_set_characters_per_second(float value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TTSSynthesisMetadata)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
                                    0, 65,
                                    2>
       _table_;
@@ -656,6 +667,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSSynthesisMetadata final : public
     ::int64_t processing_time_ms_;
     ::int64_t audio_duration_ms_;
     ::int32_t character_count_;
+    float characters_per_second_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1043,6 +1055,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSOptions final : public ::google:
     kVolumeFieldNumber = 5,
     kEnableSsmlFieldNumber = 6,
     kAudioFormatFieldNumber = 7,
+    kSampleRateFieldNumber = 8,
   };
   // string voice = 1;
   void clear_voice() ;
@@ -1124,12 +1137,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSOptions final : public ::google:
   void _internal_set_audio_format(::runanywhere::v1::AudioFormat value);
 
   public:
+  // int32 sample_rate = 8;
+  void clear_sample_rate() ;
+  [[nodiscard]] ::int32_t sample_rate() const;
+  void set_sample_rate(::int32_t value);
+
+  private:
+  ::int32_t _internal_sample_rate() const;
+  void _internal_set_sample_rate(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TTSOptions)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 7,
-                                   0, 52,
+  static const ::google::protobuf::internal::TcParseTable<3, 8,
+                                   0, 60,
                                    2>
       _table_;
 
@@ -1159,6 +1182,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSOptions final : public ::google:
     float volume_;
     bool enable_ssml_;
     int audio_format_;
+    ::int32_t sample_rate_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1324,6 +1348,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSConfiguration final : public ::g
     kSampleRateFieldNumber = 8,
     kEnableNeuralVoiceFieldNumber = 9,
     kEnableSsmlFieldNumber = 10,
+    kPreferredFrameworkFieldNumber = 11,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -1440,11 +1465,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSConfiguration final : public ::g
   void _internal_set_enable_ssml(bool value);
 
   public:
+  // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
+  [[nodiscard]] bool has_preferred_framework()
+      const;
+  void clear_preferred_framework() ;
+  [[nodiscard]] ::runanywhere::v1::InferenceFramework preferred_framework() const;
+  void set_preferred_framework(::runanywhere::v1::InferenceFramework value);
+
+  private:
+  ::runanywhere::v1::InferenceFramework _internal_preferred_framework() const;
+  void _internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TTSConfiguration)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 10,
+  static const ::google::protobuf::internal::TcParseTable<4, 11,
                                    0, 74,
                                    2>
       _table_;
@@ -1478,6 +1515,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSConfiguration final : public ::g
     ::int32_t sample_rate_;
     bool enable_neural_voice_;
     bool enable_ssml_;
+    int preferred_framework_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2423,6 +2461,35 @@ inline void TTSConfiguration::_internal_set_enable_ssml(bool value) {
   _impl_.enable_ssml_ = value;
 }
 
+// optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
+inline bool TTSConfiguration::has_preferred_framework() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
+  return value;
+}
+inline void TTSConfiguration::clear_preferred_framework() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.preferred_framework_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000400U);
+}
+inline ::runanywhere::v1::InferenceFramework TTSConfiguration::preferred_framework() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TTSConfiguration.preferred_framework)
+  return _internal_preferred_framework();
+}
+inline void TTSConfiguration::set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
+  _internal_set_preferred_framework(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TTSConfiguration.preferred_framework)
+}
+inline ::runanywhere::v1::InferenceFramework TTSConfiguration::_internal_preferred_framework() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::InferenceFramework>(_impl_.preferred_framework_);
+}
+inline void TTSConfiguration::_internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.preferred_framework_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // TTSOptions
@@ -2680,6 +2747,31 @@ inline ::runanywhere::v1::AudioFormat TTSOptions::_internal_audio_format() const
 inline void TTSOptions::_internal_set_audio_format(::runanywhere::v1::AudioFormat value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_format_ = value;
+}
+
+// int32 sample_rate = 8;
+inline void TTSOptions::clear_sample_rate() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sample_rate_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline ::int32_t TTSOptions::sample_rate() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TTSOptions.sample_rate)
+  return _internal_sample_rate();
+}
+inline void TTSOptions::set_sample_rate(::int32_t value) {
+  _internal_set_sample_rate(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TTSOptions.sample_rate)
+}
+inline ::int32_t TTSOptions::_internal_sample_rate() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.sample_rate_;
+}
+inline void TTSOptions::_internal_set_sample_rate(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sample_rate_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -3008,6 +3100,31 @@ inline ::int64_t TTSSynthesisMetadata::_internal_audio_duration_ms() const {
 inline void TTSSynthesisMetadata::_internal_set_audio_duration_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_duration_ms_ = value;
+}
+
+// float characters_per_second = 6;
+inline void TTSSynthesisMetadata::clear_characters_per_second() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.characters_per_second_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline float TTSSynthesisMetadata::characters_per_second() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TTSSynthesisMetadata.characters_per_second)
+  return _internal_characters_per_second();
+}
+inline void TTSSynthesisMetadata::set_characters_per_second(float value) {
+  _internal_set_characters_per_second(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TTSSynthesisMetadata.characters_per_second)
+}
+inline float TTSSynthesisMetadata::_internal_characters_per_second() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.characters_per_second_;
+}
+inline void TTSSynthesisMetadata::_internal_set_characters_per_second(float value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.characters_per_second_ = value;
 }
 
 // -------------------------------------------------------------------

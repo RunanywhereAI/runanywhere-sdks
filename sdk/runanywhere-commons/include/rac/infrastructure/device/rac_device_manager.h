@@ -125,6 +125,14 @@ typedef struct rac_device_callbacks {
 RAC_API rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* callbacks);
 
 /**
+ * @brief Backward-compatible alias for rac_device_manager_set_callbacks.
+ *
+ * Some FFI bindings use the shorter device callback symbol while the canonical
+ * C++ device manager API uses rac_device_manager_set_callbacks().
+ */
+RAC_API rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks);
+
+/**
  * @brief Register device with backend if not already registered
  *
  * This is the main entry point for device registration.

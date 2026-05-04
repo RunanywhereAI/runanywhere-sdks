@@ -22,10 +22,9 @@ import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
 import type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
-import type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
+import type { VoiceAgentComposeConfig, VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import type {
-  VoiceAgentConfig,
   VoiceAgentComponentStates,
   VoiceAgentResult,
 } from '../../types/index';
@@ -40,7 +39,7 @@ const logger = new SDKLogger('VoiceAgent');
  * every verb on `RunAnywhere.<voice agent>` throws `backendNotAvailable`.
  */
 export interface VoiceAgentProvider {
-  initializeVoiceAgent(config: VoiceAgentConfig): Promise<void>;
+  initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void>;
   initializeVoiceAgentWithLoadedModels(): Promise<void>;
   isVoiceAgentReady(): Promise<boolean> | boolean;
   getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> | VoiceAgentComponentStates;
@@ -85,7 +84,7 @@ function requireProvider(verb: string): VoiceAgentProvider {
 // Public API — Swift-symmetric verbs.
 // ---------------------------------------------------------------------------
 
-export async function initializeVoiceAgent(config: VoiceAgentConfig): Promise<void> {
+export async function initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void> {
   await requireProvider('initializeVoiceAgent').initializeVoiceAgent(config);
   logger.info('VoiceAgent initialized');
 }

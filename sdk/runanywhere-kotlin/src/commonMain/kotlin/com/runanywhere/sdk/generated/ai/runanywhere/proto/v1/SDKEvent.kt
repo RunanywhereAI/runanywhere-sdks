@@ -61,6 +61,30 @@ public class SDKEvent(
     schemaIndex = 1,
   )
   public val severity: EventSeverity = EventSeverity.EVENT_SEVERITY_DEBUG,
+  @field:WireField(
+    tag = 20,
+    adapter = "ai.runanywhere.proto.v1.EventCategory#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 2,
+  )
+  public val category: EventCategory = EventCategory.EVENT_CATEGORY_UNSPECIFIED,
+  @field:WireField(
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.SDKComponent#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED,
+  /**
+   * Typed failure details for any failed event. When the event itself is
+   * only an error notification, use the failure oneof arm below.
+   */
+  @field:WireField(
+    tag = 22,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 4,
+  )
+  public val error: SDKError? = null,
   /**
    * Event identifier (UUID). Required by Swift SDKEvent.id /
    * Kotlin SDKEvent.id / Dart SDKEvent.id for de-duplication.
@@ -69,7 +93,7 @@ public class SDKEvent(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 5,
   )
   public val id: String = "",
   /**
@@ -81,7 +105,7 @@ public class SDKEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sessionId",
-    schemaIndex = 3,
+    schemaIndex = 6,
   )
   public val session_id: String = "",
   /**
@@ -92,7 +116,7 @@ public class SDKEvent(
     tag = 15,
     adapter = "ai.runanywhere.proto.v1.EventDestination#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 7,
   )
   public val destination: EventDestination = EventDestination.EVENT_DESTINATION_UNSPECIFIED,
   properties: Map<String, String> = emptyMap(),
@@ -100,63 +124,63 @@ public class SDKEvent(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.InitializationEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 6,
+    schemaIndex = 9,
   )
   public val initialization: InitializationEvent? = null,
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.ConfigurationEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 7,
+    schemaIndex = 10,
   )
   public val configuration: ConfigurationEvent? = null,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.GenerationEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 8,
+    schemaIndex = 11,
   )
   public val generation: GenerationEvent? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.ModelEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 9,
+    schemaIndex = 12,
   )
   public val model: ModelEvent? = null,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.PerformanceEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 10,
+    schemaIndex = 13,
   )
   public val performance: PerformanceEvent? = null,
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.NetworkEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 11,
+    schemaIndex = 14,
   )
   public val network: NetworkEvent? = null,
   @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.StorageEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 12,
+    schemaIndex = 15,
   )
   public val storage: StorageEvent? = null,
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.FrameworkEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 13,
+    schemaIndex = 16,
   )
   public val framework: FrameworkEvent? = null,
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.DeviceEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 14,
+    schemaIndex = 17,
   )
   public val device: DeviceEvent? = null,
   @field:WireField(
@@ -164,14 +188,14 @@ public class SDKEvent(
     adapter = "ai.runanywhere.proto.v1.ComponentInitializationEvent#ADAPTER",
     jsonName = "componentInit",
     oneofName = "event",
-    schemaIndex = 15,
+    schemaIndex = 18,
   )
   public val component_init: ComponentInitializationEvent? = null,
   @field:WireField(
     tag = 17,
     adapter = "ai.runanywhere.proto.v1.VoiceLifecycleEvent#ADAPTER",
     oneofName = "event",
-    schemaIndex = 16,
+    schemaIndex = 19,
   )
   public val voice: VoiceLifecycleEvent? = null,
   /**
@@ -182,9 +206,90 @@ public class SDKEvent(
     adapter = "ai.runanywhere.proto.v1.VoiceEvent#ADAPTER",
     jsonName = "voicePipeline",
     oneofName = "event",
-    schemaIndex = 17,
+    schemaIndex = 20,
   )
   public val voice_pipeline: VoiceEvent? = null,
+  @field:WireField(
+    tag = 19,
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleEvent#ADAPTER",
+    jsonName = "componentLifecycle",
+    oneofName = "event",
+    schemaIndex = 21,
+  )
+  public val component_lifecycle: ComponentLifecycleEvent? = null,
+  @field:WireField(
+    tag = 23,
+    adapter = "ai.runanywhere.proto.v1.SessionEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 22,
+  )
+  public val session: SessionEvent? = null,
+  @field:WireField(
+    tag = 24,
+    adapter = "ai.runanywhere.proto.v1.AuthEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 23,
+  )
+  public val auth: AuthEvent? = null,
+  @field:WireField(
+    tag = 25,
+    adapter = "ai.runanywhere.proto.v1.ModelRegistryEvent#ADAPTER",
+    jsonName = "modelRegistry",
+    oneofName = "event",
+    schemaIndex = 24,
+  )
+  public val model_registry: ModelRegistryEvent? = null,
+  @field:WireField(
+    tag = 26,
+    adapter = "ai.runanywhere.proto.v1.DownloadEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 25,
+  )
+  public val download: DownloadEvent? = null,
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.StorageLifecycleEvent#ADAPTER",
+    jsonName = "storageLifecycle",
+    oneofName = "event",
+    schemaIndex = 26,
+  )
+  public val storage_lifecycle: StorageLifecycleEvent? = null,
+  @field:WireField(
+    tag = 28,
+    adapter = "ai.runanywhere.proto.v1.HardwareRoutingEvent#ADAPTER",
+    jsonName = "hardwareRouting",
+    oneofName = "event",
+    schemaIndex = 27,
+  )
+  public val hardware_routing: HardwareRoutingEvent? = null,
+  @field:WireField(
+    tag = 29,
+    adapter = "ai.runanywhere.proto.v1.CapabilityOperationEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 28,
+  )
+  public val capability: CapabilityOperationEvent? = null,
+  @field:WireField(
+    tag = 30,
+    adapter = "ai.runanywhere.proto.v1.TelemetryEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 29,
+  )
+  public val telemetry: TelemetryEvent? = null,
+  @field:WireField(
+    tag = 31,
+    adapter = "ai.runanywhere.proto.v1.CancellationEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 30,
+  )
+  public val cancellation: CancellationEvent? = null,
+  @field:WireField(
+    tag = 32,
+    adapter = "ai.runanywhere.proto.v1.FailureEvent#ADAPTER",
+    oneofName = "event",
+    schemaIndex = 31,
+  )
+  public val failure: FailureEvent? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SDKEvent, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -195,14 +300,16 @@ public class SDKEvent(
     tag = 16,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 5,
+    schemaIndex = 8,
   )
   public val properties: Map<String, String> = immutableCopyOf("properties", properties)
 
   init {
     require(countNonNull(initialization, configuration, generation, model, performance, network,
-        storage, framework, device, component_init, voice, voice_pipeline) <= 1) {
-      "At most one of initialization, configuration, generation, model, performance, network, storage, framework, device, component_init, voice, voice_pipeline may be non-null"
+        storage, framework, device, component_init, voice, voice_pipeline, component_lifecycle,
+        session, auth, model_registry, download, storage_lifecycle, hardware_routing, capability,
+        telemetry, cancellation, failure) <= 1) {
+      "At most one of initialization, configuration, generation, model, performance, network, storage, framework, device, component_init, voice, voice_pipeline, component_lifecycle, session, auth, model_registry, download, storage_lifecycle, hardware_routing, capability, telemetry, cancellation, failure may be non-null"
     }
   }
 
@@ -219,6 +326,9 @@ public class SDKEvent(
     if (unknownFields != other.unknownFields) return false
     if (timestamp_ms != other.timestamp_ms) return false
     if (severity != other.severity) return false
+    if (category != other.category) return false
+    if (component != other.component) return false
+    if (error != other.error) return false
     if (id != other.id) return false
     if (session_id != other.session_id) return false
     if (destination != other.destination) return false
@@ -235,6 +345,17 @@ public class SDKEvent(
     if (component_init != other.component_init) return false
     if (voice != other.voice) return false
     if (voice_pipeline != other.voice_pipeline) return false
+    if (component_lifecycle != other.component_lifecycle) return false
+    if (session != other.session) return false
+    if (auth != other.auth) return false
+    if (model_registry != other.model_registry) return false
+    if (download != other.download) return false
+    if (storage_lifecycle != other.storage_lifecycle) return false
+    if (hardware_routing != other.hardware_routing) return false
+    if (capability != other.capability) return false
+    if (telemetry != other.telemetry) return false
+    if (cancellation != other.cancellation) return false
+    if (failure != other.failure) return false
     return true
   }
 
@@ -244,6 +365,9 @@ public class SDKEvent(
       result = unknownFields.hashCode()
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + severity.hashCode()
+      result = result * 37 + category.hashCode()
+      result = result * 37 + component.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + id.hashCode()
       result = result * 37 + session_id.hashCode()
       result = result * 37 + destination.hashCode()
@@ -260,6 +384,17 @@ public class SDKEvent(
       result = result * 37 + (component_init?.hashCode() ?: 0)
       result = result * 37 + (voice?.hashCode() ?: 0)
       result = result * 37 + (voice_pipeline?.hashCode() ?: 0)
+      result = result * 37 + (component_lifecycle?.hashCode() ?: 0)
+      result = result * 37 + (session?.hashCode() ?: 0)
+      result = result * 37 + (auth?.hashCode() ?: 0)
+      result = result * 37 + (model_registry?.hashCode() ?: 0)
+      result = result * 37 + (download?.hashCode() ?: 0)
+      result = result * 37 + (storage_lifecycle?.hashCode() ?: 0)
+      result = result * 37 + (hardware_routing?.hashCode() ?: 0)
+      result = result * 37 + (capability?.hashCode() ?: 0)
+      result = result * 37 + (telemetry?.hashCode() ?: 0)
+      result = result * 37 + (cancellation?.hashCode() ?: 0)
+      result = result * 37 + (failure?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -269,6 +404,9 @@ public class SDKEvent(
     val result = mutableListOf<String>()
     result += """timestamp_ms=$timestamp_ms"""
     result += """severity=$severity"""
+    result += """category=$category"""
+    result += """component=$component"""
+    if (error != null) result += """error=$error"""
     result += """id=${sanitize(id)}"""
     result += """session_id=${sanitize(session_id)}"""
     result += """destination=$destination"""
@@ -285,12 +423,26 @@ public class SDKEvent(
     if (component_init != null) result += """component_init=$component_init"""
     if (voice != null) result += """voice=$voice"""
     if (voice_pipeline != null) result += """voice_pipeline=$voice_pipeline"""
+    if (component_lifecycle != null) result += """component_lifecycle=$component_lifecycle"""
+    if (session != null) result += """session=$session"""
+    if (auth != null) result += """auth=$auth"""
+    if (model_registry != null) result += """model_registry=$model_registry"""
+    if (download != null) result += """download=$download"""
+    if (storage_lifecycle != null) result += """storage_lifecycle=$storage_lifecycle"""
+    if (hardware_routing != null) result += """hardware_routing=$hardware_routing"""
+    if (capability != null) result += """capability=$capability"""
+    if (telemetry != null) result += """telemetry=$telemetry"""
+    if (cancellation != null) result += """cancellation=$cancellation"""
+    if (failure != null) result += """failure=$failure"""
     return result.joinToString(prefix = "SDKEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     timestamp_ms: Long = this.timestamp_ms,
     severity: EventSeverity = this.severity,
+    category: EventCategory = this.category,
+    component: SDKComponent = this.component,
+    error: SDKError? = this.error,
     id: String = this.id,
     session_id: String = this.session_id,
     destination: EventDestination = this.destination,
@@ -307,10 +459,23 @@ public class SDKEvent(
     component_init: ComponentInitializationEvent? = this.component_init,
     voice: VoiceLifecycleEvent? = this.voice,
     voice_pipeline: VoiceEvent? = this.voice_pipeline,
+    component_lifecycle: ComponentLifecycleEvent? = this.component_lifecycle,
+    session: SessionEvent? = this.session,
+    auth: AuthEvent? = this.auth,
+    model_registry: ModelRegistryEvent? = this.model_registry,
+    download: DownloadEvent? = this.download,
+    storage_lifecycle: StorageLifecycleEvent? = this.storage_lifecycle,
+    hardware_routing: HardwareRoutingEvent? = this.hardware_routing,
+    capability: CapabilityOperationEvent? = this.capability,
+    telemetry: TelemetryEvent? = this.telemetry,
+    cancellation: CancellationEvent? = this.cancellation,
+    failure: FailureEvent? = this.failure,
     unknownFields: ByteString = this.unknownFields,
-  ): SDKEvent = SDKEvent(timestamp_ms, severity, id, session_id, destination, properties,
-      initialization, configuration, generation, model, performance, network, storage, framework,
-      device, component_init, voice, voice_pipeline, unknownFields)
+  ): SDKEvent = SDKEvent(timestamp_ms, severity, category, component, error, id, session_id,
+      destination, properties, initialization, configuration, generation, model, performance,
+      network, storage, framework, device, component_init, voice, voice_pipeline,
+      component_lifecycle, session, auth, model_registry, download, storage_lifecycle,
+      hardware_routing, capability, telemetry, cancellation, failure, unknownFields)
 
   public companion object {
     @JvmField
@@ -331,6 +496,11 @@ public class SDKEvent(
             value.timestamp_ms)
         if (value.severity != EventSeverity.EVENT_SEVERITY_DEBUG) size +=
             EventSeverity.ADAPTER.encodedSizeWithTag(2, value.severity)
+        if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED) size +=
+            EventCategory.ADAPTER.encodedSizeWithTag(20, value.category)
+        if (value.component != SDKComponent.SDK_COMPONENT_UNSPECIFIED) size +=
+            SDKComponent.ADAPTER.encodedSizeWithTag(21, value.component)
+        size += SDKError.ADAPTER.encodedSizeWithTag(22, value.error)
         if (value.id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.id)
         if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(14,
             value.session_id)
@@ -349,6 +519,17 @@ public class SDKEvent(
         size += ComponentInitializationEvent.ADAPTER.encodedSizeWithTag(12, value.component_init)
         size += VoiceLifecycleEvent.ADAPTER.encodedSizeWithTag(17, value.voice)
         size += VoiceEvent.ADAPTER.encodedSizeWithTag(18, value.voice_pipeline)
+        size += ComponentLifecycleEvent.ADAPTER.encodedSizeWithTag(19, value.component_lifecycle)
+        size += SessionEvent.ADAPTER.encodedSizeWithTag(23, value.session)
+        size += AuthEvent.ADAPTER.encodedSizeWithTag(24, value.auth)
+        size += ModelRegistryEvent.ADAPTER.encodedSizeWithTag(25, value.model_registry)
+        size += DownloadEvent.ADAPTER.encodedSizeWithTag(26, value.download)
+        size += StorageLifecycleEvent.ADAPTER.encodedSizeWithTag(27, value.storage_lifecycle)
+        size += HardwareRoutingEvent.ADAPTER.encodedSizeWithTag(28, value.hardware_routing)
+        size += CapabilityOperationEvent.ADAPTER.encodedSizeWithTag(29, value.capability)
+        size += TelemetryEvent.ADAPTER.encodedSizeWithTag(30, value.telemetry)
+        size += CancellationEvent.ADAPTER.encodedSizeWithTag(31, value.cancellation)
+        size += FailureEvent.ADAPTER.encodedSizeWithTag(32, value.failure)
         return size
       }
 
@@ -357,6 +538,11 @@ public class SDKEvent(
             value.timestamp_ms)
         if (value.severity != EventSeverity.EVENT_SEVERITY_DEBUG)
             EventSeverity.ADAPTER.encodeWithTag(writer, 2, value.severity)
+        if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+            EventCategory.ADAPTER.encodeWithTag(writer, 20, value.category)
+        if (value.component != SDKComponent.SDK_COMPONENT_UNSPECIFIED)
+            SDKComponent.ADAPTER.encodeWithTag(writer, 21, value.component)
+        SDKError.ADAPTER.encodeWithTag(writer, 22, value.error)
         if (value.id != "") ProtoAdapter.STRING.encodeWithTag(writer, 13, value.id)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 14, value.session_id)
         if (value.destination != EventDestination.EVENT_DESTINATION_UNSPECIFIED)
@@ -374,11 +560,33 @@ public class SDKEvent(
         ComponentInitializationEvent.ADAPTER.encodeWithTag(writer, 12, value.component_init)
         VoiceLifecycleEvent.ADAPTER.encodeWithTag(writer, 17, value.voice)
         VoiceEvent.ADAPTER.encodeWithTag(writer, 18, value.voice_pipeline)
+        ComponentLifecycleEvent.ADAPTER.encodeWithTag(writer, 19, value.component_lifecycle)
+        SessionEvent.ADAPTER.encodeWithTag(writer, 23, value.session)
+        AuthEvent.ADAPTER.encodeWithTag(writer, 24, value.auth)
+        ModelRegistryEvent.ADAPTER.encodeWithTag(writer, 25, value.model_registry)
+        DownloadEvent.ADAPTER.encodeWithTag(writer, 26, value.download)
+        StorageLifecycleEvent.ADAPTER.encodeWithTag(writer, 27, value.storage_lifecycle)
+        HardwareRoutingEvent.ADAPTER.encodeWithTag(writer, 28, value.hardware_routing)
+        CapabilityOperationEvent.ADAPTER.encodeWithTag(writer, 29, value.capability)
+        TelemetryEvent.ADAPTER.encodeWithTag(writer, 30, value.telemetry)
+        CancellationEvent.ADAPTER.encodeWithTag(writer, 31, value.cancellation)
+        FailureEvent.ADAPTER.encodeWithTag(writer, 32, value.failure)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SDKEvent) {
         writer.writeBytes(value.unknownFields)
+        FailureEvent.ADAPTER.encodeWithTag(writer, 32, value.failure)
+        CancellationEvent.ADAPTER.encodeWithTag(writer, 31, value.cancellation)
+        TelemetryEvent.ADAPTER.encodeWithTag(writer, 30, value.telemetry)
+        CapabilityOperationEvent.ADAPTER.encodeWithTag(writer, 29, value.capability)
+        HardwareRoutingEvent.ADAPTER.encodeWithTag(writer, 28, value.hardware_routing)
+        StorageLifecycleEvent.ADAPTER.encodeWithTag(writer, 27, value.storage_lifecycle)
+        DownloadEvent.ADAPTER.encodeWithTag(writer, 26, value.download)
+        ModelRegistryEvent.ADAPTER.encodeWithTag(writer, 25, value.model_registry)
+        AuthEvent.ADAPTER.encodeWithTag(writer, 24, value.auth)
+        SessionEvent.ADAPTER.encodeWithTag(writer, 23, value.session)
+        ComponentLifecycleEvent.ADAPTER.encodeWithTag(writer, 19, value.component_lifecycle)
         VoiceEvent.ADAPTER.encodeWithTag(writer, 18, value.voice_pipeline)
         VoiceLifecycleEvent.ADAPTER.encodeWithTag(writer, 17, value.voice)
         ComponentInitializationEvent.ADAPTER.encodeWithTag(writer, 12, value.component_init)
@@ -396,6 +604,11 @@ public class SDKEvent(
             EventDestination.ADAPTER.encodeWithTag(writer, 15, value.destination)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 14, value.session_id)
         if (value.id != "") ProtoAdapter.STRING.encodeWithTag(writer, 13, value.id)
+        SDKError.ADAPTER.encodeWithTag(writer, 22, value.error)
+        if (value.component != SDKComponent.SDK_COMPONENT_UNSPECIFIED)
+            SDKComponent.ADAPTER.encodeWithTag(writer, 21, value.component)
+        if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+            EventCategory.ADAPTER.encodeWithTag(writer, 20, value.category)
         if (value.severity != EventSeverity.EVENT_SEVERITY_DEBUG)
             EventSeverity.ADAPTER.encodeWithTag(writer, 2, value.severity)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 1,
@@ -405,6 +618,9 @@ public class SDKEvent(
       override fun decode(reader: ProtoReader): SDKEvent {
         var timestamp_ms: Long = 0L
         var severity: EventSeverity = EventSeverity.EVENT_SEVERITY_DEBUG
+        var category: EventCategory = EventCategory.EVENT_CATEGORY_UNSPECIFIED
+        var component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED
+        var error: SDKError? = null
         var id: String = ""
         var session_id: String = ""
         var destination: EventDestination = EventDestination.EVENT_DESTINATION_UNSPECIFIED
@@ -421,6 +637,17 @@ public class SDKEvent(
         var component_init: ComponentInitializationEvent? = null
         var voice: VoiceLifecycleEvent? = null
         var voice_pipeline: VoiceEvent? = null
+        var component_lifecycle: ComponentLifecycleEvent? = null
+        var session: SessionEvent? = null
+        var auth: AuthEvent? = null
+        var model_registry: ModelRegistryEvent? = null
+        var download: DownloadEvent? = null
+        var storage_lifecycle: StorageLifecycleEvent? = null
+        var hardware_routing: HardwareRoutingEvent? = null
+        var capability: CapabilityOperationEvent? = null
+        var telemetry: TelemetryEvent? = null
+        var cancellation: CancellationEvent? = null
+        var failure: FailureEvent? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
@@ -429,6 +656,17 @@ public class SDKEvent(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            20 -> try {
+              category = EventCategory.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            21 -> try {
+              component = SDKComponent.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            22 -> error = SDKError.ADAPTER.decode(reader)
             13 -> id = ProtoAdapter.STRING.decode(reader)
             14 -> session_id = ProtoAdapter.STRING.decode(reader)
             15 -> try {
@@ -449,12 +687,26 @@ public class SDKEvent(
             12 -> component_init = ComponentInitializationEvent.ADAPTER.decode(reader)
             17 -> voice = VoiceLifecycleEvent.ADAPTER.decode(reader)
             18 -> voice_pipeline = VoiceEvent.ADAPTER.decode(reader)
+            19 -> component_lifecycle = ComponentLifecycleEvent.ADAPTER.decode(reader)
+            23 -> session = SessionEvent.ADAPTER.decode(reader)
+            24 -> auth = AuthEvent.ADAPTER.decode(reader)
+            25 -> model_registry = ModelRegistryEvent.ADAPTER.decode(reader)
+            26 -> download = DownloadEvent.ADAPTER.decode(reader)
+            27 -> storage_lifecycle = StorageLifecycleEvent.ADAPTER.decode(reader)
+            28 -> hardware_routing = HardwareRoutingEvent.ADAPTER.decode(reader)
+            29 -> capability = CapabilityOperationEvent.ADAPTER.decode(reader)
+            30 -> telemetry = TelemetryEvent.ADAPTER.decode(reader)
+            31 -> cancellation = CancellationEvent.ADAPTER.decode(reader)
+            32 -> failure = FailureEvent.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SDKEvent(
           timestamp_ms = timestamp_ms,
           severity = severity,
+          category = category,
+          component = component,
+          error = error,
           id = id,
           session_id = session_id,
           destination = destination,
@@ -471,11 +723,23 @@ public class SDKEvent(
           component_init = component_init,
           voice = voice,
           voice_pipeline = voice_pipeline,
+          component_lifecycle = component_lifecycle,
+          session = session,
+          auth = auth,
+          model_registry = model_registry,
+          download = download,
+          storage_lifecycle = storage_lifecycle,
+          hardware_routing = hardware_routing,
+          capability = capability,
+          telemetry = telemetry,
+          cancellation = cancellation,
+          failure = failure,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: SDKEvent): SDKEvent = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         initialization = value.initialization?.let(InitializationEvent.ADAPTER::redact),
         configuration = value.configuration?.let(ConfigurationEvent.ADAPTER::redact),
         generation = value.generation?.let(GenerationEvent.ADAPTER::redact),
@@ -488,6 +752,18 @@ public class SDKEvent(
         component_init = value.component_init?.let(ComponentInitializationEvent.ADAPTER::redact),
         voice = value.voice?.let(VoiceLifecycleEvent.ADAPTER::redact),
         voice_pipeline = value.voice_pipeline?.let(VoiceEvent.ADAPTER::redact),
+        component_lifecycle =
+            value.component_lifecycle?.let(ComponentLifecycleEvent.ADAPTER::redact),
+        session = value.session?.let(SessionEvent.ADAPTER::redact),
+        auth = value.auth?.let(AuthEvent.ADAPTER::redact),
+        model_registry = value.model_registry?.let(ModelRegistryEvent.ADAPTER::redact),
+        download = value.download?.let(DownloadEvent.ADAPTER::redact),
+        storage_lifecycle = value.storage_lifecycle?.let(StorageLifecycleEvent.ADAPTER::redact),
+        hardware_routing = value.hardware_routing?.let(HardwareRoutingEvent.ADAPTER::redact),
+        capability = value.capability?.let(CapabilityOperationEvent.ADAPTER::redact),
+        telemetry = value.telemetry?.let(TelemetryEvent.ADAPTER::redact),
+        cancellation = value.cancellation?.let(CancellationEvent.ADAPTER::redact),
+        failure = value.failure?.let(FailureEvent.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

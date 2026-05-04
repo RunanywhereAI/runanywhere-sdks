@@ -5,7 +5,7 @@
 // source: voice_agent_service.proto
 /* eslint-disable */
 import _m0 from "protobufjs/minimal";
-import { VoiceAgentComponentStates } from "./voice_events";
+import { audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates } from "./voice_events";
 export const protobufPackage = "runanywhere.v1";
 function createBaseVoiceAgentRequest() {
     return { eventFilter: "" };
@@ -65,6 +65,9 @@ function createBaseVoiceAgentResult() {
         thinkingContent: undefined,
         synthesizedAudio: undefined,
         finalState: undefined,
+        synthesizedAudioSampleRateHz: 0,
+        synthesizedAudioChannels: 0,
+        synthesizedAudioEncoding: 0,
     };
 }
 export const VoiceAgentResult = {
@@ -86,6 +89,15 @@ export const VoiceAgentResult = {
         }
         if (message.finalState !== undefined) {
             VoiceAgentComponentStates.encode(message.finalState, writer.uint32(50).fork()).ldelim();
+        }
+        if (message.synthesizedAudioSampleRateHz !== 0) {
+            writer.uint32(56).int32(message.synthesizedAudioSampleRateHz);
+        }
+        if (message.synthesizedAudioChannels !== 0) {
+            writer.uint32(64).int32(message.synthesizedAudioChannels);
+        }
+        if (message.synthesizedAudioEncoding !== 0) {
+            writer.uint32(72).int32(message.synthesizedAudioEncoding);
         }
         return writer;
     },
@@ -132,6 +144,24 @@ export const VoiceAgentResult = {
                     }
                     message.finalState = VoiceAgentComponentStates.decode(reader, reader.uint32());
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.synthesizedAudioSampleRateHz = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.synthesizedAudioChannels = reader.int32();
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.synthesizedAudioEncoding = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -148,6 +178,15 @@ export const VoiceAgentResult = {
             thinkingContent: isSet(object.thinkingContent) ? globalThis.String(object.thinkingContent) : undefined,
             synthesizedAudio: isSet(object.synthesizedAudio) ? bytesFromBase64(object.synthesizedAudio) : undefined,
             finalState: isSet(object.finalState) ? VoiceAgentComponentStates.fromJSON(object.finalState) : undefined,
+            synthesizedAudioSampleRateHz: isSet(object.synthesizedAudioSampleRateHz)
+                ? globalThis.Number(object.synthesizedAudioSampleRateHz)
+                : 0,
+            synthesizedAudioChannels: isSet(object.synthesizedAudioChannels)
+                ? globalThis.Number(object.synthesizedAudioChannels)
+                : 0,
+            synthesizedAudioEncoding: isSet(object.synthesizedAudioEncoding)
+                ? audioEncodingFromJSON(object.synthesizedAudioEncoding)
+                : 0,
         };
     },
     toJSON(message) {
@@ -170,6 +209,15 @@ export const VoiceAgentResult = {
         if (message.finalState !== undefined) {
             obj.finalState = VoiceAgentComponentStates.toJSON(message.finalState);
         }
+        if (message.synthesizedAudioSampleRateHz !== 0) {
+            obj.synthesizedAudioSampleRateHz = Math.round(message.synthesizedAudioSampleRateHz);
+        }
+        if (message.synthesizedAudioChannels !== 0) {
+            obj.synthesizedAudioChannels = Math.round(message.synthesizedAudioChannels);
+        }
+        if (message.synthesizedAudioEncoding !== 0) {
+            obj.synthesizedAudioEncoding = audioEncodingToJSON(message.synthesizedAudioEncoding);
+        }
         return obj;
     },
     create(base) {
@@ -185,6 +233,9 @@ export const VoiceAgentResult = {
         message.finalState = (object.finalState !== undefined && object.finalState !== null)
             ? VoiceAgentComponentStates.fromPartial(object.finalState)
             : undefined;
+        message.synthesizedAudioSampleRateHz = object.synthesizedAudioSampleRateHz ?? 0;
+        message.synthesizedAudioChannels = object.synthesizedAudioChannels ?? 0;
+        message.synthesizedAudioEncoding = object.synthesizedAudioEncoding ?? 0;
         return message;
     },
 };
@@ -195,6 +246,7 @@ function createBaseVoiceSessionConfig() {
         autoPlayTts: false,
         continuousMode: false,
         thinkingModeEnabled: false,
+        maxTokens: 0,
     };
 }
 export const VoiceSessionConfig = {
@@ -213,6 +265,9 @@ export const VoiceSessionConfig = {
         }
         if (message.thinkingModeEnabled !== false) {
             writer.uint32(40).bool(message.thinkingModeEnabled);
+        }
+        if (message.maxTokens !== 0) {
+            writer.uint32(48).int32(message.maxTokens);
         }
         return writer;
     },
@@ -253,6 +308,12 @@ export const VoiceSessionConfig = {
                     }
                     message.thinkingModeEnabled = reader.bool();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.maxTokens = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -268,6 +329,7 @@ export const VoiceSessionConfig = {
             autoPlayTts: isSet(object.autoPlayTts) ? globalThis.Boolean(object.autoPlayTts) : false,
             continuousMode: isSet(object.continuousMode) ? globalThis.Boolean(object.continuousMode) : false,
             thinkingModeEnabled: isSet(object.thinkingModeEnabled) ? globalThis.Boolean(object.thinkingModeEnabled) : false,
+            maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
         };
     },
     toJSON(message) {
@@ -287,6 +349,9 @@ export const VoiceSessionConfig = {
         if (message.thinkingModeEnabled !== false) {
             obj.thinkingModeEnabled = message.thinkingModeEnabled;
         }
+        if (message.maxTokens !== 0) {
+            obj.maxTokens = Math.round(message.maxTokens);
+        }
         return obj;
     },
     create(base) {
@@ -299,6 +364,87 @@ export const VoiceSessionConfig = {
         message.autoPlayTts = object.autoPlayTts ?? false;
         message.continuousMode = object.continuousMode ?? false;
         message.thinkingModeEnabled = object.thinkingModeEnabled ?? false;
+        message.maxTokens = object.maxTokens ?? 0;
+        return message;
+    },
+};
+function createBaseAudioPipelineConfig() {
+    return { cooldownDurationMs: 0, strictTransitions: false, maxTtsDurationMs: 0 };
+}
+export const AudioPipelineConfig = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.cooldownDurationMs !== 0) {
+            writer.uint32(8).int32(message.cooldownDurationMs);
+        }
+        if (message.strictTransitions !== false) {
+            writer.uint32(16).bool(message.strictTransitions);
+        }
+        if (message.maxTtsDurationMs !== 0) {
+            writer.uint32(24).int32(message.maxTtsDurationMs);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseAudioPipelineConfig();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.cooldownDurationMs = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.strictTransitions = reader.bool();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.maxTtsDurationMs = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            cooldownDurationMs: isSet(object.cooldownDurationMs) ? globalThis.Number(object.cooldownDurationMs) : 0,
+            strictTransitions: isSet(object.strictTransitions) ? globalThis.Boolean(object.strictTransitions) : false,
+            maxTtsDurationMs: isSet(object.maxTtsDurationMs) ? globalThis.Number(object.maxTtsDurationMs) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.cooldownDurationMs !== 0) {
+            obj.cooldownDurationMs = Math.round(message.cooldownDurationMs);
+        }
+        if (message.strictTransitions !== false) {
+            obj.strictTransitions = message.strictTransitions;
+        }
+        if (message.maxTtsDurationMs !== 0) {
+            obj.maxTtsDurationMs = Math.round(message.maxTtsDurationMs);
+        }
+        return obj;
+    },
+    create(base) {
+        return AudioPipelineConfig.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseAudioPipelineConfig();
+        message.cooldownDurationMs = object.cooldownDurationMs ?? 0;
+        message.strictTransitions = object.strictTransitions ?? false;
+        message.maxTtsDurationMs = object.maxTtsDurationMs ?? 0;
         return message;
     },
 };
@@ -324,6 +470,7 @@ function createBaseVoiceAgentComposeConfig() {
         wakewordEmbeddingModelPath: undefined,
         wakewordVadModelPath: undefined,
         sessionConfig: undefined,
+        audioPipelineConfig: undefined,
     };
 }
 export const VoiceAgentComposeConfig = {
@@ -387,6 +534,9 @@ export const VoiceAgentComposeConfig = {
         }
         if (message.sessionConfig !== undefined) {
             VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).ldelim();
+        }
+        if (message.audioPipelineConfig !== undefined) {
+            AudioPipelineConfig.encode(message.audioPipelineConfig, writer.uint32(170).fork()).ldelim();
         }
         return writer;
     },
@@ -517,6 +667,12 @@ export const VoiceAgentComposeConfig = {
                     }
                     message.sessionConfig = VoiceSessionConfig.decode(reader, reader.uint32());
                     continue;
+                case 21:
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.audioPipelineConfig = AudioPipelineConfig.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -551,6 +707,9 @@ export const VoiceAgentComposeConfig = {
                 ? globalThis.String(object.wakewordVadModelPath)
                 : undefined,
             sessionConfig: isSet(object.sessionConfig) ? VoiceSessionConfig.fromJSON(object.sessionConfig) : undefined,
+            audioPipelineConfig: isSet(object.audioPipelineConfig)
+                ? AudioPipelineConfig.fromJSON(object.audioPipelineConfig)
+                : undefined,
         };
     },
     toJSON(message) {
@@ -615,6 +774,9 @@ export const VoiceAgentComposeConfig = {
         if (message.sessionConfig !== undefined) {
             obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
         }
+        if (message.audioPipelineConfig !== undefined) {
+            obj.audioPipelineConfig = AudioPipelineConfig.toJSON(message.audioPipelineConfig);
+        }
         return obj;
     },
     create(base) {
@@ -643,6 +805,9 @@ export const VoiceAgentComposeConfig = {
         message.wakewordVadModelPath = object.wakewordVadModelPath ?? undefined;
         message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
             ? VoiceSessionConfig.fromPartial(object.sessionConfig)
+            : undefined;
+        message.audioPipelineConfig = (object.audioPipelineConfig !== undefined && object.audioPipelineConfig !== null)
+            ? AudioPipelineConfig.fromPartial(object.audioPipelineConfig)
             : undefined;
         return message;
     },

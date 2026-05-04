@@ -68,6 +68,17 @@ public class AudioFrameEvent(
     schemaIndex = 3,
   )
   public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
+  /**
+   * True for the final audio chunk in a TTS/voice-agent audio stream.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isFinal",
+    schemaIndex = 4,
+  )
+  public val is_final: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<AudioFrameEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -85,6 +96,7 @@ public class AudioFrameEvent(
     if (sample_rate_hz != other.sample_rate_hz) return false
     if (channels != other.channels) return false
     if (encoding != other.encoding) return false
+    if (is_final != other.is_final) return false
     return true
   }
 
@@ -96,6 +108,7 @@ public class AudioFrameEvent(
       result = result * 37 + sample_rate_hz.hashCode()
       result = result * 37 + channels.hashCode()
       result = result * 37 + encoding.hashCode()
+      result = result * 37 + is_final.hashCode()
       super.hashCode = result
     }
     return result
@@ -107,6 +120,7 @@ public class AudioFrameEvent(
     result += """sample_rate_hz=$sample_rate_hz"""
     result += """channels=$channels"""
     result += """encoding=$encoding"""
+    result += """is_final=$is_final"""
     return result.joinToString(prefix = "AudioFrameEvent{", separator = ", ", postfix = "}")
   }
 
@@ -115,8 +129,10 @@ public class AudioFrameEvent(
     sample_rate_hz: Int = this.sample_rate_hz,
     channels: Int = this.channels,
     encoding: AudioEncoding = this.encoding,
+    is_final: Boolean = this.is_final,
     unknownFields: ByteString = this.unknownFields,
-  ): AudioFrameEvent = AudioFrameEvent(pcm, sample_rate_hz, channels, encoding, unknownFields)
+  ): AudioFrameEvent = AudioFrameEvent(pcm, sample_rate_hz, channels, encoding, is_final,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -137,6 +153,7 @@ public class AudioFrameEvent(
         if (value.channels != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.channels)
         if (value.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) size +=
             AudioEncoding.ADAPTER.encodedSizeWithTag(4, value.encoding)
+        if (value.is_final != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.is_final)
         return size
       }
 
@@ -147,11 +164,13 @@ public class AudioFrameEvent(
         if (value.channels != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.channels)
         if (value.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED)
             AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
+        if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.is_final)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: AudioFrameEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.is_final)
         if (value.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED)
             AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
         if (value.channels != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.channels)
@@ -165,6 +184,7 @@ public class AudioFrameEvent(
         var sample_rate_hz: Int = 0
         var channels: Int = 0
         var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
+        var is_final: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> pcm = ProtoAdapter.BYTES.decode(reader)
@@ -175,6 +195,7 @@ public class AudioFrameEvent(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            5 -> is_final = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -183,6 +204,7 @@ public class AudioFrameEvent(
           sample_rate_hz = sample_rate_hz,
           channels = channels,
           encoding = encoding,
+          is_final = is_final,
           unknownFields = unknownFields
         )
       }

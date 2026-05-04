@@ -35,6 +35,14 @@ public class DownloadSubscribeRequest(
     schemaIndex = 0,
   )
   public val model_id: String = "",
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "taskId",
+    schemaIndex = 1,
+  )
+  public val task_id: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadSubscribeRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -49,6 +57,7 @@ public class DownloadSubscribeRequest(
     if (other !is DownloadSubscribeRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
+    if (task_id != other.task_id) return false
     return true
   }
 
@@ -57,6 +66,7 @@ public class DownloadSubscribeRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
+      result = result * 37 + task_id.hashCode()
       super.hashCode = result
     }
     return result
@@ -65,12 +75,16 @@ public class DownloadSubscribeRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
+    result += """task_id=${sanitize(task_id)}"""
     return result.joinToString(prefix = "DownloadSubscribeRequest{", separator = ", ", postfix =
         "}")
   }
 
-  public fun copy(model_id: String = this.model_id, unknownFields: ByteString = this.unknownFields):
-      DownloadSubscribeRequest = DownloadSubscribeRequest(model_id, unknownFields)
+  public fun copy(
+    model_id: String = this.model_id,
+    task_id: String = this.task_id,
+    unknownFields: ByteString = this.unknownFields,
+  ): DownloadSubscribeRequest = DownloadSubscribeRequest(model_id, task_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -86,29 +100,35 @@ public class DownloadSubscribeRequest(
       override fun encodedSize(`value`: DownloadSubscribeRequest): Int {
         var size = value.unknownFields.size
         if (value.model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
+        if (value.task_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.task_id)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: DownloadSubscribeRequest) {
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
+        if (value.task_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.task_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadSubscribeRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.task_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.task_id)
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
       }
 
       override fun decode(reader: ProtoReader): DownloadSubscribeRequest {
         var model_id: String = ""
+        var task_id: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
+            2 -> task_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DownloadSubscribeRequest(
           model_id = model_id,
+          task_id = task_id,
           unknownFields = unknownFields
         )
       }

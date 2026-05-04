@@ -104,6 +104,42 @@ public class VADStatistics(
     schemaIndex = 4,
   )
   public val recent_max: Float = 0f,
+  /**
+   * Richer service-level counters from rac_vad_statistics_t. Zero = unset
+   * for energy-only implementations.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalSpeechSegments",
+    schemaIndex = 5,
+  )
+  public val total_speech_segments: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalSpeechDurationMs",
+    schemaIndex = 6,
+  )
+  public val total_speech_duration_ms: Long = 0L,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "averageEnergy",
+    schemaIndex = 7,
+  )
+  public val average_energy: Float = 0f,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "peakEnergy",
+    schemaIndex = 8,
+  )
+  public val peak_energy: Float = 0f,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADStatistics, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -122,6 +158,10 @@ public class VADStatistics(
     if (ambient_level != other.ambient_level) return false
     if (recent_avg != other.recent_avg) return false
     if (recent_max != other.recent_max) return false
+    if (total_speech_segments != other.total_speech_segments) return false
+    if (total_speech_duration_ms != other.total_speech_duration_ms) return false
+    if (average_energy != other.average_energy) return false
+    if (peak_energy != other.peak_energy) return false
     return true
   }
 
@@ -134,6 +174,10 @@ public class VADStatistics(
       result = result * 37 + ambient_level.hashCode()
       result = result * 37 + recent_avg.hashCode()
       result = result * 37 + recent_max.hashCode()
+      result = result * 37 + total_speech_segments.hashCode()
+      result = result * 37 + total_speech_duration_ms.hashCode()
+      result = result * 37 + average_energy.hashCode()
+      result = result * 37 + peak_energy.hashCode()
       super.hashCode = result
     }
     return result
@@ -146,6 +190,10 @@ public class VADStatistics(
     result += """ambient_level=$ambient_level"""
     result += """recent_avg=$recent_avg"""
     result += """recent_max=$recent_max"""
+    result += """total_speech_segments=$total_speech_segments"""
+    result += """total_speech_duration_ms=$total_speech_duration_ms"""
+    result += """average_energy=$average_energy"""
+    result += """peak_energy=$peak_energy"""
     return result.joinToString(prefix = "VADStatistics{", separator = ", ", postfix = "}")
   }
 
@@ -155,9 +203,14 @@ public class VADStatistics(
     ambient_level: Float = this.ambient_level,
     recent_avg: Float = this.recent_avg,
     recent_max: Float = this.recent_max,
+    total_speech_segments: Int = this.total_speech_segments,
+    total_speech_duration_ms: Long = this.total_speech_duration_ms,
+    average_energy: Float = this.average_energy,
+    peak_energy: Float = this.peak_energy,
     unknownFields: ByteString = this.unknownFields,
   ): VADStatistics = VADStatistics(current_energy, current_threshold, ambient_level, recent_avg,
-      recent_max, unknownFields)
+      recent_max, total_speech_segments, total_speech_duration_ms, average_energy, peak_energy,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -181,6 +234,14 @@ public class VADStatistics(
             value.recent_avg)
         if (!value.recent_max.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(5,
             value.recent_max)
+        if (value.total_speech_segments != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.total_speech_segments)
+        if (value.total_speech_duration_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.total_speech_duration_ms)
+        if (!value.average_energy.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(8,
+            value.average_energy)
+        if (!value.peak_energy.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(9,
+            value.peak_energy)
         return size
       }
 
@@ -195,11 +256,27 @@ public class VADStatistics(
             value.recent_avg)
         if (!value.recent_max.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5,
             value.recent_max)
+        if (value.total_speech_segments != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.total_speech_segments)
+        if (value.total_speech_duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.total_speech_duration_ms)
+        if (!value.average_energy.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
+            value.average_energy)
+        if (!value.peak_energy.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 9,
+            value.peak_energy)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADStatistics) {
         writer.writeBytes(value.unknownFields)
+        if (!value.peak_energy.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 9,
+            value.peak_energy)
+        if (!value.average_energy.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
+            value.average_energy)
+        if (value.total_speech_duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.total_speech_duration_ms)
+        if (value.total_speech_segments != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.total_speech_segments)
         if (!value.recent_max.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5,
             value.recent_max)
         if (!value.recent_avg.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
@@ -218,6 +295,10 @@ public class VADStatistics(
         var ambient_level: Float = 0f
         var recent_avg: Float = 0f
         var recent_max: Float = 0f
+        var total_speech_segments: Int = 0
+        var total_speech_duration_ms: Long = 0L
+        var average_energy: Float = 0f
+        var peak_energy: Float = 0f
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> current_energy = ProtoAdapter.FLOAT.decode(reader)
@@ -225,6 +306,10 @@ public class VADStatistics(
             3 -> ambient_level = ProtoAdapter.FLOAT.decode(reader)
             4 -> recent_avg = ProtoAdapter.FLOAT.decode(reader)
             5 -> recent_max = ProtoAdapter.FLOAT.decode(reader)
+            6 -> total_speech_segments = ProtoAdapter.INT32.decode(reader)
+            7 -> total_speech_duration_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> average_energy = ProtoAdapter.FLOAT.decode(reader)
+            9 -> peak_energy = ProtoAdapter.FLOAT.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -234,6 +319,10 @@ public class VADStatistics(
           ambient_level = ambient_level,
           recent_avg = recent_avg,
           recent_max = recent_max,
+          total_speech_segments = total_speech_segments,
+          total_speech_duration_ms = total_speech_duration_ms,
+          average_energy = average_energy,
+          peak_energy = peak_energy,
           unknownFields = unknownFields
         )
       }

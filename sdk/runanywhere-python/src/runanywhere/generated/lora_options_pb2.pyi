@@ -31,7 +31,7 @@ class LoRAAdapterInfo(_message.Message):
     def __init__(self, adapter_id: _Optional[str] = ..., adapter_path: _Optional[str] = ..., scale: _Optional[float] = ..., applied: _Optional[bool] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class LoraAdapterCatalogEntry(_message.Message):
-    __slots__ = ("id", "name", "description", "url", "filename", "compatible_models", "size_bytes", "author")
+    __slots__ = ("id", "name", "description", "url", "filename", "compatible_models", "size_bytes", "author", "default_scale", "checksum_sha256")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -40,6 +40,8 @@ class LoraAdapterCatalogEntry(_message.Message):
     COMPATIBLE_MODELS_FIELD_NUMBER: _ClassVar[int]
     SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
     AUTHOR_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_SCALE_FIELD_NUMBER: _ClassVar[int]
+    CHECKSUM_SHA256_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     description: str
@@ -48,7 +50,9 @@ class LoraAdapterCatalogEntry(_message.Message):
     compatible_models: _containers.RepeatedScalarFieldContainer[str]
     size_bytes: int
     author: str
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., url: _Optional[str] = ..., filename: _Optional[str] = ..., compatible_models: _Optional[_Iterable[str]] = ..., size_bytes: _Optional[int] = ..., author: _Optional[str] = ...) -> None: ...
+    default_scale: float
+    checksum_sha256: str
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., url: _Optional[str] = ..., filename: _Optional[str] = ..., compatible_models: _Optional[_Iterable[str]] = ..., size_bytes: _Optional[int] = ..., author: _Optional[str] = ..., default_scale: _Optional[float] = ..., checksum_sha256: _Optional[str] = ...) -> None: ...
 
 class LoraCompatibilityResult(_message.Message):
     __slots__ = ("is_compatible", "error_message", "base_model_required")

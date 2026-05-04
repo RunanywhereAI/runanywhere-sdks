@@ -212,6 +212,15 @@ enum ErrorCategory {
     ERROR_CATEGORY_CONFIGURATION = 8;  // env mismatch, init not done, bad cfg
 }
 
+enum ErrorSeverity {
+    ERROR_SEVERITY_UNSPECIFIED = 0;
+    ERROR_SEVERITY_DEBUG       = 1;
+    ERROR_SEVERITY_INFO        = 2;
+    ERROR_SEVERITY_WARNING     = 3;
+    ERROR_SEVERITY_ERROR       = 4;
+    ERROR_SEVERITY_CRITICAL    = 5;
+}
+
 // ---------------------------------------------------------------------------
 // ErrorCode — exhaustive enumeration of every distinct numeric error code in
 // the C ABI (`rac_result_t`).
@@ -522,4 +531,11 @@ message SDKError {
 
     // Underlying error's message (the "caused by" chain), if any.
     optional string       nested_message = 6;
+
+    // Envelope metadata for canonical error emission. `component` is a stable
+    // lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
+    // "download", "storage", ...); SDKEvent carries the enum-typed component.
+    int64                 timestamp_ms   = 7;
+    ErrorSeverity         severity       = 8;
+    string                component      = 9;
 }

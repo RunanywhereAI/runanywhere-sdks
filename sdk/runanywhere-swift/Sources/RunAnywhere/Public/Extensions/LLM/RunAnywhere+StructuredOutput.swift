@@ -341,67 +341,11 @@ public extension RunAnywhere {
         }
     }
 
-    /// Internal generation for structured output (calls C++ directly)
+    /// Internal generation for structured output through the generated-proto LLM ABI.
     private static func generateForStructuredOutput(
         _ prompt: String,
         options: LLMGenerationOptions
     ) async throws -> LLMGenerationResult {
-        guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
-        }
-
-        let handle = try await CppBridge.LLM.shared.getHandle()
-
-        guard await CppBridge.LLM.shared.isLoaded else {
-            throw SDKException.llm(.notInitialized, "LLM model not loaded")
-        }
-
-        let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
-        let startTime = Date()
-
-        // Build C options
-        var cOptions = rac_llm_options_t()
-        cOptions.max_tokens = Int32(options.maxTokens)
-        cOptions.temperature = options.temperature
-        cOptions.top_p = options.topP
-        cOptions.streaming_enabled = RAC_FALSE
-
-        // Generate - wrap in system_prompt lifetime scope
-        var llmResult = rac_llm_result_t()
-        let generateResult: rac_result_t
-        if let systemPrompt = options.systemPrompt {
-            generateResult = systemPrompt.withCString { sysPromptPtr in
-                cOptions.system_prompt = sysPromptPtr
-                return prompt.withCString { promptPtr in
-                    rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
-                }
-            }
-        } else {
-            cOptions.system_prompt = nil
-            generateResult = prompt.withCString { promptPtr in
-                rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
-            }
-        }
-
-        guard generateResult == RAC_SUCCESS else {
-            throw SDKException.llm(.generationFailed, "Generation failed: \(generateResult)")
-        }
-
-        let totalTimeMs = Date().timeIntervalSince(startTime) * 1000
-        let generatedText = llmResult.text.map { String(cString: $0) } ?? ""
-
-        return LLMGenerationResult(
-            text: generatedText,
-            thinkingContent: nil,
-            inputTokens: Int(llmResult.prompt_tokens),
-            tokensUsed: Int(llmResult.completion_tokens),
-            modelUsed: modelId,
-            latencyMs: totalTimeMs,
-            framework: "llamacpp",
-            tokensPerSecond: Double(llmResult.tokens_per_second),
-            timeToFirstTokenMs: nil,
-            thinkingTokens: 0,
-            responseTokens: Int(llmResult.completion_tokens)
-        )
+        try await generate(prompt, options: options)
     }
 }

@@ -6,6 +6,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { ToolCall, ToolResult } from "./tool_calling";
 export const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -66,7 +67,17 @@ export function messageRoleToJSON(object) {
     }
 }
 function createBaseChatMessage() {
-    return { id: "", role: 0, content: "", timestampUs: 0, name: undefined, toolCallsJson: [], toolCallId: undefined };
+    return {
+        id: "",
+        role: 0,
+        content: "",
+        timestampUs: 0,
+        name: undefined,
+        toolCallsJson: [],
+        toolCallId: undefined,
+        toolCalls: [],
+        toolResult: undefined,
+    };
 }
 export const ChatMessage = {
     encode(message, writer = _m0.Writer.create()) {
@@ -90,6 +101,12 @@ export const ChatMessage = {
         }
         if (message.toolCallId !== undefined) {
             writer.uint32(58).string(message.toolCallId);
+        }
+        for (const v of message.toolCalls) {
+            ToolCall.encode(v, writer.uint32(66).fork()).ldelim();
+        }
+        if (message.toolResult !== undefined) {
+            ToolResult.encode(message.toolResult, writer.uint32(74).fork()).ldelim();
         }
         return writer;
     },
@@ -142,6 +159,18 @@ export const ChatMessage = {
                     }
                     message.toolCallId = reader.string();
                     continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.toolCalls.push(ToolCall.decode(reader, reader.uint32()));
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.toolResult = ToolResult.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -161,6 +190,10 @@ export const ChatMessage = {
                 ? object.toolCallsJson.map((e) => globalThis.String(e))
                 : [],
             toolCallId: isSet(object.toolCallId) ? globalThis.String(object.toolCallId) : undefined,
+            toolCalls: globalThis.Array.isArray(object?.toolCalls)
+                ? object.toolCalls.map((e) => ToolCall.fromJSON(e))
+                : [],
+            toolResult: isSet(object.toolResult) ? ToolResult.fromJSON(object.toolResult) : undefined,
         };
     },
     toJSON(message) {
@@ -186,6 +219,12 @@ export const ChatMessage = {
         if (message.toolCallId !== undefined) {
             obj.toolCallId = message.toolCallId;
         }
+        if (message.toolCalls?.length) {
+            obj.toolCalls = message.toolCalls.map((e) => ToolCall.toJSON(e));
+        }
+        if (message.toolResult !== undefined) {
+            obj.toolResult = ToolResult.toJSON(message.toolResult);
+        }
         return obj;
     },
     create(base) {
@@ -200,6 +239,10 @@ export const ChatMessage = {
         message.name = object.name ?? undefined;
         message.toolCallsJson = object.toolCallsJson?.map((e) => e) || [];
         message.toolCallId = object.toolCallId ?? undefined;
+        message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
+        message.toolResult = (object.toolResult !== undefined && object.toolResult !== null)
+            ? ToolResult.fromPartial(object.toolResult)
+            : undefined;
         return message;
     },
 };

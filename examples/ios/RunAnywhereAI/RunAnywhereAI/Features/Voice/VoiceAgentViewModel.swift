@@ -219,19 +219,16 @@ final class VoiceAgentViewModel: ObservableObject {
         llmModelState = mapState(states.llm)
         ttsModelState = mapState(states.tts)
 
-        if case .loaded(let id) = states.stt { updateModel(.stt, id: id) }
-        if case .loaded(let id) = states.llm { updateModel(.llm, id: id) }
-        if case .loaded(let id) = states.tts { updateModel(.tts, id: id) }
-
-        logger.info("Model states synced - STT: \(states.stt.isLoaded), LLM: \(states.llm.isLoaded), TTS: \(states.tts.isLoaded)")
+        logger.info("Model states synced - VAD: \(states.vad.isLoaded), STT: \(states.stt.isLoaded), LLM: \(states.llm.isLoaded), TTS: \(states.tts.isLoaded)")
     }
 
     private func mapState(_ state: ComponentLoadState) -> ModelLoadState {
         switch state {
-        case .notLoaded: return .notLoaded
+        case .unspecified, .notLoaded: return .notLoaded
         case .loading: return .loading
         case .loaded: return .loaded
-        case .error(let message): return .error(message)
+        case .error: return .error("Component failed")
+        case .UNRECOGNIZED(_): return .error("Unknown component state")
         }
     }
 
@@ -529,6 +526,11 @@ final class VoiceAgentViewModel: ObservableObject {
             logger.error("Voice agent error: \(err.message)")
             errorMessage = err.message
 
+        case .wakewordDetected:
+            sessionState = .listening
+            currentStatus = "Listening..."
+            isSpeechDetected = false
+
         case .interrupted, .metrics, .none:
             // No UX-visible effect for these arms today.
             break
@@ -537,7 +539,8 @@ final class VoiceAgentViewModel: ObservableObject {
         // surface them in the UI yet, so they are intentionally folded into
         // the same no-op bucket as .interrupted / .metrics.
         case .componentStateChanged, .sessionError, .sessionStarted,
-             .sessionStopped, .agentResponseStarted, .agentResponseCompleted:
+             .sessionStopped, .agentResponseStarted, .agentResponseCompleted,
+             .speechTurnDetection, .turnLifecycle:
             break
         }
     }

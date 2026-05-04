@@ -130,7 +130,7 @@ class OnnxBindings {
     if (_register == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _register!();
+    return _register();
   }
 
   /// Unregister the ONNX backend from C++ registry.
@@ -138,7 +138,7 @@ class OnnxBindings {
     if (_unregister == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregister!();
+    return _unregister();
   }
 }
 

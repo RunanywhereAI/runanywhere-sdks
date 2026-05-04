@@ -15,8 +15,15 @@ import type {
   VoiceSessionConfig as VoiceAgentConfig,
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
+import {
+  VoiceAgentComposeConfig,
+  VoiceAgentResult as VoiceAgentResultMessage,
+} from '@runanywhere/proto-ts/voice_agent_service';
 import type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
-import type { VoiceEvent } from '@runanywhere/proto-ts/dist/voice_events';
+import {
+  VoiceAgentComponentStates as VoiceAgentComponentStatesMessage,
+} from '@runanywhere/proto-ts/voice_events';
+import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {
   STTLanguage,
   type STTOutput as STTOutputType,
@@ -24,6 +31,10 @@ import {
 import type { TTSOutput } from '@runanywhere/proto-ts/tts_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
 
@@ -34,6 +45,26 @@ function base64ToBytes(b64: string): Uint8Array {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+function audioToArrayBuffer(audioData: ArrayBuffer | string): ArrayBuffer {
+  if (typeof audioData === 'string') {
+    return bytesToArrayBuffer(base64ToBytes(audioData));
+  }
+  return audioData;
+}
+
+function buildVoiceAgentComposeConfig(
+  config: VoiceAgentConfig
+): ReturnType<typeof VoiceAgentComposeConfig.create> {
+  return VoiceAgentComposeConfig.create({
+    vadSampleRate: 16000,
+    vadFrameLength: 0.1,
+    vadEnergyThreshold: config.speechThreshold ?? 0.1,
+    wakewordEnabled: false,
+    wakewordThreshold: 0,
+    sessionConfig: config,
+  });
 }
 
 /**
@@ -47,8 +78,8 @@ export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponen
   }
   const native = requireNativeModule();
   try {
-    const resultJson = await native.getVoiceAgentComponentStates();
-    return JSON.parse(resultJson) as VoiceAgentComponentStates;
+    const bytes = await native.voiceAgentComponentStatesProto();
+    return VoiceAgentComponentStatesMessage.decode(arrayBufferToBytes(bytes));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to get component states: ${msg}`);
@@ -72,7 +103,12 @@ export async function initializeVoiceAgent(
   const native = requireNativeModule();
   try {
     logger.info('Initializing voice agent...');
-    const result = await native.initializeVoiceAgent(JSON.stringify(config));
+    const bytes = await native.voiceAgentInitializeProto(
+      bytesToArrayBuffer(
+        VoiceAgentComposeConfig.encode(buildVoiceAgentComposeConfig(config)).finish()
+      )
+    );
+    const result = arrayBufferToBytes(bytes).byteLength > 0;
     if (result) {
       logger.info('Voice agent initialized successfully');
     }
@@ -126,32 +162,14 @@ export async function processVoiceTurn(
   }
   const native = requireNativeModule();
   try {
-    let base64Audio: string;
-    if (audioData instanceof ArrayBuffer) {
-      const bytes = new Uint8Array(audioData);
-      base64Audio = btoa(String.fromCharCode(...bytes));
-    } else {
-      base64Audio = audioData;
+    const resultBytes = await native.voiceAgentProcessTurnProto(
+      audioToArrayBuffer(audioData)
+    );
+    const bytes = arrayBufferToBytes(resultBytes);
+    if (bytes.byteLength === 0) {
+      throw new Error('Voice agent proto turn returned an empty result');
     }
-    const resultJson = await native.processVoiceTurn(base64Audio);
-    const parsed = JSON.parse(resultJson) as {
-      speechDetected?: boolean;
-      transcription?: string;
-      assistantResponse?: string;
-      response?: string;
-      thinkingContent?: string;
-      synthesizedAudio?: string;
-      sampleRate?: number;
-    };
-    return {
-      speechDetected: !!parsed.speechDetected,
-      transcription: parsed.transcription,
-      assistantResponse: parsed.assistantResponse ?? parsed.response,
-      thinkingContent: parsed.thinkingContent,
-      synthesizedAudio: parsed.synthesizedAudio
-        ? base64ToBytes(parsed.synthesizedAudio)
-        : undefined,
-    };
+    return VoiceAgentResultMessage.decode(bytes);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`Voice turn failed: ${msg}`);
@@ -192,6 +210,8 @@ export async function voiceAgentTranscribe(
       words: parsed.words ?? [],
       alternatives: parsed.alternatives ?? [],
       metadata: parsed.metadata,
+      timestampMs: parsed.timestampMs ?? Date.now(),
+      durationMs: parsed.durationMs ?? 0,
     };
   } catch {
     // Native returned a plain text string — wrap it.
@@ -201,6 +221,8 @@ export async function voiceAgentTranscribe(
       confidence: 1.0,
       words: [],
       alternatives: [],
+      timestampMs: Date.now(),
+      durationMs: 0,
     };
   }
 }

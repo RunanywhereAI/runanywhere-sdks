@@ -151,19 +151,63 @@ public class ModelInfo(
     schemaIndex = 14,
   )
   public val updated_at_unix_ms: Long = 0L,
+  /**
+   * Separate from download_size_bytes: this is the estimated runtime RAM
+   * requirement used by compatibility checks and model selection UIs.
+   */
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    jsonName = "memoryRequiredBytes",
+    schemaIndex = 15,
+  )
+  public val memory_required_bytes: Long? = null,
+  /**
+   * Lowercase hex SHA-256 checksum for the primary artifact. Per-file
+   * checksums for multi-file artifacts live on ModelFileDescriptor.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "checksumSha256",
+    schemaIndex = 16,
+  )
+  public val checksum_sha256: String? = null,
+  /**
+   * Thinking/reasoning metadata. `supports_thinking` remains the boolean
+   * capability flag; this optional pattern declares model-specific tags.
+   */
+  @field:WireField(
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.ModelThinkingTagPattern#ADAPTER",
+    jsonName = "thinkingPattern",
+    schemaIndex = 17,
+  )
+  public val thinking_pattern: ModelThinkingTagPattern? = null,
+  /**
+   * Structured public catalog metadata. `description` (field 12) is kept for
+   * backward compatibility and should mirror metadata.description when both
+   * are populated.
+   */
+  @field:WireField(
+    tag = 19,
+    adapter = "ai.runanywhere.proto.v1.ModelInfoMetadata#ADAPTER",
+    schemaIndex = 18,
+  )
+  public val metadata: ModelInfoMetadata? = null,
   @field:WireField(
     tag = 20,
     adapter = "ai.runanywhere.proto.v1.SingleFileArtifact#ADAPTER",
     jsonName = "singleFile",
     oneofName = "artifact",
-    schemaIndex = 15,
+    schemaIndex = 19,
   )
   public val single_file: SingleFileArtifact? = null,
   @field:WireField(
     tag = 21,
     adapter = "ai.runanywhere.proto.v1.ArchiveArtifact#ADAPTER",
     oneofName = "artifact",
-    schemaIndex = 16,
+    schemaIndex = 20,
   )
   public val archive: ArchiveArtifact? = null,
   @field:WireField(
@@ -171,7 +215,7 @@ public class ModelInfo(
     adapter = "ai.runanywhere.proto.v1.MultiFileArtifact#ADAPTER",
     jsonName = "multiFile",
     oneofName = "artifact",
-    schemaIndex = 17,
+    schemaIndex = 21,
   )
   public val multi_file: MultiFileArtifact? = null,
   @field:WireField(
@@ -179,7 +223,7 @@ public class ModelInfo(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "customStrategyId",
     oneofName = "artifact",
-    schemaIndex = 18,
+    schemaIndex = 22,
   )
   public val custom_strategy_id: String? = null,
   @field:WireField(
@@ -187,7 +231,7 @@ public class ModelInfo(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "builtIn",
     oneofName = "artifact",
-    schemaIndex = 19,
+    schemaIndex = 23,
   )
   public val built_in: Boolean? = null,
   /**
@@ -199,7 +243,7 @@ public class ModelInfo(
     tag = 25,
     adapter = "ai.runanywhere.proto.v1.ModelArtifactType#ADAPTER",
     jsonName = "artifactType",
-    schemaIndex = 20,
+    schemaIndex = 24,
   )
   public val artifact_type: ModelArtifactType? = null,
   /**
@@ -209,7 +253,7 @@ public class ModelInfo(
     tag = 26,
     adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
     jsonName = "expectedFiles",
-    schemaIndex = 21,
+    schemaIndex = 25,
   )
   public val expected_files: ExpectedModelFiles? = null,
   /**
@@ -219,7 +263,7 @@ public class ModelInfo(
     tag = 27,
     adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     jsonName = "accelerationPreference",
-    schemaIndex = 22,
+    schemaIndex = 26,
   )
   public val acceleration_preference: AccelerationPreference? = null,
   /**
@@ -229,9 +273,79 @@ public class ModelInfo(
     tag = 28,
     adapter = "ai.runanywhere.proto.v1.RoutingPolicy#ADAPTER",
     jsonName = "routingPolicy",
-    schemaIndex = 23,
+    schemaIndex = 27,
   )
   public val routing_policy: RoutingPolicy? = null,
+  /**
+   * Framework/format compatibility declarations. `framework` (field 5) is
+   * the canonical/preferred runtime when no explicit preferred_framework is set.
+   */
+  @field:WireField(
+    tag = 29,
+    adapter = "ai.runanywhere.proto.v1.ModelRuntimeCompatibility#ADAPTER",
+    schemaIndex = 28,
+  )
+  public val compatibility: ModelRuntimeCompatibility? = null,
+  @field:WireField(
+    tag = 30,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    jsonName = "preferredFramework",
+    schemaIndex = 29,
+  )
+  public val preferred_framework: InferenceFramework? = null,
+  /**
+   * Durable registry state. Live byte progress belongs to
+   * download_service.DownloadProgress, not ModelInfo.
+   */
+  @field:WireField(
+    tag = 31,
+    adapter = "ai.runanywhere.proto.v1.ModelRegistryStatus#ADAPTER",
+    jsonName = "registryStatus",
+    schemaIndex = 30,
+  )
+  public val registry_status: ModelRegistryStatus? = null,
+  @field:WireField(
+    tag = 32,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "isDownloaded",
+    schemaIndex = 31,
+  )
+  public val is_downloaded: Boolean? = null,
+  @field:WireField(
+    tag = 33,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "isAvailable",
+    schemaIndex = 32,
+  )
+  public val is_available: Boolean? = null,
+  @field:WireField(
+    tag = 34,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    jsonName = "lastUsedAtUnixMs",
+    schemaIndex = 33,
+  )
+  public val last_used_at_unix_ms: Long? = null,
+  @field:WireField(
+    tag = 35,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "usageCount",
+    schemaIndex = 34,
+  )
+  public val usage_count: Int? = null,
+  @field:WireField(
+    tag = 36,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "syncPending",
+    schemaIndex = 35,
+  )
+  public val sync_pending: Boolean? = null,
+  @field:WireField(
+    tag = 37,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "statusMessage",
+    schemaIndex = 36,
+  )
+  public val status_message: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelInfo, Nothing>(ADAPTER, unknownFields) {
   init {
@@ -266,6 +380,10 @@ public class ModelInfo(
     if (source != other.source) return false
     if (created_at_unix_ms != other.created_at_unix_ms) return false
     if (updated_at_unix_ms != other.updated_at_unix_ms) return false
+    if (memory_required_bytes != other.memory_required_bytes) return false
+    if (checksum_sha256 != other.checksum_sha256) return false
+    if (thinking_pattern != other.thinking_pattern) return false
+    if (metadata != other.metadata) return false
     if (single_file != other.single_file) return false
     if (archive != other.archive) return false
     if (multi_file != other.multi_file) return false
@@ -275,6 +393,15 @@ public class ModelInfo(
     if (expected_files != other.expected_files) return false
     if (acceleration_preference != other.acceleration_preference) return false
     if (routing_policy != other.routing_policy) return false
+    if (compatibility != other.compatibility) return false
+    if (preferred_framework != other.preferred_framework) return false
+    if (registry_status != other.registry_status) return false
+    if (is_downloaded != other.is_downloaded) return false
+    if (is_available != other.is_available) return false
+    if (last_used_at_unix_ms != other.last_used_at_unix_ms) return false
+    if (usage_count != other.usage_count) return false
+    if (sync_pending != other.sync_pending) return false
+    if (status_message != other.status_message) return false
     return true
   }
 
@@ -297,6 +424,10 @@ public class ModelInfo(
       result = result * 37 + source.hashCode()
       result = result * 37 + created_at_unix_ms.hashCode()
       result = result * 37 + updated_at_unix_ms.hashCode()
+      result = result * 37 + (memory_required_bytes?.hashCode() ?: 0)
+      result = result * 37 + (checksum_sha256?.hashCode() ?: 0)
+      result = result * 37 + (thinking_pattern?.hashCode() ?: 0)
+      result = result * 37 + (metadata?.hashCode() ?: 0)
       result = result * 37 + (single_file?.hashCode() ?: 0)
       result = result * 37 + (archive?.hashCode() ?: 0)
       result = result * 37 + (multi_file?.hashCode() ?: 0)
@@ -306,6 +437,15 @@ public class ModelInfo(
       result = result * 37 + (expected_files?.hashCode() ?: 0)
       result = result * 37 + (acceleration_preference?.hashCode() ?: 0)
       result = result * 37 + (routing_policy?.hashCode() ?: 0)
+      result = result * 37 + (compatibility?.hashCode() ?: 0)
+      result = result * 37 + (preferred_framework?.hashCode() ?: 0)
+      result = result * 37 + (registry_status?.hashCode() ?: 0)
+      result = result * 37 + (is_downloaded?.hashCode() ?: 0)
+      result = result * 37 + (is_available?.hashCode() ?: 0)
+      result = result * 37 + (last_used_at_unix_ms?.hashCode() ?: 0)
+      result = result * 37 + (usage_count?.hashCode() ?: 0)
+      result = result * 37 + (sync_pending?.hashCode() ?: 0)
+      result = result * 37 + (status_message?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -328,6 +468,10 @@ public class ModelInfo(
     result += """source=$source"""
     result += """created_at_unix_ms=$created_at_unix_ms"""
     result += """updated_at_unix_ms=$updated_at_unix_ms"""
+    if (memory_required_bytes != null) result += """memory_required_bytes=$memory_required_bytes"""
+    if (checksum_sha256 != null) result += """checksum_sha256=${sanitize(checksum_sha256)}"""
+    if (thinking_pattern != null) result += """thinking_pattern=$thinking_pattern"""
+    if (metadata != null) result += """metadata=$metadata"""
     if (single_file != null) result += """single_file=$single_file"""
     if (archive != null) result += """archive=$archive"""
     if (multi_file != null) result += """multi_file=$multi_file"""
@@ -339,6 +483,15 @@ public class ModelInfo(
     if (acceleration_preference != null) result +=
         """acceleration_preference=$acceleration_preference"""
     if (routing_policy != null) result += """routing_policy=$routing_policy"""
+    if (compatibility != null) result += """compatibility=$compatibility"""
+    if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
+    if (registry_status != null) result += """registry_status=$registry_status"""
+    if (is_downloaded != null) result += """is_downloaded=$is_downloaded"""
+    if (is_available != null) result += """is_available=$is_available"""
+    if (last_used_at_unix_ms != null) result += """last_used_at_unix_ms=$last_used_at_unix_ms"""
+    if (usage_count != null) result += """usage_count=$usage_count"""
+    if (sync_pending != null) result += """sync_pending=$sync_pending"""
+    if (status_message != null) result += """status_message=${sanitize(status_message)}"""
     return result.joinToString(prefix = "ModelInfo{", separator = ", ", postfix = "}")
   }
 
@@ -358,6 +511,10 @@ public class ModelInfo(
     source: ModelSource = this.source,
     created_at_unix_ms: Long = this.created_at_unix_ms,
     updated_at_unix_ms: Long = this.updated_at_unix_ms,
+    memory_required_bytes: Long? = this.memory_required_bytes,
+    checksum_sha256: String? = this.checksum_sha256,
+    thinking_pattern: ModelThinkingTagPattern? = this.thinking_pattern,
+    metadata: ModelInfoMetadata? = this.metadata,
     single_file: SingleFileArtifact? = this.single_file,
     archive: ArchiveArtifact? = this.archive,
     multi_file: MultiFileArtifact? = this.multi_file,
@@ -367,12 +524,23 @@ public class ModelInfo(
     expected_files: ExpectedModelFiles? = this.expected_files,
     acceleration_preference: AccelerationPreference? = this.acceleration_preference,
     routing_policy: RoutingPolicy? = this.routing_policy,
+    compatibility: ModelRuntimeCompatibility? = this.compatibility,
+    preferred_framework: InferenceFramework? = this.preferred_framework,
+    registry_status: ModelRegistryStatus? = this.registry_status,
+    is_downloaded: Boolean? = this.is_downloaded,
+    is_available: Boolean? = this.is_available,
+    last_used_at_unix_ms: Long? = this.last_used_at_unix_ms,
+    usage_count: Int? = this.usage_count,
+    sync_pending: Boolean? = this.sync_pending,
+    status_message: String? = this.status_message,
     unknownFields: ByteString = this.unknownFields,
   ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path,
       download_size_bytes, context_length, supports_thinking, supports_lora, description, source,
-      created_at_unix_ms, updated_at_unix_ms, single_file, archive, multi_file, custom_strategy_id,
-      built_in, artifact_type, expected_files, acceleration_preference, routing_policy,
-      unknownFields)
+      created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256,
+      thinking_pattern, metadata, single_file, archive, multi_file, custom_strategy_id, built_in,
+      artifact_type, expected_files, acceleration_preference, routing_policy, compatibility,
+      preferred_framework, registry_status, is_downloaded, is_available, last_used_at_unix_ms,
+      usage_count, sync_pending, status_message, unknownFields)
 
   public companion object {
     @JvmField
@@ -414,6 +582,10 @@ public class ModelInfo(
             value.created_at_unix_ms)
         if (value.updated_at_unix_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(15,
             value.updated_at_unix_ms)
+        size += ProtoAdapter.INT64.encodedSizeWithTag(16, value.memory_required_bytes)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.checksum_sha256)
+        size += ModelThinkingTagPattern.ADAPTER.encodedSizeWithTag(18, value.thinking_pattern)
+        size += ModelInfoMetadata.ADAPTER.encodedSizeWithTag(19, value.metadata)
         size += SingleFileArtifact.ADAPTER.encodedSizeWithTag(20, value.single_file)
         size += ArchiveArtifact.ADAPTER.encodedSizeWithTag(21, value.archive)
         size += MultiFileArtifact.ADAPTER.encodedSizeWithTag(22, value.multi_file)
@@ -423,6 +595,15 @@ public class ModelInfo(
         size += ExpectedModelFiles.ADAPTER.encodedSizeWithTag(26, value.expected_files)
         size += AccelerationPreference.ADAPTER.encodedSizeWithTag(27, value.acceleration_preference)
         size += RoutingPolicy.ADAPTER.encodedSizeWithTag(28, value.routing_policy)
+        size += ModelRuntimeCompatibility.ADAPTER.encodedSizeWithTag(29, value.compatibility)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(30, value.preferred_framework)
+        size += ModelRegistryStatus.ADAPTER.encodedSizeWithTag(31, value.registry_status)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(32, value.is_downloaded)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(33, value.is_available)
+        size += ProtoAdapter.INT64.encodedSizeWithTag(34, value.last_used_at_unix_ms)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(35, value.usage_count)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(36, value.sync_pending)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(37, value.status_message)
         return size
       }
 
@@ -454,10 +635,23 @@ public class ModelInfo(
             value.created_at_unix_ms)
         if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15,
             value.updated_at_unix_ms)
+        ProtoAdapter.INT64.encodeWithTag(writer, 16, value.memory_required_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.checksum_sha256)
+        ModelThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
+        ModelInfoMetadata.ADAPTER.encodeWithTag(writer, 19, value.metadata)
         ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
         AccelerationPreference.ADAPTER.encodeWithTag(writer, 27, value.acceleration_preference)
         RoutingPolicy.ADAPTER.encodeWithTag(writer, 28, value.routing_policy)
+        ModelRuntimeCompatibility.ADAPTER.encodeWithTag(writer, 29, value.compatibility)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 30, value.preferred_framework)
+        ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 31, value.registry_status)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 32, value.is_downloaded)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 33, value.is_available)
+        ProtoAdapter.INT64.encodeWithTag(writer, 34, value.last_used_at_unix_ms)
+        ProtoAdapter.INT32.encodeWithTag(writer, 35, value.usage_count)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 36, value.sync_pending)
+        ProtoAdapter.STRING.encodeWithTag(writer, 37, value.status_message)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
@@ -473,10 +667,23 @@ public class ModelInfo(
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
+        ProtoAdapter.STRING.encodeWithTag(writer, 37, value.status_message)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 36, value.sync_pending)
+        ProtoAdapter.INT32.encodeWithTag(writer, 35, value.usage_count)
+        ProtoAdapter.INT64.encodeWithTag(writer, 34, value.last_used_at_unix_ms)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 33, value.is_available)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 32, value.is_downloaded)
+        ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 31, value.registry_status)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 30, value.preferred_framework)
+        ModelRuntimeCompatibility.ADAPTER.encodeWithTag(writer, 29, value.compatibility)
         RoutingPolicy.ADAPTER.encodeWithTag(writer, 28, value.routing_policy)
         AccelerationPreference.ADAPTER.encodeWithTag(writer, 27, value.acceleration_preference)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
         ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
+        ModelInfoMetadata.ADAPTER.encodeWithTag(writer, 19, value.metadata)
+        ModelThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.checksum_sha256)
+        ProtoAdapter.INT64.encodeWithTag(writer, 16, value.memory_required_bytes)
         if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15,
             value.updated_at_unix_ms)
         if (value.created_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 14,
@@ -522,6 +729,10 @@ public class ModelInfo(
         var source: ModelSource = ModelSource.MODEL_SOURCE_UNSPECIFIED
         var created_at_unix_ms: Long = 0L
         var updated_at_unix_ms: Long = 0L
+        var memory_required_bytes: Long? = null
+        var checksum_sha256: String? = null
+        var thinking_pattern: ModelThinkingTagPattern? = null
+        var metadata: ModelInfoMetadata? = null
         var single_file: SingleFileArtifact? = null
         var archive: ArchiveArtifact? = null
         var multi_file: MultiFileArtifact? = null
@@ -531,6 +742,15 @@ public class ModelInfo(
         var expected_files: ExpectedModelFiles? = null
         var acceleration_preference: AccelerationPreference? = null
         var routing_policy: RoutingPolicy? = null
+        var compatibility: ModelRuntimeCompatibility? = null
+        var preferred_framework: InferenceFramework? = null
+        var registry_status: ModelRegistryStatus? = null
+        var is_downloaded: Boolean? = null
+        var is_available: Boolean? = null
+        var last_used_at_unix_ms: Long? = null
+        var usage_count: Int? = null
+        var sync_pending: Boolean? = null
+        var status_message: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -564,6 +784,10 @@ public class ModelInfo(
             }
             14 -> created_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             15 -> updated_at_unix_ms = ProtoAdapter.INT64.decode(reader)
+            16 -> memory_required_bytes = ProtoAdapter.INT64.decode(reader)
+            17 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
+            18 -> thinking_pattern = ModelThinkingTagPattern.ADAPTER.decode(reader)
+            19 -> metadata = ModelInfoMetadata.ADAPTER.decode(reader)
             20 -> single_file = SingleFileArtifact.ADAPTER.decode(reader)
             21 -> archive = ArchiveArtifact.ADAPTER.decode(reader)
             22 -> multi_file = MultiFileArtifact.ADAPTER.decode(reader)
@@ -585,6 +809,23 @@ public class ModelInfo(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            29 -> compatibility = ModelRuntimeCompatibility.ADAPTER.decode(reader)
+            30 -> try {
+              preferred_framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            31 -> try {
+              registry_status = ModelRegistryStatus.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            32 -> is_downloaded = ProtoAdapter.BOOL.decode(reader)
+            33 -> is_available = ProtoAdapter.BOOL.decode(reader)
+            34 -> last_used_at_unix_ms = ProtoAdapter.INT64.decode(reader)
+            35 -> usage_count = ProtoAdapter.INT32.decode(reader)
+            36 -> sync_pending = ProtoAdapter.BOOL.decode(reader)
+            37 -> status_message = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -604,6 +845,10 @@ public class ModelInfo(
           source = source,
           created_at_unix_ms = created_at_unix_ms,
           updated_at_unix_ms = updated_at_unix_ms,
+          memory_required_bytes = memory_required_bytes,
+          checksum_sha256 = checksum_sha256,
+          thinking_pattern = thinking_pattern,
+          metadata = metadata,
           single_file = single_file,
           archive = archive,
           multi_file = multi_file,
@@ -613,15 +858,27 @@ public class ModelInfo(
           expected_files = expected_files,
           acceleration_preference = acceleration_preference,
           routing_policy = routing_policy,
+          compatibility = compatibility,
+          preferred_framework = preferred_framework,
+          registry_status = registry_status,
+          is_downloaded = is_downloaded,
+          is_available = is_available,
+          last_used_at_unix_ms = last_used_at_unix_ms,
+          usage_count = usage_count,
+          sync_pending = sync_pending,
+          status_message = status_message,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelInfo): ModelInfo = value.copy(
+        thinking_pattern = value.thinking_pattern?.let(ModelThinkingTagPattern.ADAPTER::redact),
+        metadata = value.metadata?.let(ModelInfoMetadata.ADAPTER::redact),
         single_file = value.single_file?.let(SingleFileArtifact.ADAPTER::redact),
         archive = value.archive?.let(ArchiveArtifact.ADAPTER::redact),
         multi_file = value.multi_file?.let(MultiFileArtifact.ADAPTER::redact),
         expected_files = value.expected_files?.let(ExpectedModelFiles.ADAPTER::redact),
+        compatibility = value.compatibility?.let(ModelRuntimeCompatibility.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -37,6 +37,11 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "download_service.proto";
+import "errors.proto";
+import "hardware_profile.proto";
+import "model_types.proto";
+import "storage_types.proto";
 import "voice_events.proto";
 
 option cc_enable_arenas          = true;
@@ -100,6 +105,63 @@ enum EventDestination {
     EVENT_DESTINATION_ALL              = 1;   // EventBus + Analytics (default)
     EVENT_DESTINATION_PUBLIC_ONLY      = 2;   // EventBus only
     EVENT_DESTINATION_ANALYTICS_ONLY   = 3;   // Analytics/telemetry only
+}
+
+// Canonical event category carried by every SDKEvent envelope. The oneof arm
+// identifies the concrete payload shape; this field preserves the stable bus /
+// analytics route used by Swift, Kotlin, Dart/Flutter, React Native, Web, and
+// C++ commons.
+enum EventCategory {
+    EVENT_CATEGORY_UNSPECIFIED          = 0;
+    EVENT_CATEGORY_SDK                  = 1;
+    EVENT_CATEGORY_INITIALIZATION       = 2;
+    EVENT_CATEGORY_SHUTDOWN             = 3;
+    EVENT_CATEGORY_SESSION              = 4;
+    EVENT_CATEGORY_AUTH                 = 5;
+    EVENT_CATEGORY_DEVICE               = 6;
+    EVENT_CATEGORY_REGISTRY             = 7;
+    EVENT_CATEGORY_ASSIGNMENT           = 8;
+    EVENT_CATEGORY_IMPORT               = 9;
+    EVENT_CATEGORY_DISCOVERY            = 10;
+    EVENT_CATEGORY_DOWNLOAD             = 11;
+    EVENT_CATEGORY_STORAGE              = 12;
+    EVENT_CATEGORY_HARDWARE             = 13;
+    EVENT_CATEGORY_ROUTING              = 14;
+    EVENT_CATEGORY_FRAMEWORK            = 15;
+    EVENT_CATEGORY_MODEL                = 16;
+    EVENT_CATEGORY_COMPONENT            = 17;
+    EVENT_CATEGORY_LLM                  = 18;
+    EVENT_CATEGORY_STT                  = 19;
+    EVENT_CATEGORY_ASR                  = 20;
+    EVENT_CATEGORY_TTS                  = 21;
+    EVENT_CATEGORY_VAD                  = 22;
+    EVENT_CATEGORY_STD                  = 23;  // speech-turn detection / diarization
+    EVENT_CATEGORY_VOICE_AGENT          = 24;
+    EVENT_CATEGORY_VLM                  = 25;
+    EVENT_CATEGORY_DIFFUSION            = 26;
+    EVENT_CATEGORY_EMBEDDINGS           = 27;
+    EVENT_CATEGORY_RAG                  = 28;
+    EVENT_CATEGORY_LORA                 = 29;
+    EVENT_CATEGORY_TELEMETRY            = 30;
+    EVENT_CATEGORY_PERFORMANCE          = 31;
+    EVENT_CATEGORY_CANCELLATION         = 32;
+    EVENT_CATEGORY_FAILURE              = 33;
+    EVENT_CATEGORY_NETWORK              = 34;
+    EVENT_CATEGORY_ERROR                = 35;
+}
+
+// Component runtime lifecycle state for model-backed SDK components. This is
+// distinct from voice_events.proto's ComponentLoadState, which is scoped to
+// the voice-agent sub-pipeline. Platform adapters own native component handles;
+// this enum carries the C++ lifecycle state every SDK can expose uniformly.
+enum ComponentLifecycleState {
+    COMPONENT_LIFECYCLE_STATE_UNSPECIFIED = 0;
+    COMPONENT_LIFECYCLE_STATE_NOT_LOADED  = 1;
+    COMPONENT_LIFECYCLE_STATE_LOADING     = 2;
+    COMPONENT_LIFECYCLE_STATE_READY       = 3;
+    COMPONENT_LIFECYCLE_STATE_UNLOADING   = 4;
+    COMPONENT_LIFECYCLE_STATE_ERROR       = 5;
+    COMPONENT_LIFECYCLE_STATE_SHUTDOWN    = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +291,15 @@ message GenerationEvent {
     // For ROUTING_DECISION — RN events.ts:89.
     string              routing_target   = 15;
     string              routing_reason   = 16;
+
+    // For cancellation / tool / structured-output / thinking events.
+    string              cancel_reason    = 17;
+    string              tool_call_id      = 18;
+    string              tool_name         = 19;
+    string              tool_payload_json = 20;
+    string              structured_schema_json = 21;
+    string              structured_output_json = 22;
+    string              thinking_text     = 23;
 }
 
 enum GenerationEventKind {
@@ -246,6 +317,17 @@ enum GenerationEventKind {
     GENERATION_EVENT_KIND_COST_CALCULATED        = 11;
     GENERATION_EVENT_KIND_ROUTING_DECISION       = 12;
     GENERATION_EVENT_KIND_STREAM_COMPLETED       = 13;   // Kotlin LLMEvent.STREAM_COMPLETED
+    GENERATION_EVENT_KIND_CANCEL_REQUESTED       = 14;
+    GENERATION_EVENT_KIND_CANCELLED              = 15;
+    GENERATION_EVENT_KIND_TOOL_CALL_STARTED      = 16;
+    GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED    = 17;
+    GENERATION_EVENT_KIND_TOOL_CALL_FAILED       = 18;
+    GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED = 19;
+    GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED = 20;
+    GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED = 21;
+    GENERATION_EVENT_KIND_THINKING_STARTED       = 22;
+    GENERATION_EVENT_KIND_THINKING_DELTA         = 23;
+    GENERATION_EVENT_KIND_THINKING_COMPLETED     = 24;
 }
 
 // ---------------------------------------------------------------------------
@@ -676,6 +758,11 @@ message ComponentInitializationEvent {
     bool                             init_success     = 12;
     int32                            ready_count      = 13;
     int32                            failed_count     = 14;
+
+    // Typed equivalents of old_state/new_state for SDKs that want generated
+    // enum-backed component lifecycle state instead of parsing strings.
+    ComponentLifecycleState          previous_lifecycle_state = 15;
+    ComponentLifecycleState          current_lifecycle_state  = 16;
 }
 
 enum ComponentInitializationEventKind {
@@ -697,6 +784,268 @@ enum ComponentInitializationEventKind {
     COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY      = 15;
 }
 
+// Snapshot of a component's current model-backed lifecycle state.
+message ComponentLifecycleSnapshot {
+    SDKComponent            component     = 1;
+    ComponentLifecycleState state         = 2;
+    string                  model_id      = 3;
+    int64                   updated_at_ms = 4;
+    string                  error_message = 5;
+}
+
+// Operation-aware lifecycle event. The oneof arms intentionally reference the
+// operation result/progress protos from this contract slice instead of adding
+// another broad event taxonomy.
+message ComponentLifecycleEvent {
+    SDKComponent            component      = 1;
+    ComponentLifecycleState previous_state = 2;
+    ComponentLifecycleState current_state  = 3;
+    string                  model_id       = 4;
+    int64                   timestamp_ms   = 5;
+
+    oneof payload {
+        ModelLoadResult       model_load_result        = 10;
+        ModelUnloadResult     model_unload_result      = 11;
+        ModelDeleteResult     model_delete_result      = 12;
+        DownloadProgress      download_progress        = 13;
+        StorageAvailabilityResult storage_availability = 14;
+        StorageDeleteResult   storage_delete_result    = 15;
+    }
+}
+
+// SDK session lifecycle independent of voice-agent turn sessions.
+message SessionEvent {
+    SessionEventKind kind = 1;
+    string           session_id = 2;
+    string           user_id = 3;
+    string           reason = 4;
+    string           error = 5;
+    int64            started_at_ms = 6;
+    int64            ended_at_ms = 7;
+}
+
+enum SessionEventKind {
+    SESSION_EVENT_KIND_UNSPECIFIED = 0;
+    SESSION_EVENT_KIND_CREATED     = 1;
+    SESSION_EVENT_KIND_STARTED     = 2;
+    SESSION_EVENT_KIND_RESUMED     = 3;
+    SESSION_EVENT_KIND_PAUSED      = 4;
+    SESSION_EVENT_KIND_ENDED       = 5;
+    SESSION_EVENT_KIND_EXPIRED     = 6;
+    SESSION_EVENT_KIND_FAILED      = 7;
+}
+
+message AuthEvent {
+    AuthEventKind kind = 1;
+    string        provider = 2;
+    string        subject_id = 3;
+    string        scope = 4;
+    string        error = 5;
+}
+
+enum AuthEventKind {
+    AUTH_EVENT_KIND_UNSPECIFIED        = 0;
+    AUTH_EVENT_KIND_REQUESTED          = 1;
+    AUTH_EVENT_KIND_SUCCEEDED          = 2;
+    AUTH_EVENT_KIND_FAILED             = 3;
+    AUTH_EVENT_KIND_TOKEN_REFRESHED    = 4;
+    AUTH_EVENT_KIND_TOKEN_EXPIRED      = 5;
+    AUTH_EVENT_KIND_DEVICE_REGISTERED  = 6;
+    AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED = 7;
+}
+
+message ModelRegistryEvent {
+    ModelRegistryEventKind kind = 1;
+    string                 model_id = 2;
+    string                 assignment_id = 3;
+    SDKComponent           assigned_component = 4;
+    InferenceFramework     framework = 5;
+    string                 source_path = 6;
+    string                 error = 7;
+
+    oneof result {
+        ModelRegistryRefreshResult refresh_result = 20;
+        ModelListResult            list_result = 21;
+        ModelGetResult             get_result = 22;
+        ModelImportResult          import_result = 23;
+        ModelDiscoveryResult       discovery_result = 24;
+        ModelCompatibilityResult   compatibility_result = 25;
+        CurrentModelResult         current_model_result = 26;
+    }
+}
+
+enum ModelRegistryEventKind {
+    MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED          = 0;
+    MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED      = 1;
+    MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED    = 2;
+    MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED       = 3;
+    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED   = 4;
+    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED = 5;
+    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED    = 6;
+    MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED       = 7;
+    MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED     = 8;
+    MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED        = 9;
+    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED    = 10;
+    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED  = 11;
+    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED     = 12;
+    MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED = 13;
+}
+
+message DownloadEvent {
+    DownloadEventKind kind = 1;
+    string            model_id = 2;
+    string            task_id = 3;
+    string            error = 4;
+
+    oneof payload {
+        DownloadPlanResult   plan_result = 20;
+        DownloadStartResult  start_result = 21;
+        DownloadProgress     progress = 22;
+        DownloadCancelResult cancel_result = 23;
+        DownloadResumeResult resume_result = 24;
+    }
+}
+
+enum DownloadEventKind {
+    DOWNLOAD_EVENT_KIND_UNSPECIFIED       = 0;
+    DOWNLOAD_EVENT_KIND_PLAN_STARTED      = 1;
+    DOWNLOAD_EVENT_KIND_PLAN_COMPLETED    = 2;
+    DOWNLOAD_EVENT_KIND_PLAN_FAILED       = 3;
+    DOWNLOAD_EVENT_KIND_STARTED           = 4;
+    DOWNLOAD_EVENT_KIND_PROGRESS          = 5;
+    DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED  = 6;
+    DOWNLOAD_EVENT_KIND_CANCELLED         = 7;
+    DOWNLOAD_EVENT_KIND_RESUME_REQUESTED  = 8;
+    DOWNLOAD_EVENT_KIND_RESUMED           = 9;
+    DOWNLOAD_EVENT_KIND_COMPLETED         = 10;
+    DOWNLOAD_EVENT_KIND_FAILED            = 11;
+}
+
+message StorageLifecycleEvent {
+    StorageLifecycleEventKind kind = 1;
+    string                    model_id = 2;
+    string                    cache_key = 3;
+    int64                     bytes = 4;
+    string                    error = 5;
+
+    oneof result {
+        StorageInfoResult         info_result = 20;
+        StorageAvailabilityResult availability_result = 21;
+        StorageDeletePlan         delete_plan = 22;
+        StorageDeleteResult       delete_result = 23;
+    }
+}
+
+enum StorageLifecycleEventKind {
+    STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0;
+    STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED = 1;
+    STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED = 2;
+    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED = 3;
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED = 4;
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED = 5;
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED = 6;
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED = 7;
+    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED = 8;
+    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED = 9;
+    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED = 10;
+}
+
+message HardwareRoutingEvent {
+    HardwareRoutingEventKind kind = 1;
+    SDKComponent             component = 2;
+    InferenceFramework       framework = 3;
+    string                   capability = 4;
+    string                   route = 5;
+    string                   reason = 6;
+    string                   error = 7;
+    HardwareProfileResult    hardware_profile = 20;
+}
+
+enum HardwareRoutingEventKind {
+    HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED = 0;
+    HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED = 1;
+    HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED = 2;
+    HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED = 3;
+    HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED = 4;
+    HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED = 5;
+    HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED = 6;
+    HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING = 7;
+}
+
+message CapabilityOperationEvent {
+    CapabilityOperationEventKind kind = 1;
+    SDKComponent                 component = 2;
+    string                       model_id = 3;
+    string                       operation_id = 4;
+    string                       operation = 5;
+    float                        progress = 6;
+    int64                        input_count = 7;
+    int64                        output_count = 8;
+    string                       result_json = 9;
+    string                       error = 10;
+}
+
+enum CapabilityOperationEventKind {
+    CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED = 0;
+    CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED = 1;
+    CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED = 2;
+    CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED = 3;
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED = 4;
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS = 5;
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED = 6;
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED = 7;
+    CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED = 8;
+    CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED = 9;
+    CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED = 10;
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED = 11;
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED = 12;
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED = 13;
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED = 14;
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED = 15;
+    CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED = 16;
+    CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED = 17;
+    CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED = 18;
+}
+
+message TelemetryEvent {
+    TelemetryEventKind kind = 1;
+    string             name = 2;
+    map<string, string> attributes = 3;
+    double             value = 4;
+    string             unit = 5;
+}
+
+enum TelemetryEventKind {
+    TELEMETRY_EVENT_KIND_UNSPECIFIED = 0;
+    TELEMETRY_EVENT_KIND_COUNTER     = 1;
+    TELEMETRY_EVENT_KIND_GAUGE       = 2;
+    TELEMETRY_EVENT_KIND_HISTOGRAM   = 3;
+    TELEMETRY_EVENT_KIND_TRACE       = 4;
+}
+
+message CancellationEvent {
+    CancellationEventKind kind = 1;
+    SDKComponent          component = 2;
+    string                operation_id = 3;
+    string                reason = 4;
+    bool                  user_initiated = 5;
+}
+
+enum CancellationEventKind {
+    CANCELLATION_EVENT_KIND_UNSPECIFIED = 0;
+    CANCELLATION_EVENT_KIND_REQUESTED   = 1;
+    CANCELLATION_EVENT_KIND_ACKNOWLEDGED = 2;
+    CANCELLATION_EVENT_KIND_COMPLETED   = 3;
+    CANCELLATION_EVENT_KIND_FAILED      = 4;
+}
+
+message FailureEvent {
+    SDKComponent component = 1;
+    string       operation = 2;
+    SDKError     error = 3;
+    bool         recoverable = 4;
+}
+
 // ---------------------------------------------------------------------------
 // Top-level event envelope. Every event published by every SDK is wrapped in
 // exactly one `SDKEvent` — analytics consumers, app developers, and
@@ -712,6 +1061,13 @@ message SDKEvent {
     int64            timestamp_ms = 1;
 
     EventSeverity    severity     = 2;
+
+    EventCategory    category     = 20;
+    SDKComponent     component    = 21;
+
+    // Typed failure details for any failed event. When the event itself is
+    // only an error notification, use the failure oneof arm below.
+    optional SDKError error       = 22;
 
     // Event identifier (UUID). Required by Swift SDKEvent.id /
     // Kotlin SDKEvent.id / Dart SDKEvent.id for de-duplication.
@@ -742,5 +1098,16 @@ message SDKEvent {
         ComponentInitializationEvent  component_init     = 12;
         VoiceLifecycleEvent           voice              = 17;
         VoiceEvent                    voice_pipeline     = 18;   // from voice_events.proto
+        ComponentLifecycleEvent       component_lifecycle = 19;
+        SessionEvent                  session            = 23;
+        AuthEvent                     auth               = 24;
+        ModelRegistryEvent            model_registry     = 25;
+        DownloadEvent                 download           = 26;
+        StorageLifecycleEvent         storage_lifecycle  = 27;
+        HardwareRoutingEvent          hardware_routing   = 28;
+        CapabilityOperationEvent      capability         = 29;
+        TelemetryEvent                telemetry          = 30;
+        CancellationEvent             cancellation       = 31;
+        FailureEvent                  failure            = 32;
     }
 }

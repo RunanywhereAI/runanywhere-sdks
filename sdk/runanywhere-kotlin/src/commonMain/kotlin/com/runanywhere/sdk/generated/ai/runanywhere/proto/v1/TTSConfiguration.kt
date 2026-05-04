@@ -159,6 +159,17 @@ public class TTSConfiguration(
     schemaIndex = 9,
   )
   public val enable_ssml: Boolean = false,
+  /**
+   * Preferred framework for the component. Absent = auto. Mirrors the C
+   * ABI rac_tts_config_t preferred_framework field.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    jsonName = "preferredFramework",
+    schemaIndex = 10,
+  )
+  public val preferred_framework: InferenceFramework? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -182,6 +193,7 @@ public class TTSConfiguration(
     if (sample_rate != other.sample_rate) return false
     if (enable_neural_voice != other.enable_neural_voice) return false
     if (enable_ssml != other.enable_ssml) return false
+    if (preferred_framework != other.preferred_framework) return false
     return true
   }
 
@@ -199,6 +211,7 @@ public class TTSConfiguration(
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + enable_neural_voice.hashCode()
       result = result * 37 + enable_ssml.hashCode()
+      result = result * 37 + (preferred_framework?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -216,6 +229,7 @@ public class TTSConfiguration(
     result += """sample_rate=$sample_rate"""
     result += """enable_neural_voice=$enable_neural_voice"""
     result += """enable_ssml=$enable_ssml"""
+    if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
     return result.joinToString(prefix = "TTSConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -230,9 +244,11 @@ public class TTSConfiguration(
     sample_rate: Int = this.sample_rate,
     enable_neural_voice: Boolean = this.enable_neural_voice,
     enable_ssml: Boolean = this.enable_ssml,
+    preferred_framework: InferenceFramework? = this.preferred_framework,
     unknownFields: ByteString = this.unknownFields,
   ): TTSConfiguration = TTSConfiguration(model_id, voice, language_code, speaking_rate, pitch,
-      volume, audio_format, sample_rate, enable_neural_voice, enable_ssml, unknownFields)
+      volume, audio_format, sample_rate, enable_neural_voice, enable_ssml, preferred_framework,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -262,6 +278,7 @@ public class TTSConfiguration(
             value.enable_neural_voice)
         if (value.enable_ssml != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(10,
             value.enable_ssml)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(11, value.preferred_framework)
         return size
       }
 
@@ -281,11 +298,13 @@ public class TTSConfiguration(
             value.enable_neural_voice)
         if (value.enable_ssml != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
             value.enable_ssml)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.preferred_framework)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSConfiguration) {
         writer.writeBytes(value.unknownFields)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.preferred_framework)
         if (value.enable_ssml != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
             value.enable_ssml)
         if (value.enable_neural_voice != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9,
@@ -314,6 +333,7 @@ public class TTSConfiguration(
         var sample_rate: Int = 0
         var enable_neural_voice: Boolean = false
         var enable_ssml: Boolean = false
+        var preferred_framework: InferenceFramework? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -330,6 +350,11 @@ public class TTSConfiguration(
             8 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             9 -> enable_neural_voice = ProtoAdapter.BOOL.decode(reader)
             10 -> enable_ssml = ProtoAdapter.BOOL.decode(reader)
+            11 -> try {
+              preferred_framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -344,6 +369,7 @@ public class TTSConfiguration(
           sample_rate = sample_rate,
           enable_neural_voice = enable_neural_voice,
           enable_ssml = enable_ssml,
+          preferred_framework = preferred_framework,
           unknownFields = unknownFields
         )
       }

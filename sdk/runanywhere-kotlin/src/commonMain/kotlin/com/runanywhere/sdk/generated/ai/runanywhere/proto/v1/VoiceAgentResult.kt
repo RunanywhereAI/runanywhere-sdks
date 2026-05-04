@@ -106,6 +106,34 @@ public class VoiceAgentResult(
     schemaIndex = 5,
   )
   public val final_state: VoiceAgentComponentStates? = null,
+  /**
+   * Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
+   * or unknown.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "synthesizedAudioSampleRateHz",
+    schemaIndex = 6,
+  )
+  public val synthesized_audio_sample_rate_hz: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "synthesizedAudioChannels",
+    schemaIndex = 7,
+  )
+  public val synthesized_audio_channels: Int = 0,
+  @field:WireField(
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "synthesizedAudioEncoding",
+    schemaIndex = 8,
+  )
+  public val synthesized_audio_encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -125,6 +153,9 @@ public class VoiceAgentResult(
     if (thinking_content != other.thinking_content) return false
     if (synthesized_audio != other.synthesized_audio) return false
     if (final_state != other.final_state) return false
+    if (synthesized_audio_sample_rate_hz != other.synthesized_audio_sample_rate_hz) return false
+    if (synthesized_audio_channels != other.synthesized_audio_channels) return false
+    if (synthesized_audio_encoding != other.synthesized_audio_encoding) return false
     return true
   }
 
@@ -138,6 +169,9 @@ public class VoiceAgentResult(
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + (synthesized_audio?.hashCode() ?: 0)
       result = result * 37 + (final_state?.hashCode() ?: 0)
+      result = result * 37 + synthesized_audio_sample_rate_hz.hashCode()
+      result = result * 37 + synthesized_audio_channels.hashCode()
+      result = result * 37 + synthesized_audio_encoding.hashCode()
       super.hashCode = result
     }
     return result
@@ -152,6 +186,9 @@ public class VoiceAgentResult(
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     if (synthesized_audio != null) result += """synthesized_audio=$synthesized_audio"""
     if (final_state != null) result += """final_state=$final_state"""
+    result += """synthesized_audio_sample_rate_hz=$synthesized_audio_sample_rate_hz"""
+    result += """synthesized_audio_channels=$synthesized_audio_channels"""
+    result += """synthesized_audio_encoding=$synthesized_audio_encoding"""
     return result.joinToString(prefix = "VoiceAgentResult{", separator = ", ", postfix = "}")
   }
 
@@ -162,9 +199,13 @@ public class VoiceAgentResult(
     thinking_content: String? = this.thinking_content,
     synthesized_audio: ByteString? = this.synthesized_audio,
     final_state: VoiceAgentComponentStates? = this.final_state,
+    synthesized_audio_sample_rate_hz: Int = this.synthesized_audio_sample_rate_hz,
+    synthesized_audio_channels: Int = this.synthesized_audio_channels,
+    synthesized_audio_encoding: AudioEncoding = this.synthesized_audio_encoding,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceAgentResult = VoiceAgentResult(speech_detected, transcription, assistant_response,
-      thinking_content, synthesized_audio, final_state, unknownFields)
+      thinking_content, synthesized_audio, final_state, synthesized_audio_sample_rate_hz,
+      synthesized_audio_channels, synthesized_audio_encoding, unknownFields)
 
   public companion object {
     @JvmField
@@ -185,6 +226,12 @@ public class VoiceAgentResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.thinking_content)
         size += ProtoAdapter.BYTES.encodedSizeWithTag(5, value.synthesized_audio)
         size += VoiceAgentComponentStates.ADAPTER.encodedSizeWithTag(6, value.final_state)
+        if (value.synthesized_audio_sample_rate_hz != 0) size +=
+            ProtoAdapter.INT32.encodedSizeWithTag(7, value.synthesized_audio_sample_rate_hz)
+        if (value.synthesized_audio_channels != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.synthesized_audio_channels)
+        if (value.synthesized_audio_encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) size +=
+            AudioEncoding.ADAPTER.encodedSizeWithTag(9, value.synthesized_audio_encoding)
         return size
       }
 
@@ -196,11 +243,23 @@ public class VoiceAgentResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.thinking_content)
         ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.synthesized_audio)
         VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 6, value.final_state)
+        if (value.synthesized_audio_sample_rate_hz != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.synthesized_audio_sample_rate_hz)
+        if (value.synthesized_audio_channels != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.synthesized_audio_channels)
+        if (value.synthesized_audio_encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED)
+            AudioEncoding.ADAPTER.encodeWithTag(writer, 9, value.synthesized_audio_encoding)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.synthesized_audio_encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED)
+            AudioEncoding.ADAPTER.encodeWithTag(writer, 9, value.synthesized_audio_encoding)
+        if (value.synthesized_audio_channels != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.synthesized_audio_channels)
+        if (value.synthesized_audio_sample_rate_hz != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.synthesized_audio_sample_rate_hz)
         VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 6, value.final_state)
         ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.synthesized_audio)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.thinking_content)
@@ -217,6 +276,9 @@ public class VoiceAgentResult(
         var thinking_content: String? = null
         var synthesized_audio: ByteString? = null
         var final_state: VoiceAgentComponentStates? = null
+        var synthesized_audio_sample_rate_hz: Int = 0
+        var synthesized_audio_channels: Int = 0
+        var synthesized_audio_encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> speech_detected = ProtoAdapter.BOOL.decode(reader)
@@ -225,6 +287,13 @@ public class VoiceAgentResult(
             4 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             5 -> synthesized_audio = ProtoAdapter.BYTES.decode(reader)
             6 -> final_state = VoiceAgentComponentStates.ADAPTER.decode(reader)
+            7 -> synthesized_audio_sample_rate_hz = ProtoAdapter.INT32.decode(reader)
+            8 -> synthesized_audio_channels = ProtoAdapter.INT32.decode(reader)
+            9 -> try {
+              synthesized_audio_encoding = AudioEncoding.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -235,6 +304,9 @@ public class VoiceAgentResult(
           thinking_content = thinking_content,
           synthesized_audio = synthesized_audio,
           final_state = final_state,
+          synthesized_audio_sample_rate_hz = synthesized_audio_sample_rate_hz,
+          synthesized_audio_channels = synthesized_audio_channels,
+          synthesized_audio_encoding = synthesized_audio_encoding,
           unknownFields = unknownFields
         )
       }

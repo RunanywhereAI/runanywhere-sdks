@@ -24,23 +24,30 @@ import type {
   LoRAAdapterInfo,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
+import {
+  LoRAAdapterConfig as LoRAAdapterConfigMessage,
+  LoRAAdapterInfo as LoRAAdapterInfoMessage,
+  LoraCompatibilityResult as LoraCompatibilityResultMessage,
+} from '@runanywhere/proto-ts/lora_options';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.LoRA');
 
-interface LoRANativeModule {
-  loadLoraAdapter?: (configJson: string) => Promise<boolean>;
-  removeLoraAdapter?: (path: string) => Promise<boolean>;
-  clearLoraAdapters?: () => Promise<boolean>;
-  getLoadedLoraAdapters?: () => Promise<string>;
-  /** Accepts `adapterId` and optional `modelId` (passed as JSON object). */
-  checkLoraCompatibility?: (adapterId: string, modelId?: string) => Promise<string>;
-  registerLoraAdapter?: (entryJson: string) => Promise<boolean>;
-  loraAdaptersForModel?: (modelId: string) => Promise<string>;
-  allRegisteredLoraAdapters?: () => Promise<string>;
+function encodeConfig(config: LoRAAdapterConfig): ArrayBuffer {
+  return bytesToArrayBuffer(LoRAAdapterConfigMessage.encode(
+    LoRAAdapterConfigMessage.create(config)
+  ).finish());
 }
 
-function getNative(): LoRANativeModule {
-  return requireNativeModule() as unknown as LoRANativeModule;
+function decodeAdapterInfo(buffer: ArrayBuffer, operation: string): LoRAAdapterInfo {
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    throw new Error(`${operation} returned an empty LoRA proto result`);
+  }
+  return LoRAAdapterInfoMessage.decode(bytes);
 }
 
 // ============================================================================
@@ -59,31 +66,13 @@ async function load(config: LoRAAdapterConfig): Promise<LoRAAdapterInfo> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-  const native = getNative();
-  if (!native.loadLoraAdapter) {
-    throw new Error(
-      'LoRA adapter loading is not supported by the current LLM backend'
-    );
-  }
-  const configJson = JSON.stringify({
-    path: config.adapterPath,
-    scale: config.scale ?? 1.0,
-    adapter_id: config.adapterId,
-  });
-  const ok = await native.loadLoraAdapter(configJson);
-  if (!ok) {
-    throw new Error(`Failed to load LoRA adapter: ${config.adapterPath}`);
-  }
+  const native = requireNativeModule();
+  const info = decodeAdapterInfo(
+    await native.loraLoadProto(encodeConfig(config)),
+    'loraLoadProto'
+  );
   logger.info(`LoRA adapter loaded: ${config.adapterPath}`);
-  // Return an LoRAAdapterInfo constructed from the config values.
-  // The native bridge returns bool only; callers that need the full proto
-  // info should call `lora.getLoaded()` after loading.
-  return {
-    adapterId: config.adapterId ?? '',
-    adapterPath: config.adapterPath,
-    scale: config.scale ?? 1.0,
-    applied: true,
-  };
+  return info;
 }
 
 /**
@@ -95,16 +84,12 @@ async function remove(adapterId: string): Promise<void> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-  const native = getNative();
-  if (!native.removeLoraAdapter) {
-    throw new Error(
-      'LoRA adapter removal is not supported by the current LLM backend'
-    );
-  }
-  const ok = await native.removeLoraAdapter(adapterId);
-  if (!ok) {
-    throw new Error(`Failed to remove LoRA adapter: ${adapterId}`);
-  }
+  const native = requireNativeModule();
+  await native.loraRemoveProto(encodeConfig({
+    adapterId,
+    adapterPath: adapterId,
+    scale: 1.0,
+  }));
   logger.info(`LoRA adapter removed: ${adapterId}`);
 }
 
@@ -113,13 +98,7 @@ async function clear(): Promise<void> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-  const native = getNative();
-  if (!native.clearLoraAdapters) {
-    throw new Error(
-      'LoRA adapter clearing is not supported by the current LLM backend'
-    );
-  }
-  await native.clearLoraAdapters();
+  await requireNativeModule().loraClearProto();
   logger.info('All LoRA adapters cleared');
 }
 
@@ -129,36 +108,7 @@ async function clear(): Promise<void> {
  * Canonical: `RunAnywhere.lora.getLoaded()`.
  */
 async function getLoaded(): Promise<LoRAAdapterInfo[]> {
-  if (!isNativeModuleAvailable()) return [];
-  const native = getNative();
-  if (!native.getLoadedLoraAdapters) return [];
-  const json = await native.getLoadedLoraAdapters();
-  try {
-    const arr = JSON.parse(json);
-    if (!Array.isArray(arr)) return [];
-    return arr.map(
-      (entry: {
-        path?: string;
-        adapter_path?: string;
-        adapterPath?: string;
-        scale?: number;
-        applied?: boolean;
-        adapter_id?: string;
-        adapterId?: string;
-        error_message?: string;
-        errorMessage?: string;
-      }): LoRAAdapterInfo => ({
-        adapterId: entry.adapter_id ?? entry.adapterId ?? '',
-        adapterPath:
-          entry.adapter_path ?? entry.adapterPath ?? entry.path ?? '',
-        scale: entry.scale ?? 1.0,
-        applied: entry.applied ?? false,
-        errorMessage: entry.error_message ?? entry.errorMessage,
-      })
-    );
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 /**
@@ -176,35 +126,21 @@ async function checkCompatibility(
   if (!isNativeModuleAvailable()) {
     return { isCompatible: false, errorMessage: 'SDK not initialized' };
   }
-  const native = getNative();
-  if (!native.checkLoraCompatibility) {
-    return { isCompatible: false, errorMessage: 'LoRA support not available' };
-  }
-  // Pass modelId to the bridge when provided so the C ABI can verify
-  // compatibility against a specific base model (not just the loaded one).
-  const json = await native.checkLoraCompatibility(adapterId, modelId);
-  try {
-    const result = JSON.parse(json) as {
-      isCompatible?: boolean;
-      is_compatible?: boolean;
-      error?: string;
-      error_message?: string;
-      errorMessage?: string;
-      base_model_required?: string;
-      baseModelRequired?: string;
-    };
-    return {
-      isCompatible: !!(result.isCompatible ?? result.is_compatible),
-      errorMessage:
-        result.error_message ?? result.errorMessage ?? result.error,
-      baseModelRequired: result.base_model_required ?? result.baseModelRequired,
-    };
-  } catch {
-    return {
-      isCompatible: false,
-      errorMessage: 'Failed to parse compatibility result',
-    };
-  }
+  const native = requireNativeModule();
+  const config = LoRAAdapterConfigMessage.create({
+    adapterId,
+    adapterPath: adapterId,
+    scale: 1.0,
+  });
+  void modelId;
+  const bytes = arrayBufferToBytes(
+    await native.loraCompatibilityProto(
+      bytesToArrayBuffer(LoRAAdapterConfigMessage.encode(config).finish())
+    )
+  );
+  return bytes.byteLength > 0
+    ? LoraCompatibilityResultMessage.decode(bytes)
+    : { isCompatible: false, errorMessage: 'LoRA proto ABI unavailable' };
 }
 
 // ============================================================================
@@ -220,25 +156,8 @@ async function checkCompatibility(
  * Canonical: `RunAnywhere.lora.register(config: LoRAAdapterConfig) → void`.
  */
 async function register(config: LoRAAdapterConfig): Promise<void> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = getNative();
-  if (!native.registerLoraAdapter) {
-    throw new Error(
-      'LoRA registration is not supported by the current LLM backend'
-    );
-  }
-  const entryJson = JSON.stringify({
-    path: config.adapterPath,
-    scale: config.scale ?? 1.0,
-    adapter_id: config.adapterId,
-  });
-  const ok = await native.registerLoraAdapter(entryJson);
-  if (!ok) {
-    throw new Error(`Failed to register LoRA adapter: ${config.adapterPath}`);
-  }
-  logger.info(`LoRA adapter registered: ${config.adapterPath}`);
+  void config;
+  throw new Error('LoRA catalog registration is not exposed by the RN core bridge because commons does not provide a lifecycle-owned LoRA registry handle.');
 }
 
 /**
@@ -249,11 +168,8 @@ async function register(config: LoRAAdapterConfig): Promise<void> {
 async function adaptersForModel(
   modelId: string,
 ): Promise<LoRAAdapterInfo[]> {
-  if (!isNativeModuleAvailable()) return [];
-  const native = getNative();
-  if (!native.loraAdaptersForModel) return [];
-  const json = await native.loraAdaptersForModel(modelId);
-  return parseAdapterInfoEntries(json);
+  void modelId;
+  return [];
 }
 
 /**
@@ -262,40 +178,7 @@ async function adaptersForModel(
  * Canonical: `RunAnywhere.lora.allRegistered() → LoRAAdapterInfo[]` (§3).
  */
 async function allRegistered(): Promise<LoRAAdapterInfo[]> {
-  if (!isNativeModuleAvailable()) return [];
-  const native = getNative();
-  if (!native.allRegisteredLoraAdapters) return [];
-  const json = await native.allRegisteredLoraAdapters();
-  return parseAdapterInfoEntries(json);
-}
-
-function parseAdapterInfoEntries(json: string): LoRAAdapterInfo[] {
-  try {
-    const arr = JSON.parse(json);
-    if (!Array.isArray(arr)) return [];
-    return arr.map(
-      (entry: {
-        adapter_id?: string;
-        adapterId?: string;
-        id?: string;
-        adapter_path?: string;
-        adapterPath?: string;
-        path?: string;
-        scale?: number;
-        applied?: boolean;
-        error_message?: string;
-        errorMessage?: string;
-      }): LoRAAdapterInfo => ({
-        adapterId: entry.adapter_id ?? entry.adapterId ?? entry.id ?? '',
-        adapterPath: entry.adapter_path ?? entry.adapterPath ?? entry.path ?? '',
-        scale: entry.scale ?? 1.0,
-        applied: entry.applied ?? false,
-        errorMessage: entry.error_message ?? entry.errorMessage,
-      })
-    );
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 // ============================================================================

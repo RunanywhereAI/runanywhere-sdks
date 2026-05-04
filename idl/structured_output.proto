@@ -132,6 +132,19 @@ message JSONSchema {
 
     // Whether properties not declared in `properties` are allowed.
     optional bool                        additional_properties = 5;
+
+    // JSON Schema document metadata / composition fields. Field names avoid
+    // `$` in generated APIs while preserving JSON names for serializers.
+    optional string                      schema_uri            = 6 [json_name = "$schema"];
+    optional string                      id_uri                = 7 [json_name = "$id"];
+    optional string                      title                 = 8;
+    optional string                      description           = 9;
+    map<string, JSONSchema>              definitions           = 10;
+    optional string                      ref                   = 11 [json_name = "$ref"];
+    repeated JSONSchema                  all_of                = 12;
+    repeated JSONSchema                  any_of                = 13;
+    repeated JSONSchema                  one_of                = 14;
+    optional JSONSchema                  not_schema            = 15;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +165,14 @@ message StructuredOutputOptions {
 
     // Strict schema adherence — rejects outputs that don't fully validate.
     optional bool  strict_mode              = 3;
+
+    // Raw JSON Schema string for C ABI and SDKs that already carry schema as
+    // serialized JSON instead of the typed JSONSchema tree.
+    optional string json_schema             = 4;
+
+    // Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
+    optional string type_name               = 5;
+    optional string name                    = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +194,10 @@ message StructuredOutputValidation {
 
     // Original raw model output (for debugging / fallback parsing).
     optional string raw_output     = 4;
+
+    // JSON substring extracted from raw_output before validation, when the
+    // extractor found one.
+    optional string extracted_json = 5;
 }
 
 // ---------------------------------------------------------------------------

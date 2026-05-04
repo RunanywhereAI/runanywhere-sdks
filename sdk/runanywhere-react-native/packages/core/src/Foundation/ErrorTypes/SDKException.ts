@@ -8,7 +8,7 @@
  * etc.).
  *
  * Reference: sdk/proto/errors.proto
- *            sdk/runanywhere-proto-ts/dist/errors.d.ts
+ *            @runanywhere/proto-ts/errors
  */
 
 import {

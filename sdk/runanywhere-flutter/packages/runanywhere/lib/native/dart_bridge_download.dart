@@ -4,7 +4,10 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
+import 'package:protobuf/protobuf.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/download_service.pb.dart' as download_pb;
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
@@ -203,10 +206,11 @@ class DartBridgeDownload {
     try {
       final lib = PlatformLoader.loadCommons();
       final fn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<Utf8>,
-              Pointer<RacDownloadProgress>),
-          int Function(Pointer<Void>, Pointer<Utf8>,
-              Pointer<RacDownloadProgress>)>('rac_download_manager_get_progress');
+              Int32 Function(
+                  Pointer<Void>, Pointer<Utf8>, Pointer<RacDownloadProgress>),
+              int Function(
+                  Pointer<Void>, Pointer<Utf8>, Pointer<RacDownloadProgress>)>(
+          'rac_download_manager_get_progress');
 
       final handle = managerHandle();
       final tidPtr = taskId.toNativeUtf8();
@@ -246,8 +250,8 @@ class DartBridgeDownload {
       final lib = PlatformLoader.loadCommons();
       final fn = lib.lookupFunction<
           Int32 Function(Pointer<Void>, Pointer<Utf8>),
-          int Function(Pointer<Void>,
-              Pointer<Utf8>)>('rac_download_manager_cancel');
+          int Function(
+              Pointer<Void>, Pointer<Utf8>)>('rac_download_manager_cancel');
 
       final handle = managerHandle();
       final tidPtr = taskId.toNativeUtf8();
@@ -276,7 +280,9 @@ class DartBridgeDownload {
             Pointer<Utf8>,
             Pointer<Utf8>,
             Pointer<NativeFunction<Void Function(Int64, Int64, Pointer<Void>)>>,
-            Pointer<NativeFunction<Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
+            Pointer<
+                NativeFunction<
+                    Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
             Pointer<Void>,
             Pointer<Pointer<Utf8>>,
           ),
@@ -284,7 +290,9 @@ class DartBridgeDownload {
             Pointer<Utf8>,
             Pointer<Utf8>,
             Pointer<NativeFunction<Void Function(Int64, Int64, Pointer<Void>)>>,
-            Pointer<NativeFunction<Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
+            Pointer<
+                NativeFunction<
+                    Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
             Pointer<Void>,
             Pointer<Pointer<Utf8>>,
           )>('rac_http_download');
@@ -308,9 +316,8 @@ class DartBridgeDownload {
           return null;
         }
 
-        final taskId = taskIdPtr.value != nullptr
-            ? taskIdPtr.value.toDartString()
-            : null;
+        final taskId =
+            taskIdPtr.value != nullptr ? taskIdPtr.value.toDartString() : null;
 
         if (taskId != null) {
           _activeTasks[taskId] = _DownloadTask(
@@ -337,8 +344,7 @@ class DartBridgeDownload {
   Future<bool> cancelDownload(String taskId) async {
     try {
       final lib = PlatformLoader.load();
-      final cancelFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>),
+      final cancelFn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
           int Function(Pointer<Utf8>)>('rac_http_download_cancel');
 
       final taskIdPtr = taskId.toNativeUtf8();
@@ -357,6 +363,133 @@ class DartBridgeDownload {
 
   /// Get active download count
   int get activeDownloadCount => _activeTasks.length;
+
+  // ===========================================================================
+  // Stable download proto-byte API
+  // ===========================================================================
+
+  Future<download_pb.DownloadPlanResult> planProto(
+    download_pb.DownloadPlanRequest request,
+  ) async {
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_plan_proto,
+      download_pb.DownloadPlanResult.fromBuffer,
+      'rac_download_plan_proto',
+    );
+    return result ??
+        download_pb.DownloadPlanResult(
+          canStart: false,
+          errorMessage: 'Download plan proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadStartResult> startProto(
+    download_pb.DownloadStartRequest request,
+  ) async {
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_start_proto,
+      download_pb.DownloadStartResult.fromBuffer,
+      'rac_download_start_proto',
+    );
+    return result ??
+        download_pb.DownloadStartResult(
+          accepted: false,
+          modelId: request.modelId,
+          errorMessage: 'Download start proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadCancelResult> cancelProto(
+    download_pb.DownloadCancelRequest request,
+  ) async {
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_cancel_proto,
+      download_pb.DownloadCancelResult.fromBuffer,
+      'rac_download_cancel_proto',
+    );
+    return result ??
+        download_pb.DownloadCancelResult(
+          success: false,
+          taskId: request.taskId,
+          modelId: request.modelId,
+          errorMessage: 'Download cancel proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadResumeResult> resumeProto(
+    download_pb.DownloadResumeRequest request,
+  ) async {
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_resume_proto,
+      download_pb.DownloadResumeResult.fromBuffer,
+      'rac_download_resume_proto',
+    );
+    return result ??
+        download_pb.DownloadResumeResult(
+          accepted: false,
+          taskId: request.taskId,
+          modelId: request.modelId,
+          errorMessage: 'Download resume proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadProgress?> pollProgressProto(
+    download_pb.DownloadSubscribeRequest request,
+  ) {
+    return _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_progress_poll_proto,
+      download_pb.DownloadProgress.fromBuffer,
+      'rac_download_progress_poll_proto',
+      logNotFound: false,
+    );
+  }
+
+  Future<T?> _callDownloadProto<T extends GeneratedMessage>(
+    GeneratedMessage request,
+    RacDownloadProtoDart? fn,
+    T Function(List<int>) decode,
+    String symbol, {
+    bool logNotFound = true,
+  }) async {
+    if (fn == null) return null;
+
+    final bytes = request.writeToBuffer();
+    final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      if (bytes.isNotEmpty) {
+        requestPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(requestPtr, bytes.length, out);
+      if (code != RacResultCode.success || out.ref.data == nullptr) {
+        if (logNotFound || code != RacResultCode.errorNotFound) {
+          final message = out.ref.errorMessage == nullptr
+              ? 'code=$code status=${out.ref.status}'
+              : out.ref.errorMessage.toDartString();
+          _logger.debug('$symbol failed: $message');
+        }
+        return null;
+      }
+      final resultBytes =
+          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      return decode(resultBytes);
+    } catch (e) {
+      _logger.debug('$symbol error: $e');
+      return null;
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(requestPtr);
+      calloc.free(out);
+    }
+  }
 
   // ===========================================================================
   // Download Orchestrator Utilities (from rac_download_orchestrator.h)

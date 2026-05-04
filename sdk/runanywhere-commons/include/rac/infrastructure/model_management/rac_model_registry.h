@@ -13,6 +13,9 @@
 #ifndef RAC_MODEL_REGISTRY_H
 #define RAC_MODEL_REGISTRY_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -182,6 +185,131 @@ RAC_API rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle
 RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle_t handle,
                                                                const char* model_id,
                                                                const char* local_path);
+
+// =============================================================================
+// PROTO-BYTE MODEL INFO API
+// =============================================================================
+
+/**
+ * @brief Save model metadata from serialized runanywhere.v1.ModelInfo bytes.
+ *
+ * This is the canonical SDK-facing write path for generated proto adapters.
+ * The registry converts the proto to its internal C++/C representation and
+ * applies the same semantics as rac_model_registry_save().
+ *
+ * @param handle Registry handle
+ * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
+ * @param proto_size Byte count
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handle,
+                                                       const uint8_t* proto_bytes,
+                                                       size_t proto_size);
+
+/**
+ * @brief Update existing model metadata from serialized runanywhere.v1.ModelInfo bytes.
+ *
+ * Unlike register_proto, this returns RAC_ERROR_NOT_FOUND when the model id is
+ * not already present in the registry.
+ *
+ * @param handle Registry handle
+ * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
+ * @param proto_size Byte count
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
+                                                     const uint8_t* proto_bytes,
+                                                     size_t proto_size);
+
+/**
+ * @brief Get model metadata as serialized runanywhere.v1.ModelInfo bytes.
+ *
+ * The caller owns the returned buffer and must free it with
+ * rac_model_registry_proto_free().
+ *
+ * @param handle Registry handle
+ * @param model_id Model identifier
+ * @param proto_bytes_out Output: allocated proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_get_proto(rac_model_registry_handle_t handle,
+                                                  const char* model_id,
+                                                  uint8_t** proto_bytes_out,
+                                                  size_t* proto_size_out);
+
+/**
+ * @brief List all model metadata as serialized runanywhere.v1.ModelInfoList bytes.
+ *
+ * The caller owns the returned buffer and must free it with
+ * rac_model_registry_proto_free().
+ *
+ * @param handle Registry handle
+ * @param proto_bytes_out Output: allocated proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_list_proto(rac_model_registry_handle_t handle,
+                                                   uint8_t** proto_bytes_out,
+                                                   size_t* proto_size_out);
+
+/**
+ * @brief Query model metadata using serialized runanywhere.v1.ModelQuery bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelInfoList bytes. The caller owns the
+ * returned buffer and must free it with rac_model_registry_proto_free().
+ *
+ * The current generated ModelQuery schema supports framework/category/format/
+ * source, downloaded_only, available_only, max_size_bytes, and search_query
+ * filters, plus schema-defined sort_field/sort_order ordering.
+ *
+ * @param handle Registry handle
+ * @param query_proto_bytes Serialized runanywhere.v1.ModelQuery bytes
+ * @param query_proto_size Byte count
+ * @param proto_bytes_out Output: allocated ModelInfoList proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_query_proto(rac_model_registry_handle_t handle,
+                                                    const uint8_t* query_proto_bytes,
+                                                    size_t query_proto_size,
+                                                    uint8_t** proto_bytes_out,
+                                                    size_t* proto_size_out);
+
+/**
+ * @brief List downloaded model metadata as serialized runanywhere.v1.ModelInfoList bytes.
+ *
+ * This is equivalent to a ModelQuery with downloaded_only=true. The caller owns
+ * the returned buffer and must free it with rac_model_registry_proto_free().
+ *
+ * @param handle Registry handle
+ * @param proto_bytes_out Output: allocated ModelInfoList proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_list_downloaded_proto(rac_model_registry_handle_t handle,
+                                                              uint8_t** proto_bytes_out,
+                                                              size_t* proto_size_out);
+
+/**
+ * @brief Remove model metadata by id.
+ *
+ * Provided as part of the proto-byte ABI surface so SDK adapters can stop
+ * depending on struct/JSON registry paths for mutations.
+ *
+ * @param handle Registry handle
+ * @param model_id Model identifier
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_remove_proto(rac_model_registry_handle_t handle,
+                                                     const char* model_id);
+
+/**
+ * @brief Free buffers returned by registry proto-byte APIs.
+ *
+ * @param proto_bytes Buffer to free (may be NULL)
+ */
+RAC_API void rac_model_registry_proto_free(uint8_t* proto_bytes);
 
 // =============================================================================
 // QUERY HELPERS

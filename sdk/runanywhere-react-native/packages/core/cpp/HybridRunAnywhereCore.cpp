@@ -4,6 +4,9 @@
  * Domain implementation for HybridRunAnywhereCore.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
+#include "bridges/ExternalConfigGuard.hpp"
+
+#include <utility>
 
 // =============================================================================
 // Platform HTTP transport registration (v2 close-out Phase H6)
@@ -39,15 +42,9 @@ HybridRunAnywhereCore::HybridRunAnywhereCore() : HybridObject(TAG) {
 HybridRunAnywhereCore::~HybridRunAnywhereCore() {
     LOGI("HybridRunAnywhereCore destructor");
 
-    // Cleanup bridges (note: telemetry is NOT shutdown here because it's shared
-    // across instances and should persist for the SDK lifetime)
-    EventBridge::shared().unregisterFromEvents();
-    DownloadBridge::shared().shutdown();
-    FileManagerBridge::shared().shutdown();
-    StorageBridge::shared().shutdown();
-    ModelRegistryBridge::shared().shutdown();
-    // Note: InitBridge and TelemetryBridge are not shutdown in destructor
-    // to allow events to be tracked even after HybridObject instances are destroyed
+    // Nitro may create short-lived HybridObject wrappers while the SDK process
+    // remains initialized. Shared bridge state is owned by initialize()/destroy(),
+    // not by an individual wrapper's C++ destructor.
 }
 
 // SDK Lifecycle
@@ -78,8 +75,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
 #endif
 
         // Parse config
-        std::string apiKey = extractStringValue(configJson, "apiKey");
-        std::string baseURL = extractStringValue(configJson, "baseURL", "https://api.runanywhere.ai");
+        std::string apiKey = config::trim(extractStringValue(configJson, "apiKey"));
+        std::string baseURL = config::trim(extractStringValue(configJson, "baseURL", "https://api.runanywhere.ai"));
         std::string deviceId = extractStringValue(configJson, "deviceId");
         std::string envStr = extractStringValue(configJson, "environment", "production");
         std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
@@ -119,16 +116,51 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             // Continue - not fatal
         }
 
-        // 4. Initialize storage analyzer
+        // 4. Initialize file manager bridge (POSIX-based I/O for C++ business logic)
+        FileManagerBridge::shared().initialize();
+        FileManagerBridge::shared().createDirectoryStructure();
+
+        // 4b. Initialize storage analyzer with platform file callbacks.
+        // Storage aggregation stays in commons; RN only supplies filesystem
+        // primitives through the C++ FileManagerBridge.
+        {
+            StoragePlatformCallbacks storageCallbacks;
+            storageCallbacks.calculateDirSize = [](const std::string& path) -> int64_t {
+                return FileManagerBridge::shared().calculateDirectorySize(path);
+            };
+            storageCallbacks.getFileSize = [](const std::string& path) -> int64_t {
+                const auto* callbacks = FileManagerBridge::shared().getCallbacks();
+                if (!callbacks || !callbacks->get_file_size) return -1;
+                return callbacks->get_file_size(path.c_str(), callbacks->user_data);
+            };
+            storageCallbacks.pathExists = [](const std::string& path) -> std::pair<bool, bool> {
+                const auto* callbacks = FileManagerBridge::shared().getCallbacks();
+                if (!callbacks || !callbacks->path_exists) return {false, false};
+                rac_bool_t isDirectory = RAC_FALSE;
+                bool exists = callbacks->path_exists(
+                    path.c_str(),
+                    &isDirectory,
+                    callbacks->user_data) == RAC_TRUE;
+                return {exists, isDirectory == RAC_TRUE};
+            };
+            storageCallbacks.getAvailableSpace = []() -> int64_t {
+                const auto* callbacks = FileManagerBridge::shared().getCallbacks();
+                if (!callbacks || !callbacks->get_available_space) return 0;
+                return callbacks->get_available_space(callbacks->user_data);
+            };
+            storageCallbacks.getTotalSpace = []() -> int64_t {
+                const auto* callbacks = FileManagerBridge::shared().getCallbacks();
+                if (!callbacks || !callbacks->get_total_space) return 0;
+                return callbacks->get_total_space(callbacks->user_data);
+            };
+            StorageBridge::shared().setPlatformCallbacks(storageCallbacks);
+        }
+
         result = StorageBridge::shared().initialize();
         if (result != RAC_SUCCESS) {
             LOGE("Failed to initialize storage analyzer: %d", result);
             // Continue - not fatal
         }
-
-        // 4b. Initialize file manager bridge (POSIX-based I/O for C++ business logic)
-        FileManagerBridge::shared().initialize();
-        FileManagerBridge::shared().createDirectoryStructure();
 
         // 5. Initialize download manager
         result = DownloadBridge::shared().initialize();
@@ -140,8 +172,15 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         // 6. Register for events
         EventBridge::shared().registerForEvents();
 
-        // 7. Configure HTTP
-        HTTPBridge::shared().configure(baseURL, apiKey);
+        // 7. Configure HTTP only for deployable backend configs. Development
+        // mode uses the C++ dev config directly in telemetry/device callbacks.
+        if (env != SDKEnvironment::Development &&
+            config::isUsableHttpUrl(baseURL) &&
+            config::isUsableSecret(apiKey)) {
+            HTTPBridge::shared().configure(baseURL, apiKey);
+        } else {
+            LOGI("HTTPBridge not configured: no usable external config");
+        }
 
         // 8. Initialize telemetry (matches Swift's CppBridge.Telemetry.initialize)
         // This creates the C++ telemetry manager and registers HTTP callback

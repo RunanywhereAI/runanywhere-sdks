@@ -9,43 +9,34 @@
 import CRACommons
 import Foundation
 
-// MARK: - Voice Agent Result
+// MARK: - Canonical Proto Typealiases
 
-/// Result from voice agent processing
-/// Contains all outputs from the voice pipeline: transcription, LLM response, and synthesized audio
-public struct VoiceAgentResult: Sendable {
-    /// Whether speech was detected in the input audio
-    public var speechDetected: Bool
+public typealias VoiceAgentResult = RAVoiceAgentResult
+public typealias ComponentLoadState = RAComponentLoadState
+public typealias VoiceAgentComponentStates = RAVoiceAgentComponentStates
+public typealias ComponentStates = RAVoiceAgentComponentStates
+public typealias VoiceAgentConfiguration = RAVoiceAgentComposeConfig
+public typealias VoiceAgentConfig = RAVoiceAgentComposeConfig
 
-    /// Transcribed text from STT
-    public var transcription: String?
-
-    /// Generated response text from LLM
-    public var response: String?
-
-    /// Thinking content extracted from `<think>...</think>` tags (nil if none)
-    public var thinkingContent: String?
-
-    /// Synthesized audio data from TTS
-    public var synthesizedAudio: Data?
-
-    /// Initialize with default values
-    public init(
+public extension RAVoiceAgentResult {
+    init(
         speechDetected: Bool = false,
         transcription: String? = nil,
         response: String? = nil,
         thinkingContent: String? = nil,
-        synthesizedAudio: Data? = nil
+        synthesizedAudio: Data? = nil,
+        finalState: RAVoiceAgentComponentStates? = nil
     ) {
+        self.init()
         self.speechDetected = speechDetected
-        self.transcription = transcription
-        self.response = response
-        self.thinkingContent = thinkingContent
-        self.synthesizedAudio = synthesizedAudio
+        if let transcription { self.transcription = transcription }
+        if let response { self.assistantResponse = response }
+        if let thinkingContent { self.thinkingContent = thinkingContent }
+        if let synthesizedAudio { self.synthesizedAudio = synthesizedAudio }
+        if let finalState { self.finalState = finalState }
     }
 
-    /// Initialize from C++ rac_voice_agent_result_t
-    public init(from cResult: rac_voice_agent_result_t) {
+    init(from cResult: rac_voice_agent_result_t) {
         self.init(
             speechDetected: cResult.speech_detected == RAC_TRUE,
             transcription: cResult.transcription.map { String(cString: $0) },
@@ -58,103 +49,75 @@ public struct VoiceAgentResult: Sendable {
             }()
         )
     }
-}
 
-// MARK: - Component Load State
-
-/// Represents the loading state of a single model/voice component
-public enum ComponentLoadState: Sendable, Equatable {
-    case notLoaded
-    case loading
-    case loaded(modelId: String)
-    case error(String)
-
-    /// Whether the component is currently loaded and ready to use
-    public var isLoaded: Bool {
-        if case .loaded = self { return true }
-        return false
-    }
-
-    /// Whether the component is currently loading
-    public var isLoading: Bool {
-        if case .loading = self { return true }
-        return false
-    }
-
-    /// Get the model ID if loaded
-    public var modelId: String? {
-        if case .loaded(let id) = self { return id }
-        return nil
+    var response: String? {
+        get { hasAssistantResponse ? assistantResponse : nil }
+        set {
+            if let newValue {
+                assistantResponse = newValue
+            } else {
+                clearAssistantResponse()
+            }
+        }
     }
 }
 
-// MARK: - Voice Agent Component States
+public extension RAComponentLoadState {
+    var isLoaded: Bool { self == .loaded }
+    var isLoading: Bool { self == .loading }
+}
 
-/// Unified state of all voice agent components
-public struct VoiceAgentComponentStates: Sendable {
-    /// Speech-to-Text component state
-    public let stt: ComponentLoadState
-
-    /// Large Language Model component state
-    public let llm: ComponentLoadState
-
-    /// Text-to-Speech component state
-    public let tts: ComponentLoadState
-
-    /// Whether all components are loaded and the voice agent is ready to use
-    public var isFullyReady: Bool {
-        stt.isLoaded && llm.isLoaded && tts.isLoaded
+public extension RAVoiceAgentComponentStates {
+    var stt: RAComponentLoadState {
+        get { sttState }
+        set { sttState = newValue }
     }
 
-    /// Whether any component is currently loading
-    public var isAnyLoading: Bool {
-        stt.isLoading || llm.isLoading || tts.isLoading
+    var llm: RAComponentLoadState {
+        get { llmState }
+        set { llmState = newValue }
     }
 
-    /// Get a summary of which components are missing
-    public var missingComponents: [String] {
+    var tts: RAComponentLoadState {
+        get { ttsState }
+        set { ttsState = newValue }
+    }
+
+    var vad: RAComponentLoadState {
+        get { vadState }
+        set { vadState = newValue }
+    }
+
+    var isFullyReady: Bool { ready }
+    var isAnyLoading: Bool { anyLoading }
+
+    var missingComponents: [String] {
         var missing: [String] = []
-        if !stt.isLoaded { missing.append("STT") }
-        if !llm.isLoaded { missing.append("LLM") }
-        if !tts.isLoaded { missing.append("TTS") }
+        if !sttState.isLoaded { missing.append("STT") }
+        if !llmState.isLoaded { missing.append("LLM") }
+        if !ttsState.isLoaded { missing.append("TTS") }
+        if !vadState.isLoaded { missing.append("VAD") }
         return missing
     }
 
-    public init(
-        stt: ComponentLoadState = .notLoaded,
-        llm: ComponentLoadState = .notLoaded,
-        tts: ComponentLoadState = .notLoaded
+    init(
+        stt: RAComponentLoadState = .notLoaded,
+        llm: RAComponentLoadState = .notLoaded,
+        tts: RAComponentLoadState = .notLoaded,
+        vad: RAComponentLoadState = .notLoaded
     ) {
-        self.stt = stt
-        self.llm = llm
-        self.tts = tts
+        self.init()
+        self.sttState = stt
+        self.llmState = llm
+        self.ttsState = tts
+        self.vadState = vad
+        self.ready = stt.isLoaded && llm.isLoaded && tts.isLoaded && vad.isLoaded
+        self.anyLoading = stt.isLoading || llm.isLoading || tts.isLoading || vad.isLoading
     }
 }
 
-// MARK: - Voice Agent Configuration
-
-/// Configuration for the voice agent
-/// Uses C++ defaults via rac_voice_agent_config_t
-public struct VoiceAgentConfiguration: Sendable {
-    /// STT model ID (optional - uses currently loaded model if nil)
-    public let sttModelId: String?
-
-    /// LLM model ID (optional - uses currently loaded model if nil)
-    public let llmModelId: String?
-
-    /// TTS voice (optional - uses currently loaded voice if nil)
-    public let ttsVoice: String?
-
-    /// VAD sample rate
-    public let vadSampleRate: Int
-
-    /// VAD frame length in seconds
-    public let vadFrameLength: Float
-
-    /// VAD energy threshold
-    public let vadEnergyThreshold: Float
-
-    public init(
+public extension RAVoiceAgentComposeConfig {
+    init(
         sttModelId: String? = nil,
         llmModelId: String? = nil,
         ttsVoice: String? = nil,
@@ -162,35 +125,36 @@ public struct VoiceAgentConfiguration: Sendable {
         vadFrameLength: Float = 0.1,
         vadEnergyThreshold: Float = 0.005
     ) {
-        self.sttModelId = sttModelId
-        self.llmModelId = llmModelId
-        self.ttsVoice = ttsVoice
-        self.vadSampleRate = vadSampleRate
+        self.init()
+        if let sttModelId { self.sttModelID = sttModelId }
+        if let llmModelId { self.llmModelID = llmModelId }
+        if let ttsVoice { self.ttsVoiceID = ttsVoice }
+        self.vadSampleRate = Int32(vadSampleRate)
         self.vadFrameLength = vadFrameLength
         self.vadEnergyThreshold = vadEnergyThreshold
     }
+
+    var sttModelId: String? {
+        get { hasSttModelID ? sttModelID : nil }
+        set {
+            if let newValue { sttModelID = newValue } else { clearSttModelID() }
+        }
+    }
+
+    var llmModelId: String? {
+        get { hasLlmModelID ? llmModelID : nil }
+        set {
+            if let newValue { llmModelID = newValue } else { clearLlmModelID() }
+        }
+    }
+
+    var ttsVoice: String? {
+        get { hasTtsVoiceID ? ttsVoiceID : nil }
+        set {
+            if let newValue { ttsVoiceID = newValue } else { clearTtsVoiceID() }
+        }
+    }
 }
-
-// MARK: - Canonical Typealiases (CANONICAL_API §10)
-//
-// The spec names `VoiceAgentConfig` and `ComponentStates` as the canonical types.
-// Until the proto `idl/voice_*.proto` exports these exact names (CPP track),
-// we bridge from the hand-rolled Swift types with typealiases so all callers can
-// use the canonical names.
-//
-// Pending proto adoption: once generated `RAVoiceAgentConfig` and
-// `RAComponentStates` are available in `Generated/`, replace these typealiases
-// with re-exports of the generated forms.
-
-/// Canonical name for the voice agent configuration (CANONICAL_API §10).
-/// Backed by the hand-rolled `VoiceAgentConfiguration` struct;
-/// pending migration to proto-generated `RAVoiceAgentConfig`.
-public typealias VoiceAgentConfig = VoiceAgentConfiguration
-
-/// Canonical name for voice agent component states (CANONICAL_API §10).
-/// Backed by the hand-rolled `VoiceAgentComponentStates` struct;
-/// pending migration to proto-generated `RAComponentStates`.
-public typealias ComponentStates = VoiceAgentComponentStates
 
 // v3.1: VoiceSessionEvent enum + `from(_:)` mapper DELETED. Use
 // RAVoiceEvent (the proto-generated type) via
@@ -198,62 +162,65 @@ public typealias ComponentStates = VoiceAgentComponentStates
 
 // MARK: - Voice Session Configuration
 
-/// Configuration for voice session behavior
-public struct VoiceSessionConfig: Sendable {
-    /// Silence duration (seconds) before processing speech
-    public var silenceDuration: TimeInterval
+public typealias VoiceSessionConfig = RAVoiceSessionConfig
 
-    /// Minimum audio level to detect speech (0.0 - 1.0)
-    public var speechThreshold: Float
-
-    /// Whether to auto-play TTS response
-    public var autoPlayTTS: Bool
-
-    /// Whether to auto-resume listening after TTS playback
-    public var continuousMode: Bool
-
-    /// Whether thinking mode is enabled for the LLM.
-    public var thinkingModeEnabled: Bool
-
-    /// Maximum tokens for LLM generation (nil uses SDK default of 100)
-    public var maxTokens: Int?
-
-    public init(
+public extension RAVoiceSessionConfig {
+    init(
         silenceDuration: TimeInterval = 1.5,
         speechThreshold: Float = 0.1,
         autoPlayTTS: Bool = true,
         continuousMode: Bool = true,
         thinkingModeEnabled: Bool = false,
-        maxTokens: Int? = nil
+        maxTokens _: Int? = nil
     ) {
+        self.init()
         self.silenceDuration = silenceDuration
         self.speechThreshold = speechThreshold
-        self.autoPlayTTS = autoPlayTTS
+        self.autoPlayTts = autoPlayTTS
         self.continuousMode = continuousMode
         self.thinkingModeEnabled = thinkingModeEnabled
-        self.maxTokens = maxTokens
     }
 
-    /// Default configuration
-    public static let `default` = VoiceSessionConfig()
+    var silenceDuration: TimeInterval {
+        get { TimeInterval(silenceDurationMs) / 1000.0 }
+        set { silenceDurationMs = Int32((newValue * 1000.0).rounded()) }
+    }
+
+    var autoPlayTTS: Bool {
+        get { autoPlayTts }
+        set { autoPlayTts = newValue }
+    }
+
+    static let `default` = RAVoiceSessionConfig(
+        silenceDuration: 1.5,
+        speechThreshold: 0.1,
+        autoPlayTTS: true,
+        continuousMode: true,
+        thinkingModeEnabled: false
+    )
 }
 
 // MARK: - Voice Session Errors
 
-/// Errors that can occur during a voice session
-public enum VoiceSessionError: LocalizedError {
-    case microphonePermissionDenied
-    case notReady
-    case alreadyRunning
+public typealias VoiceSessionError = RAVoiceSessionError
+public typealias VoiceSessionErrorCode = RAVoiceSessionErrorCode
 
+extension RAVoiceSessionError: LocalizedError {
     public var errorDescription: String? {
-        switch self {
+        if !message.isEmpty { return message }
+        switch code {
         case .microphonePermissionDenied:
             return "Microphone permission denied"
         case .notReady:
-            return "Voice agent not ready. Load STT, LLM, and TTS models first."
+            return "Voice agent not ready. Load VAD, STT, LLM, and TTS models first."
         case .alreadyRunning:
             return "Voice session already running"
+        case .componentFailure:
+            return failedComponent.isEmpty
+                ? "Voice agent component failed"
+                : "Voice agent component failed: \(failedComponent)"
+        default:
+            return "Voice session error"
         }
     }
 }

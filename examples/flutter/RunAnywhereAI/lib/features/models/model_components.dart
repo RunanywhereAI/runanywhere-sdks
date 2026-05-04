@@ -70,67 +70,73 @@ class FrameworkRow extends StatelessWidget {
 
   IconData get _frameworkIcon {
     switch (framework) {
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Icons.apple;
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return Icons.memory;
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return Icons.developer_board;
-      case LLMFramework.sherpa:
+      case LLMFramework.INFERENCE_FRAMEWORK_SHERPA:
         return Icons.mic;
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return Icons.volume_up;
-      case LLMFramework.genie:
+      case LLMFramework.INFERENCE_FRAMEWORK_GENIE:
         return Icons.bolt;
-      case LLMFramework.fluidAudio:
+      case LLMFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
         return Icons.audiotrack;
-      case LLMFramework.builtIn:
+      case LLMFramework.INFERENCE_FRAMEWORK_BUILT_IN:
         return Icons.phone_android;
-      case LLMFramework.none:
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_NONE:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
+        return Icons.psychology;
+      default:
         return Icons.psychology;
     }
   }
 
   Color get _frameworkColor {
     switch (framework) {
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.black;
-      case LLMFramework.genie:
+      case LLMFramework.INFERENCE_FRAMEWORK_GENIE:
         return AppColors.statusGreen;
-      case LLMFramework.onnx:
-      case LLMFramework.sherpa:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
+      case LLMFramework.INFERENCE_FRAMEWORK_SHERPA:
         return AppColors.statusBlue;
-      case LLMFramework.llamaCpp:
-      case LLMFramework.systemTTS:
-      case LLMFramework.fluidAudio:
-      case LLMFramework.builtIn:
-      case LLMFramework.none:
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+      case LLMFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+      case LLMFramework.INFERENCE_FRAMEWORK_NONE:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
+        return AppColors.statusGray;
+      default:
         return AppColors.statusGray;
     }
   }
 
   String get _frameworkDescription {
     switch (framework) {
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return "Apple's pre-installed system models";
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return 'Fast C++ inference for GGUF models';
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return 'Microsoft ONNX inference runtime';
-      case LLMFramework.sherpa:
+      case LLMFramework.INFERENCE_FRAMEWORK_SHERPA:
         return 'OpenAI Whisper for speech recognition';
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return 'Built-in system text-to-speech';
-      case LLMFramework.genie:
+      case LLMFramework.INFERENCE_FRAMEWORK_GENIE:
         return 'Qualcomm Genie NPU inference';
-      case LLMFramework.fluidAudio:
+      case LLMFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
         return 'FluidAudio audio inference';
-      case LLMFramework.builtIn:
+      case LLMFramework.INFERENCE_FRAMEWORK_BUILT_IN:
         return 'Built-in platform model';
-      case LLMFramework.none:
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_NONE:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
+        return 'Machine learning framework';
+      default:
         return 'Machine learning framework';
     }
   }
@@ -279,8 +285,8 @@ class _ModelRowState extends State<ModelRow> {
   }
 
   Widget _buildDownloadStatus(BuildContext context) {
-    if (widget.model.downloadURL != null) {
-      if (widget.model.localPath == null) {
+    if (widget.model.downloadUrl.isNotEmpty) {
+      if (widget.model.localPath.isEmpty) {
         if (_isDownloading) {
           return Row(
             children: [
@@ -327,7 +333,7 @@ class _ModelRowState extends State<ModelRow> {
   }
 
   Widget _buildActionButton(BuildContext context) {
-    if (widget.model.downloadURL != null && widget.model.localPath == null) {
+    if (widget.model.downloadUrl.isNotEmpty && widget.model.localPath.isEmpty) {
       // Model needs to be downloaded
       if (_isDownloading) {
         return Column(
@@ -363,7 +369,7 @@ class _ModelRowState extends State<ModelRow> {
           ),
         );
       }
-    } else if (widget.model.localPath != null) {
+    } else if (widget.model.localPath.isNotEmpty) {
       // Model is downloaded
       if (widget.isSelected) {
         return Row(
@@ -428,7 +434,8 @@ class _ModelRowState extends State<ModelRow> {
         if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+        } else if (progress.stage ==
+                sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
             progress.errorMessage.isNotEmpty) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
           throw Exception('Download failed: ${progress.errorMessage}');

@@ -87,6 +87,7 @@ export function applyLLMGenerationDefaults(
 // VLM — proto-ts canonical types + Web-only browser shapes
 // ---------------------------------------------------------------------------
 export type {
+  VLMImage,
   VLMConfiguration,
   VLMGenerationOptions,
   VLMResult as VLMGenerationResult,
@@ -95,16 +96,6 @@ export {
   VLMImageFormat,
   VLMErrorCode,
 } from '@runanywhere/proto-ts/vlm_options';
-
-// Web-only VLM image shape (carries TypedArray pixel data + base64).
-export interface VLMImage {
-  format: number; // VLMImageFormat enum value
-  filePath?: string;
-  pixelData?: Uint8Array;
-  base64Data?: string;
-  width?: number;
-  height?: number;
-}
 
 import type { VLMResult as ProtoVLMResult } from '@runanywhere/proto-ts/vlm_options';
 
@@ -127,28 +118,18 @@ export type {
   TranscriptionMetadata,
 } from '@runanywhere/proto-ts/stt_options';
 export { STTLanguage } from '@runanywhere/proto-ts/stt_options';
+import type { STTOptions, STTOutput, WordTimestamp } from '@runanywhere/proto-ts/stt_options';
 
-// Web-only ergonomic transcription result + word + streaming shapes.
-export interface STTTranscriptionResult {
-  [key: string]: unknown;
-  text: string;
-  confidence: number;
-  detectedLanguage?: string;
-  processingTimeMs: number;
-  words?: STTWord[];
-}
+export type STTTranscriptionResult = STTOutput;
+export type STTWord = WordTimestamp;
 
-export interface STTWord {
-  text: string;
-  startMs: number;
-  endMs: number;
-  confidence: number;
-}
-
-export interface STTTranscribeOptions {
-  language?: string;
-  sampleRate?: number;
-}
+// Raw browser PCM buffers do not carry sample rate, so the Web adapter accepts
+// that one transport hint alongside canonical STTOptions.
+export type STTTranscribeOptions =
+  Partial<Omit<STTOptions, 'language'>> & {
+    language?: STTOptions['language'] | string;
+    sampleRate?: number;
+  };
 
 export type STTStreamCallback = (text: string, isFinal: boolean) => void;
 
@@ -198,14 +179,15 @@ export type {
   VADStatistics,
   SpeechActivityEvent,
 } from '@runanywhere/proto-ts/vad_options';
+import { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 export { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 
-// Web-only string-union for ergonomic switch statements.
-export enum SpeechActivity {
-  Started = 'started',
-  Ended = 'ended',
-  Ongoing = 'ongoing',
-}
+export const SpeechActivity = {
+  Started: SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED,
+  Ended: SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED,
+  Ongoing: SpeechActivityKind.SPEECH_ACTIVITY_KIND_ONGOING,
+} as const;
+export type SpeechActivity = SpeechActivityKind;
 
 export type SpeechActivityCallback = (activity: SpeechActivity) => void;
 
@@ -248,24 +230,24 @@ export type {
 export type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
 export { ComponentLoadState } from '@runanywhere/proto-ts/voice_events';
 
-export type VoiceAgentComponentLoadState = 'notLoaded' | 'loading' | 'loaded' | 'failed';
-
-export interface VoiceAgentComponentState {
-  state: VoiceAgentComponentLoadState;
-  modelId?: string;
-  voiceId?: string;
-}
-
-export interface VoiceAgentConfig {
-  sttModelId?: string;
-  llmModelId?: string;
-  ttsVoice?: string;
-  vadSampleRate?: number;
-  vadFrameLength?: number;
-  vadEnergyThreshold?: number;
-  language?: string;
-  systemPrompt?: string;
-}
+// ---------------------------------------------------------------------------
+// Model lifecycle — generated proto source of truth
+// ---------------------------------------------------------------------------
+export type {
+  CurrentModelRequest,
+  CurrentModelResult,
+  ModelLoadRequest,
+  ModelLoadResult,
+  ModelUnloadRequest,
+  ModelUnloadResult,
+} from '@runanywhere/proto-ts/model_types';
+export type {
+  ComponentLifecycleEvent,
+  ComponentLifecycleSnapshot,
+} from '@runanywhere/proto-ts/sdk_events';
+export {
+  ComponentLifecycleState,
+} from '@runanywhere/proto-ts/sdk_events';
 
 // ---------------------------------------------------------------------------
 // Tool Calling — pure proto re-export
@@ -277,9 +259,9 @@ export * from '@runanywhere/proto-ts/tool_calling';
 // ---------------------------------------------------------------------------
 export {
   AccelerationPreference,
-  ComponentState,
   ConfigurationSource,
   DownloadStage,
+  DownloadState,
   FrameworkModality,
   HardwareAcceleration,
   LLMFramework,

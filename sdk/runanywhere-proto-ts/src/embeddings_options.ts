@@ -7,8 +7,103 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
+
+/**
+ * ---------------------------------------------------------------------------
+ * Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
+ * ---------------------------------------------------------------------------
+ */
+export enum EmbeddingsNormalizeMode {
+  EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0,
+  EMBEDDINGS_NORMALIZE_MODE_NONE = 1,
+  EMBEDDINGS_NORMALIZE_MODE_L2 = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function embeddingsNormalizeModeFromJSON(object: any): EmbeddingsNormalizeMode {
+  switch (object) {
+    case 0:
+    case "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED":
+      return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
+    case 1:
+    case "EMBEDDINGS_NORMALIZE_MODE_NONE":
+      return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE;
+    case 2:
+    case "EMBEDDINGS_NORMALIZE_MODE_L2":
+      return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return EmbeddingsNormalizeMode.UNRECOGNIZED;
+  }
+}
+
+export function embeddingsNormalizeModeToJSON(object: EmbeddingsNormalizeMode): string {
+  switch (object) {
+    case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED:
+      return "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED";
+    case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE:
+      return "EMBEDDINGS_NORMALIZE_MODE_NONE";
+    case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2:
+      return "EMBEDDINGS_NORMALIZE_MODE_L2";
+    case EmbeddingsNormalizeMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
+ * ---------------------------------------------------------------------------
+ */
+export enum EmbeddingsPoolingStrategy {
+  EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
+  EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
+  EMBEDDINGS_POOLING_STRATEGY_CLS = 2,
+  EMBEDDINGS_POOLING_STRATEGY_LAST = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function embeddingsPoolingStrategyFromJSON(object: any): EmbeddingsPoolingStrategy {
+  switch (object) {
+    case 0:
+    case "EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED":
+      return EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED;
+    case 1:
+    case "EMBEDDINGS_POOLING_STRATEGY_MEAN":
+      return EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN;
+    case 2:
+    case "EMBEDDINGS_POOLING_STRATEGY_CLS":
+      return EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_CLS;
+    case 3:
+    case "EMBEDDINGS_POOLING_STRATEGY_LAST":
+      return EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_LAST;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return EmbeddingsPoolingStrategy.UNRECOGNIZED;
+  }
+}
+
+export function embeddingsPoolingStrategyToJSON(object: EmbeddingsPoolingStrategy): string {
+  switch (object) {
+    case EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED:
+      return "EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED";
+    case EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN:
+      return "EMBEDDINGS_POOLING_STRATEGY_MEAN";
+    case EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_CLS:
+      return "EMBEDDINGS_POOLING_STRATEGY_CLS";
+    case EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_LAST:
+      return "EMBEDDINGS_POOLING_STRATEGY_LAST";
+    case EmbeddingsPoolingStrategy.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 /**
  * ---------------------------------------------------------------------------
@@ -34,7 +129,26 @@ export interface EmbeddingsConfiguration {
    * Default L2 normalization for produced vectors. When unset the backend
    * applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
    */
-  normalize?: boolean | undefined;
+  normalize?:
+    | boolean
+    | undefined;
+  /** Preferred framework for the component. Absent = auto. */
+  preferredFramework?:
+    | InferenceFramework
+    | undefined;
+  /**
+   * C ABI name for max_sequence_length. 0 = use max_sequence_length or
+   * backend default.
+   */
+  maxTokens: number;
+  /**
+   * Exact C ABI normalization/pooling modes for backends that need more
+   * than the bool normalize flag.
+   */
+  normalizeMode: EmbeddingsNormalizeMode;
+  pooling: EmbeddingsPoolingStrategy;
+  /** Backend-specific JSON config (e.g. tokenizer/vocab companion paths). */
+  configJson?: string | undefined;
 }
 
 /**
@@ -62,7 +176,14 @@ export interface EmbeddingsOptions {
    * Override batch size for embed_batch. Unset = backend chooses
    * (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
    */
-  batchSize?: number | undefined;
+  batchSize?:
+    | number
+    | undefined;
+  /** Exact C ABI per-call overrides. UNSPECIFIED = use component config. */
+  normalizeMode: EmbeddingsNormalizeMode;
+  pooling: EmbeddingsPoolingStrategy;
+  /** 0 = auto */
+  nThreads: number;
 }
 
 /**
@@ -91,7 +212,25 @@ export interface EmbeddingVector {
    * multi-input batches where the caller wants to correlate without
    * tracking ordering separately.
    */
-  text?: string | undefined;
+  text?:
+    | string
+    | undefined;
+  /**
+   * Vector dimension for consumers that need per-vector sizing without
+   * inspecting EmbeddingsResult.dimension.
+   */
+  dimension: number;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Request envelope for service-handle APIs. One text = embed, multiple texts =
+ * embed_batch.
+ * ---------------------------------------------------------------------------
+ */
+export interface EmbeddingsRequest {
+  texts: string[];
+  options?: EmbeddingsOptions | undefined;
 }
 
 /**
@@ -117,7 +256,17 @@ export interface EmbeddingsResult {
 }
 
 function createBaseEmbeddingsConfiguration(): EmbeddingsConfiguration {
-  return { modelId: "", embeddingDimension: 0, maxSequenceLength: 0, normalize: undefined };
+  return {
+    modelId: "",
+    embeddingDimension: 0,
+    maxSequenceLength: 0,
+    normalize: undefined,
+    preferredFramework: undefined,
+    maxTokens: 0,
+    normalizeMode: 0,
+    pooling: 0,
+    configJson: undefined,
+  };
 }
 
 export const EmbeddingsConfiguration = {
@@ -133,6 +282,21 @@ export const EmbeddingsConfiguration = {
     }
     if (message.normalize !== undefined) {
       writer.uint32(32).bool(message.normalize);
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(40).int32(message.preferredFramework);
+    }
+    if (message.maxTokens !== 0) {
+      writer.uint32(48).int32(message.maxTokens);
+    }
+    if (message.normalizeMode !== 0) {
+      writer.uint32(56).int32(message.normalizeMode);
+    }
+    if (message.pooling !== 0) {
+      writer.uint32(64).int32(message.pooling);
+    }
+    if (message.configJson !== undefined) {
+      writer.uint32(74).string(message.configJson);
     }
     return writer;
   },
@@ -172,6 +336,41 @@ export const EmbeddingsConfiguration = {
 
           message.normalize = reader.bool();
           continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.maxTokens = reader.int32();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.normalizeMode = reader.int32() as any;
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.pooling = reader.int32() as any;
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.configJson = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -187,6 +386,13 @@ export const EmbeddingsConfiguration = {
       embeddingDimension: isSet(object.embeddingDimension) ? globalThis.Number(object.embeddingDimension) : 0,
       maxSequenceLength: isSet(object.maxSequenceLength) ? globalThis.Number(object.maxSequenceLength) : 0,
       normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : undefined,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
+      maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+      normalizeMode: isSet(object.normalizeMode) ? embeddingsNormalizeModeFromJSON(object.normalizeMode) : 0,
+      pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
+      configJson: isSet(object.configJson) ? globalThis.String(object.configJson) : undefined,
     };
   },
 
@@ -204,6 +410,21 @@ export const EmbeddingsConfiguration = {
     if (message.normalize !== undefined) {
       obj.normalize = message.normalize;
     }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
+    if (message.maxTokens !== 0) {
+      obj.maxTokens = Math.round(message.maxTokens);
+    }
+    if (message.normalizeMode !== 0) {
+      obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
+    }
+    if (message.pooling !== 0) {
+      obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
+    }
+    if (message.configJson !== undefined) {
+      obj.configJson = message.configJson;
+    }
     return obj;
   },
 
@@ -216,12 +437,17 @@ export const EmbeddingsConfiguration = {
     message.embeddingDimension = object.embeddingDimension ?? 0;
     message.maxSequenceLength = object.maxSequenceLength ?? 0;
     message.normalize = object.normalize ?? undefined;
+    message.preferredFramework = object.preferredFramework ?? undefined;
+    message.maxTokens = object.maxTokens ?? 0;
+    message.normalizeMode = object.normalizeMode ?? 0;
+    message.pooling = object.pooling ?? 0;
+    message.configJson = object.configJson ?? undefined;
     return message;
   },
 };
 
 function createBaseEmbeddingsOptions(): EmbeddingsOptions {
-  return { normalize: false, truncate: undefined, batchSize: undefined };
+  return { normalize: false, truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
 }
 
 export const EmbeddingsOptions = {
@@ -234,6 +460,15 @@ export const EmbeddingsOptions = {
     }
     if (message.batchSize !== undefined) {
       writer.uint32(24).int32(message.batchSize);
+    }
+    if (message.normalizeMode !== 0) {
+      writer.uint32(32).int32(message.normalizeMode);
+    }
+    if (message.pooling !== 0) {
+      writer.uint32(40).int32(message.pooling);
+    }
+    if (message.nThreads !== 0) {
+      writer.uint32(48).int32(message.nThreads);
     }
     return writer;
   },
@@ -266,6 +501,27 @@ export const EmbeddingsOptions = {
 
           message.batchSize = reader.int32();
           continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.normalizeMode = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.pooling = reader.int32() as any;
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.nThreads = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -280,6 +536,9 @@ export const EmbeddingsOptions = {
       normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
       truncate: isSet(object.truncate) ? globalThis.Boolean(object.truncate) : undefined,
       batchSize: isSet(object.batchSize) ? globalThis.Number(object.batchSize) : undefined,
+      normalizeMode: isSet(object.normalizeMode) ? embeddingsNormalizeModeFromJSON(object.normalizeMode) : 0,
+      pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
+      nThreads: isSet(object.nThreads) ? globalThis.Number(object.nThreads) : 0,
     };
   },
 
@@ -294,6 +553,15 @@ export const EmbeddingsOptions = {
     if (message.batchSize !== undefined) {
       obj.batchSize = Math.round(message.batchSize);
     }
+    if (message.normalizeMode !== 0) {
+      obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
+    }
+    if (message.pooling !== 0) {
+      obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
+    }
+    if (message.nThreads !== 0) {
+      obj.nThreads = Math.round(message.nThreads);
+    }
     return obj;
   },
 
@@ -305,12 +573,15 @@ export const EmbeddingsOptions = {
     message.normalize = object.normalize ?? false;
     message.truncate = object.truncate ?? undefined;
     message.batchSize = object.batchSize ?? undefined;
+    message.normalizeMode = object.normalizeMode ?? 0;
+    message.pooling = object.pooling ?? 0;
+    message.nThreads = object.nThreads ?? 0;
     return message;
   },
 };
 
 function createBaseEmbeddingVector(): EmbeddingVector {
-  return { values: [], norm: undefined, text: undefined };
+  return { values: [], norm: undefined, text: undefined, dimension: 0 };
 }
 
 export const EmbeddingVector = {
@@ -325,6 +596,9 @@ export const EmbeddingVector = {
     }
     if (message.text !== undefined) {
       writer.uint32(26).string(message.text);
+    }
+    if (message.dimension !== 0) {
+      writer.uint32(32).int32(message.dimension);
     }
     return writer;
   },
@@ -367,6 +641,13 @@ export const EmbeddingVector = {
 
           message.text = reader.string();
           continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.dimension = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -381,6 +662,7 @@ export const EmbeddingVector = {
       values: globalThis.Array.isArray(object?.values) ? object.values.map((e: any) => globalThis.Number(e)) : [],
       norm: isSet(object.norm) ? globalThis.Number(object.norm) : undefined,
       text: isSet(object.text) ? globalThis.String(object.text) : undefined,
+      dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
     };
   },
 
@@ -395,6 +677,9 @@ export const EmbeddingVector = {
     if (message.text !== undefined) {
       obj.text = message.text;
     }
+    if (message.dimension !== 0) {
+      obj.dimension = Math.round(message.dimension);
+    }
     return obj;
   },
 
@@ -406,6 +691,83 @@ export const EmbeddingVector = {
     message.values = object.values?.map((e) => e) || [];
     message.norm = object.norm ?? undefined;
     message.text = object.text ?? undefined;
+    message.dimension = object.dimension ?? 0;
+    return message;
+  },
+};
+
+function createBaseEmbeddingsRequest(): EmbeddingsRequest {
+  return { texts: [], options: undefined };
+}
+
+export const EmbeddingsRequest = {
+  encode(message: EmbeddingsRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.texts) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.options !== undefined) {
+      EmbeddingsOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEmbeddingsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.texts.push(reader.string());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.options = EmbeddingsOptions.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EmbeddingsRequest {
+    return {
+      texts: globalThis.Array.isArray(object?.texts) ? object.texts.map((e: any) => globalThis.String(e)) : [],
+      options: isSet(object.options) ? EmbeddingsOptions.fromJSON(object.options) : undefined,
+    };
+  },
+
+  toJSON(message: EmbeddingsRequest): unknown {
+    const obj: any = {};
+    if (message.texts?.length) {
+      obj.texts = message.texts;
+    }
+    if (message.options !== undefined) {
+      obj.options = EmbeddingsOptions.toJSON(message.options);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(base?: I): EmbeddingsRequest {
+    return EmbeddingsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(object: I): EmbeddingsRequest {
+    const message = createBaseEmbeddingsRequest();
+    message.texts = object.texts?.map((e) => e) || [];
+    message.options = (object.options !== undefined && object.options !== null)
+      ? EmbeddingsOptions.fromPartial(object.options)
+      : undefined;
     return message;
   },
 };

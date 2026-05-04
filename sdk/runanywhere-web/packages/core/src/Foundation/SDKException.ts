@@ -14,6 +14,7 @@
 import {
   ErrorCategory as ProtoErrorCategory,
   ErrorCode as ProtoErrorCode,
+  ErrorSeverity as ProtoErrorSeverity,
   type SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
 
@@ -110,6 +111,27 @@ function protoCodeForSDKCode(code: SDKErrorCode): ProtoErrorCode {
   return ProtoErrorCode.ERROR_CODE_UNSPECIFIED;
 }
 
+function severityForCode(code: SDKErrorCode): ProtoErrorSeverity {
+  return code === SDKErrorCode.Success
+    ? ProtoErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
+    : ProtoErrorSeverity.ERROR_SEVERITY_ERROR;
+}
+
+function componentForCode(code: SDKErrorCode): string {
+  if (code === SDKErrorCode.Success) return 'sdk';
+  const abs = Math.abs(code);
+  if (abs >= 100 && abs <= 109) return 'sdk';
+  if (abs >= 110 && abs <= 129) return 'model';
+  if (abs >= 130 && abs <= 149) return 'generation';
+  if (abs >= 150 && abs <= 179) return 'network';
+  if (abs >= 180 && abs <= 219) return 'storage';
+  if (abs >= 220 && abs <= 229) return 'validation';
+  if (abs >= 230 && abs <= 249) return 'component';
+  if (abs >= 600 && abs <= 699) return 'backend';
+  if (abs >= 900 && abs <= 999) return 'wasm';
+  return 'sdk';
+}
+
 /**
  * SDK exception class — wraps a full proto-ts SDKError envelope. Wire-compatible
  * with the C ABI (same negative numeric code range).
@@ -130,6 +152,9 @@ export class SDKException extends Error {
         message: msg,
         nestedMessage: details,
         context: undefined,
+        timestampMs: Date.now(),
+        severity: severityForCode(code),
+        component: componentForCode(code),
       };
     } else {
       super(codeOrProto.message);
@@ -221,4 +246,5 @@ export type {
 export {
   ErrorCategory as ProtoErrorCategory,
   ErrorCode as ProtoErrorCode,
+  ErrorSeverity as ProtoErrorSeverity,
 } from '@runanywhere/proto-ts/errors';

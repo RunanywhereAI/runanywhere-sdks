@@ -11,6 +11,20 @@ Every shell script in the repo lives in one of these places, organized by scope:
 | `sync-checksums.sh <zip_dir>` | Reads SHA-256 of freshly-built XCFramework zips and updates the `checksum: "..."` lines in root `Package.swift`. Run in the release workflow after native iOS/macOS builds produce the zips. |
 | `validate-artifact.sh <file>...` | Type-aware sanity check for each artifact extension (XCFramework Info.plist + slices, `.so` ELF magic, `.aar` classes.jar + jni, `.wasm` magic bytes, `.tgz` package.json). Same script runs locally and in CI. |
 
+## Validation command hub — `scripts/validation/`
+
+These scripts are the standard entry point for build and runtime-validation
+preflight work. They write generated build output under `build/validation/`
+instead of ad hoc root folders like `build-cpp*`, `build-link*`, or
+`build-proto*`. The build-folder inventory and cleanup policy live in
+`docs/BUILD_ORGANIZATION.md`.
+
+| Script | Purpose |
+|---|---|
+| `validation/run_global_source_checks.sh` | Runs short repo status, whitespace diff check, and IDL drift check. Local validation compares codegen against the current worktree baseline; CI keeps the committed-index drift gate. |
+| `validation/run_commons_proto_checks.sh` | Configures/builds/tests commons proto/core CMake checks under `build/validation/commons-proto/`. |
+| `validation/run_seven_lane_validation.sh` | Creates the seven-lane evidence folder under `test_workflows/logs/`; add `--with-preflight` to run the two preflight scripts first. |
+
 ## Per-SDK `sdk/runanywhere-<lang>/scripts/`
 
 Each client SDK has a `scripts/` folder next to its source with scripts scoped to that SDK. Two canonical names to know:

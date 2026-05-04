@@ -148,8 +148,7 @@ class VADImpl {
    */
   processSamples(samples: Float32Array): boolean {
     if (this._vadHandle === 0) {
-      logger.warning('VAD not initialized. Call loadModel() first.');
-      return false;
+      throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No VAD model loaded. Call loadModel() first.');
     }
 
     const m = SherpaONNXBridge.shared.module;

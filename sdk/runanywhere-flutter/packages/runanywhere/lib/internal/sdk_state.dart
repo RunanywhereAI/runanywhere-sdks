@@ -9,7 +9,7 @@
 // Phase C of the v2 close-out moved this state off the static
 // `RunAnywhere` god-class. One singleton, one source of truth.
 
-import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Package-internal SDK lifecycle state.

@@ -15,12 +15,12 @@ export type { DownloadProgress };
 export * from './types/index';
 
 import type { SDKInitOptions } from './types/models';
+import type { CompactModelDef, ManagedModel } from './Infrastructure/ModelManager';
 import type {
   STTTranscribeOptions,
   STTTranscriptionResult,
   TTSSynthesizeOptions,
 } from './types/index';
-import type { ModelCategory } from './types/enums';
 
 /** Convenience alias for {@link SDKInitOptions}. */
 export type InitializeOptions = SDKInitOptions;
@@ -35,38 +35,9 @@ export type TranscribeResult = STTTranscriptionResult;
 export type SynthesisOptions = TTSSynthesizeOptions;
 
 
-// Phase C5: re-export proto-ts ChatMessage from the canonical proto-ts module.
-export type { ChatMessage as ProtoChatMessage } from '@runanywhere/proto-ts/chat';
-export { MessageRole as ProtoMessageRole } from '@runanywhere/proto-ts/chat';
-
-/** Web-side simplified chat message (string roles, no proto envelope). */
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-/** How the model artifact is packaged (public API). */
-export enum ModelArtifactType {
-  SingleFile = 'single_file',
-  TarGzArchive = 'tar_gz_archive',
-  Directory = 'directory',
-}
-
-/** Descriptor for a model (id, url, memory, modality). Used in catalog/API. */
-export interface ModelDescriptor {
-  /** Unique model identifier used to reference this model in SDK calls. */
-  id: string;
-  /** Human-readable display name. */
-  name: string;
-  /** Direct download URL for the model artifact. */
-  url: string;
-  /** Approximate memory requirement in bytes. */
-  memoryRequirement: number;
-  /** Model category / modality. */
-  modality?: ModelCategory;
-  /** How the model artifact is packaged. Defaults to SingleFile. */
-  artifactType?: ModelArtifactType;
-}
+export type { ChatMessage } from '@runanywhere/proto-ts/chat';
+export { MessageRole } from '@runanywhere/proto-ts/chat';
+export { ModelArtifactType } from '@runanywhere/proto-ts/model_types';
 
 
 /**
@@ -76,6 +47,10 @@ export interface ModelDescriptor {
 export interface IRunAnywhere {
   initialize(options: SDKInitOptions): Promise<void>;
   readonly isInitialized: boolean;
+  registerModel(model: CompactModelDef): void;
+  unregisterModel(modelId: string): void;
+  availableModels(): ManagedModel[];
+  getModel(modelId: string): ManagedModel | undefined;
   downloadModel(modelId: string, onProgress?: (p: DownloadProgress) => void): Promise<void>;
   cancelDownload(modelId: string): boolean;
   deleteModel(modelId: string): Promise<void>;

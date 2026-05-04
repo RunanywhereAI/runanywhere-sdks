@@ -134,7 +134,7 @@ class SupabaseConfig {
   });
 
   /// Get configuration for environment
-  /// 
+  ///
   /// For development mode, reads from C++ dev config (development_config.cpp).
   /// This ensures credentials are stored in a single git-ignored location.
   static SupabaseConfig? configuration(SDKEnvironment environment) {
@@ -143,22 +143,39 @@ class SupabaseConfig {
         // Read from C++ dev config - credentials stored in development_config.cpp (git-ignored)
         final supabaseUrl = DartBridgeDevConfig.supabaseURL;
         final supabaseKey = DartBridgeDevConfig.supabaseKey;
-        
-        if (supabaseUrl == null || supabaseUrl.isEmpty ||
-            supabaseKey == null || supabaseKey.isEmpty) {
-          // Dev config not available - this is expected if development_config.cpp 
+
+        if (supabaseUrl == null ||
+            supabaseUrl.isEmpty ||
+            supabaseKey == null ||
+            supabaseKey.isEmpty ||
+            _looksLikePlaceholder(supabaseUrl) ||
+            _looksLikePlaceholder(supabaseKey)) {
+          // Dev config not available - this is expected if development_config.cpp
           // hasn't been filled in. Telemetry will be disabled in dev mode.
           return null;
         }
-        
+
+        final uri = Uri.tryParse(supabaseUrl);
+        if (uri == null ||
+            !uri.hasScheme ||
+            (uri.scheme != 'http' && uri.scheme != 'https') ||
+            uri.host.isEmpty) {
+          return null;
+        }
+
         return SupabaseConfig(
-          projectURL: Uri.parse(supabaseUrl),
+          projectURL: uri,
           anonKey: supabaseKey,
         );
       case SDKEnvironment.staging:
       case SDKEnvironment.production:
         return null;
     }
+  }
+
+  static bool _looksLikePlaceholder(String value) {
+    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+        .hasMatch(value);
   }
 }
 

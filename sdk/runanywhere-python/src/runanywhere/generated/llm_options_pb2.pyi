@@ -21,7 +21,7 @@ EXECUTION_TARGET_CLOUD: ExecutionTarget
 EXECUTION_TARGET_AUTO: ExecutionTarget
 
 class LLMGenerationOptions(_message.Message):
-    __slots__ = ("max_tokens", "temperature", "top_p", "top_k", "repetition_penalty", "stop_sequences", "streaming_enabled", "preferred_framework", "system_prompt", "json_schema", "thinking_pattern", "execution_target", "structured_output")
+    __slots__ = ("max_tokens", "temperature", "top_p", "top_k", "repetition_penalty", "stop_sequences", "streaming_enabled", "preferred_framework", "system_prompt", "json_schema", "thinking_pattern", "execution_target", "structured_output", "enable_real_time_tracking")
     MAX_TOKENS_FIELD_NUMBER: _ClassVar[int]
     TEMPERATURE_FIELD_NUMBER: _ClassVar[int]
     TOP_P_FIELD_NUMBER: _ClassVar[int]
@@ -35,6 +35,7 @@ class LLMGenerationOptions(_message.Message):
     THINKING_PATTERN_FIELD_NUMBER: _ClassVar[int]
     EXECUTION_TARGET_FIELD_NUMBER: _ClassVar[int]
     STRUCTURED_OUTPUT_FIELD_NUMBER: _ClassVar[int]
+    ENABLE_REAL_TIME_TRACKING_FIELD_NUMBER: _ClassVar[int]
     max_tokens: int
     temperature: float
     top_p: float
@@ -48,10 +49,11 @@ class LLMGenerationOptions(_message.Message):
     thinking_pattern: ThinkingTagPattern
     execution_target: ExecutionTarget
     structured_output: _structured_output_pb2.StructuredOutputOptions
-    def __init__(self, max_tokens: _Optional[int] = ..., temperature: _Optional[float] = ..., top_p: _Optional[float] = ..., top_k: _Optional[int] = ..., repetition_penalty: _Optional[float] = ..., stop_sequences: _Optional[_Iterable[str]] = ..., streaming_enabled: _Optional[bool] = ..., preferred_framework: _Optional[_Union[_model_types_pb2.InferenceFramework, str]] = ..., system_prompt: _Optional[str] = ..., json_schema: _Optional[str] = ..., thinking_pattern: _Optional[_Union[ThinkingTagPattern, _Mapping]] = ..., execution_target: _Optional[_Union[ExecutionTarget, str]] = ..., structured_output: _Optional[_Union[_structured_output_pb2.StructuredOutputOptions, _Mapping]] = ...) -> None: ...
+    enable_real_time_tracking: bool
+    def __init__(self, max_tokens: _Optional[int] = ..., temperature: _Optional[float] = ..., top_p: _Optional[float] = ..., top_k: _Optional[int] = ..., repetition_penalty: _Optional[float] = ..., stop_sequences: _Optional[_Iterable[str]] = ..., streaming_enabled: _Optional[bool] = ..., preferred_framework: _Optional[_Union[_model_types_pb2.InferenceFramework, str]] = ..., system_prompt: _Optional[str] = ..., json_schema: _Optional[str] = ..., thinking_pattern: _Optional[_Union[ThinkingTagPattern, _Mapping]] = ..., execution_target: _Optional[_Union[ExecutionTarget, str]] = ..., structured_output: _Optional[_Union[_structured_output_pb2.StructuredOutputOptions, _Mapping]] = ..., enable_real_time_tracking: _Optional[bool] = ...) -> None: ...
 
 class LLMGenerationResult(_message.Message):
-    __slots__ = ("text", "thinking_content", "input_tokens", "tokens_generated", "model_used", "generation_time_ms", "ttft_ms", "tokens_per_second", "framework", "finish_reason", "thinking_tokens", "response_tokens", "json_output", "performance", "executed_on")
+    __slots__ = ("text", "thinking_content", "input_tokens", "tokens_generated", "model_used", "generation_time_ms", "ttft_ms", "tokens_per_second", "framework", "finish_reason", "thinking_tokens", "response_tokens", "json_output", "performance", "executed_on", "structured_output_validation", "total_tokens", "error_message")
     TEXT_FIELD_NUMBER: _ClassVar[int]
     THINKING_CONTENT_FIELD_NUMBER: _ClassVar[int]
     INPUT_TOKENS_FIELD_NUMBER: _ClassVar[int]
@@ -67,6 +69,9 @@ class LLMGenerationResult(_message.Message):
     JSON_OUTPUT_FIELD_NUMBER: _ClassVar[int]
     PERFORMANCE_FIELD_NUMBER: _ClassVar[int]
     EXECUTED_ON_FIELD_NUMBER: _ClassVar[int]
+    STRUCTURED_OUTPUT_VALIDATION_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     text: str
     thinking_content: str
     input_tokens: int
@@ -82,21 +87,28 @@ class LLMGenerationResult(_message.Message):
     json_output: str
     performance: PerformanceMetrics
     executed_on: ExecutionTarget
-    def __init__(self, text: _Optional[str] = ..., thinking_content: _Optional[str] = ..., input_tokens: _Optional[int] = ..., tokens_generated: _Optional[int] = ..., model_used: _Optional[str] = ..., generation_time_ms: _Optional[float] = ..., ttft_ms: _Optional[float] = ..., tokens_per_second: _Optional[float] = ..., framework: _Optional[str] = ..., finish_reason: _Optional[str] = ..., thinking_tokens: _Optional[int] = ..., response_tokens: _Optional[int] = ..., json_output: _Optional[str] = ..., performance: _Optional[_Union[PerformanceMetrics, _Mapping]] = ..., executed_on: _Optional[_Union[ExecutionTarget, str]] = ...) -> None: ...
+    structured_output_validation: _structured_output_pb2.StructuredOutputValidation
+    total_tokens: int
+    error_message: str
+    def __init__(self, text: _Optional[str] = ..., thinking_content: _Optional[str] = ..., input_tokens: _Optional[int] = ..., tokens_generated: _Optional[int] = ..., model_used: _Optional[str] = ..., generation_time_ms: _Optional[float] = ..., ttft_ms: _Optional[float] = ..., tokens_per_second: _Optional[float] = ..., framework: _Optional[str] = ..., finish_reason: _Optional[str] = ..., thinking_tokens: _Optional[int] = ..., response_tokens: _Optional[int] = ..., json_output: _Optional[str] = ..., performance: _Optional[_Union[PerformanceMetrics, _Mapping]] = ..., executed_on: _Optional[_Union[ExecutionTarget, str]] = ..., structured_output_validation: _Optional[_Union[_structured_output_pb2.StructuredOutputValidation, _Mapping]] = ..., total_tokens: _Optional[int] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class LLMConfiguration(_message.Message):
-    __slots__ = ("context_length", "temperature", "max_tokens", "system_prompt", "streaming")
+    __slots__ = ("context_length", "temperature", "max_tokens", "system_prompt", "streaming", "model_id", "preferred_framework")
     CONTEXT_LENGTH_FIELD_NUMBER: _ClassVar[int]
     TEMPERATURE_FIELD_NUMBER: _ClassVar[int]
     MAX_TOKENS_FIELD_NUMBER: _ClassVar[int]
     SYSTEM_PROMPT_FIELD_NUMBER: _ClassVar[int]
     STREAMING_FIELD_NUMBER: _ClassVar[int]
+    MODEL_ID_FIELD_NUMBER: _ClassVar[int]
+    PREFERRED_FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
     context_length: int
     temperature: float
     max_tokens: int
     system_prompt: str
     streaming: bool
-    def __init__(self, context_length: _Optional[int] = ..., temperature: _Optional[float] = ..., max_tokens: _Optional[int] = ..., system_prompt: _Optional[str] = ..., streaming: _Optional[bool] = ...) -> None: ...
+    model_id: str
+    preferred_framework: _model_types_pb2.InferenceFramework
+    def __init__(self, context_length: _Optional[int] = ..., temperature: _Optional[float] = ..., max_tokens: _Optional[int] = ..., system_prompt: _Optional[str] = ..., streaming: _Optional[bool] = ..., model_id: _Optional[str] = ..., preferred_framework: _Optional[_Union[_model_types_pb2.InferenceFramework, str]] = ...) -> None: ...
 
 class GenerationHints(_message.Message):
     __slots__ = ("temperature", "max_tokens", "system_role")

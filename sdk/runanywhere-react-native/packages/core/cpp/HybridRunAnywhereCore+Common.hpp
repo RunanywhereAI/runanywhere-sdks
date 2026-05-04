@@ -299,7 +299,10 @@ rac_model_category_t categoryFromString(const std::string& category) {
     // Handle both hyphen and underscore variants
     if (category == "SpeechRecognition" || category == "speech-recognition" || category == "speech_recognition") return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION;
     if (category == "SpeechSynthesis" || category == "speech-synthesis" || category == "speech_synthesis") return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS;
-    if (category == "VoiceActivity" || category == "voice-activity" || category == "voice_activity") return RAC_MODEL_CATEGORY_AUDIO;
+    if (category == "VoiceActivity" || category == "voice-activity" || category == "voice_activity" ||
+        category == "VoiceActivityDetection" || category == "voice-activity-detection" || category == "voice_activity_detection") {
+        return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+    }
     if (category == "Vision" || category == "vision") return RAC_MODEL_CATEGORY_VISION;
     if (category == "ImageGeneration" || category == "image-generation" || category == "image_generation") return RAC_MODEL_CATEGORY_IMAGE_GENERATION;
     if (category == "Multimodal" || category == "multimodal") return RAC_MODEL_CATEGORY_MULTIMODAL;

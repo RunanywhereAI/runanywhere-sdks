@@ -201,6 +201,13 @@ public struct RAGSearchResult: Sendable {
         self.similarityScore = cResult.similarity_score
         self.metadataJSON = cResult.metadata_json.map { String(cString: $0) }
     }
+
+    public init(from proto: RARAGSearchResult) {
+        self.chunkId = proto.chunkID
+        self.text = proto.text
+        self.similarityScore = proto.similarityScore
+        self.metadataJSON = proto.hasMetadataJson ? proto.metadataJson : nil
+    }
 }
 
 // MARK: - RAG Result
@@ -262,6 +269,15 @@ public struct RAGResult: Sendable {
         self.retrievalTimeMs = cResult.retrieval_time_ms
         self.generationTimeMs = cResult.generation_time_ms
         self.totalTimeMs = cResult.total_time_ms
+    }
+
+    public init(from proto: RARAGResult) {
+        self.answer = proto.answer
+        self.retrievedChunks = proto.retrievedChunks.map { RAGSearchResult(from: $0) }
+        self.contextUsed = proto.contextUsed.isEmpty ? nil : proto.contextUsed
+        self.retrievalTimeMs = Double(proto.retrievalTimeMs)
+        self.generationTimeMs = Double(proto.generationTimeMs)
+        self.totalTimeMs = Double(proto.totalTimeMs)
     }
 }
 
@@ -333,9 +349,7 @@ private func withOptionalCString<T>(
 // shape is known.
 
 extension RAGConfiguration {
-    /// Convert to canonical generated proto `RARAGConfiguration`. Notes:
-    /// `maxContextTokens`, `promptTemplate`, `embeddingConfigJSON`,
-    /// `llmConfigJSON` are dropped (not in proto schema).
+    /// Convert to canonical generated proto `RARAGConfiguration`.
     public func toRARAGConfiguration() -> RARAGConfiguration {
         var proto = RARAGConfiguration()
         proto.embeddingModelPath = embeddingModelPath
@@ -345,6 +359,20 @@ extension RAGConfiguration {
         proto.similarityThreshold = similarityThreshold
         proto.chunkSize = Int32(chunkSize)
         proto.chunkOverlap = Int32(chunkOverlap)
+        proto.maxContextTokens = Int32(maxContextTokens)
+        if let promptTemplate { proto.promptTemplate = promptTemplate }
+        if let embeddingConfigJSON { proto.embeddingConfigJson = embeddingConfigJSON }
+        if let llmConfigJSON { proto.llmConfigJson = llmConfigJSON }
+        return proto
+    }
+}
+
+extension RAGDocument {
+    /// Convert to canonical generated proto `RARAGDocument`.
+    public func toRARAGDocument() -> RARAGDocument {
+        var proto = RARAGDocument()
+        proto.text = text
+        if let metadataJSON { proto.metadataJson = metadataJSON }
         return proto
     }
 }

@@ -1,5 +1,5 @@
 import _m0 from "protobufjs/minimal";
-import { VoiceAgentComponentStates } from "./voice_events";
+import { AudioEncoding, VoiceAgentComponentStates } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * Empty request type — the voice agent already has its config set via
@@ -53,6 +53,13 @@ export interface VoiceAgentResult {
      * final result. Unset when the caller does not ask for it.
      */
     finalState?: VoiceAgentComponentStates | undefined;
+    /**
+     * Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
+     * or unknown.
+     */
+    synthesizedAudioSampleRateHz: number;
+    synthesizedAudioChannels: number;
+    synthesizedAudioEncoding: AudioEncoding;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -84,6 +91,21 @@ export interface VoiceSessionConfig {
      * Default false.
      */
     thinkingModeEnabled: boolean;
+    /** Optional per-turn LLM max token limit. 0 = LLM/default. */
+    maxTokens: number;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * v3.2: Audio pipeline state-manager configuration.
+ *
+ * Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
+ * to prevent microphone/TTS feedback loops.
+ * ---------------------------------------------------------------------------
+ */
+export interface AudioPipelineConfig {
+    cooldownDurationMs: number;
+    strictTransitions: boolean;
+    maxTtsDurationMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -156,6 +178,11 @@ export interface VoiceAgentComposeConfig {
      * -------------------------------------------------------------------
      */
     sessionConfig?: VoiceSessionConfig | undefined;
+    /**
+     * Audio state-machine behavior. Optional so defaults can be applied by
+     * the native voice-agent implementation.
+     */
+    audioPipelineConfig?: AudioPipelineConfig | undefined;
 }
 export declare const VoiceAgentRequest: {
     encode(message: VoiceAgentRequest, writer?: _m0.Writer): _m0.Writer;
@@ -180,6 +207,14 @@ export declare const VoiceSessionConfig: {
     toJSON(message: VoiceSessionConfig): unknown;
     create<I extends Exact<DeepPartial<VoiceSessionConfig>, I>>(base?: I): VoiceSessionConfig;
     fromPartial<I extends Exact<DeepPartial<VoiceSessionConfig>, I>>(object: I): VoiceSessionConfig;
+};
+export declare const AudioPipelineConfig: {
+    encode(message: AudioPipelineConfig, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): AudioPipelineConfig;
+    fromJSON(object: any): AudioPipelineConfig;
+    toJSON(message: AudioPipelineConfig): unknown;
+    create<I extends Exact<DeepPartial<AudioPipelineConfig>, I>>(base?: I): AudioPipelineConfig;
+    fromPartial<I extends Exact<DeepPartial<AudioPipelineConfig>, I>>(object: I): AudioPipelineConfig;
 };
 export declare const VoiceAgentComposeConfig: {
     encode(message: VoiceAgentComposeConfig, writer?: _m0.Writer): _m0.Writer;

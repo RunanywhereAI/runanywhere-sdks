@@ -6,7 +6,9 @@
 //
 
 import CRACommons
+import Darwin
 import Foundation
+import SwiftProtobuf
 
 // MARK: - Model Discovery Result
 
@@ -14,6 +16,79 @@ import Foundation
 public struct ModelDiscoveryResult {
     public let discoveredCount: Int
     public let unregisteredCount: Int
+}
+
+private enum RegistryProtoABI {
+    typealias RegisterProto = @convention(c) (
+        rac_model_registry_handle_t?, UnsafePointer<UInt8>?, Int
+    ) -> rac_result_t
+    typealias UpdateProto = @convention(c) (
+        rac_model_registry_handle_t?, UnsafePointer<UInt8>?, Int
+    ) -> rac_result_t
+    typealias GetProto = @convention(c) (
+        rac_model_registry_handle_t?,
+        UnsafePointer<CChar>?,
+        UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+        UnsafeMutablePointer<Int>?
+    ) -> rac_result_t
+    typealias ListProto = @convention(c) (
+        rac_model_registry_handle_t?,
+        UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+        UnsafeMutablePointer<Int>?
+    ) -> rac_result_t
+    typealias QueryProto = @convention(c) (
+        rac_model_registry_handle_t?,
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+        UnsafeMutablePointer<Int>?
+    ) -> rac_result_t
+    typealias RemoveProto = @convention(c) (
+        rac_model_registry_handle_t?, UnsafePointer<CChar>?
+    ) -> rac_result_t
+    typealias FreeProto = @convention(c) (UnsafeMutablePointer<UInt8>?) -> Void
+
+    private static let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2)
+
+    private static func load<T>(_ symbolName: String, as _: T.Type) -> T? {
+        guard let symbol = dlsym(defaultHandle, symbolName) else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: T.self)
+    }
+
+    static let registerProto = load(
+        "rac_model_registry_register_proto",
+        as: RegisterProto.self
+    )
+    static let updateProto = load(
+        "rac_model_registry_update_proto",
+        as: UpdateProto.self
+    )
+    static let getProto = load(
+        "rac_model_registry_get_proto",
+        as: GetProto.self
+    )
+    static let listProto = load(
+        "rac_model_registry_list_proto",
+        as: ListProto.self
+    )
+    static let queryProto = load(
+        "rac_model_registry_query_proto",
+        as: QueryProto.self
+    )
+    static let listDownloadedProto = load(
+        "rac_model_registry_list_downloaded_proto",
+        as: ListProto.self
+    )
+    static let removeProto = load(
+        "rac_model_registry_remove_proto",
+        as: RemoveProto.self
+    )
+    static let freeProto = load(
+        "rac_model_registry_proto_free",
+        as: FreeProto.self
+    )
 }
 
 // Top-level helper so it can be referenced from a C function pointer (no `Self` capture).
@@ -82,6 +157,23 @@ extension CppBridge {
             }
 
             logger.info("Saving model: \(model.id), Swift framework: \(model.framework.wireString) (\(model.framework.displayName))")
+            if let registerProto = RegistryProtoABI.registerProto {
+                let data = try model.proto.serializedData()
+                let result = data.withUnsafeBytes { rawBuffer -> rac_result_t in
+                    guard let bytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress else {
+                        return RAC_ERROR_INVALID_ARGUMENT
+                    }
+                    return registerProto(handle, bytes, rawBuffer.count)
+                }
+
+                guard result == RAC_SUCCESS else {
+                    throw SDKException.general(.processingFailed, "Failed to save model via proto registry")
+                }
+
+                logger.info("Model saved successfully via proto registry: \(model.id)")
+                return
+            }
+
             var cModel = model.toCModelInfo()
             logger.info("Converted to C++: framework=\(cModel.framework) (expected CoreML=8, Unknown=99)")
             defer { freeCModelInfo(&cModel) }
@@ -94,9 +186,57 @@ extension CppBridge {
             logger.info("Model saved successfully: \(model.id)")
         }
 
+        /// Update existing model metadata in the registry.
+        public func update(_ model: ModelInfo) throws {
+            guard let handle = handle else {
+                throw SDKException.general(.initializationFailed, "Registry not initialized")
+            }
+
+            if let updateProto = RegistryProtoABI.updateProto {
+                let data = try model.proto.serializedData()
+                let result = data.withUnsafeBytes { rawBuffer -> rac_result_t in
+                    guard let bytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress else {
+                        return RAC_ERROR_INVALID_ARGUMENT
+                    }
+                    return updateProto(handle, bytes, rawBuffer.count)
+                }
+
+                guard result == RAC_SUCCESS else {
+                    throw SDKException.general(.modelNotFound, "Model not found: \(model.id)")
+                }
+
+                logger.debug("Model updated via proto registry: \(model.id)")
+                return
+            }
+
+            guard get(modelId: model.id) != nil else {
+                throw SDKException.general(.modelNotFound, "Model not found: \(model.id)")
+            }
+            try save(model)
+        }
+
         /// Get model metadata by ID
         public func get(modelId: String) -> ModelInfo? {
             guard let handle = handle else { return nil }
+
+            if let getProto = RegistryProtoABI.getProto,
+               let freeProto = RegistryProtoABI.freeProto {
+                var bytesPtr: UnsafeMutablePointer<UInt8>?
+                var byteCount = 0
+                let result = modelId.withCString { modelIdPtr in
+                    getProto(handle, modelIdPtr, &bytesPtr, &byteCount)
+                }
+
+                guard result == RAC_SUCCESS, let bytesPtr else { return nil }
+                defer { freeProto(bytesPtr) }
+
+                let data = Data(bytes: bytesPtr, count: byteCount)
+                guard let proto = try? RAModelInfo(serializedBytes: data) else {
+                    logger.warning("Failed to decode model registry proto for: \(modelId)")
+                    return nil
+                }
+                return proto.modelInfo
+            }
 
             var modelPtr: UnsafeMutablePointer<rac_model_info_t>?
             let result = modelId.withCString { mid in
@@ -112,6 +252,23 @@ extension CppBridge {
         /// Get all stored models
         public func getAll() -> [ModelInfo] {
             guard let handle = handle else { return [] }
+
+            if let listProto = RegistryProtoABI.listProto,
+               let freeProto = RegistryProtoABI.freeProto {
+                var bytesPtr: UnsafeMutablePointer<UInt8>?
+                var byteCount = 0
+                let result = listProto(handle, &bytesPtr, &byteCount)
+
+                guard result == RAC_SUCCESS, let bytesPtr else { return [] }
+                defer { freeProto(bytesPtr) }
+
+                let data = Data(bytes: bytesPtr, count: byteCount)
+                guard let protoList = try? RAModelInfoList(serializedBytes: data) else {
+                    logger.warning("Failed to decode model registry list proto")
+                    return []
+                }
+                return protoList.models.map(\.modelInfo)
+            }
 
             var modelsPtr: UnsafeMutablePointer<UnsafeMutablePointer<rac_model_info_t>?>?
             var count: Int = 0
@@ -137,6 +294,23 @@ extension CppBridge {
         public func getDownloaded() -> [ModelInfo] {
             guard let handle = handle else { return [] }
 
+            if let listDownloadedProto = RegistryProtoABI.listDownloadedProto,
+               let freeProto = RegistryProtoABI.freeProto {
+                var bytesPtr: UnsafeMutablePointer<UInt8>?
+                var byteCount = 0
+                let result = listDownloadedProto(handle, &bytesPtr, &byteCount)
+
+                guard result == RAC_SUCCESS, let bytesPtr else { return [] }
+                defer { freeProto(bytesPtr) }
+
+                let data = Data(bytes: bytesPtr, count: byteCount)
+                guard let protoList = try? RAModelInfoList(serializedBytes: data) else {
+                    logger.warning("Failed to decode downloaded model registry proto")
+                    return []
+                }
+                return protoList.models.map(\.modelInfo)
+            }
+
             var modelsPtr: UnsafeMutablePointer<UnsafeMutablePointer<rac_model_info_t>?>?
             var count: Int = 0
 
@@ -154,9 +328,73 @@ extension CppBridge {
             return modelInfos
         }
 
+        /// Query models using the canonical generated proto request shape.
+        public func query(_ query: RAModelQuery) -> RAModelListResult {
+            guard let handle = handle else {
+                return modelListResult(success: false, errorMessage: "Registry not initialized")
+            }
+
+            if let queryProto = RegistryProtoABI.queryProto,
+               let freeProto = RegistryProtoABI.freeProto,
+               let data = try? query.serializedData() {
+                var bytesPtr: UnsafeMutablePointer<UInt8>?
+                var byteCount = 0
+                let result = data.withUnsafeBytes { rawBuffer -> rac_result_t in
+                    let bytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress
+                    return queryProto(handle, bytes, rawBuffer.count, &bytesPtr, &byteCount)
+                }
+
+                guard result == RAC_SUCCESS, let bytesPtr else {
+                    return modelListResult(success: false, errorMessage: "Model registry query failed")
+                }
+                defer { freeProto(bytesPtr) }
+
+                do {
+                    let list = try RAModelInfoList(serializedBytes: Data(bytes: bytesPtr, count: byteCount))
+                    return modelListResult(models: list.models)
+                } catch {
+                    return modelListResult(success: false, errorMessage: "Failed to decode model registry query result")
+                }
+            }
+
+            let models = applyFallbackQuery(query, to: getAll()).map(\.proto)
+            return modelListResult(models: models, warnings: [NativeProtoABI.unavailableMessage])
+        }
+
+        public func list(_ request: RAModelListRequest = RAModelListRequest()) -> RAModelListResult {
+            if request.hasQuery {
+                return query(request.query)
+            }
+            let models = getAll().map(\.proto)
+            return modelListResult(models: models)
+        }
+
+        public func get(_ request: RAModelGetRequest) -> RAModelGetResult {
+            var result = RAModelGetResult()
+            guard !request.modelID.isEmpty else {
+                result.found = false
+                result.errorMessage = "model_id is required"
+                return result
+            }
+            guard let model = get(modelId: request.modelID) else {
+                result.found = false
+                result.errorMessage = "Model not found: \(request.modelID)"
+                return result
+            }
+            result.found = true
+            result.model = model.proto
+            return result
+        }
+
         /// Get models for specific frameworks
         public func getByFrameworks(_ frameworks: [InferenceFramework]) -> [ModelInfo] {
             guard let handle = handle, !frameworks.isEmpty else { return [] }
+
+            if RegistryProtoABI.listProto != nil,
+               RegistryProtoABI.freeProto != nil {
+                let frameworkSet = Set(frameworks)
+                return getAll().filter { frameworkSet.contains($0.framework) }
+            }
 
             var cFrameworks = frameworks.map { $0.toCFramework() }
             var modelsPtr: UnsafeMutablePointer<UnsafeMutablePointer<rac_model_info_t>?>?
@@ -189,6 +427,17 @@ extension CppBridge {
         public func updateDownloadStatus(modelId: String, localPath: URL?) throws {
             guard let handle = handle else {
                 throw SDKException.general(.initializationFailed, "Registry not initialized")
+            }
+
+            if RegistryProtoABI.updateProto != nil {
+                guard var model = get(modelId: modelId) else {
+                    throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
+                }
+                model.localPath = localPath
+                model.updatedAt = Date()
+                try update(model)
+                logger.debug("Updated download status via proto registry for: \(modelId)")
+                return
             }
 
             let result: rac_result_t
@@ -232,6 +481,19 @@ extension CppBridge {
         public func remove(modelId: String) throws {
             guard let handle = handle else {
                 throw SDKException.general(.initializationFailed, "Registry not initialized")
+            }
+
+            if let removeProto = RegistryProtoABI.removeProto {
+                let result = modelId.withCString { mid in
+                    removeProto(handle, mid)
+                }
+
+                guard result == RAC_SUCCESS else {
+                    throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
+                }
+
+                logger.debug("Model removed via proto registry: \(modelId)")
+                return
             }
 
             let result = modelId.withCString { mid in
@@ -400,6 +662,88 @@ extension CppBridge {
             if let url = model.download_url { free(UnsafeMutablePointer(mutating: url)) }
             if let path = model.local_path { free(UnsafeMutablePointer(mutating: path)) }
             if let desc = model.description { free(UnsafeMutablePointer(mutating: desc)) }
+        }
+
+        private func modelListResult(
+            success: Bool = true,
+            models: [RAModelInfo] = [],
+            warnings: [String] = [],
+            errorMessage: String = ""
+        ) -> RAModelListResult {
+            var result = RAModelListResult()
+            result.success = success
+            var list = RAModelInfoList()
+            list.models = models
+            result.models = list
+            if !warnings.isEmpty {
+                result.errorMessage = warnings.joined(separator: "; ")
+            } else {
+                result.errorMessage = errorMessage
+            }
+            return result
+        }
+
+        private func applyFallbackQuery(_ query: RAModelQuery, to models: [ModelInfo]) -> [ModelInfo] {
+            var filtered = models.filter { model in
+                if query.hasFramework, query.framework != .unspecified, model.framework != query.framework {
+                    return false
+                }
+                if query.hasCategory, query.category != .unspecified, model.category != query.category {
+                    return false
+                }
+                if query.hasFormat, query.format != .unspecified, model.format != query.format {
+                    return false
+                }
+                if query.hasSource, query.source != .unspecified, model.source != query.source {
+                    return false
+                }
+                if query.hasDownloadedOnly, query.downloadedOnly, model.localPath == nil {
+                    return false
+                }
+                if query.hasAvailableOnly, query.availableOnly, !model.isAvailable {
+                    return false
+                }
+                if query.hasMaxSizeBytes, query.maxSizeBytes > 0 {
+                    let size = model.downloadSize ?? 0
+                    if size > query.maxSizeBytes {
+                        return false
+                    }
+                }
+                if !query.searchQuery.isEmpty {
+                    let needle = query.searchQuery.lowercased()
+                    let haystack = [
+                        model.id,
+                        model.name,
+                        model.description ?? "",
+                    ].joined(separator: " ").lowercased()
+                    if !haystack.contains(needle) {
+                        return false
+                    }
+                }
+                return true
+            }
+
+            guard query.hasSortField, query.sortField != .unspecified else {
+                return filtered
+            }
+            let descending = query.hasSortOrder && query.sortOrder == .descending
+            filtered.sort { lhs, rhs in
+                let orderedAscending: Bool
+                switch query.sortField {
+                case .name:
+                    orderedAscending = lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                case .createdAtUnixMs:
+                    orderedAscending = lhs.createdAt < rhs.createdAt
+                case .updatedAtUnixMs:
+                    orderedAscending = lhs.updatedAt < rhs.updatedAt
+                case .downloadSizeBytes:
+                    orderedAscending = (lhs.downloadSize ?? 0) < (rhs.downloadSize ?? 0)
+                default:
+                    orderedAscending = lhs.id < rhs.id
+                }
+                return descending ? !orderedAscending : orderedAscending
+            }
+            return filtered
         }
     }
 }

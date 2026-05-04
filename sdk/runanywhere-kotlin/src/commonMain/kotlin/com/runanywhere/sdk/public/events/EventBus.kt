@@ -9,6 +9,13 @@
 
 package com.runanywhere.sdk.public.events
 
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_ERROR
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_LLM
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_MODEL
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_RAG
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_SDK
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -54,7 +61,7 @@ object EventBus {
      * Publish an event to all subscribers.
      */
     fun publish(event: SDKEvent) {
-        logger.debug("Publishing event: ${event.type} (category: ${event.category.value})")
+        logger.debug("Publishing event: ${event.id} (category: ${event.category})")
         _events.tryEmit(event)
     }
 
@@ -80,41 +87,41 @@ object EventBus {
      * Get LLM events.
      */
     val llmEvents: Flow<SDKEvent>
-        get() = events(EventCategory.LLM)
+        get() = events(EVENT_CATEGORY_LLM)
 
     /**
      * Get STT events.
      */
     val sttEvents: Flow<SDKEvent>
-        get() = events(EventCategory.STT)
+        get() = events(EVENT_CATEGORY_STT)
 
     /**
      * Get TTS events.
      */
     val ttsEvents: Flow<SDKEvent>
-        get() = events(EventCategory.TTS)
+        get() = events(EVENT_CATEGORY_TTS)
 
     /**
      * Get model events.
      */
     val modelEvents: Flow<SDKEvent>
-        get() = events(EventCategory.MODEL)
+        get() = events(EVENT_CATEGORY_MODEL)
 
     /**
      * Get error events.
      */
     val errorEvents: Flow<SDKEvent>
-        get() = events(EventCategory.ERROR)
+        get() = events(EVENT_CATEGORY_ERROR)
 
     /**
      * Get SDK lifecycle events.
      */
     val sdkEvents: Flow<SDKEvent>
-        get() = events(EventCategory.SDK)
+        get() = events(EVENT_CATEGORY_SDK)
 
     /**
      * Get RAG events.
      */
     val ragEvents: Flow<SDKEvent>
-        get() = events(EventCategory.RAG)
+        get() = events(EVENT_CATEGORY_RAG)
 }

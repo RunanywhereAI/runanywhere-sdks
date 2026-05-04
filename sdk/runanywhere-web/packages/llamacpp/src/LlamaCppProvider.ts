@@ -15,6 +15,7 @@ import {
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
+  ServiceKey,
 } from '@runanywhere/web';
 
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
@@ -57,6 +58,9 @@ async function _doRegister(acceleration?: 'auto' | 'webgpu' | 'cpu'): Promise<vo
   // higher-level SDK extensions) can access the LLM via
   // ExtensionPoint.getProvider('llm') at runtime.
   ExtensionPoint.registerProvider('llm', TextGeneration);
+  ExtensionPoint.registerService(ServiceKey.VLM, VLM);
+  ExtensionPoint.registerService(ServiceKey.Embeddings, Embeddings);
+  ExtensionPoint.registerService(ServiceKey.Diffusion, Diffusion);
 
   _isRegistered = true;
   logger.info('LlamaCpp backend registered successfully');
@@ -79,6 +83,9 @@ const llamacppExtension: BackendExtension = {
     Embeddings.cleanup();
     Diffusion.cleanup();
     ExtensionPoint.removeProvider('llm');
+    ExtensionPoint.removeService(ServiceKey.VLM);
+    ExtensionPoint.removeService(ServiceKey.Embeddings);
+    ExtensionPoint.removeService(ServiceKey.Diffusion);
     _isRegistered = false;
     _registeringPromise = null;
     logger.info('LlamaCpp backend cleaned up');

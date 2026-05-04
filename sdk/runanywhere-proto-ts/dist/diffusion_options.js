@@ -6,6 +6,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 export const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -113,6 +114,8 @@ export var DiffusionScheduler;
     DiffusionScheduler[DiffusionScheduler["DIFFUSION_SCHEDULER_LMS"] = 8] = "DIFFUSION_SCHEDULER_LMS";
     /** DIFFUSION_SCHEDULER_LCM - forward-looking — pairs with the LCM model variant */
     DiffusionScheduler[DiffusionScheduler["DIFFUSION_SCHEDULER_LCM"] = 9] = "DIFFUSION_SCHEDULER_LCM";
+    /** DIFFUSION_SCHEDULER_DPMPP_2M_SDE - Swift/Kotlin/RN/Web/C-ABI */
+    DiffusionScheduler[DiffusionScheduler["DIFFUSION_SCHEDULER_DPMPP_2M_SDE"] = 10] = "DIFFUSION_SCHEDULER_DPMPP_2M_SDE";
     DiffusionScheduler[DiffusionScheduler["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(DiffusionScheduler || (DiffusionScheduler = {}));
 export function diffusionSchedulerFromJSON(object) {
@@ -147,6 +150,9 @@ export function diffusionSchedulerFromJSON(object) {
         case 9:
         case "DIFFUSION_SCHEDULER_LCM":
             return DiffusionScheduler.DIFFUSION_SCHEDULER_LCM;
+        case 10:
+        case "DIFFUSION_SCHEDULER_DPMPP_2M_SDE":
+            return DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M_SDE;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -175,6 +181,8 @@ export function diffusionSchedulerToJSON(object) {
             return "DIFFUSION_SCHEDULER_LMS";
         case DiffusionScheduler.DIFFUSION_SCHEDULER_LCM:
             return "DIFFUSION_SCHEDULER_LCM";
+        case DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M_SDE:
+            return "DIFFUSION_SCHEDULER_DPMPP_2M_SDE";
         case DiffusionScheduler.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -319,7 +327,7 @@ export function diffusionTokenizerSourceKindToJSON(object) {
     }
 }
 function createBaseDiffusionTokenizerSource() {
-    return { kind: 0, customPath: undefined };
+    return { kind: 0, customPath: undefined, autoDownload: false };
 }
 export const DiffusionTokenizerSource = {
     encode(message, writer = _m0.Writer.create()) {
@@ -328,6 +336,9 @@ export const DiffusionTokenizerSource = {
         }
         if (message.customPath !== undefined) {
             writer.uint32(18).string(message.customPath);
+        }
+        if (message.autoDownload !== false) {
+            writer.uint32(24).bool(message.autoDownload);
         }
         return writer;
     },
@@ -350,6 +361,12 @@ export const DiffusionTokenizerSource = {
                     }
                     message.customPath = reader.string();
                     continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.autoDownload = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -362,6 +379,7 @@ export const DiffusionTokenizerSource = {
         return {
             kind: isSet(object.kind) ? diffusionTokenizerSourceKindFromJSON(object.kind) : 0,
             customPath: isSet(object.customPath) ? globalThis.String(object.customPath) : undefined,
+            autoDownload: isSet(object.autoDownload) ? globalThis.Boolean(object.autoDownload) : false,
         };
     },
     toJSON(message) {
@@ -372,6 +390,9 @@ export const DiffusionTokenizerSource = {
         if (message.customPath !== undefined) {
             obj.customPath = message.customPath;
         }
+        if (message.autoDownload !== false) {
+            obj.autoDownload = message.autoDownload;
+        }
         return obj;
     },
     create(base) {
@@ -381,11 +402,20 @@ export const DiffusionTokenizerSource = {
         const message = createBaseDiffusionTokenizerSource();
         message.kind = object.kind ?? 0;
         message.customPath = object.customPath ?? undefined;
+        message.autoDownload = object.autoDownload ?? false;
         return message;
     },
 };
 function createBaseDiffusionConfiguration() {
-    return { modelVariant: 0, tokenizerSource: undefined, enableSafetyChecker: false, maxMemoryMb: 0 };
+    return {
+        modelVariant: 0,
+        tokenizerSource: undefined,
+        enableSafetyChecker: false,
+        maxMemoryMb: 0,
+        modelId: undefined,
+        preferredFramework: undefined,
+        reduceMemory: false,
+    };
 }
 export const DiffusionConfiguration = {
     encode(message, writer = _m0.Writer.create()) {
@@ -400,6 +430,15 @@ export const DiffusionConfiguration = {
         }
         if (message.maxMemoryMb !== 0) {
             writer.uint32(32).int32(message.maxMemoryMb);
+        }
+        if (message.modelId !== undefined) {
+            writer.uint32(42).string(message.modelId);
+        }
+        if (message.preferredFramework !== undefined) {
+            writer.uint32(48).int32(message.preferredFramework);
+        }
+        if (message.reduceMemory !== false) {
+            writer.uint32(56).bool(message.reduceMemory);
         }
         return writer;
     },
@@ -434,6 +473,24 @@ export const DiffusionConfiguration = {
                     }
                     message.maxMemoryMb = reader.int32();
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.preferredFramework = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.reduceMemory = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -450,6 +507,11 @@ export const DiffusionConfiguration = {
                 : undefined,
             enableSafetyChecker: isSet(object.enableSafetyChecker) ? globalThis.Boolean(object.enableSafetyChecker) : false,
             maxMemoryMb: isSet(object.maxMemoryMb) ? globalThis.Number(object.maxMemoryMb) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : undefined,
+            preferredFramework: isSet(object.preferredFramework)
+                ? inferenceFrameworkFromJSON(object.preferredFramework)
+                : undefined,
+            reduceMemory: isSet(object.reduceMemory) ? globalThis.Boolean(object.reduceMemory) : false,
         };
     },
     toJSON(message) {
@@ -466,6 +528,15 @@ export const DiffusionConfiguration = {
         if (message.maxMemoryMb !== 0) {
             obj.maxMemoryMb = Math.round(message.maxMemoryMb);
         }
+        if (message.modelId !== undefined) {
+            obj.modelId = message.modelId;
+        }
+        if (message.preferredFramework !== undefined) {
+            obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+        }
+        if (message.reduceMemory !== false) {
+            obj.reduceMemory = message.reduceMemory;
+        }
         return obj;
     },
     create(base) {
@@ -479,6 +550,105 @@ export const DiffusionConfiguration = {
             : undefined;
         message.enableSafetyChecker = object.enableSafetyChecker ?? false;
         message.maxMemoryMb = object.maxMemoryMb ?? 0;
+        message.modelId = object.modelId ?? undefined;
+        message.preferredFramework = object.preferredFramework ?? undefined;
+        message.reduceMemory = object.reduceMemory ?? false;
+        return message;
+    },
+};
+function createBaseDiffusionConfig() {
+    return { modelPath: "", modelId: "", modelName: "", configuration: undefined };
+}
+export const DiffusionConfig = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.modelPath !== "") {
+            writer.uint32(10).string(message.modelPath);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.modelName !== "") {
+            writer.uint32(26).string(message.modelName);
+        }
+        if (message.configuration !== undefined) {
+            DiffusionConfiguration.encode(message.configuration, writer.uint32(34).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseDiffusionConfig();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelPath = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.modelName = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.configuration = DiffusionConfiguration.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelPath: isSet(object.modelPath) ? globalThis.String(object.modelPath) : "",
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            modelName: isSet(object.modelName) ? globalThis.String(object.modelName) : "",
+            configuration: isSet(object.configuration) ? DiffusionConfiguration.fromJSON(object.configuration) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelPath !== "") {
+            obj.modelPath = message.modelPath;
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.modelName !== "") {
+            obj.modelName = message.modelName;
+        }
+        if (message.configuration !== undefined) {
+            obj.configuration = DiffusionConfiguration.toJSON(message.configuration);
+        }
+        return obj;
+    },
+    create(base) {
+        return DiffusionConfig.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseDiffusionConfig();
+        message.modelPath = object.modelPath ?? "";
+        message.modelId = object.modelId ?? "";
+        message.modelName = object.modelName ?? "";
+        message.configuration = (object.configuration !== undefined && object.configuration !== null)
+            ? DiffusionConfiguration.fromPartial(object.configuration)
+            : undefined;
         return message;
     },
 };
@@ -493,6 +663,13 @@ function createBaseDiffusionGenerationOptions() {
         seed: 0,
         scheduler: 0,
         mode: 0,
+        inputImage: undefined,
+        maskImage: undefined,
+        denoiseStrength: 0,
+        reportIntermediateImages: false,
+        progressStride: 0,
+        inputImageWidth: 0,
+        inputImageHeight: 0,
     };
 }
 export const DiffusionGenerationOptions = {
@@ -523,6 +700,27 @@ export const DiffusionGenerationOptions = {
         }
         if (message.mode !== 0) {
             writer.uint32(72).int32(message.mode);
+        }
+        if (message.inputImage !== undefined) {
+            writer.uint32(82).bytes(message.inputImage);
+        }
+        if (message.maskImage !== undefined) {
+            writer.uint32(90).bytes(message.maskImage);
+        }
+        if (message.denoiseStrength !== 0) {
+            writer.uint32(101).float(message.denoiseStrength);
+        }
+        if (message.reportIntermediateImages !== false) {
+            writer.uint32(104).bool(message.reportIntermediateImages);
+        }
+        if (message.progressStride !== 0) {
+            writer.uint32(112).int32(message.progressStride);
+        }
+        if (message.inputImageWidth !== 0) {
+            writer.uint32(120).int32(message.inputImageWidth);
+        }
+        if (message.inputImageHeight !== 0) {
+            writer.uint32(128).int32(message.inputImageHeight);
         }
         return writer;
     },
@@ -587,6 +785,48 @@ export const DiffusionGenerationOptions = {
                     }
                     message.mode = reader.int32();
                     continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.inputImage = reader.bytes();
+                    continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.maskImage = reader.bytes();
+                    continue;
+                case 12:
+                    if (tag !== 101) {
+                        break;
+                    }
+                    message.denoiseStrength = reader.float();
+                    continue;
+                case 13:
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.reportIntermediateImages = reader.bool();
+                    continue;
+                case 14:
+                    if (tag !== 112) {
+                        break;
+                    }
+                    message.progressStride = reader.int32();
+                    continue;
+                case 15:
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.inputImageWidth = reader.int32();
+                    continue;
+                case 16:
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.inputImageHeight = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -606,6 +846,15 @@ export const DiffusionGenerationOptions = {
             seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
             scheduler: isSet(object.scheduler) ? diffusionSchedulerFromJSON(object.scheduler) : 0,
             mode: isSet(object.mode) ? diffusionModeFromJSON(object.mode) : 0,
+            inputImage: isSet(object.inputImage) ? bytesFromBase64(object.inputImage) : undefined,
+            maskImage: isSet(object.maskImage) ? bytesFromBase64(object.maskImage) : undefined,
+            denoiseStrength: isSet(object.denoiseStrength) ? globalThis.Number(object.denoiseStrength) : 0,
+            reportIntermediateImages: isSet(object.reportIntermediateImages)
+                ? globalThis.Boolean(object.reportIntermediateImages)
+                : false,
+            progressStride: isSet(object.progressStride) ? globalThis.Number(object.progressStride) : 0,
+            inputImageWidth: isSet(object.inputImageWidth) ? globalThis.Number(object.inputImageWidth) : 0,
+            inputImageHeight: isSet(object.inputImageHeight) ? globalThis.Number(object.inputImageHeight) : 0,
         };
     },
     toJSON(message) {
@@ -637,6 +886,27 @@ export const DiffusionGenerationOptions = {
         if (message.mode !== 0) {
             obj.mode = diffusionModeToJSON(message.mode);
         }
+        if (message.inputImage !== undefined) {
+            obj.inputImage = base64FromBytes(message.inputImage);
+        }
+        if (message.maskImage !== undefined) {
+            obj.maskImage = base64FromBytes(message.maskImage);
+        }
+        if (message.denoiseStrength !== 0) {
+            obj.denoiseStrength = message.denoiseStrength;
+        }
+        if (message.reportIntermediateImages !== false) {
+            obj.reportIntermediateImages = message.reportIntermediateImages;
+        }
+        if (message.progressStride !== 0) {
+            obj.progressStride = Math.round(message.progressStride);
+        }
+        if (message.inputImageWidth !== 0) {
+            obj.inputImageWidth = Math.round(message.inputImageWidth);
+        }
+        if (message.inputImageHeight !== 0) {
+            obj.inputImageHeight = Math.round(message.inputImageHeight);
+        }
         return obj;
     },
     create(base) {
@@ -653,11 +923,26 @@ export const DiffusionGenerationOptions = {
         message.seed = object.seed ?? 0;
         message.scheduler = object.scheduler ?? 0;
         message.mode = object.mode ?? 0;
+        message.inputImage = object.inputImage ?? undefined;
+        message.maskImage = object.maskImage ?? undefined;
+        message.denoiseStrength = object.denoiseStrength ?? 0;
+        message.reportIntermediateImages = object.reportIntermediateImages ?? false;
+        message.progressStride = object.progressStride ?? 0;
+        message.inputImageWidth = object.inputImageWidth ?? 0;
+        message.inputImageHeight = object.inputImageHeight ?? 0;
         return message;
     },
 };
 function createBaseDiffusionProgress() {
-    return { progressPercent: 0, currentStep: 0, totalSteps: 0, stage: "", intermediateImageData: undefined };
+    return {
+        progressPercent: 0,
+        currentStep: 0,
+        totalSteps: 0,
+        stage: "",
+        intermediateImageData: undefined,
+        intermediateImageWidth: 0,
+        intermediateImageHeight: 0,
+    };
 }
 export const DiffusionProgress = {
     encode(message, writer = _m0.Writer.create()) {
@@ -675,6 +960,12 @@ export const DiffusionProgress = {
         }
         if (message.intermediateImageData !== undefined) {
             writer.uint32(42).bytes(message.intermediateImageData);
+        }
+        if (message.intermediateImageWidth !== 0) {
+            writer.uint32(48).int32(message.intermediateImageWidth);
+        }
+        if (message.intermediateImageHeight !== 0) {
+            writer.uint32(56).int32(message.intermediateImageHeight);
         }
         return writer;
     },
@@ -715,6 +1006,18 @@ export const DiffusionProgress = {
                     }
                     message.intermediateImageData = reader.bytes();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.intermediateImageWidth = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.intermediateImageHeight = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -732,6 +1035,12 @@ export const DiffusionProgress = {
             intermediateImageData: isSet(object.intermediateImageData)
                 ? bytesFromBase64(object.intermediateImageData)
                 : undefined,
+            intermediateImageWidth: isSet(object.intermediateImageWidth)
+                ? globalThis.Number(object.intermediateImageWidth)
+                : 0,
+            intermediateImageHeight: isSet(object.intermediateImageHeight)
+                ? globalThis.Number(object.intermediateImageHeight)
+                : 0,
         };
     },
     toJSON(message) {
@@ -751,6 +1060,12 @@ export const DiffusionProgress = {
         if (message.intermediateImageData !== undefined) {
             obj.intermediateImageData = base64FromBytes(message.intermediateImageData);
         }
+        if (message.intermediateImageWidth !== 0) {
+            obj.intermediateImageWidth = Math.round(message.intermediateImageWidth);
+        }
+        if (message.intermediateImageHeight !== 0) {
+            obj.intermediateImageHeight = Math.round(message.intermediateImageHeight);
+        }
         return obj;
     },
     create(base) {
@@ -763,6 +1078,8 @@ export const DiffusionProgress = {
         message.totalSteps = object.totalSteps ?? 0;
         message.stage = object.stage ?? "";
         message.intermediateImageData = object.intermediateImageData ?? undefined;
+        message.intermediateImageWidth = object.intermediateImageWidth ?? 0;
+        message.intermediateImageHeight = object.intermediateImageHeight ?? 0;
         return message;
     },
 };
@@ -775,6 +1092,8 @@ function createBaseDiffusionResult() {
         totalTimeMs: 0,
         safetyFlag: false,
         usedScheduler: 0,
+        errorMessage: undefined,
+        errorCode: 0,
     };
 }
 export const DiffusionResult = {
@@ -799,6 +1118,12 @@ export const DiffusionResult = {
         }
         if (message.usedScheduler !== 0) {
             writer.uint32(56).int32(message.usedScheduler);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(66).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(72).int32(message.errorCode);
         }
         return writer;
     },
@@ -851,6 +1176,18 @@ export const DiffusionResult = {
                     }
                     message.usedScheduler = reader.int32();
                     continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -868,6 +1205,8 @@ export const DiffusionResult = {
             totalTimeMs: isSet(object.totalTimeMs) ? globalThis.Number(object.totalTimeMs) : 0,
             safetyFlag: isSet(object.safetyFlag) ? globalThis.Boolean(object.safetyFlag) : false,
             usedScheduler: isSet(object.usedScheduler) ? diffusionSchedulerFromJSON(object.usedScheduler) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
         };
     },
     toJSON(message) {
@@ -893,6 +1232,12 @@ export const DiffusionResult = {
         if (message.usedScheduler !== 0) {
             obj.usedScheduler = diffusionSchedulerToJSON(message.usedScheduler);
         }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
         return obj;
     },
     create(base) {
@@ -907,11 +1252,25 @@ export const DiffusionResult = {
         message.totalTimeMs = object.totalTimeMs ?? 0;
         message.safetyFlag = object.safetyFlag ?? false;
         message.usedScheduler = object.usedScheduler ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };
 function createBaseDiffusionCapabilities() {
-    return { supportedVariants: [], supportedSchedulers: [], maxResolutionPx: 0 };
+    return {
+        supportedVariants: [],
+        supportedSchedulers: [],
+        maxResolutionPx: 0,
+        supportedModes: [],
+        maxWidthPx: 0,
+        maxHeightPx: 0,
+        supportsIntermediateImages: false,
+        supportsSafetyChecker: false,
+        isReady: false,
+        currentModel: undefined,
+        safetyCheckerEnabled: false,
+    };
 }
 export const DiffusionCapabilities = {
     encode(message, writer = _m0.Writer.create()) {
@@ -927,6 +1286,32 @@ export const DiffusionCapabilities = {
         writer.ldelim();
         if (message.maxResolutionPx !== 0) {
             writer.uint32(24).int32(message.maxResolutionPx);
+        }
+        writer.uint32(34).fork();
+        for (const v of message.supportedModes) {
+            writer.int32(v);
+        }
+        writer.ldelim();
+        if (message.maxWidthPx !== 0) {
+            writer.uint32(40).int32(message.maxWidthPx);
+        }
+        if (message.maxHeightPx !== 0) {
+            writer.uint32(48).int32(message.maxHeightPx);
+        }
+        if (message.supportsIntermediateImages !== false) {
+            writer.uint32(56).bool(message.supportsIntermediateImages);
+        }
+        if (message.supportsSafetyChecker !== false) {
+            writer.uint32(64).bool(message.supportsSafetyChecker);
+        }
+        if (message.isReady !== false) {
+            writer.uint32(72).bool(message.isReady);
+        }
+        if (message.currentModel !== undefined) {
+            writer.uint32(82).string(message.currentModel);
+        }
+        if (message.safetyCheckerEnabled !== false) {
+            writer.uint32(88).bool(message.safetyCheckerEnabled);
         }
         return writer;
     },
@@ -969,6 +1354,61 @@ export const DiffusionCapabilities = {
                     }
                     message.maxResolutionPx = reader.int32();
                     continue;
+                case 4:
+                    if (tag === 32) {
+                        message.supportedModes.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 34) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.supportedModes.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.maxWidthPx = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.maxHeightPx = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.supportsIntermediateImages = reader.bool();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.supportsSafetyChecker = reader.bool();
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.isReady = reader.bool();
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.currentModel = reader.string();
+                    continue;
+                case 11:
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.safetyCheckerEnabled = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -986,6 +1426,22 @@ export const DiffusionCapabilities = {
                 ? object.supportedSchedulers.map((e) => diffusionSchedulerFromJSON(e))
                 : [],
             maxResolutionPx: isSet(object.maxResolutionPx) ? globalThis.Number(object.maxResolutionPx) : 0,
+            supportedModes: globalThis.Array.isArray(object?.supportedModes)
+                ? object.supportedModes.map((e) => diffusionModeFromJSON(e))
+                : [],
+            maxWidthPx: isSet(object.maxWidthPx) ? globalThis.Number(object.maxWidthPx) : 0,
+            maxHeightPx: isSet(object.maxHeightPx) ? globalThis.Number(object.maxHeightPx) : 0,
+            supportsIntermediateImages: isSet(object.supportsIntermediateImages)
+                ? globalThis.Boolean(object.supportsIntermediateImages)
+                : false,
+            supportsSafetyChecker: isSet(object.supportsSafetyChecker)
+                ? globalThis.Boolean(object.supportsSafetyChecker)
+                : false,
+            isReady: isSet(object.isReady) ? globalThis.Boolean(object.isReady) : false,
+            currentModel: isSet(object.currentModel) ? globalThis.String(object.currentModel) : undefined,
+            safetyCheckerEnabled: isSet(object.safetyCheckerEnabled)
+                ? globalThis.Boolean(object.safetyCheckerEnabled)
+                : false,
         };
     },
     toJSON(message) {
@@ -999,6 +1455,30 @@ export const DiffusionCapabilities = {
         if (message.maxResolutionPx !== 0) {
             obj.maxResolutionPx = Math.round(message.maxResolutionPx);
         }
+        if (message.supportedModes?.length) {
+            obj.supportedModes = message.supportedModes.map((e) => diffusionModeToJSON(e));
+        }
+        if (message.maxWidthPx !== 0) {
+            obj.maxWidthPx = Math.round(message.maxWidthPx);
+        }
+        if (message.maxHeightPx !== 0) {
+            obj.maxHeightPx = Math.round(message.maxHeightPx);
+        }
+        if (message.supportsIntermediateImages !== false) {
+            obj.supportsIntermediateImages = message.supportsIntermediateImages;
+        }
+        if (message.supportsSafetyChecker !== false) {
+            obj.supportsSafetyChecker = message.supportsSafetyChecker;
+        }
+        if (message.isReady !== false) {
+            obj.isReady = message.isReady;
+        }
+        if (message.currentModel !== undefined) {
+            obj.currentModel = message.currentModel;
+        }
+        if (message.safetyCheckerEnabled !== false) {
+            obj.safetyCheckerEnabled = message.safetyCheckerEnabled;
+        }
         return obj;
     },
     create(base) {
@@ -1009,6 +1489,14 @@ export const DiffusionCapabilities = {
         message.supportedVariants = object.supportedVariants?.map((e) => e) || [];
         message.supportedSchedulers = object.supportedSchedulers?.map((e) => e) || [];
         message.maxResolutionPx = object.maxResolutionPx ?? 0;
+        message.supportedModes = object.supportedModes?.map((e) => e) || [];
+        message.maxWidthPx = object.maxWidthPx ?? 0;
+        message.maxHeightPx = object.maxHeightPx ?? 0;
+        message.supportsIntermediateImages = object.supportsIntermediateImages ?? false;
+        message.supportsSafetyChecker = object.supportsSafetyChecker ?? false;
+        message.isReady = object.isReady ?? false;
+        message.currentModel = object.currentModel ?? undefined;
+        message.safetyCheckerEnabled = object.safetyCheckerEnabled ?? false;
         return message;
     },
 };

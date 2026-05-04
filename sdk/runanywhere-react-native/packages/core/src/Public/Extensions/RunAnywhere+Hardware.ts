@@ -9,38 +9,33 @@
  *   - `hardware.hasNeuralEngine: boolean`
  *   - `hardware.accelerationMode: string`
  *
- * Wave 3 Step 3.2: this RN extension was missing entirely. The four entry
- * points below mirror the existing platform extensions and will route through
- * the `rac_hardware_profile_get` C ABI once the RN Nitro HybridObject method
- * for hardware profile lands. Until then, values are derived from
- * `Platform.OS` / `Platform.constants` and the existing `getChip()` device
- * probe (see RunAnywhere+Device.ts).
+ * Values come from the `rac_hardware_profile_get` C ABI exposed through the
+ * core Nitro object. A native platform fallback exists only for stale binaries
+ * that do not expose the ABI yet.
  */
 
 import { Platform } from 'react-native';
+import {
+  AcceleratorPreference,
+  HardwareProfileResult as HardwareProfileResultCodec,
+  type HardwareProfileResult,
+} from '@runanywhere/proto-ts/hardware_profile';
+import {
+  isNativeModuleAvailable,
+  requireDeviceInfoModule,
+  requireNativeModule,
+} from '../../native';
+import { arrayBufferToBytes } from '../../services/ProtoBytes';
 import { getChip as getNpuChip } from './RunAnywhere+Device';
 
-/**
- * Aggregated hardware profile for the current device.
- *
- * Wire shape mirrors the proto type `HardwareProfileResult` from
- * `idl/hardware_profile.proto`. Once the RN Nitro thunk exists, this type
- * will be replaced with the proto-generated equivalent without changing
- * the public surface.
- */
-export interface HardwareProfileResult {
-  chip: string;
-  hasNeuralEngine: boolean;
-  accelerationMode: string;
-  platform: string;
-}
+export type { HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
 
 function detectAccelerationMode(hasNpu: boolean): string {
   if (Platform.OS === 'ios' || Platform.OS === 'macos') {
-    return 'Neural Engine';
+    return 'ane';
   }
-  if (hasNpu) return 'NPU';
-  return 'CPU';
+  if (hasNpu) return 'gpu';
+  return 'cpu';
 }
 
 function genericChipLabel(): string {
@@ -58,46 +53,101 @@ function genericChipLabel(): string {
   }
 }
 
+async function buildPlatformFallbackProfile(): Promise<HardwareProfileResult> {
+  const npuChip = await getNpuChip();
+  const hasNpuFromChip = npuChip !== null;
+  let chip = npuChip?.displayName ?? genericChipLabel();
+  let totalMemoryBytes = 0;
+  let coreCount = 0;
+  let hasNpu = hasNpuFromChip;
+
+  try {
+    const deviceInfo = requireDeviceInfoModule();
+    const [chipName, memory, cores, nativeHasNpu] = await Promise.all([
+      deviceInfo.getChipName(),
+      deviceInfo.getTotalRAM(),
+      deviceInfo.getCPUCores(),
+      deviceInfo.hasNPU(),
+    ]);
+    if (!npuChip && chipName && chipName !== 'Unknown') {
+      chip = chipName;
+    }
+    totalMemoryBytes = Number.isFinite(memory) ? memory : 0;
+    coreCount = Number.isFinite(cores) ? cores : 0;
+    hasNpu = hasNpu || nativeHasNpu;
+  } catch {
+    // Keep the generic fallback shape when the device info HybridObject is not available.
+  }
+
+  const acceleration = detectAccelerationMode(hasNpu);
+  return {
+    profile: {
+      chip,
+      hasNeuralEngine: hasNpu || Platform.OS === 'ios' || Platform.OS === 'macos',
+      accelerationMode: acceleration,
+      totalMemoryBytes,
+      coreCount,
+      performanceCores: 0,
+      efficiencyCores: 0,
+      architecture: '',
+      platform: Platform.OS,
+    },
+    accelerators: [
+      {
+        name: acceleration,
+        type:
+          acceleration === 'ane'
+            ? AcceleratorPreference.ACCELERATOR_PREFERENCE_ANE
+            : acceleration === 'gpu'
+              ? AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU
+              : AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU,
+        available: true,
+      },
+    ],
+  };
+}
+
 /**
  * Snapshot the current hardware profile.
  *
- * Calls `rac_hardware_profile_get` via the Nitro HybridObject when available;
- * falls back to platform inspection. The proto-backed path is gated on the
- * `RNHardwareProfile` Nitro module which is not yet generated (CPP gate).
+ * Calls `rac_hardware_profile_get` via the core Nitro HybridObject when
+ * available; falls back to native platform inspection only for stale binaries.
  */
 export async function getProfile(): Promise<HardwareProfileResult> {
-  const npuChip = await getNpuChip();
-  const hasNeuralEngine =
-    Platform.OS === 'ios' || Platform.OS === 'macos' || npuChip !== null;
-  const chip = npuChip?.displayName ?? genericChipLabel();
-  return {
-    chip,
-    hasNeuralEngine,
-    accelerationMode: detectAccelerationMode(npuChip !== null),
-    platform: Platform.OS,
-  };
+  try {
+    if (isNativeModuleAvailable()) {
+      const native = requireNativeModule();
+      if (typeof native.hardwareProfileProto === 'function') {
+        const buffer = await native.hardwareProfileProto();
+        if (buffer.byteLength > 0) {
+          return HardwareProfileResultCodec.decode(arrayBufferToBytes(buffer));
+        }
+      }
+    }
+  } catch {
+    // Stale native binary or ABI unavailable; use platform fallback below.
+  }
+
+  return buildPlatformFallbackProfile();
 }
 
 /**
  * Get the chip / SoC name for the current device.
  *
- * Returns the NPU chip's display name when detected, otherwise a generic
- * platform label (e.g. "Apple Silicon", "Android").
+ * Returns the chip name reported by the native hardware profile, otherwise a
+ * generic platform label (e.g. "Apple Silicon", "Android").
  */
 export async function getChip(): Promise<string> {
-  const npuChip = await getNpuChip();
-  return npuChip?.displayName ?? genericChipLabel();
+  return (await getProfile()).profile?.chip || genericChipLabel();
 }
 
 /**
  * Whether the current device has a dedicated neural engine / NPU.
  *
- * iOS / macOS always reports true (Apple Neural Engine assumption). Android
- * reports true when a supported Qualcomm SoC is detected.
+ * Delegates to the native hardware profile when available.
  */
 export async function hasNeuralEngine(): Promise<boolean> {
-  if (Platform.OS === 'ios' || Platform.OS === 'macos') return true;
-  return (await getNpuChip()) !== null;
+  return (await getProfile()).profile?.hasNeuralEngine ?? false;
 }
 
 /**
@@ -106,8 +156,7 @@ export async function hasNeuralEngine(): Promise<boolean> {
  * Possible values: `"Neural Engine"`, `"NPU"`, `"GPU"`, `"CPU"`.
  */
 export async function accelerationMode(): Promise<string> {
-  const npuChip = await getNpuChip();
-  return detectAccelerationMode(npuChip !== null);
+  return (await getProfile()).profile?.accelerationMode || 'cpu';
 }
 
 /**

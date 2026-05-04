@@ -1,18 +1,105 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: vlm_options.proto
 //
 // @dart = 2.12
-// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
+
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'model_types.pbenum.dart' as $0;
 import 'vlm_options.pbenum.dart';
 
 export 'vlm_options.pbenum.dart';
+
+/// ---------------------------------------------------------------------------
+/// Custom VLM chat template.
+/// Mirrors rac_vlm_chat_template_t.
+/// ---------------------------------------------------------------------------
+class VLMChatTemplate extends $pb.GeneratedMessage {
+  factory VLMChatTemplate({
+    $core.String? templateText,
+    $core.String? imageMarker,
+    $core.String? defaultSystemPrompt,
+  }) {
+    final $result = create();
+    if (templateText != null) {
+      $result.templateText = templateText;
+    }
+    if (imageMarker != null) {
+      $result.imageMarker = imageMarker;
+    }
+    if (defaultSystemPrompt != null) {
+      $result.defaultSystemPrompt = defaultSystemPrompt;
+    }
+    return $result;
+  }
+  VLMChatTemplate._() : super();
+  factory VLMChatTemplate.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VLMChatTemplate.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMChatTemplate', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'templateText')
+    ..aOS(2, _omitFieldNames ? '' : 'imageMarker')
+    ..aOS(3, _omitFieldNames ? '' : 'defaultSystemPrompt')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VLMChatTemplate clone() => VLMChatTemplate()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VLMChatTemplate copyWith(void Function(VLMChatTemplate) updates) => super.copyWith((message) => updates(message as VLMChatTemplate)) as VLMChatTemplate;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VLMChatTemplate create() => VLMChatTemplate._();
+  VLMChatTemplate createEmptyInstance() => create();
+  static $pb.PbList<VLMChatTemplate> createRepeated() => $pb.PbList<VLMChatTemplate>();
+  @$core.pragma('dart2js:noInline')
+  static VLMChatTemplate getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VLMChatTemplate>(create);
+  static VLMChatTemplate? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get templateText => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set templateText($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasTemplateText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTemplateText() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get imageMarker => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set imageMarker($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasImageMarker() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearImageMarker() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get defaultSystemPrompt => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set defaultSystemPrompt($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasDefaultSystemPrompt() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDefaultSystemPrompt() => clearField(3);
+}
 
 enum VLMImage_Source {
   filePath, 
@@ -22,27 +109,17 @@ enum VLMImage_Source {
   notSet
 }
 
+///  ---------------------------------------------------------------------------
+///  VLM image input.
+///
+///  `source` is a oneof so that exactly one of {file_path, encoded, raw_rgb,
+///  base64} can be supplied per request. `width` / `height` are required for
+///  non-encoded formats (raw_rgb, raw_rgba) where the consumer cannot infer
+///  dimensions from a container header. `format` disambiguates encoded `bytes`
+///  payloads (JPEG / PNG / WEBP) and explicitly tags raw / file-path / base64
+///  sources.
+///  ---------------------------------------------------------------------------
 class VLMImage extends $pb.GeneratedMessage {
-  static const $core.Map<$core.int, VLMImage_Source> _VLMImage_SourceByTag = {
-    1 : VLMImage_Source.filePath,
-    2 : VLMImage_Source.encoded,
-    3 : VLMImage_Source.rawRgb,
-    4 : VLMImage_Source.base64,
-    0 : VLMImage_Source.notSet
-  };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VLMImage', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4])
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'filePath')
-    ..a<$core.List<$core.int>>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'encoded', $pb.PbFieldType.OY)
-    ..a<$core.List<$core.int>>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rawRgb', $pb.PbFieldType.OY)
-    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'base64')
-    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'width', $pb.PbFieldType.O3)
-    ..a<$core.int>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'height', $pb.PbFieldType.O3)
-    ..e<VLMImageFormat>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED, valueOf: VLMImageFormat.valueOf, enumValues: VLMImageFormat.values)
-    ..hasRequiredFields = false
-  ;
-
-  VLMImage._() : super();
   factory VLMImage({
     $core.String? filePath,
     $core.List<$core.int>? encoded,
@@ -52,32 +129,53 @@ class VLMImage extends $pb.GeneratedMessage {
     $core.int? height,
     VLMImageFormat? format,
   }) {
-    final _result = create();
+    final $result = create();
     if (filePath != null) {
-      _result.filePath = filePath;
+      $result.filePath = filePath;
     }
     if (encoded != null) {
-      _result.encoded = encoded;
+      $result.encoded = encoded;
     }
     if (rawRgb != null) {
-      _result.rawRgb = rawRgb;
+      $result.rawRgb = rawRgb;
     }
     if (base64 != null) {
-      _result.base64 = base64;
+      $result.base64 = base64;
     }
     if (width != null) {
-      _result.width = width;
+      $result.width = width;
     }
     if (height != null) {
-      _result.height = height;
+      $result.height = height;
     }
     if (format != null) {
-      _result.format = format;
+      $result.format = format;
     }
-    return _result;
+    return $result;
   }
+  VLMImage._() : super();
   factory VLMImage.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VLMImage.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static const $core.Map<$core.int, VLMImage_Source> _VLMImage_SourceByTag = {
+    1 : VLMImage_Source.filePath,
+    2 : VLMImage_Source.encoded,
+    3 : VLMImage_Source.rawRgb,
+    4 : VLMImage_Source.base64,
+    0 : VLMImage_Source.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMImage', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..oo(0, [1, 2, 3, 4])
+    ..aOS(1, _omitFieldNames ? '' : 'filePath')
+    ..a<$core.List<$core.int>>(2, _omitFieldNames ? '' : 'encoded', $pb.PbFieldType.OY)
+    ..a<$core.List<$core.int>>(3, _omitFieldNames ? '' : 'rawRgb', $pb.PbFieldType.OY)
+    ..aOS(4, _omitFieldNames ? '' : 'base64')
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'width', $pb.PbFieldType.O3)
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'height', $pb.PbFieldType.O3)
+    ..e<VLMImageFormat>(7, _omitFieldNames ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED, valueOf: VLMImageFormat.valueOf, enumValues: VLMImageFormat.values)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -87,8 +185,10 @@ class VLMImage extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VLMImage copyWith(void Function(VLMImage) updates) => super.copyWith((message) => updates(message as VLMImage)) as VLMImage; // ignore: deprecated_member_use
+  VLMImage copyWith(void Function(VLMImage) updates) => super.copyWith((message) => updates(message as VLMImage)) as VLMImage;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VLMImage create() => VLMImage._();
   VLMImage createEmptyInstance() => create();
@@ -136,6 +236,10 @@ class VLMImage extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearBase64() => clearField(4);
 
+  /// Required for VLM_IMAGE_FORMAT_RAW_RGB and VLM_IMAGE_FORMAT_RAW_RGBA
+  /// (consumers cannot infer dimensions for raw pixel buffers). Optional
+  /// for encoded / file_path / base64 sources where the decoder reads
+  /// dimensions from the container.
   @$pb.TagNumber(5)
   $core.int get width => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -164,34 +268,75 @@ class VLMImage extends $pb.GeneratedMessage {
   void clearFormat() => clearField(7);
 }
 
+///  ---------------------------------------------------------------------------
+///  VLM component configuration.
+///  Sources pre-IDL:
+///    Kotlin VLMTypes.kt:163        (modelId, contextLength, temperature,
+///                                   maxTokens, systemPrompt, streamingEnabled,
+///                                   preferredFramework)
+///    C ABI  rac_vlm_types.h:224    (model_id, preferred_framework,
+///                                   context_length, temperature, max_tokens,
+///                                   system_prompt, streaming_enabled)
+///
+///  Per the canonicalization brief, only the load-bearing identification +
+///  limits cross the IDL boundary here: model_id, max_image_size_px, max_tokens.
+///  Per-request sampling parameters live on VLMGenerationOptions; runtime
+///  streaming toggles and chat-template selection stay backend-private.
+///  ---------------------------------------------------------------------------
 class VLMConfiguration extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VLMConfiguration', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'modelId')
-    ..a<$core.int>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxImageSizePx', $pb.PbFieldType.O3)
-    ..a<$core.int>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxTokens', $pb.PbFieldType.O3)
-    ..hasRequiredFields = false
-  ;
-
-  VLMConfiguration._() : super();
   factory VLMConfiguration({
     $core.String? modelId,
     $core.int? maxImageSizePx,
     $core.int? maxTokens,
+    $core.int? contextLength,
+    $core.double? temperature,
+    $core.String? systemPrompt,
+    $core.bool? streamingEnabled,
+    $0.InferenceFramework? preferredFramework,
   }) {
-    final _result = create();
+    final $result = create();
     if (modelId != null) {
-      _result.modelId = modelId;
+      $result.modelId = modelId;
     }
     if (maxImageSizePx != null) {
-      _result.maxImageSizePx = maxImageSizePx;
+      $result.maxImageSizePx = maxImageSizePx;
     }
     if (maxTokens != null) {
-      _result.maxTokens = maxTokens;
+      $result.maxTokens = maxTokens;
     }
-    return _result;
+    if (contextLength != null) {
+      $result.contextLength = contextLength;
+    }
+    if (temperature != null) {
+      $result.temperature = temperature;
+    }
+    if (systemPrompt != null) {
+      $result.systemPrompt = systemPrompt;
+    }
+    if (streamingEnabled != null) {
+      $result.streamingEnabled = streamingEnabled;
+    }
+    if (preferredFramework != null) {
+      $result.preferredFramework = preferredFramework;
+    }
+    return $result;
   }
+  VLMConfiguration._() : super();
   factory VLMConfiguration.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VLMConfiguration.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMConfiguration', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+    ..a<$core.int>(2, _omitFieldNames ? '' : 'maxImageSizePx', $pb.PbFieldType.O3)
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'contextLength', $pb.PbFieldType.O3)
+    ..a<$core.double>(5, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
+    ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
+    ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
+    ..e<$0.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -201,8 +346,10 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VLMConfiguration copyWith(void Function(VLMConfiguration) updates) => super.copyWith((message) => updates(message as VLMConfiguration)) as VLMConfiguration; // ignore: deprecated_member_use
+  VLMConfiguration copyWith(void Function(VLMConfiguration) updates) => super.copyWith((message) => updates(message as VLMConfiguration)) as VLMConfiguration;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VLMConfiguration create() => VLMConfiguration._();
   VLMConfiguration createEmptyInstance() => create();
@@ -229,6 +376,7 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearMaxImageSizePx() => clearField(2);
 
+  /// (0 = backend default)
   @$pb.TagNumber(3)
   $core.int get maxTokens => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -237,46 +385,159 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   $core.bool hasMaxTokens() => $_has(2);
   @$pb.TagNumber(3)
   void clearMaxTokens() => clearField(3);
+
+  /// Additional component-level fields from rac_vlm_config_t.
+  @$pb.TagNumber(4)
+  $core.int get contextLength => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set contextLength($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasContextLength() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContextLength() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.double get temperature => $_getN(4);
+  @$pb.TagNumber(5)
+  set temperature($core.double v) { $_setFloat(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasTemperature() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTemperature() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get systemPrompt => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set systemPrompt($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasSystemPrompt() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSystemPrompt() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get streamingEnabled => $_getBF(6);
+  @$pb.TagNumber(7)
+  set streamingEnabled($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasStreamingEnabled() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStreamingEnabled() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $0.InferenceFramework get preferredFramework => $_getN(7);
+  @$pb.TagNumber(8)
+  set preferredFramework($0.InferenceFramework v) { setField(8, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasPreferredFramework() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPreferredFramework() => clearField(8);
 }
 
+///  ---------------------------------------------------------------------------
+///  VLM generation options — per-request sampling + prompt parameters.
+///  Sources pre-IDL:
+///    Kotlin VLMTypes.kt:103        (maxTokens, temperature, topP, systemPrompt,
+///                                   maxImageSize, nThreads, useGpu)
+///    Dart   vlm_types.dart:127     (maxTokens, temperature, topP, systemPrompt,
+///                                   maxImageSize, nThreads, useGpu)
+///    RN     VLMTypes.ts:21         (maxTokens, temperature, topP)
+///    Web    VLMTypes.ts:28         (maxTokens, temperature, topP, systemPrompt,
+///                                   modelFamily, streaming)
+///    C ABI  rac_vlm_types.h:143    (max_tokens, temperature, top_p,
+///                                   stop_sequences, num_stop_sequences,
+///                                   streaming_enabled, system_prompt,
+///                                   max_image_size, n_threads, use_gpu,
+///                                   model_family, custom_chat_template,
+///                                   image_marker_override)
+///
+///  top_k is included to align with the other text generation services
+///  (LLM / chat) even though no current VLM SDK exposes it; the C ABI's
+///  llama.cpp backend already supports top_k internally.
+///  ---------------------------------------------------------------------------
 class VLMGenerationOptions extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VLMGenerationOptions', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'prompt')
-    ..a<$core.int>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxTokens', $pb.PbFieldType.O3)
-    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'temperature', $pb.PbFieldType.OF)
-    ..a<$core.double>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'topP', $pb.PbFieldType.OF)
-    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'topK', $pb.PbFieldType.O3)
-    ..hasRequiredFields = false
-  ;
-
-  VLMGenerationOptions._() : super();
   factory VLMGenerationOptions({
     $core.String? prompt,
     $core.int? maxTokens,
     $core.double? temperature,
     $core.double? topP,
     $core.int? topK,
+    $core.Iterable<$core.String>? stopSequences,
+    $core.bool? streamingEnabled,
+    $core.String? systemPrompt,
+    $core.int? maxImageSize,
+    $core.int? nThreads,
+    $core.bool? useGpu,
+    VLMModelFamily? modelFamily,
+    VLMChatTemplate? customChatTemplate,
+    $core.String? imageMarkerOverride,
   }) {
-    final _result = create();
+    final $result = create();
     if (prompt != null) {
-      _result.prompt = prompt;
+      $result.prompt = prompt;
     }
     if (maxTokens != null) {
-      _result.maxTokens = maxTokens;
+      $result.maxTokens = maxTokens;
     }
     if (temperature != null) {
-      _result.temperature = temperature;
+      $result.temperature = temperature;
     }
     if (topP != null) {
-      _result.topP = topP;
+      $result.topP = topP;
     }
     if (topK != null) {
-      _result.topK = topK;
+      $result.topK = topK;
     }
-    return _result;
+    if (stopSequences != null) {
+      $result.stopSequences.addAll(stopSequences);
+    }
+    if (streamingEnabled != null) {
+      $result.streamingEnabled = streamingEnabled;
+    }
+    if (systemPrompt != null) {
+      $result.systemPrompt = systemPrompt;
+    }
+    if (maxImageSize != null) {
+      $result.maxImageSize = maxImageSize;
+    }
+    if (nThreads != null) {
+      $result.nThreads = nThreads;
+    }
+    if (useGpu != null) {
+      $result.useGpu = useGpu;
+    }
+    if (modelFamily != null) {
+      $result.modelFamily = modelFamily;
+    }
+    if (customChatTemplate != null) {
+      $result.customChatTemplate = customChatTemplate;
+    }
+    if (imageMarkerOverride != null) {
+      $result.imageMarkerOverride = imageMarkerOverride;
+    }
+    return $result;
   }
+  VLMGenerationOptions._() : super();
   factory VLMGenerationOptions.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VLMGenerationOptions.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMGenerationOptions', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'prompt')
+    ..a<$core.int>(2, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
+    ..a<$core.double>(4, _omitFieldNames ? '' : 'topP', $pb.PbFieldType.OF)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'topK', $pb.PbFieldType.O3)
+    ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
+    ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
+    ..aOS(8, _omitFieldNames ? '' : 'systemPrompt')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'maxImageSize', $pb.PbFieldType.O3)
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'nThreads', $pb.PbFieldType.O3)
+    ..aOB(11, _omitFieldNames ? '' : 'useGpu')
+    ..e<VLMModelFamily>(12, _omitFieldNames ? '' : 'modelFamily', $pb.PbFieldType.OE, defaultOrMaker: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED, valueOf: VLMModelFamily.valueOf, enumValues: VLMModelFamily.values)
+    ..aOM<VLMChatTemplate>(13, _omitFieldNames ? '' : 'customChatTemplate', subBuilder: VLMChatTemplate.create)
+    ..aOS(14, _omitFieldNames ? '' : 'imageMarkerOverride')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -286,8 +547,10 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VLMGenerationOptions copyWith(void Function(VLMGenerationOptions) updates) => super.copyWith((message) => updates(message as VLMGenerationOptions)) as VLMGenerationOptions; // ignore: deprecated_member_use
+  VLMGenerationOptions copyWith(void Function(VLMGenerationOptions) updates) => super.copyWith((message) => updates(message as VLMGenerationOptions)) as VLMGenerationOptions;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VLMGenerationOptions create() => VLMGenerationOptions._();
   VLMGenerationOptions createEmptyInstance() => create();
@@ -340,20 +603,115 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   $core.bool hasTopK() => $_has(4);
   @$pb.TagNumber(5)
   void clearTopK() => clearField(5);
+
+  /// Full rac_vlm_options_t coverage.
+  @$pb.TagNumber(6)
+  $core.List<$core.String> get stopSequences => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $core.bool get streamingEnabled => $_getBF(6);
+  @$pb.TagNumber(7)
+  set streamingEnabled($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasStreamingEnabled() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStreamingEnabled() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get systemPrompt => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set systemPrompt($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasSystemPrompt() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSystemPrompt() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get maxImageSize => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set maxImageSize($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasMaxImageSize() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearMaxImageSize() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get nThreads => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set nThreads($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasNThreads() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearNThreads() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.bool get useGpu => $_getBF(10);
+  @$pb.TagNumber(11)
+  set useGpu($core.bool v) { $_setBool(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasUseGpu() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearUseGpu() => clearField(11);
+
+  @$pb.TagNumber(12)
+  VLMModelFamily get modelFamily => $_getN(11);
+  @$pb.TagNumber(12)
+  set modelFamily(VLMModelFamily v) { setField(12, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasModelFamily() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearModelFamily() => clearField(12);
+
+  @$pb.TagNumber(13)
+  VLMChatTemplate get customChatTemplate => $_getN(12);
+  @$pb.TagNumber(13)
+  set customChatTemplate(VLMChatTemplate v) { setField(13, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasCustomChatTemplate() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearCustomChatTemplate() => clearField(13);
+  @$pb.TagNumber(13)
+  VLMChatTemplate ensureCustomChatTemplate() => $_ensure(12);
+
+  @$pb.TagNumber(14)
+  $core.String get imageMarkerOverride => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set imageMarkerOverride($core.String v) { $_setString(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasImageMarkerOverride() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearImageMarkerOverride() => clearField(14);
 }
 
+///  ---------------------------------------------------------------------------
+///  VLM generation result.
+///  Sources pre-IDL:
+///    Swift  VLMTypes.swift:208     (text, promptTokens, completionTokens,
+///                                   totalTimeMs as Double, tokensPerSecond)
+///    Kotlin VLMTypes.kt:120        (text, promptTokens, imageTokens,
+///                                   completionTokens, totalTokens,
+///                                   timeToFirstTokenMs, imageEncodeTimeMs,
+///                                   totalTimeMs, tokensPerSecond)
+///    Dart   vlm_types.dart:68      (text, promptTokens, completionTokens,
+///                                   totalTimeMs, tokensPerSecond)
+///    RN     VLMTypes.ts:28         (text, promptTokens, completionTokens,
+///                                   totalTimeMs, tokensPerSecond)
+///    Web    VLMTypes.ts:38         (VLMGenerationResult: text, promptTokens,
+///                                   imageTokens, completionTokens, totalTokens,
+///                                   timeToFirstTokenMs, imageEncodeTimeMs,
+///                                   totalTimeMs, tokensPerSecond, hardwareUsed)
+///    C ABI  rac_vlm_types.h:268    (text, prompt_tokens, image_tokens,
+///                                   completion_tokens, total_tokens,
+///                                   time_to_first_token_ms,
+///                                   image_encode_time_ms, total_time_ms,
+///                                   tokens_per_second)
+///
+///  Streaming note: streaming results reuse this VLMResult message; per-token
+///  text deltas are emitted on the existing LLM stream channel
+///  (llm_service.proto streaming surface). No VLM-specific stream-event message
+///  is introduced here.
+///  ---------------------------------------------------------------------------
 class VLMResult extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VLMResult', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'text')
-    ..a<$core.int>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'promptTokens', $pb.PbFieldType.O3)
-    ..a<$core.int>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'completionTokens', $pb.PbFieldType.O3)
-    ..aInt64(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'totalTokens')
-    ..aInt64(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'processingTimeMs')
-    ..a<$core.double>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'tokensPerSecond', $pb.PbFieldType.OF)
-    ..hasRequiredFields = false
-  ;
-
-  VLMResult._() : super();
   factory VLMResult({
     $core.String? text,
     $core.int? promptTokens,
@@ -361,30 +719,62 @@ class VLMResult extends $pb.GeneratedMessage {
     $fixnum.Int64? totalTokens,
     $fixnum.Int64? processingTimeMs,
     $core.double? tokensPerSecond,
+    $core.int? imageTokens,
+    $fixnum.Int64? timeToFirstTokenMs,
+    $fixnum.Int64? imageEncodeTimeMs,
+    $core.String? hardwareUsed,
   }) {
-    final _result = create();
+    final $result = create();
     if (text != null) {
-      _result.text = text;
+      $result.text = text;
     }
     if (promptTokens != null) {
-      _result.promptTokens = promptTokens;
+      $result.promptTokens = promptTokens;
     }
     if (completionTokens != null) {
-      _result.completionTokens = completionTokens;
+      $result.completionTokens = completionTokens;
     }
     if (totalTokens != null) {
-      _result.totalTokens = totalTokens;
+      $result.totalTokens = totalTokens;
     }
     if (processingTimeMs != null) {
-      _result.processingTimeMs = processingTimeMs;
+      $result.processingTimeMs = processingTimeMs;
     }
     if (tokensPerSecond != null) {
-      _result.tokensPerSecond = tokensPerSecond;
+      $result.tokensPerSecond = tokensPerSecond;
     }
-    return _result;
+    if (imageTokens != null) {
+      $result.imageTokens = imageTokens;
+    }
+    if (timeToFirstTokenMs != null) {
+      $result.timeToFirstTokenMs = timeToFirstTokenMs;
+    }
+    if (imageEncodeTimeMs != null) {
+      $result.imageEncodeTimeMs = imageEncodeTimeMs;
+    }
+    if (hardwareUsed != null) {
+      $result.hardwareUsed = hardwareUsed;
+    }
+    return $result;
   }
+  VLMResult._() : super();
   factory VLMResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VLMResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..a<$core.int>(2, _omitFieldNames ? '' : 'promptTokens', $pb.PbFieldType.O3)
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'completionTokens', $pb.PbFieldType.O3)
+    ..aInt64(4, _omitFieldNames ? '' : 'totalTokens')
+    ..aInt64(5, _omitFieldNames ? '' : 'processingTimeMs')
+    ..a<$core.double>(6, _omitFieldNames ? '' : 'tokensPerSecond', $pb.PbFieldType.OF)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'imageTokens', $pb.PbFieldType.O3)
+    ..aInt64(8, _omitFieldNames ? '' : 'timeToFirstTokenMs')
+    ..aInt64(9, _omitFieldNames ? '' : 'imageEncodeTimeMs')
+    ..aOS(10, _omitFieldNames ? '' : 'hardwareUsed')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -394,8 +784,10 @@ class VLMResult extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VLMResult copyWith(void Function(VLMResult) updates) => super.copyWith((message) => updates(message as VLMResult)) as VLMResult; // ignore: deprecated_member_use
+  VLMResult copyWith(void Function(VLMResult) updates) => super.copyWith((message) => updates(message as VLMResult)) as VLMResult;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VLMResult create() => VLMResult._();
   VLMResult createEmptyInstance() => create();
@@ -449,6 +841,7 @@ class VLMResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearProcessingTimeMs() => clearField(5);
 
+  /// Swift VLMResult totalTimeMs (Double ms).
   @$pb.TagNumber(6)
   $core.double get tokensPerSecond => $_getN(5);
   @$pb.TagNumber(6)
@@ -457,5 +850,45 @@ class VLMResult extends $pb.GeneratedMessage {
   $core.bool hasTokensPerSecond() => $_has(5);
   @$pb.TagNumber(6)
   void clearTokensPerSecond() => clearField(6);
+
+  /// Detailed VLM metrics from Kotlin/Web/C ABI.
+  @$pb.TagNumber(7)
+  $core.int get imageTokens => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set imageTokens($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasImageTokens() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearImageTokens() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set timeToFirstTokenMs($fixnum.Int64 v) { $_setInt64(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasTimeToFirstTokenMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTimeToFirstTokenMs() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get imageEncodeTimeMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set imageEncodeTimeMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasImageEncodeTimeMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearImageEncodeTimeMs() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get hardwareUsed => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set hardwareUsed($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasHardwareUsed() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearHardwareUsed() => clearField(10);
 }
 
+
+const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
+const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');

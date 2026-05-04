@@ -10,6 +10,231 @@ import _m0 from "protobufjs/minimal";
 
 export const protobufPackage = "runanywhere.v1";
 
+export enum VoiceEventCategory {
+  VOICE_EVENT_CATEGORY_UNSPECIFIED = 0,
+  VOICE_EVENT_CATEGORY_VOICE_AGENT = 1,
+  VOICE_EVENT_CATEGORY_STT = 2,
+  VOICE_EVENT_CATEGORY_ASR = 3,
+  VOICE_EVENT_CATEGORY_TTS = 4,
+  VOICE_EVENT_CATEGORY_VAD = 5,
+  VOICE_EVENT_CATEGORY_STD = 6,
+  VOICE_EVENT_CATEGORY_LLM = 7,
+  VOICE_EVENT_CATEGORY_AUDIO = 8,
+  VOICE_EVENT_CATEGORY_METRICS = 9,
+  VOICE_EVENT_CATEGORY_ERROR = 10,
+  VOICE_EVENT_CATEGORY_WAKEWORD = 11,
+  UNRECOGNIZED = -1,
+}
+
+export function voiceEventCategoryFromJSON(object: any): VoiceEventCategory {
+  switch (object) {
+    case 0:
+    case "VOICE_EVENT_CATEGORY_UNSPECIFIED":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED;
+    case 1:
+    case "VOICE_EVENT_CATEGORY_VOICE_AGENT":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_VOICE_AGENT;
+    case 2:
+    case "VOICE_EVENT_CATEGORY_STT":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_STT;
+    case 3:
+    case "VOICE_EVENT_CATEGORY_ASR":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_ASR;
+    case 4:
+    case "VOICE_EVENT_CATEGORY_TTS":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_TTS;
+    case 5:
+    case "VOICE_EVENT_CATEGORY_VAD":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_VAD;
+    case 6:
+    case "VOICE_EVENT_CATEGORY_STD":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_STD;
+    case 7:
+    case "VOICE_EVENT_CATEGORY_LLM":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_LLM;
+    case 8:
+    case "VOICE_EVENT_CATEGORY_AUDIO":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_AUDIO;
+    case 9:
+    case "VOICE_EVENT_CATEGORY_METRICS":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_METRICS;
+    case 10:
+    case "VOICE_EVENT_CATEGORY_ERROR":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_ERROR;
+    case 11:
+    case "VOICE_EVENT_CATEGORY_WAKEWORD":
+      return VoiceEventCategory.VOICE_EVENT_CATEGORY_WAKEWORD;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return VoiceEventCategory.UNRECOGNIZED;
+  }
+}
+
+export function voiceEventCategoryToJSON(object: VoiceEventCategory): string {
+  switch (object) {
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED:
+      return "VOICE_EVENT_CATEGORY_UNSPECIFIED";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_VOICE_AGENT:
+      return "VOICE_EVENT_CATEGORY_VOICE_AGENT";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_STT:
+      return "VOICE_EVENT_CATEGORY_STT";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_ASR:
+      return "VOICE_EVENT_CATEGORY_ASR";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_TTS:
+      return "VOICE_EVENT_CATEGORY_TTS";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_VAD:
+      return "VOICE_EVENT_CATEGORY_VAD";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_STD:
+      return "VOICE_EVENT_CATEGORY_STD";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_LLM:
+      return "VOICE_EVENT_CATEGORY_LLM";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_AUDIO:
+      return "VOICE_EVENT_CATEGORY_AUDIO";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_METRICS:
+      return "VOICE_EVENT_CATEGORY_METRICS";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_ERROR:
+      return "VOICE_EVENT_CATEGORY_ERROR";
+    case VoiceEventCategory.VOICE_EVENT_CATEGORY_WAKEWORD:
+      return "VOICE_EVENT_CATEGORY_WAKEWORD";
+    case VoiceEventCategory.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum VoiceEventSeverity {
+  VOICE_EVENT_SEVERITY_DEBUG = 0,
+  VOICE_EVENT_SEVERITY_INFO = 1,
+  VOICE_EVENT_SEVERITY_WARNING = 2,
+  VOICE_EVENT_SEVERITY_ERROR = 3,
+  VOICE_EVENT_SEVERITY_CRITICAL = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function voiceEventSeverityFromJSON(object: any): VoiceEventSeverity {
+  switch (object) {
+    case 0:
+    case "VOICE_EVENT_SEVERITY_DEBUG":
+      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG;
+    case 1:
+    case "VOICE_EVENT_SEVERITY_INFO":
+      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_INFO;
+    case 2:
+    case "VOICE_EVENT_SEVERITY_WARNING":
+      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_WARNING;
+    case 3:
+    case "VOICE_EVENT_SEVERITY_ERROR":
+      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_ERROR;
+    case 4:
+    case "VOICE_EVENT_SEVERITY_CRITICAL":
+      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_CRITICAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return VoiceEventSeverity.UNRECOGNIZED;
+  }
+}
+
+export function voiceEventSeverityToJSON(object: VoiceEventSeverity): string {
+  switch (object) {
+    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG:
+      return "VOICE_EVENT_SEVERITY_DEBUG";
+    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_INFO:
+      return "VOICE_EVENT_SEVERITY_INFO";
+    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_WARNING:
+      return "VOICE_EVENT_SEVERITY_WARNING";
+    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_ERROR:
+      return "VOICE_EVENT_SEVERITY_ERROR";
+    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_CRITICAL:
+      return "VOICE_EVENT_SEVERITY_CRITICAL";
+    case VoiceEventSeverity.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum VoicePipelineComponent {
+  VOICE_PIPELINE_COMPONENT_UNSPECIFIED = 0,
+  VOICE_PIPELINE_COMPONENT_AGENT = 1,
+  VOICE_PIPELINE_COMPONENT_STT = 2,
+  VOICE_PIPELINE_COMPONENT_ASR = 3,
+  VOICE_PIPELINE_COMPONENT_TTS = 4,
+  VOICE_PIPELINE_COMPONENT_VAD = 5,
+  VOICE_PIPELINE_COMPONENT_STD = 6,
+  VOICE_PIPELINE_COMPONENT_LLM = 7,
+  VOICE_PIPELINE_COMPONENT_AUDIO = 8,
+  VOICE_PIPELINE_COMPONENT_WAKEWORD = 9,
+  UNRECOGNIZED = -1,
+}
+
+export function voicePipelineComponentFromJSON(object: any): VoicePipelineComponent {
+  switch (object) {
+    case 0:
+    case "VOICE_PIPELINE_COMPONENT_UNSPECIFIED":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED;
+    case 1:
+    case "VOICE_PIPELINE_COMPONENT_AGENT":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT;
+    case 2:
+    case "VOICE_PIPELINE_COMPONENT_STT":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_STT;
+    case 3:
+    case "VOICE_PIPELINE_COMPONENT_ASR":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_ASR;
+    case 4:
+    case "VOICE_PIPELINE_COMPONENT_TTS":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_TTS;
+    case 5:
+    case "VOICE_PIPELINE_COMPONENT_VAD":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_VAD;
+    case 6:
+    case "VOICE_PIPELINE_COMPONENT_STD":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_STD;
+    case 7:
+    case "VOICE_PIPELINE_COMPONENT_LLM":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_LLM;
+    case 8:
+    case "VOICE_PIPELINE_COMPONENT_AUDIO":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AUDIO;
+    case 9:
+    case "VOICE_PIPELINE_COMPONENT_WAKEWORD":
+      return VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_WAKEWORD;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return VoicePipelineComponent.UNRECOGNIZED;
+  }
+}
+
+export function voicePipelineComponentToJSON(object: VoicePipelineComponent): string {
+  switch (object) {
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED:
+      return "VOICE_PIPELINE_COMPONENT_UNSPECIFIED";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT:
+      return "VOICE_PIPELINE_COMPONENT_AGENT";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_STT:
+      return "VOICE_PIPELINE_COMPONENT_STT";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_ASR:
+      return "VOICE_PIPELINE_COMPONENT_ASR";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_TTS:
+      return "VOICE_PIPELINE_COMPONENT_TTS";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_VAD:
+      return "VOICE_PIPELINE_COMPONENT_VAD";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_STD:
+      return "VOICE_PIPELINE_COMPONENT_STD";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_LLM:
+      return "VOICE_PIPELINE_COMPONENT_LLM";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AUDIO:
+      return "VOICE_PIPELINE_COMPONENT_AUDIO";
+    case VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_WAKEWORD:
+      return "VOICE_PIPELINE_COMPONENT_WAKEWORD";
+    case VoicePipelineComponent.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum TokenKind {
   TOKEN_KIND_UNSPECIFIED = 0,
   /** TOKEN_KIND_ANSWER - Regular content token */
@@ -103,6 +328,8 @@ export enum VADEventType {
   VAD_EVENT_VOICE_END_OF_UTTERANCE = 2,
   VAD_EVENT_BARGE_IN = 3,
   VAD_EVENT_SILENCE = 4,
+  VAD_EVENT_STATISTICS = 5,
+  VAD_EVENT_STATE_CHANGED = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -123,6 +350,12 @@ export function vADEventTypeFromJSON(object: any): VADEventType {
     case 4:
     case "VAD_EVENT_SILENCE":
       return VADEventType.VAD_EVENT_SILENCE;
+    case 5:
+    case "VAD_EVENT_STATISTICS":
+      return VADEventType.VAD_EVENT_STATISTICS;
+    case 6:
+    case "VAD_EVENT_STATE_CHANGED":
+      return VADEventType.VAD_EVENT_STATE_CHANGED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -142,6 +375,10 @@ export function vADEventTypeToJSON(object: VADEventType): string {
       return "VAD_EVENT_BARGE_IN";
     case VADEventType.VAD_EVENT_SILENCE:
       return "VAD_EVENT_SILENCE";
+    case VADEventType.VAD_EVENT_STATISTICS:
+      return "VAD_EVENT_STATISTICS";
+    case VADEventType.VAD_EVENT_STATE_CHANGED:
+      return "VAD_EVENT_STATE_CHANGED";
     case VADEventType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -206,6 +443,12 @@ export enum PipelineState {
   PIPELINE_STATE_THINKING = 3,
   PIPELINE_STATE_SPEAKING = 4,
   PIPELINE_STATE_STOPPED = 5,
+  PIPELINE_STATE_WAITING_WAKEWORD = 6,
+  PIPELINE_STATE_PROCESSING_SPEECH = 7,
+  PIPELINE_STATE_GENERATING_RESPONSE = 8,
+  PIPELINE_STATE_PLAYING_TTS = 9,
+  PIPELINE_STATE_COOLDOWN = 10,
+  PIPELINE_STATE_ERROR = 11,
   UNRECOGNIZED = -1,
 }
 
@@ -229,6 +472,24 @@ export function pipelineStateFromJSON(object: any): PipelineState {
     case 5:
     case "PIPELINE_STATE_STOPPED":
       return PipelineState.PIPELINE_STATE_STOPPED;
+    case 6:
+    case "PIPELINE_STATE_WAITING_WAKEWORD":
+      return PipelineState.PIPELINE_STATE_WAITING_WAKEWORD;
+    case 7:
+    case "PIPELINE_STATE_PROCESSING_SPEECH":
+      return PipelineState.PIPELINE_STATE_PROCESSING_SPEECH;
+    case 8:
+    case "PIPELINE_STATE_GENERATING_RESPONSE":
+      return PipelineState.PIPELINE_STATE_GENERATING_RESPONSE;
+    case 9:
+    case "PIPELINE_STATE_PLAYING_TTS":
+      return PipelineState.PIPELINE_STATE_PLAYING_TTS;
+    case 10:
+    case "PIPELINE_STATE_COOLDOWN":
+      return PipelineState.PIPELINE_STATE_COOLDOWN;
+    case 11:
+    case "PIPELINE_STATE_ERROR":
+      return PipelineState.PIPELINE_STATE_ERROR;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -250,6 +511,18 @@ export function pipelineStateToJSON(object: PipelineState): string {
       return "PIPELINE_STATE_SPEAKING";
     case PipelineState.PIPELINE_STATE_STOPPED:
       return "PIPELINE_STATE_STOPPED";
+    case PipelineState.PIPELINE_STATE_WAITING_WAKEWORD:
+      return "PIPELINE_STATE_WAITING_WAKEWORD";
+    case PipelineState.PIPELINE_STATE_PROCESSING_SPEECH:
+      return "PIPELINE_STATE_PROCESSING_SPEECH";
+    case PipelineState.PIPELINE_STATE_GENERATING_RESPONSE:
+      return "PIPELINE_STATE_GENERATING_RESPONSE";
+    case PipelineState.PIPELINE_STATE_PLAYING_TTS:
+      return "PIPELINE_STATE_PLAYING_TTS";
+    case PipelineState.PIPELINE_STATE_COOLDOWN:
+      return "PIPELINE_STATE_COOLDOWN";
+    case PipelineState.PIPELINE_STATE_ERROR:
+      return "PIPELINE_STATE_ERROR";
     case PipelineState.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -363,6 +636,138 @@ export function voiceSessionErrorCodeToJSON(object: VoiceSessionErrorCode): stri
   }
 }
 
+export enum SpeechTurnDetectionEventKind {
+  SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
+  SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
+  SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED = 2,
+  SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED = 3,
+  SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function speechTurnDetectionEventKindFromJSON(object: any): SpeechTurnDetectionEventKind {
+  switch (object) {
+    case 0:
+    case "SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED":
+      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED":
+      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED;
+    case 2:
+    case "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED":
+      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED;
+    case 3:
+    case "SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED":
+      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED;
+    case 4:
+    case "SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS":
+      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return SpeechTurnDetectionEventKind.UNRECOGNIZED;
+  }
+}
+
+export function speechTurnDetectionEventKindToJSON(object: SpeechTurnDetectionEventKind): string {
+  switch (object) {
+    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED:
+      return "SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED";
+    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
+      return "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED";
+    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
+      return "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED";
+    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED:
+      return "SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED";
+    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS:
+      return "SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS";
+    case SpeechTurnDetectionEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum TurnLifecycleEventKind {
+  TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
+  TURN_LIFECYCLE_EVENT_KIND_STARTED = 1,
+  TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED = 2,
+  TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED = 3,
+  TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL = 4,
+  TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED = 5,
+  TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED = 6,
+  TURN_LIFECYCLE_EVENT_KIND_COMPLETED = 7,
+  TURN_LIFECYCLE_EVENT_KIND_CANCELLED = 8,
+  TURN_LIFECYCLE_EVENT_KIND_FAILED = 9,
+  UNRECOGNIZED = -1,
+}
+
+export function turnLifecycleEventKindFromJSON(object: any): TurnLifecycleEventKind {
+  switch (object) {
+    case 0:
+    case "TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "TURN_LIFECYCLE_EVENT_KIND_STARTED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_STARTED;
+    case 2:
+    case "TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED;
+    case 3:
+    case "TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED;
+    case 4:
+    case "TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL;
+    case 5:
+    case "TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED;
+    case 6:
+    case "TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED;
+    case 7:
+    case "TURN_LIFECYCLE_EVENT_KIND_COMPLETED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_COMPLETED;
+    case 8:
+    case "TURN_LIFECYCLE_EVENT_KIND_CANCELLED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_CANCELLED;
+    case 9:
+    case "TURN_LIFECYCLE_EVENT_KIND_FAILED":
+      return TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_FAILED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TurnLifecycleEventKind.UNRECOGNIZED;
+  }
+}
+
+export function turnLifecycleEventKindToJSON(object: TurnLifecycleEventKind): string {
+  switch (object) {
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED:
+      return "TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_STARTED:
+      return "TURN_LIFECYCLE_EVENT_KIND_STARTED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED:
+      return "TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED:
+      return "TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL:
+      return "TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED:
+      return "TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED:
+      return "TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_COMPLETED:
+      return "TURN_LIFECYCLE_EVENT_KIND_COMPLETED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_CANCELLED:
+      return "TURN_LIFECYCLE_EVENT_KIND_CANCELLED";
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_FAILED:
+      return "TURN_LIFECYCLE_EVENT_KIND_FAILED";
+    case TurnLifecycleEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * ---------------------------------------------------------------------------
  * Sum type emitted on the output edge of the VoiceAgent pipeline.
@@ -379,6 +784,9 @@ export interface VoiceEvent {
    * Unix epoch. Frontends may re-timestamp for UI display.
    */
   timestampUs: number;
+  category: VoiceEventCategory;
+  severity: VoiceEventSeverity;
+  component: VoicePipelineComponent;
   userSaid?: UserSaidEvent | undefined;
   assistantToken?: AssistantTokenEvent | undefined;
   audio?: AudioFrameEvent | undefined;
@@ -403,6 +811,9 @@ export interface VoiceEvent {
   sessionStopped?: SessionStoppedEvent | undefined;
   agentResponseStarted?: AgentResponseStartedEvent | undefined;
   agentResponseCompleted?: AgentResponseCompletedEvent | undefined;
+  speechTurnDetection?: SpeechTurnDetectionEvent | undefined;
+  turnLifecycle?: TurnLifecycleEvent | undefined;
+  wakewordDetected?: WakeWordDetectedEvent | undefined;
 }
 
 /** User speech finalized by STT (is_final=false → partial hypothesis). */
@@ -437,6 +848,8 @@ export interface AudioFrameEvent {
   /** 1 for mono */
   channels: number;
   encoding: AudioEncoding;
+  /** True for the final audio chunk in a TTS/voice-agent audio stream. */
+  isFinal: boolean;
 }
 
 /**
@@ -446,6 +859,11 @@ export interface AudioFrameEvent {
 export interface VADEvent {
   type: VADEventType;
   frameOffsetUs: number;
+  confidence: number;
+  isSpeech: boolean;
+  speechDurationMs: number;
+  silenceDurationMs: number;
+  noiseFloorDb: number;
 }
 
 /**
@@ -540,10 +958,41 @@ export interface AgentResponseStartedEvent {
 export interface AgentResponseCompletedEvent {
 }
 
+export interface SpeechTurnDetectionEvent {
+  kind: SpeechTurnDetectionEventKind;
+  speakerId: string;
+  turnStartUs: number;
+  turnEndUs: number;
+  confidence: number;
+  speechDurationMs: number;
+  silenceDurationMs: number;
+}
+
+export interface TurnLifecycleEvent {
+  kind: TurnLifecycleEventKind;
+  turnId: string;
+  sessionId: string;
+  transcript: string;
+  response: string;
+  error: string;
+}
+
+export interface WakeWordDetectedEvent {
+  wakeWord: string;
+  confidence: number;
+  timestampMs: number;
+  modelId: string;
+  modelIndex: number;
+  durationMs: number;
+}
+
 function createBaseVoiceEvent(): VoiceEvent {
   return {
     seq: 0,
     timestampUs: 0,
+    category: 0,
+    severity: 0,
+    component: 0,
     userSaid: undefined,
     assistantToken: undefined,
     audio: undefined,
@@ -558,6 +1007,9 @@ function createBaseVoiceEvent(): VoiceEvent {
     sessionStopped: undefined,
     agentResponseStarted: undefined,
     agentResponseCompleted: undefined,
+    speechTurnDetection: undefined,
+    turnLifecycle: undefined,
+    wakewordDetected: undefined,
   };
 }
 
@@ -568,6 +1020,15 @@ export const VoiceEvent = {
     }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.category !== 0) {
+      writer.uint32(24).int32(message.category);
+    }
+    if (message.severity !== 0) {
+      writer.uint32(32).int32(message.severity);
+    }
+    if (message.component !== 0) {
+      writer.uint32(40).int32(message.component);
     }
     if (message.userSaid !== undefined) {
       UserSaidEvent.encode(message.userSaid, writer.uint32(82).fork()).ldelim();
@@ -611,6 +1072,15 @@ export const VoiceEvent = {
     if (message.agentResponseCompleted !== undefined) {
       AgentResponseCompletedEvent.encode(message.agentResponseCompleted, writer.uint32(186).fork()).ldelim();
     }
+    if (message.speechTurnDetection !== undefined) {
+      SpeechTurnDetectionEvent.encode(message.speechTurnDetection, writer.uint32(194).fork()).ldelim();
+    }
+    if (message.turnLifecycle !== undefined) {
+      TurnLifecycleEvent.encode(message.turnLifecycle, writer.uint32(202).fork()).ldelim();
+    }
+    if (message.wakewordDetected !== undefined) {
+      WakeWordDetectedEvent.encode(message.wakewordDetected, writer.uint32(210).fork()).ldelim();
+    }
     return writer;
   },
 
@@ -634,6 +1104,27 @@ export const VoiceEvent = {
           }
 
           message.timestampUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.severity = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.component = reader.int32() as any;
           continue;
         case 10:
           if (tag !== 82) {
@@ -733,6 +1224,27 @@ export const VoiceEvent = {
 
           message.agentResponseCompleted = AgentResponseCompletedEvent.decode(reader, reader.uint32());
           continue;
+        case 24:
+          if (tag !== 194) {
+            break;
+          }
+
+          message.speechTurnDetection = SpeechTurnDetectionEvent.decode(reader, reader.uint32());
+          continue;
+        case 25:
+          if (tag !== 202) {
+            break;
+          }
+
+          message.turnLifecycle = TurnLifecycleEvent.decode(reader, reader.uint32());
+          continue;
+        case 26:
+          if (tag !== 210) {
+            break;
+          }
+
+          message.wakewordDetected = WakeWordDetectedEvent.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -746,6 +1258,9 @@ export const VoiceEvent = {
     return {
       seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+      category: isSet(object.category) ? voiceEventCategoryFromJSON(object.category) : 0,
+      severity: isSet(object.severity) ? voiceEventSeverityFromJSON(object.severity) : 0,
+      component: isSet(object.component) ? voicePipelineComponentFromJSON(object.component) : 0,
       userSaid: isSet(object.userSaid) ? UserSaidEvent.fromJSON(object.userSaid) : undefined,
       assistantToken: isSet(object.assistantToken) ? AssistantTokenEvent.fromJSON(object.assistantToken) : undefined,
       audio: isSet(object.audio) ? AudioFrameEvent.fromJSON(object.audio) : undefined,
@@ -766,6 +1281,13 @@ export const VoiceEvent = {
       agentResponseCompleted: isSet(object.agentResponseCompleted)
         ? AgentResponseCompletedEvent.fromJSON(object.agentResponseCompleted)
         : undefined,
+      speechTurnDetection: isSet(object.speechTurnDetection)
+        ? SpeechTurnDetectionEvent.fromJSON(object.speechTurnDetection)
+        : undefined,
+      turnLifecycle: isSet(object.turnLifecycle) ? TurnLifecycleEvent.fromJSON(object.turnLifecycle) : undefined,
+      wakewordDetected: isSet(object.wakewordDetected)
+        ? WakeWordDetectedEvent.fromJSON(object.wakewordDetected)
+        : undefined,
     };
   },
 
@@ -776,6 +1298,15 @@ export const VoiceEvent = {
     }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.category !== 0) {
+      obj.category = voiceEventCategoryToJSON(message.category);
+    }
+    if (message.severity !== 0) {
+      obj.severity = voiceEventSeverityToJSON(message.severity);
+    }
+    if (message.component !== 0) {
+      obj.component = voicePipelineComponentToJSON(message.component);
     }
     if (message.userSaid !== undefined) {
       obj.userSaid = UserSaidEvent.toJSON(message.userSaid);
@@ -819,6 +1350,15 @@ export const VoiceEvent = {
     if (message.agentResponseCompleted !== undefined) {
       obj.agentResponseCompleted = AgentResponseCompletedEvent.toJSON(message.agentResponseCompleted);
     }
+    if (message.speechTurnDetection !== undefined) {
+      obj.speechTurnDetection = SpeechTurnDetectionEvent.toJSON(message.speechTurnDetection);
+    }
+    if (message.turnLifecycle !== undefined) {
+      obj.turnLifecycle = TurnLifecycleEvent.toJSON(message.turnLifecycle);
+    }
+    if (message.wakewordDetected !== undefined) {
+      obj.wakewordDetected = WakeWordDetectedEvent.toJSON(message.wakewordDetected);
+    }
     return obj;
   },
 
@@ -829,6 +1369,9 @@ export const VoiceEvent = {
     const message = createBaseVoiceEvent();
     message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
+    message.category = object.category ?? 0;
+    message.severity = object.severity ?? 0;
+    message.component = object.component ?? 0;
     message.userSaid = (object.userSaid !== undefined && object.userSaid !== null)
       ? UserSaidEvent.fromPartial(object.userSaid)
       : undefined;
@@ -871,6 +1414,15 @@ export const VoiceEvent = {
       (object.agentResponseCompleted !== undefined && object.agentResponseCompleted !== null)
         ? AgentResponseCompletedEvent.fromPartial(object.agentResponseCompleted)
         : undefined;
+    message.speechTurnDetection = (object.speechTurnDetection !== undefined && object.speechTurnDetection !== null)
+      ? SpeechTurnDetectionEvent.fromPartial(object.speechTurnDetection)
+      : undefined;
+    message.turnLifecycle = (object.turnLifecycle !== undefined && object.turnLifecycle !== null)
+      ? TurnLifecycleEvent.fromPartial(object.turnLifecycle)
+      : undefined;
+    message.wakewordDetected = (object.wakewordDetected !== undefined && object.wakewordDetected !== null)
+      ? WakeWordDetectedEvent.fromPartial(object.wakewordDetected)
+      : undefined;
     return message;
   },
 };
@@ -1084,7 +1636,7 @@ export const AssistantTokenEvent = {
 };
 
 function createBaseAudioFrameEvent(): AudioFrameEvent {
-  return { pcm: new Uint8Array(0), sampleRateHz: 0, channels: 0, encoding: 0 };
+  return { pcm: new Uint8Array(0), sampleRateHz: 0, channels: 0, encoding: 0, isFinal: false };
 }
 
 export const AudioFrameEvent = {
@@ -1100,6 +1652,9 @@ export const AudioFrameEvent = {
     }
     if (message.encoding !== 0) {
       writer.uint32(32).int32(message.encoding);
+    }
+    if (message.isFinal !== false) {
+      writer.uint32(40).bool(message.isFinal);
     }
     return writer;
   },
@@ -1139,6 +1694,13 @@ export const AudioFrameEvent = {
 
           message.encoding = reader.int32() as any;
           continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isFinal = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1154,6 +1716,7 @@ export const AudioFrameEvent = {
       sampleRateHz: isSet(object.sampleRateHz) ? globalThis.Number(object.sampleRateHz) : 0,
       channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
       encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+      isFinal: isSet(object.isFinal) ? globalThis.Boolean(object.isFinal) : false,
     };
   },
 
@@ -1171,6 +1734,9 @@ export const AudioFrameEvent = {
     if (message.encoding !== 0) {
       obj.encoding = audioEncodingToJSON(message.encoding);
     }
+    if (message.isFinal !== false) {
+      obj.isFinal = message.isFinal;
+    }
     return obj;
   },
 
@@ -1183,12 +1749,21 @@ export const AudioFrameEvent = {
     message.sampleRateHz = object.sampleRateHz ?? 0;
     message.channels = object.channels ?? 0;
     message.encoding = object.encoding ?? 0;
+    message.isFinal = object.isFinal ?? false;
     return message;
   },
 };
 
 function createBaseVADEvent(): VADEvent {
-  return { type: 0, frameOffsetUs: 0 };
+  return {
+    type: 0,
+    frameOffsetUs: 0,
+    confidence: 0,
+    isSpeech: false,
+    speechDurationMs: 0,
+    silenceDurationMs: 0,
+    noiseFloorDb: 0,
+  };
 }
 
 export const VADEvent = {
@@ -1198,6 +1773,21 @@ export const VADEvent = {
     }
     if (message.frameOffsetUs !== 0) {
       writer.uint32(16).int64(message.frameOffsetUs);
+    }
+    if (message.confidence !== 0) {
+      writer.uint32(29).float(message.confidence);
+    }
+    if (message.isSpeech !== false) {
+      writer.uint32(32).bool(message.isSpeech);
+    }
+    if (message.speechDurationMs !== 0) {
+      writer.uint32(41).double(message.speechDurationMs);
+    }
+    if (message.silenceDurationMs !== 0) {
+      writer.uint32(49).double(message.silenceDurationMs);
+    }
+    if (message.noiseFloorDb !== 0) {
+      writer.uint32(57).double(message.noiseFloorDb);
     }
     return writer;
   },
@@ -1223,6 +1813,41 @@ export const VADEvent = {
 
           message.frameOffsetUs = longToNumber(reader.int64() as Long);
           continue;
+        case 3:
+          if (tag !== 29) {
+            break;
+          }
+
+          message.confidence = reader.float();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.isSpeech = reader.bool();
+          continue;
+        case 5:
+          if (tag !== 41) {
+            break;
+          }
+
+          message.speechDurationMs = reader.double();
+          continue;
+        case 6:
+          if (tag !== 49) {
+            break;
+          }
+
+          message.silenceDurationMs = reader.double();
+          continue;
+        case 7:
+          if (tag !== 57) {
+            break;
+          }
+
+          message.noiseFloorDb = reader.double();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1236,6 +1861,11 @@ export const VADEvent = {
     return {
       type: isSet(object.type) ? vADEventTypeFromJSON(object.type) : 0,
       frameOffsetUs: isSet(object.frameOffsetUs) ? globalThis.Number(object.frameOffsetUs) : 0,
+      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+      isSpeech: isSet(object.isSpeech) ? globalThis.Boolean(object.isSpeech) : false,
+      speechDurationMs: isSet(object.speechDurationMs) ? globalThis.Number(object.speechDurationMs) : 0,
+      silenceDurationMs: isSet(object.silenceDurationMs) ? globalThis.Number(object.silenceDurationMs) : 0,
+      noiseFloorDb: isSet(object.noiseFloorDb) ? globalThis.Number(object.noiseFloorDb) : 0,
     };
   },
 
@@ -1247,6 +1877,21 @@ export const VADEvent = {
     if (message.frameOffsetUs !== 0) {
       obj.frameOffsetUs = Math.round(message.frameOffsetUs);
     }
+    if (message.confidence !== 0) {
+      obj.confidence = message.confidence;
+    }
+    if (message.isSpeech !== false) {
+      obj.isSpeech = message.isSpeech;
+    }
+    if (message.speechDurationMs !== 0) {
+      obj.speechDurationMs = message.speechDurationMs;
+    }
+    if (message.silenceDurationMs !== 0) {
+      obj.silenceDurationMs = message.silenceDurationMs;
+    }
+    if (message.noiseFloorDb !== 0) {
+      obj.noiseFloorDb = message.noiseFloorDb;
+    }
     return obj;
   },
 
@@ -1257,6 +1902,11 @@ export const VADEvent = {
     const message = createBaseVADEvent();
     message.type = object.type ?? 0;
     message.frameOffsetUs = object.frameOffsetUs ?? 0;
+    message.confidence = object.confidence ?? 0;
+    message.isSpeech = object.isSpeech ?? false;
+    message.speechDurationMs = object.speechDurationMs ?? 0;
+    message.silenceDurationMs = object.silenceDurationMs ?? 0;
+    message.noiseFloorDb = object.noiseFloorDb ?? 0;
     return message;
   },
 };
@@ -2077,6 +2727,431 @@ export const AgentResponseCompletedEvent = {
   },
   fromPartial<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(_: I): AgentResponseCompletedEvent {
     const message = createBaseAgentResponseCompletedEvent();
+    return message;
+  },
+};
+
+function createBaseSpeechTurnDetectionEvent(): SpeechTurnDetectionEvent {
+  return {
+    kind: 0,
+    speakerId: "",
+    turnStartUs: 0,
+    turnEndUs: 0,
+    confidence: 0,
+    speechDurationMs: 0,
+    silenceDurationMs: 0,
+  };
+}
+
+export const SpeechTurnDetectionEvent = {
+  encode(message: SpeechTurnDetectionEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.kind !== 0) {
+      writer.uint32(8).int32(message.kind);
+    }
+    if (message.speakerId !== "") {
+      writer.uint32(18).string(message.speakerId);
+    }
+    if (message.turnStartUs !== 0) {
+      writer.uint32(24).int64(message.turnStartUs);
+    }
+    if (message.turnEndUs !== 0) {
+      writer.uint32(32).int64(message.turnEndUs);
+    }
+    if (message.confidence !== 0) {
+      writer.uint32(45).float(message.confidence);
+    }
+    if (message.speechDurationMs !== 0) {
+      writer.uint32(49).double(message.speechDurationMs);
+    }
+    if (message.silenceDurationMs !== 0) {
+      writer.uint32(57).double(message.silenceDurationMs);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): SpeechTurnDetectionEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSpeechTurnDetectionEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.speakerId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.turnStartUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.turnEndUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 45) {
+            break;
+          }
+
+          message.confidence = reader.float();
+          continue;
+        case 6:
+          if (tag !== 49) {
+            break;
+          }
+
+          message.speechDurationMs = reader.double();
+          continue;
+        case 7:
+          if (tag !== 57) {
+            break;
+          }
+
+          message.silenceDurationMs = reader.double();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SpeechTurnDetectionEvent {
+    return {
+      kind: isSet(object.kind) ? speechTurnDetectionEventKindFromJSON(object.kind) : 0,
+      speakerId: isSet(object.speakerId) ? globalThis.String(object.speakerId) : "",
+      turnStartUs: isSet(object.turnStartUs) ? globalThis.Number(object.turnStartUs) : 0,
+      turnEndUs: isSet(object.turnEndUs) ? globalThis.Number(object.turnEndUs) : 0,
+      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+      speechDurationMs: isSet(object.speechDurationMs) ? globalThis.Number(object.speechDurationMs) : 0,
+      silenceDurationMs: isSet(object.silenceDurationMs) ? globalThis.Number(object.silenceDurationMs) : 0,
+    };
+  },
+
+  toJSON(message: SpeechTurnDetectionEvent): unknown {
+    const obj: any = {};
+    if (message.kind !== 0) {
+      obj.kind = speechTurnDetectionEventKindToJSON(message.kind);
+    }
+    if (message.speakerId !== "") {
+      obj.speakerId = message.speakerId;
+    }
+    if (message.turnStartUs !== 0) {
+      obj.turnStartUs = Math.round(message.turnStartUs);
+    }
+    if (message.turnEndUs !== 0) {
+      obj.turnEndUs = Math.round(message.turnEndUs);
+    }
+    if (message.confidence !== 0) {
+      obj.confidence = message.confidence;
+    }
+    if (message.speechDurationMs !== 0) {
+      obj.speechDurationMs = message.speechDurationMs;
+    }
+    if (message.silenceDurationMs !== 0) {
+      obj.silenceDurationMs = message.silenceDurationMs;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SpeechTurnDetectionEvent>, I>>(base?: I): SpeechTurnDetectionEvent {
+    return SpeechTurnDetectionEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SpeechTurnDetectionEvent>, I>>(object: I): SpeechTurnDetectionEvent {
+    const message = createBaseSpeechTurnDetectionEvent();
+    message.kind = object.kind ?? 0;
+    message.speakerId = object.speakerId ?? "";
+    message.turnStartUs = object.turnStartUs ?? 0;
+    message.turnEndUs = object.turnEndUs ?? 0;
+    message.confidence = object.confidence ?? 0;
+    message.speechDurationMs = object.speechDurationMs ?? 0;
+    message.silenceDurationMs = object.silenceDurationMs ?? 0;
+    return message;
+  },
+};
+
+function createBaseTurnLifecycleEvent(): TurnLifecycleEvent {
+  return { kind: 0, turnId: "", sessionId: "", transcript: "", response: "", error: "" };
+}
+
+export const TurnLifecycleEvent = {
+  encode(message: TurnLifecycleEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.kind !== 0) {
+      writer.uint32(8).int32(message.kind);
+    }
+    if (message.turnId !== "") {
+      writer.uint32(18).string(message.turnId);
+    }
+    if (message.sessionId !== "") {
+      writer.uint32(26).string(message.sessionId);
+    }
+    if (message.transcript !== "") {
+      writer.uint32(34).string(message.transcript);
+    }
+    if (message.response !== "") {
+      writer.uint32(42).string(message.response);
+    }
+    if (message.error !== "") {
+      writer.uint32(50).string(message.error);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TurnLifecycleEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTurnLifecycleEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.turnId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.transcript = reader.string();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.response = reader.string();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.error = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TurnLifecycleEvent {
+    return {
+      kind: isSet(object.kind) ? turnLifecycleEventKindFromJSON(object.kind) : 0,
+      turnId: isSet(object.turnId) ? globalThis.String(object.turnId) : "",
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      transcript: isSet(object.transcript) ? globalThis.String(object.transcript) : "",
+      response: isSet(object.response) ? globalThis.String(object.response) : "",
+      error: isSet(object.error) ? globalThis.String(object.error) : "",
+    };
+  },
+
+  toJSON(message: TurnLifecycleEvent): unknown {
+    const obj: any = {};
+    if (message.kind !== 0) {
+      obj.kind = turnLifecycleEventKindToJSON(message.kind);
+    }
+    if (message.turnId !== "") {
+      obj.turnId = message.turnId;
+    }
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.transcript !== "") {
+      obj.transcript = message.transcript;
+    }
+    if (message.response !== "") {
+      obj.response = message.response;
+    }
+    if (message.error !== "") {
+      obj.error = message.error;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TurnLifecycleEvent>, I>>(base?: I): TurnLifecycleEvent {
+    return TurnLifecycleEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TurnLifecycleEvent>, I>>(object: I): TurnLifecycleEvent {
+    const message = createBaseTurnLifecycleEvent();
+    message.kind = object.kind ?? 0;
+    message.turnId = object.turnId ?? "";
+    message.sessionId = object.sessionId ?? "";
+    message.transcript = object.transcript ?? "";
+    message.response = object.response ?? "";
+    message.error = object.error ?? "";
+    return message;
+  },
+};
+
+function createBaseWakeWordDetectedEvent(): WakeWordDetectedEvent {
+  return { wakeWord: "", confidence: 0, timestampMs: 0, modelId: "", modelIndex: 0, durationMs: 0 };
+}
+
+export const WakeWordDetectedEvent = {
+  encode(message: WakeWordDetectedEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.wakeWord !== "") {
+      writer.uint32(10).string(message.wakeWord);
+    }
+    if (message.confidence !== 0) {
+      writer.uint32(21).float(message.confidence);
+    }
+    if (message.timestampMs !== 0) {
+      writer.uint32(24).int64(message.timestampMs);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(34).string(message.modelId);
+    }
+    if (message.modelIndex !== 0) {
+      writer.uint32(40).int32(message.modelIndex);
+    }
+    if (message.durationMs !== 0) {
+      writer.uint32(48).int64(message.durationMs);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): WakeWordDetectedEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWakeWordDetectedEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.wakeWord = reader.string();
+          continue;
+        case 2:
+          if (tag !== 21) {
+            break;
+          }
+
+          message.confidence = reader.float();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.timestampMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.modelIndex = reader.int32();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.durationMs = longToNumber(reader.int64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WakeWordDetectedEvent {
+    return {
+      wakeWord: isSet(object.wakeWord) ? globalThis.String(object.wakeWord) : "",
+      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+      timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      modelIndex: isSet(object.modelIndex) ? globalThis.Number(object.modelIndex) : 0,
+      durationMs: isSet(object.durationMs) ? globalThis.Number(object.durationMs) : 0,
+    };
+  },
+
+  toJSON(message: WakeWordDetectedEvent): unknown {
+    const obj: any = {};
+    if (message.wakeWord !== "") {
+      obj.wakeWord = message.wakeWord;
+    }
+    if (message.confidence !== 0) {
+      obj.confidence = message.confidence;
+    }
+    if (message.timestampMs !== 0) {
+      obj.timestampMs = Math.round(message.timestampMs);
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.modelIndex !== 0) {
+      obj.modelIndex = Math.round(message.modelIndex);
+    }
+    if (message.durationMs !== 0) {
+      obj.durationMs = Math.round(message.durationMs);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<WakeWordDetectedEvent>, I>>(base?: I): WakeWordDetectedEvent {
+    return WakeWordDetectedEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<WakeWordDetectedEvent>, I>>(object: I): WakeWordDetectedEvent {
+    const message = createBaseWakeWordDetectedEvent();
+    message.wakeWord = object.wakeWord ?? "";
+    message.confidence = object.confidence ?? 0;
+    message.timestampMs = object.timestampMs ?? 0;
+    message.modelId = object.modelId ?? "";
+    message.modelIndex = object.modelIndex ?? 0;
+    message.durationMs = object.durationMs ?? 0;
     return message;
   },
 };

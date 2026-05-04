@@ -119,6 +119,33 @@ public class SDKError(
     schemaIndex = 5,
   )
   public val nested_message: String? = null,
+  /**
+   * Envelope metadata for canonical error emission. `component` is a stable
+   * lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
+   * "download", "storage", ...); SDKEvent carries the enum-typed component.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timestampMs",
+    schemaIndex = 6,
+  )
+  public val timestamp_ms: Long = 0L,
+  @field:WireField(
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.ErrorSeverity#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 7,
+  )
+  public val severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 8,
+  )
+  public val component: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SDKError, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -138,6 +165,9 @@ public class SDKError(
     if (context != other.context) return false
     if (c_abi_code != other.c_abi_code) return false
     if (nested_message != other.nested_message) return false
+    if (timestamp_ms != other.timestamp_ms) return false
+    if (severity != other.severity) return false
+    if (component != other.component) return false
     return true
   }
 
@@ -151,6 +181,9 @@ public class SDKError(
       result = result * 37 + (context?.hashCode() ?: 0)
       result = result * 37 + (c_abi_code?.hashCode() ?: 0)
       result = result * 37 + (nested_message?.hashCode() ?: 0)
+      result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + severity.hashCode()
+      result = result * 37 + component.hashCode()
       super.hashCode = result
     }
     return result
@@ -164,6 +197,9 @@ public class SDKError(
     if (context != null) result += """context=$context"""
     if (c_abi_code != null) result += """c_abi_code=$c_abi_code"""
     if (nested_message != null) result += """nested_message=${sanitize(nested_message)}"""
+    result += """timestamp_ms=$timestamp_ms"""
+    result += """severity=$severity"""
+    result += """component=${sanitize(component)}"""
     return result.joinToString(prefix = "SDKError{", separator = ", ", postfix = "}")
   }
 
@@ -174,9 +210,12 @@ public class SDKError(
     context: ErrorContext? = this.context,
     c_abi_code: Int? = this.c_abi_code,
     nested_message: String? = this.nested_message,
+    timestamp_ms: Long = this.timestamp_ms,
+    severity: ErrorSeverity = this.severity,
+    component: String = this.component,
     unknownFields: ByteString = this.unknownFields,
-  ): SDKError = SDKError(code, category, message, context, c_abi_code, nested_message,
-      unknownFields)
+  ): SDKError = SDKError(code, category, message, context, c_abi_code, nested_message, timestamp_ms,
+      severity, component, unknownFields)
 
   public companion object {
     @JvmField
@@ -198,6 +237,12 @@ public class SDKError(
         size += ErrorContext.ADAPTER.encodedSizeWithTag(4, value.context)
         size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.c_abi_code)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.nested_message)
+        if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.timestamp_ms)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) size +=
+            ErrorSeverity.ADAPTER.encodedSizeWithTag(8, value.severity)
+        if (value.component != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
+            value.component)
         return size
       }
 
@@ -210,11 +255,21 @@ public class SDKError(
         ErrorContext.ADAPTER.encodeWithTag(writer, 4, value.context)
         ProtoAdapter.INT32.encodeWithTag(writer, 5, value.c_abi_code)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.nested_message)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.timestamp_ms)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 8, value.severity)
+        if (value.component != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.component)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SDKError) {
         writer.writeBytes(value.unknownFields)
+        if (value.component != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.component)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 8, value.severity)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.timestamp_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.nested_message)
         ProtoAdapter.INT32.encodeWithTag(writer, 5, value.c_abi_code)
         ErrorContext.ADAPTER.encodeWithTag(writer, 4, value.context)
@@ -232,6 +287,9 @@ public class SDKError(
         var context: ErrorContext? = null
         var c_abi_code: Int? = null
         var nested_message: String? = null
+        var timestamp_ms: Long = 0L
+        var severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
+        var component: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -248,6 +306,13 @@ public class SDKError(
             4 -> context = ErrorContext.ADAPTER.decode(reader)
             5 -> c_abi_code = ProtoAdapter.INT32.decode(reader)
             6 -> nested_message = ProtoAdapter.STRING.decode(reader)
+            7 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> try {
+              severity = ErrorSeverity.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            9 -> component = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -258,6 +323,9 @@ public class SDKError(
           context = context,
           c_abi_code = c_abi_code,
           nested_message = nested_message,
+          timestamp_ms = timestamp_ms,
+          severity = severity,
+          component = component,
           unknownFields = unknownFields
         )
       }

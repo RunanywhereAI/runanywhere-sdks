@@ -15,6 +15,7 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/vad/rac_vad_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -232,6 +233,55 @@ RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
                                                       float* ambient_level_out,
                                                       float* recent_avg_out,
                                                       float* recent_max_out);
+
+// =============================================================================
+// GENERATED-PROTO C ABI
+// =============================================================================
+
+/**
+ * @brief Callback fired for serialized runanywhere.v1.SpeechActivityEvent bytes.
+ *
+ * The byte buffer is valid only for the duration of the callback.
+ */
+typedef void (*rac_vad_proto_activity_callback_fn)(const uint8_t* activity_proto_bytes,
+                                                    size_t activity_proto_size,
+                                                    void* user_data);
+
+/**
+ * @brief Configure VAD from serialized runanywhere.v1.VADConfiguration bytes.
+ */
+RAC_API rac_result_t rac_vad_component_configure_proto(
+    rac_handle_t handle,
+    const uint8_t* config_proto_bytes,
+    size_t config_proto_size);
+
+/**
+ * @brief Process float PCM samples with serialized runanywhere.v1.VADOptions.
+ *
+ * Returns serialized runanywhere.v1.VADResult bytes in out_result.
+ */
+RAC_API rac_result_t rac_vad_component_process_proto(
+    rac_handle_t handle,
+    const float* samples,
+    size_t num_samples,
+    const uint8_t* options_proto_bytes,
+    size_t options_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Read VAD statistics as serialized runanywhere.v1.VADStatistics bytes.
+ */
+RAC_API rac_result_t rac_vad_component_get_statistics_proto(
+    rac_handle_t handle,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Register a speech activity callback that receives generated proto bytes.
+ */
+RAC_API rac_result_t rac_vad_component_set_activity_proto_callback(
+    rac_handle_t handle,
+    rac_vad_proto_activity_callback_fn callback,
+    void* user_data);
 
 #ifdef __cplusplus
 }

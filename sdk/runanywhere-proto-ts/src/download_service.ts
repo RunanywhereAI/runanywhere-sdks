@@ -7,6 +7,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { ModelFileDescriptor, ModelInfo } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -70,6 +71,8 @@ export enum DownloadState {
   DOWNLOAD_STATE_COMPLETED = 5,
   DOWNLOAD_STATE_FAILED = 6,
   DOWNLOAD_STATE_CANCELLED = 7,
+  DOWNLOAD_STATE_PAUSED = 8,
+  DOWNLOAD_STATE_RESUMING = 9,
   UNRECOGNIZED = -1,
 }
 
@@ -99,6 +102,12 @@ export function downloadStateFromJSON(object: any): DownloadState {
     case 7:
     case "DOWNLOAD_STATE_CANCELLED":
       return DownloadState.DOWNLOAD_STATE_CANCELLED;
+    case 8:
+    case "DOWNLOAD_STATE_PAUSED":
+      return DownloadState.DOWNLOAD_STATE_PAUSED;
+    case 9:
+    case "DOWNLOAD_STATE_RESUMING":
+      return DownloadState.DOWNLOAD_STATE_RESUMING;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -124,6 +133,10 @@ export function downloadStateToJSON(object: DownloadState): string {
       return "DOWNLOAD_STATE_FAILED";
     case DownloadState.DOWNLOAD_STATE_CANCELLED:
       return "DOWNLOAD_STATE_CANCELLED";
+    case DownloadState.DOWNLOAD_STATE_PAUSED:
+      return "DOWNLOAD_STATE_PAUSED";
+    case DownloadState.DOWNLOAD_STATE_RESUMING:
+      return "DOWNLOAD_STATE_RESUMING";
     case DownloadState.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -132,6 +145,7 @@ export function downloadStateToJSON(object: DownloadState): string {
 
 export interface DownloadSubscribeRequest {
   modelId: string;
+  taskId: string;
 }
 
 export interface DownloadProgress {
@@ -150,16 +164,98 @@ export interface DownloadProgress {
   retryAttempt: number;
   /** populated when state == FAILED */
   errorMessage: string;
+  taskId: string;
+  /** 0-based within the planned file list */
+  currentFileIndex: number;
+  totalFiles: number;
+  /** C++ storage identifier, not a platform file handle */
+  storageKey: string;
+  /** final path once known */
+  localPath: string;
+}
+
+export interface DownloadPlanRequest {
+  modelId: string;
+  model?: ModelInfo | undefined;
+  resumeExisting: boolean;
+  availableStorageBytes: number;
+  allowMeteredNetwork: boolean;
+}
+
+export interface DownloadFilePlan {
+  file?: ModelFileDescriptor | undefined;
+  storageKey: string;
+  destinationPath: string;
+  expectedBytes: number;
+  requiresExtraction: boolean;
+  checksumSha256: string;
+}
+
+export interface DownloadPlanResult {
+  canStart: boolean;
+  modelId: string;
+  files: DownloadFilePlan[];
+  totalBytes: number;
+  requiresExtraction: boolean;
+  canResume: boolean;
+  resumeFromBytes: number;
+  warnings: string[];
+  errorMessage: string;
+}
+
+export interface DownloadStartRequest {
+  modelId: string;
+  plan?: DownloadPlanResult | undefined;
+  resume: boolean;
+}
+
+export interface DownloadStartResult {
+  accepted: boolean;
+  taskId: string;
+  modelId: string;
+  initialProgress?: DownloadProgress | undefined;
+  errorMessage: string;
+}
+
+export interface DownloadCancelRequest {
+  taskId: string;
+  modelId: string;
+  deletePartialBytes: boolean;
+}
+
+export interface DownloadCancelResult {
+  success: boolean;
+  taskId: string;
+  modelId: string;
+  partialBytesDeleted: number;
+  errorMessage: string;
+}
+
+export interface DownloadResumeRequest {
+  taskId: string;
+  modelId: string;
+  resumeFromBytes: number;
+}
+
+export interface DownloadResumeResult {
+  accepted: boolean;
+  taskId: string;
+  modelId: string;
+  initialProgress?: DownloadProgress | undefined;
+  errorMessage: string;
 }
 
 function createBaseDownloadSubscribeRequest(): DownloadSubscribeRequest {
-  return { modelId: "" };
+  return { modelId: "", taskId: "" };
 }
 
 export const DownloadSubscribeRequest = {
   encode(message: DownloadSubscribeRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.modelId !== "") {
       writer.uint32(10).string(message.modelId);
+    }
+    if (message.taskId !== "") {
+      writer.uint32(18).string(message.taskId);
     }
     return writer;
   },
@@ -178,6 +274,13 @@ export const DownloadSubscribeRequest = {
 
           message.modelId = reader.string();
           continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -188,13 +291,19 @@ export const DownloadSubscribeRequest = {
   },
 
   fromJSON(object: any): DownloadSubscribeRequest {
-    return { modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "" };
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+    };
   },
 
   toJSON(message: DownloadSubscribeRequest): unknown {
     const obj: any = {};
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
+    }
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
     }
     return obj;
   },
@@ -205,6 +314,7 @@ export const DownloadSubscribeRequest = {
   fromPartial<I extends Exact<DeepPartial<DownloadSubscribeRequest>, I>>(object: I): DownloadSubscribeRequest {
     const message = createBaseDownloadSubscribeRequest();
     message.modelId = object.modelId ?? "";
+    message.taskId = object.taskId ?? "";
     return message;
   },
 };
@@ -221,6 +331,11 @@ function createBaseDownloadProgress(): DownloadProgress {
     state: 0,
     retryAttempt: 0,
     errorMessage: "",
+    taskId: "",
+    currentFileIndex: 0,
+    totalFiles: 0,
+    storageKey: "",
+    localPath: "",
   };
 }
 
@@ -255,6 +370,21 @@ export const DownloadProgress = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(82).string(message.errorMessage);
+    }
+    if (message.taskId !== "") {
+      writer.uint32(90).string(message.taskId);
+    }
+    if (message.currentFileIndex !== 0) {
+      writer.uint32(96).int32(message.currentFileIndex);
+    }
+    if (message.totalFiles !== 0) {
+      writer.uint32(104).int32(message.totalFiles);
+    }
+    if (message.storageKey !== "") {
+      writer.uint32(114).string(message.storageKey);
+    }
+    if (message.localPath !== "") {
+      writer.uint32(122).string(message.localPath);
     }
     return writer;
   },
@@ -336,6 +466,41 @@ export const DownloadProgress = {
 
           message.errorMessage = reader.string();
           continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.currentFileIndex = reader.int32();
+          continue;
+        case 13:
+          if (tag !== 104) {
+            break;
+          }
+
+          message.totalFiles = reader.int32();
+          continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.storageKey = reader.string();
+          continue;
+        case 15:
+          if (tag !== 122) {
+            break;
+          }
+
+          message.localPath = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -357,6 +522,11 @@ export const DownloadProgress = {
       state: isSet(object.state) ? downloadStateFromJSON(object.state) : 0,
       retryAttempt: isSet(object.retryAttempt) ? globalThis.Number(object.retryAttempt) : 0,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+      currentFileIndex: isSet(object.currentFileIndex) ? globalThis.Number(object.currentFileIndex) : 0,
+      totalFiles: isSet(object.totalFiles) ? globalThis.Number(object.totalFiles) : 0,
+      storageKey: isSet(object.storageKey) ? globalThis.String(object.storageKey) : "",
+      localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
     };
   },
 
@@ -392,6 +562,21 @@ export const DownloadProgress = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
+    }
+    if (message.currentFileIndex !== 0) {
+      obj.currentFileIndex = Math.round(message.currentFileIndex);
+    }
+    if (message.totalFiles !== 0) {
+      obj.totalFiles = Math.round(message.totalFiles);
+    }
+    if (message.storageKey !== "") {
+      obj.storageKey = message.storageKey;
+    }
+    if (message.localPath !== "") {
+      obj.localPath = message.localPath;
+    }
     return obj;
   },
 
@@ -409,6 +594,1094 @@ export const DownloadProgress = {
     message.etaSeconds = object.etaSeconds ?? 0;
     message.state = object.state ?? 0;
     message.retryAttempt = object.retryAttempt ?? 0;
+    message.errorMessage = object.errorMessage ?? "";
+    message.taskId = object.taskId ?? "";
+    message.currentFileIndex = object.currentFileIndex ?? 0;
+    message.totalFiles = object.totalFiles ?? 0;
+    message.storageKey = object.storageKey ?? "";
+    message.localPath = object.localPath ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadPlanRequest(): DownloadPlanRequest {
+  return { modelId: "", model: undefined, resumeExisting: false, availableStorageBytes: 0, allowMeteredNetwork: false };
+}
+
+export const DownloadPlanRequest = {
+  encode(message: DownloadPlanRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.model !== undefined) {
+      ModelInfo.encode(message.model, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.resumeExisting !== false) {
+      writer.uint32(24).bool(message.resumeExisting);
+    }
+    if (message.availableStorageBytes !== 0) {
+      writer.uint32(32).int64(message.availableStorageBytes);
+    }
+    if (message.allowMeteredNetwork !== false) {
+      writer.uint32(40).bool(message.allowMeteredNetwork);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadPlanRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadPlanRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.model = ModelInfo.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.resumeExisting = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.availableStorageBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.allowMeteredNetwork = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadPlanRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      resumeExisting: isSet(object.resumeExisting) ? globalThis.Boolean(object.resumeExisting) : false,
+      availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
+      allowMeteredNetwork: isSet(object.allowMeteredNetwork) ? globalThis.Boolean(object.allowMeteredNetwork) : false,
+    };
+  },
+
+  toJSON(message: DownloadPlanRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.model !== undefined) {
+      obj.model = ModelInfo.toJSON(message.model);
+    }
+    if (message.resumeExisting !== false) {
+      obj.resumeExisting = message.resumeExisting;
+    }
+    if (message.availableStorageBytes !== 0) {
+      obj.availableStorageBytes = Math.round(message.availableStorageBytes);
+    }
+    if (message.allowMeteredNetwork !== false) {
+      obj.allowMeteredNetwork = message.allowMeteredNetwork;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadPlanRequest>, I>>(base?: I): DownloadPlanRequest {
+    return DownloadPlanRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadPlanRequest>, I>>(object: I): DownloadPlanRequest {
+    const message = createBaseDownloadPlanRequest();
+    message.modelId = object.modelId ?? "";
+    message.model = (object.model !== undefined && object.model !== null)
+      ? ModelInfo.fromPartial(object.model)
+      : undefined;
+    message.resumeExisting = object.resumeExisting ?? false;
+    message.availableStorageBytes = object.availableStorageBytes ?? 0;
+    message.allowMeteredNetwork = object.allowMeteredNetwork ?? false;
+    return message;
+  },
+};
+
+function createBaseDownloadFilePlan(): DownloadFilePlan {
+  return {
+    file: undefined,
+    storageKey: "",
+    destinationPath: "",
+    expectedBytes: 0,
+    requiresExtraction: false,
+    checksumSha256: "",
+  };
+}
+
+export const DownloadFilePlan = {
+  encode(message: DownloadFilePlan, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.file !== undefined) {
+      ModelFileDescriptor.encode(message.file, writer.uint32(10).fork()).ldelim();
+    }
+    if (message.storageKey !== "") {
+      writer.uint32(18).string(message.storageKey);
+    }
+    if (message.destinationPath !== "") {
+      writer.uint32(26).string(message.destinationPath);
+    }
+    if (message.expectedBytes !== 0) {
+      writer.uint32(32).int64(message.expectedBytes);
+    }
+    if (message.requiresExtraction !== false) {
+      writer.uint32(40).bool(message.requiresExtraction);
+    }
+    if (message.checksumSha256 !== "") {
+      writer.uint32(50).string(message.checksumSha256);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadFilePlan {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadFilePlan();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.file = ModelFileDescriptor.decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.storageKey = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.destinationPath = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.expectedBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.requiresExtraction = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.checksumSha256 = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadFilePlan {
+    return {
+      file: isSet(object.file) ? ModelFileDescriptor.fromJSON(object.file) : undefined,
+      storageKey: isSet(object.storageKey) ? globalThis.String(object.storageKey) : "",
+      destinationPath: isSet(object.destinationPath) ? globalThis.String(object.destinationPath) : "",
+      expectedBytes: isSet(object.expectedBytes) ? globalThis.Number(object.expectedBytes) : 0,
+      requiresExtraction: isSet(object.requiresExtraction) ? globalThis.Boolean(object.requiresExtraction) : false,
+      checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : "",
+    };
+  },
+
+  toJSON(message: DownloadFilePlan): unknown {
+    const obj: any = {};
+    if (message.file !== undefined) {
+      obj.file = ModelFileDescriptor.toJSON(message.file);
+    }
+    if (message.storageKey !== "") {
+      obj.storageKey = message.storageKey;
+    }
+    if (message.destinationPath !== "") {
+      obj.destinationPath = message.destinationPath;
+    }
+    if (message.expectedBytes !== 0) {
+      obj.expectedBytes = Math.round(message.expectedBytes);
+    }
+    if (message.requiresExtraction !== false) {
+      obj.requiresExtraction = message.requiresExtraction;
+    }
+    if (message.checksumSha256 !== "") {
+      obj.checksumSha256 = message.checksumSha256;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadFilePlan>, I>>(base?: I): DownloadFilePlan {
+    return DownloadFilePlan.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadFilePlan>, I>>(object: I): DownloadFilePlan {
+    const message = createBaseDownloadFilePlan();
+    message.file = (object.file !== undefined && object.file !== null)
+      ? ModelFileDescriptor.fromPartial(object.file)
+      : undefined;
+    message.storageKey = object.storageKey ?? "";
+    message.destinationPath = object.destinationPath ?? "";
+    message.expectedBytes = object.expectedBytes ?? 0;
+    message.requiresExtraction = object.requiresExtraction ?? false;
+    message.checksumSha256 = object.checksumSha256 ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadPlanResult(): DownloadPlanResult {
+  return {
+    canStart: false,
+    modelId: "",
+    files: [],
+    totalBytes: 0,
+    requiresExtraction: false,
+    canResume: false,
+    resumeFromBytes: 0,
+    warnings: [],
+    errorMessage: "",
+  };
+}
+
+export const DownloadPlanResult = {
+  encode(message: DownloadPlanResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.canStart !== false) {
+      writer.uint32(8).bool(message.canStart);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    for (const v of message.files) {
+      DownloadFilePlan.encode(v!, writer.uint32(26).fork()).ldelim();
+    }
+    if (message.totalBytes !== 0) {
+      writer.uint32(32).int64(message.totalBytes);
+    }
+    if (message.requiresExtraction !== false) {
+      writer.uint32(40).bool(message.requiresExtraction);
+    }
+    if (message.canResume !== false) {
+      writer.uint32(48).bool(message.canResume);
+    }
+    if (message.resumeFromBytes !== 0) {
+      writer.uint32(56).int64(message.resumeFromBytes);
+    }
+    for (const v of message.warnings) {
+      writer.uint32(66).string(v!);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(74).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadPlanResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadPlanResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.canStart = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.files.push(DownloadFilePlan.decode(reader, reader.uint32()));
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.totalBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.requiresExtraction = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.canResume = reader.bool();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.resumeFromBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.warnings.push(reader.string());
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadPlanResult {
+    return {
+      canStart: isSet(object.canStart) ? globalThis.Boolean(object.canStart) : false,
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      files: globalThis.Array.isArray(object?.files) ? object.files.map((e: any) => DownloadFilePlan.fromJSON(e)) : [],
+      totalBytes: isSet(object.totalBytes) ? globalThis.Number(object.totalBytes) : 0,
+      requiresExtraction: isSet(object.requiresExtraction) ? globalThis.Boolean(object.requiresExtraction) : false,
+      canResume: isSet(object.canResume) ? globalThis.Boolean(object.canResume) : false,
+      resumeFromBytes: isSet(object.resumeFromBytes) ? globalThis.Number(object.resumeFromBytes) : 0,
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: DownloadPlanResult): unknown {
+    const obj: any = {};
+    if (message.canStart !== false) {
+      obj.canStart = message.canStart;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.files?.length) {
+      obj.files = message.files.map((e) => DownloadFilePlan.toJSON(e));
+    }
+    if (message.totalBytes !== 0) {
+      obj.totalBytes = Math.round(message.totalBytes);
+    }
+    if (message.requiresExtraction !== false) {
+      obj.requiresExtraction = message.requiresExtraction;
+    }
+    if (message.canResume !== false) {
+      obj.canResume = message.canResume;
+    }
+    if (message.resumeFromBytes !== 0) {
+      obj.resumeFromBytes = Math.round(message.resumeFromBytes);
+    }
+    if (message.warnings?.length) {
+      obj.warnings = message.warnings;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadPlanResult>, I>>(base?: I): DownloadPlanResult {
+    return DownloadPlanResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadPlanResult>, I>>(object: I): DownloadPlanResult {
+    const message = createBaseDownloadPlanResult();
+    message.canStart = object.canStart ?? false;
+    message.modelId = object.modelId ?? "";
+    message.files = object.files?.map((e) => DownloadFilePlan.fromPartial(e)) || [];
+    message.totalBytes = object.totalBytes ?? 0;
+    message.requiresExtraction = object.requiresExtraction ?? false;
+    message.canResume = object.canResume ?? false;
+    message.resumeFromBytes = object.resumeFromBytes ?? 0;
+    message.warnings = object.warnings?.map((e) => e) || [];
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadStartRequest(): DownloadStartRequest {
+  return { modelId: "", plan: undefined, resume: false };
+}
+
+export const DownloadStartRequest = {
+  encode(message: DownloadStartRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.plan !== undefined) {
+      DownloadPlanResult.encode(message.plan, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.resume !== false) {
+      writer.uint32(24).bool(message.resume);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadStartRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadStartRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.plan = DownloadPlanResult.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.resume = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadStartRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      plan: isSet(object.plan) ? DownloadPlanResult.fromJSON(object.plan) : undefined,
+      resume: isSet(object.resume) ? globalThis.Boolean(object.resume) : false,
+    };
+  },
+
+  toJSON(message: DownloadStartRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.plan !== undefined) {
+      obj.plan = DownloadPlanResult.toJSON(message.plan);
+    }
+    if (message.resume !== false) {
+      obj.resume = message.resume;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadStartRequest>, I>>(base?: I): DownloadStartRequest {
+    return DownloadStartRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadStartRequest>, I>>(object: I): DownloadStartRequest {
+    const message = createBaseDownloadStartRequest();
+    message.modelId = object.modelId ?? "";
+    message.plan = (object.plan !== undefined && object.plan !== null)
+      ? DownloadPlanResult.fromPartial(object.plan)
+      : undefined;
+    message.resume = object.resume ?? false;
+    return message;
+  },
+};
+
+function createBaseDownloadStartResult(): DownloadStartResult {
+  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "" };
+}
+
+export const DownloadStartResult = {
+  encode(message: DownloadStartResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.accepted !== false) {
+      writer.uint32(8).bool(message.accepted);
+    }
+    if (message.taskId !== "") {
+      writer.uint32(18).string(message.taskId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(26).string(message.modelId);
+    }
+    if (message.initialProgress !== undefined) {
+      DownloadProgress.encode(message.initialProgress, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(42).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadStartResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadStartResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.accepted = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.initialProgress = DownloadProgress.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadStartResult {
+    return {
+      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      initialProgress: isSet(object.initialProgress) ? DownloadProgress.fromJSON(object.initialProgress) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: DownloadStartResult): unknown {
+    const obj: any = {};
+    if (message.accepted !== false) {
+      obj.accepted = message.accepted;
+    }
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.initialProgress !== undefined) {
+      obj.initialProgress = DownloadProgress.toJSON(message.initialProgress);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadStartResult>, I>>(base?: I): DownloadStartResult {
+    return DownloadStartResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadStartResult>, I>>(object: I): DownloadStartResult {
+    const message = createBaseDownloadStartResult();
+    message.accepted = object.accepted ?? false;
+    message.taskId = object.taskId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.initialProgress = (object.initialProgress !== undefined && object.initialProgress !== null)
+      ? DownloadProgress.fromPartial(object.initialProgress)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadCancelRequest(): DownloadCancelRequest {
+  return { taskId: "", modelId: "", deletePartialBytes: false };
+}
+
+export const DownloadCancelRequest = {
+  encode(message: DownloadCancelRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.taskId !== "") {
+      writer.uint32(10).string(message.taskId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.deletePartialBytes !== false) {
+      writer.uint32(24).bool(message.deletePartialBytes);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadCancelRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadCancelRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.deletePartialBytes = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadCancelRequest {
+    return {
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      deletePartialBytes: isSet(object.deletePartialBytes) ? globalThis.Boolean(object.deletePartialBytes) : false,
+    };
+  },
+
+  toJSON(message: DownloadCancelRequest): unknown {
+    const obj: any = {};
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.deletePartialBytes !== false) {
+      obj.deletePartialBytes = message.deletePartialBytes;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadCancelRequest>, I>>(base?: I): DownloadCancelRequest {
+    return DownloadCancelRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadCancelRequest>, I>>(object: I): DownloadCancelRequest {
+    const message = createBaseDownloadCancelRequest();
+    message.taskId = object.taskId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.deletePartialBytes = object.deletePartialBytes ?? false;
+    return message;
+  },
+};
+
+function createBaseDownloadCancelResult(): DownloadCancelResult {
+  return { success: false, taskId: "", modelId: "", partialBytesDeleted: 0, errorMessage: "" };
+}
+
+export const DownloadCancelResult = {
+  encode(message: DownloadCancelResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.taskId !== "") {
+      writer.uint32(18).string(message.taskId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(26).string(message.modelId);
+    }
+    if (message.partialBytesDeleted !== 0) {
+      writer.uint32(32).int64(message.partialBytesDeleted);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(42).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadCancelResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadCancelResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.partialBytesDeleted = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadCancelResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      partialBytesDeleted: isSet(object.partialBytesDeleted) ? globalThis.Number(object.partialBytesDeleted) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: DownloadCancelResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.partialBytesDeleted !== 0) {
+      obj.partialBytesDeleted = Math.round(message.partialBytesDeleted);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadCancelResult>, I>>(base?: I): DownloadCancelResult {
+    return DownloadCancelResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadCancelResult>, I>>(object: I): DownloadCancelResult {
+    const message = createBaseDownloadCancelResult();
+    message.success = object.success ?? false;
+    message.taskId = object.taskId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.partialBytesDeleted = object.partialBytesDeleted ?? 0;
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadResumeRequest(): DownloadResumeRequest {
+  return { taskId: "", modelId: "", resumeFromBytes: 0 };
+}
+
+export const DownloadResumeRequest = {
+  encode(message: DownloadResumeRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.taskId !== "") {
+      writer.uint32(10).string(message.taskId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.resumeFromBytes !== 0) {
+      writer.uint32(24).int64(message.resumeFromBytes);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadResumeRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadResumeRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.resumeFromBytes = longToNumber(reader.int64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadResumeRequest {
+    return {
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      resumeFromBytes: isSet(object.resumeFromBytes) ? globalThis.Number(object.resumeFromBytes) : 0,
+    };
+  },
+
+  toJSON(message: DownloadResumeRequest): unknown {
+    const obj: any = {};
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.resumeFromBytes !== 0) {
+      obj.resumeFromBytes = Math.round(message.resumeFromBytes);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadResumeRequest>, I>>(base?: I): DownloadResumeRequest {
+    return DownloadResumeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadResumeRequest>, I>>(object: I): DownloadResumeRequest {
+    const message = createBaseDownloadResumeRequest();
+    message.taskId = object.taskId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.resumeFromBytes = object.resumeFromBytes ?? 0;
+    return message;
+  },
+};
+
+function createBaseDownloadResumeResult(): DownloadResumeResult {
+  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "" };
+}
+
+export const DownloadResumeResult = {
+  encode(message: DownloadResumeResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.accepted !== false) {
+      writer.uint32(8).bool(message.accepted);
+    }
+    if (message.taskId !== "") {
+      writer.uint32(18).string(message.taskId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(26).string(message.modelId);
+    }
+    if (message.initialProgress !== undefined) {
+      DownloadProgress.encode(message.initialProgress, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(42).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DownloadResumeResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadResumeResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.accepted = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.taskId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.initialProgress = DownloadProgress.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadResumeResult {
+    return {
+      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+      taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      initialProgress: isSet(object.initialProgress) ? DownloadProgress.fromJSON(object.initialProgress) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: DownloadResumeResult): unknown {
+    const obj: any = {};
+    if (message.accepted !== false) {
+      obj.accepted = message.accepted;
+    }
+    if (message.taskId !== "") {
+      obj.taskId = message.taskId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.initialProgress !== undefined) {
+      obj.initialProgress = DownloadProgress.toJSON(message.initialProgress);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DownloadResumeResult>, I>>(base?: I): DownloadResumeResult {
+    return DownloadResumeResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DownloadResumeResult>, I>>(object: I): DownloadResumeResult {
+    const message = createBaseDownloadResumeResult();
+    message.accepted = object.accepted ?? false;
+    message.taskId = object.taskId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.initialProgress = (object.initialProgress !== undefined && object.initialProgress !== null)
+      ? DownloadProgress.fromPartial(object.initialProgress)
+      : undefined;
     message.errorMessage = object.errorMessage ?? "";
     return message;
   },

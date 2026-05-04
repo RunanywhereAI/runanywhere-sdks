@@ -2,7 +2,9 @@
 // Mirrors Swift RunAnywhere+VLMModels.swift.
 // Provides filtered model catalog for vision-language models.
 
-import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show ModelCategory;
 import 'package:runanywhere/generated/vlm_options.pb.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
@@ -16,8 +18,8 @@ class RunAnywhereVLMModels {
     final all = await RunAnywhereModels.shared.available();
     return all
         .where((m) =>
-            m.category == ModelCategory.vision ||
-            m.category == ModelCategory.multimodal)
+            m.category == ModelCategory.MODEL_CATEGORY_VISION ||
+            m.category == ModelCategory.MODEL_CATEGORY_MULTIMODAL)
         .toList();
   }
 

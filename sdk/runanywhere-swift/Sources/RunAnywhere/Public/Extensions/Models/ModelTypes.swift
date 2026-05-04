@@ -312,6 +312,7 @@ public extension RAInferenceFramework {
         case .mlx:                 return RAC_FRAMEWORK_MLX
         case .whisperkitCoreml:    return RAC_FRAMEWORK_WHISPERKIT_COREML
         case .metalrt:             return RAC_FRAMEWORK_METALRT
+        case .genie:               return RAC_FRAMEWORK_GENIE
         case .builtIn:             return RAC_FRAMEWORK_BUILTIN
         case .none:                return RAC_FRAMEWORK_NONE
         default:                   return RAC_FRAMEWORK_UNKNOWN
@@ -331,6 +332,7 @@ public extension RAInferenceFramework {
         case RAC_FRAMEWORK_MLX:                 return .mlx
         case RAC_FRAMEWORK_WHISPERKIT_COREML:   return .whisperkitCoreml
         case RAC_FRAMEWORK_METALRT:             return .metalrt
+        case RAC_FRAMEWORK_GENIE:               return .genie
         case RAC_FRAMEWORK_BUILTIN:             return .builtIn
         case RAC_FRAMEWORK_NONE:                return .none
         default:                                return .unknown
@@ -740,5 +742,196 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         self.source = source
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Model Info Proto Helpers
+
+public extension ModelInfo {
+    /// Convert the public Swift model metadata wrapper to the canonical
+    /// generated `ModelInfo` proto used by the native registry byte ABI.
+    var proto: RAModelInfo {
+        var proto = RAModelInfo()
+        proto.id = id
+        proto.name = name
+        proto.category = category
+        proto.format = format
+        proto.framework = framework
+        proto.downloadURL = downloadURL?.absoluteString ?? ""
+        proto.localPath = localPath.map(Self.registryPathString(from:)) ?? ""
+        proto.downloadSizeBytes = downloadSize ?? 0
+        proto.contextLength = Int32(contextLength ?? 0)
+        proto.supportsThinking = supportsThinking
+        proto.description_p = description ?? ""
+        proto.source = source
+        proto.createdAtUnixMs = Self.unixMilliseconds(from: createdAt)
+        proto.updatedAtUnixMs = Self.unixMilliseconds(from: updatedAt)
+        proto.apply(artifactType)
+        return proto
+    }
+
+    /// Initialize from generated `ModelInfo` proto bytes decoded from the
+    /// native registry.
+    init(proto: RAModelInfo) {
+        self.init(
+            id: proto.id,
+            name: proto.name,
+            category: proto.category,
+            format: proto.format,
+            framework: proto.framework,
+            downloadURL: proto.downloadURL.isEmpty ? nil : URL(string: proto.downloadURL),
+            localPath: Self.registryURL(from: proto.localPath),
+            artifactType: ModelArtifactType(proto: proto),
+            downloadSize: proto.downloadSizeBytes > 0 ? proto.downloadSizeBytes : nil,
+            contextLength: proto.contextLength > 0 ? Int(proto.contextLength) : nil,
+            supportsThinking: proto.supportsThinking,
+            description: proto.description_p.isEmpty ? nil : proto.description_p,
+            source: proto.source,
+            createdAt: Self.date(fromUnixMillisecondsOrSeconds: proto.createdAtUnixMs),
+            updatedAt: Self.date(fromUnixMillisecondsOrSeconds: proto.updatedAtUnixMs)
+        )
+    }
+
+    private static func registryPathString(from url: URL) -> String {
+        url.isFileURL ? url.path : url.absoluteString
+    }
+
+    private static func registryURL(from value: String) -> URL? {
+        guard !value.isEmpty else { return nil }
+        if value.hasPrefix("/") {
+            return URL(fileURLWithPath: value)
+        }
+        if let url = URL(string: value), url.scheme != nil {
+            return url
+        }
+        return URL(fileURLWithPath: value)
+    }
+
+    private static func unixMilliseconds(from date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1_000).rounded())
+    }
+
+    private static func date(fromUnixMillisecondsOrSeconds value: Int64) -> Date {
+        guard value != 0 else { return Date(timeIntervalSince1970: 0) }
+        let absolute = value < 0 ? -value : value
+        let seconds = absolute > 10_000_000_000 ? Double(value) / 1_000 : Double(value)
+        return Date(timeIntervalSince1970: seconds)
+    }
+}
+
+public extension RAModelInfo {
+    /// Convert generated registry proto metadata into the public Swift wrapper.
+    var modelInfo: ModelInfo {
+        ModelInfo(proto: self)
+    }
+}
+
+private extension RAModelInfo {
+    mutating func apply(_ artifactType: ModelArtifactType) {
+        switch artifactType {
+        case .singleFile(let expectedFiles):
+            var artifact = RASingleFileArtifact()
+            artifact.requiredPatterns = expectedFiles.requiredPatterns
+            artifact.optionalPatterns = expectedFiles.optionalPatterns
+            singleFile = artifact
+            self.artifactType = .singleFile
+
+        case .archive(let archiveType, let structure, let expectedFiles):
+            var artifact = RAArchiveArtifact()
+            artifact.type = archiveType
+            artifact.structure = structure
+            artifact.requiredPatterns = expectedFiles.requiredPatterns
+            artifact.optionalPatterns = expectedFiles.optionalPatterns
+            archive = artifact
+            switch archiveType {
+            case .zip:
+                self.artifactType = .zipArchive
+            case .tarGz:
+                self.artifactType = .tarGzArchive
+            default:
+                self.artifactType = .unspecified
+            }
+
+        case .multiFile(let files):
+            var artifact = RAMultiFileArtifact()
+            artifact.files = files.map { file in
+                var descriptor = RAModelFileDescriptor()
+                descriptor.url = file.url.absoluteString
+                descriptor.filename = file.filename
+                descriptor.isRequired = file.isRequired
+                return descriptor
+            }
+            multiFile = artifact
+            self.artifactType = .directory
+
+        case .custom(let strategyId):
+            customStrategyID = strategyId
+            self.artifactType = .custom
+
+        case .builtIn:
+            builtIn = true
+        }
+    }
+}
+
+private extension ModelArtifactType {
+    init(proto: RAModelInfo) {
+        switch proto.artifact {
+        case .singleFile(let artifact):
+            self = .singleFile(
+                expectedFiles: ExpectedModelFiles(
+                    requiredPatterns: artifact.requiredPatterns,
+                    optionalPatterns: artifact.optionalPatterns
+                )
+            )
+
+        case .archive(let artifact):
+            let archiveType = artifact.type == .unspecified ? ArchiveType.zip : artifact.type
+            let structure = artifact.structure == .unspecified ? ArchiveStructure.unknown : artifact.structure
+            self = .archive(
+                archiveType,
+                structure: structure,
+                expectedFiles: ExpectedModelFiles(
+                    requiredPatterns: artifact.requiredPatterns,
+                    optionalPatterns: artifact.optionalPatterns
+                )
+            )
+
+        case .multiFile(let artifact):
+            self = .multiFile(
+                artifact.files.compactMap { descriptor in
+                    guard let url = URL(string: descriptor.url) else { return nil }
+                    return ModelFileDescriptor(
+                        url: url,
+                        filename: descriptor.filename,
+                        isRequired: descriptor.isRequired
+                    )
+                }
+            )
+
+        case .customStrategyID(let strategyId):
+            self = .custom(strategyId: strategyId)
+
+        case .builtIn(let isBuiltIn):
+            self = isBuiltIn ? .builtIn : .singleFile()
+
+        case nil:
+            self = Self.fromArtifactType(proto.artifactType)
+        }
+    }
+
+    static func fromArtifactType(_ artifactType: RAModelArtifactType) -> ModelArtifactType {
+        switch artifactType {
+        case .zipArchive:
+            return .archive(.zip, structure: .unknown)
+        case .tarGzArchive:
+            return .archive(.tarGz, structure: .unknown)
+        case .directory:
+            return .multiFile([])
+        case .custom:
+            return .custom(strategyId: "")
+        default:
+            return .singleFile()
+        }
     }
 }

@@ -27,6 +27,32 @@ public enum RADownload: Sendable {
     public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.Download")
     /// Namespace for method metadata.
     public enum Method: Sendable {
+        /// Namespace for "Plan" metadata.
+        public enum Plan: Sendable {
+            /// Request type for "Plan".
+            public typealias Input = RADownloadPlanRequest
+            /// Response type for "Plan".
+            public typealias Output = RADownloadPlanResult
+            /// Descriptor for "Plan".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.Download"),
+                method: "Plan",
+                type: .unary
+            )
+        }
+        /// Namespace for "Start" metadata.
+        public enum Start: Sendable {
+            /// Request type for "Start".
+            public typealias Input = RADownloadStartRequest
+            /// Response type for "Start".
+            public typealias Output = RADownloadStartResult
+            /// Descriptor for "Start".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.Download"),
+                method: "Start",
+                type: .unary
+            )
+        }
         /// Namespace for "Subscribe" metadata.
         public enum Subscribe: Sendable {
             /// Request type for "Subscribe".
@@ -40,9 +66,39 @@ public enum RADownload: Sendable {
                 type: .serverStreaming
             )
         }
+        /// Namespace for "Cancel" metadata.
+        public enum Cancel: Sendable {
+            /// Request type for "Cancel".
+            public typealias Input = RADownloadCancelRequest
+            /// Response type for "Cancel".
+            public typealias Output = RADownloadCancelResult
+            /// Descriptor for "Cancel".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.Download"),
+                method: "Cancel",
+                type: .unary
+            )
+        }
+        /// Namespace for "Resume" metadata.
+        public enum Resume: Sendable {
+            /// Request type for "Resume".
+            public typealias Input = RADownloadResumeRequest
+            /// Response type for "Resume".
+            public typealias Output = RADownloadResumeResult
+            /// Descriptor for "Resume".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.Download"),
+                method: "Resume",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "runanywhere.v1.Download" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
-            Subscribe.descriptor
+            Plan.descriptor,
+            Start.descriptor,
+            Subscribe.descriptor,
+            Cancel.descriptor,
+            Resume.descriptor
         ]
     }
 }
@@ -68,6 +124,34 @@ extension RADownload {
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
     public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+        /// Handle the "Plan" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RADownloadPlanRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RADownloadPlanResult` messages.
+        func plan(
+            request: GRPCCore.StreamingServerRequest<RADownloadPlanRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RADownloadPlanResult>
+
+        /// Handle the "Start" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RADownloadStartRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RADownloadStartResult` messages.
+        func start(
+            request: GRPCCore.StreamingServerRequest<RADownloadStartRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RADownloadStartResult>
+
         /// Handle the "Subscribe" method.
         ///
         /// > Source IDL Documentation:
@@ -87,6 +171,34 @@ extension RADownload {
             request: GRPCCore.StreamingServerRequest<RADownloadSubscribeRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<RADownloadProgress>
+
+        /// Handle the "Cancel" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RADownloadCancelRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RADownloadCancelResult` messages.
+        func cancel(
+            request: GRPCCore.StreamingServerRequest<RADownloadCancelRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RADownloadCancelResult>
+
+        /// Handle the "Resume" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RADownloadResumeRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RADownloadResumeResult` messages.
+        func resume(
+            request: GRPCCore.StreamingServerRequest<RADownloadResumeRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RADownloadResumeResult>
     }
 
     /// Service protocol for the "runanywhere.v1.Download" service.
@@ -97,6 +209,34 @@ extension RADownload {
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
     public protocol ServiceProtocol: RADownload.StreamingServiceProtocol {
+        /// Handle the "Plan" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadPlanRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RADownloadPlanResult` message.
+        func plan(
+            request: GRPCCore.ServerRequest<RADownloadPlanRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RADownloadPlanResult>
+
+        /// Handle the "Start" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadStartRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RADownloadStartResult` message.
+        func start(
+            request: GRPCCore.ServerRequest<RADownloadStartRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RADownloadStartResult>
+
         /// Handle the "Subscribe" method.
         ///
         /// > Source IDL Documentation:
@@ -116,6 +256,34 @@ extension RADownload {
             request: GRPCCore.ServerRequest<RADownloadSubscribeRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<RADownloadProgress>
+
+        /// Handle the "Cancel" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadCancelRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RADownloadCancelResult` message.
+        func cancel(
+            request: GRPCCore.ServerRequest<RADownloadCancelRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RADownloadCancelResult>
+
+        /// Handle the "Resume" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadResumeRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RADownloadResumeResult` message.
+        func resume(
+            request: GRPCCore.ServerRequest<RADownloadResumeRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RADownloadResumeResult>
     }
 
     /// Simple service protocol for the "runanywhere.v1.Download" service.
@@ -124,6 +292,34 @@ extension RADownload {
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
     public protocol SimpleServiceProtocol: RADownload.ServiceProtocol {
+        /// Handle the "Plan" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `RADownloadPlanRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RADownloadPlanResult` to respond with.
+        func plan(
+            request: RADownloadPlanRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RADownloadPlanResult
+
+        /// Handle the "Start" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `RADownloadStartRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RADownloadStartResult` to respond with.
+        func start(
+            request: RADownloadStartRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RADownloadStartResult
+
         /// Handle the "Subscribe" method.
         ///
         /// > Source IDL Documentation:
@@ -144,6 +340,34 @@ extension RADownload {
             response: GRPCCore.RPCWriter<RADownloadProgress>,
             context: GRPCCore.ServerContext
         ) async throws
+
+        /// Handle the "Cancel" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `RADownloadCancelRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RADownloadCancelResult` to respond with.
+        func cancel(
+            request: RADownloadCancelRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RADownloadCancelResult
+
+        /// Handle the "Resume" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `RADownloadResumeRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RADownloadResumeResult` to respond with.
+        func resume(
+            request: RADownloadResumeRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RADownloadResumeResult
     }
 }
 
@@ -151,6 +375,28 @@ extension RADownload {
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension RADownload.StreamingServiceProtocol {
     public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
+        router.registerHandler(
+            forMethod: RADownload.Method.Plan.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadPlanRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadPlanResult>(),
+            handler: { request, context in
+                try await self.plan(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: RADownload.Method.Start.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadStartRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadStartResult>(),
+            handler: { request, context in
+                try await self.start(
+                    request: request,
+                    context: context
+                )
+            }
+        )
         router.registerHandler(
             forMethod: RADownload.Method.Subscribe.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadSubscribeRequest>(),
@@ -162,12 +408,56 @@ extension RADownload.StreamingServiceProtocol {
                 )
             }
         )
+        router.registerHandler(
+            forMethod: RADownload.Method.Cancel.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadCancelRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadCancelResult>(),
+            handler: { request, context in
+                try await self.cancel(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: RADownload.Method.Resume.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadResumeRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadResumeResult>(),
+            handler: { request, context in
+                try await self.resume(
+                    request: request,
+                    context: context
+                )
+            }
+        )
     }
 }
 
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension RADownload.ServiceProtocol {
+    public func plan(
+        request: GRPCCore.StreamingServerRequest<RADownloadPlanRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RADownloadPlanResult> {
+        let response = try await self.plan(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func start(
+        request: GRPCCore.StreamingServerRequest<RADownloadStartRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RADownloadStartResult> {
+        let response = try await self.start(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
     public func subscribe(
         request: GRPCCore.StreamingServerRequest<RADownloadSubscribeRequest>,
         context: GRPCCore.ServerContext
@@ -178,11 +468,59 @@ extension RADownload.ServiceProtocol {
         )
         return response
     }
+
+    public func cancel(
+        request: GRPCCore.StreamingServerRequest<RADownloadCancelRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RADownloadCancelResult> {
+        let response = try await self.cancel(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func resume(
+        request: GRPCCore.StreamingServerRequest<RADownloadResumeRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RADownloadResumeResult> {
+        let response = try await self.resume(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
 }
 
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension RADownload.SimpleServiceProtocol {
+    public func plan(
+        request: GRPCCore.ServerRequest<RADownloadPlanRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RADownloadPlanResult> {
+        return GRPCCore.ServerResponse<RADownloadPlanResult>(
+            message: try await self.plan(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func start(
+        request: GRPCCore.ServerRequest<RADownloadStartRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RADownloadStartResult> {
+        return GRPCCore.ServerResponse<RADownloadStartResult>(
+            message: try await self.start(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
     public func subscribe(
         request: GRPCCore.ServerRequest<RADownloadSubscribeRequest>,
         context: GRPCCore.ServerContext
@@ -199,6 +537,32 @@ extension RADownload.SimpleServiceProtocol {
             }
         )
     }
+
+    public func cancel(
+        request: GRPCCore.ServerRequest<RADownloadCancelRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RADownloadCancelResult> {
+        return GRPCCore.ServerResponse<RADownloadCancelResult>(
+            message: try await self.cancel(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func resume(
+        request: GRPCCore.ServerRequest<RADownloadResumeRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RADownloadResumeResult> {
+        return GRPCCore.ServerResponse<RADownloadResumeResult>(
+            message: try await self.resume(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
 }
 
 // MARK: runanywhere.v1.Download (client)
@@ -210,6 +574,44 @@ extension RADownload {
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
     public protocol ClientProtocol: Sendable {
+        /// Call the "Plan" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadPlanRequest` message.
+        ///   - serializer: A serializer for `RADownloadPlanRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadPlanResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func plan<Result>(
+            request: GRPCCore.ClientRequest<RADownloadPlanRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadPlanRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadPlanResult>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadPlanResult>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "Start" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadStartRequest` message.
+        ///   - serializer: A serializer for `RADownloadStartRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadStartResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func start<Result>(
+            request: GRPCCore.ClientRequest<RADownloadStartRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadStartRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadStartResult>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadStartResult>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
         /// Call the "Subscribe" method.
         ///
         /// > Source IDL Documentation:
@@ -234,6 +636,44 @@ extension RADownload {
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RADownloadProgress>) async throws -> Result
         ) async throws -> Result where Result: Sendable
+
+        /// Call the "Cancel" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadCancelRequest` message.
+        ///   - serializer: A serializer for `RADownloadCancelRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadCancelResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func cancel<Result>(
+            request: GRPCCore.ClientRequest<RADownloadCancelRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadCancelRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadCancelResult>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadCancelResult>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "Resume" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadResumeRequest` message.
+        ///   - serializer: A serializer for `RADownloadResumeRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadResumeResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func resume<Result>(
+            request: GRPCCore.ClientRequest<RADownloadResumeRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadResumeRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadResumeResult>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadResumeResult>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
     }
 
     /// Generated client for the "runanywhere.v1.Download" service.
@@ -250,6 +690,66 @@ extension RADownload {
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
         public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
+        }
+
+        /// Call the "Plan" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadPlanRequest` message.
+        ///   - serializer: A serializer for `RADownloadPlanRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadPlanResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func plan<Result>(
+            request: GRPCCore.ClientRequest<RADownloadPlanRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadPlanRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadPlanResult>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadPlanResult>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RADownload.Method.Plan.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "Start" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadStartRequest` message.
+        ///   - serializer: A serializer for `RADownloadStartRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadStartResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func start<Result>(
+            request: GRPCCore.ClientRequest<RADownloadStartRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadStartRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadStartResult>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadStartResult>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RADownload.Method.Start.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
         }
 
         /// Call the "Subscribe" method.
@@ -285,12 +785,122 @@ extension RADownload {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "Cancel" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadCancelRequest` message.
+        ///   - serializer: A serializer for `RADownloadCancelRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadCancelResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func cancel<Result>(
+            request: GRPCCore.ClientRequest<RADownloadCancelRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadCancelRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadCancelResult>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadCancelResult>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RADownload.Method.Cancel.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "Resume" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RADownloadResumeRequest` message.
+        ///   - serializer: A serializer for `RADownloadResumeRequest` messages.
+        ///   - deserializer: A deserializer for `RADownloadResumeResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func resume<Result>(
+            request: GRPCCore.ClientRequest<RADownloadResumeRequest>,
+            serializer: some GRPCCore.MessageSerializer<RADownloadResumeRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RADownloadResumeResult>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadResumeResult>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RADownload.Method.Resume.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
 // Helpers providing default arguments to 'ClientProtocol' methods.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension RADownload.ClientProtocol {
+    /// Call the "Plan" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RADownloadPlanRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func plan<Result>(
+        request: GRPCCore.ClientRequest<RADownloadPlanRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadPlanResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.plan(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadPlanRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadPlanResult>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Start" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RADownloadStartRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func start<Result>(
+        request: GRPCCore.ClientRequest<RADownloadStartRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadStartResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.start(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadStartRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadStartResult>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "Subscribe" method.
     ///
     /// > Source IDL Documentation:
@@ -319,11 +929,119 @@ extension RADownload.ClientProtocol {
             onResponse: handleResponse
         )
     }
+
+    /// Call the "Cancel" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RADownloadCancelRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func cancel<Result>(
+        request: GRPCCore.ClientRequest<RADownloadCancelRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadCancelResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.cancel(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadCancelRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadCancelResult>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Resume" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RADownloadResumeRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resume<Result>(
+        request: GRPCCore.ClientRequest<RADownloadResumeRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadResumeResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.resume(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RADownloadResumeRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RADownloadResumeResult>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
 }
 
 // Helpers providing sugared APIs for 'ClientProtocol' methods.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension RADownload.ClientProtocol {
+    /// Call the "Plan" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func plan<Result>(
+        _ message: RADownloadPlanRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadPlanResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RADownloadPlanRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.plan(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Start" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func start<Result>(
+        _ message: RADownloadStartRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadStartResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RADownloadStartRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.start(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "Subscribe" method.
     ///
     /// > Source IDL Documentation:
@@ -351,6 +1069,64 @@ extension RADownload.ClientProtocol {
             metadata: metadata
         )
         return try await self.subscribe(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Cancel" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func cancel<Result>(
+        _ message: RADownloadCancelRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadCancelResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RADownloadCancelRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.cancel(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Resume" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func resume<Result>(
+        _ message: RADownloadResumeRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RADownloadResumeResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RADownloadResumeRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.resume(
             request: request,
             options: options,
             onResponse: handleResponse

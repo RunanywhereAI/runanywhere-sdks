@@ -230,6 +230,17 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 19,
   )
   public val session_config: VoiceSessionConfig? = null,
+  /**
+   * Audio state-machine behavior. Optional so defaults can be applied by
+   * the native voice-agent implementation.
+   */
+  @field:WireField(
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.AudioPipelineConfig#ADAPTER",
+    jsonName = "audioPipelineConfig",
+    schemaIndex = 20,
+  )
+  public val audio_pipeline_config: AudioPipelineConfig? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentComposeConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -263,6 +274,7 @@ public class VoiceAgentComposeConfig(
     if (wakeword_embedding_model_path != other.wakeword_embedding_model_path) return false
     if (wakeword_vad_model_path != other.wakeword_vad_model_path) return false
     if (session_config != other.session_config) return false
+    if (audio_pipeline_config != other.audio_pipeline_config) return false
     return true
   }
 
@@ -290,6 +302,7 @@ public class VoiceAgentComposeConfig(
       result = result * 37 + (wakeword_embedding_model_path?.hashCode() ?: 0)
       result = result * 37 + (wakeword_vad_model_path?.hashCode() ?: 0)
       result = result * 37 + (session_config?.hashCode() ?: 0)
+      result = result * 37 + (audio_pipeline_config?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -320,6 +333,7 @@ public class VoiceAgentComposeConfig(
     if (wakeword_vad_model_path != null) result +=
         """wakeword_vad_model_path=${sanitize(wakeword_vad_model_path)}"""
     if (session_config != null) result += """session_config=$session_config"""
+    if (audio_pipeline_config != null) result += """audio_pipeline_config=$audio_pipeline_config"""
     return result.joinToString(prefix = "VoiceAgentComposeConfig{", separator = ", ", postfix = "}")
   }
 
@@ -344,12 +358,14 @@ public class VoiceAgentComposeConfig(
     wakeword_embedding_model_path: String? = this.wakeword_embedding_model_path,
     wakeword_vad_model_path: String? = this.wakeword_vad_model_path,
     session_config: VoiceSessionConfig? = this.session_config,
+    audio_pipeline_config: AudioPipelineConfig? = this.audio_pipeline_config,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceAgentComposeConfig = VoiceAgentComposeConfig(stt_model_path, stt_model_id, stt_model_name,
       llm_model_path, llm_model_id, llm_model_name, tts_voice_path, tts_voice_id, tts_voice_name,
       vad_sample_rate, vad_frame_length, vad_energy_threshold, wakeword_enabled,
       wakeword_model_path, wakeword_model_id, wakeword_phrase, wakeword_threshold,
-      wakeword_embedding_model_path, wakeword_vad_model_path, session_config, unknownFields)
+      wakeword_embedding_model_path, wakeword_vad_model_path, session_config, audio_pipeline_config,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -389,6 +405,7 @@ public class VoiceAgentComposeConfig(
         size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.wakeword_embedding_model_path)
         size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.wakeword_vad_model_path)
         size += VoiceSessionConfig.ADAPTER.encodedSizeWithTag(20, value.session_config)
+        size += AudioPipelineConfig.ADAPTER.encodedSizeWithTag(21, value.audio_pipeline_config)
         return size
       }
 
@@ -418,11 +435,13 @@ public class VoiceAgentComposeConfig(
         ProtoAdapter.STRING.encodeWithTag(writer, 18, value.wakeword_embedding_model_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 19, value.wakeword_vad_model_path)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
+        AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentComposeConfig) {
         writer.writeBytes(value.unknownFields)
+        AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
         ProtoAdapter.STRING.encodeWithTag(writer, 19, value.wakeword_vad_model_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 18, value.wakeword_embedding_model_path)
@@ -471,6 +490,7 @@ public class VoiceAgentComposeConfig(
         var wakeword_embedding_model_path: String? = null
         var wakeword_vad_model_path: String? = null
         var session_config: VoiceSessionConfig? = null
+        var audio_pipeline_config: AudioPipelineConfig? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> stt_model_path = ProtoAdapter.STRING.decode(reader)
@@ -493,6 +513,7 @@ public class VoiceAgentComposeConfig(
             18 -> wakeword_embedding_model_path = ProtoAdapter.STRING.decode(reader)
             19 -> wakeword_vad_model_path = ProtoAdapter.STRING.decode(reader)
             20 -> session_config = VoiceSessionConfig.ADAPTER.decode(reader)
+            21 -> audio_pipeline_config = AudioPipelineConfig.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -517,12 +538,15 @@ public class VoiceAgentComposeConfig(
           wakeword_embedding_model_path = wakeword_embedding_model_path,
           wakeword_vad_model_path = wakeword_vad_model_path,
           session_config = session_config,
+          audio_pipeline_config = audio_pipeline_config,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VoiceAgentComposeConfig): VoiceAgentComposeConfig = value.copy(
         session_config = value.session_config?.let(VoiceSessionConfig.ADAPTER::redact),
+        audio_pipeline_config =
+            value.audio_pipeline_config?.let(AudioPipelineConfig.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

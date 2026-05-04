@@ -94,9 +94,7 @@ async function initializeSDK(): Promise<void> {
   // Try to import and initialize the SDK
   // This is optional -- the demo app works without WASM for UI development
   try {
-    const { RunAnywhere, SDKEnvironment } = await import(
-      '../../../../sdk/runanywhere-web/packages/core/src/index'
-    );
+    const { RunAnywhere, SDKEnvironment } = await import('@runanywhere/web');
 
     await RunAnywhere.initialize({
       environment: SDKEnvironment.Development,
@@ -105,8 +103,8 @@ async function initializeSDK(): Promise<void> {
     });
 
     // Import and register backends
-    const { LlamaCPP } = await import('../../../../sdk/runanywhere-web/packages/llamacpp/src/index');
-    const { ONNX } = await import('../../../../sdk/runanywhere-web/packages/onnx/src/index');
+    const { LlamaCPP } = await import('@runanywhere/web-llamacpp');
+    const { ONNX } = await import('@runanywhere/web-onnx');
     await LlamaCPP.register();
     await ONNX.register();
 

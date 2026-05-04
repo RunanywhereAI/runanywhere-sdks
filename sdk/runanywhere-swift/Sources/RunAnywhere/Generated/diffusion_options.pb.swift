@@ -162,6 +162,9 @@ public enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
 
   /// forward-looking — pairs with the LCM model variant
   case lcm // = 9
+
+  /// Swift/Kotlin/RN/Web/C-ABI
+  case dpmpp2MSde // = 10
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -180,6 +183,7 @@ public enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 7: self = .pndm
     case 8: self = .lms
     case 9: self = .lcm
+    case 10: self = .dpmpp2MSde
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -196,6 +200,7 @@ public enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .pndm: return 7
     case .lms: return 8
     case .lcm: return 9
+    case .dpmpp2MSde: return 10
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -212,6 +217,7 @@ public enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
     .pndm,
     .lms,
     .lcm,
+    .dpmpp2MSde,
   ]
 
 }
@@ -368,6 +374,10 @@ public struct RADiffusionTokenizerSource: Sendable {
   /// Clears the value of `customPath`. Subsequent reads from it will return its default value.
   public mutating func clearCustomPath() {self._customPath = nil}
 
+  /// Automatically download missing tokenizer files. Defaults to backend
+  /// policy when unset/false.
+  public var autoDownload: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -425,11 +435,67 @@ public struct RADiffusionConfiguration: Sendable {
   /// `reduceMemory` bool flag.
   public var maxMemoryMb: Int32 = 0
 
+  /// C ABI / SDK component fields that identify and route the component.
+  public var modelID: String {
+    get {_modelID ?? String()}
+    set {_modelID = newValue}
+  }
+  /// Returns true if `modelID` has been explicitly set.
+  public var hasModelID: Bool {self._modelID != nil}
+  /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
+  public mutating func clearModelID() {self._modelID = nil}
+
+  public var preferredFramework: RAInferenceFramework {
+    get {_preferredFramework ?? .unspecified}
+    set {_preferredFramework = newValue}
+  }
+  /// Returns true if `preferredFramework` has been explicitly set.
+  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
+  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
+
+  /// Legacy low-memory boolean. Backends may translate true to an internal
+  /// memory cap when max_memory_mb is unset.
+  public var reduceMemory: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _tokenizerSource: RADiffusionTokenizerSource? = nil
+  fileprivate var _modelID: String? = nil
+  fileprivate var _preferredFramework: RAInferenceFramework? = nil
+}
+
+/// ---------------------------------------------------------------------------
+/// Canonical load-model wrapper used by SDKs that require a single argument
+/// for diffusion model lifecycle calls.
+/// ---------------------------------------------------------------------------
+public struct RADiffusionConfig: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var modelPath: String = String()
+
+  public var modelID: String = String()
+
+  public var modelName: String = String()
+
+  public var configuration: RADiffusionConfiguration {
+    get {_configuration ?? RADiffusionConfiguration()}
+    set {_configuration = newValue}
+  }
+  /// Returns true if `configuration` has been explicitly set.
+  public var hasConfiguration: Bool {self._configuration != nil}
+  /// Clears the value of `configuration`. Subsequent reads from it will return its default value.
+  public mutating func clearConfiguration() {self._configuration = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _configuration: RADiffusionConfiguration? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -489,9 +555,44 @@ public struct RADiffusionGenerationOptions: Sendable {
   /// TEXT_TO_IMAGE.
   public var mode: RADiffusionMode = .unspecified
 
+  /// Image-to-image / inpainting payloads from rac_diffusion_options_t.
+  public var inputImage: Data {
+    get {_inputImage ?? Data()}
+    set {_inputImage = newValue}
+  }
+  /// Returns true if `inputImage` has been explicitly set.
+  public var hasInputImage: Bool {self._inputImage != nil}
+  /// Clears the value of `inputImage`. Subsequent reads from it will return its default value.
+  public mutating func clearInputImage() {self._inputImage = nil}
+
+  public var maskImage: Data {
+    get {_maskImage ?? Data()}
+    set {_maskImage = newValue}
+  }
+  /// Returns true if `maskImage` has been explicitly set.
+  public var hasMaskImage: Bool {self._maskImage != nil}
+  /// Clears the value of `maskImage`. Subsequent reads from it will return its default value.
+  public mutating func clearMaskImage() {self._maskImage = nil}
+
+  public var denoiseStrength: Float = 0
+
+  /// Progress reporting controls.
+  public var reportIntermediateImages: Bool = false
+
+  public var progressStride: Int32 = 0
+
+  /// Dimensions for raw input_image payloads when the backend cannot infer
+  /// them from an encoded container.
+  public var inputImageWidth: Int32 = 0
+
+  public var inputImageHeight: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _inputImage: Data? = nil
+  fileprivate var _maskImage: Data? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -531,6 +632,11 @@ public struct RADiffusionProgress: Sendable {
   public var hasIntermediateImageData: Bool {self._intermediateImageData != nil}
   /// Clears the value of `intermediateImageData`. Subsequent reads from it will return its default value.
   public mutating func clearIntermediateImageData() {self._intermediateImageData = nil}
+
+  /// Dimensions for intermediate_image_data when it is raw pixel data.
+  public var intermediateImageWidth: Int32 = 0
+
+  public var intermediateImageHeight: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -585,9 +691,23 @@ public struct RADiffusionResult: Sendable {
   /// DIFFUSION_SCHEDULER_UNSPECIFIED.
   public var usedScheduler: RADiffusionScheduler = .unspecified
 
+  /// Failure details for result-envelope APIs.
+  public var errorMessage: String {
+    get {_errorMessage ?? String()}
+    set {_errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {self._errorMessage = nil}
+
+  public var errorCode: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _errorMessage: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -629,9 +749,36 @@ public struct RADiffusionCapabilities: Sendable {
   /// generation. 0 = unknown / not advertised.
   public var maxResolutionPx: Int32 = 0
 
+  /// Generation modes this backend supports.
+  public var supportedModes: [RADiffusionMode] = []
+
+  /// Asymmetric maximum dimensions when known. 0 = unknown.
+  public var maxWidthPx: Int32 = 0
+
+  public var maxHeightPx: Int32 = 0
+
+  public var supportsIntermediateImages: Bool = false
+
+  public var supportsSafetyChecker: Bool = false
+
+  public var isReady: Bool = false
+
+  public var currentModel: String {
+    get {_currentModel ?? String()}
+    set {_currentModel = newValue}
+  }
+  /// Returns true if `currentModel` has been explicitly set.
+  public var hasCurrentModel: Bool {self._currentModel != nil}
+  /// Clears the value of `currentModel`. Subsequent reads from it will return its default value.
+  public mutating func clearCurrentModel() {self._currentModel = nil}
+
+  public var safetyCheckerEnabled: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _currentModel: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -643,7 +790,7 @@ extension RADiffusionMode: SwiftProtobuf._ProtoNameProviding {
 }
 
 extension RADiffusionScheduler: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_SCHEDULER_UNSPECIFIED\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS\0\u{1}DIFFUSION_SCHEDULER_DDIM\0\u{1}DIFFUSION_SCHEDULER_DDPM\0\u{1}DIFFUSION_SCHEDULER_EULER\0\u{1}DIFFUSION_SCHEDULER_EULER_A\0\u{1}DIFFUSION_SCHEDULER_PNDM\0\u{1}DIFFUSION_SCHEDULER_LMS\0\u{1}DIFFUSION_SCHEDULER_LCM\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_SCHEDULER_UNSPECIFIED\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS\0\u{1}DIFFUSION_SCHEDULER_DDIM\0\u{1}DIFFUSION_SCHEDULER_DDPM\0\u{1}DIFFUSION_SCHEDULER_EULER\0\u{1}DIFFUSION_SCHEDULER_EULER_A\0\u{1}DIFFUSION_SCHEDULER_PNDM\0\u{1}DIFFUSION_SCHEDULER_LMS\0\u{1}DIFFUSION_SCHEDULER_LCM\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M_SDE\0")
 }
 
 extension RADiffusionModelVariant: SwiftProtobuf._ProtoNameProviding {
@@ -656,7 +803,7 @@ extension RADiffusionTokenizerSourceKind: SwiftProtobuf._ProtoNameProviding {
 
 extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionTokenizerSource"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}custom_path\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}custom_path\0\u{3}auto_download\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -666,6 +813,7 @@ extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._Mess
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self._customPath) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.autoDownload) }()
       default: break
       }
     }
@@ -682,12 +830,16 @@ extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._Mess
     try { if let v = self._customPath {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
+    if self.autoDownload != false {
+      try visitor.visitSingularBoolField(value: self.autoDownload, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RADiffusionTokenizerSource, rhs: RADiffusionTokenizerSource) -> Bool {
     if lhs.kind != rhs.kind {return false}
     if lhs._customPath != rhs._customPath {return false}
+    if lhs.autoDownload != rhs.autoDownload {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -695,7 +847,7 @@ extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_variant\0\u{3}tokenizer_source\0\u{3}enable_safety_checker\0\u{3}max_memory_mb\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_variant\0\u{3}tokenizer_source\0\u{3}enable_safety_checker\0\u{3}max_memory_mb\0\u{3}model_id\0\u{3}preferred_framework\0\u{3}reduce_memory\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -707,6 +859,9 @@ extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 2: try { try decoder.decodeSingularMessageField(value: &self._tokenizerSource) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.enableSafetyChecker) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxMemoryMb) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.reduceMemory) }()
       default: break
       }
     }
@@ -729,6 +884,15 @@ extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.maxMemoryMb != 0 {
       try visitor.visitSingularInt32Field(value: self.maxMemoryMb, fieldNumber: 4)
     }
+    try { if let v = self._modelID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._preferredFramework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
+    } }()
+    if self.reduceMemory != false {
+      try visitor.visitSingularBoolField(value: self.reduceMemory, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -737,6 +901,58 @@ extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs._tokenizerSource != rhs._tokenizerSource {return false}
     if lhs.enableSafetyChecker != rhs.enableSafetyChecker {return false}
     if lhs.maxMemoryMb != rhs.maxMemoryMb {return false}
+    if lhs._modelID != rhs._modelID {return false}
+    if lhs._preferredFramework != rhs._preferredFramework {return false}
+    if lhs.reduceMemory != rhs.reduceMemory {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RADiffusionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DiffusionConfig"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_path\0\u{3}model_id\0\u{3}model_name\0\u{1}configuration\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.modelPath) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.modelName) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._configuration) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.modelPath.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelPath, fieldNumber: 1)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+    }
+    if !self.modelName.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelName, fieldNumber: 3)
+    }
+    try { if let v = self._configuration {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RADiffusionConfig, rhs: RADiffusionConfig) -> Bool {
+    if lhs.modelPath != rhs.modelPath {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.modelName != rhs.modelName {return false}
+    if lhs._configuration != rhs._configuration {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -744,7 +960,7 @@ extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
 extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{3}num_inference_steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{3}num_inference_steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0\u{3}input_image\0\u{3}mask_image\0\u{3}denoise_strength\0\u{3}report_intermediate_images\0\u{3}progress_stride\0\u{3}input_image_width\0\u{3}input_image_height\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -761,12 +977,23 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
       case 7: try { try decoder.decodeSingularInt64Field(value: &self.seed) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self.scheduler) }()
       case 9: try { try decoder.decodeSingularEnumField(value: &self.mode) }()
+      case 10: try { try decoder.decodeSingularBytesField(value: &self._inputImage) }()
+      case 11: try { try decoder.decodeSingularBytesField(value: &self._maskImage) }()
+      case 12: try { try decoder.decodeSingularFloatField(value: &self.denoiseStrength) }()
+      case 13: try { try decoder.decodeSingularBoolField(value: &self.reportIntermediateImages) }()
+      case 14: try { try decoder.decodeSingularInt32Field(value: &self.progressStride) }()
+      case 15: try { try decoder.decodeSingularInt32Field(value: &self.inputImageWidth) }()
+      case 16: try { try decoder.decodeSingularInt32Field(value: &self.inputImageHeight) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.prompt.isEmpty {
       try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
     }
@@ -794,6 +1021,27 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
     if self.mode != .unspecified {
       try visitor.visitSingularEnumField(value: self.mode, fieldNumber: 9)
     }
+    try { if let v = self._inputImage {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._maskImage {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 11)
+    } }()
+    if self.denoiseStrength.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.denoiseStrength, fieldNumber: 12)
+    }
+    if self.reportIntermediateImages != false {
+      try visitor.visitSingularBoolField(value: self.reportIntermediateImages, fieldNumber: 13)
+    }
+    if self.progressStride != 0 {
+      try visitor.visitSingularInt32Field(value: self.progressStride, fieldNumber: 14)
+    }
+    if self.inputImageWidth != 0 {
+      try visitor.visitSingularInt32Field(value: self.inputImageWidth, fieldNumber: 15)
+    }
+    if self.inputImageHeight != 0 {
+      try visitor.visitSingularInt32Field(value: self.inputImageHeight, fieldNumber: 16)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -807,6 +1055,13 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
     if lhs.seed != rhs.seed {return false}
     if lhs.scheduler != rhs.scheduler {return false}
     if lhs.mode != rhs.mode {return false}
+    if lhs._inputImage != rhs._inputImage {return false}
+    if lhs._maskImage != rhs._maskImage {return false}
+    if lhs.denoiseStrength != rhs.denoiseStrength {return false}
+    if lhs.reportIntermediateImages != rhs.reportIntermediateImages {return false}
+    if lhs.progressStride != rhs.progressStride {return false}
+    if lhs.inputImageWidth != rhs.inputImageWidth {return false}
+    if lhs.inputImageHeight != rhs.inputImageHeight {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -814,7 +1069,7 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionProgress"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}progress_percent\0\u{3}current_step\0\u{3}total_steps\0\u{1}stage\0\u{3}intermediate_image_data\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}progress_percent\0\u{3}current_step\0\u{3}total_steps\0\u{1}stage\0\u{3}intermediate_image_data\0\u{3}intermediate_image_width\0\u{3}intermediate_image_height\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -827,6 +1082,8 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.totalSteps) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.stage) }()
       case 5: try { try decoder.decodeSingularBytesField(value: &self._intermediateImageData) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.intermediateImageWidth) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.intermediateImageHeight) }()
       default: break
       }
     }
@@ -852,6 +1109,12 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     try { if let v = self._intermediateImageData {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
     } }()
+    if self.intermediateImageWidth != 0 {
+      try visitor.visitSingularInt32Field(value: self.intermediateImageWidth, fieldNumber: 6)
+    }
+    if self.intermediateImageHeight != 0 {
+      try visitor.visitSingularInt32Field(value: self.intermediateImageHeight, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -861,6 +1124,8 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.totalSteps != rhs.totalSteps {return false}
     if lhs.stage != rhs.stage {return false}
     if lhs._intermediateImageData != rhs._intermediateImageData {return false}
+    if lhs.intermediateImageWidth != rhs.intermediateImageWidth {return false}
+    if lhs.intermediateImageHeight != rhs.intermediateImageHeight {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -868,7 +1133,7 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}image_data\0\u{1}width\0\u{1}height\0\u{3}seed_used\0\u{3}total_time_ms\0\u{3}safety_flag\0\u{3}used_scheduler\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}image_data\0\u{1}width\0\u{1}height\0\u{3}seed_used\0\u{3}total_time_ms\0\u{3}safety_flag\0\u{3}used_scheduler\0\u{3}error_message\0\u{3}error_code\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -883,12 +1148,18 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.totalTimeMs) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.safetyFlag) }()
       case 7: try { try decoder.decodeSingularEnumField(value: &self.usedScheduler) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
+      case 9: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.imageData.isEmpty {
       try visitor.visitSingularBytesField(value: self.imageData, fieldNumber: 1)
     }
@@ -910,6 +1181,12 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if self.usedScheduler != .unspecified {
       try visitor.visitSingularEnumField(value: self.usedScheduler, fieldNumber: 7)
     }
+    try { if let v = self._errorMessage {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -921,6 +1198,8 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.totalTimeMs != rhs.totalTimeMs {return false}
     if lhs.safetyFlag != rhs.safetyFlag {return false}
     if lhs.usedScheduler != rhs.usedScheduler {return false}
+    if lhs._errorMessage != rhs._errorMessage {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -928,7 +1207,7 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}supported_variants\0\u{3}supported_schedulers\0\u{3}max_resolution_px\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}supported_variants\0\u{3}supported_schedulers\0\u{3}max_resolution_px\0\u{3}supported_modes\0\u{3}max_width_px\0\u{3}max_height_px\0\u{3}supports_intermediate_images\0\u{3}supports_safety_checker\0\u{3}is_ready\0\u{3}current_model\0\u{3}safety_checker_enabled\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -939,12 +1218,24 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 1: try { try decoder.decodeRepeatedEnumField(value: &self.supportedVariants) }()
       case 2: try { try decoder.decodeRepeatedEnumField(value: &self.supportedSchedulers) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxResolutionPx) }()
+      case 4: try { try decoder.decodeRepeatedEnumField(value: &self.supportedModes) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.maxWidthPx) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.maxHeightPx) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.supportsIntermediateImages) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.supportsSafetyChecker) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.isReady) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._currentModel) }()
+      case 11: try { try decoder.decodeSingularBoolField(value: &self.safetyCheckerEnabled) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.supportedVariants.isEmpty {
       try visitor.visitPackedEnumField(value: self.supportedVariants, fieldNumber: 1)
     }
@@ -954,6 +1245,30 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
     if self.maxResolutionPx != 0 {
       try visitor.visitSingularInt32Field(value: self.maxResolutionPx, fieldNumber: 3)
     }
+    if !self.supportedModes.isEmpty {
+      try visitor.visitPackedEnumField(value: self.supportedModes, fieldNumber: 4)
+    }
+    if self.maxWidthPx != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxWidthPx, fieldNumber: 5)
+    }
+    if self.maxHeightPx != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxHeightPx, fieldNumber: 6)
+    }
+    if self.supportsIntermediateImages != false {
+      try visitor.visitSingularBoolField(value: self.supportsIntermediateImages, fieldNumber: 7)
+    }
+    if self.supportsSafetyChecker != false {
+      try visitor.visitSingularBoolField(value: self.supportsSafetyChecker, fieldNumber: 8)
+    }
+    if self.isReady != false {
+      try visitor.visitSingularBoolField(value: self.isReady, fieldNumber: 9)
+    }
+    try { if let v = self._currentModel {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
+    if self.safetyCheckerEnabled != false {
+      try visitor.visitSingularBoolField(value: self.safetyCheckerEnabled, fieldNumber: 11)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -961,6 +1276,14 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs.supportedVariants != rhs.supportedVariants {return false}
     if lhs.supportedSchedulers != rhs.supportedSchedulers {return false}
     if lhs.maxResolutionPx != rhs.maxResolutionPx {return false}
+    if lhs.supportedModes != rhs.supportedModes {return false}
+    if lhs.maxWidthPx != rhs.maxWidthPx {return false}
+    if lhs.maxHeightPx != rhs.maxHeightPx {return false}
+    if lhs.supportsIntermediateImages != rhs.supportsIntermediateImages {return false}
+    if lhs.supportsSafetyChecker != rhs.supportsSafetyChecker {return false}
+    if lhs.isReady != rhs.isReady {return false}
+    if lhs._currentModel != rhs._currentModel {return false}
+    if lhs.safetyCheckerEnabled != rhs.safetyCheckerEnabled {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

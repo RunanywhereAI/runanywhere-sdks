@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17structured_output.proto\x12\x0erunanywhere.v1\"\xb3\x02\n\x12JSONSchemaProperty\x12,\n\x04type\x18\x01 \x01(\x0e\x32\x1e.runanywhere.v1.JSONSchemaType\x12\x18\n\x0b\x64\x65scription\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x13\n\x0b\x65num_values\x18\x03 \x03(\t\x12\x13\n\x06\x66ormat\x18\x04 \x01(\tH\x01\x88\x01\x01\x12\x35\n\x0citems_schema\x18\x05 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchemaH\x02\x88\x01\x01\x12\x36\n\robject_schema\x18\x06 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchemaH\x03\x88\x01\x01\x42\x0e\n\x0c_descriptionB\t\n\x07_formatB\x0f\n\r_items_schemaB\x10\n\x0e_object_schema\"\xe3\x02\n\nJSONSchema\x12,\n\x04type\x18\x01 \x01(\x0e\x32\x1e.runanywhere.v1.JSONSchemaType\x12>\n\nproperties\x18\x02 \x03(\x0b\x32*.runanywhere.v1.JSONSchema.PropertiesEntry\x12\x10\n\x08required\x18\x03 \x03(\t\x12\x36\n\x05items\x18\x04 \x01(\x0b\x32\".runanywhere.v1.JSONSchemaPropertyH\x00\x88\x01\x01\x12\"\n\x15\x61\x64\x64itional_properties\x18\x05 \x01(\x08H\x01\x88\x01\x01\x1aU\n\x0fPropertiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x31\n\x05value\x18\x02 \x01(\x0b\x32\".runanywhere.v1.JSONSchemaProperty:\x02\x38\x01\x42\x08\n\x06_itemsB\x18\n\x16_additional_properties\"\x91\x01\n\x17StructuredOutputOptions\x12*\n\x06schema\x18\x01 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchema\x12 \n\x18include_schema_in_prompt\x18\x02 \x01(\x08\x12\x18\n\x0bstrict_mode\x18\x03 \x01(\x08H\x00\x88\x01\x01\x42\x0e\n\x0c_strict_mode\"\x9b\x01\n\x1aStructuredOutputValidation\x12\x10\n\x08is_valid\x18\x01 \x01(\x08\x12\x15\n\rcontains_json\x18\x02 \x01(\x08\x12\x1a\n\rerror_message\x18\x03 \x01(\tH\x00\x88\x01\x01\x12\x17\n\nraw_output\x18\x04 \x01(\tH\x01\x88\x01\x01\x42\x10\n\x0e_error_messageB\r\n\x0b_raw_output\"\x91\x01\n\x16StructuredOutputResult\x12\x13\n\x0bparsed_json\x18\x01 \x01(\x0c\x12>\n\nvalidation\x18\x02 \x01(\x0b\x32*.runanywhere.v1.StructuredOutputValidation\x12\x15\n\x08raw_text\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x0b\n\t_raw_text\"n\n\x0bNamedEntity\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x13\n\x0b\x65ntity_type\x18\x02 \x01(\t\x12\x14\n\x0cstart_offset\x18\x03 \x01(\x05\x12\x12\n\nend_offset\x18\x04 \x01(\x05\x12\x12\n\nconfidence\x18\x05 \x01(\x02\"G\n\x16\x45ntityExtractionResult\x12-\n\x08\x65ntities\x18\x01 \x03(\x0b\x32\x1b.runanywhere.v1.NamedEntity\"<\n\x17\x43lassificationCandidate\x12\r\n\x05label\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x02\"x\n\x14\x43lassificationResult\x12\r\n\x05label\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x02\x12=\n\x0c\x61lternatives\x18\x03 \x03(\x0b\x32\'.runanywhere.v1.ClassificationCandidate\"\xe1\x01\n\x0fSentimentResult\x12,\n\tsentiment\x18\x01 \x01(\x0e\x32\x19.runanywhere.v1.Sentiment\x12\x12\n\nconfidence\x18\x02 \x01(\x02\x12\x1b\n\x0epositive_score\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x1b\n\x0enegative_score\x18\x04 \x01(\x02H\x01\x88\x01\x01\x12\x1a\n\rneutral_score\x18\x05 \x01(\x02H\x02\x88\x01\x01\x42\x11\n\x0f_positive_scoreB\x11\n\x0f_negative_scoreB\x10\n\x0e_neutral_score\":\n\tNERResult\x12-\n\x08\x65ntities\x18\x01 \x03(\x0b\x32\x1b.runanywhere.v1.NamedEntity*\xfc\x01\n\x0eJSONSchemaType\x12 \n\x1cJSON_SCHEMA_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n\x17JSON_SCHEMA_TYPE_OBJECT\x10\x01\x12\x1a\n\x16JSON_SCHEMA_TYPE_ARRAY\x10\x02\x12\x1b\n\x17JSON_SCHEMA_TYPE_STRING\x10\x03\x12\x1b\n\x17JSON_SCHEMA_TYPE_NUMBER\x10\x04\x12\x1c\n\x18JSON_SCHEMA_TYPE_INTEGER\x10\x05\x12\x1c\n\x18JSON_SCHEMA_TYPE_BOOLEAN\x10\x06\x12\x19\n\x15JSON_SCHEMA_TYPE_NULL\x10\x07*\x82\x01\n\tSentiment\x12\x19\n\x15SENTIMENT_UNSPECIFIED\x10\x00\x12\x16\n\x12SENTIMENT_POSITIVE\x10\x01\x12\x16\n\x12SENTIMENT_NEGATIVE\x10\x02\x12\x15\n\x11SENTIMENT_NEUTRAL\x10\x03\x12\x13\n\x0fSENTIMENT_MIXED\x10\x04\x42\x90\x01\n\x17\x61i.runanywhere.proto.v1B\x15StructuredOutputProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17structured_output.proto\x12\x0erunanywhere.v1\"\xb3\x02\n\x12JSONSchemaProperty\x12,\n\x04type\x18\x01 \x01(\x0e\x32\x1e.runanywhere.v1.JSONSchemaType\x12\x18\n\x0b\x64\x65scription\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x13\n\x0b\x65num_values\x18\x03 \x03(\t\x12\x13\n\x06\x66ormat\x18\x04 \x01(\tH\x01\x88\x01\x01\x12\x35\n\x0citems_schema\x18\x05 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchemaH\x02\x88\x01\x01\x12\x36\n\robject_schema\x18\x06 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchemaH\x03\x88\x01\x01\x42\x0e\n\x0c_descriptionB\t\n\x07_formatB\x0f\n\r_items_schemaB\x10\n\x0e_object_schema\"\xfb\x06\n\nJSONSchema\x12,\n\x04type\x18\x01 \x01(\x0e\x32\x1e.runanywhere.v1.JSONSchemaType\x12>\n\nproperties\x18\x02 \x03(\x0b\x32*.runanywhere.v1.JSONSchema.PropertiesEntry\x12\x10\n\x08required\x18\x03 \x03(\t\x12\x36\n\x05items\x18\x04 \x01(\x0b\x32\".runanywhere.v1.JSONSchemaPropertyH\x00\x88\x01\x01\x12\"\n\x15\x61\x64\x64itional_properties\x18\x05 \x01(\x08H\x01\x88\x01\x01\x12 \n\nschema_uri\x18\x06 \x01(\tH\x02R\x07$schema\x88\x01\x01\x12\x18\n\x06id_uri\x18\x07 \x01(\tH\x03R\x03$id\x88\x01\x01\x12\x12\n\x05title\x18\x08 \x01(\tH\x04\x88\x01\x01\x12\x18\n\x0b\x64\x65scription\x18\t \x01(\tH\x05\x88\x01\x01\x12@\n\x0b\x64\x65\x66initions\x18\n \x03(\x0b\x32+.runanywhere.v1.JSONSchema.DefinitionsEntry\x12\x16\n\x03ref\x18\x0b \x01(\tH\x06R\x04$ref\x88\x01\x01\x12*\n\x06\x61ll_of\x18\x0c \x03(\x0b\x32\x1a.runanywhere.v1.JSONSchema\x12*\n\x06\x61ny_of\x18\r \x03(\x0b\x32\x1a.runanywhere.v1.JSONSchema\x12*\n\x06one_of\x18\x0e \x03(\x0b\x32\x1a.runanywhere.v1.JSONSchema\x12\x33\n\nnot_schema\x18\x0f \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchemaH\x07\x88\x01\x01\x1aU\n\x0fPropertiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x31\n\x05value\x18\x02 \x01(\x0b\x32\".runanywhere.v1.JSONSchemaProperty:\x02\x38\x01\x1aN\n\x10\x44\x65\x66initionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12)\n\x05value\x18\x02 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchema:\x02\x38\x01\x42\x08\n\x06_itemsB\x18\n\x16_additional_propertiesB\r\n\x0b_schema_uriB\t\n\x07_id_uriB\x08\n\x06_titleB\x0e\n\x0c_descriptionB\x06\n\x04_refB\r\n\x0b_not_schema\"\xfd\x01\n\x17StructuredOutputOptions\x12*\n\x06schema\x18\x01 \x01(\x0b\x32\x1a.runanywhere.v1.JSONSchema\x12 \n\x18include_schema_in_prompt\x18\x02 \x01(\x08\x12\x18\n\x0bstrict_mode\x18\x03 \x01(\x08H\x00\x88\x01\x01\x12\x18\n\x0bjson_schema\x18\x04 \x01(\tH\x01\x88\x01\x01\x12\x16\n\ttype_name\x18\x05 \x01(\tH\x02\x88\x01\x01\x12\x11\n\x04name\x18\x06 \x01(\tH\x03\x88\x01\x01\x42\x0e\n\x0c_strict_modeB\x0e\n\x0c_json_schemaB\x0c\n\n_type_nameB\x07\n\x05_name\"\xcb\x01\n\x1aStructuredOutputValidation\x12\x10\n\x08is_valid\x18\x01 \x01(\x08\x12\x15\n\rcontains_json\x18\x02 \x01(\x08\x12\x1a\n\rerror_message\x18\x03 \x01(\tH\x00\x88\x01\x01\x12\x17\n\nraw_output\x18\x04 \x01(\tH\x01\x88\x01\x01\x12\x1b\n\x0e\x65xtracted_json\x18\x05 \x01(\tH\x02\x88\x01\x01\x42\x10\n\x0e_error_messageB\r\n\x0b_raw_outputB\x11\n\x0f_extracted_json\"\x91\x01\n\x16StructuredOutputResult\x12\x13\n\x0bparsed_json\x18\x01 \x01(\x0c\x12>\n\nvalidation\x18\x02 \x01(\x0b\x32*.runanywhere.v1.StructuredOutputValidation\x12\x15\n\x08raw_text\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x0b\n\t_raw_text\"n\n\x0bNamedEntity\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x13\n\x0b\x65ntity_type\x18\x02 \x01(\t\x12\x14\n\x0cstart_offset\x18\x03 \x01(\x05\x12\x12\n\nend_offset\x18\x04 \x01(\x05\x12\x12\n\nconfidence\x18\x05 \x01(\x02\"G\n\x16\x45ntityExtractionResult\x12-\n\x08\x65ntities\x18\x01 \x03(\x0b\x32\x1b.runanywhere.v1.NamedEntity\"<\n\x17\x43lassificationCandidate\x12\r\n\x05label\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x02\"x\n\x14\x43lassificationResult\x12\r\n\x05label\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x02\x12=\n\x0c\x61lternatives\x18\x03 \x03(\x0b\x32\'.runanywhere.v1.ClassificationCandidate\"\xe1\x01\n\x0fSentimentResult\x12,\n\tsentiment\x18\x01 \x01(\x0e\x32\x19.runanywhere.v1.Sentiment\x12\x12\n\nconfidence\x18\x02 \x01(\x02\x12\x1b\n\x0epositive_score\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x1b\n\x0enegative_score\x18\x04 \x01(\x02H\x01\x88\x01\x01\x12\x1a\n\rneutral_score\x18\x05 \x01(\x02H\x02\x88\x01\x01\x42\x11\n\x0f_positive_scoreB\x11\n\x0f_negative_scoreB\x10\n\x0e_neutral_score\":\n\tNERResult\x12-\n\x08\x65ntities\x18\x01 \x03(\x0b\x32\x1b.runanywhere.v1.NamedEntity*\xfc\x01\n\x0eJSONSchemaType\x12 \n\x1cJSON_SCHEMA_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n\x17JSON_SCHEMA_TYPE_OBJECT\x10\x01\x12\x1a\n\x16JSON_SCHEMA_TYPE_ARRAY\x10\x02\x12\x1b\n\x17JSON_SCHEMA_TYPE_STRING\x10\x03\x12\x1b\n\x17JSON_SCHEMA_TYPE_NUMBER\x10\x04\x12\x1c\n\x18JSON_SCHEMA_TYPE_INTEGER\x10\x05\x12\x1c\n\x18JSON_SCHEMA_TYPE_BOOLEAN\x10\x06\x12\x19\n\x15JSON_SCHEMA_TYPE_NULL\x10\x07*\x82\x01\n\tSentiment\x12\x19\n\x15SENTIMENT_UNSPECIFIED\x10\x00\x12\x16\n\x12SENTIMENT_POSITIVE\x10\x01\x12\x16\n\x12SENTIMENT_NEGATIVE\x10\x02\x12\x15\n\x11SENTIMENT_NEUTRAL\x10\x03\x12\x13\n\x0fSENTIMENT_MIXED\x10\x04\x42\x90\x01\n\x17\x61i.runanywhere.proto.v1B\x15StructuredOutputProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,32 +34,36 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\025StructuredOutputProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
   _globals['_JSONSCHEMA_PROPERTIESENTRY']._loaded_options = None
   _globals['_JSONSCHEMA_PROPERTIESENTRY']._serialized_options = b'8\001'
-  _globals['_JSONSCHEMATYPE']._serialized_start=1823
-  _globals['_JSONSCHEMATYPE']._serialized_end=2075
-  _globals['_SENTIMENT']._serialized_start=2078
-  _globals['_SENTIMENT']._serialized_end=2208
+  _globals['_JSONSCHEMA_DEFINITIONSENTRY']._loaded_options = None
+  _globals['_JSONSCHEMA_DEFINITIONSENTRY']._serialized_options = b'8\001'
+  _globals['_JSONSCHEMATYPE']._serialized_start=2515
+  _globals['_JSONSCHEMATYPE']._serialized_end=2767
+  _globals['_SENTIMENT']._serialized_start=2770
+  _globals['_SENTIMENT']._serialized_end=2900
   _globals['_JSONSCHEMAPROPERTY']._serialized_start=44
   _globals['_JSONSCHEMAPROPERTY']._serialized_end=351
   _globals['_JSONSCHEMA']._serialized_start=354
-  _globals['_JSONSCHEMA']._serialized_end=709
-  _globals['_JSONSCHEMA_PROPERTIESENTRY']._serialized_start=588
-  _globals['_JSONSCHEMA_PROPERTIESENTRY']._serialized_end=673
-  _globals['_STRUCTUREDOUTPUTOPTIONS']._serialized_start=712
-  _globals['_STRUCTUREDOUTPUTOPTIONS']._serialized_end=857
-  _globals['_STRUCTUREDOUTPUTVALIDATION']._serialized_start=860
-  _globals['_STRUCTUREDOUTPUTVALIDATION']._serialized_end=1015
-  _globals['_STRUCTUREDOUTPUTRESULT']._serialized_start=1018
-  _globals['_STRUCTUREDOUTPUTRESULT']._serialized_end=1163
-  _globals['_NAMEDENTITY']._serialized_start=1165
-  _globals['_NAMEDENTITY']._serialized_end=1275
-  _globals['_ENTITYEXTRACTIONRESULT']._serialized_start=1277
-  _globals['_ENTITYEXTRACTIONRESULT']._serialized_end=1348
-  _globals['_CLASSIFICATIONCANDIDATE']._serialized_start=1350
-  _globals['_CLASSIFICATIONCANDIDATE']._serialized_end=1410
-  _globals['_CLASSIFICATIONRESULT']._serialized_start=1412
-  _globals['_CLASSIFICATIONRESULT']._serialized_end=1532
-  _globals['_SENTIMENTRESULT']._serialized_start=1535
-  _globals['_SENTIMENTRESULT']._serialized_end=1760
-  _globals['_NERRESULT']._serialized_start=1762
-  _globals['_NERRESULT']._serialized_end=1820
+  _globals['_JSONSCHEMA']._serialized_end=1245
+  _globals['_JSONSCHEMA_PROPERTIESENTRY']._serialized_start=969
+  _globals['_JSONSCHEMA_PROPERTIESENTRY']._serialized_end=1054
+  _globals['_JSONSCHEMA_DEFINITIONSENTRY']._serialized_start=1056
+  _globals['_JSONSCHEMA_DEFINITIONSENTRY']._serialized_end=1134
+  _globals['_STRUCTUREDOUTPUTOPTIONS']._serialized_start=1248
+  _globals['_STRUCTUREDOUTPUTOPTIONS']._serialized_end=1501
+  _globals['_STRUCTUREDOUTPUTVALIDATION']._serialized_start=1504
+  _globals['_STRUCTUREDOUTPUTVALIDATION']._serialized_end=1707
+  _globals['_STRUCTUREDOUTPUTRESULT']._serialized_start=1710
+  _globals['_STRUCTUREDOUTPUTRESULT']._serialized_end=1855
+  _globals['_NAMEDENTITY']._serialized_start=1857
+  _globals['_NAMEDENTITY']._serialized_end=1967
+  _globals['_ENTITYEXTRACTIONRESULT']._serialized_start=1969
+  _globals['_ENTITYEXTRACTIONRESULT']._serialized_end=2040
+  _globals['_CLASSIFICATIONCANDIDATE']._serialized_start=2042
+  _globals['_CLASSIFICATIONCANDIDATE']._serialized_end=2102
+  _globals['_CLASSIFICATIONRESULT']._serialized_start=2104
+  _globals['_CLASSIFICATIONRESULT']._serialized_end=2224
+  _globals['_SENTIMENTRESULT']._serialized_start=2227
+  _globals['_SENTIMENTRESULT']._serialized_end=2452
+  _globals['_NERRESULT']._serialized_start=2454
+  _globals['_NERRESULT']._serialized_end=2512
 # @@protoc_insertion_point(module_scope)

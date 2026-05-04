@@ -2,7 +2,9 @@
 // Mirrors Swift RunAnywhere+ModelAssignments.swift.
 // Provides model registration helpers (assign custom local models to registry).
 
-import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework, ModelCategory, ModelFormat;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 class RunAnywhereModelAssignments {
@@ -18,8 +20,8 @@ class RunAnywhereModelAssignments {
     required String name,
     required Uri localPath,
     required InferenceFramework framework,
-    ModelCategory category = ModelCategory.language,
-    ModelFormat format = ModelFormat.gguf,
+    ModelCategory category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ModelFormat format = ModelFormat.MODEL_FORMAT_GGUF,
     String? description,
     int contextLength = 4096,
   }) {

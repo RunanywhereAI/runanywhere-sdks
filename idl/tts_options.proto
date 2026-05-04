@@ -132,6 +132,10 @@ message TTSConfiguration {
 
     // Whether to enable SSML markup support.
     bool               enable_ssml         = 10;
+
+    // Preferred framework for the component. Absent = auto. Mirrors the C
+    // ABI rac_tts_config_t preferred_framework field.
+    optional InferenceFramework preferred_framework = 11;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +174,10 @@ message TTSOptions {
 
     // Output audio format.
     runanywhere.v1.AudioFormat audio_format = 7;
+
+    // Output sample rate override in Hz. 0 = component/default sample rate.
+    // Present in rac_tts_options_t and several SDK option structs.
+    int32              sample_rate         = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +223,10 @@ message TTSSynthesisMetadata {
     // mirrored here so metadata is self-describing for clients that consume
     // metadata-only paths (e.g. TTSSpeakResult).
     int64  audio_duration_ms   = 5;
+
+    // Characters processed per second. Some native paths expose this directly;
+    // consumers may also compute it from character_count / processing_time_ms.
+    float  characters_per_second = 6;
 }
 
 // ---------------------------------------------------------------------------

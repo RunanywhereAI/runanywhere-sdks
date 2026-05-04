@@ -7,16 +7,16 @@
  */
 
 import type {
+  VLMImage,
   VLMGenerationOptions,
   VLMResult,
   VLMConfiguration,
 } from '@runanywhere/proto-ts/vlm_options';
 export { VLMImageFormat, VLMErrorCode } from '@runanywhere/proto-ts/vlm_options';
-export type { VLMGenerationOptions, VLMResult, VLMConfiguration };
+export type { VLMImage, VLMGenerationOptions, VLMResult, VLMConfiguration };
 
-import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
+import { ExtensionPoint, ServiceKey } from '../../Infrastructure/ExtensionPoint';
 import { SDKException } from '../../Foundation/SDKException';
-import type { VLMImage } from '../../types/index';
 
 /** Extended VLM provider interface covering all canonical §7 methods. */
 interface VLMProvider {
@@ -31,6 +31,8 @@ interface VLMProvider {
 }
 
 function getVLMProvider(): VLMProvider | null {
+  const service = ExtensionPoint.getService<VLMProvider>(ServiceKey.VLM);
+  if (service != null) return service;
   return ExtensionPoint.getProvider('llm') as VLMProvider | null;
 }
 

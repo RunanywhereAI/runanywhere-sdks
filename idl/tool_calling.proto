@@ -45,7 +45,7 @@ message ToolValue {
         bool    bool_value   = 3;
         ToolValueArray  array_value  = 4;
         ToolValueObject object_value = 5;
-        // No "null" arm — proto3 scalar defaults already represent absence.
+        bool    null_value   = 6;  // true means JSON null
     }
 }
 
@@ -132,6 +132,14 @@ message ToolCall {
     // Discriminator for OpenAI-compatible flows ("function" is the only
     // value at the moment). Empty = unset.
     string type                      = 4;
+
+    // Strongly-typed arguments map for SDKs that do not want to parse
+    // arguments_json. Producers should keep arguments_json populated for C++
+    // tokenizer compatibility.
+    map<string, ToolValue> arguments = 5;
+
+    // Alias for id used by pre-proto SDK surfaces.
+    optional string call_id          = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +151,18 @@ message ToolResult {
     string name                      = 2;
     string result_json               = 3;
     optional string error            = 4;
+
+    // Whether execution succeeded. If unset/false and error is empty,
+    // consumers should fall back to legacy result_json/error semantics.
+    bool success                     = 5;
+
+    // Strongly-typed result map for SDKs that do not want to parse
+    // result_json. Producers should keep result_json populated for C++
+    // tokenizer compatibility.
+    map<string, ToolValue> result    = 6;
+
+    // Alias for tool_call_id used by pre-proto SDK surfaces.
+    optional string call_id          = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +211,10 @@ message ToolCallingOptions {
     // Distinct from `system_prompt` (field 6), which is merged unless
     // `replace_system_prompt` is true.
     optional string custom_system_prompt = 11;
+
+    // C ABI / SDK field name for max_iterations. 0 = use max_iterations or
+    // SDK default.
+    optional int32 max_tool_calls = 12;
 }
 
 // ---------------------------------------------------------------------------

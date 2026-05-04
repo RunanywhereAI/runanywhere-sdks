@@ -142,7 +142,12 @@ struct RunAnywhereAIApp: App {
         let customApiKey = SettingsViewModel.getStoredApiKey()
         let customBaseURL = SettingsViewModel.getStoredBaseURL()
 
-        if let apiKey = customApiKey, let baseURL = customBaseURL {
+        if let apiKey = customApiKey,
+           let baseURL = customBaseURL,
+           !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !looksLikePlaceholder(apiKey),
+           isUsableHTTPURL(baseURL) {
             // Custom configuration mode - use stored credentials
             // Always use .production for custom backends (model assignment auto-fetch enabled)
             logger.info("🔧 Found custom API configuration")
@@ -171,6 +176,29 @@ struct RunAnywhereAIApp: App {
             fatalError("Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; set in Settings.bundle or .xcconfig before shipping.")
             #endif
         }
+    }
+
+    private func looksLikePlaceholder(_ value: String) -> Bool {
+        value.range(
+            of: "YOUR_|<your|REPLACE_ME|PLACEHOLDER",
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
+    private func isUsableHTTPURL(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !looksLikePlaceholder(trimmed),
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              let host = url.host,
+              !host.isEmpty,
+              host.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              !host.contains("<"),
+              !host.contains(">") else {
+            return false
+        }
+        return true
     }
 
     private func retryInitialization() async {

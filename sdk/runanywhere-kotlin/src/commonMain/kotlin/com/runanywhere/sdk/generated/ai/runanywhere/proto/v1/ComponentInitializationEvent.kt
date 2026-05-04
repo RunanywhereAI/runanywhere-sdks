@@ -148,6 +148,28 @@ public class ComponentInitializationEvent(
     schemaIndex = 13,
   )
   public val failed_count: Int = 0,
+  /**
+   * Typed equivalents of old_state/new_state for SDKs that want generated
+   * enum-backed component lifecycle state instead of parsing strings.
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "previousLifecycleState",
+    schemaIndex = 14,
+  )
+  public val previous_lifecycle_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
+  @field:WireField(
+    tag = 16,
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "currentLifecycleState",
+    schemaIndex = 15,
+  )
+  public val current_lifecycle_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ComponentInitializationEvent, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -207,6 +229,8 @@ public class ComponentInitializationEvent(
     if (init_success != other.init_success) return false
     if (ready_count != other.ready_count) return false
     if (failed_count != other.failed_count) return false
+    if (previous_lifecycle_state != other.previous_lifecycle_state) return false
+    if (current_lifecycle_state != other.current_lifecycle_state) return false
     return true
   }
 
@@ -228,6 +252,8 @@ public class ComponentInitializationEvent(
       result = result * 37 + init_success.hashCode()
       result = result * 37 + ready_count.hashCode()
       result = result * 37 + failed_count.hashCode()
+      result = result * 37 + previous_lifecycle_state.hashCode()
+      result = result * 37 + current_lifecycle_state.hashCode()
       super.hashCode = result
     }
     return result
@@ -249,6 +275,8 @@ public class ComponentInitializationEvent(
     result += """init_success=$init_success"""
     result += """ready_count=$ready_count"""
     result += """failed_count=$failed_count"""
+    result += """previous_lifecycle_state=$previous_lifecycle_state"""
+    result += """current_lifecycle_state=$current_lifecycle_state"""
     return result.joinToString(prefix = "ComponentInitializationEvent{", separator = ", ", postfix =
         "}")
   }
@@ -268,10 +296,13 @@ public class ComponentInitializationEvent(
     init_success: Boolean = this.init_success,
     ready_count: Int = this.ready_count,
     failed_count: Int = this.failed_count,
+    previous_lifecycle_state: ComponentLifecycleState = this.previous_lifecycle_state,
+    current_lifecycle_state: ComponentLifecycleState = this.current_lifecycle_state,
     unknownFields: ByteString = this.unknownFields,
   ): ComponentInitializationEvent = ComponentInitializationEvent(kind, component, model_id,
       size_bytes, progress, error, old_state, new_state, components, ready_components,
-      pending_components, init_success, ready_count, failed_count, unknownFields)
+      pending_components, init_success, ready_count, failed_count, previous_lifecycle_state,
+      current_lifecycle_state, unknownFields)
 
   public companion object {
     @JvmField
@@ -309,6 +340,12 @@ public class ComponentInitializationEvent(
             value.ready_count)
         if (value.failed_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(14,
             value.failed_count)
+        if (value.previous_lifecycle_state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED) size +=
+            ComponentLifecycleState.ADAPTER.encodedSizeWithTag(15, value.previous_lifecycle_state)
+        if (value.current_lifecycle_state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED) size +=
+            ComponentLifecycleState.ADAPTER.encodedSizeWithTag(16, value.current_lifecycle_state)
         return size
       }
 
@@ -331,11 +368,25 @@ public class ComponentInitializationEvent(
         if (value.ready_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 13, value.ready_count)
         if (value.failed_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
             value.failed_count)
+        if (value.previous_lifecycle_state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 15,
+            value.previous_lifecycle_state)
+        if (value.current_lifecycle_state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 16, value.current_lifecycle_state)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ComponentInitializationEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.current_lifecycle_state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 16, value.current_lifecycle_state)
+        if (value.previous_lifecycle_state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 15,
+            value.previous_lifecycle_state)
         if (value.failed_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
             value.failed_count)
         if (value.ready_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 13, value.ready_count)
@@ -372,6 +423,10 @@ public class ComponentInitializationEvent(
         var init_success: Boolean = false
         var ready_count: Int = 0
         var failed_count: Int = 0
+        var previous_lifecycle_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
+        var current_lifecycle_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -408,6 +463,16 @@ public class ComponentInitializationEvent(
             12 -> init_success = ProtoAdapter.BOOL.decode(reader)
             13 -> ready_count = ProtoAdapter.INT32.decode(reader)
             14 -> failed_count = ProtoAdapter.INT32.decode(reader)
+            15 -> try {
+              previous_lifecycle_state = ComponentLifecycleState.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            16 -> try {
+              current_lifecycle_state = ComponentLifecycleState.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -426,6 +491,8 @@ public class ComponentInitializationEvent(
           init_success = init_success,
           ready_count = ready_count,
           failed_count = failed_count,
+          previous_lifecycle_state = previous_lifecycle_state,
+          current_lifecycle_state = current_lifecycle_state,
           unknownFields = unknownFields
         )
       }

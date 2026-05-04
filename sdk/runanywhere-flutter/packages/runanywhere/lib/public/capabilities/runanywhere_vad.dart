@@ -14,25 +14,23 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/features/vad/vad_configuration.dart' show VADComponentConfig;
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/vad_options.pb.dart'
-    show VADOptions, VADResult, VADStatistics;
+    show
+        SpeechActivityEvent,
+        SpeechActivityKind,
+        VADConfiguration,
+        VADOptions,
+        VADResult,
+        VADStatistics;
+import 'package:runanywhere/generated/voice_events.pbenum.dart'
+    show VADEventType;
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_vad.dart' as bridge
-    show VADActivityEvent, VADSpeechStartedEvent, VADSpeechEndedEvent;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
-
-/// Speech-activity event lifecycle. Mirrors Swift's
-/// `SpeechActivityEvent` enum (`.started` / `.ended`).
-enum SpeechActivityEvent {
-  started,
-  ended,
-}
-
 
 /// Voice Activity Detection (VAD) capability surface.
 ///
@@ -40,16 +38,11 @@ enum SpeechActivityEvent {
 /// `RunAnywhere+VAD.swift` extension functions.
 class RunAnywhereVAD {
   RunAnywhereVAD._() {
-    // Bridge the bridge-level [VADActivityEvent] stream to the public
-    // [SpeechActivityEvent] stream + invoke any registered callbacks.
-    _bridgeSubscription = DartBridge.vad.activityStream.listen((event) {
-      if (event is bridge.VADSpeechStartedEvent) {
-        _speechActivityCallback?.call(SpeechActivityEvent.started);
-        _activityController.add(SpeechActivityEvent.started);
-      } else if (event is bridge.VADSpeechEndedEvent) {
-        _speechActivityCallback?.call(SpeechActivityEvent.ended);
-        _activityController.add(SpeechActivityEvent.ended);
-      }
+    _bridgeSubscription = DartBridge.vad.activityProtoStream.listen((event) {
+      final vadEvent = _toVadEventType(event);
+      if (vadEvent == null) return;
+      _speechActivityCallback?.call(vadEvent);
+      _activityController.add(vadEvent);
     });
   }
 
@@ -59,20 +52,14 @@ class RunAnywhereVAD {
   final _logger = SDKLogger('RunAnywhere.VAD');
 
   // Public broadcast stream for speech activity changes.
-  final _activityController = StreamController<SpeechActivityEvent>.broadcast();
+  final _activityController = StreamController<VADEventType>.broadcast();
 
   // Stored audio-buffer + speech-activity + statistics callbacks.
-  void Function(SpeechActivityEvent event)? _speechActivityCallback;
+  void Function(VADEventType event)? _speechActivityCallback;
   void Function(Float32List samples)? _audioBufferCallback;
   void Function(VADStatistics stats)? _statisticsCallback;
 
-  // Running statistics counters (updated on every detectSpeech call).
-  int _speechEventCount = 0;
-  double _totalAudioMs = 0.0;
-  int _speechFrames = 0;
-  int _totalFrames = 0;
-
-  late final StreamSubscription<bridge.VADActivityEvent> _bridgeSubscription;
+  late final StreamSubscription<SpeechActivityEvent> _bridgeSubscription;
 
   // VAD model state — independent from the energy-based VAD process.
   String? _loadedModelId;
@@ -84,16 +71,12 @@ class RunAnywhereVAD {
 
   /// Initialize VAD with default configuration. Mirrors Swift's
   /// `initializeVAD()`.
-  Future<void> initializeVAD([VADComponentConfig? config]) async {
+  Future<void> initializeVAD([VADConfiguration? config]) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (config != null) {
-      config.validate();
-      // Push energy-threshold configuration through the bridge.
-      DartBridge.vad.energyThreshold = config.energyThreshold;
-    }
     await DartBridge.vad.initialize();
+    await DartBridge.vad.configureProto(_effectiveConfiguration(config));
     _logger.info('VAD initialized');
   }
 
@@ -111,12 +94,10 @@ class RunAnywhereVAD {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final result = DartBridge.vad.process(samples);
-    // Estimate audio duration from sample count at 16kHz.
-    _totalAudioMs += samples.length / 16.0;
+    final result = DartBridge.vad.processProto(samples);
     // Forward to audio-buffer callback for parity with Swift.
     _audioBufferCallback?.call(samples);
-    _emitStatistics(result.isSpeech);
+    _emitStatistics();
     return result.isSpeech;
   }
 
@@ -132,16 +113,10 @@ class RunAnywhereVAD {
       throw SDKException.notInitialized();
     }
     final samples = _pcm16ToFloat32(audio);
-    final result = DartBridge.vad.process(samples);
-    _totalAudioMs += audio.length / 32.0; // PCM-16 at 16kHz: 2 bytes * 16000 = 32000 bytes/s
+    final result = DartBridge.vad.processProto(samples, options);
     _audioBufferCallback?.call(samples);
-    _emitStatistics(result.isSpeech);
-    return VADResult(
-      isSpeech: result.isSpeech,
-      confidence: result.speechProbability,
-      energy: result.energy,
-      durationMs: 0,
-    );
+    _emitStatistics();
+    return result;
   }
 
   /// Detect voice activity from Float32 PCM samples (internal / advanced).
@@ -152,14 +127,10 @@ class RunAnywhereVAD {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final result = DartBridge.vad.process(audio);
+    final result = DartBridge.vad.processProto(audio, options);
     _audioBufferCallback?.call(audio);
-    return VADResult(
-      isSpeech: result.isSpeech,
-      confidence: result.speechProbability,
-      energy: result.energy,
-      durationMs: 0,
-    );
+    _emitStatistics();
+    return result;
   }
 
   static Float32List _pcm16ToFloat32(Uint8List pcm16) {
@@ -208,13 +179,12 @@ class RunAnywhereVAD {
   /// Stream of speech activity transitions (started / ended). Each
   /// emission is also forwarded to the registered
   /// `setSpeechActivityCallback` listener if any.
-  Stream<SpeechActivityEvent> get activityStream =>
-      _activityController.stream;
+  Stream<VADEventType> get activityStream => _activityController.stream;
 
   /// Register a single callback for speech activity events. Mirrors
   /// Swift's `setVADSpeechActivityCallback(_:)`.
   void setSpeechActivityCallback(
-    void Function(SpeechActivityEvent event)? callback,
+    void Function(VADEventType event)? callback,
   ) {
     _speechActivityCallback = callback;
   }
@@ -248,22 +218,10 @@ class RunAnywhereVAD {
     }
   }
 
-  // Internal helper to emit statistics after each detection call.
-  void _emitStatistics(bool isSpeech) {
-    _totalFrames++;
-    if (isSpeech) {
-      _speechFrames++;
-      _speechEventCount++;
-    }
-    // Map to proto VADStatistics fields: recentAvg as speech fraction,
-    // recentMax as total frames (normalized), ambientLevel as totalAudioMs.
-    final speechFraction =
-        _totalFrames > 0 ? _speechFrames / _totalFrames : 0.0;
-    _statisticsCallback?.call(VADStatistics(
-      ambientLevel: _totalAudioMs,
-      recentAvg: speechFraction,
-      recentMax: _speechEventCount.toDouble(),
-    ));
+  void _emitStatistics() {
+    final callback = _statisticsCallback;
+    if (callback == null) return;
+    callback(DartBridge.vad.statisticsProto());
   }
 
   // ---------------------------------------------------------------------
@@ -295,17 +253,24 @@ class RunAnywhereVAD {
     if (model == null) {
       throw SDKException.modelNotFound('VAD model not found: $modelId');
     }
-    if (model.localPath == null) {
+    if (model.localPath.isEmpty) {
       throw SDKException.modelNotDownloaded(
         'VAD model is not downloaded. Call downloadModel() first.',
       );
     }
 
-    // Re-initialize the VAD component for the new model. The C++ side
-    // does not currently expose a model-aware load — initialization is
-    // sufficient for the energy-based path while still recording the
-    // active model id for parity with Swift.
-    await DartBridge.vad.initialize();
+    final resolvedPath =
+        await DartBridge.modelPaths.resolveModelFilePath(model);
+    if (resolvedPath == null) {
+      throw SDKException.modelNotFound(
+          'Could not resolve VAD model file path for: $modelId');
+    }
+
+    await initializeVAD(VADConfiguration(
+      modelId: modelId,
+      modelPath: resolvedPath,
+      sampleRate: 16000,
+    ));
 
     _loadedModelId = modelId;
     _loadedModel = model;
@@ -331,5 +296,33 @@ class RunAnywhereVAD {
     await _bridgeSubscription.cancel();
     await _activityController.close();
     DartBridge.vad.dispose();
+  }
+
+  VADConfiguration _effectiveConfiguration(VADConfiguration? config) {
+    final effective = (config ?? VADConfiguration()).deepCopy();
+    if (!effective.hasSampleRate()) {
+      effective.sampleRate = 16000;
+    }
+    if (!effective.hasFrameLengthMs()) {
+      effective.frameLengthMs = 30;
+    }
+    if (!effective.hasThreshold()) {
+      effective.threshold = DartBridge.vad.energyThreshold;
+    }
+    return effective;
+  }
+
+  VADEventType? _toVadEventType(SpeechActivityEvent event) {
+    switch (event.eventType) {
+      case SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED:
+        return VADEventType.VAD_EVENT_VOICE_START;
+      case SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED:
+        return VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE;
+      case SpeechActivityKind.SPEECH_ACTIVITY_KIND_ONGOING:
+        return VADEventType.VAD_EVENT_BARGE_IN;
+      case SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED:
+        return null;
+    }
+    return null;
   }
 }

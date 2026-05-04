@@ -37,12 +37,17 @@ public extension RunAnywhere {
         /// - Returns: `LoRAAdapterInfo` describing the loaded adapter.
         @discardableResult
         public func load(_ config: LoRAAdapterConfig) async throws -> LoRAAdapterInfo {
+            let info = try await load(config.toRALoRAAdapterConfig())
+            return LoRAAdapterInfo(from: info)
+        }
+
+        /// Load and apply a generated-proto LoRA adapter config.
+        @discardableResult
+        public func load(_ config: RALoRAAdapterConfig) async throws -> RALoRAAdapterInfo {
             guard RunAnywhere.isInitialized else {
                 throw SDKException.general(.notInitialized, "SDK not initialized")
             }
-            try await CppBridge.LLM.shared.loadLoraAdapter(config)
-            // C ABI does not return adapter metadata on load; build from config.
-            return LoRAAdapterInfo(path: config.path, scale: config.scale, applied: true)
+            return try await CppBridge.LLM.shared.loadLoraAdapter(config)
         }
 
         /// Remove a specific LoRA adapter by adapter id (file path).
@@ -50,7 +55,10 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException.general(.notInitialized, "SDK not initialized")
             }
-            try await CppBridge.LLM.shared.removeLoraAdapter(adapterId)
+            var config = RALoRAAdapterConfig()
+            config.adapterPath = adapterId
+            config.adapterID = adapterId
+            _ = try await CppBridge.LLM.shared.removeLoraAdapter(config)
         }
 
         /// Remove all loaded LoRA adapters.
@@ -58,7 +66,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException.general(.notInitialized, "SDK not initialized")
             }
-            try await CppBridge.LLM.shared.clearLoraAdapters()
+            _ = try await CppBridge.LLM.shared.clearLoraAdaptersProto()
         }
 
         /// Get info about all currently loaded LoRA adapters.
@@ -82,7 +90,14 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 return LoraCompatibilityResult(isCompatible: false, error: "SDK not initialized")
             }
-            return await CppBridge.LLM.shared.checkLoraCompatibility(loraPath: adapterId)
+            var config = RALoRAAdapterConfig()
+            config.adapterPath = adapterId
+            do {
+                let proto = try await CppBridge.LLM.shared.checkLoraCompatibility(config)
+                return LoraCompatibilityResult(from: proto)
+            } catch {
+                return LoraCompatibilityResult(isCompatible: false, error: error.localizedDescription)
+            }
         }
 
         // MARK: Catalog Operations
@@ -106,7 +121,7 @@ public extension RunAnywhere {
                 fileSize: 0,
                 defaultScale: config.scale
             )
-            try await CppBridge.LoraRegistry.shared.register(entry)
+            try await register(entry)
         }
 
         /// Register a LoRA adapter from a full catalog entry.
@@ -116,10 +131,15 @@ public extension RunAnywhere {
         ///
         /// - Parameter entry: A complete `LoraAdapterCatalogEntry` to register.
         public func register(_ entry: LoraAdapterCatalogEntry) async throws {
+            try await register(entry.toRALoraAdapterCatalogEntry())
+        }
+
+        /// Register a generated-proto LoRA catalog entry.
+        public func register(_ entry: RALoraAdapterCatalogEntry) async throws {
             guard RunAnywhere.isInitialized else {
                 throw SDKException.general(.notInitialized, "SDK not initialized")
             }
-            try await CppBridge.LoraRegistry.shared.register(entry)
+            _ = try await CppBridge.LoraRegistry.shared.register(entry)
         }
 
         /// Get all LoRA adapters compatible with a specific model (CANONICAL_API §3).

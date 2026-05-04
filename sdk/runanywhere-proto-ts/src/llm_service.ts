@@ -64,6 +64,34 @@ export interface LLMGenerateRequest {
   systemPrompt: string;
   /** chain-of-thought tokens emit as TokenKind.THOUGHT */
   emitThoughts: boolean;
+  /**
+   * Additional LLMGenerationOptions fields kept inline to avoid a codegen
+   * package cycle between service stubs and option messages.
+   */
+  repetitionPenalty: number;
+  stopSequences: string[];
+  streamingEnabled: boolean;
+  preferredFramework: string;
+  jsonSchema: string;
+  executionTarget: string;
+}
+
+/**
+ * Aggregate result carried on the terminal LLMStreamEvent. This intentionally
+ * duplicates the scalar result fields instead of importing llm_options.proto:
+ * Square Wire treats files with/without go_package as different Kotlin
+ * packages, and that import creates a package cycle through sdk_events.
+ */
+export interface LLMStreamFinalResult {
+  text: string;
+  thinkingContent?: string | undefined;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  totalTimeMs: number;
+  timeToFirstTokenMs: number;
+  tokensPerSecond: number;
+  finishReason: string;
 }
 
 /**
@@ -110,10 +138,36 @@ export interface LLMStreamEvent {
    * Empty on success.
    */
   errorMessage: string;
+  /**
+   * Final aggregate result. Only populated on terminal events
+   * (is_final=true) when the backend can report result metrics.
+   */
+  result?:
+    | LLMStreamFinalResult
+    | undefined;
+  /**
+   * Numeric backend status code when the terminal event represents a
+   * failure. 0 = unset/success.
+   */
+  errorCode: number;
 }
 
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
-  return { prompt: "", maxTokens: 0, temperature: 0, topP: 0, topK: 0, systemPrompt: "", emitThoughts: false };
+  return {
+    prompt: "",
+    maxTokens: 0,
+    temperature: 0,
+    topP: 0,
+    topK: 0,
+    systemPrompt: "",
+    emitThoughts: false,
+    repetitionPenalty: 0,
+    stopSequences: [],
+    streamingEnabled: false,
+    preferredFramework: "",
+    jsonSchema: "",
+    executionTarget: "",
+  };
 }
 
 export const LLMGenerateRequest = {
@@ -138,6 +192,24 @@ export const LLMGenerateRequest = {
     }
     if (message.emitThoughts !== false) {
       writer.uint32(56).bool(message.emitThoughts);
+    }
+    if (message.repetitionPenalty !== 0) {
+      writer.uint32(69).float(message.repetitionPenalty);
+    }
+    for (const v of message.stopSequences) {
+      writer.uint32(74).string(v!);
+    }
+    if (message.streamingEnabled !== false) {
+      writer.uint32(80).bool(message.streamingEnabled);
+    }
+    if (message.preferredFramework !== "") {
+      writer.uint32(90).string(message.preferredFramework);
+    }
+    if (message.jsonSchema !== "") {
+      writer.uint32(98).string(message.jsonSchema);
+    }
+    if (message.executionTarget !== "") {
+      writer.uint32(106).string(message.executionTarget);
     }
     return writer;
   },
@@ -198,6 +270,48 @@ export const LLMGenerateRequest = {
 
           message.emitThoughts = reader.bool();
           continue;
+        case 8:
+          if (tag !== 69) {
+            break;
+          }
+
+          message.repetitionPenalty = reader.float();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.stopSequences.push(reader.string());
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.streamingEnabled = reader.bool();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.preferredFramework = reader.string();
+          continue;
+        case 12:
+          if (tag !== 98) {
+            break;
+          }
+
+          message.jsonSchema = reader.string();
+          continue;
+        case 13:
+          if (tag !== 106) {
+            break;
+          }
+
+          message.executionTarget = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -216,6 +330,14 @@ export const LLMGenerateRequest = {
       topK: isSet(object.topK) ? globalThis.Number(object.topK) : 0,
       systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : "",
       emitThoughts: isSet(object.emitThoughts) ? globalThis.Boolean(object.emitThoughts) : false,
+      repetitionPenalty: isSet(object.repetitionPenalty) ? globalThis.Number(object.repetitionPenalty) : 0,
+      stopSequences: globalThis.Array.isArray(object?.stopSequences)
+        ? object.stopSequences.map((e: any) => globalThis.String(e))
+        : [],
+      streamingEnabled: isSet(object.streamingEnabled) ? globalThis.Boolean(object.streamingEnabled) : false,
+      preferredFramework: isSet(object.preferredFramework) ? globalThis.String(object.preferredFramework) : "",
+      jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : "",
+      executionTarget: isSet(object.executionTarget) ? globalThis.String(object.executionTarget) : "",
     };
   },
 
@@ -242,6 +364,24 @@ export const LLMGenerateRequest = {
     if (message.emitThoughts !== false) {
       obj.emitThoughts = message.emitThoughts;
     }
+    if (message.repetitionPenalty !== 0) {
+      obj.repetitionPenalty = message.repetitionPenalty;
+    }
+    if (message.stopSequences?.length) {
+      obj.stopSequences = message.stopSequences;
+    }
+    if (message.streamingEnabled !== false) {
+      obj.streamingEnabled = message.streamingEnabled;
+    }
+    if (message.preferredFramework !== "") {
+      obj.preferredFramework = message.preferredFramework;
+    }
+    if (message.jsonSchema !== "") {
+      obj.jsonSchema = message.jsonSchema;
+    }
+    if (message.executionTarget !== "") {
+      obj.executionTarget = message.executionTarget;
+    }
     return obj;
   },
 
@@ -257,6 +397,201 @@ export const LLMGenerateRequest = {
     message.topK = object.topK ?? 0;
     message.systemPrompt = object.systemPrompt ?? "";
     message.emitThoughts = object.emitThoughts ?? false;
+    message.repetitionPenalty = object.repetitionPenalty ?? 0;
+    message.stopSequences = object.stopSequences?.map((e) => e) || [];
+    message.streamingEnabled = object.streamingEnabled ?? false;
+    message.preferredFramework = object.preferredFramework ?? "";
+    message.jsonSchema = object.jsonSchema ?? "";
+    message.executionTarget = object.executionTarget ?? "";
+    return message;
+  },
+};
+
+function createBaseLLMStreamFinalResult(): LLMStreamFinalResult {
+  return {
+    text: "",
+    thinkingContent: undefined,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    totalTimeMs: 0,
+    timeToFirstTokenMs: 0,
+    tokensPerSecond: 0,
+    finishReason: "",
+  };
+}
+
+export const LLMStreamFinalResult = {
+  encode(message: LLMStreamFinalResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.text !== "") {
+      writer.uint32(10).string(message.text);
+    }
+    if (message.thinkingContent !== undefined) {
+      writer.uint32(18).string(message.thinkingContent);
+    }
+    if (message.promptTokens !== 0) {
+      writer.uint32(24).int32(message.promptTokens);
+    }
+    if (message.completionTokens !== 0) {
+      writer.uint32(32).int32(message.completionTokens);
+    }
+    if (message.totalTokens !== 0) {
+      writer.uint32(40).int32(message.totalTokens);
+    }
+    if (message.totalTimeMs !== 0) {
+      writer.uint32(48).int64(message.totalTimeMs);
+    }
+    if (message.timeToFirstTokenMs !== 0) {
+      writer.uint32(56).int64(message.timeToFirstTokenMs);
+    }
+    if (message.tokensPerSecond !== 0) {
+      writer.uint32(69).float(message.tokensPerSecond);
+    }
+    if (message.finishReason !== "") {
+      writer.uint32(74).string(message.finishReason);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LLMStreamFinalResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLLMStreamFinalResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.thinkingContent = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.promptTokens = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.completionTokens = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.totalTokens = reader.int32();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.totalTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.timeToFirstTokenMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 69) {
+            break;
+          }
+
+          message.tokensPerSecond = reader.float();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.finishReason = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LLMStreamFinalResult {
+    return {
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      thinkingContent: isSet(object.thinkingContent) ? globalThis.String(object.thinkingContent) : undefined,
+      promptTokens: isSet(object.promptTokens) ? globalThis.Number(object.promptTokens) : 0,
+      completionTokens: isSet(object.completionTokens) ? globalThis.Number(object.completionTokens) : 0,
+      totalTokens: isSet(object.totalTokens) ? globalThis.Number(object.totalTokens) : 0,
+      totalTimeMs: isSet(object.totalTimeMs) ? globalThis.Number(object.totalTimeMs) : 0,
+      timeToFirstTokenMs: isSet(object.timeToFirstTokenMs) ? globalThis.Number(object.timeToFirstTokenMs) : 0,
+      tokensPerSecond: isSet(object.tokensPerSecond) ? globalThis.Number(object.tokensPerSecond) : 0,
+      finishReason: isSet(object.finishReason) ? globalThis.String(object.finishReason) : "",
+    };
+  },
+
+  toJSON(message: LLMStreamFinalResult): unknown {
+    const obj: any = {};
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.thinkingContent !== undefined) {
+      obj.thinkingContent = message.thinkingContent;
+    }
+    if (message.promptTokens !== 0) {
+      obj.promptTokens = Math.round(message.promptTokens);
+    }
+    if (message.completionTokens !== 0) {
+      obj.completionTokens = Math.round(message.completionTokens);
+    }
+    if (message.totalTokens !== 0) {
+      obj.totalTokens = Math.round(message.totalTokens);
+    }
+    if (message.totalTimeMs !== 0) {
+      obj.totalTimeMs = Math.round(message.totalTimeMs);
+    }
+    if (message.timeToFirstTokenMs !== 0) {
+      obj.timeToFirstTokenMs = Math.round(message.timeToFirstTokenMs);
+    }
+    if (message.tokensPerSecond !== 0) {
+      obj.tokensPerSecond = message.tokensPerSecond;
+    }
+    if (message.finishReason !== "") {
+      obj.finishReason = message.finishReason;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(base?: I): LLMStreamFinalResult {
+    return LLMStreamFinalResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(object: I): LLMStreamFinalResult {
+    const message = createBaseLLMStreamFinalResult();
+    message.text = object.text ?? "";
+    message.thinkingContent = object.thinkingContent ?? undefined;
+    message.promptTokens = object.promptTokens ?? 0;
+    message.completionTokens = object.completionTokens ?? 0;
+    message.totalTokens = object.totalTokens ?? 0;
+    message.totalTimeMs = object.totalTimeMs ?? 0;
+    message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
+    message.tokensPerSecond = object.tokensPerSecond ?? 0;
+    message.finishReason = object.finishReason ?? "";
     return message;
   },
 };
@@ -272,6 +607,8 @@ function createBaseLLMStreamEvent(): LLMStreamEvent {
     logprob: 0,
     finishReason: "",
     errorMessage: "",
+    result: undefined,
+    errorCode: 0,
   };
 }
 
@@ -303,6 +640,12 @@ export const LLMStreamEvent = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(74).string(message.errorMessage);
+    }
+    if (message.result !== undefined) {
+      LLMStreamFinalResult.encode(message.result, writer.uint32(82).fork()).ldelim();
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(88).int32(message.errorCode);
     }
     return writer;
   },
@@ -377,6 +720,20 @@ export const LLMStreamEvent = {
 
           message.errorMessage = reader.string();
           continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.result = LLMStreamFinalResult.decode(reader, reader.uint32());
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -397,6 +754,8 @@ export const LLMStreamEvent = {
       logprob: isSet(object.logprob) ? globalThis.Number(object.logprob) : 0,
       finishReason: isSet(object.finishReason) ? globalThis.String(object.finishReason) : "",
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      result: isSet(object.result) ? LLMStreamFinalResult.fromJSON(object.result) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
     };
   },
 
@@ -429,6 +788,12 @@ export const LLMStreamEvent = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.result !== undefined) {
+      obj.result = LLMStreamFinalResult.toJSON(message.result);
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     return obj;
   },
 
@@ -446,6 +811,10 @@ export const LLMStreamEvent = {
     message.logprob = object.logprob ?? 0;
     message.finishReason = object.finishReason ?? "";
     message.errorMessage = object.errorMessage ?? "";
+    message.result = (object.result !== undefined && object.result !== null)
+      ? LLMStreamFinalResult.fromPartial(object.result)
+      : undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };

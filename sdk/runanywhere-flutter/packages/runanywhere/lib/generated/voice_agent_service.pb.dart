@@ -1,9 +1,13 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: voice_agent_service.proto
 //
 // @dart = 2.12
-// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
+
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
 import 'dart:async' as $async;
 import 'dart:core' as $core;
@@ -11,25 +15,30 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'voice_events.pb.dart' as $0;
+import 'voice_events.pbenum.dart' as $0;
 
+/// Empty request type — the voice agent already has its config set via
+/// `rac_voice_agent_init()` at handle creation time. The Stream rpc just
+/// opens a new event subscription on an existing handle.
 class VoiceAgentRequest extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceAgentRequest', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'eventFilter')
-    ..hasRequiredFields = false
-  ;
-
-  VoiceAgentRequest._() : super();
   factory VoiceAgentRequest({
     $core.String? eventFilter,
   }) {
-    final _result = create();
+    final $result = create();
     if (eventFilter != null) {
-      _result.eventFilter = eventFilter;
+      $result.eventFilter = eventFilter;
     }
-    return _result;
+    return $result;
   }
+  VoiceAgentRequest._() : super();
   factory VoiceAgentRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VoiceAgentRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'eventFilter')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -39,8 +48,10 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VoiceAgentRequest copyWith(void Function(VoiceAgentRequest) updates) => super.copyWith((message) => updates(message as VoiceAgentRequest)) as VoiceAgentRequest; // ignore: deprecated_member_use
+  VoiceAgentRequest copyWith(void Function(VoiceAgentRequest) updates) => super.copyWith((message) => updates(message as VoiceAgentRequest)) as VoiceAgentRequest;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VoiceAgentRequest create() => VoiceAgentRequest._();
   VoiceAgentRequest createEmptyInstance() => create();
@@ -49,6 +60,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   static VoiceAgentRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentRequest>(create);
   static VoiceAgentRequest? _defaultInstance;
 
+  /// Optional: filter the stream to only certain VoiceEvent.payload arms
+  /// (e.g. "user_said,assistant_token"). Empty = all events.
   @$pb.TagNumber(1)
   $core.String get eventFilter => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -59,18 +72,17 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   void clearEventFilter() => clearField(1);
 }
 
+///  ---------------------------------------------------------------------------
+///  v3.2: One-shot voice-turn result.
+///
+///  Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
+///  `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
+///  `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
+///  Returned by the `processVoiceTurn` ergonomic API where a single audio
+///  blob produces transcription + assistant response + synthesized audio in
+///  one call (as opposed to the streaming path served by the Stream rpc).
+///  ---------------------------------------------------------------------------
 class VoiceAgentResult extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceAgentResult', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOB(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'speechDetected')
-    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'transcription')
-    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'assistantResponse')
-    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'thinkingContent')
-    ..a<$core.List<$core.int>>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'synthesizedAudio', $pb.PbFieldType.OY)
-    ..aOM<$0.VoiceAgentComponentStates>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'finalState', subBuilder: $0.VoiceAgentComponentStates.create)
-    ..hasRequiredFields = false
-  ;
-
-  VoiceAgentResult._() : super();
   factory VoiceAgentResult({
     $core.bool? speechDetected,
     $core.String? transcription,
@@ -78,30 +90,57 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     $core.String? thinkingContent,
     $core.List<$core.int>? synthesizedAudio,
     $0.VoiceAgentComponentStates? finalState,
+    $core.int? synthesizedAudioSampleRateHz,
+    $core.int? synthesizedAudioChannels,
+    $0.AudioEncoding? synthesizedAudioEncoding,
   }) {
-    final _result = create();
+    final $result = create();
     if (speechDetected != null) {
-      _result.speechDetected = speechDetected;
+      $result.speechDetected = speechDetected;
     }
     if (transcription != null) {
-      _result.transcription = transcription;
+      $result.transcription = transcription;
     }
     if (assistantResponse != null) {
-      _result.assistantResponse = assistantResponse;
+      $result.assistantResponse = assistantResponse;
     }
     if (thinkingContent != null) {
-      _result.thinkingContent = thinkingContent;
+      $result.thinkingContent = thinkingContent;
     }
     if (synthesizedAudio != null) {
-      _result.synthesizedAudio = synthesizedAudio;
+      $result.synthesizedAudio = synthesizedAudio;
     }
     if (finalState != null) {
-      _result.finalState = finalState;
+      $result.finalState = finalState;
     }
-    return _result;
+    if (synthesizedAudioSampleRateHz != null) {
+      $result.synthesizedAudioSampleRateHz = synthesizedAudioSampleRateHz;
+    }
+    if (synthesizedAudioChannels != null) {
+      $result.synthesizedAudioChannels = synthesizedAudioChannels;
+    }
+    if (synthesizedAudioEncoding != null) {
+      $result.synthesizedAudioEncoding = synthesizedAudioEncoding;
+    }
+    return $result;
   }
+  VoiceAgentResult._() : super();
   factory VoiceAgentResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VoiceAgentResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'speechDetected')
+    ..aOS(2, _omitFieldNames ? '' : 'transcription')
+    ..aOS(3, _omitFieldNames ? '' : 'assistantResponse')
+    ..aOS(4, _omitFieldNames ? '' : 'thinkingContent')
+    ..a<$core.List<$core.int>>(5, _omitFieldNames ? '' : 'synthesizedAudio', $pb.PbFieldType.OY)
+    ..aOM<$0.VoiceAgentComponentStates>(6, _omitFieldNames ? '' : 'finalState', subBuilder: $0.VoiceAgentComponentStates.create)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'synthesizedAudioSampleRateHz', $pb.PbFieldType.O3)
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'synthesizedAudioChannels', $pb.PbFieldType.O3)
+    ..e<$0.AudioEncoding>(9, _omitFieldNames ? '' : 'synthesizedAudioEncoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -111,8 +150,10 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VoiceAgentResult copyWith(void Function(VoiceAgentResult) updates) => super.copyWith((message) => updates(message as VoiceAgentResult)) as VoiceAgentResult; // ignore: deprecated_member_use
+  VoiceAgentResult copyWith(void Function(VoiceAgentResult) updates) => super.copyWith((message) => updates(message as VoiceAgentResult)) as VoiceAgentResult;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VoiceAgentResult create() => VoiceAgentResult._();
   VoiceAgentResult createEmptyInstance() => create();
@@ -121,6 +162,7 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   static VoiceAgentResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentResult>(create);
   static VoiceAgentResult? _defaultInstance;
 
+  /// Whether the input audio passed VAD's speech-detected check.
   @$pb.TagNumber(1)
   $core.bool get speechDetected => $_getBF(0);
   @$pb.TagNumber(1)
@@ -130,6 +172,7 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSpeechDetected() => clearField(1);
 
+  /// Transcribed text from STT. Unset when speech_detected=false.
   @$pb.TagNumber(2)
   $core.String get transcription => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -139,6 +182,8 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTranscription() => clearField(2);
 
+  /// Generated assistant response text from the LLM. Unset when STT
+  /// produced no transcription or LLM was skipped.
   @$pb.TagNumber(3)
   $core.String get assistantResponse => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -148,6 +193,9 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAssistantResponse() => clearField(3);
 
+  /// Thinking content extracted from `<think>...</think>` tags
+  /// (qwen3, deepseek-r1). Unset when the active LLM does not emit
+  /// a chain-of-thought trace.
   @$pb.TagNumber(4)
   $core.String get thinkingContent => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -157,6 +205,9 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearThinkingContent() => clearField(4);
 
+  /// Synthesized audio data from TTS. Encoding follows AudioFrameEvent
+  /// conventions (typically PCM-F32-LE, sample rate per voice). Unset
+  /// when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
   @$pb.TagNumber(5)
   $core.List<$core.int> get synthesizedAudio => $_getN(4);
   @$pb.TagNumber(5)
@@ -166,6 +217,9 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearSynthesizedAudio() => clearField(5);
 
+  /// Component states captured at the end of the turn — useful for UIs
+  /// surfacing readiness / partial-failure breakdowns alongside the
+  /// final result. Unset when the caller does not ask for it.
   @$pb.TagNumber(6)
   $0.VoiceAgentComponentStates get finalState => $_getN(5);
   @$pb.TagNumber(6)
@@ -176,46 +230,89 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   void clearFinalState() => clearField(6);
   @$pb.TagNumber(6)
   $0.VoiceAgentComponentStates ensureFinalState() => $_ensure(5);
+
+  /// Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
+  /// or unknown.
+  @$pb.TagNumber(7)
+  $core.int get synthesizedAudioSampleRateHz => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set synthesizedAudioSampleRateHz($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasSynthesizedAudioSampleRateHz() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSynthesizedAudioSampleRateHz() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get synthesizedAudioChannels => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set synthesizedAudioChannels($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasSynthesizedAudioChannels() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSynthesizedAudioChannels() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $0.AudioEncoding get synthesizedAudioEncoding => $_getN(8);
+  @$pb.TagNumber(9)
+  set synthesizedAudioEncoding($0.AudioEncoding v) { setField(9, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasSynthesizedAudioEncoding() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSynthesizedAudioEncoding() => clearField(9);
 }
 
+///  ---------------------------------------------------------------------------
+///  v3.2: Voice session behavior configuration.
+///
+///  Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
+///  Controls runtime behavior of the voice agent's session loop — silence
+///  timing, speech threshold, auto-TTS playback, continuous mode, and
+///  LLM thinking-mode toggle.
+///  ---------------------------------------------------------------------------
 class VoiceSessionConfig extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceSessionConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..a<$core.int>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'silenceDurationMs', $pb.PbFieldType.O3)
-    ..a<$core.double>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'speechThreshold', $pb.PbFieldType.OF)
-    ..aOB(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'autoPlayTts')
-    ..aOB(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'continuousMode')
-    ..aOB(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'thinkingModeEnabled')
-    ..hasRequiredFields = false
-  ;
-
-  VoiceSessionConfig._() : super();
   factory VoiceSessionConfig({
     $core.int? silenceDurationMs,
     $core.double? speechThreshold,
     $core.bool? autoPlayTts,
     $core.bool? continuousMode,
     $core.bool? thinkingModeEnabled,
+    $core.int? maxTokens,
   }) {
-    final _result = create();
+    final $result = create();
     if (silenceDurationMs != null) {
-      _result.silenceDurationMs = silenceDurationMs;
+      $result.silenceDurationMs = silenceDurationMs;
     }
     if (speechThreshold != null) {
-      _result.speechThreshold = speechThreshold;
+      $result.speechThreshold = speechThreshold;
     }
     if (autoPlayTts != null) {
-      _result.autoPlayTts = autoPlayTts;
+      $result.autoPlayTts = autoPlayTts;
     }
     if (continuousMode != null) {
-      _result.continuousMode = continuousMode;
+      $result.continuousMode = continuousMode;
     }
     if (thinkingModeEnabled != null) {
-      _result.thinkingModeEnabled = thinkingModeEnabled;
+      $result.thinkingModeEnabled = thinkingModeEnabled;
     }
-    return _result;
+    if (maxTokens != null) {
+      $result.maxTokens = maxTokens;
+    }
+    return $result;
   }
+  VoiceSessionConfig._() : super();
   factory VoiceSessionConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VoiceSessionConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceSessionConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.int>(1, _omitFieldNames ? '' : 'silenceDurationMs', $pb.PbFieldType.O3)
+    ..a<$core.double>(2, _omitFieldNames ? '' : 'speechThreshold', $pb.PbFieldType.OF)
+    ..aOB(3, _omitFieldNames ? '' : 'autoPlayTts')
+    ..aOB(4, _omitFieldNames ? '' : 'continuousMode')
+    ..aOB(5, _omitFieldNames ? '' : 'thinkingModeEnabled')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -225,8 +322,10 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VoiceSessionConfig copyWith(void Function(VoiceSessionConfig) updates) => super.copyWith((message) => updates(message as VoiceSessionConfig)) as VoiceSessionConfig; // ignore: deprecated_member_use
+  VoiceSessionConfig copyWith(void Function(VoiceSessionConfig) updates) => super.copyWith((message) => updates(message as VoiceSessionConfig)) as VoiceSessionConfig;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VoiceSessionConfig create() => VoiceSessionConfig._();
   VoiceSessionConfig createEmptyInstance() => create();
@@ -235,6 +334,8 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   static VoiceSessionConfig getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceSessionConfig>(create);
   static VoiceSessionConfig? _defaultInstance;
 
+  /// Silence duration (milliseconds) before processing the speech
+  /// buffer. Default per Swift/Kotlin: 1500 ms.
   @$pb.TagNumber(1)
   $core.int get silenceDurationMs => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -244,6 +345,8 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSilenceDurationMs() => clearField(1);
 
+  /// Minimum audio level to detect speech (0.0 - 1.0). Default per
+  /// Swift/Kotlin: 0.1.
   @$pb.TagNumber(2)
   $core.double get speechThreshold => $_getN(1);
   @$pb.TagNumber(2)
@@ -253,6 +356,7 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSpeechThreshold() => clearField(2);
 
+  /// Whether to auto-play TTS response after synthesis. Default true.
   @$pb.TagNumber(3)
   $core.bool get autoPlayTts => $_getBF(2);
   @$pb.TagNumber(3)
@@ -262,6 +366,7 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAutoPlayTts() => clearField(3);
 
+  /// Whether to auto-resume listening after TTS playback. Default true.
   @$pb.TagNumber(4)
   $core.bool get continuousMode => $_getBF(3);
   @$pb.TagNumber(4)
@@ -271,6 +376,8 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearContinuousMode() => clearField(4);
 
+  /// Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
+  /// Default false.
   @$pb.TagNumber(5)
   $core.bool get thinkingModeEnabled => $_getBF(4);
   @$pb.TagNumber(5)
@@ -279,34 +386,116 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   $core.bool hasThinkingModeEnabled() => $_has(4);
   @$pb.TagNumber(5)
   void clearThinkingModeEnabled() => clearField(5);
+
+  /// Optional per-turn LLM max token limit. 0 = LLM/default.
+  @$pb.TagNumber(6)
+  $core.int get maxTokens => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set maxTokens($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasMaxTokens() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearMaxTokens() => clearField(6);
 }
 
-class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'VoiceAgentComposeConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sttModelPath')
-    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sttModelId')
-    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sttModelName')
-    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelPath')
-    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelId')
-    ..aOS(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'llmModelName')
-    ..aOS(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ttsVoicePath')
-    ..aOS(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ttsVoiceId')
-    ..aOS(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'ttsVoiceName')
-    ..a<$core.int>(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vadSampleRate', $pb.PbFieldType.O3)
-    ..a<$core.double>(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vadFrameLength', $pb.PbFieldType.OF)
-    ..a<$core.double>(12, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vadEnergyThreshold', $pb.PbFieldType.OF)
-    ..aOB(13, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordEnabled')
-    ..aOS(14, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordModelPath')
-    ..aOS(15, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordModelId')
-    ..aOS(16, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordPhrase')
-    ..a<$core.double>(17, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordThreshold', $pb.PbFieldType.OF)
-    ..aOS(18, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordEmbeddingModelPath')
-    ..aOS(19, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'wakewordVadModelPath')
-    ..aOM<VoiceSessionConfig>(20, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sessionConfig', subBuilder: VoiceSessionConfig.create)
+///  ---------------------------------------------------------------------------
+///  v3.2: Audio pipeline state-manager configuration.
+///
+///  Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
+///  to prevent microphone/TTS feedback loops.
+///  ---------------------------------------------------------------------------
+class AudioPipelineConfig extends $pb.GeneratedMessage {
+  factory AudioPipelineConfig({
+    $core.int? cooldownDurationMs,
+    $core.bool? strictTransitions,
+    $core.int? maxTtsDurationMs,
+  }) {
+    final $result = create();
+    if (cooldownDurationMs != null) {
+      $result.cooldownDurationMs = cooldownDurationMs;
+    }
+    if (strictTransitions != null) {
+      $result.strictTransitions = strictTransitions;
+    }
+    if (maxTtsDurationMs != null) {
+      $result.maxTtsDurationMs = maxTtsDurationMs;
+    }
+    return $result;
+  }
+  AudioPipelineConfig._() : super();
+  factory AudioPipelineConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory AudioPipelineConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AudioPipelineConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.int>(1, _omitFieldNames ? '' : 'cooldownDurationMs', $pb.PbFieldType.O3)
+    ..aOB(2, _omitFieldNames ? '' : 'strictTransitions')
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'maxTtsDurationMs', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
-  VoiceAgentComposeConfig._() : super();
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  AudioPipelineConfig clone() => AudioPipelineConfig()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  AudioPipelineConfig copyWith(void Function(AudioPipelineConfig) updates) => super.copyWith((message) => updates(message as AudioPipelineConfig)) as AudioPipelineConfig;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AudioPipelineConfig create() => AudioPipelineConfig._();
+  AudioPipelineConfig createEmptyInstance() => create();
+  static $pb.PbList<AudioPipelineConfig> createRepeated() => $pb.PbList<AudioPipelineConfig>();
+  @$core.pragma('dart2js:noInline')
+  static AudioPipelineConfig getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AudioPipelineConfig>(create);
+  static AudioPipelineConfig? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get cooldownDurationMs => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set cooldownDurationMs($core.int v) { $_setSignedInt32(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasCooldownDurationMs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCooldownDurationMs() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get strictTransitions => $_getBF(1);
+  @$pb.TagNumber(2)
+  set strictTransitions($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasStrictTransitions() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStrictTransitions() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get maxTtsDurationMs => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set maxTtsDurationMs($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasMaxTtsDurationMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMaxTtsDurationMs() => clearField(3);
+}
+
+///  ---------------------------------------------------------------------------
+///  v3.2: Aggregated voice-agent compose configuration.
+///
+///  Mirrors the C ABI `rac_voice_agent_config_t` and Swift
+///  `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
+///  (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
+///  new message provides the fine-grained sub-component view consumed by the
+///  `rac_voice_agent_initialize()` C entry-point.
+///
+///  Each sub-config string field uses a "model_id" naming convention; the
+///  runtime resolves IDs against the model registry. An empty string means
+///  "use the currently loaded model/voice for that capability".
+///  ---------------------------------------------------------------------------
+class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   factory VoiceAgentComposeConfig({
     $core.String? sttModelPath,
     $core.String? sttModelId,
@@ -328,72 +517,103 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     $core.String? wakewordEmbeddingModelPath,
     $core.String? wakewordVadModelPath,
     VoiceSessionConfig? sessionConfig,
+    AudioPipelineConfig? audioPipelineConfig,
   }) {
-    final _result = create();
+    final $result = create();
     if (sttModelPath != null) {
-      _result.sttModelPath = sttModelPath;
+      $result.sttModelPath = sttModelPath;
     }
     if (sttModelId != null) {
-      _result.sttModelId = sttModelId;
+      $result.sttModelId = sttModelId;
     }
     if (sttModelName != null) {
-      _result.sttModelName = sttModelName;
+      $result.sttModelName = sttModelName;
     }
     if (llmModelPath != null) {
-      _result.llmModelPath = llmModelPath;
+      $result.llmModelPath = llmModelPath;
     }
     if (llmModelId != null) {
-      _result.llmModelId = llmModelId;
+      $result.llmModelId = llmModelId;
     }
     if (llmModelName != null) {
-      _result.llmModelName = llmModelName;
+      $result.llmModelName = llmModelName;
     }
     if (ttsVoicePath != null) {
-      _result.ttsVoicePath = ttsVoicePath;
+      $result.ttsVoicePath = ttsVoicePath;
     }
     if (ttsVoiceId != null) {
-      _result.ttsVoiceId = ttsVoiceId;
+      $result.ttsVoiceId = ttsVoiceId;
     }
     if (ttsVoiceName != null) {
-      _result.ttsVoiceName = ttsVoiceName;
+      $result.ttsVoiceName = ttsVoiceName;
     }
     if (vadSampleRate != null) {
-      _result.vadSampleRate = vadSampleRate;
+      $result.vadSampleRate = vadSampleRate;
     }
     if (vadFrameLength != null) {
-      _result.vadFrameLength = vadFrameLength;
+      $result.vadFrameLength = vadFrameLength;
     }
     if (vadEnergyThreshold != null) {
-      _result.vadEnergyThreshold = vadEnergyThreshold;
+      $result.vadEnergyThreshold = vadEnergyThreshold;
     }
     if (wakewordEnabled != null) {
-      _result.wakewordEnabled = wakewordEnabled;
+      $result.wakewordEnabled = wakewordEnabled;
     }
     if (wakewordModelPath != null) {
-      _result.wakewordModelPath = wakewordModelPath;
+      $result.wakewordModelPath = wakewordModelPath;
     }
     if (wakewordModelId != null) {
-      _result.wakewordModelId = wakewordModelId;
+      $result.wakewordModelId = wakewordModelId;
     }
     if (wakewordPhrase != null) {
-      _result.wakewordPhrase = wakewordPhrase;
+      $result.wakewordPhrase = wakewordPhrase;
     }
     if (wakewordThreshold != null) {
-      _result.wakewordThreshold = wakewordThreshold;
+      $result.wakewordThreshold = wakewordThreshold;
     }
     if (wakewordEmbeddingModelPath != null) {
-      _result.wakewordEmbeddingModelPath = wakewordEmbeddingModelPath;
+      $result.wakewordEmbeddingModelPath = wakewordEmbeddingModelPath;
     }
     if (wakewordVadModelPath != null) {
-      _result.wakewordVadModelPath = wakewordVadModelPath;
+      $result.wakewordVadModelPath = wakewordVadModelPath;
     }
     if (sessionConfig != null) {
-      _result.sessionConfig = sessionConfig;
+      $result.sessionConfig = sessionConfig;
     }
-    return _result;
+    if (audioPipelineConfig != null) {
+      $result.audioPipelineConfig = audioPipelineConfig;
+    }
+    return $result;
   }
+  VoiceAgentComposeConfig._() : super();
   factory VoiceAgentComposeConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory VoiceAgentComposeConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentComposeConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sttModelPath')
+    ..aOS(2, _omitFieldNames ? '' : 'sttModelId')
+    ..aOS(3, _omitFieldNames ? '' : 'sttModelName')
+    ..aOS(4, _omitFieldNames ? '' : 'llmModelPath')
+    ..aOS(5, _omitFieldNames ? '' : 'llmModelId')
+    ..aOS(6, _omitFieldNames ? '' : 'llmModelName')
+    ..aOS(7, _omitFieldNames ? '' : 'ttsVoicePath')
+    ..aOS(8, _omitFieldNames ? '' : 'ttsVoiceId')
+    ..aOS(9, _omitFieldNames ? '' : 'ttsVoiceName')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'vadSampleRate', $pb.PbFieldType.O3)
+    ..a<$core.double>(11, _omitFieldNames ? '' : 'vadFrameLength', $pb.PbFieldType.OF)
+    ..a<$core.double>(12, _omitFieldNames ? '' : 'vadEnergyThreshold', $pb.PbFieldType.OF)
+    ..aOB(13, _omitFieldNames ? '' : 'wakewordEnabled')
+    ..aOS(14, _omitFieldNames ? '' : 'wakewordModelPath')
+    ..aOS(15, _omitFieldNames ? '' : 'wakewordModelId')
+    ..aOS(16, _omitFieldNames ? '' : 'wakewordPhrase')
+    ..a<$core.double>(17, _omitFieldNames ? '' : 'wakewordThreshold', $pb.PbFieldType.OF)
+    ..aOS(18, _omitFieldNames ? '' : 'wakewordEmbeddingModelPath')
+    ..aOS(19, _omitFieldNames ? '' : 'wakewordVadModelPath')
+    ..aOM<VoiceSessionConfig>(20, _omitFieldNames ? '' : 'sessionConfig', subBuilder: VoiceSessionConfig.create)
+    ..aOM<AudioPipelineConfig>(21, _omitFieldNames ? '' : 'audioPipelineConfig', subBuilder: AudioPipelineConfig.create)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -403,8 +623,10 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  VoiceAgentComposeConfig copyWith(void Function(VoiceAgentComposeConfig) updates) => super.copyWith((message) => updates(message as VoiceAgentComposeConfig)) as VoiceAgentComposeConfig; // ignore: deprecated_member_use
+  VoiceAgentComposeConfig copyWith(void Function(VoiceAgentComposeConfig) updates) => super.copyWith((message) => updates(message as VoiceAgentComposeConfig)) as VoiceAgentComposeConfig;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static VoiceAgentComposeConfig create() => VoiceAgentComposeConfig._();
   VoiceAgentComposeConfig createEmptyInstance() => create();
@@ -413,6 +635,9 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   static VoiceAgentComposeConfig getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentComposeConfig>(create);
   static VoiceAgentComposeConfig? _defaultInstance;
 
+  /// -------------------------------------------------------------------
+  /// STT sub-config (mirrors rac_voice_agent_stt_config_t).
+  /// -------------------------------------------------------------------
   @$pb.TagNumber(1)
   $core.String get sttModelPath => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -440,6 +665,9 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSttModelName() => clearField(3);
 
+  /// -------------------------------------------------------------------
+  /// LLM sub-config (mirrors rac_voice_agent_llm_config_t).
+  /// -------------------------------------------------------------------
   @$pb.TagNumber(4)
   $core.String get llmModelPath => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -467,6 +695,9 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearLlmModelName() => clearField(6);
 
+  /// -------------------------------------------------------------------
+  /// TTS sub-config (mirrors rac_voice_agent_tts_config_t).
+  /// -------------------------------------------------------------------
   @$pb.TagNumber(7)
   $core.String get ttsVoicePath => $_getSZ(6);
   @$pb.TagNumber(7)
@@ -494,6 +725,9 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearTtsVoiceName() => clearField(9);
 
+  /// -------------------------------------------------------------------
+  /// VAD sub-config (mirrors rac_voice_agent_vad_config_t).
+  /// -------------------------------------------------------------------
   @$pb.TagNumber(10)
   $core.int get vadSampleRate => $_getIZ(9);
   @$pb.TagNumber(10)
@@ -521,6 +755,10 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearVadEnergyThreshold() => clearField(12);
 
+  /// -------------------------------------------------------------------
+  /// Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
+  /// rac_wakeword_config_t).
+  /// -------------------------------------------------------------------
   @$pb.TagNumber(13)
   $core.bool get wakewordEnabled => $_getBF(12);
   @$pb.TagNumber(13)
@@ -584,6 +822,10 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   void clearWakewordVadModelPath() => clearField(19);
 
+  /// -------------------------------------------------------------------
+  /// Session-behavior sub-config. Optional so the C ABI can be invoked
+  /// without runtime-behavior overrides (engine defaults applied).
+  /// -------------------------------------------------------------------
   @$pb.TagNumber(20)
   VoiceSessionConfig get sessionConfig => $_getN(19);
   @$pb.TagNumber(20)
@@ -594,15 +836,30 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   void clearSessionConfig() => clearField(20);
   @$pb.TagNumber(20)
   VoiceSessionConfig ensureSessionConfig() => $_ensure(19);
+
+  /// Audio state-machine behavior. Optional so defaults can be applied by
+  /// the native voice-agent implementation.
+  @$pb.TagNumber(21)
+  AudioPipelineConfig get audioPipelineConfig => $_getN(20);
+  @$pb.TagNumber(21)
+  set audioPipelineConfig(AudioPipelineConfig v) { setField(21, v); }
+  @$pb.TagNumber(21)
+  $core.bool hasAudioPipelineConfig() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearAudioPipelineConfig() => clearField(21);
+  @$pb.TagNumber(21)
+  AudioPipelineConfig ensureAudioPipelineConfig() => $_ensure(20);
 }
 
 class VoiceAgentApi {
   $pb.RpcClient _client;
   VoiceAgentApi(this._client);
 
-  $async.Future<$0.VoiceEvent> stream($pb.ClientContext? ctx, VoiceAgentRequest request) {
-    var emptyResponse = $0.VoiceEvent();
-    return _client.invoke<$0.VoiceEvent>(ctx, 'VoiceAgent', 'Stream', request, emptyResponse);
-  }
+  $async.Future<$0.VoiceEvent> stream($pb.ClientContext? ctx, VoiceAgentRequest request) =>
+    _client.invoke<$0.VoiceEvent>(ctx, 'VoiceAgent', 'Stream', request, $0.VoiceEvent())
+  ;
 }
 
+
+const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
+const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');

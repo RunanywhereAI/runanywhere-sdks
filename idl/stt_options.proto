@@ -136,6 +136,21 @@ message STTConfiguration {
     int32       sample_rate  = 3;   // Hz; default 16000
     bool        enable_vad   = 4;
     AudioFormat audio_format = 5;
+
+    // C ABI / legacy SDK config-level transcription defaults. These may be
+    // mirrored into STTOptions by adapters for per-call overrides.
+    bool        enable_punctuation      = 6;
+    bool        enable_diarization      = 7;
+    repeated string vocabulary_list     = 8;
+    int32       max_alternatives        = 9;   // 0 = backend/default
+    bool        enable_word_timestamps  = 10;
+
+    // Preferred framework for the component. Absent = auto.
+    optional InferenceFramework preferred_framework = 11;
+
+    // Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
+    // that cannot be represented by STTLanguage's base-code enum.
+    optional string language_code       = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +177,21 @@ message STTOptions {
     repeated string vocabulary_list        = 5;   // Custom vocabulary bias
     bool            enable_word_timestamps = 6;
     int32           beam_size              = 7;   // 0 = backend default
+
+    // Free-form BCP-47 language tag. When set, consumers should prefer this
+    // over the base-language enum above.
+    optional string language_code          = 8;
+
+    // Explicit language auto-detection flag for C ABI parity. Equivalent to
+    // language == STT_LANGUAGE_AUTO for generated-only consumers.
+    bool            detect_language        = 9;
+
+    // Per-call input audio hints mirrored from rac_stt_options_t.
+    AudioFormat     audio_format           = 10;
+    int32           sample_rate            = 11;
+
+    // Maximum number of alternatives to return. 0 = backend/default.
+    int32           max_alternatives       = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +272,16 @@ message STTOutput {
     repeated WordTimestamp            words         = 4;
     repeated TranscriptionAlternative alternatives  = 5;
     TranscriptionMetadata             metadata      = 6;
+
+    // Free-form detected language tag, preserving regional variants.
+    optional string                   language_code = 7;
+
+    // Wall-clock output timestamp in milliseconds since Unix epoch.
+    int64                             timestamp_ms  = 8;
+
+    // Audio duration in milliseconds for SDKs that expose duration directly.
+    // Often duplicates metadata.audio_length_ms.
+    int64                             duration_ms   = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,4 +301,11 @@ message STTPartialResult {
     string text      = 1;
     bool   is_final  = 2;
     float  stability = 3;
+
+    // Additional partial-hypothesis fields carried by Dart/RN live streams.
+    float  confidence = 4;
+    STTLanguage language = 5;
+    int64  timestamp_ms = 6;
+    repeated TranscriptionAlternative alternatives = 7;
+    optional string language_code = 8;
 }

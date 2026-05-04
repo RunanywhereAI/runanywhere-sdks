@@ -694,6 +694,929 @@ export const StoredModel = {
         return message;
     },
 };
+function createBaseStorageInfoRequest() {
+    return { includeDevice: false, includeApp: false, includeModels: false };
+}
+export const StorageInfoRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.includeDevice !== false) {
+            writer.uint32(8).bool(message.includeDevice);
+        }
+        if (message.includeApp !== false) {
+            writer.uint32(16).bool(message.includeApp);
+        }
+        if (message.includeModels !== false) {
+            writer.uint32(24).bool(message.includeModels);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageInfoRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.includeDevice = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.includeApp = reader.bool();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.includeModels = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            includeDevice: isSet(object.includeDevice) ? globalThis.Boolean(object.includeDevice) : false,
+            includeApp: isSet(object.includeApp) ? globalThis.Boolean(object.includeApp) : false,
+            includeModels: isSet(object.includeModels) ? globalThis.Boolean(object.includeModels) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.includeDevice !== false) {
+            obj.includeDevice = message.includeDevice;
+        }
+        if (message.includeApp !== false) {
+            obj.includeApp = message.includeApp;
+        }
+        if (message.includeModels !== false) {
+            obj.includeModels = message.includeModels;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageInfoRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageInfoRequest();
+        message.includeDevice = object.includeDevice ?? false;
+        message.includeApp = object.includeApp ?? false;
+        message.includeModels = object.includeModels ?? false;
+        return message;
+    },
+};
+function createBaseStorageInfoResult() {
+    return { success: false, info: undefined, errorMessage: "" };
+}
+export const StorageInfoResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.info !== undefined) {
+            StorageInfo.encode(message.info, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageInfoResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.info = StorageInfo.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            info: isSet(object.info) ? StorageInfo.fromJSON(object.info) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.info !== undefined) {
+            obj.info = StorageInfo.toJSON(message.info);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageInfoResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageInfoResult();
+        message.success = object.success ?? false;
+        message.info = (object.info !== undefined && object.info !== null)
+            ? StorageInfo.fromPartial(object.info)
+            : undefined;
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseStorageAvailabilityRequest() {
+    return { modelId: "", requiredBytes: 0, safetyMargin: 0, includeExistingModelBytes: false };
+}
+export const StorageAvailabilityRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.modelId !== "") {
+            writer.uint32(10).string(message.modelId);
+        }
+        if (message.requiredBytes !== 0) {
+            writer.uint32(16).int64(message.requiredBytes);
+        }
+        if (message.safetyMargin !== 0) {
+            writer.uint32(25).double(message.safetyMargin);
+        }
+        if (message.includeExistingModelBytes !== false) {
+            writer.uint32(32).bool(message.includeExistingModelBytes);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageAvailabilityRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.requiredBytes = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 25) {
+                        break;
+                    }
+                    message.safetyMargin = reader.double();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.includeExistingModelBytes = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            requiredBytes: isSet(object.requiredBytes) ? globalThis.Number(object.requiredBytes) : 0,
+            safetyMargin: isSet(object.safetyMargin) ? globalThis.Number(object.safetyMargin) : 0,
+            includeExistingModelBytes: isSet(object.includeExistingModelBytes)
+                ? globalThis.Boolean(object.includeExistingModelBytes)
+                : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.requiredBytes !== 0) {
+            obj.requiredBytes = Math.round(message.requiredBytes);
+        }
+        if (message.safetyMargin !== 0) {
+            obj.safetyMargin = message.safetyMargin;
+        }
+        if (message.includeExistingModelBytes !== false) {
+            obj.includeExistingModelBytes = message.includeExistingModelBytes;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageAvailabilityRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageAvailabilityRequest();
+        message.modelId = object.modelId ?? "";
+        message.requiredBytes = object.requiredBytes ?? 0;
+        message.safetyMargin = object.safetyMargin ?? 0;
+        message.includeExistingModelBytes = object.includeExistingModelBytes ?? false;
+        return message;
+    },
+};
+function createBaseStorageAvailabilityResult() {
+    return { success: false, availability: undefined, warnings: [], errorMessage: "" };
+}
+export const StorageAvailabilityResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.availability !== undefined) {
+            StorageAvailability.encode(message.availability, writer.uint32(18).fork()).ldelim();
+        }
+        for (const v of message.warnings) {
+            writer.uint32(26).string(v);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(34).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageAvailabilityResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.availability = StorageAvailability.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            availability: isSet(object.availability) ? StorageAvailability.fromJSON(object.availability) : undefined,
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.availability !== undefined) {
+            obj.availability = StorageAvailability.toJSON(message.availability);
+        }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageAvailabilityResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageAvailabilityResult();
+        message.success = object.success ?? false;
+        message.availability = (object.availability !== undefined && object.availability !== null)
+            ? StorageAvailability.fromPartial(object.availability)
+            : undefined;
+        message.warnings = object.warnings?.map((e) => e) || [];
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseStorageDeletePlanRequest() {
+    return { modelIds: [], requiredBytes: 0, includeCache: false, oldestFirst: false };
+}
+export const StorageDeletePlanRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        for (const v of message.modelIds) {
+            writer.uint32(10).string(v);
+        }
+        if (message.requiredBytes !== 0) {
+            writer.uint32(16).int64(message.requiredBytes);
+        }
+        if (message.includeCache !== false) {
+            writer.uint32(24).bool(message.includeCache);
+        }
+        if (message.oldestFirst !== false) {
+            writer.uint32(32).bool(message.oldestFirst);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageDeletePlanRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelIds.push(reader.string());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.requiredBytes = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.includeCache = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.oldestFirst = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelIds: globalThis.Array.isArray(object?.modelIds) ? object.modelIds.map((e) => globalThis.String(e)) : [],
+            requiredBytes: isSet(object.requiredBytes) ? globalThis.Number(object.requiredBytes) : 0,
+            includeCache: isSet(object.includeCache) ? globalThis.Boolean(object.includeCache) : false,
+            oldestFirst: isSet(object.oldestFirst) ? globalThis.Boolean(object.oldestFirst) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelIds?.length) {
+            obj.modelIds = message.modelIds;
+        }
+        if (message.requiredBytes !== 0) {
+            obj.requiredBytes = Math.round(message.requiredBytes);
+        }
+        if (message.includeCache !== false) {
+            obj.includeCache = message.includeCache;
+        }
+        if (message.oldestFirst !== false) {
+            obj.oldestFirst = message.oldestFirst;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageDeletePlanRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageDeletePlanRequest();
+        message.modelIds = object.modelIds?.map((e) => e) || [];
+        message.requiredBytes = object.requiredBytes ?? 0;
+        message.includeCache = object.includeCache ?? false;
+        message.oldestFirst = object.oldestFirst ?? false;
+        return message;
+    },
+};
+function createBaseStorageDeleteCandidate() {
+    return { modelId: "", reclaimableBytes: 0, lastUsedMs: undefined, isLoaded: false, localPath: "" };
+}
+export const StorageDeleteCandidate = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.modelId !== "") {
+            writer.uint32(10).string(message.modelId);
+        }
+        if (message.reclaimableBytes !== 0) {
+            writer.uint32(16).int64(message.reclaimableBytes);
+        }
+        if (message.lastUsedMs !== undefined) {
+            writer.uint32(24).int64(message.lastUsedMs);
+        }
+        if (message.isLoaded !== false) {
+            writer.uint32(32).bool(message.isLoaded);
+        }
+        if (message.localPath !== "") {
+            writer.uint32(42).string(message.localPath);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageDeleteCandidate();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.reclaimableBytes = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.lastUsedMs = longToNumber(reader.int64());
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.isLoaded = reader.bool();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.localPath = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            reclaimableBytes: isSet(object.reclaimableBytes) ? globalThis.Number(object.reclaimableBytes) : 0,
+            lastUsedMs: isSet(object.lastUsedMs) ? globalThis.Number(object.lastUsedMs) : undefined,
+            isLoaded: isSet(object.isLoaded) ? globalThis.Boolean(object.isLoaded) : false,
+            localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.reclaimableBytes !== 0) {
+            obj.reclaimableBytes = Math.round(message.reclaimableBytes);
+        }
+        if (message.lastUsedMs !== undefined) {
+            obj.lastUsedMs = Math.round(message.lastUsedMs);
+        }
+        if (message.isLoaded !== false) {
+            obj.isLoaded = message.isLoaded;
+        }
+        if (message.localPath !== "") {
+            obj.localPath = message.localPath;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageDeleteCandidate.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageDeleteCandidate();
+        message.modelId = object.modelId ?? "";
+        message.reclaimableBytes = object.reclaimableBytes ?? 0;
+        message.lastUsedMs = object.lastUsedMs ?? undefined;
+        message.isLoaded = object.isLoaded ?? false;
+        message.localPath = object.localPath ?? "";
+        return message;
+    },
+};
+function createBaseStorageDeletePlan() {
+    return {
+        canReclaimRequiredBytes: false,
+        requiredBytes: 0,
+        reclaimableBytes: 0,
+        candidates: [],
+        warnings: [],
+        errorMessage: "",
+    };
+}
+export const StorageDeletePlan = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.canReclaimRequiredBytes !== false) {
+            writer.uint32(8).bool(message.canReclaimRequiredBytes);
+        }
+        if (message.requiredBytes !== 0) {
+            writer.uint32(16).int64(message.requiredBytes);
+        }
+        if (message.reclaimableBytes !== 0) {
+            writer.uint32(24).int64(message.reclaimableBytes);
+        }
+        for (const v of message.candidates) {
+            StorageDeleteCandidate.encode(v, writer.uint32(34).fork()).ldelim();
+        }
+        for (const v of message.warnings) {
+            writer.uint32(42).string(v);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(50).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageDeletePlan();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.canReclaimRequiredBytes = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.requiredBytes = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.reclaimableBytes = longToNumber(reader.int64());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.candidates.push(StorageDeleteCandidate.decode(reader, reader.uint32()));
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            canReclaimRequiredBytes: isSet(object.canReclaimRequiredBytes)
+                ? globalThis.Boolean(object.canReclaimRequiredBytes)
+                : false,
+            requiredBytes: isSet(object.requiredBytes) ? globalThis.Number(object.requiredBytes) : 0,
+            reclaimableBytes: isSet(object.reclaimableBytes) ? globalThis.Number(object.reclaimableBytes) : 0,
+            candidates: globalThis.Array.isArray(object?.candidates)
+                ? object.candidates.map((e) => StorageDeleteCandidate.fromJSON(e))
+                : [],
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.canReclaimRequiredBytes !== false) {
+            obj.canReclaimRequiredBytes = message.canReclaimRequiredBytes;
+        }
+        if (message.requiredBytes !== 0) {
+            obj.requiredBytes = Math.round(message.requiredBytes);
+        }
+        if (message.reclaimableBytes !== 0) {
+            obj.reclaimableBytes = Math.round(message.reclaimableBytes);
+        }
+        if (message.candidates?.length) {
+            obj.candidates = message.candidates.map((e) => StorageDeleteCandidate.toJSON(e));
+        }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageDeletePlan.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageDeletePlan();
+        message.canReclaimRequiredBytes = object.canReclaimRequiredBytes ?? false;
+        message.requiredBytes = object.requiredBytes ?? 0;
+        message.reclaimableBytes = object.reclaimableBytes ?? 0;
+        message.candidates = object.candidates?.map((e) => StorageDeleteCandidate.fromPartial(e)) || [];
+        message.warnings = object.warnings?.map((e) => e) || [];
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseStorageDeleteRequest() {
+    return { modelIds: [], deleteFiles: false, clearRegistryPaths: false, unloadIfLoaded: false, dryRun: false };
+}
+export const StorageDeleteRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        for (const v of message.modelIds) {
+            writer.uint32(10).string(v);
+        }
+        if (message.deleteFiles !== false) {
+            writer.uint32(16).bool(message.deleteFiles);
+        }
+        if (message.clearRegistryPaths !== false) {
+            writer.uint32(24).bool(message.clearRegistryPaths);
+        }
+        if (message.unloadIfLoaded !== false) {
+            writer.uint32(32).bool(message.unloadIfLoaded);
+        }
+        if (message.dryRun !== false) {
+            writer.uint32(40).bool(message.dryRun);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageDeleteRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelIds.push(reader.string());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.deleteFiles = reader.bool();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.clearRegistryPaths = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.unloadIfLoaded = reader.bool();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.dryRun = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelIds: globalThis.Array.isArray(object?.modelIds) ? object.modelIds.map((e) => globalThis.String(e)) : [],
+            deleteFiles: isSet(object.deleteFiles) ? globalThis.Boolean(object.deleteFiles) : false,
+            clearRegistryPaths: isSet(object.clearRegistryPaths) ? globalThis.Boolean(object.clearRegistryPaths) : false,
+            unloadIfLoaded: isSet(object.unloadIfLoaded) ? globalThis.Boolean(object.unloadIfLoaded) : false,
+            dryRun: isSet(object.dryRun) ? globalThis.Boolean(object.dryRun) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelIds?.length) {
+            obj.modelIds = message.modelIds;
+        }
+        if (message.deleteFiles !== false) {
+            obj.deleteFiles = message.deleteFiles;
+        }
+        if (message.clearRegistryPaths !== false) {
+            obj.clearRegistryPaths = message.clearRegistryPaths;
+        }
+        if (message.unloadIfLoaded !== false) {
+            obj.unloadIfLoaded = message.unloadIfLoaded;
+        }
+        if (message.dryRun !== false) {
+            obj.dryRun = message.dryRun;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageDeleteRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageDeleteRequest();
+        message.modelIds = object.modelIds?.map((e) => e) || [];
+        message.deleteFiles = object.deleteFiles ?? false;
+        message.clearRegistryPaths = object.clearRegistryPaths ?? false;
+        message.unloadIfLoaded = object.unloadIfLoaded ?? false;
+        message.dryRun = object.dryRun ?? false;
+        return message;
+    },
+};
+function createBaseStorageDeleteResult() {
+    return { success: false, deletedBytes: 0, deletedModelIds: [], failedModelIds: [], warnings: [], errorMessage: "" };
+}
+export const StorageDeleteResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.deletedBytes !== 0) {
+            writer.uint32(16).int64(message.deletedBytes);
+        }
+        for (const v of message.deletedModelIds) {
+            writer.uint32(26).string(v);
+        }
+        for (const v of message.failedModelIds) {
+            writer.uint32(34).string(v);
+        }
+        for (const v of message.warnings) {
+            writer.uint32(42).string(v);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(50).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageDeleteResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.deletedBytes = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.deletedModelIds.push(reader.string());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.failedModelIds.push(reader.string());
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            deletedBytes: isSet(object.deletedBytes) ? globalThis.Number(object.deletedBytes) : 0,
+            deletedModelIds: globalThis.Array.isArray(object?.deletedModelIds)
+                ? object.deletedModelIds.map((e) => globalThis.String(e))
+                : [],
+            failedModelIds: globalThis.Array.isArray(object?.failedModelIds)
+                ? object.failedModelIds.map((e) => globalThis.String(e))
+                : [],
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.deletedBytes !== 0) {
+            obj.deletedBytes = Math.round(message.deletedBytes);
+        }
+        if (message.deletedModelIds?.length) {
+            obj.deletedModelIds = message.deletedModelIds;
+        }
+        if (message.failedModelIds?.length) {
+            obj.failedModelIds = message.failedModelIds;
+        }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageDeleteResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageDeleteResult();
+        message.success = object.success ?? false;
+        message.deletedBytes = object.deletedBytes ?? 0;
+        message.deletedModelIds = object.deletedModelIds?.map((e) => e) || [];
+        message.failedModelIds = object.failedModelIds?.map((e) => e) || [];
+        message.warnings = object.warnings?.map((e) => e) || [];
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
 function longToNumber(long) {
     if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
         throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");

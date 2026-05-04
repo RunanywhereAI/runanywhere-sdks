@@ -75,6 +75,12 @@ message VoiceAgentResult {
     // surfacing readiness / partial-failure breakdowns alongside the
     // final result. Unset when the caller does not ask for it.
     optional VoiceAgentComponentStates final_state = 6;
+
+    // Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
+    // or unknown.
+    int32 synthesized_audio_sample_rate_hz = 7;
+    int32 synthesized_audio_channels       = 8;
+    AudioEncoding synthesized_audio_encoding = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +109,21 @@ message VoiceSessionConfig {
     // Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
     // Default false.
     bool  thinking_mode_enabled = 5;
+
+    // Optional per-turn LLM max token limit. 0 = LLM/default.
+    int32 max_tokens = 6;
+}
+
+// ---------------------------------------------------------------------------
+// v3.2: Audio pipeline state-manager configuration.
+//
+// Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
+// to prevent microphone/TTS feedback loops.
+// ---------------------------------------------------------------------------
+message AudioPipelineConfig {
+    int32 cooldown_duration_ms = 1;
+    bool  strict_transitions   = 2;
+    int32 max_tts_duration_ms  = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,4 +185,8 @@ message VoiceAgentComposeConfig {
     // without runtime-behavior overrides (engine defaults applied).
     // -------------------------------------------------------------------
     optional VoiceSessionConfig session_config = 20;
+
+    // Audio state-machine behavior. Optional so defaults can be applied by
+    // the native voice-agent implementation.
+    optional AudioPipelineConfig audio_pipeline_config = 21;
 }

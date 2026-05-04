@@ -8,10 +8,9 @@
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Result of loading a plugin: registered name + return code (0 ok).
 class PluginLoadResult {

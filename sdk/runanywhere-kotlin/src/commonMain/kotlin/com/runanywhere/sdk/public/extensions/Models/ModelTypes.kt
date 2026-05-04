@@ -11,7 +11,6 @@
 
 package com.runanywhere.sdk.public.extensions.Models
 
-import com.runanywhere.sdk.public.extensions.LLM.ThinkingTagPattern
 import kotlinx.serialization.Serializable
 
 // MARK: - Model Source
@@ -150,7 +149,8 @@ enum class ModelSelectionContext(
             VOICE ->
                 category == ModelCategory.LANGUAGE ||
                     category == ModelCategory.SPEECH_RECOGNITION ||
-                    category == ModelCategory.SPEECH_SYNTHESIS
+                    category == ModelCategory.SPEECH_SYNTHESIS ||
+                    category == ModelCategory.VOICE_ACTIVITY_DETECTION
             RAG_EMBEDDING -> category == ModelCategory.EMBEDDING
             RAG_LLM -> category == ModelCategory.LANGUAGE
             VLM ->
@@ -189,9 +189,8 @@ enum class ModelSelectionContext(
 /**
  * Defines the category/type of a model based on its input/output modality.
  *
- * GAP 01 Phase 3: the proto superset adds `VOICE_ACTIVITY_DETECTION`; Kotlin
- * does not yet expose VAD as its own category (uses AUDIO) but the bijection
- * is kept up-to-date for future expansion without an IDL change.
+ * Mirrors `runanywhere.v1.ModelCategory`; business rules for these categories
+ * live in the C++ registry and lifecycle layer.
  */
 @Serializable
 enum class ModelCategory(
@@ -205,6 +204,7 @@ enum class ModelCategory(
     MULTIMODAL("multimodal"), // Models that handle multiple modalities
     AUDIO("audio"), // Audio processing (diarization, etc.)
     EMBEDDING("embedding"), // Embedding models (RAG, semantic search)
+    VOICE_ACTIVITY_DETECTION("voice-activity-detection"), // VAD models
     ;
 
     /** Whether this category typically requires context length */
@@ -225,6 +225,7 @@ enum class ModelCategory(
             MULTIMODAL -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL
             AUDIO -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO
             EMBEDDING -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING
+            VOICE_ACTIVITY_DETECTION -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         }
 
     companion object {
@@ -238,7 +239,7 @@ enum class ModelCategory(
                 ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL -> MULTIMODAL
                 ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO -> AUDIO
                 ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING -> EMBEDDING
-                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> AUDIO // collapse into AUDIO for now
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> VOICE_ACTIVITY_DETECTION
                 ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED -> AUDIO // defensive
             }
     }
@@ -469,7 +470,6 @@ data class ModelInfo(
     val contextLength: Int? = null,
     val supportsThinking: Boolean = false,
     val supportsLora: Boolean = false,
-    val thinkingPattern: ThinkingTagPattern? = null,
     // Optional metadata
     val description: String? = null,
     /**

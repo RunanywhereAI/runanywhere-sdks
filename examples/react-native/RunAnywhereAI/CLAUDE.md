@@ -160,7 +160,7 @@ Mirrors iOS Swift app design tokens exactly:
 Defined in `tsconfig.json`:
 - `@/*` → `src/*`
 - `@components/*`, `@screens/*`, `@hooks/*`, `@theme/*`, `@types/*`, `@services/*`, `@store/*`, `@utils/*` → corresponding `src/` subdirectories
-- `@runanywhere/proto-ts` → `../../../sdk/runanywhere-proto-ts/dist/index.d.ts`
+- `@runanywhere/proto-ts` → workspace package exports
 
 ## Linting Rules
 

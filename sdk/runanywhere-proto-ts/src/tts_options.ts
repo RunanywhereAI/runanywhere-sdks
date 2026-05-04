@@ -7,7 +7,14 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
-import { AudioFormat, audioFormatFromJSON, audioFormatToJSON } from "./model_types";
+import {
+  AudioFormat,
+  audioFormatFromJSON,
+  audioFormatToJSON,
+  InferenceFramework,
+  inferenceFrameworkFromJSON,
+  inferenceFrameworkToJSON,
+} from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -115,6 +122,11 @@ export interface TTSConfiguration {
   enableNeuralVoice: boolean;
   /** Whether to enable SSML markup support. */
   enableSsml: boolean;
+  /**
+   * Preferred framework for the component. Absent = auto. Mirrors the C
+   * ABI rac_tts_config_t preferred_framework field.
+   */
+  preferredFramework?: InferenceFramework | undefined;
 }
 
 /**
@@ -153,6 +165,11 @@ export interface TTSOptions {
   enableSsml: boolean;
   /** Output audio format. */
   audioFormat: AudioFormat;
+  /**
+   * Output sample rate override in Hz. 0 = component/default sample rate.
+   * Present in rac_tts_options_t and several SDK option structs.
+   */
+  sampleRate: number;
 }
 
 /**
@@ -200,6 +217,11 @@ export interface TTSSynthesisMetadata {
    * metadata-only paths (e.g. TTSSpeakResult).
    */
   audioDurationMs: number;
+  /**
+   * Characters processed per second. Some native paths expose this directly;
+   * consumers may also compute it from character_count / processing_time_ms.
+   */
+  charactersPerSecond: number;
 }
 
 /**
@@ -306,6 +328,7 @@ function createBaseTTSConfiguration(): TTSConfiguration {
     sampleRate: 0,
     enableNeuralVoice: false,
     enableSsml: false,
+    preferredFramework: undefined,
   };
 }
 
@@ -340,6 +363,9 @@ export const TTSConfiguration = {
     }
     if (message.enableSsml !== false) {
       writer.uint32(80).bool(message.enableSsml);
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(88).int32(message.preferredFramework);
     }
     return writer;
   },
@@ -421,6 +447,13 @@ export const TTSConfiguration = {
 
           message.enableSsml = reader.bool();
           continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -442,6 +475,9 @@ export const TTSConfiguration = {
       sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
       enableNeuralVoice: isSet(object.enableNeuralVoice) ? globalThis.Boolean(object.enableNeuralVoice) : false,
       enableSsml: isSet(object.enableSsml) ? globalThis.Boolean(object.enableSsml) : false,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
     };
   },
 
@@ -477,6 +513,9 @@ export const TTSConfiguration = {
     if (message.enableSsml !== false) {
       obj.enableSsml = message.enableSsml;
     }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
     return obj;
   },
 
@@ -495,12 +534,22 @@ export const TTSConfiguration = {
     message.sampleRate = object.sampleRate ?? 0;
     message.enableNeuralVoice = object.enableNeuralVoice ?? false;
     message.enableSsml = object.enableSsml ?? false;
+    message.preferredFramework = object.preferredFramework ?? undefined;
     return message;
   },
 };
 
 function createBaseTTSOptions(): TTSOptions {
-  return { voice: "", languageCode: "", speakingRate: 0, pitch: 0, volume: 0, enableSsml: false, audioFormat: 0 };
+  return {
+    voice: "",
+    languageCode: "",
+    speakingRate: 0,
+    pitch: 0,
+    volume: 0,
+    enableSsml: false,
+    audioFormat: 0,
+    sampleRate: 0,
+  };
 }
 
 export const TTSOptions = {
@@ -525,6 +574,9 @@ export const TTSOptions = {
     }
     if (message.audioFormat !== 0) {
       writer.uint32(56).int32(message.audioFormat);
+    }
+    if (message.sampleRate !== 0) {
+      writer.uint32(64).int32(message.sampleRate);
     }
     return writer;
   },
@@ -585,6 +637,13 @@ export const TTSOptions = {
 
           message.audioFormat = reader.int32() as any;
           continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.sampleRate = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -603,6 +662,7 @@ export const TTSOptions = {
       volume: isSet(object.volume) ? globalThis.Number(object.volume) : 0,
       enableSsml: isSet(object.enableSsml) ? globalThis.Boolean(object.enableSsml) : false,
       audioFormat: isSet(object.audioFormat) ? audioFormatFromJSON(object.audioFormat) : 0,
+      sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
     };
   },
 
@@ -629,6 +689,9 @@ export const TTSOptions = {
     if (message.audioFormat !== 0) {
       obj.audioFormat = audioFormatToJSON(message.audioFormat);
     }
+    if (message.sampleRate !== 0) {
+      obj.sampleRate = Math.round(message.sampleRate);
+    }
     return obj;
   },
 
@@ -644,6 +707,7 @@ export const TTSOptions = {
     message.volume = object.volume ?? 0;
     message.enableSsml = object.enableSsml ?? false;
     message.audioFormat = object.audioFormat ?? 0;
+    message.sampleRate = object.sampleRate ?? 0;
     return message;
   },
 };
@@ -738,7 +802,14 @@ export const TTSPhonemeTimestamp = {
 };
 
 function createBaseTTSSynthesisMetadata(): TTSSynthesisMetadata {
-  return { voiceId: "", languageCode: "", processingTimeMs: 0, characterCount: 0, audioDurationMs: 0 };
+  return {
+    voiceId: "",
+    languageCode: "",
+    processingTimeMs: 0,
+    characterCount: 0,
+    audioDurationMs: 0,
+    charactersPerSecond: 0,
+  };
 }
 
 export const TTSSynthesisMetadata = {
@@ -757,6 +828,9 @@ export const TTSSynthesisMetadata = {
     }
     if (message.audioDurationMs !== 0) {
       writer.uint32(40).int64(message.audioDurationMs);
+    }
+    if (message.charactersPerSecond !== 0) {
+      writer.uint32(53).float(message.charactersPerSecond);
     }
     return writer;
   },
@@ -803,6 +877,13 @@ export const TTSSynthesisMetadata = {
 
           message.audioDurationMs = longToNumber(reader.int64() as Long);
           continue;
+        case 6:
+          if (tag !== 53) {
+            break;
+          }
+
+          message.charactersPerSecond = reader.float();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -819,6 +900,7 @@ export const TTSSynthesisMetadata = {
       processingTimeMs: isSet(object.processingTimeMs) ? globalThis.Number(object.processingTimeMs) : 0,
       characterCount: isSet(object.characterCount) ? globalThis.Number(object.characterCount) : 0,
       audioDurationMs: isSet(object.audioDurationMs) ? globalThis.Number(object.audioDurationMs) : 0,
+      charactersPerSecond: isSet(object.charactersPerSecond) ? globalThis.Number(object.charactersPerSecond) : 0,
     };
   },
 
@@ -839,6 +921,9 @@ export const TTSSynthesisMetadata = {
     if (message.audioDurationMs !== 0) {
       obj.audioDurationMs = Math.round(message.audioDurationMs);
     }
+    if (message.charactersPerSecond !== 0) {
+      obj.charactersPerSecond = message.charactersPerSecond;
+    }
     return obj;
   },
 
@@ -852,6 +937,7 @@ export const TTSSynthesisMetadata = {
     message.processingTimeMs = object.processingTimeMs ?? 0;
     message.characterCount = object.characterCount ?? 0;
     message.audioDurationMs = object.audioDurationMs ?? 0;
+    message.charactersPerSecond = object.charactersPerSecond ?? 0;
     return message;
   },
 };

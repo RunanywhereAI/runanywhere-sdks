@@ -24,8 +24,12 @@
 #ifndef RAC_DOWNLOAD_ORCHESTRATOR_H
 #define RAC_DOWNLOAD_ORCHESTRATOR_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "rac_error.h"
 #include "rac_types.h"
+#include "rac_proto_buffer.h"
 #include "rac_download.h"
 #include "rac_model_types.h"
 
@@ -93,6 +97,37 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
     rac_inference_framework_t framework, rac_model_format_t format,
     rac_download_progress_callback_fn progress_callback,
     rac_download_complete_callback_fn complete_callback, void* user_data, char** out_task_id);
+
+// =============================================================================
+// PROTO-BYTE DOWNLOAD WORKFLOW ABI
+// =============================================================================
+
+typedef void (*rac_download_proto_progress_callback_fn)(const uint8_t* proto_bytes,
+                                                        size_t proto_size,
+                                                        void* user_data);
+
+RAC_API rac_result_t rac_download_set_progress_proto_callback(
+    rac_download_proto_progress_callback_fn callback, void* user_data);
+
+RAC_API rac_result_t rac_download_plan_proto(const uint8_t* request_bytes,
+                                             size_t request_size,
+                                             rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
+                                              size_t request_size,
+                                              rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes,
+                                               size_t request_size,
+                                               rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_resume_proto(const uint8_t* request_bytes,
+                                               size_t request_size,
+                                               rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_download_progress_poll_proto(const uint8_t* request_bytes,
+                                                      size_t request_size,
+                                                      rac_proto_buffer_t* out_result);
 
 // =============================================================================
 // POST-EXTRACTION MODEL PATH FINDING

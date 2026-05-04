@@ -131,6 +131,14 @@ public struct RAVoiceAgentResult: Sendable {
   /// Clears the value of `finalState`. Subsequent reads from it will return its default value.
   public mutating func clearFinalState() {self._finalState = nil}
 
+  /// Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
+  /// or unknown.
+  public var synthesizedAudioSampleRateHz: Int32 = 0
+
+  public var synthesizedAudioChannels: Int32 = 0
+
+  public var synthesizedAudioEncoding: RAAudioEncoding = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -172,6 +180,31 @@ public struct RAVoiceSessionConfig: Sendable {
   /// Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
   /// Default false.
   public var thinkingModeEnabled: Bool = false
+
+  /// Optional per-turn LLM max token limit. 0 = LLM/default.
+  public var maxTokens: Int32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// ---------------------------------------------------------------------------
+/// v3.2: Audio pipeline state-manager configuration.
+///
+/// Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
+/// to prevent microphone/TTS feedback loops.
+/// ---------------------------------------------------------------------------
+public struct RAAudioPipelineConfig: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cooldownDurationMs: Int32 = 0
+
+  public var strictTransitions: Bool = false
+
+  public var maxTtsDurationMs: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -379,6 +412,17 @@ public struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `sessionConfig`. Subsequent reads from it will return its default value.
   public mutating func clearSessionConfig() {_uniqueStorage()._sessionConfig = nil}
 
+  /// Audio state-machine behavior. Optional so defaults can be applied by
+  /// the native voice-agent implementation.
+  public var audioPipelineConfig: RAAudioPipelineConfig {
+    get {_storage._audioPipelineConfig ?? RAAudioPipelineConfig()}
+    set {_uniqueStorage()._audioPipelineConfig = newValue}
+  }
+  /// Returns true if `audioPipelineConfig` has been explicitly set.
+  public var hasAudioPipelineConfig: Bool {_storage._audioPipelineConfig != nil}
+  /// Clears the value of `audioPipelineConfig`. Subsequent reads from it will return its default value.
+  public mutating func clearAudioPipelineConfig() {_uniqueStorage()._audioPipelineConfig = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -422,7 +466,7 @@ extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0\u{3}synthesized_audio_sample_rate_hz\0\u{3}synthesized_audio_channels\0\u{3}synthesized_audio_encoding\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -436,6 +480,9 @@ extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 4: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
       case 5: try { try decoder.decodeSingularBytesField(value: &self._synthesizedAudio) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._finalState) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.synthesizedAudioSampleRateHz) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self.synthesizedAudioChannels) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self.synthesizedAudioEncoding) }()
       default: break
       }
     }
@@ -464,6 +511,15 @@ extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     try { if let v = self._finalState {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
+    if self.synthesizedAudioSampleRateHz != 0 {
+      try visitor.visitSingularInt32Field(value: self.synthesizedAudioSampleRateHz, fieldNumber: 7)
+    }
+    if self.synthesizedAudioChannels != 0 {
+      try visitor.visitSingularInt32Field(value: self.synthesizedAudioChannels, fieldNumber: 8)
+    }
+    if self.synthesizedAudioEncoding != .unspecified {
+      try visitor.visitSingularEnumField(value: self.synthesizedAudioEncoding, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -474,6 +530,9 @@ extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs._thinkingContent != rhs._thinkingContent {return false}
     if lhs._synthesizedAudio != rhs._synthesizedAudio {return false}
     if lhs._finalState != rhs._finalState {return false}
+    if lhs.synthesizedAudioSampleRateHz != rhs.synthesizedAudioSampleRateHz {return false}
+    if lhs.synthesizedAudioChannels != rhs.synthesizedAudioChannels {return false}
+    if lhs.synthesizedAudioEncoding != rhs.synthesizedAudioEncoding {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -481,7 +540,7 @@ extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceSessionConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}silence_duration_ms\0\u{3}speech_threshold\0\u{3}auto_play_tts\0\u{3}continuous_mode\0\u{3}thinking_mode_enabled\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}silence_duration_ms\0\u{3}speech_threshold\0\u{3}auto_play_tts\0\u{3}continuous_mode\0\u{3}thinking_mode_enabled\0\u{3}max_tokens\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -494,6 +553,7 @@ extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 3: try { try decoder.decodeSingularBoolField(value: &self.autoPlayTts) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.continuousMode) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.thinkingModeEnabled) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
       default: break
       }
     }
@@ -515,6 +575,9 @@ extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if self.thinkingModeEnabled != false {
       try visitor.visitSingularBoolField(value: self.thinkingModeEnabled, fieldNumber: 5)
     }
+    if self.maxTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -524,6 +587,47 @@ extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.autoPlayTts != rhs.autoPlayTts {return false}
     if lhs.continuousMode != rhs.continuousMode {return false}
     if lhs.thinkingModeEnabled != rhs.thinkingModeEnabled {return false}
+    if lhs.maxTokens != rhs.maxTokens {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AudioPipelineConfig"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}cooldown_duration_ms\0\u{3}strict_transitions\0\u{3}max_tts_duration_ms\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.cooldownDurationMs) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.strictTransitions) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxTtsDurationMs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cooldownDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.cooldownDurationMs, fieldNumber: 1)
+    }
+    if self.strictTransitions != false {
+      try visitor.visitSingularBoolField(value: self.strictTransitions, fieldNumber: 2)
+    }
+    if self.maxTtsDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxTtsDurationMs, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAAudioPipelineConfig, rhs: RAAudioPipelineConfig) -> Bool {
+    if lhs.cooldownDurationMs != rhs.cooldownDurationMs {return false}
+    if lhs.strictTransitions != rhs.strictTransitions {return false}
+    if lhs.maxTtsDurationMs != rhs.maxTtsDurationMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -531,7 +635,7 @@ extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{3}wakeword_enabled\0\u{3}wakeword_model_path\0\u{3}wakeword_model_id\0\u{3}wakeword_phrase\0\u{3}wakeword_threshold\0\u{3}wakeword_embedding_model_path\0\u{3}wakeword_vad_model_path\0\u{3}session_config\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{3}wakeword_enabled\0\u{3}wakeword_model_path\0\u{3}wakeword_model_id\0\u{3}wakeword_phrase\0\u{3}wakeword_threshold\0\u{3}wakeword_embedding_model_path\0\u{3}wakeword_vad_model_path\0\u{3}session_config\0\u{3}audio_pipeline_config\0")
 
   fileprivate class _StorageClass {
     var _sttModelPath: String? = nil
@@ -554,6 +658,7 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
     var _wakewordEmbeddingModelPath: String? = nil
     var _wakewordVadModelPath: String? = nil
     var _sessionConfig: RAVoiceSessionConfig? = nil
+    var _audioPipelineConfig: RAAudioPipelineConfig? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -584,6 +689,7 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
       _wakewordEmbeddingModelPath = source._wakewordEmbeddingModelPath
       _wakewordVadModelPath = source._wakewordVadModelPath
       _sessionConfig = source._sessionConfig
+      _audioPipelineConfig = source._audioPipelineConfig
     }
   }
 
@@ -622,6 +728,7 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
         case 18: try { try decoder.decodeSingularStringField(value: &_storage._wakewordEmbeddingModelPath) }()
         case 19: try { try decoder.decodeSingularStringField(value: &_storage._wakewordVadModelPath) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._sessionConfig) }()
+        case 21: try { try decoder.decodeSingularMessageField(value: &_storage._audioPipelineConfig) }()
         default: break
         }
       }
@@ -694,6 +801,9 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
       try { if let v = _storage._sessionConfig {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
       } }()
+      try { if let v = _storage._audioPipelineConfig {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -723,6 +833,7 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
         if _storage._wakewordEmbeddingModelPath != rhs_storage._wakewordEmbeddingModelPath {return false}
         if _storage._wakewordVadModelPath != rhs_storage._wakewordVadModelPath {return false}
         if _storage._sessionConfig != rhs_storage._sessionConfig {return false}
+        if _storage._audioPipelineConfig != rhs_storage._audioPipelineConfig {return false}
         return true
       }
       if !storagesAreEqual {return false}

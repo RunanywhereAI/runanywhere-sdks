@@ -12,9 +12,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
@@ -30,6 +32,34 @@ static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
         case RAC_FRAMEWORK_METALRT:            return "metalrt";
         default:                               return nullptr;
     }
+}
+
+static std::string json_escape(const char* value) {
+    std::string out;
+    if (!value) return out;
+    for (const char* p = value; *p; ++p) {
+        switch (*p) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out.push_back(*p);
+                break;
+        }
+    }
+    return out;
 }
 
 // =============================================================================
@@ -69,24 +99,39 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
 
     // Default to llama.cpp for VLM (has broad VLM support via mtmd)
     rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
-    const char* model_path = model_id;
+    std::string model_path_owned = model_id;
+    std::string config_json_owned;
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
-        model_path = model_info->local_path ? model_info->local_path : model_id;
+        model_path_owned = model_info->local_path ? model_info->local_path : model_id;
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
                      model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path ? model_path : "NULL");
+                     model_path_owned.c_str());
+
+        rac_model_path_resolution_t resolution = {};
+        rac_result_t path_rc = rac_model_paths_resolve_artifact(
+            model_info, model_path_owned.c_str(), /*expected_primary_sha256=*/nullptr,
+            &resolution);
+        if (path_rc == RAC_SUCCESS) {
+            if (resolution.primary_model_path) {
+                model_path_owned = resolution.primary_model_path;
+            }
+            if (resolution.mmproj_path) {
+                config_json_owned = "{\"mmproj_path\":\"" +
+                                    json_escape(resolution.mmproj_path) + "\"}";
+            }
+        }
+        rac_model_path_resolution_free(&resolution);
     } else {
         RAC_LOG_WARNING(LOG_CAT,
                         "Model NOT found in registry (result=%d), using default framework=%d",
                         result, static_cast<int>(framework));
     }
 
-    // v3 Phase B8: route through the plugin registry. VLM config_json
-    // is emitted by registry lookups for multi-file VLM models (mmproj_path,
-    // etc.) — today we pass nullptr; future PR will wire up config_json
-    // from the model_info's extra fields.
+    // v3 Phase B8: route through the plugin registry. For local VLM
+    // directories, resolve companion files in C++ and pass mmproj_path to the
+    // backend instead of requiring SDK-local filename inference.
     rac_routing_hints_t hints = {};
     hints.preferred_engine_name = framework_to_plugin_name(framework);
 
@@ -104,7 +149,9 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 
     void* impl = nullptr;
-    result = vt->vlm_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    result = vt->vlm_ops->create(
+        model_path_owned.c_str(),
+        config_json_owned.empty() ? nullptr : config_json_owned.c_str(), &impl);
     if (result != RAC_SUCCESS || !impl) {
         RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;

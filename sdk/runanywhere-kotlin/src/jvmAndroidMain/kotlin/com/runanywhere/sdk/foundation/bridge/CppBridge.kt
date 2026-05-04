@@ -198,7 +198,11 @@ object CppBridge {
                 }
                 logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
             } else {
-                logger.debug("Development mode: using Supabase URL from C++ dev config")
+                if (CppBridgeTelemetry.hasUsableDevelopmentConfig()) {
+                    logger.debug("Development mode: using Supabase URL from C++ dev config")
+                } else {
+                    logger.debug("Development mode: no usable Supabase config; external telemetry/auth/device registration disabled")
+                }
             }
 
             // Register device callbacks (sets up JNI callbacks for C++ to call)
@@ -518,13 +522,27 @@ object CppBridge {
             // Register platform services callbacks
             CppBridgePlatform.register()
 
-            // Flush any queued telemetry events now that HTTP should be configured
-            // This ensures events queued during Phase 1 initialization are sent
-            CppBridgeTelemetry.flush()
+            // Flush any queued telemetry events now that HTTP should be configured.
+            // In demo/default development mode, no usable external config is expected.
+            if (CppBridgeTelemetry.hasUsableNetworkConfig()) {
+                CppBridgeTelemetry.flush()
+            } else {
+                logger.debug("Skipping telemetry flush: no usable external config")
+            }
 
             // Trigger device registration with backend (non-blocking, best-effort)
             // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
             try {
+                if (!CppBridgeTelemetry.hasUsableNetworkConfig()) {
+                    logger.debug("Skipping device registration: no usable external config")
+                    synchronized(lock) {
+                        _servicesInitialized = true
+                        _servicesInitializing = false
+                    }
+                    logger.info("✅ Phase 2 services initialization complete")
+                    return
+                }
+
                 val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
                 // Get build token for development mode (mirrors Swift SDK)

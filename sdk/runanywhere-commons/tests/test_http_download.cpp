@@ -31,6 +31,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/http/rac_http_download.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
 
 namespace fs = std::filesystem;
 
@@ -53,6 +54,79 @@ std::vector<uint8_t> g_payload = make_payload(512 * 1024);
 // SHA-256("<deterministic 32 KiB payload>") — expected digest is
 // computed once at runtime before the tests run.
 std::string g_expected_sha;
+
+std::string path_from_url(const char* url) {
+    std::string s = url ? url : "";
+    auto scheme = s.find("://");
+    if (scheme != std::string::npos) {
+        auto slash = s.find('/', scheme + 3);
+        return slash == std::string::npos ? "/" : s.substr(slash);
+    }
+    return s;
+}
+
+rac_bool_t stream_payload_from(size_t from, rac_http_body_chunk_fn cb, void* cb_user_data) {
+    const size_t chunk = 8192;
+    uint64_t delivered = 0;
+    for (size_t offset = from; offset < g_payload.size(); offset += chunk) {
+        size_t n = std::min(chunk, g_payload.size() - offset);
+        delivered += n;
+        if (cb(g_payload.data() + offset, n, delivered,
+               static_cast<uint64_t>(g_payload.size() - from), cb_user_data) == RAC_FALSE) {
+            return RAC_FALSE;
+        }
+    }
+    return RAC_TRUE;
+}
+
+rac_result_t test_transport_send(void*, const rac_http_request_t*, rac_http_response_t* out_resp) {
+    if (!out_resp) return RAC_ERROR_INVALID_ARGUMENT;
+    out_resp->status = 200;
+    return RAC_SUCCESS;
+}
+
+rac_result_t test_transport_stream(void*, const rac_http_request_t* req,
+                                   rac_http_body_chunk_fn cb, void* cb_user_data,
+                                   rac_http_response_t* out_resp_meta) {
+    if (!req || !req->url || !cb || !out_resp_meta) return RAC_ERROR_INVALID_ARGUMENT;
+    std::string path = path_from_url(req->url);
+    if (path == "/payload") {
+        out_resp_meta->status = 200;
+        return stream_payload_from(0, cb, cb_user_data) == RAC_TRUE ? RAC_SUCCESS
+                                                                    : RAC_ERROR_CANCELLED;
+    }
+    if (path == "/missing") {
+        static const uint8_t body[] = {'n', 'o', 't', ' ', 'f', 'o', 'u', 'n', 'd'};
+        out_resp_meta->status = 404;
+        cb(body, sizeof(body), sizeof(body), sizeof(body), cb_user_data);
+        return RAC_SUCCESS;
+    }
+    out_resp_meta->status = 400;
+    return RAC_SUCCESS;
+}
+
+rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_t resume_from_byte,
+                                   rac_http_body_chunk_fn cb, void* cb_user_data,
+                                   rac_http_response_t* out_resp_meta) {
+    if (!req || !req->url || !cb || !out_resp_meta) return RAC_ERROR_INVALID_ARGUMENT;
+    std::string path = path_from_url(req->url);
+    if (path != "/payload") {
+        out_resp_meta->status = 404;
+        return RAC_SUCCESS;
+    }
+    out_resp_meta->status = 206;
+    size_t from = std::min<size_t>(static_cast<size_t>(resume_from_byte), g_payload.size());
+    return stream_payload_from(from, cb, cb_user_data) == RAC_TRUE ? RAC_SUCCESS
+                                                                   : RAC_ERROR_CANCELLED;
+}
+
+const rac_http_transport_ops_t g_test_transport_ops = {
+    test_transport_send,
+    test_transport_stream,
+    test_transport_resume,
+    nullptr,
+    nullptr,
+};
 
 void write_all(int fd, const void* buf, size_t n) {
     const char* p = static_cast<const char*>(buf);
@@ -457,6 +531,8 @@ int main() {
     g_expected_sha = sha::hash(g_payload.data(), g_payload.size());
     std::cout << "payload sha256 = " << g_expected_sha << "\n";
 
+    rac_http_transport_register(&g_test_transport_ops, nullptr);
+
     test_happy_path_with_checksum();
     test_checksum_mismatch();
     test_server_error_404();
@@ -464,6 +540,7 @@ int main() {
     test_cancel_via_progress();
     test_resume_merged_matches_payload();
 
+    rac_http_transport_register(nullptr, nullptr);
     stop();
     std::cout << "passes=" << passes << " failures=" << failures << "\n";
     return failures == 0 ? 0 : 1;

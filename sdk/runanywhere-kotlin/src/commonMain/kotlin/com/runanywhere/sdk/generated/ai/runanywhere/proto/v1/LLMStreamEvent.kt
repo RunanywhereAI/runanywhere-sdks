@@ -136,6 +136,28 @@ public class LLMStreamEvent(
     schemaIndex = 8,
   )
   public val error_message: String = "",
+  /**
+   * Final aggregate result. Only populated on terminal events
+   * (is_final=true) when the backend can report result metrics.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.LLMStreamFinalResult#ADAPTER",
+    schemaIndex = 9,
+  )
+  public val result: LLMStreamFinalResult? = null,
+  /**
+   * Numeric backend status code when the terminal event represents a
+   * failure. 0 = unset/success.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 10,
+  )
+  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -158,39 +180,45 @@ public class LLMStreamEvent(
     if (logprob != other.logprob) return false
     if (finish_reason != other.finish_reason) return false
     if (error_message != other.error_message) return false
+    if (result != other.result) return false
+    if (error_code != other.error_code) return false
     return true
   }
 
   override fun hashCode(): Int {
-    var result = super.hashCode
-    if (result == 0) {
-      result = unknownFields.hashCode()
-      result = result * 37 + seq.hashCode()
-      result = result * 37 + timestamp_us.hashCode()
-      result = result * 37 + token.hashCode()
-      result = result * 37 + is_final.hashCode()
-      result = result * 37 + kind.hashCode()
-      result = result * 37 + token_id.hashCode()
-      result = result * 37 + logprob.hashCode()
-      result = result * 37 + finish_reason.hashCode()
-      result = result * 37 + error_message.hashCode()
-      super.hashCode = result
+    var result_ = super.hashCode
+    if (result_ == 0) {
+      result_ = unknownFields.hashCode()
+      result_ = result_ * 37 + seq.hashCode()
+      result_ = result_ * 37 + timestamp_us.hashCode()
+      result_ = result_ * 37 + token.hashCode()
+      result_ = result_ * 37 + is_final.hashCode()
+      result_ = result_ * 37 + kind.hashCode()
+      result_ = result_ * 37 + token_id.hashCode()
+      result_ = result_ * 37 + logprob.hashCode()
+      result_ = result_ * 37 + finish_reason.hashCode()
+      result_ = result_ * 37 + error_message.hashCode()
+      result_ = result_ * 37 + (result?.hashCode() ?: 0)
+      result_ = result_ * 37 + error_code.hashCode()
+      super.hashCode = result_
     }
-    return result
+    return result_
   }
 
   override fun toString(): String {
-    val result = mutableListOf<String>()
-    result += """seq=$seq"""
-    result += """timestamp_us=$timestamp_us"""
-    result += """token=${sanitize(token)}"""
-    result += """is_final=$is_final"""
-    result += """kind=$kind"""
-    result += """token_id=$token_id"""
-    result += """logprob=$logprob"""
-    result += """finish_reason=${sanitize(finish_reason)}"""
-    result += """error_message=${sanitize(error_message)}"""
-    return result.joinToString(prefix = "LLMStreamEvent{", separator = ", ", postfix = "}")
+    val result_ = mutableListOf<String>()
+    result_ += """seq=$seq"""
+    result_ += """timestamp_us=$timestamp_us"""
+    result_ += """token=${sanitize(token)}"""
+    result_ += """is_final=$is_final"""
+    result_ += """kind=$kind"""
+    result_ += """token_id=$token_id"""
+    result_ += """logprob=$logprob"""
+    result_ += """finish_reason=${sanitize(finish_reason)}"""
+    result_ += """error_message=${sanitize(error_message)}"""
+    if (result != null) result_ += """result=$result"""
+    result_ += """error_code=$error_code"""
+    return result_.joinToString(prefix = "LLMStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
@@ -203,9 +231,11 @@ public class LLMStreamEvent(
     logprob: Float = this.logprob,
     finish_reason: String = this.finish_reason,
     error_message: String = this.error_message,
+    result: LLMStreamFinalResult? = this.result,
+    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
   ): LLMStreamEvent = LLMStreamEvent(seq, timestamp_us, token, is_final, kind, token_id, logprob,
-      finish_reason, error_message, unknownFields)
+      finish_reason, error_message, result, error_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -233,6 +263,9 @@ public class LLMStreamEvent(
             value.finish_reason)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
             value.error_message)
+        size += LLMStreamFinalResult.ADAPTER.encodedSizeWithTag(10, value.result)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(11,
+            value.error_code)
         return size
       }
 
@@ -250,11 +283,15 @@ public class LLMStreamEvent(
             value.finish_reason)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.error_message)
+        LLMStreamFinalResult.ADAPTER.encodeWithTag(writer, 10, value.result)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
+        LLMStreamFinalResult.ADAPTER.encodeWithTag(writer, 10, value.result)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.error_message)
         if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 8,
@@ -280,6 +317,8 @@ public class LLMStreamEvent(
         var logprob: Float = 0f
         var finish_reason: String = ""
         var error_message: String = ""
+        var result: LLMStreamFinalResult? = null
+        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
@@ -295,6 +334,8 @@ public class LLMStreamEvent(
             7 -> logprob = ProtoAdapter.FLOAT.decode(reader)
             8 -> finish_reason = ProtoAdapter.STRING.decode(reader)
             9 -> error_message = ProtoAdapter.STRING.decode(reader)
+            10 -> result = LLMStreamFinalResult.ADAPTER.decode(reader)
+            11 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -308,11 +349,14 @@ public class LLMStreamEvent(
           logprob = logprob,
           finish_reason = finish_reason,
           error_message = error_message,
+          result = result,
+          error_code = error_code,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMStreamEvent): LLMStreamEvent = value.copy(
+        result = value.result?.let(LLMStreamFinalResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

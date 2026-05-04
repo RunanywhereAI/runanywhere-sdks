@@ -227,6 +227,12 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_http_download"
     "_rac_http_download_cancel"
     "_rac_extract_archive"
+    "_rac_proto_buffer_init"
+    "_rac_proto_buffer_copy"
+    "_rac_proto_buffer_set_error"
+    "_rac_proto_buffer_free"
+    "_rac_proto_buffer_copy_to_raw"
+    "_rac_proto_buffer_free_data"
 
     # HTTP client / download (T3.13 — Web SDK migration off hand-rolled
     # fetch() onto the commons libcurl-backed C ABI). See
@@ -288,6 +294,11 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_wasm_offsetof_http_download_request_follow_redirects"
     "_rac_wasm_offsetof_http_download_request_resume_from_byte"
     "_rac_wasm_offsetof_http_download_request_expected_sha256_hex"
+    "_rac_wasm_sizeof_proto_buffer"
+    "_rac_wasm_offsetof_proto_buffer_data"
+    "_rac_wasm_offsetof_proto_buffer_size"
+    "_rac_wasm_offsetof_proto_buffer_status"
+    "_rac_wasm_offsetof_proto_buffer_error_message"
 
     # Module registry
     "_rac_module_register"
@@ -307,6 +318,12 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_event_publish"
     "_rac_event_track"
     "_rac_event_category_name"
+    "_rac_sdk_event_subscribe"
+    "_rac_sdk_event_unsubscribe"
+    "_rac_sdk_event_publish_proto"
+    "_rac_sdk_event_poll"
+    "_rac_sdk_event_publish_failure"
+    "_rac_sdk_event_clear_queue"
 
     # Error handling
     "_rac_error_message"
@@ -328,6 +345,14 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_model_registry_get_downloaded"
     "_rac_model_registry_update_download_status"
     "_rac_model_registry_refresh"
+    "_rac_model_registry_register_proto"
+    "_rac_model_registry_update_proto"
+    "_rac_model_registry_get_proto"
+    "_rac_model_registry_list_proto"
+    "_rac_model_registry_query_proto"
+    "_rac_model_registry_list_downloaded_proto"
+    "_rac_model_registry_remove_proto"
+    "_rac_model_registry_proto_free"
     "_rac_model_info_is_downloaded"
     "_rac_model_info_alloc"
     "_rac_model_info_free"
@@ -355,6 +380,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_lifecycle_destroy"
     "_rac_lifecycle_state_name"
 
+    # Model lifecycle proto ABI. Generated model_types/sdk_events protos are
+    # serialized through rac_proto_buffer_t so Web can expose the same stable
+    # lifecycle surface as native SDKs.
+    "_rac_model_lifecycle_load_proto"
+    "_rac_model_lifecycle_unload_proto"
+    "_rac_model_lifecycle_current_model_proto"
+    "_rac_component_lifecycle_snapshot_proto"
+    "_rac_model_lifecycle_reset"
+
     # LLM service
     "_rac_llm_create"
     "_rac_llm_initialize"
@@ -367,6 +401,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_llm_result_free"
     "_rac_llm_set_stream_proto_callback"
     "_rac_llm_unset_stream_proto_callback"
+    "_rac_llm_generate_proto"
+    "_rac_llm_generate_stream_proto"
+    "_rac_llm_cancel_proto"
 
     # LLM Thinking (<think>...</think> parsing) — v3 Phase A11 / GAP 08 #6.
     # Wrapped by sdk/runanywhere-web/packages/core/src/Features/LLM/LlmThinking.ts
@@ -432,6 +469,8 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_stt_component_transcribe"
     "_rac_stt_component_supports_streaming"
     "_rac_stt_component_transcribe_stream"
+    "_rac_stt_component_transcribe_proto"
+    "_rac_stt_component_transcribe_stream_proto"
     "_rac_stt_component_get_state"
     "_rac_stt_component_get_metrics"
     "_rac_stt_component_destroy"
@@ -458,6 +497,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_tts_component_stop"
     "_rac_tts_component_synthesize"
     "_rac_tts_component_synthesize_stream"
+    "_rac_tts_component_list_voices_proto"
+    "_rac_tts_component_synthesize_proto"
+    "_rac_tts_component_synthesize_stream_proto"
     "_rac_tts_component_get_state"
     "_rac_tts_component_get_metrics"
     "_rac_tts_component_destroy"
@@ -489,6 +531,10 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vad_component_stop"
     "_rac_vad_component_reset"
     "_rac_vad_component_process"
+    "_rac_vad_component_configure_proto"
+    "_rac_vad_component_process_proto"
+    "_rac_vad_component_get_statistics_proto"
+    "_rac_vad_component_set_activity_proto_callback"
     "_rac_vad_component_is_speech_active"
     "_rac_vad_component_get_energy_threshold"
     "_rac_vad_component_set_energy_threshold"
@@ -532,6 +578,9 @@ set(RAC_EXPORTED_FUNCTIONS
     # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
     # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
     "_rac_voice_agent_set_proto_callback"
+    "_rac_voice_agent_initialize_proto"
+    "_rac_voice_agent_component_states_proto"
+    "_rac_voice_agent_process_voice_turn_proto"
 
     # Solutions runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8.
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/
@@ -548,6 +597,25 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_solution_close_input"
     "_rac_solution_destroy"
 
+    # C++-owned proto download workflow. JS keeps only transport/progress
+    # callback wiring while commons owns planning, lifecycle, resume/cancel,
+    # and progress state.
+    "_rac_download_set_progress_proto_callback"
+    "_rac_download_plan_proto"
+    "_rac_download_start_proto"
+    "_rac_download_cancel_proto"
+    "_rac_download_resume_proto"
+    "_rac_download_progress_poll_proto"
+
+    # Storage analyzer proto ABI. The browser supplies storage/file callbacks
+    # locally; commons owns availability, delete planning and deletion policy.
+    "_rac_storage_analyzer_create"
+    "_rac_storage_analyzer_destroy"
+    "_rac_storage_analyzer_info_proto"
+    "_rac_storage_analyzer_availability_proto"
+    "_rac_storage_analyzer_delete_plan_proto"
+    "_rac_storage_analyzer_delete_proto"
+
     # VLM service
     "_rac_vlm_get_builtin_template"
     "_rac_vlm_result_free"
@@ -557,6 +625,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vlm_process_stream"
     "_rac_vlm_get_info"
     "_rac_vlm_cancel"
+    "_rac_vlm_process_proto"
+    "_rac_vlm_process_stream_proto"
+    "_rac_vlm_cancel_proto"
     "_rac_vlm_cleanup"
     "_rac_vlm_destroy"
 
@@ -587,6 +658,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_structured_output_validation_free"
 
     # Diffusion component
+    "_rac_diffusion_generate_proto"
+    "_rac_diffusion_generate_with_progress_proto"
+    "_rac_diffusion_cancel_proto"
     "_rac_diffusion_component_create"
     "_rac_diffusion_component_configure"
     "_rac_diffusion_component_is_loaded"
@@ -612,6 +686,7 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_embeddings_initialize"
     "_rac_embeddings_embed"
     "_rac_embeddings_embed_batch"
+    "_rac_embeddings_embed_batch_proto"
     "_rac_embeddings_get_info"
     "_rac_embeddings_cleanup"
     "_rac_embeddings_destroy"
@@ -630,6 +705,21 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_embeddings_component_get_state"
     "_rac_embeddings_component_get_metrics"
     "_rac_embeddings_component_destroy"
+
+    # RAG generated-proto pipeline
+    "_rac_rag_session_create_proto"
+    "_rac_rag_session_destroy_proto"
+    "_rac_rag_ingest_proto"
+    "_rac_rag_query_proto"
+    "_rac_rag_clear_proto"
+    "_rac_rag_stats_proto"
+
+    # LoRA generated-proto service
+    "_rac_lora_register_proto"
+    "_rac_lora_compatibility_proto"
+    "_rac_lora_load_proto"
+    "_rac_lora_remove_proto"
+    "_rac_lora_clear_proto"
 
     # Environment / SDK config
     "_rac_sdk_init"

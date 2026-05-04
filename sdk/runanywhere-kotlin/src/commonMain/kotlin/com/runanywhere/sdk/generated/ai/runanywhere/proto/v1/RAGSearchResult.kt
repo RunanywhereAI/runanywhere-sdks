@@ -80,6 +80,17 @@ public class RAGSearchResult(
   )
   public val source_document: String? = null,
   metadata: Map<String, String> = emptyMap(),
+  /**
+   * Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
+   * pass metadata without parsing it.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "metadataJson",
+    schemaIndex = 5,
+  )
+  public val metadata_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGSearchResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -111,6 +122,7 @@ public class RAGSearchResult(
     if (similarity_score != other.similarity_score) return false
     if (source_document != other.source_document) return false
     if (metadata != other.metadata) return false
+    if (metadata_json != other.metadata_json) return false
     return true
   }
 
@@ -123,6 +135,7 @@ public class RAGSearchResult(
       result = result * 37 + similarity_score.hashCode()
       result = result * 37 + (source_document?.hashCode() ?: 0)
       result = result * 37 + metadata.hashCode()
+      result = result * 37 + (metadata_json?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -135,6 +148,7 @@ public class RAGSearchResult(
     result += """similarity_score=$similarity_score"""
     if (source_document != null) result += """source_document=${sanitize(source_document)}"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
+    if (metadata_json != null) result += """metadata_json=${sanitize(metadata_json)}"""
     return result.joinToString(prefix = "RAGSearchResult{", separator = ", ", postfix = "}")
   }
 
@@ -144,9 +158,10 @@ public class RAGSearchResult(
     similarity_score: Float = this.similarity_score,
     source_document: String? = this.source_document,
     metadata: Map<String, String> = this.metadata,
+    metadata_json: String? = this.metadata_json,
     unknownFields: ByteString = this.unknownFields,
   ): RAGSearchResult = RAGSearchResult(chunk_id, text, similarity_score, source_document, metadata,
-      unknownFields)
+      metadata_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -169,6 +184,7 @@ public class RAGSearchResult(
             value.similarity_score)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.source_document)
         size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.metadata_json)
         return size
       }
 
@@ -179,11 +195,13 @@ public class RAGSearchResult(
             value.similarity_score)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.source_document)
         metadataAdapter.encodeWithTag(writer, 5, value.metadata)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.metadata_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGSearchResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.metadata_json)
         metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.source_document)
         if (!value.similarity_score.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
@@ -198,6 +216,7 @@ public class RAGSearchResult(
         var similarity_score: Float = 0f
         var source_document: String? = null
         val metadata = mutableMapOf<String, String>()
+        var metadata_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> chunk_id = ProtoAdapter.STRING.decode(reader)
@@ -205,6 +224,7 @@ public class RAGSearchResult(
             3 -> similarity_score = ProtoAdapter.FLOAT.decode(reader)
             4 -> source_document = ProtoAdapter.STRING.decode(reader)
             5 -> metadata.putAll(metadataAdapter.decode(reader))
+            6 -> metadata_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -214,6 +234,7 @@ public class RAGSearchResult(
           similarity_score = similarity_score,
           source_document = source_document,
           metadata = metadata,
+          metadata_json = metadata_json,
           unknownFields = unknownFields
         )
       }

@@ -68,6 +68,10 @@ export interface LoraAdapterCatalogEntry {
     sizeBytes: number;
     /** optional adapter author */
     author?: string | undefined;
+    /** recommended adapter scale */
+    defaultScale: number;
+    /** lowercase hex SHA-256 */
+    checksumSha256?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

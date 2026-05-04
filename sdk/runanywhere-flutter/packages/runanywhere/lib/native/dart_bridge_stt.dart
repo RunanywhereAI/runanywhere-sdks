@@ -9,8 +9,12 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/features/stt/stt_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/stt_options.pb.dart'
+    show STTOptions, STTOutput;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -120,7 +124,8 @@ class DartBridgeSTT {
     final namePtr = modelName.toNativeUtf8();
 
     try {
-      final result = NativeFunctions.sttLoadModel(handle, pathPtr, idPtr, namePtr);
+      final result =
+          NativeFunctions.sttLoadModel(handle, pathPtr, idPtr, namePtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -151,6 +156,55 @@ class DartBridgeSTT {
   }
 
   // MARK: - Transcription
+
+  /// Transcribe audio with serialized runanywhere.v1.STTOptions.
+  Future<STTOutput> transcribeProto(
+    Uint8List audioData,
+    STTOptions options,
+  ) async {
+    final handle = getHandle();
+    if (!isLoaded) {
+      throw StateError('No STT model loaded. Call loadModel() first.');
+    }
+
+    final fn = RacNative.bindings.rac_stt_component_transcribe_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_stt_component_transcribe_proto is unavailable');
+    }
+
+    final optionsBytes = options.writeToBuffer();
+    final audioPtr = calloc<Uint8>(audioData.isEmpty ? 1 : audioData.length);
+    final optionsPtr = DartBridgeProtoUtils.copyBytes(optionsBytes);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      if (audioData.isNotEmpty) {
+        audioPtr.asTypedList(audioData.length).setAll(0, audioData);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(
+        handle,
+        audioPtr.cast<Void>(),
+        audioData.length,
+        optionsPtr,
+        optionsBytes.length,
+        out,
+      );
+      DartBridgeProtoUtils.ensureSuccess(
+        out,
+        code,
+        'rac_stt_component_transcribe_proto',
+      );
+      return DartBridgeProtoUtils.decodeBuffer(out, STTOutput.fromBuffer);
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(audioPtr);
+      calloc.free(optionsPtr);
+      calloc.free(out);
+    }
+  }
 
   /// Transcribe audio data.
   ///
@@ -239,8 +293,10 @@ class DartBridgeSTT {
       final languagePtr = language.toNativeUtf8();
       optionsPtr.ref.language = languagePtr;
       optionsPtr.ref.detectLanguage = detectLanguage ? RAC_TRUE : RAC_FALSE;
-      optionsPtr.ref.enablePunctuation = enablePunctuation ? RAC_TRUE : RAC_FALSE;
-      optionsPtr.ref.enableDiarization = enableDiarization ? RAC_TRUE : RAC_FALSE;
+      optionsPtr.ref.enablePunctuation =
+          enablePunctuation ? RAC_TRUE : RAC_FALSE;
+      optionsPtr.ref.enableDiarization =
+          enableDiarization ? RAC_TRUE : RAC_FALSE;
       optionsPtr.ref.maxSpeakers = maxSpeakers;
       optionsPtr.ref.enableTimestamps = enableTimestamps ? RAC_TRUE : RAC_FALSE;
       optionsPtr.ref.audioFormat = audioFormat;
@@ -298,8 +354,7 @@ class DartBridgeSTT {
       // Free C-allocated strings inside the result (strdup'd by rac_stt_component_transcribe).
       // Must happen before calloc.free(resultPtr) which frees the struct itself.
       try {
-        final resultFreeFn = lib.lookupFunction<
-            Void Function(Pointer<Void>),
+        final resultFreeFn = lib.lookupFunction<Void Function(Pointer<Void>),
             void Function(Pointer<Void>)>('rac_stt_result_free');
         resultFreeFn(resultPtr.cast<Void>());
       } catch (_) {

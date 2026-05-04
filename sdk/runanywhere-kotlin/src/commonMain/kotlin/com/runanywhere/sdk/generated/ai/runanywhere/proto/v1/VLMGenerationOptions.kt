@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -25,6 +26,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -89,8 +91,82 @@ public class VLMGenerationOptions(
     schemaIndex = 4,
   )
   public val top_k: Int = 0,
+  stop_sequences: List<String> = emptyList(),
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "streamingEnabled",
+    schemaIndex = 6,
+  )
+  public val streaming_enabled: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "systemPrompt",
+    schemaIndex = 7,
+  )
+  public val system_prompt: String? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxImageSize",
+    schemaIndex = 8,
+  )
+  public val max_image_size: Int = 0,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "nThreads",
+    schemaIndex = 9,
+  )
+  public val n_threads: Int = 0,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "useGpu",
+    schemaIndex = 10,
+  )
+  public val use_gpu: Boolean = false,
+  @field:WireField(
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.VLMModelFamily#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelFamily",
+    schemaIndex = 11,
+  )
+  public val model_family: VLMModelFamily = VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
+  @field:WireField(
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.VLMChatTemplate#ADAPTER",
+    jsonName = "customChatTemplate",
+    schemaIndex = 12,
+  )
+  public val custom_chat_template: VLMChatTemplate? = null,
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "imageMarkerOverride",
+    schemaIndex = 13,
+  )
+  public val image_marker_override: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * Full rac_vlm_options_t coverage.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "stopSequences",
+    schemaIndex = 5,
+  )
+  public val stop_sequences: List<String> = immutableCopyOf("stop_sequences", stop_sequences)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -107,6 +183,15 @@ public class VLMGenerationOptions(
     if (temperature != other.temperature) return false
     if (top_p != other.top_p) return false
     if (top_k != other.top_k) return false
+    if (stop_sequences != other.stop_sequences) return false
+    if (streaming_enabled != other.streaming_enabled) return false
+    if (system_prompt != other.system_prompt) return false
+    if (max_image_size != other.max_image_size) return false
+    if (n_threads != other.n_threads) return false
+    if (use_gpu != other.use_gpu) return false
+    if (model_family != other.model_family) return false
+    if (custom_chat_template != other.custom_chat_template) return false
+    if (image_marker_override != other.image_marker_override) return false
     return true
   }
 
@@ -119,6 +204,15 @@ public class VLMGenerationOptions(
       result = result * 37 + temperature.hashCode()
       result = result * 37 + top_p.hashCode()
       result = result * 37 + top_k.hashCode()
+      result = result * 37 + stop_sequences.hashCode()
+      result = result * 37 + streaming_enabled.hashCode()
+      result = result * 37 + (system_prompt?.hashCode() ?: 0)
+      result = result * 37 + max_image_size.hashCode()
+      result = result * 37 + n_threads.hashCode()
+      result = result * 37 + use_gpu.hashCode()
+      result = result * 37 + model_family.hashCode()
+      result = result * 37 + (custom_chat_template?.hashCode() ?: 0)
+      result = result * 37 + (image_marker_override?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -131,6 +225,16 @@ public class VLMGenerationOptions(
     result += """temperature=$temperature"""
     result += """top_p=$top_p"""
     result += """top_k=$top_k"""
+    if (stop_sequences.isNotEmpty()) result += """stop_sequences=${sanitize(stop_sequences)}"""
+    result += """streaming_enabled=$streaming_enabled"""
+    if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
+    result += """max_image_size=$max_image_size"""
+    result += """n_threads=$n_threads"""
+    result += """use_gpu=$use_gpu"""
+    result += """model_family=$model_family"""
+    if (custom_chat_template != null) result += """custom_chat_template=$custom_chat_template"""
+    if (image_marker_override != null) result +=
+        """image_marker_override=${sanitize(image_marker_override)}"""
     return result.joinToString(prefix = "VLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
@@ -140,9 +244,19 @@ public class VLMGenerationOptions(
     temperature: Float = this.temperature,
     top_p: Float = this.top_p,
     top_k: Int = this.top_k,
+    stop_sequences: List<String> = this.stop_sequences,
+    streaming_enabled: Boolean = this.streaming_enabled,
+    system_prompt: String? = this.system_prompt,
+    max_image_size: Int = this.max_image_size,
+    n_threads: Int = this.n_threads,
+    use_gpu: Boolean = this.use_gpu,
+    model_family: VLMModelFamily = this.model_family,
+    custom_chat_template: VLMChatTemplate? = this.custom_chat_template,
+    image_marker_override: String? = this.image_marker_override,
     unknownFields: ByteString = this.unknownFields,
   ): VLMGenerationOptions = VLMGenerationOptions(prompt, max_tokens, temperature, top_p, top_k,
-      unknownFields)
+      stop_sequences, streaming_enabled, system_prompt, max_image_size, n_threads, use_gpu,
+      model_family, custom_chat_template, image_marker_override, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,6 +278,18 @@ public class VLMGenerationOptions(
             value.temperature)
         if (!value.top_p.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.top_p)
         if (value.top_k != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.top_k)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.stop_sequences)
+        if (value.streaming_enabled != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.streaming_enabled)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.system_prompt)
+        if (value.max_image_size != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(9,
+            value.max_image_size)
+        if (value.n_threads != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.n_threads)
+        if (value.use_gpu != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.use_gpu)
+        if (value.model_family != VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED) size +=
+            VLMModelFamily.ADAPTER.encodedSizeWithTag(12, value.model_family)
+        size += VLMChatTemplate.ADAPTER.encodedSizeWithTag(13, value.custom_chat_template)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.image_marker_override)
         return size
       }
 
@@ -174,11 +300,35 @@ public class VLMGenerationOptions(
             value.temperature)
         if (!value.top_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.top_p)
         if (value.top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5, value.top_k)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.stop_sequences)
+        if (value.streaming_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.streaming_enabled)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.system_prompt)
+        if (value.max_image_size != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9,
+            value.max_image_size)
+        if (value.n_threads != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10, value.n_threads)
+        if (value.use_gpu != false) ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.use_gpu)
+        if (value.model_family != VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED)
+            VLMModelFamily.ADAPTER.encodeWithTag(writer, 12, value.model_family)
+        VLMChatTemplate.ADAPTER.encodeWithTag(writer, 13, value.custom_chat_template)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.image_marker_override)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.image_marker_override)
+        VLMChatTemplate.ADAPTER.encodeWithTag(writer, 13, value.custom_chat_template)
+        if (value.model_family != VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED)
+            VLMModelFamily.ADAPTER.encodeWithTag(writer, 12, value.model_family)
+        if (value.use_gpu != false) ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.use_gpu)
+        if (value.n_threads != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10, value.n_threads)
+        if (value.max_image_size != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9,
+            value.max_image_size)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.system_prompt)
+        if (value.streaming_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.streaming_enabled)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.stop_sequences)
         if (value.top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5, value.top_k)
         if (!value.top_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.top_p)
         if (!value.temperature.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
@@ -193,6 +343,15 @@ public class VLMGenerationOptions(
         var temperature: Float = 0f
         var top_p: Float = 0f
         var top_k: Int = 0
+        val stop_sequences = mutableListOf<String>()
+        var streaming_enabled: Boolean = false
+        var system_prompt: String? = null
+        var max_image_size: Int = 0
+        var n_threads: Int = 0
+        var use_gpu: Boolean = false
+        var model_family: VLMModelFamily = VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED
+        var custom_chat_template: VLMChatTemplate? = null
+        var image_marker_override: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -200,6 +359,19 @@ public class VLMGenerationOptions(
             3 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             4 -> top_p = ProtoAdapter.FLOAT.decode(reader)
             5 -> top_k = ProtoAdapter.INT32.decode(reader)
+            6 -> stop_sequences.add(ProtoAdapter.STRING.decode(reader))
+            7 -> streaming_enabled = ProtoAdapter.BOOL.decode(reader)
+            8 -> system_prompt = ProtoAdapter.STRING.decode(reader)
+            9 -> max_image_size = ProtoAdapter.INT32.decode(reader)
+            10 -> n_threads = ProtoAdapter.INT32.decode(reader)
+            11 -> use_gpu = ProtoAdapter.BOOL.decode(reader)
+            12 -> try {
+              model_family = VLMModelFamily.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            13 -> custom_chat_template = VLMChatTemplate.ADAPTER.decode(reader)
+            14 -> image_marker_override = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -209,11 +381,21 @@ public class VLMGenerationOptions(
           temperature = temperature,
           top_p = top_p,
           top_k = top_k,
+          stop_sequences = stop_sequences,
+          streaming_enabled = streaming_enabled,
+          system_prompt = system_prompt,
+          max_image_size = max_image_size,
+          n_threads = n_threads,
+          use_gpu = use_gpu,
+          model_family = model_family,
+          custom_chat_template = custom_chat_template,
+          image_marker_override = image_marker_override,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VLMGenerationOptions): VLMGenerationOptions = value.copy(
+        custom_chat_template = value.custom_chat_template?.let(VLMChatTemplate.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

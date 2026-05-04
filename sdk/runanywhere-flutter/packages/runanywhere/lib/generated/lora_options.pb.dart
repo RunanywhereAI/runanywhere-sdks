@@ -1,43 +1,57 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: lora_options.proto
 //
 // @dart = 2.12
-// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
+
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+///  ---------------------------------------------------------------------------
+///  Configuration for loading a LoRA adapter.
+///
+///  `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
+///  adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
+///  quantized bases). `adapter_id` is optional and, when present, links the
+///  runtime config back to a `LoraAdapterCatalogEntry.id` — none of the current
+///  SDK shapes carry it, so it is encoded as a `proto3 optional` field.
+///  ---------------------------------------------------------------------------
 class LoRAAdapterConfig extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'LoRAAdapterConfig', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'adapterPath')
-    ..a<$core.double>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'scale', $pb.PbFieldType.OF)
-    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'adapterId')
-    ..hasRequiredFields = false
-  ;
-
-  LoRAAdapterConfig._() : super();
   factory LoRAAdapterConfig({
     $core.String? adapterPath,
     $core.double? scale,
     $core.String? adapterId,
   }) {
-    final _result = create();
+    final $result = create();
     if (adapterPath != null) {
-      _result.adapterPath = adapterPath;
+      $result.adapterPath = adapterPath;
     }
     if (scale != null) {
-      _result.scale = scale;
+      $result.scale = scale;
     }
     if (adapterId != null) {
-      _result.adapterId = adapterId;
+      $result.adapterId = adapterId;
     }
-    return _result;
+    return $result;
   }
+  LoRAAdapterConfig._() : super();
   factory LoRAAdapterConfig.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory LoRAAdapterConfig.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LoRAAdapterConfig', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'adapterPath')
+    ..a<$core.double>(2, _omitFieldNames ? '' : 'scale', $pb.PbFieldType.OF)
+    ..aOS(3, _omitFieldNames ? '' : 'adapterId')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -47,8 +61,10 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LoRAAdapterConfig copyWith(void Function(LoRAAdapterConfig) updates) => super.copyWith((message) => updates(message as LoRAAdapterConfig)) as LoRAAdapterConfig; // ignore: deprecated_member_use
+  LoRAAdapterConfig copyWith(void Function(LoRAAdapterConfig) updates) => super.copyWith((message) => updates(message as LoRAAdapterConfig)) as LoRAAdapterConfig;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static LoRAAdapterConfig create() => LoRAAdapterConfig._();
   LoRAAdapterConfig createEmptyInstance() => create();
@@ -85,17 +101,14 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   void clearAdapterId() => clearField(3);
 }
 
+///  ---------------------------------------------------------------------------
+///  Info about a currently-loaded LoRA adapter (read-only snapshot).
+///
+///  `adapter_id` and `error_message` are not present in any current SDK shape;
+///  they are encoded as `proto3 optional` so the existing fields (path, scale,
+///  applied) round-trip exactly while reserving room for richer status reports.
+///  ---------------------------------------------------------------------------
 class LoRAAdapterInfo extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'LoRAAdapterInfo', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'adapterId')
-    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'adapterPath')
-    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'scale', $pb.PbFieldType.OF)
-    ..aOB(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'applied')
-    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'errorMessage')
-    ..hasRequiredFields = false
-  ;
-
-  LoRAAdapterInfo._() : super();
   factory LoRAAdapterInfo({
     $core.String? adapterId,
     $core.String? adapterPath,
@@ -103,26 +116,37 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
     $core.bool? applied,
     $core.String? errorMessage,
   }) {
-    final _result = create();
+    final $result = create();
     if (adapterId != null) {
-      _result.adapterId = adapterId;
+      $result.adapterId = adapterId;
     }
     if (adapterPath != null) {
-      _result.adapterPath = adapterPath;
+      $result.adapterPath = adapterPath;
     }
     if (scale != null) {
-      _result.scale = scale;
+      $result.scale = scale;
     }
     if (applied != null) {
-      _result.applied = applied;
+      $result.applied = applied;
     }
     if (errorMessage != null) {
-      _result.errorMessage = errorMessage;
+      $result.errorMessage = errorMessage;
     }
-    return _result;
+    return $result;
   }
+  LoRAAdapterInfo._() : super();
   factory LoRAAdapterInfo.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory LoRAAdapterInfo.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LoRAAdapterInfo', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'adapterId')
+    ..aOS(2, _omitFieldNames ? '' : 'adapterPath')
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'scale', $pb.PbFieldType.OF)
+    ..aOB(4, _omitFieldNames ? '' : 'applied')
+    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -132,8 +156,10 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LoRAAdapterInfo copyWith(void Function(LoRAAdapterInfo) updates) => super.copyWith((message) => updates(message as LoRAAdapterInfo)) as LoRAAdapterInfo; // ignore: deprecated_member_use
+  LoRAAdapterInfo copyWith(void Function(LoRAAdapterInfo) updates) => super.copyWith((message) => updates(message as LoRAAdapterInfo)) as LoRAAdapterInfo;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static LoRAAdapterInfo create() => LoRAAdapterInfo._();
   LoRAAdapterInfo createEmptyInstance() => create();
@@ -188,20 +214,16 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
   void clearErrorMessage() => clearField(5);
 }
 
+///  ---------------------------------------------------------------------------
+///  Catalog entry for a LoRA adapter registered with the SDK.
+///  Apps register entries at startup; SDKs query "which adapters work with this
+///  model" without reinventing detection logic per platform.
+///
+///  `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
+///  Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
+///  nullable / has-bit-tracked field.
+///  ---------------------------------------------------------------------------
 class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'LoraAdapterCatalogEntry', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'id')
-    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
-    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'description')
-    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'url')
-    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'filename')
-    ..pPS(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'compatibleModels')
-    ..aInt64(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sizeBytes')
-    ..aOS(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'author')
-    ..hasRequiredFields = false
-  ;
-
-  LoraAdapterCatalogEntry._() : super();
   factory LoraAdapterCatalogEntry({
     $core.String? id,
     $core.String? name,
@@ -211,36 +233,60 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? compatibleModels,
     $fixnum.Int64? sizeBytes,
     $core.String? author,
+    $core.double? defaultScale,
+    $core.String? checksumSha256,
   }) {
-    final _result = create();
+    final $result = create();
     if (id != null) {
-      _result.id = id;
+      $result.id = id;
     }
     if (name != null) {
-      _result.name = name;
+      $result.name = name;
     }
     if (description != null) {
-      _result.description = description;
+      $result.description = description;
     }
     if (url != null) {
-      _result.url = url;
+      $result.url = url;
     }
     if (filename != null) {
-      _result.filename = filename;
+      $result.filename = filename;
     }
     if (compatibleModels != null) {
-      _result.compatibleModels.addAll(compatibleModels);
+      $result.compatibleModels.addAll(compatibleModels);
     }
     if (sizeBytes != null) {
-      _result.sizeBytes = sizeBytes;
+      $result.sizeBytes = sizeBytes;
     }
     if (author != null) {
-      _result.author = author;
+      $result.author = author;
     }
-    return _result;
+    if (defaultScale != null) {
+      $result.defaultScale = defaultScale;
+    }
+    if (checksumSha256 != null) {
+      $result.checksumSha256 = checksumSha256;
+    }
+    return $result;
   }
+  LoraAdapterCatalogEntry._() : super();
   factory LoraAdapterCatalogEntry.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory LoraAdapterCatalogEntry.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LoraAdapterCatalogEntry', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'description')
+    ..aOS(4, _omitFieldNames ? '' : 'url')
+    ..aOS(5, _omitFieldNames ? '' : 'filename')
+    ..pPS(6, _omitFieldNames ? '' : 'compatibleModels')
+    ..aInt64(7, _omitFieldNames ? '' : 'sizeBytes')
+    ..aOS(8, _omitFieldNames ? '' : 'author')
+    ..a<$core.double>(9, _omitFieldNames ? '' : 'defaultScale', $pb.PbFieldType.OF)
+    ..aOS(10, _omitFieldNames ? '' : 'checksumSha256')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -250,8 +296,10 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LoraAdapterCatalogEntry copyWith(void Function(LoraAdapterCatalogEntry) updates) => super.copyWith((message) => updates(message as LoraAdapterCatalogEntry)) as LoraAdapterCatalogEntry; // ignore: deprecated_member_use
+  LoraAdapterCatalogEntry copyWith(void Function(LoraAdapterCatalogEntry) updates) => super.copyWith((message) => updates(message as LoraAdapterCatalogEntry)) as LoraAdapterCatalogEntry;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static LoraAdapterCatalogEntry create() => LoraAdapterCatalogEntry._();
   LoraAdapterCatalogEntry createEmptyInstance() => create();
@@ -325,36 +373,62 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   $core.bool hasAuthor() => $_has(7);
   @$pb.TagNumber(8)
   void clearAuthor() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.double get defaultScale => $_getN(8);
+  @$pb.TagNumber(9)
+  set defaultScale($core.double v) { $_setFloat(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasDefaultScale() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearDefaultScale() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get checksumSha256 => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set checksumSha256($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasChecksumSha256() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearChecksumSha256() => clearField(10);
 }
 
+///  ---------------------------------------------------------------------------
+///  Result of a LoRA compatibility pre-check.
+///
+///  `base_model_required` is not present in any current SDK shape — it is
+///  encoded as `proto3 optional` so a future implementation can surface "this
+///  adapter requires base model X" without breaking wire compatibility.
+///  ---------------------------------------------------------------------------
 class LoraCompatibilityResult extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'LoraCompatibilityResult', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOB(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isCompatible')
-    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'errorMessage')
-    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'baseModelRequired')
-    ..hasRequiredFields = false
-  ;
-
-  LoraCompatibilityResult._() : super();
   factory LoraCompatibilityResult({
     $core.bool? isCompatible,
     $core.String? errorMessage,
     $core.String? baseModelRequired,
   }) {
-    final _result = create();
+    final $result = create();
     if (isCompatible != null) {
-      _result.isCompatible = isCompatible;
+      $result.isCompatible = isCompatible;
     }
     if (errorMessage != null) {
-      _result.errorMessage = errorMessage;
+      $result.errorMessage = errorMessage;
     }
     if (baseModelRequired != null) {
-      _result.baseModelRequired = baseModelRequired;
+      $result.baseModelRequired = baseModelRequired;
     }
-    return _result;
+    return $result;
   }
+  LoraCompatibilityResult._() : super();
   factory LoraCompatibilityResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory LoraCompatibilityResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LoraCompatibilityResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isCompatible')
+    ..aOS(2, _omitFieldNames ? '' : 'errorMessage')
+    ..aOS(3, _omitFieldNames ? '' : 'baseModelRequired')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -364,8 +438,10 @@ class LoraCompatibilityResult extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LoraCompatibilityResult copyWith(void Function(LoraCompatibilityResult) updates) => super.copyWith((message) => updates(message as LoraCompatibilityResult)) as LoraCompatibilityResult; // ignore: deprecated_member_use
+  LoraCompatibilityResult copyWith(void Function(LoraCompatibilityResult) updates) => super.copyWith((message) => updates(message as LoraCompatibilityResult)) as LoraCompatibilityResult;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static LoraCompatibilityResult create() => LoraCompatibilityResult._();
   LoraCompatibilityResult createEmptyInstance() => create();
@@ -402,3 +478,6 @@ class LoraCompatibilityResult extends $pb.GeneratedMessage {
   void clearBaseModelRequired() => clearField(3);
 }
 
+
+const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
+const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');

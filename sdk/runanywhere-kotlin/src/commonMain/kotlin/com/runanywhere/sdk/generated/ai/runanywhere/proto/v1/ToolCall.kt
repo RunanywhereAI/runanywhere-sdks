@@ -13,6 +13,8 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +26,8 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.Map
+import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -75,8 +79,32 @@ public class ToolCall(
     schemaIndex = 3,
   )
   public val type: String = "",
+  arguments: Map<String, ToolValue> = emptyMap(),
+  /**
+   * Alias for id used by pre-proto SDK surfaces.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "callId",
+    schemaIndex = 5,
+  )
+  public val call_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCall, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * Strongly-typed arguments map for SDKs that do not want to parse
+   * arguments_json. Producers should keep arguments_json populated for C++
+   * tokenizer compatibility.
+   */
+  @field:WireField(
+    tag = 5,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.ToolValue#ADAPTER",
+    schemaIndex = 4,
+  )
+  public val arguments: Map<String, ToolValue> = immutableCopyOf("arguments", arguments)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -92,6 +120,8 @@ public class ToolCall(
     if (name != other.name) return false
     if (arguments_json != other.arguments_json) return false
     if (type != other.type) return false
+    if (arguments != other.arguments) return false
+    if (call_id != other.call_id) return false
     return true
   }
 
@@ -103,6 +133,8 @@ public class ToolCall(
       result = result * 37 + name.hashCode()
       result = result * 37 + arguments_json.hashCode()
       result = result * 37 + type.hashCode()
+      result = result * 37 + arguments.hashCode()
+      result = result * 37 + (call_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -114,6 +146,8 @@ public class ToolCall(
     result += """name=${sanitize(name)}"""
     result += """arguments_json=${sanitize(arguments_json)}"""
     result += """type=${sanitize(type)}"""
+    if (arguments.isNotEmpty()) result += """arguments=$arguments"""
+    if (call_id != null) result += """call_id=${sanitize(call_id)}"""
     return result.joinToString(prefix = "ToolCall{", separator = ", ", postfix = "}")
   }
 
@@ -122,8 +156,10 @@ public class ToolCall(
     name: String = this.name,
     arguments_json: String = this.arguments_json,
     type: String = this.type,
+    arguments: Map<String, ToolValue> = this.arguments,
+    call_id: String? = this.call_id,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCall = ToolCall(id, name, arguments_json, type, unknownFields)
+  ): ToolCall = ToolCall(id, name, arguments_json, type, arguments, call_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -135,6 +171,9 @@ public class ToolCall(
       null, 
       "tool_calling.proto"
     ) {
+      private val argumentsAdapter: ProtoAdapter<Map<String, ToolValue>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ToolValue.ADAPTER) }
+
       override fun encodedSize(`value`: ToolCall): Int {
         var size = value.unknownFields.size
         if (value.id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.id)
@@ -142,6 +181,8 @@ public class ToolCall(
         if (value.arguments_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3,
             value.arguments_json)
         if (value.type != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.type)
+        size += argumentsAdapter.encodedSizeWithTag(5, value.arguments)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.call_id)
         return size
       }
 
@@ -151,11 +192,15 @@ public class ToolCall(
         if (value.arguments_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.arguments_json)
         if (value.type != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
+        argumentsAdapter.encodeWithTag(writer, 5, value.arguments)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCall) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
+        argumentsAdapter.encodeWithTag(writer, 5, value.arguments)
         if (value.type != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
         if (value.arguments_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.arguments_json)
@@ -168,12 +213,16 @@ public class ToolCall(
         var name: String = ""
         var arguments_json: String = ""
         var type: String = ""
+        val arguments = mutableMapOf<String, ToolValue>()
+        var call_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
             2 -> name = ProtoAdapter.STRING.decode(reader)
             3 -> arguments_json = ProtoAdapter.STRING.decode(reader)
             4 -> type = ProtoAdapter.STRING.decode(reader)
+            5 -> arguments.putAll(argumentsAdapter.decode(reader))
+            6 -> call_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -182,11 +231,14 @@ public class ToolCall(
           name = name,
           arguments_json = arguments_json,
           type = type,
+          arguments = arguments,
+          call_id = call_id,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolCall): ToolCall = value.copy(
+        arguments = value.arguments.redactElements(ToolValue.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

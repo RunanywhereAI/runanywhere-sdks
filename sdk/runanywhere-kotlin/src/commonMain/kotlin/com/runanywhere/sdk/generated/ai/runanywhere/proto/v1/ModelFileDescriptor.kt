@@ -68,6 +68,38 @@ public class ModelFileDescriptor(
     schemaIndex = 4,
   )
   public val checksum: String? = null,
+  /**
+   * Path fields used by SDK-local wrappers/catalogs. `filename` is the
+   * storage name for simple cases; relative_path/destination_path preserve
+   * directory layouts for archive and multi-file artifacts.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "relativePath",
+    schemaIndex = 5,
+  )
+  public val relative_path: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "destinationPath",
+    schemaIndex = 6,
+  )
+  public val destination_path: String? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.ModelFileRole#ADAPTER",
+    schemaIndex = 7,
+  )
+  public val role: ModelFileRole? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "localPath",
+    schemaIndex = 8,
+  )
+  public val local_path: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelFileDescriptor, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -86,6 +118,10 @@ public class ModelFileDescriptor(
     if (is_required != other.is_required) return false
     if (size_bytes != other.size_bytes) return false
     if (checksum != other.checksum) return false
+    if (relative_path != other.relative_path) return false
+    if (destination_path != other.destination_path) return false
+    if (role != other.role) return false
+    if (local_path != other.local_path) return false
     return true
   }
 
@@ -98,6 +134,10 @@ public class ModelFileDescriptor(
       result = result * 37 + is_required.hashCode()
       result = result * 37 + (size_bytes?.hashCode() ?: 0)
       result = result * 37 + (checksum?.hashCode() ?: 0)
+      result = result * 37 + (relative_path?.hashCode() ?: 0)
+      result = result * 37 + (destination_path?.hashCode() ?: 0)
+      result = result * 37 + (role?.hashCode() ?: 0)
+      result = result * 37 + (local_path?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -110,6 +150,10 @@ public class ModelFileDescriptor(
     result += """is_required=$is_required"""
     if (size_bytes != null) result += """size_bytes=$size_bytes"""
     if (checksum != null) result += """checksum=${sanitize(checksum)}"""
+    if (relative_path != null) result += """relative_path=${sanitize(relative_path)}"""
+    if (destination_path != null) result += """destination_path=${sanitize(destination_path)}"""
+    if (role != null) result += """role=$role"""
+    if (local_path != null) result += """local_path=${sanitize(local_path)}"""
     return result.joinToString(prefix = "ModelFileDescriptor{", separator = ", ", postfix = "}")
   }
 
@@ -119,9 +163,13 @@ public class ModelFileDescriptor(
     is_required: Boolean = this.is_required,
     size_bytes: Long? = this.size_bytes,
     checksum: String? = this.checksum,
+    relative_path: String? = this.relative_path,
+    destination_path: String? = this.destination_path,
+    role: ModelFileRole? = this.role,
+    local_path: String? = this.local_path,
     unknownFields: ByteString = this.unknownFields,
   ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, checksum,
-      unknownFields)
+      relative_path, destination_path, role, local_path, unknownFields)
 
   public companion object {
     @JvmField
@@ -142,6 +190,10 @@ public class ModelFileDescriptor(
             value.is_required)
         size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.size_bytes)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.checksum)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.relative_path)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.destination_path)
+        size += ModelFileRole.ADAPTER.encodedSizeWithTag(8, value.role)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.local_path)
         return size
       }
 
@@ -152,11 +204,19 @@ public class ModelFileDescriptor(
             value.is_required)
         ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.checksum)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.relative_path)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
+        ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.local_path)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelFileDescriptor) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.local_path)
+        ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.relative_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.checksum)
         ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
         if (value.is_required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
@@ -171,6 +231,10 @@ public class ModelFileDescriptor(
         var is_required: Boolean = false
         var size_bytes: Long? = null
         var checksum: String? = null
+        var relative_path: String? = null
+        var destination_path: String? = null
+        var role: ModelFileRole? = null
+        var local_path: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
@@ -178,6 +242,14 @@ public class ModelFileDescriptor(
             3 -> is_required = ProtoAdapter.BOOL.decode(reader)
             4 -> size_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> checksum = ProtoAdapter.STRING.decode(reader)
+            6 -> relative_path = ProtoAdapter.STRING.decode(reader)
+            7 -> destination_path = ProtoAdapter.STRING.decode(reader)
+            8 -> try {
+              role = ModelFileRole.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            9 -> local_path = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -187,6 +259,10 @@ public class ModelFileDescriptor(
           is_required = is_required,
           size_bytes = size_bytes,
           checksum = checksum,
+          relative_path = relative_path,
+          destination_path = destination_path,
+          role = role,
+          local_path = local_path,
           unknownFields = unknownFields
         )
       }

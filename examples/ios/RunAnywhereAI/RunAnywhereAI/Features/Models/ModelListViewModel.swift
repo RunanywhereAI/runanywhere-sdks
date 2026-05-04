@@ -190,6 +190,7 @@ class ModelListViewModel: ObservableObject {
             framework: framework,
             memoryRequirement: estimatedSize
         )
+        await RunAnywhere.flushPendingRegistrations()
 
         // Reload models to include the new one
         await loadModelsFromRegistry()

@@ -135,12 +135,28 @@ public struct RAChatMessage: Sendable {
   /// Clears the value of `toolCallID`. Subsequent reads from it will return its default value.
   public mutating func clearToolCallID() {self._toolCallID = nil}
 
+  /// Typed tool calls embedded in this assistant message. Supersedes
+  /// tool_calls_json for generated-proto callers while keeping the legacy
+  /// JSON string list available.
+  public var toolCalls: [RAToolCall] = []
+
+  /// Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
+  public var toolResult: RAToolResult {
+    get {_toolResult ?? RAToolResult()}
+    set {_toolResult = newValue}
+  }
+  /// Returns true if `toolResult` has been explicitly set.
+  public var hasToolResult: Bool {self._toolResult != nil}
+  /// Clears the value of `toolResult`. Subsequent reads from it will return its default value.
+  public mutating func clearToolResult() {self._toolResult = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _name: String? = nil
   fileprivate var _toolCallID: String? = nil
+  fileprivate var _toolResult: RAToolResult? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -153,7 +169,7 @@ extension RAMessageRole: SwiftProtobuf._ProtoNameProviding {
 
 extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatMessage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}role\0\u{1}content\0\u{3}timestamp_us\0\u{1}name\0\u{3}tool_calls_json\0\u{3}tool_call_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}role\0\u{1}content\0\u{3}timestamp_us\0\u{1}name\0\u{3}tool_calls_json\0\u{3}tool_call_id\0\u{3}tool_calls\0\u{3}tool_result\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -168,6 +184,8 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 5: try { try decoder.decodeSingularStringField(value: &self._name) }()
       case 6: try { try decoder.decodeRepeatedStringField(value: &self.toolCallsJson) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._toolCallID) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.toolCalls) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._toolResult) }()
       default: break
       }
     }
@@ -199,6 +217,12 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     try { if let v = self._toolCallID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     } }()
+    if !self.toolCalls.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.toolCalls, fieldNumber: 8)
+    }
+    try { if let v = self._toolResult {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -210,6 +234,8 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if lhs._name != rhs._name {return false}
     if lhs.toolCallsJson != rhs.toolCallsJson {return false}
     if lhs._toolCallID != rhs._toolCallID {return false}
+    if lhs.toolCalls != rhs.toolCalls {return false}
+    if lhs._toolResult != rhs._toolResult {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

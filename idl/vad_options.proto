@@ -13,6 +13,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "model_types.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -79,6 +81,24 @@ message VADConfiguration {
     // result as a multiplier on the threshold (see calibration_multiplier
     // in the C ABI). Defaults to false.
     bool   enable_auto_calibration = 5;
+
+    // Calibration multiplier (threshold = ambient noise * multiplier).
+    // Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+    float  calibration_multiplier = 6;
+
+    // Preferred framework for VAD. Absent = auto.
+    optional InferenceFramework preferred_framework = 7;
+
+    // Optional model path for backend-specific VADs (e.g. Silero ONNX).
+    optional string model_path = 8;
+
+    // Window size in samples for frame-based neural VAD backends. 0 =
+    // backend/default.
+    int32  window_size_samples = 9;
+
+    // Maximum continuous speech segment duration in milliseconds. 0 =
+    // backend/default.
+    int32  max_speech_duration_ms = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +133,10 @@ message VADOptions {
     // Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
     // Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
     int32 min_silence_duration_ms  = 3;
+
+    // Maximum continuous speech duration (ms) before forcing a segment split.
+    // 0 = backend/default.
+    int32 max_speech_duration_ms    = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +172,13 @@ message VADResult {
 
     // Length of the analyzed frame in milliseconds.
     int32 duration_ms  = 4;
+
+    // Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+    int64 timestamp_ms = 5;
+
+    // Optional detected segment start/end times, in milliseconds. 0 = unset.
+    int64 start_time_ms = 6;
+    int64 end_time_ms   = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +216,13 @@ message VADStatistics {
 
     // Recent moving-window peak energy. (Swift/Kotlin: `recentMax`)
     float recent_max       = 5;
+
+    // Richer service-level counters from rac_vad_statistics_t. Zero = unset
+    // for energy-only implementations.
+    int32 total_speech_segments     = 6;
+    int64 total_speech_duration_ms  = 7;
+    float average_energy            = 8;
+    float peak_energy               = 9;
 }
 
 // ---------------------------------------------------------------------------

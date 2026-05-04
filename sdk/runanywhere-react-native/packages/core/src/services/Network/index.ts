@@ -9,6 +9,11 @@
 export {
   createNetworkConfig,
   getEnvironmentName,
+  looksLikePlaceholder,
+  isUsableHttpUrl,
+  isUsableCredential,
+  hasUsableBackendConfig,
+  hasUsableSupabaseConfig,
   isDevelopment,
   isProduction,
   DEFAULT_BASE_URL,

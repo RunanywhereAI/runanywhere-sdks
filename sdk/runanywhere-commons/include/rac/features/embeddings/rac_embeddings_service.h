@@ -16,6 +16,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -133,6 +134,17 @@ RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char*
                                                 size_t num_texts,
                                                 const rac_embeddings_options_t* options,
                                                 rac_embeddings_result_t* out_result);
+
+/**
+ * @brief Generate embeddings for a proto-carried batch.
+ *
+ * request_proto_bytes encodes runanywhere.v1.EmbeddingsRequest.
+ * out_result receives serialized runanywhere.v1.EmbeddingsResult bytes with
+ * dense vector values populated.
+ */
+RAC_API rac_result_t rac_embeddings_embed_batch_proto(
+    rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get service information

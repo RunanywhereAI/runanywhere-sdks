@@ -84,7 +84,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       final hasCustomConfig = customApiKey != null &&
           customApiKey.isNotEmpty &&
           customBaseURL != null &&
-          customBaseURL.isNotEmpty;
+          customBaseURL.isNotEmpty &&
+          !_looksLikePlaceholder(customApiKey) &&
+          !_looksLikePlaceholder(customBaseURL);
 
       if (hasCustomConfig) {
         final normalizedURL = _normalizeBaseURL(customBaseURL);
@@ -130,7 +132,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
   }
 
+  bool _looksLikePlaceholder(String value) {
+    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+        .hasMatch(value);
+  }
+
   /// E2E auto-test: download → load → generate (non-streaming) → generateStream
+  // ignore: unused_element
   Future<void> _runE2EAutoTest() async {
     const testModelId = 'lfm2-350m-q4_k_m';
     debugPrint('');
@@ -192,8 +200,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       final result =
           await RunAnywhereSDK.instance.llm.generate('Hello!', genOpts);
       sw.stop();
-      debugPrint('✅ generate() => "${result.text.substring(0, result.text.length.clamp(0, 120))}"');
-      debugPrint('   tokens=${result.tokensGenerated}  t/s=${result.tokensPerSecond.toStringAsFixed(1)}  time=${sw.elapsedMilliseconds}ms');
+      debugPrint(
+          '✅ generate() => "${result.text.substring(0, result.text.length.clamp(0, 120))}"');
+      debugPrint(
+          '   tokens=${result.tokensGenerated}  t/s=${result.tokensPerSecond.toStringAsFixed(1)}  time=${sw.elapsedMilliseconds}ms');
 
       // ── Step 4: Streaming generate ───────────────────────────────
       debugPrint('▶ Step 4: streaming generateStream …');
@@ -333,13 +343,37 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         // Models with per-chip availability
         const genieModels = [
           // Qwen3 4B — Gen 5 only
-          (slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8EliteGen5}),
+          (
+            slug: 'qwen3-4b',
+            name: 'Qwen3 4B',
+            mem: 2800000000,
+            quant: 'w4a16',
+            chips: {NPUChip.snapdragon8EliteGen5}
+          ),
           // Llama 3.2 1B Instruct — both chips
-          (slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          (
+            slug: 'llama3.2-1b-instruct',
+            name: 'Llama 3.2 1B Instruct',
+            mem: 1200000000,
+            quant: 'w4a16',
+            chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}
+          ),
           // SEA-LION v3.5 8B Instruct — both chips
-          (slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          (
+            slug: 'sea-lion3.5-8b-instruct',
+            name: 'SEA-LION v3.5 8B Instruct',
+            mem: 4800000000,
+            quant: 'w4a16',
+            chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}
+          ),
           // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
-          (slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4200000000, quant: 'w8a16', chips: {NPUChip.snapdragon8Elite}),
+          (
+            slug: 'qwen2.5-7b-instruct',
+            name: 'Qwen 2.5 7B Instruct',
+            mem: 4200000000,
+            quant: 'w8a16',
+            chips: {NPUChip.snapdragon8Elite}
+          ),
         ];
         for (final m in genieModels) {
           if (m.chips.contains(chip)) {
@@ -366,10 +400,11 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       name: 'SmolVLM 500M Instruct',
       url: Uri.parse(
           'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz'),
-      framework: InferenceFramework.llamaCpp,
-      modality: ModelCategory.multimodal,
-      artifactType: ModelArtifactType.tarGzArchive(
-        structure: ArchiveStructure.directoryBased,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      artifactType: ArchiveArtifact(
+        type: ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+        structure: ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
       ),
       memoryRequirement: 600000000,
     );
@@ -381,18 +416,20 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     RunAnywhereSDK.instance.models.register(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
-      framework: InferenceFramework.sherpa,
-      modality: ModelCategory.speechRecognition,
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       memoryRequirement: 75000000,
     );
 
     RunAnywhereSDK.instance.models.register(
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
-      framework: InferenceFramework.sherpa,
-      modality: ModelCategory.speechRecognition,
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       memoryRequirement: 250000000,
     );
 
@@ -400,18 +437,20 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     RunAnywhereSDK.instance.models.register(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
-      framework: InferenceFramework.sherpa,
-      modality: ModelCategory.speechSynthesis,
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 65000000,
     );
 
     RunAnywhereSDK.instance.models.register(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
-      framework: InferenceFramework.sherpa,
-      modality: ModelCategory.speechSynthesis,
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 65000000,
     );
 
@@ -422,8 +461,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       id: 'system-tts',
       name: 'System TTS',
       url: Uri.parse('about:blank'),
-      framework: InferenceFramework.systemTTS,
-      modality: ModelCategory.speechSynthesis,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 0,
     );
     debugPrint('✅ STT/TTS models registered via Core SDK (incl. system-tts)');
@@ -435,20 +474,20 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       name: 'All MiniLM L6 v2 (Embedding)',
       files: [
         ModelFileDescriptor(
-          relativePath: 'model.onnx',
-          destinationPath: 'model.onnx',
-          url: Uri.parse(
-              'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx'),
+          filename: 'model.onnx',
+          url:
+              'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+          isRequired: true,
         ),
         ModelFileDescriptor(
-          relativePath: 'vocab.txt',
-          destinationPath: 'vocab.txt',
-          url: Uri.parse(
-              'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt'),
+          filename: 'vocab.txt',
+          url:
+              'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+          isRequired: true,
         ),
       ],
-      framework: InferenceFramework.onnx,
-      modality: ModelCategory.embedding,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
       memoryRequirement: 25500000,
     );
     debugPrint('✅ ONNX Embedding models registered');

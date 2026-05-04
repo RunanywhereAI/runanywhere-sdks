@@ -1,25 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_embeddings.dart - Embeddings capability (B10).
-//
-// STUB: this capability surfaces the public `embed(...)` API on
-// `RunAnywhereSDK.instance.embeddings`, but the underlying FFI bridge
-// (`DartBridgeEmbeddings`) does not exist yet.
-//
-// TODO(B10): implement `lib/native/dart_bridge_embeddings.dart` with
-// ffi bindings for the three `rac_embeddings_*` C symbols:
-//   - rac_embeddings_create(const char* modelId, rac_handle_t* out)
-//   - rac_embeddings_embed(handle, text, options*, result*)
-//   - rac_embeddings_destroy(handle)
-// Plus a finalizer + a handle cache keyed on modelId. See
-// `lib/native/dart_bridge_diffusion.dart` for the pattern and
-// `lib/public/capabilities/runanywhere_embeddings.dart` (this file)
-// for the public-surface shape to preserve.
+// runanywhere_embeddings.dart - Embeddings capability.
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart'
-    show EmbeddingsOptions, EmbeddingsResult;
+    show EmbeddingsOptions, EmbeddingsRequest, EmbeddingsResult;
 import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 /// Embeddings capability surface.
 ///
@@ -33,10 +21,6 @@ class RunAnywhereEmbeddings {
   /// Generate an embedding vector for a single text.
   ///
   /// Returns an [EmbeddingsResult] containing one vector under `vectors[0]`.
-  /// Throws [SDKException.notInitialized] if the SDK is not yet initialized
-  /// and [SDKException.notImplemented] until the FFI bridge lands (see
-  /// file header TODO).
-  ///
   /// - [text]: the input text to embed.
   /// - [modelId]: the embeddings model identifier (registry id or path).
   /// - [options]: optional per-call overrides.
@@ -48,9 +32,44 @@ class RunAnywhereEmbeddings {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    throw SDKException.notImplemented(
-      'embeddings.embed(): TODO(B10) - FFI bridge '
-      'DartBridgeEmbeddings not implemented yet. See file header.',
+    return embedBatch(
+      EmbeddingsRequest(texts: [text], options: options),
+      modelId: modelId,
     );
   }
+
+  Future<EmbeddingsResult> embedBatch(
+    EmbeddingsRequest request, {
+    required String modelId,
+  }) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+
+    if (DartBridge.embeddings.currentModelId != modelId) {
+      final models = await RunAnywhereModels.shared.available();
+      final model = models.where((m) => m.id == modelId).firstOrNull;
+      if (model == null) {
+        throw SDKException.modelNotFound(
+            'Embeddings model not found: $modelId');
+      }
+      if (model.localPath.isEmpty) {
+        throw SDKException.modelNotDownloaded(
+          'Embeddings model is not downloaded. Call downloadModel() first.',
+        );
+      }
+      final resolvedPath =
+          await DartBridge.modelPaths.resolveModelFilePath(model);
+      if (resolvedPath == null) {
+        throw SDKException.modelNotFound(
+          'Could not resolve embeddings model file path for: $modelId',
+        );
+      }
+      DartBridge.embeddings.load(modelId, resolvedPath);
+    }
+
+    return DartBridge.embeddings.embedBatch(request);
+  }
+
+  Future<void> unload() async => DartBridge.embeddings.unload();
 }

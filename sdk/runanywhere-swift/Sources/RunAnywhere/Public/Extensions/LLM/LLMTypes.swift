@@ -87,6 +87,22 @@ public struct LLMGenerationOptions: Sendable {
             return try body(&cOptions)
         }
     }
+
+    /// Convert to the generated-proto request owned by the C++ LLM service.
+    public func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
+        var request = RALLMGenerateRequest()
+        request.prompt = prompt
+        request.maxTokens = Int32(maxTokens)
+        request.temperature = temperature
+        request.topP = topP
+        request.stopSequences = stopSequences
+        request.streamingEnabled = streamingEnabled
+        request.preferredFramework = preferredFramework?.wireString ?? ""
+        if let systemPrompt {
+            request.systemPrompt = systemPrompt
+        }
+        return request
+    }
 }
 
 // MARK: - LLM Generation Result
@@ -196,6 +212,24 @@ public struct LLMGenerationResult: Sendable {
             structuredOutputValidation: nil,
             thinkingTokens: metrics.thinking_tokens > 0 ? Int(metrics.thinking_tokens) : nil,
             responseTokens: Int(metrics.response_tokens)
+        )
+    }
+
+    /// Initialize from the generated-proto C++ LLM result.
+    public init(from proto: RALLMGenerationResult) {
+        self.init(
+            text: proto.text,
+            thinkingContent: proto.hasThinkingContent ? proto.thinkingContent : nil,
+            inputTokens: Int(proto.inputTokens),
+            tokensUsed: Int(proto.tokensGenerated),
+            modelUsed: proto.modelUsed,
+            latencyMs: proto.generationTimeMs,
+            framework: proto.hasFramework ? proto.framework : nil,
+            tokensPerSecond: proto.tokensPerSecond,
+            timeToFirstTokenMs: proto.hasTtftMs ? proto.ttftMs : nil,
+            structuredOutputValidation: nil,
+            thinkingTokens: proto.thinkingTokens > 0 ? Int(proto.thinkingTokens) : nil,
+            responseTokens: proto.responseTokens > 0 ? Int(proto.responseTokens) : Int(proto.tokensGenerated)
         )
     }
 }

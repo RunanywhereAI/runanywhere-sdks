@@ -94,6 +94,25 @@ public class DiffusionProgress(
     schemaIndex = 4,
   )
   public val intermediate_image_data: ByteString? = null,
+  /**
+   * Dimensions for intermediate_image_data when it is raw pixel data.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "intermediateImageWidth",
+    schemaIndex = 5,
+  )
+  public val intermediate_image_width: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "intermediateImageHeight",
+    schemaIndex = 6,
+  )
+  public val intermediate_image_height: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionProgress, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -112,6 +131,8 @@ public class DiffusionProgress(
     if (total_steps != other.total_steps) return false
     if (stage != other.stage) return false
     if (intermediate_image_data != other.intermediate_image_data) return false
+    if (intermediate_image_width != other.intermediate_image_width) return false
+    if (intermediate_image_height != other.intermediate_image_height) return false
     return true
   }
 
@@ -124,6 +145,8 @@ public class DiffusionProgress(
       result = result * 37 + total_steps.hashCode()
       result = result * 37 + stage.hashCode()
       result = result * 37 + (intermediate_image_data?.hashCode() ?: 0)
+      result = result * 37 + intermediate_image_width.hashCode()
+      result = result * 37 + intermediate_image_height.hashCode()
       super.hashCode = result
     }
     return result
@@ -137,6 +160,8 @@ public class DiffusionProgress(
     result += """stage=${sanitize(stage)}"""
     if (intermediate_image_data != null) result +=
         """intermediate_image_data=$intermediate_image_data"""
+    result += """intermediate_image_width=$intermediate_image_width"""
+    result += """intermediate_image_height=$intermediate_image_height"""
     return result.joinToString(prefix = "DiffusionProgress{", separator = ", ", postfix = "}")
   }
 
@@ -146,9 +171,11 @@ public class DiffusionProgress(
     total_steps: Int = this.total_steps,
     stage: String = this.stage,
     intermediate_image_data: ByteString? = this.intermediate_image_data,
+    intermediate_image_width: Int = this.intermediate_image_width,
+    intermediate_image_height: Int = this.intermediate_image_height,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionProgress = DiffusionProgress(progress_percent, current_step, total_steps, stage,
-      intermediate_image_data, unknownFields)
+      intermediate_image_data, intermediate_image_width, intermediate_image_height, unknownFields)
 
   public companion object {
     @JvmField
@@ -170,6 +197,10 @@ public class DiffusionProgress(
             value.total_steps)
         if (value.stage != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.stage)
         size += ProtoAdapter.BYTES.encodedSizeWithTag(5, value.intermediate_image_data)
+        if (value.intermediate_image_width != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.intermediate_image_width)
+        if (value.intermediate_image_height != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.intermediate_image_height)
         return size
       }
 
@@ -180,11 +211,19 @@ public class DiffusionProgress(
         if (value.total_steps != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.total_steps)
         if (value.stage != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.stage)
         ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.intermediate_image_data)
+        if (value.intermediate_image_width != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.intermediate_image_width)
+        if (value.intermediate_image_height != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.intermediate_image_height)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionProgress) {
         writer.writeBytes(value.unknownFields)
+        if (value.intermediate_image_height != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.intermediate_image_height)
+        if (value.intermediate_image_width != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.intermediate_image_width)
         ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.intermediate_image_data)
         if (value.stage != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.stage)
         if (value.total_steps != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.total_steps)
@@ -199,6 +238,8 @@ public class DiffusionProgress(
         var total_steps: Int = 0
         var stage: String = ""
         var intermediate_image_data: ByteString? = null
+        var intermediate_image_width: Int = 0
+        var intermediate_image_height: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> progress_percent = ProtoAdapter.FLOAT.decode(reader)
@@ -206,6 +247,8 @@ public class DiffusionProgress(
             3 -> total_steps = ProtoAdapter.INT32.decode(reader)
             4 -> stage = ProtoAdapter.STRING.decode(reader)
             5 -> intermediate_image_data = ProtoAdapter.BYTES.decode(reader)
+            6 -> intermediate_image_width = ProtoAdapter.INT32.decode(reader)
+            7 -> intermediate_image_height = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -215,6 +258,8 @@ public class DiffusionProgress(
           total_steps = total_steps,
           stage = stage,
           intermediate_image_data = intermediate_image_data,
+          intermediate_image_width = intermediate_image_width,
+          intermediate_image_height = intermediate_image_height,
           unknownFields = unknownFields
         )
       }

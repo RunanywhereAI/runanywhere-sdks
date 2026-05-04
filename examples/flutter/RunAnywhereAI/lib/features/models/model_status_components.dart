@@ -146,15 +146,15 @@ class ModelStatusBanner extends StatelessWidget {
 
   IconData _frameworkIcon(LLMFramework framework) {
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return Icons.memory;
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return Icons.graphic_eq;
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return Icons.developer_board;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Icons.apple;
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return Icons.volume_up;
       default:
         return Icons.view_in_ar;
@@ -163,15 +163,15 @@ class ModelStatusBanner extends StatelessWidget {
 
   Color _frameworkColor(LLMFramework framework) {
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return AppColors.primaryBlue;
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return AppColors.primaryGreen;
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return AppColors.primaryPurple;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.black;
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return AppColors.primaryOrange;
       default:
         return AppColors.statusGray;
@@ -596,13 +596,13 @@ class CompactModelIndicator extends StatelessWidget {
 
   Color _frameworkColor(LLMFramework framework) {
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return AppColors.primaryBlue;
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return AppColors.statusGreen;
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return AppColors.primaryPurple;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.black;
       default:
         return AppColors.statusGray;

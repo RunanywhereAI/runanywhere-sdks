@@ -27,6 +27,7 @@ import {
   type STTOptions,
   STTLanguage,
 } from '@runanywhere/proto-ts/stt_options';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
 /** Default proto STTOptions for live transcription. */
 function defaultLiveSTTOptions(): STTOptions {
@@ -38,6 +39,10 @@ function defaultLiveSTTOptions(): STTOptions {
     vocabularyList: [],
     enableWordTimestamps: false,
     beamSize: 0,
+    detectLanguage: true,
+    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+    sampleRate: 16000,
+    maxAlternatives: 0,
   };
 }
 

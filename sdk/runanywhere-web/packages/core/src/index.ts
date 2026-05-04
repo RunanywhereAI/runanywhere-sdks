@@ -26,7 +26,31 @@ export type { StorageBackend } from './Public/RunAnywhere';
 
 // Namespace extensions — symmetric with Swift's 19-extension pattern.
 export { Storage } from './Public/Extensions/RunAnywhere+Storage';
-export type { StorageInfoExtended } from './Public/Extensions/RunAnywhere+Storage';
+export type {
+  StorageAvailabilityRequest,
+  StorageAvailabilityResult,
+  StorageDeletePlan,
+  StorageDeletePlanRequest,
+  StorageDeleteRequest,
+  StorageDeleteResult,
+  StorageInfoRequest,
+  StorageInfoResult,
+} from '@runanywhere/proto-ts/storage_types';
+export { Downloads } from './Public/Extensions/RunAnywhere+Downloads';
+export { SDKEvents } from './Public/Extensions/RunAnywhere+SDKEvents';
+export { ModelRegistry } from './Public/Extensions/RunAnywhere+ModelRegistry';
+export { ModelLifecycle } from './Public/Extensions/RunAnywhere+ModelLifecycle';
+export type {
+  ComponentLifecycleEvent,
+  ComponentLifecycleSnapshot,
+  CurrentModelRequest,
+  CurrentModelResult,
+  ModelLoadRequest,
+  ModelLoadResult,
+  ModelUnloadRequest,
+  ModelUnloadResult,
+} from './Public/Extensions/RunAnywhere+ModelLifecycle';
+export { ComponentLifecycleState } from './Public/Extensions/RunAnywhere+ModelLifecycle';
 export { PluginLoader } from './Public/Extensions/RunAnywhere+PluginLoader';
 export { TextGeneration, generateStructuredStream, extractStructuredOutput } from './Public/Extensions/RunAnywhere+TextGeneration';
 export type { StructuredOutputResult, JSONSchemaDescriptor } from './Public/Extensions/RunAnywhere+TextGeneration';
@@ -38,7 +62,8 @@ export { TTS } from './Public/Extensions/RunAnywhere+TTS';
 export { VAD } from './Public/Extensions/RunAnywhere+VAD';
 export { VoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export { VisionLanguage } from './Public/Extensions/RunAnywhere+VisionLanguage';
-export type { VLMGenerationOptions, VLMResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
+export type { VLMImage, VLMGenerationOptions, VLMResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
+export { VLMImageFormat, VLMErrorCode } from './Public/Extensions/RunAnywhere+VisionLanguage';
 export { VLMModels } from './Public/Extensions/RunAnywhere+VLMModels';
 export { Diffusion } from './Public/Extensions/RunAnywhere+Diffusion';
 export type {
@@ -47,6 +72,12 @@ export type {
   DiffusionConfiguration,
   DiffusionCapabilities,
   DiffusionProgress,
+} from './Public/Extensions/RunAnywhere+Diffusion';
+export {
+  DiffusionMode,
+  DiffusionScheduler,
+  DiffusionModelVariant,
+  DiffusionTokenizerSourceKind,
 } from './Public/Extensions/RunAnywhere+Diffusion';
 export {
   generateImage,
@@ -65,7 +96,7 @@ export { Frameworks } from './Public/Extensions/RunAnywhere+Frameworks';
 export { solutions as Solutions } from './Public/Extensions/RunAnywhere+Solutions';
 export { Logging } from './Public/Extensions/RunAnywhere+Logging';
 export { Hardware } from './Public/Extensions/RunAnywhere+Hardware';
-export type { HardwareProfile } from './Public/Extensions/RunAnywhere+Hardware';
+export type { HardwareProfile, HardwareProfileResult } from './Public/Extensions/RunAnywhere+Hardware';
 
 // Phase 4d: top-level convenience verbs (chat / generate / transcribe /
 // synthesize / speak / detectSpeech / setVADCallback / etc.) — also reachable
@@ -112,9 +143,11 @@ export {
   ragClearDocuments,
   ragGetDocumentCount,
   ragGetStatistics,
+  getRAGAvailability,
+  isRAGAvailable,
   setRAGProvider,
 } from './Public/Extensions/RunAnywhere+RAG';
-export type { RAGProvider } from './Public/Extensions/RunAnywhere+RAG';
+export type { RAGAvailability, RAGAvailabilitySource, RAGProvider } from './Public/Extensions/RunAnywhere+RAG';
 
 export {
   initializeVoiceAgent,
@@ -170,6 +203,23 @@ export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
 export type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
 export type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 export { LLMTokenKind } from '@runanywhere/proto-ts/llm_service';
+export {
+  DiffusionProtoAdapter,
+  EmbeddingsProtoAdapter,
+  LLMProtoAdapter,
+  LoRAProtoAdapter,
+  ModalityProtoAdapter,
+  RAGProtoAdapter,
+  STTProtoAdapter,
+  TTSProtoAdapter,
+  VADProtoAdapter,
+  VLMProtoAdapter,
+  VoiceAgentProtoAdapter,
+} from './Adapters/ModalityProtoAdapter';
+export type {
+  ModalityProtoModule,
+  ProtoEventHandler,
+} from './Adapters/ModalityProtoAdapter';
 
 // Solutions runtime (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
 // Construct via `RunAnywhere.solutions.run(...)` (preferred) or directly via
@@ -222,15 +272,29 @@ export type {
 export { FetchHttpTransport } from './Adapters/FetchHttpTransport';
 export type { FetchHttpTransportModule } from './Adapters/FetchHttpTransport';
 
-// Model registry refresh (T4.9) — wraps the commons
-// `rac_model_registry_refresh` C ABI so the web surface is symmetric with
+// Model registry bridge — wraps the commons `rac_model_registry_refresh`
+// and proto-byte model-info C ABI so the web surface is symmetric with
 // Swift / Kotlin / RN / Flutter. Backend packages install their Emscripten
 // module via `ModelRegistryAdapter.setDefaultModule(module)` after load.
 export { ModelRegistryAdapter } from './Adapters/ModelRegistryAdapter';
 export type {
   ModelRegistryModule,
+  ModelInfoList,
+  ModelRegistryAvailability,
   RefreshOptions,
 } from './Adapters/ModelRegistryAdapter';
+export { ModelLifecycleAdapter } from './Adapters/ModelLifecycleAdapter';
+export type { ModelLifecycleModule } from './Adapters/ModelLifecycleAdapter';
+export { DownloadAdapter } from './Adapters/DownloadAdapter';
+export type { DownloadModule, ProtoDownloadProgressHandler } from './Adapters/DownloadAdapter';
+export { StorageAdapter } from './Adapters/StorageAdapter';
+export type { StorageModule } from './Adapters/StorageAdapter';
+export { SDKEventStreamAdapter } from './Adapters/SDKEventStreamAdapter';
+export type {
+  SDKEventHandler,
+  SDKEventStreamModule,
+  SDKEventUnsubscribe,
+} from './Adapters/SDKEventStreamAdapter';
 
 // Types
 export * from './types';

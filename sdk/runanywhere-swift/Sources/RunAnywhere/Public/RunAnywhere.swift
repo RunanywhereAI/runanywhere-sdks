@@ -207,10 +207,14 @@ public enum RunAnywhere {
             params = SDKInitParams(forDevelopmentWithAPIKey: apiKey ?? "")
         } else {
             // Production/Staging mode - require API key and URL
-            guard let apiKey = apiKey, !apiKey.isEmpty else {
+            let trimmedAPIKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedBaseURL = baseURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let apiKey = trimmedAPIKey,
+                  CppBridge.DevConfig.isUsableCredential(apiKey) else {
                 throw SDKException.general(.invalidConfiguration, "API key is required for \(environment.description) mode")
             }
-            guard let baseURL = baseURL, !baseURL.isEmpty else {
+            guard let baseURL = trimmedBaseURL,
+                  CppBridge.DevConfig.isUsableHTTPURL(baseURL) else {
                 throw SDKException.general(.invalidConfiguration, "Base URL is required for \(environment.description) mode")
             }
             params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
@@ -225,6 +229,16 @@ public enum RunAnywhere {
         baseURL: URL,
         environment: SDKEnvironment = .production
     ) throws {
+        if environment != .development {
+            guard CppBridge.DevConfig.isUsableCredential(apiKey),
+                  CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) else {
+                throw SDKException.general(
+                    .invalidConfiguration,
+                    "Usable API key and baseURL are required for \(environment.description) mode"
+                )
+            }
+        }
+
         let params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
         try performCoreInit(with: params, startBackgroundServices: true)
     }
@@ -364,7 +378,7 @@ public enum RunAnywhere {
             // Step 1: Configure HTTP transport
             do {
                 try await setupHTTP(params: params, environment: environment, logger: logger)
-                hasCompletedHTTPSetup = true
+                hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured
             } catch {
                 // If HTTP/auth setup fails (e.g. device is offline), log warning but
                 // continue initialization so local/cached models remain accessible.
@@ -373,8 +387,12 @@ public enum RunAnywhere {
             }
 
             // Step 1.5: Flush any queued telemetry events (may be no-op if HTTP unconfigured)
-            CppBridge.Telemetry.flush()
-            logger.debug("Attempted telemetry flush (may be no-op if HTTP unconfigured)")
+            if await CppBridge.HTTP.shared.isConfigured {
+                CppBridge.Telemetry.flush()
+                logger.debug("Attempted telemetry flush")
+            } else {
+                logger.debug("Skipping telemetry flush: HTTP not configured")
+            }
         }
 
         // Step 2: Initialize C++ state
@@ -401,8 +419,12 @@ public enum RunAnywhere {
 
         // Step 5: Register device via CppBridge (C++ handles all business logic)
         do {
-            try await CppBridge.Device.registerIfNeeded(environment: environment)
-            logger.debug("Device registration check completed")
+            if shouldUseExternalDeviceRegistration(environment: environment) {
+                try await CppBridge.Device.registerIfNeeded(environment: environment)
+                logger.debug("Device registration check completed")
+            } else {
+                logger.debug("Skipping device registration: no usable external config")
+            }
         } catch {
             logger.warning("Device registration failed (non-critical): \(error.localizedDescription)")
         }
@@ -449,8 +471,13 @@ public enum RunAnywhere {
 
         do {
             try await setupHTTP(params: params, environment: environment, logger: logger)
-            hasCompletedHTTPSetup = true
-            logger.info("✅ HTTP/Auth setup succeeded on retry")
+            hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured
+            if hasCompletedHTTPSetup {
+                logger.info("✅ HTTP/Auth setup succeeded on retry")
+            } else {
+                logger.debug("HTTP/Auth retry skipped: no usable external config")
+                return
+            }
 
             // Flush any telemetry events queued during offline period
             CppBridge.Telemetry.flush()
@@ -476,11 +503,16 @@ public enum RunAnywhere {
             if await CppBridge.DevConfig.configureHTTP() {
                 logger.debug("HTTP: Supabase from C++ config (development)")
             } else {
-                await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
-                logger.debug("HTTP: Provided URL (development)")
+                logger.debug("HTTP disabled: development Supabase config is missing or placeholder")
             }
 
         case .staging, .production:
+            guard CppBridge.DevConfig.isUsableCredential(params.apiKey),
+                  CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString) else {
+                logger.debug("HTTP/Auth disabled: no usable external config")
+                return
+            }
+
             // Configure HTTP first
             await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
 
@@ -492,6 +524,19 @@ public enum RunAnywhere {
             // .unspecified / UNRECOGNIZED — treat like development (no auth).
             await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
             logger.warning("HTTP: unknown environment \(environment.wireString); defaulting to development behavior")
+        }
+    }
+
+    private static func shouldUseExternalDeviceRegistration(environment: SDKEnvironment) -> Bool {
+        switch environment {
+        case .development:
+            return CppBridge.DevConfig.hasUsableDevelopmentRegistrationConfig
+        case .staging, .production:
+            guard let params = initParams else { return false }
+            return CppBridge.DevConfig.isUsableCredential(params.apiKey) &&
+                CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString)
+        default:
+            return false
         }
     }
 

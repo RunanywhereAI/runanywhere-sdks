@@ -319,6 +319,15 @@ object CppBridgeDevice {
                                     null
                                 }
 
+                            if (!CppBridgeTelemetry.isUsableHttpUrl(baseUrl)) {
+                                CppBridgePlatformAdapter.logCallback(
+                                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                                    TAG,
+                                    "Skipping development device registration HTTP: Supabase URL is missing or placeholder",
+                                )
+                                return -1
+                            }
+
                             // Add Supabase-specific headers
                             headers["Prefer"] = "resolution=merge-duplicates"
 
@@ -327,7 +336,7 @@ object CppBridgeDevice {
                                 val apiKey =
                                     com.runanywhere.sdk.native.bridge.RunAnywhereBridge
                                         .racDevConfigGetSupabaseKey()
-                                if (!apiKey.isNullOrEmpty()) {
+                                if (apiKey != null && !CppBridgeTelemetry.looksLikePlaceholder(apiKey)) {
                                     headers["apikey"] = apiKey
                                     CppBridgePlatformAdapter.logCallback(
                                         CppBridgePlatformAdapter.LogLevel.DEBUG,
@@ -345,6 +354,15 @@ object CppBridgeDevice {
                         } else {
                             // PRODUCTION/STAGING mode - use Railway backend
                             baseUrl = CppBridgeTelemetry.getBaseUrl()
+
+                            if (!CppBridgeTelemetry.isUsableHttpUrl(baseUrl)) {
+                                CppBridgePlatformAdapter.logCallback(
+                                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                                    TAG,
+                                    "Skipping device registration HTTP: base URL is missing or placeholder",
+                                )
+                                return -1
+                            }
 
                             // Add Bearer auth with JWT access token
                             // Use getValidToken() which automatically refreshes if needed
@@ -1068,6 +1086,15 @@ object CppBridgeDevice {
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
                 "❌ Cannot trigger registration: device callbacks not registered",
+            )
+            return false
+        }
+
+        if (!CppBridgeTelemetry.hasUsableNetworkConfig(environment)) {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Skipping device registration: no usable external config for env=$environment",
             )
             return false
         }

@@ -117,6 +117,47 @@ public class RAGConfiguration(
     schemaIndex = 6,
   )
   public val chunk_overlap: Int = 0,
+  /**
+   * Maximum tokens of retrieved context passed to the LLM.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxContextTokens",
+    schemaIndex = 7,
+  )
+  public val max_context_tokens: Int = 0,
+  /**
+   * Prompt template with `{context}` and `{query}` placeholders.
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "promptTemplate",
+    schemaIndex = 8,
+  )
+  public val prompt_template: String? = null,
+  /**
+   * Backend-specific config JSON passed to the embedding model/provider.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "embeddingConfigJson",
+    schemaIndex = 9,
+  )
+  public val embedding_config_json: String? = null,
+  /**
+   * Backend-specific config JSON passed to the LLM provider.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "llmConfigJson",
+    schemaIndex = 10,
+  )
+  public val llm_config_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -137,6 +178,10 @@ public class RAGConfiguration(
     if (similarity_threshold != other.similarity_threshold) return false
     if (chunk_size != other.chunk_size) return false
     if (chunk_overlap != other.chunk_overlap) return false
+    if (max_context_tokens != other.max_context_tokens) return false
+    if (prompt_template != other.prompt_template) return false
+    if (embedding_config_json != other.embedding_config_json) return false
+    if (llm_config_json != other.llm_config_json) return false
     return true
   }
 
@@ -151,6 +196,10 @@ public class RAGConfiguration(
       result = result * 37 + similarity_threshold.hashCode()
       result = result * 37 + chunk_size.hashCode()
       result = result * 37 + chunk_overlap.hashCode()
+      result = result * 37 + max_context_tokens.hashCode()
+      result = result * 37 + (prompt_template?.hashCode() ?: 0)
+      result = result * 37 + (embedding_config_json?.hashCode() ?: 0)
+      result = result * 37 + (llm_config_json?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -165,6 +214,11 @@ public class RAGConfiguration(
     result += """similarity_threshold=$similarity_threshold"""
     result += """chunk_size=$chunk_size"""
     result += """chunk_overlap=$chunk_overlap"""
+    result += """max_context_tokens=$max_context_tokens"""
+    if (prompt_template != null) result += """prompt_template=${sanitize(prompt_template)}"""
+    if (embedding_config_json != null) result +=
+        """embedding_config_json=${sanitize(embedding_config_json)}"""
+    if (llm_config_json != null) result += """llm_config_json=${sanitize(llm_config_json)}"""
     return result.joinToString(prefix = "RAGConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -176,9 +230,14 @@ public class RAGConfiguration(
     similarity_threshold: Float = this.similarity_threshold,
     chunk_size: Int = this.chunk_size,
     chunk_overlap: Int = this.chunk_overlap,
+    max_context_tokens: Int = this.max_context_tokens,
+    prompt_template: String? = this.prompt_template,
+    embedding_config_json: String? = this.embedding_config_json,
+    llm_config_json: String? = this.llm_config_json,
     unknownFields: ByteString = this.unknownFields,
   ): RAGConfiguration = RAGConfiguration(embedding_model_path, llm_model_path, embedding_dimension,
-      top_k, similarity_threshold, chunk_size, chunk_overlap, unknownFields)
+      top_k, similarity_threshold, chunk_size, chunk_overlap, max_context_tokens, prompt_template,
+      embedding_config_json, llm_config_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -205,6 +264,11 @@ public class RAGConfiguration(
             value.chunk_size)
         if (value.chunk_overlap != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
             value.chunk_overlap)
+        if (value.max_context_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.max_context_tokens)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.prompt_template)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.embedding_config_json)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.llm_config_json)
         return size
       }
 
@@ -221,11 +285,21 @@ public class RAGConfiguration(
         if (value.chunk_size != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
         if (value.chunk_overlap != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
             value.chunk_overlap)
+        if (value.max_context_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.max_context_tokens)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGConfiguration) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
+        if (value.max_context_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.max_context_tokens)
         if (value.chunk_overlap != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
             value.chunk_overlap)
         if (value.chunk_size != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
@@ -248,6 +322,10 @@ public class RAGConfiguration(
         var similarity_threshold: Float = 0f
         var chunk_size: Int = 0
         var chunk_overlap: Int = 0
+        var max_context_tokens: Int = 0
+        var prompt_template: String? = null
+        var embedding_config_json: String? = null
+        var llm_config_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> embedding_model_path = ProtoAdapter.STRING.decode(reader)
@@ -257,6 +335,10 @@ public class RAGConfiguration(
             5 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
             6 -> chunk_size = ProtoAdapter.INT32.decode(reader)
             7 -> chunk_overlap = ProtoAdapter.INT32.decode(reader)
+            8 -> max_context_tokens = ProtoAdapter.INT32.decode(reader)
+            9 -> prompt_template = ProtoAdapter.STRING.decode(reader)
+            10 -> embedding_config_json = ProtoAdapter.STRING.decode(reader)
+            11 -> llm_config_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -268,6 +350,10 @@ public class RAGConfiguration(
           similarity_threshold = similarity_threshold,
           chunk_size = chunk_size,
           chunk_overlap = chunk_overlap,
+          max_context_tokens = max_context_tokens,
+          prompt_template = prompt_template,
+          embedding_config_json = embedding_config_json,
+          llm_config_json = llm_config_json,
           unknownFields = unknownFields
         )
       }

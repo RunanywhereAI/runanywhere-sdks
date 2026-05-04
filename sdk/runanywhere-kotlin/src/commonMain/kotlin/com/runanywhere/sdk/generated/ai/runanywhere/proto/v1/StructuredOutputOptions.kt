@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -68,6 +69,33 @@ public class StructuredOutputOptions(
     schemaIndex = 2,
   )
   public val strict_mode: Boolean? = null,
+  /**
+   * Raw JSON Schema string for C ABI and SDKs that already carry schema as
+   * serialized JSON instead of the typed JSONSchema tree.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "jsonSchema",
+    schemaIndex = 3,
+  )
+  public val json_schema: String? = null,
+  /**
+   * Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "typeName",
+    schemaIndex = 4,
+  )
+  public val type_name: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 5,
+  )
+  public val name: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -84,6 +112,9 @@ public class StructuredOutputOptions(
     if (schema != other.schema) return false
     if (include_schema_in_prompt != other.include_schema_in_prompt) return false
     if (strict_mode != other.strict_mode) return false
+    if (json_schema != other.json_schema) return false
+    if (type_name != other.type_name) return false
+    if (name != other.name) return false
     return true
   }
 
@@ -94,6 +125,9 @@ public class StructuredOutputOptions(
       result = result * 37 + (schema?.hashCode() ?: 0)
       result = result * 37 + include_schema_in_prompt.hashCode()
       result = result * 37 + (strict_mode?.hashCode() ?: 0)
+      result = result * 37 + (json_schema?.hashCode() ?: 0)
+      result = result * 37 + (type_name?.hashCode() ?: 0)
+      result = result * 37 + (name?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -104,6 +138,9 @@ public class StructuredOutputOptions(
     if (schema != null) result += """schema=$schema"""
     result += """include_schema_in_prompt=$include_schema_in_prompt"""
     if (strict_mode != null) result += """strict_mode=$strict_mode"""
+    if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
+    if (type_name != null) result += """type_name=${sanitize(type_name)}"""
+    if (name != null) result += """name=${sanitize(name)}"""
     return result.joinToString(prefix = "StructuredOutputOptions{", separator = ", ", postfix = "}")
   }
 
@@ -111,9 +148,12 @@ public class StructuredOutputOptions(
     schema: JSONSchema? = this.schema,
     include_schema_in_prompt: Boolean = this.include_schema_in_prompt,
     strict_mode: Boolean? = this.strict_mode,
+    json_schema: String? = this.json_schema,
+    type_name: String? = this.type_name,
+    name: String? = this.name,
     unknownFields: ByteString = this.unknownFields,
   ): StructuredOutputOptions = StructuredOutputOptions(schema, include_schema_in_prompt,
-      strict_mode, unknownFields)
+      strict_mode, json_schema, type_name, name, unknownFields)
 
   public companion object {
     @JvmField
@@ -132,6 +172,9 @@ public class StructuredOutputOptions(
         if (value.include_schema_in_prompt != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(2,
             value.include_schema_in_prompt)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.strict_mode)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.json_schema)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.type_name)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.name)
         return size
       }
 
@@ -140,11 +183,17 @@ public class StructuredOutputOptions(
         if (value.include_schema_in_prompt != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2,
             value.include_schema_in_prompt)
         ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.strict_mode)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.type_name)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.name)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.name)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.type_name)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
         ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.strict_mode)
         if (value.include_schema_in_prompt != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2,
             value.include_schema_in_prompt)
@@ -155,11 +204,17 @@ public class StructuredOutputOptions(
         var schema: JSONSchema? = null
         var include_schema_in_prompt: Boolean = false
         var strict_mode: Boolean? = null
+        var json_schema: String? = null
+        var type_name: String? = null
+        var name: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> schema = JSONSchema.ADAPTER.decode(reader)
             2 -> include_schema_in_prompt = ProtoAdapter.BOOL.decode(reader)
             3 -> strict_mode = ProtoAdapter.BOOL.decode(reader)
+            4 -> json_schema = ProtoAdapter.STRING.decode(reader)
+            5 -> type_name = ProtoAdapter.STRING.decode(reader)
+            6 -> name = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -167,6 +222,9 @@ public class StructuredOutputOptions(
           schema = schema,
           include_schema_in_prompt = include_schema_in_prompt,
           strict_mode = strict_mode,
+          json_schema = json_schema,
+          type_name = type_name,
+          name = name,
           unknownFields = unknownFields
         )
       }

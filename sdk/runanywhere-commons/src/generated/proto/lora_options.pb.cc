@@ -91,7 +91,11 @@ inline constexpr LoraAdapterCatalogEntry::Impl_::Impl_(
         author_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        size_bytes_{::int64_t{0}} {}
+        checksum_sha256_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        size_bytes_{::int64_t{0}},
+        default_scale_{0} {}
 
 template <typename>
 constexpr LoraAdapterCatalogEntry::LoraAdapterCatalogEntry(::_pbi::ConstantInitialized)
@@ -213,7 +217,7 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_._has_bits_),
-        11, // hasbit index offset
+        13, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.name_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.description_),
@@ -222,14 +226,18 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.compatible_models_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.size_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.author_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.default_scale_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterCatalogEntry, _impl_.checksum_sha256_),
         1,
         2,
         3,
         4,
         5,
         0,
-        7,
+        8,
         6,
+        9,
+        7,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraCompatibilityResult, _impl_._has_bits_),
         6, // hasbit index offset
@@ -246,7 +254,7 @@ static const ::_pbi::MigrationSchema
         {0, sizeof(::runanywhere::v1::LoRAAdapterConfig)},
         {9, sizeof(::runanywhere::v1::LoRAAdapterInfo)},
         {22, sizeof(::runanywhere::v1::LoraAdapterCatalogEntry)},
-        {41, sizeof(::runanywhere::v1::LoraCompatibilityResult)},
+        {45, sizeof(::runanywhere::v1::LoraCompatibilityResult)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_LoRAAdapterConfig_default_instance_._instance,
@@ -262,26 +270,27 @@ const char descriptor_table_protodef_lora_5foptions_2eproto[] ABSL_ATTRIBUTE_SEC
     "\r\n\013_adapter_id\"\211\001\n\017LoRAAdapterInfo\022\022\n\nad"
     "apter_id\030\001 \001(\t\022\024\n\014adapter_path\030\002 \001(\t\022\r\n\005"
     "scale\030\003 \001(\002\022\017\n\007applied\030\004 \001(\010\022\032\n\rerror_me"
-    "ssage\030\005 \001(\tH\000\210\001\001B\020\n\016_error_message\"\266\001\n\027L"
+    "ssage\030\005 \001(\tH\000\210\001\001B\020\n\016_error_message\"\377\001\n\027L"
     "oraAdapterCatalogEntry\022\n\n\002id\030\001 \001(\t\022\014\n\004na"
     "me\030\002 \001(\t\022\023\n\013description\030\003 \001(\t\022\013\n\003url\030\004 \001"
     "(\t\022\020\n\010filename\030\005 \001(\t\022\031\n\021compatible_model"
     "s\030\006 \003(\t\022\022\n\nsize_bytes\030\007 \001(\003\022\023\n\006author\030\010 "
-    "\001(\tH\000\210\001\001B\t\n\007_author\"\230\001\n\027LoraCompatibilit"
-    "yResult\022\025\n\ris_compatible\030\001 \001(\010\022\032\n\rerror_"
-    "message\030\002 \001(\tH\000\210\001\001\022 \n\023base_model_require"
-    "d\030\003 \001(\tH\001\210\001\001B\020\n\016_error_messageB\026\n\024_base_"
-    "model_requiredB\213\001\n\027ai.runanywhere.proto."
-    "v1B\020LoraOptionsProtoP\001Z<github.com/runan"
-    "ywhere/runanywhere-sdks/idl/v1;runanywhe"
-    "rev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pr"
-    "oto3"
+    "\001(\tH\000\210\001\001\022\025\n\rdefault_scale\030\t \001(\002\022\034\n\017check"
+    "sum_sha256\030\n \001(\tH\001\210\001\001B\t\n\007_authorB\022\n\020_che"
+    "cksum_sha256\"\230\001\n\027LoraCompatibilityResult"
+    "\022\025\n\ris_compatible\030\001 \001(\010\022\032\n\rerror_message"
+    "\030\002 \001(\tH\000\210\001\001\022 \n\023base_model_required\030\003 \001(\t"
+    "H\001\210\001\001B\020\n\016_error_messageB\026\n\024_base_model_r"
+    "equiredB\213\001\n\027ai.runanywhere.proto.v1B\020Lor"
+    "aOptionsProtoP\001Z<github.com/runanywhere/"
+    "runanywhere-sdks/idl/v1;runanywherev1\370\001\001"
+    "\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_lora_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_lora_5foptions_2eproto = {
     false,
     false,
-    764,
+    837,
     descriptor_table_protodef_lora_5foptions_2eproto,
     "lora_options.proto",
     &descriptor_table_lora_5foptions_2eproto_once,
@@ -1103,7 +1112,8 @@ PROTOBUF_NDEBUG_INLINE LoraAdapterCatalogEntry::Impl_::Impl_(
         description_(arena, from.description_),
         url_(arena, from.url_),
         filename_(arena, from.filename_),
-        author_(arena, from.author_) {}
+        author_(arena, from.author_),
+        checksum_sha256_(arena, from.checksum_sha256_) {}
 
 LoraAdapterCatalogEntry::LoraAdapterCatalogEntry(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -1118,7 +1128,13 @@ LoraAdapterCatalogEntry::LoraAdapterCatalogEntry(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.size_bytes_ = from._impl_.size_bytes_;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, size_bytes_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, size_bytes_),
+           offsetof(Impl_, default_scale_) -
+               offsetof(Impl_, size_bytes_) +
+               sizeof(Impl_::default_scale_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.LoraAdapterCatalogEntry)
 }
@@ -1140,11 +1156,17 @@ PROTOBUF_NDEBUG_INLINE LoraAdapterCatalogEntry::Impl_::Impl_(
         description_(arena),
         url_(arena),
         filename_(arena),
-        author_(arena) {}
+        author_(arena),
+        checksum_sha256_(arena) {}
 
 inline void LoraAdapterCatalogEntry::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.size_bytes_ = {};
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, size_bytes_),
+           0,
+           offsetof(Impl_, default_scale_) -
+               offsetof(Impl_, size_bytes_) +
+               sizeof(Impl_::default_scale_));
 }
 LoraAdapterCatalogEntry::~LoraAdapterCatalogEntry() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.LoraAdapterCatalogEntry)
@@ -1163,6 +1185,7 @@ inline void LoraAdapterCatalogEntry::SharedDtor(MessageLite& self) {
   this_._impl_.url_.Destroy();
   this_._impl_.filename_.Destroy();
   this_._impl_.author_.Destroy();
+  this_._impl_.checksum_sha256_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -1227,16 +1250,16 @@ LoraAdapterCatalogEntry::GetClassData() const {
   return LoraAdapterCatalogEntry_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 8, 0, 106, 2>
+const ::_pbi::TcParseTable<4, 10, 0, 121, 2>
 LoraAdapterCatalogEntry::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_._has_bits_),
     0, // no _extensions_
-    8, 56,  // max_field_number, fast_idx_mask
+    10, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967040,  // skipmap
+    4294966272,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    8,  // num_field_entries
+    10,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     LoraAdapterCatalogEntry_class_data_.base(),
@@ -1246,10 +1269,7 @@ LoraAdapterCatalogEntry::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::LoraAdapterCatalogEntry>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // optional string author = 8;
-    {::_pbi::TcParser::FastUS1,
-     {66, 6, 0,
-      PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.author_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // string id = 1;
     {::_pbi::TcParser::FastUS1,
      {10, 1, 0,
@@ -1275,9 +1295,26 @@ LoraAdapterCatalogEntry::_table_ = {
      {50, 0, 0,
       PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.compatible_models_)}},
     // int64 size_bytes = 7;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LoraAdapterCatalogEntry, _impl_.size_bytes_), 7>(),
-     {56, 7, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LoraAdapterCatalogEntry, _impl_.size_bytes_), 8>(),
+     {56, 8, 0,
       PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.size_bytes_)}},
+    // optional string author = 8;
+    {::_pbi::TcParser::FastUS1,
+     {66, 6, 0,
+      PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.author_)}},
+    // float default_scale = 9;
+    {::_pbi::TcParser::FastF32S1,
+     {77, 9, 0,
+      PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.default_scale_)}},
+    // optional string checksum_sha256 = 10;
+    {::_pbi::TcParser::FastUS1,
+     {82, 7, 0,
+      PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.checksum_sha256_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
@@ -1294,13 +1331,17 @@ LoraAdapterCatalogEntry::_table_ = {
     // repeated string compatible_models = 6;
     {PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.compatible_models_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
     // int64 size_bytes = 7;
-    {PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.size_bytes_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    {PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.size_bytes_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // optional string author = 8;
     {PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.author_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // float default_scale = 9;
+    {PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.default_scale_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // optional string checksum_sha256 = 10;
+    {PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.checksum_sha256_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
-    "\46\2\4\13\3\10\21\0\6\0\0\0\0\0\0\0"
+    "\46\2\4\13\3\10\21\0\6\0\17\0\0\0\0\0"
     "runanywhere.v1.LoraAdapterCatalogEntry"
     "id"
     "name"
@@ -1309,6 +1350,7 @@ LoraAdapterCatalogEntry::_table_ = {
     "filename"
     "compatible_models"
     "author"
+    "checksum_sha256"
   }},
 };
 PROTOBUF_NOINLINE void LoraAdapterCatalogEntry::Clear() {
@@ -1319,7 +1361,7 @@ PROTOBUF_NOINLINE void LoraAdapterCatalogEntry::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _impl_.compatible_models_.Clear();
     }
@@ -1341,8 +1383,15 @@ PROTOBUF_NOINLINE void LoraAdapterCatalogEntry::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       _impl_.author_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      _impl_.checksum_sha256_.ClearNonDefaultToEmpty();
+    }
   }
-  _impl_.size_bytes_ = ::int64_t{0};
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    ::memset(&_impl_.size_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.default_scale_) -
+        reinterpret_cast<char*>(&_impl_.size_bytes_)) + sizeof(_impl_.default_scale_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -1427,7 +1476,7 @@ PROTOBUF_NOINLINE void LoraAdapterCatalogEntry::Clear() {
   }
 
   // int64 size_bytes = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_size_bytes() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
@@ -1441,6 +1490,23 @@ PROTOBUF_NOINLINE void LoraAdapterCatalogEntry::Clear() {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LoraAdapterCatalogEntry.author");
     target = stream->WriteStringMaybeAliased(8, _s, target);
+  }
+
+  // float default_scale = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_default_scale()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          9, this_._internal_default_scale(), target);
+    }
+  }
+
+  // optional string checksum_sha256 = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    const ::std::string& _s = this_._internal_checksum_sha256();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LoraAdapterCatalogEntry.checksum_sha256");
+    target = stream->WriteStringMaybeAliased(10, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -1518,11 +1584,24 @@ PROTOBUF_NOINLINE void LoraAdapterCatalogEntry::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_author());
     }
-    // int64 size_bytes = 7;
+    // optional string checksum_sha256 = 10;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_checksum_sha256());
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    // int64 size_bytes = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_size_bytes() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_size_bytes());
+      }
+    }
+    // float default_scale = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_default_scale()) != 0) {
+        total_size += 5;
       }
     }
   }
@@ -1600,8 +1679,18 @@ void LoraAdapterCatalogEntry::MergeImpl(::google::protobuf::MessageLite& to_msg,
       _this->_internal_set_author(from._internal_author());
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      _this->_internal_set_checksum_sha256(from._internal_checksum_sha256());
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (from._internal_size_bytes() != 0) {
         _this->_impl_.size_bytes_ = from._impl_.size_bytes_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_default_scale()) != 0) {
+        _this->_impl_.default_scale_ = from._impl_.default_scale_;
       }
     }
   }
@@ -1631,7 +1720,13 @@ void LoraAdapterCatalogEntry::InternalSwap(LoraAdapterCatalogEntry* PROTOBUF_RES
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.url_, &other->_impl_.url_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.filename_, &other->_impl_.filename_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.author_, &other->_impl_.author_, arena);
-  swap(_impl_.size_bytes_, other->_impl_.size_bytes_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.checksum_sha256_, &other->_impl_.checksum_sha256_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.default_scale_)
+      + sizeof(LoraAdapterCatalogEntry::_impl_.default_scale_)
+      - PROTOBUF_FIELD_OFFSET(LoraAdapterCatalogEntry, _impl_.size_bytes_)>(
+          reinterpret_cast<char*>(&_impl_.size_bytes_),
+          reinterpret_cast<char*>(&other->_impl_.size_bytes_));
 }
 
 ::google::protobuf::Metadata LoraAdapterCatalogEntry::GetMetadata() const {

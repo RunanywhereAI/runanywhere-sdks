@@ -278,7 +278,23 @@ export const JSONSchemaProperty = {
     },
 };
 function createBaseJSONSchema() {
-    return { type: 0, properties: {}, required: [], items: undefined, additionalProperties: undefined };
+    return {
+        type: 0,
+        properties: {},
+        required: [],
+        items: undefined,
+        additionalProperties: undefined,
+        schemaUri: undefined,
+        idUri: undefined,
+        title: undefined,
+        description: undefined,
+        definitions: {},
+        ref: undefined,
+        allOf: [],
+        anyOf: [],
+        oneOf: [],
+        notSchema: undefined,
+    };
 }
 export const JSONSchema = {
     encode(message, writer = _m0.Writer.create()) {
@@ -296,6 +312,36 @@ export const JSONSchema = {
         }
         if (message.additionalProperties !== undefined) {
             writer.uint32(40).bool(message.additionalProperties);
+        }
+        if (message.schemaUri !== undefined) {
+            writer.uint32(50).string(message.schemaUri);
+        }
+        if (message.idUri !== undefined) {
+            writer.uint32(58).string(message.idUri);
+        }
+        if (message.title !== undefined) {
+            writer.uint32(66).string(message.title);
+        }
+        if (message.description !== undefined) {
+            writer.uint32(74).string(message.description);
+        }
+        Object.entries(message.definitions).forEach(([key, value]) => {
+            JSONSchema_DefinitionsEntry.encode({ key: key, value }, writer.uint32(82).fork()).ldelim();
+        });
+        if (message.ref !== undefined) {
+            writer.uint32(90).string(message.ref);
+        }
+        for (const v of message.allOf) {
+            JSONSchema.encode(v, writer.uint32(98).fork()).ldelim();
+        }
+        for (const v of message.anyOf) {
+            JSONSchema.encode(v, writer.uint32(106).fork()).ldelim();
+        }
+        for (const v of message.oneOf) {
+            JSONSchema.encode(v, writer.uint32(114).fork()).ldelim();
+        }
+        if (message.notSchema !== undefined) {
+            JSONSchema.encode(message.notSchema, writer.uint32(122).fork()).ldelim();
         }
         return writer;
     },
@@ -339,6 +385,69 @@ export const JSONSchema = {
                     }
                     message.additionalProperties = reader.bool();
                     continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.schemaUri = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.idUri = reader.string();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.title = reader.string();
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.description = reader.string();
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    const entry10 = JSONSchema_DefinitionsEntry.decode(reader, reader.uint32());
+                    if (entry10.value !== undefined) {
+                        message.definitions[entry10.key] = entry10.value;
+                    }
+                    continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.ref = reader.string();
+                    continue;
+                case 12:
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.allOf.push(JSONSchema.decode(reader, reader.uint32()));
+                    continue;
+                case 13:
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.anyOf.push(JSONSchema.decode(reader, reader.uint32()));
+                    continue;
+                case 14:
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.oneOf.push(JSONSchema.decode(reader, reader.uint32()));
+                    continue;
+                case 15:
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.notSchema = JSONSchema.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -361,6 +470,21 @@ export const JSONSchema = {
             additionalProperties: isSet(object.additionalProperties)
                 ? globalThis.Boolean(object.additionalProperties)
                 : undefined,
+            schemaUri: isSet(object.$schema) ? globalThis.String(object.$schema) : undefined,
+            idUri: isSet(object.$id) ? globalThis.String(object.$id) : undefined,
+            title: isSet(object.title) ? globalThis.String(object.title) : undefined,
+            description: isSet(object.description) ? globalThis.String(object.description) : undefined,
+            definitions: isObject(object.definitions)
+                ? Object.entries(object.definitions).reduce((acc, [key, value]) => {
+                    acc[key] = JSONSchema.fromJSON(value);
+                    return acc;
+                }, {})
+                : {},
+            ref: isSet(object.$ref) ? globalThis.String(object.$ref) : undefined,
+            allOf: globalThis.Array.isArray(object?.allOf) ? object.allOf.map((e) => JSONSchema.fromJSON(e)) : [],
+            anyOf: globalThis.Array.isArray(object?.anyOf) ? object.anyOf.map((e) => JSONSchema.fromJSON(e)) : [],
+            oneOf: globalThis.Array.isArray(object?.oneOf) ? object.oneOf.map((e) => JSONSchema.fromJSON(e)) : [],
+            notSchema: isSet(object.notSchema) ? JSONSchema.fromJSON(object.notSchema) : undefined,
         };
     },
     toJSON(message) {
@@ -386,6 +510,42 @@ export const JSONSchema = {
         if (message.additionalProperties !== undefined) {
             obj.additionalProperties = message.additionalProperties;
         }
+        if (message.schemaUri !== undefined) {
+            obj.$schema = message.schemaUri;
+        }
+        if (message.idUri !== undefined) {
+            obj.$id = message.idUri;
+        }
+        if (message.title !== undefined) {
+            obj.title = message.title;
+        }
+        if (message.description !== undefined) {
+            obj.description = message.description;
+        }
+        if (message.definitions) {
+            const entries = Object.entries(message.definitions);
+            if (entries.length > 0) {
+                obj.definitions = {};
+                entries.forEach(([k, v]) => {
+                    obj.definitions[k] = JSONSchema.toJSON(v);
+                });
+            }
+        }
+        if (message.ref !== undefined) {
+            obj.$ref = message.ref;
+        }
+        if (message.allOf?.length) {
+            obj.allOf = message.allOf.map((e) => JSONSchema.toJSON(e));
+        }
+        if (message.anyOf?.length) {
+            obj.anyOf = message.anyOf.map((e) => JSONSchema.toJSON(e));
+        }
+        if (message.oneOf?.length) {
+            obj.oneOf = message.oneOf.map((e) => JSONSchema.toJSON(e));
+        }
+        if (message.notSchema !== undefined) {
+            obj.notSchema = JSONSchema.toJSON(message.notSchema);
+        }
         return obj;
     },
     create(base) {
@@ -405,6 +565,23 @@ export const JSONSchema = {
             ? JSONSchemaProperty.fromPartial(object.items)
             : undefined;
         message.additionalProperties = object.additionalProperties ?? undefined;
+        message.schemaUri = object.schemaUri ?? undefined;
+        message.idUri = object.idUri ?? undefined;
+        message.title = object.title ?? undefined;
+        message.description = object.description ?? undefined;
+        message.definitions = Object.entries(object.definitions ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = JSONSchema.fromPartial(value);
+            }
+            return acc;
+        }, {});
+        message.ref = object.ref ?? undefined;
+        message.allOf = object.allOf?.map((e) => JSONSchema.fromPartial(e)) || [];
+        message.anyOf = object.anyOf?.map((e) => JSONSchema.fromPartial(e)) || [];
+        message.oneOf = object.oneOf?.map((e) => JSONSchema.fromPartial(e)) || [];
+        message.notSchema = (object.notSchema !== undefined && object.notSchema !== null)
+            ? JSONSchema.fromPartial(object.notSchema)
+            : undefined;
         return message;
     },
 };
@@ -476,8 +653,83 @@ export const JSONSchema_PropertiesEntry = {
         return message;
     },
 };
+function createBaseJSONSchema_DefinitionsEntry() {
+    return { key: "", value: undefined };
+}
+export const JSONSchema_DefinitionsEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== undefined) {
+            JSONSchema.encode(message.value, writer.uint32(18).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseJSONSchema_DefinitionsEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = JSONSchema.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? JSONSchema.fromJSON(object.value) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== undefined) {
+            obj.value = JSONSchema.toJSON(message.value);
+        }
+        return obj;
+    },
+    create(base) {
+        return JSONSchema_DefinitionsEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseJSONSchema_DefinitionsEntry();
+        message.key = object.key ?? "";
+        message.value = (object.value !== undefined && object.value !== null)
+            ? JSONSchema.fromPartial(object.value)
+            : undefined;
+        return message;
+    },
+};
 function createBaseStructuredOutputOptions() {
-    return { schema: undefined, includeSchemaInPrompt: false, strictMode: undefined };
+    return {
+        schema: undefined,
+        includeSchemaInPrompt: false,
+        strictMode: undefined,
+        jsonSchema: undefined,
+        typeName: undefined,
+        name: undefined,
+    };
 }
 export const StructuredOutputOptions = {
     encode(message, writer = _m0.Writer.create()) {
@@ -489,6 +741,15 @@ export const StructuredOutputOptions = {
         }
         if (message.strictMode !== undefined) {
             writer.uint32(24).bool(message.strictMode);
+        }
+        if (message.jsonSchema !== undefined) {
+            writer.uint32(34).string(message.jsonSchema);
+        }
+        if (message.typeName !== undefined) {
+            writer.uint32(42).string(message.typeName);
+        }
+        if (message.name !== undefined) {
+            writer.uint32(50).string(message.name);
         }
         return writer;
     },
@@ -517,6 +778,24 @@ export const StructuredOutputOptions = {
                     }
                     message.strictMode = reader.bool();
                     continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.jsonSchema = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.typeName = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.name = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -532,6 +811,9 @@ export const StructuredOutputOptions = {
                 ? globalThis.Boolean(object.includeSchemaInPrompt)
                 : false,
             strictMode: isSet(object.strictMode) ? globalThis.Boolean(object.strictMode) : undefined,
+            jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : undefined,
+            typeName: isSet(object.typeName) ? globalThis.String(object.typeName) : undefined,
+            name: isSet(object.name) ? globalThis.String(object.name) : undefined,
         };
     },
     toJSON(message) {
@@ -545,6 +827,15 @@ export const StructuredOutputOptions = {
         if (message.strictMode !== undefined) {
             obj.strictMode = message.strictMode;
         }
+        if (message.jsonSchema !== undefined) {
+            obj.jsonSchema = message.jsonSchema;
+        }
+        if (message.typeName !== undefined) {
+            obj.typeName = message.typeName;
+        }
+        if (message.name !== undefined) {
+            obj.name = message.name;
+        }
         return obj;
     },
     create(base) {
@@ -557,11 +848,20 @@ export const StructuredOutputOptions = {
             : undefined;
         message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? false;
         message.strictMode = object.strictMode ?? undefined;
+        message.jsonSchema = object.jsonSchema ?? undefined;
+        message.typeName = object.typeName ?? undefined;
+        message.name = object.name ?? undefined;
         return message;
     },
 };
 function createBaseStructuredOutputValidation() {
-    return { isValid: false, containsJson: false, errorMessage: undefined, rawOutput: undefined };
+    return {
+        isValid: false,
+        containsJson: false,
+        errorMessage: undefined,
+        rawOutput: undefined,
+        extractedJson: undefined,
+    };
 }
 export const StructuredOutputValidation = {
     encode(message, writer = _m0.Writer.create()) {
@@ -576,6 +876,9 @@ export const StructuredOutputValidation = {
         }
         if (message.rawOutput !== undefined) {
             writer.uint32(34).string(message.rawOutput);
+        }
+        if (message.extractedJson !== undefined) {
+            writer.uint32(42).string(message.extractedJson);
         }
         return writer;
     },
@@ -610,6 +913,12 @@ export const StructuredOutputValidation = {
                     }
                     message.rawOutput = reader.string();
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.extractedJson = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -624,6 +933,7 @@ export const StructuredOutputValidation = {
             containsJson: isSet(object.containsJson) ? globalThis.Boolean(object.containsJson) : false,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
             rawOutput: isSet(object.rawOutput) ? globalThis.String(object.rawOutput) : undefined,
+            extractedJson: isSet(object.extractedJson) ? globalThis.String(object.extractedJson) : undefined,
         };
     },
     toJSON(message) {
@@ -640,6 +950,9 @@ export const StructuredOutputValidation = {
         if (message.rawOutput !== undefined) {
             obj.rawOutput = message.rawOutput;
         }
+        if (message.extractedJson !== undefined) {
+            obj.extractedJson = message.extractedJson;
+        }
         return obj;
     },
     create(base) {
@@ -651,6 +964,7 @@ export const StructuredOutputValidation = {
         message.containsJson = object.containsJson ?? false;
         message.errorMessage = object.errorMessage ?? undefined;
         message.rawOutput = object.rawOutput ?? undefined;
+        message.extractedJson = object.extractedJson ?? undefined;
         return message;
     },
 };

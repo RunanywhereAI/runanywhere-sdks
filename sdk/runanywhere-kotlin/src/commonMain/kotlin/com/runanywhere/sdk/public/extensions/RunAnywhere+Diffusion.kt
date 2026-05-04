@@ -18,34 +18,13 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.DiffusionCapabilities
-import ai.runanywhere.proto.v1.DiffusionConfiguration
+import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
 import ai.runanywhere.proto.v1.DiffusionResult
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
-
-// MARK: - DiffusionConfig
-
-/**
- * Canonical single-parameter configuration object for [loadDiffusionModel].
- *
- * Per §8 of CANONICAL_API.md the load call must accept a single `DiffusionConfig`
- * instead of 4 positional parameters. This Kotlin data class serves as
- * `DiffusionConfig` until the IDL generates a proto message of that name.
- *
- * @param modelPath Absolute filesystem path to the model directory / bundle
- * @param modelId Model identifier (must match a registered model in the registry)
- * @param modelName Human-readable model name
- * @param configuration Optional runtime tuning settings (steps, guidance scale, etc.)
- */
-data class DiffusionConfig(
-    val modelPath: String,
-    val modelId: String,
-    val modelName: String,
-    val configuration: DiffusionConfiguration? = null,
-)
 
 // MARK: - Image Generation
 

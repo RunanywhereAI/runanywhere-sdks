@@ -11,15 +11,12 @@ import com.runanywhere.runanywhereai.domain.models.SessionState
 import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.EventCategory
-import com.runanywhere.sdk.public.events.LLMEvent
-import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.events.SDKEvent
-import com.runanywhere.sdk.public.events.STTEvent
-import com.runanywhere.sdk.public.events.TTSEvent
-import ai.runanywhere.proto.v1.ComponentLoadState as ProtoComponentLoadState
-import com.runanywhere.sdk.public.extensions.VoiceAgent.ComponentLoadState
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_LLM
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
+import ai.runanywhere.proto.v1.ComponentLoadState
+import ai.runanywhere.proto.v1.ModelEventKind
 import com.runanywhere.sdk.public.extensions.getVoiceAgentComponentStates
 // Round 1 KOTLIN (G-E4 / Task 7): migrated off CppBridgeVoiceAgent direct
 // calls. Pipeline now flows through RunAnywhere.streamVoiceAgent() which
@@ -64,10 +61,10 @@ enum class ModelLoadState {
     companion object {
         fun fromSDK(state: ComponentLoadState): ModelLoadState =
             when (state) {
-                is ComponentLoadState.NotLoaded -> NOT_LOADED
-                is ComponentLoadState.Loading -> LOADING
-                is ComponentLoadState.Loaded -> LOADED
-                is ComponentLoadState.Error -> ERROR
+                ComponentLoadState.COMPONENT_LOAD_STATE_LOADED -> LOADED
+                ComponentLoadState.COMPONENT_LOAD_STATE_LOADING -> LOADING
+                ComponentLoadState.COMPONENT_LOAD_STATE_ERROR -> ERROR
+                else -> NOT_LOADED
             }
     }
 }
@@ -598,87 +595,73 @@ class VoiceAssistantViewModel(
      * iOS Reference: handleSDKEvent(_:) in VoiceAgentViewModel.swift
      */
     private fun handleSDKEvent(event: SDKEvent) {
-        when (event) {
-            // Handle model events for LLM, STT, TTS
-            is ModelEvent -> {
-                when (event.eventType) {
-                    ModelEvent.ModelEventType.LOADED -> {
-                        when (event.category) {
-                            EventCategory.LLM -> {
-                                _uiState.update {
-                                    it.copy(
-                                        llmLoadState = ModelLoadState.LOADED,
-                                        llmModel = SelectedModel("llamacpp", event.modelId, event.modelId),
-                                        currentLLMModel = event.modelId,
-                                    )
-                                }
-                                Timber.i("✅ LLM model loaded: ${event.modelId}")
-                            }
-                            EventCategory.STT -> {
-                                _uiState.update {
-                                    it.copy(
-                                        sttLoadState = ModelLoadState.LOADED,
-                                        sttModel = SelectedModel("whisper", event.modelId, event.modelId),
-                                        whisperModel = event.modelId,
-                                    )
-                                }
-                                Timber.i("✅ STT model loaded: ${event.modelId}")
-                            }
-                            EventCategory.TTS -> {
-                                _uiState.update {
-                                    it.copy(
-                                        ttsLoadState = ModelLoadState.LOADED,
-                                        ttsModel = SelectedModel("tts", event.modelId, event.modelId),
-                                        ttsVoice = event.modelId,
-                                    )
-                                }
-                                Timber.i("✅ TTS model loaded: ${event.modelId}")
-                            }
-                            else -> { /* Ignore other categories */ }
+        val modelEvent = event.model ?: return
+        when (modelEvent.kind) {
+            ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED -> {
+                when (event.category) {
+                    EVENT_CATEGORY_LLM -> {
+                        _uiState.update {
+                            it.copy(
+                                llmLoadState = ModelLoadState.LOADED,
+                                llmModel = SelectedModel("llamacpp", modelEvent.model_id, modelEvent.model_id),
+                                currentLLMModel = modelEvent.model_id,
+                            )
                         }
+                        Timber.i("✅ LLM model loaded: ${modelEvent.model_id}")
                     }
-                    ModelEvent.ModelEventType.UNLOADED -> {
-                        when (event.category) {
-                            EventCategory.LLM -> {
-                                _uiState.update {
-                                    it.copy(
-                                        llmLoadState = ModelLoadState.NOT_LOADED,
-                                        llmModel = null,
-                                    )
-                                }
-                            }
-                            EventCategory.STT -> {
-                                _uiState.update {
-                                    it.copy(
-                                        sttLoadState = ModelLoadState.NOT_LOADED,
-                                        sttModel = null,
-                                    )
-                                }
-                            }
-                            EventCategory.TTS -> {
-                                _uiState.update {
-                                    it.copy(
-                                        ttsLoadState = ModelLoadState.NOT_LOADED,
-                                        ttsModel = null,
-                                    )
-                                }
-                            }
-                            else -> { /* Ignore other categories */ }
+                    EVENT_CATEGORY_STT -> {
+                        _uiState.update {
+                            it.copy(
+                                sttLoadState = ModelLoadState.LOADED,
+                                sttModel = SelectedModel("whisper", modelEvent.model_id, modelEvent.model_id),
+                                whisperModel = modelEvent.model_id,
+                            )
                         }
+                        Timber.i("✅ STT model loaded: ${modelEvent.model_id}")
                     }
-                    else -> { /* Ignore other model events */ }
+                    EVENT_CATEGORY_TTS -> {
+                        _uiState.update {
+                            it.copy(
+                                ttsLoadState = ModelLoadState.LOADED,
+                                ttsModel = SelectedModel("tts", modelEvent.model_id, modelEvent.model_id),
+                                ttsVoice = modelEvent.model_id,
+                            )
+                        }
+                        Timber.i("✅ TTS model loaded: ${modelEvent.model_id}")
+                    }
+                    else -> { /* Ignore other categories */ }
                 }
             }
-            is LLMEvent -> {
-                // LLM generation events (handled separately from model loading)
+            ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED -> {
+                when (event.category) {
+                    EVENT_CATEGORY_LLM -> {
+                        _uiState.update {
+                            it.copy(
+                                llmLoadState = ModelLoadState.NOT_LOADED,
+                                llmModel = null,
+                            )
+                        }
+                    }
+                    EVENT_CATEGORY_STT -> {
+                        _uiState.update {
+                            it.copy(
+                                sttLoadState = ModelLoadState.NOT_LOADED,
+                                sttModel = null,
+                            )
+                        }
+                    }
+                    EVENT_CATEGORY_TTS -> {
+                        _uiState.update {
+                            it.copy(
+                                ttsLoadState = ModelLoadState.NOT_LOADED,
+                                ttsModel = null,
+                            )
+                        }
+                    }
+                    else -> { /* Ignore other categories */ }
+                }
             }
-            is STTEvent -> {
-                // STT transcription events (handled separately from model loading)
-            }
-            is TTSEvent -> {
-                // TTS synthesis events (handled separately from model loading)
-            }
-            else -> { /* Ignore other events */ }
+            else -> { /* Ignore other model events */ }
         }
     }
 
@@ -694,24 +677,14 @@ class VoiceAssistantViewModel(
         try {
             val protoStates = RunAnywhere.getVoiceAgentComponentStates()
 
-            // Map proto ComponentLoadState values to local ComponentLoadState
-            fun protoToLocalState(protoState: ProtoComponentLoadState?, key: String): ComponentLoadState {
-                return when (protoState) {
-                    ProtoComponentLoadState.COMPONENT_LOAD_STATE_LOADED -> ComponentLoadState.Loaded(key)
-                    ProtoComponentLoadState.COMPONENT_LOAD_STATE_LOADING -> ComponentLoadState.Loading
-                    ProtoComponentLoadState.COMPONENT_LOAD_STATE_ERROR -> ComponentLoadState.Error("Error")
-                    else -> ComponentLoadState.NotLoaded
-                }
-            }
-
             // getVoiceAgentComponentStates() now returns VoiceAgentComponentStates (proto message).
-            val sttState = protoToLocalState(protoStates.stt_state, "stt")
-            val llmState = protoToLocalState(protoStates.llm_state, "llm")
-            val ttsState = protoToLocalState(protoStates.tts_state, "tts")
+            val sttState = protoStates.stt_state
+            val llmState = protoStates.llm_state
+            val ttsState = protoStates.tts_state
 
-            val sttModelId = (sttState as? ComponentLoadState.Loaded)?.loadedModelId
-            val llmModelId = (llmState as? ComponentLoadState.Loaded)?.loadedModelId
-            val ttsModelId = (ttsState as? ComponentLoadState.Loaded)?.loadedModelId
+            val sttModelId = "stt".takeIf { sttState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED }
+            val llmModelId = "llm".takeIf { llmState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED }
+            val ttsModelId = "tts".takeIf { ttsState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED }
 
             _uiState.update { currentState ->
                 currentState.copy(
@@ -736,7 +709,11 @@ class VoiceAssistantViewModel(
                 )
             }
 
-            Timber.i("Model states synced - STT: ${sttState.isLoaded}, LLM: ${llmState.isLoaded}, TTS: ${ttsState.isLoaded}")
+            Timber.i(
+                "Model states synced - STT: ${sttState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED}, " +
+                    "LLM: ${llmState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED}, " +
+                    "TTS: ${ttsState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED}",
+            )
         } catch (e: Exception) {
             Timber.w("Could not sync model states: ${e.message}")
         }
@@ -1274,10 +1251,10 @@ class VoiceAssistantViewModel(
         return try {
             val result = RunAnywhere.processVoiceTurn(audioData)
             VoicePipelineResult(
-                speechDetected = result.speechDetected,
+                speechDetected = result.speech_detected,
                 transcription = result.transcription,
-                response = result.response,
-                synthesizedAudio = result.synthesizedAudio,
+                response = result.assistant_response,
+                synthesizedAudio = result.synthesized_audio?.toByteArray(),
             )
         } catch (e: Exception) {
             Timber.e(e, "Voice pipeline error")

@@ -26,6 +26,14 @@ extension CppBridge {
         /// - Parameter apiKey: API key for authentication
         /// - Throws: SDKException on failure
         public static func authenticate(apiKey: String) async throws {
+            guard CppBridge.DevConfig.isUsableCredential(apiKey),
+                  await CppBridge.HTTP.hasUsableConfiguration else {
+                throw SDKException.general(
+                    .invalidConfiguration,
+                    "Authentication skipped: no usable external config"
+                )
+            }
+
             let deviceId = DeviceIdentity.persistentUUID
 
             // 1. Build request JSON via C++
@@ -61,6 +69,13 @@ extension CppBridge {
         /// atomically.
         /// - Throws: SDKException on failure
         public static func refreshToken() async throws {
+            guard await CppBridge.HTTP.hasUsableConfiguration else {
+                throw SDKException.general(
+                    .invalidConfiguration,
+                    "Token refresh skipped: no usable external config"
+                )
+            }
+
             // 1. Build refresh request JSON via C++ (reads refresh_token
             //    and device_id from C++ auth state).
             guard let jsonPtr = rac_auth_build_refresh_request() else {

@@ -39,89 +39,33 @@ public extension RunAnywhere {
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
+        let opts = options ?? LLMGenerationOptions()
+        var request = opts.toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = false
+        let result = try await generate(request)
+        return LLMGenerationResult(from: result)
+    }
+
+    /// Generate text through the generated-proto C++ LLM service ABI.
+    static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
-        let handle = try await CppBridge.LLM.shared.getHandle()
-
-        guard await CppBridge.LLM.shared.isLoaded else {
+        guard await isModelLoaded else {
             throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
-        let opts = options ?? LLMGenerationOptions()
-
-        let startTime = Date()
-
-        var cOptions = rac_llm_options_t()
-        cOptions.max_tokens = Int32(opts.maxTokens)
-        cOptions.temperature = opts.temperature
-        cOptions.top_p = opts.topP
-        cOptions.streaming_enabled = RAC_FALSE
-
-        let systemPromptDesc = opts.systemPrompt.map { "set(\($0.count) chars)" } ?? "nil"
+        let systemPromptDesc = request.systemPrompt.isEmpty ? "nil" : "set(\(request.systemPrompt.count) chars)"
         SDKLogger.llm.info(
-            "[PARAMS] generate: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), "
-            + "max_tokens=\(cOptions.max_tokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(cOptions.streaming_enabled == RAC_TRUE)"
+            "[PARAMS] generate: temperature=\(request.temperature), top_p=\(request.topP), "
+            + "max_tokens=\(request.maxTokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(request.streamingEnabled)"
         )
 
-        var llmResult = rac_llm_result_t()
-        let generateResult: rac_result_t
-        if let systemPrompt = opts.systemPrompt {
-            generateResult = systemPrompt.withCString { sysPromptPtr in
-                cOptions.system_prompt = sysPromptPtr
-                return prompt.withCString { promptPtr in
-                    rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
-                }
-            }
-        } else {
-            cOptions.system_prompt = nil
-            generateResult = prompt.withCString { promptPtr in
-                rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
-            }
-        }
-
-        guard generateResult == RAC_SUCCESS else {
-            throw SDKException.llm(.generationFailed, "Generation failed: \(generateResult)")
-        }
-
-        let endTime = Date()
-        let totalTimeMs = endTime.timeIntervalSince(startTime) * 1000
-
-        let rawText: String
-        if let textPtr = llmResult.text {
-            rawText = String(cString: textPtr)
-        } else {
-            rawText = ""
-        }
-        let inputTokens = Int(llmResult.prompt_tokens)
-        let outputTokens = Int(llmResult.completion_tokens)
-        let tokensPerSecond = llmResult.tokens_per_second > 0 ? Double(llmResult.tokens_per_second) : 0
-
-        let (generatedText, thinkingContent) = ThinkingContentParser.extract(from: rawText)
-        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
-            totalCompletionTokens: outputTokens,
-            responseText: generatedText,
-            thinkingContent: thinkingContent
-        )
-
-        return LLMGenerationResult(
-            text: generatedText,
-            thinkingContent: thinkingContent,
-            inputTokens: inputTokens,
-            tokensUsed: outputTokens,
-            modelUsed: modelId,
-            latencyMs: totalTimeMs,
-            framework: "llamacpp",
-            tokensPerSecond: tokensPerSecond,
-            timeToFirstTokenMs: nil,
-            thinkingTokens: thinkingTokens,
-            responseTokens: responseTokens
-        )
+        return try await CppBridge.LLM.shared.generate(request)
     }
 
     /// Streaming text generation using the Phase G-2 proto-byte event
@@ -152,65 +96,32 @@ public extension RunAnywhere {
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> AsyncStream<RALLMStreamEvent> {
+        let opts = options ?? LLMGenerationOptions(streamingEnabled: true)
+        var request = opts.toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = true
+        return try await generateStream(request)
+    }
+
+    /// Stream text generation through the generated-proto C++ LLM service ABI.
+    static func generateStream(_ request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
 
-        let handle = try await CppBridge.LLM.shared.getHandle()
-
-        guard await CppBridge.LLM.shared.isLoaded else {
+        guard await isModelLoaded else {
             throw SDKException.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let opts = options ?? LLMGenerationOptions()
-
-        var cOptions = rac_llm_options_t()
-        cOptions.max_tokens = Int32(opts.maxTokens)
-        cOptions.temperature = opts.temperature
-        cOptions.top_p = opts.topP
-        cOptions.streaming_enabled = RAC_TRUE
-
-        let systemPromptDesc = opts.systemPrompt.map { "set(\($0.count) chars)" } ?? "nil"
+        let systemPromptDesc = request.systemPrompt.isEmpty ? "nil" : "set(\(request.systemPrompt.count) chars)"
         SDKLogger.llm.info(
-            "[PARAMS] generateStream: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), "
-            + "max_tokens=\(cOptions.max_tokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(cOptions.streaming_enabled == RAC_TRUE)"
+            "[PARAMS] generateStream: temperature=\(request.temperature), top_p=\(request.topP), "
+            + "max_tokens=\(request.maxTokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(request.streamingEnabled)"
         )
 
-        // Subscribe BEFORE kicking off the generation so we never miss
-        // early tokens that the engine emits synchronously from inside
-        // rac_llm_component_generate_stream().
-        let adapter = LLMStreamAdapter(handle: handle)
-        let stream = adapter.stream()
-
-        let capturedPrompt = prompt
-        let capturedSystemPrompt = opts.systemPrompt
-        var capturedOptions = cOptions
-        Task.detached {
-            _ = capturedPrompt.withCString { promptPtr -> rac_result_t in
-                if let sysPrompt = capturedSystemPrompt {
-                    return sysPrompt.withCString { sysPtr in
-                        capturedOptions.system_prompt = sysPtr
-                        return rac_llm_component_generate_stream(
-                            handle,
-                            promptPtr,
-                            &capturedOptions,
-                            nil, nil, nil, nil)
-                    }
-                } else {
-                    capturedOptions.system_prompt = nil
-                    return rac_llm_component_generate_stream(
-                        handle,
-                        promptPtr,
-                        &capturedOptions,
-                        nil, nil, nil, nil)
-                }
-            }
-        }
-
-        return stream
+        return try await CppBridge.LLM.shared.generateStream(request)
     }
 }
 

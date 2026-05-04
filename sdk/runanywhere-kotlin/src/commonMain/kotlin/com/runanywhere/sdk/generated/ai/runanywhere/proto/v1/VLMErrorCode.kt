@@ -57,6 +57,13 @@ public enum class VLMErrorCode(
    * Image exceeds
    */
   VLM_ERROR_CODE_IMAGE_TOO_LARGE(4),
+  /**
+   * VLMConfiguration.max_image_size_px
+   */
+  VLM_ERROR_CODE_NOT_INITIALIZED(5),
+  VLM_ERROR_CODE_MODEL_LOAD_FAILED(6),
+  VLM_ERROR_CODE_PROCESSING_FAILED(7),
+  VLM_ERROR_CODE_CANCELLED(8),
   ;
 
   public companion object {
@@ -76,6 +83,10 @@ public enum class VLMErrorCode(
       2 -> VLM_ERROR_CODE_MODEL_NOT_LOADED
       3 -> VLM_ERROR_CODE_UNSUPPORTED_FORMAT
       4 -> VLM_ERROR_CODE_IMAGE_TOO_LARGE
+      5 -> VLM_ERROR_CODE_NOT_INITIALIZED
+      6 -> VLM_ERROR_CODE_MODEL_LOAD_FAILED
+      7 -> VLM_ERROR_CODE_PROCESSING_FAILED
+      8 -> VLM_ERROR_CODE_CANCELLED
       else -> null
     }
   }

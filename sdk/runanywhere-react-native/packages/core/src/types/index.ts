@@ -16,11 +16,14 @@
 // =========================================================================
 
 export {
+  AccelerationPreference,
+  AudioFormat,
   ComponentState,
   ConfigurationSource,
   ExecutionTarget,
   FrameworkModality,
   HardwareAcceleration,
+  InferenceFramework,
   LLMFramework,
   LLMFrameworkDisplayNames,
   ModelCategory,
@@ -35,9 +38,17 @@ export {
 } from './enums';
 
 // =========================================================================
-// Models (RN-local: ModelInfo registry shape, init params, device info,
-// generation result + storage shapes used by Public/RunAnywhere)
+// Model registry — proto-canonical types plus legacy RN bridge DTOs.
 // =========================================================================
+
+export type {
+  ModelInfo as ProtoModelInfo,
+  ModelFileDescriptor as ProtoModelFileDescriptor,
+  SingleFileArtifact as ProtoSingleFileArtifact,
+  ArchiveArtifact as ProtoArchiveArtifact,
+  MultiFileArtifact as ProtoMultiFileArtifact,
+  ExpectedModelFiles as ProtoExpectedModelFiles,
+} from '@runanywhere/proto-ts/model_types';
 
 export type {
   ComponentHealth,
@@ -109,6 +120,44 @@ export {
   DeviceEventKind as ProtoDeviceEventKind,
   ComponentInitializationEventKind as ProtoComponentInitializationEventKind,
 } from '@runanywhere/proto-ts/sdk_events';
+
+// =========================================================================
+// Download — proto-canonical
+// =========================================================================
+
+export type {
+  DownloadCancelRequest,
+  DownloadCancelResult,
+  DownloadFilePlan,
+  DownloadPlanRequest,
+  DownloadPlanResult,
+  DownloadProgress,
+  DownloadResumeRequest,
+  DownloadResumeResult,
+  DownloadStartRequest,
+  DownloadStartResult,
+  DownloadSubscribeRequest,
+} from '@runanywhere/proto-ts/download_service';
+export {
+  DownloadStage,
+  DownloadState,
+} from '@runanywhere/proto-ts/download_service';
+
+// =========================================================================
+// Storage — proto-canonical
+// =========================================================================
+
+export type {
+  StorageAvailability,
+  StorageAvailabilityRequest,
+  StorageAvailabilityResult,
+  StorageDeleteCandidate,
+  StorageDeletePlan,
+  StorageDeletePlanRequest,
+  StorageDeleteRequest,
+  StorageDeleteResult,
+  StorageInfoResult,
+} from '@runanywhere/proto-ts/storage_types';
 
 // =========================================================================
 // STT — proto-canonical

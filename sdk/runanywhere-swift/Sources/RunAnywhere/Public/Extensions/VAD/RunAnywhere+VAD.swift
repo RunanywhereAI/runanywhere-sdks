@@ -62,28 +62,17 @@ public extension RunAnywhere {
     /// Initialize VAD with configuration
     /// - Parameter config: VAD configuration
     static func initializeVAD(_ config: VADConfiguration) async throws {
+        try await initializeVAD(config.toRAVADConfiguration())
+    }
+
+    /// Initialize and configure VAD through the generated-proto C++ ABI.
+    static func initializeVAD(_ config: RAVADConfiguration) async throws {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        // Get handle and configure
-        let handle = try await CppBridge.VAD.shared.getHandle()
-
-        var cConfig = rac_vad_config_t()
-        cConfig.sample_rate = Int32(config.sampleRate)
-        cConfig.frame_length = Float(config.frameLength)
-        cConfig.energy_threshold = Float(config.energyThreshold)
-
-        let configResult = rac_vad_component_configure(handle, &cConfig)
-        if configResult != RAC_SUCCESS {
-            // Log warning but continue
-        }
-
-        // Initialize
-        let result = rac_vad_component_initialize(handle)
-        guard result == RAC_SUCCESS else {
-            throw SDKException.vad(.initializationFailed, "VAD initialization failed: \(result)")
-        }
+        try await CppBridge.VAD.shared.initialize()
+        try await CppBridge.VAD.shared.configure(config)
     }
 
     /// Check if VAD is ready
@@ -122,23 +111,8 @@ public extension RunAnywhere {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await CppBridge.VAD.shared.getHandle()
-
-        var hasVoice: rac_bool_t = RAC_FALSE
-        let result = samples.withUnsafeBufferPointer { buffer in
-            rac_vad_component_process(
-                handle,
-                buffer.baseAddress,
-                buffer.count,
-                &hasVoice
-            )
-        }
-
-        guard result == RAC_SUCCESS else {
-            throw SDKException.vad(.processingFailed, "Failed to process samples: \(result)")
-        }
-
-        let detected = hasVoice == RAC_TRUE
+        let audioData = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+        let detected = try await detectVoiceActivity(audioData).isSpeech
 
         // Forward to audio buffer callback if set
         if let callback = await VADStateManager.shared.getAudioBufferCallback() {
@@ -182,32 +156,13 @@ public extension RunAnywhere {
             throw SDKException.vad(.emptyAudioBuffer, "Audio data is empty")
         }
 
-        let handle = try await CppBridge.VAD.shared.getHandle()
-
-        // Apply per-call threshold if provided
-        if let opts = options, opts.threshold > 0 {
-            rac_vad_component_set_energy_threshold(handle, opts.threshold)
+        let samples: [Float] = audioData.withUnsafeBytes { rawBuf in
+            Array(rawBuf.bindMemory(to: Float.self).prefix(sampleCount))
         }
-
-        var hasVoice: rac_bool_t = RAC_FALSE
-        let result: rac_result_t = audioData.withUnsafeBytes { rawBuf in
-            guard let baseAddress = rawBuf.bindMemory(to: Float.self).baseAddress else {
-                return RAC_ERROR_INVALID_ARGUMENT
-            }
-            return rac_vad_component_process(handle, baseAddress, sampleCount, &hasVoice)
-        }
-        guard result == RAC_SUCCESS else {
-            throw SDKException.vad(.processingFailed, "VAD processing failed: \(result)")
-        }
-
-        // Build proto result; energy comes from the current threshold getter as a proxy
-        // (the C ABI does not expose a per-call energy output — this is consistent with
-        // how Kotlin wraps the same ABI).
-        var vadResult = RAVADResult()
-        vadResult.isSpeech = hasVoice == RAC_TRUE
-        vadResult.confidence = hasVoice == RAC_TRUE ? 1.0 : 0.0
-        vadResult.energy = rac_vad_component_get_energy_threshold(handle)
-        vadResult.durationMs = Int32(Double(sampleCount) / 16.0)  // assume 16 kHz
+        let vadResult = try await CppBridge.VAD.shared.process(
+            samples: samples,
+            options: options ?? RAVADOptions()
+        )
 
         // Notify statistics subscriber if registered
         if let statsCtx = await VADStateManager.shared.getStatisticsContext() {
@@ -247,12 +202,7 @@ public extension RunAnywhere {
     ///
     /// - Parameter callback: Closure receiving `RAVADStatistics` on each VAD frame.
     static func setVADStatisticsCallback(_ callback: @escaping (RAVADStatistics) -> Void) async {
-        guard let handle = try? await CppBridge.VAD.shared.getHandle() else { return }
-
-        // Build a statistics snapshot from the live C ABI getters and forward to the callback
-        // after each process call via a periodic poll. The C ABI does not expose a statistics
-        // callback registration, so we adapt it to the canonical shape here.
-        let context = VADStatisticsCallbackContext(handle: handle, onStats: callback)
+        let context = VADStatisticsCallbackContext(onStats: callback)
         await VADStateManager.shared.setStatisticsContext(context)
     }
 
@@ -272,13 +222,24 @@ public extension RunAnywhere {
     /// Set VAD speech activity callback
     /// - Parameter callback: Callback invoked when speech state changes
     static func setVADSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) async {
-        guard let handle = try? await CppBridge.VAD.shared.getHandle() else { return }
+        if (try? await CppBridge.VAD.shared.setActivityCallbackProto({ event in
+            switch event.eventType {
+            case .speechStarted:
+                callback(.started)
+            case .speechEnded:
+                callback(.ended)
+            default:
+                break
+            }
+        })) != nil {
+            return
+        }
 
-        // Create callback context
         let context = VADCallbackContext(onActivity: callback)
         await VADStateManager.shared.setCallbackContext(context)
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
+        guard let handle = try? await CppBridge.VAD.shared.getHandle() else { return }
         rac_vad_component_set_activity_callback(
             handle,
             { activity, userData in
@@ -321,20 +282,17 @@ private final class VADCallbackContext: @unchecked Sendable {
 /// The C ABI does not expose a statistics callback registration; we build a snapshot
 /// from live getters and forward it each time `detectVoiceActivity` is called.
 private final class VADStatisticsCallbackContext: @unchecked Sendable {
-    let handle: rac_handle_t
     let onStats: (RAVADStatistics) -> Void
 
-    init(handle: rac_handle_t, onStats: @escaping (RAVADStatistics) -> Void) {
-        self.handle = handle
+    init(onStats: @escaping (RAVADStatistics) -> Void) {
         self.onStats = onStats
     }
 
     func emitSnapshot() {
-        var stats = RAVADStatistics()
-        stats.currentThreshold = rac_vad_component_get_energy_threshold(handle)
-        // Remaining fields (currentEnergy, ambientLevel, recentAvg, recentMax) are not
-        // directly exposed by the current C ABI; they default to 0.0 until the C layer
-        // adds rac_vad_component_get_statistics (CPP-blocked: G-C6).
-        onStats(stats)
+        Task {
+            if let stats = try? await CppBridge.VAD.shared.statisticsProto() {
+                onStats(stats)
+            }
+        }
     }
 }

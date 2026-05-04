@@ -149,6 +149,17 @@ public class ToolCallingOptions(
     schemaIndex = 10,
   )
   public val custom_system_prompt: String? = null,
+  /**
+   * C ABI / SDK field name for max_iterations. 0 = use max_iterations or
+   * SDK default.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "maxToolCalls",
+    schemaIndex = 11,
+  )
+  public val max_tool_calls: Int? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -185,6 +196,7 @@ public class ToolCallingOptions(
     if (format_hint != other.format_hint) return false
     if (format != other.format) return false
     if (custom_system_prompt != other.custom_system_prompt) return false
+    if (max_tool_calls != other.max_tool_calls) return false
     return true
   }
 
@@ -203,6 +215,7 @@ public class ToolCallingOptions(
       result = result * 37 + format_hint.hashCode()
       result = result * 37 + (format?.hashCode() ?: 0)
       result = result * 37 + (custom_system_prompt?.hashCode() ?: 0)
+      result = result * 37 + (max_tool_calls?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -222,6 +235,7 @@ public class ToolCallingOptions(
     if (format != null) result += """format=$format"""
     if (custom_system_prompt != null) result +=
         """custom_system_prompt=${sanitize(custom_system_prompt)}"""
+    if (max_tool_calls != null) result += """max_tool_calls=$max_tool_calls"""
     return result.joinToString(prefix = "ToolCallingOptions{", separator = ", ", postfix = "}")
   }
 
@@ -237,10 +251,11 @@ public class ToolCallingOptions(
     format_hint: String = this.format_hint,
     format: ToolCallFormatName? = this.format,
     custom_system_prompt: String? = this.custom_system_prompt,
+    max_tool_calls: Int? = this.max_tool_calls,
     unknownFields: ByteString = this.unknownFields,
   ): ToolCallingOptions = ToolCallingOptions(tools, max_iterations, auto_execute, temperature,
       max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format_hint, format,
-      custom_system_prompt, unknownFields)
+      custom_system_prompt, max_tool_calls, unknownFields)
 
   public companion object {
     @JvmField
@@ -271,6 +286,7 @@ public class ToolCallingOptions(
             value.format_hint)
         size += ToolCallFormatName.ADAPTER.encodedSizeWithTag(10, value.format)
         size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.custom_system_prompt)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.max_tool_calls)
         return size
       }
 
@@ -290,11 +306,13 @@ public class ToolCallingOptions(
         if (value.format_hint != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.format_hint)
         ToolCallFormatName.ADAPTER.encodeWithTag(writer, 10, value.format)
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.custom_system_prompt)
+        ProtoAdapter.INT32.encodeWithTag(writer, 12, value.max_tool_calls)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.INT32.encodeWithTag(writer, 12, value.max_tool_calls)
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.custom_system_prompt)
         ToolCallFormatName.ADAPTER.encodeWithTag(writer, 10, value.format)
         if (value.format_hint != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.format_hint)
@@ -324,6 +342,7 @@ public class ToolCallingOptions(
         var format_hint: String = ""
         var format: ToolCallFormatName? = null
         var custom_system_prompt: String? = null
+        var max_tool_calls: Int? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tools.add(ToolDefinition.ADAPTER.decode(reader))
@@ -341,6 +360,7 @@ public class ToolCallingOptions(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             11 -> custom_system_prompt = ProtoAdapter.STRING.decode(reader)
+            12 -> max_tool_calls = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -356,6 +376,7 @@ public class ToolCallingOptions(
           format_hint = format_hint,
           format = format,
           custom_system_prompt = custom_system_prompt,
+          max_tool_calls = max_tool_calls,
           unknownFields = unknownFields
         )
       }

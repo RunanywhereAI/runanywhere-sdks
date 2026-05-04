@@ -38,6 +38,9 @@ inline constexpr StructuredOutputValidation::Impl_::Impl_(
         raw_output_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        extracted_json_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         is_valid_{false},
         contains_json_{false} {}
 
@@ -138,7 +141,50 @@ inline constexpr JSONSchema::Impl_::Impl_(
         required_ {}
         #endif
         ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        all_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.all_of_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        all_of_ {}
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        any_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.any_of_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        any_of_ {}
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        one_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.one_of_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        one_of_ {}
+        #endif
+        ,
+        schema_uri_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        id_uri_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        title_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        description_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        ref_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         items_{nullptr},
+        not_schema_{nullptr},
         type_{static_cast< ::runanywhere::v1::JSONSchemaType >(0)},
         additional_properties_{false},
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
@@ -148,6 +194,15 @@ inline constexpr JSONSchema::Impl_::Impl_(
         }
         #else
         properties_ {}
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        definitions_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.definitions_)>()
+        }
+        #else
+        definitions_ {}
         #endif
      {}
 
@@ -170,6 +225,24 @@ struct JSONSchemaDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 JSONSchemaDefaultTypeInternal _JSONSchema_default_instance_;
+template <typename>
+constexpr JSONSchema_DefinitionsEntry_DoNotUse::JSONSchema_DefinitionsEntry_DoNotUse(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : JSONSchema_DefinitionsEntry_DoNotUse::MapEntry(JSONSchema_DefinitionsEntry_DoNotUse_class_data_.base()){}
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : JSONSchema_DefinitionsEntry_DoNotUse::MapEntry() {
+}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+struct JSONSchema_DefinitionsEntry_DoNotUseDefaultTypeInternal {
+  constexpr JSONSchema_DefinitionsEntry_DoNotUseDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~JSONSchema_DefinitionsEntry_DoNotUseDefaultTypeInternal() {}
+  union {
+    JSONSchema_DefinitionsEntry_DoNotUse _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 JSONSchema_DefinitionsEntry_DoNotUseDefaultTypeInternal _JSONSchema_DefinitionsEntry_DoNotUse_default_instance_;
 template <typename>
 constexpr JSONSchema_PropertiesEntry_DoNotUse::JSONSchema_PropertiesEntry_DoNotUse(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -297,6 +370,15 @@ inline constexpr StructuredOutputOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
+        json_schema_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        type_name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         schema_{nullptr},
         include_schema_in_prompt_{false},
         strict_mode_{false} {}
@@ -458,38 +540,73 @@ const ::uint32_t
         0,
         1,
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema_DefinitionsEntry_DoNotUse, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema_DefinitionsEntry_DoNotUse, _impl_.key_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema_DefinitionsEntry_DoNotUse, _impl_.value_),
+        0,
+        1,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_._has_bits_),
-        8, // hasbit index offset
+        18, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.type_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.properties_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.required_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.items_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.additional_properties_),
-        2,
-        4,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.schema_uri_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.id_uri_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.title_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.description_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.definitions_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.ref_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.all_of_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.any_of_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.one_of_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.not_schema_),
+        11,
+        13,
         0,
+        9,
+        12,
+        4,
+        5,
+        6,
+        7,
+        14,
+        8,
         1,
+        2,
         3,
+        10,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_._has_bits_),
-        6, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_.schema_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_.include_schema_in_prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_.strict_mode_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_.json_schema_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_.type_name_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputOptions, _impl_.name_),
+        3,
+        4,
+        5,
         0,
         1,
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputValidation, _impl_._has_bits_),
-        7, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputValidation, _impl_.is_valid_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputValidation, _impl_.contains_json_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputValidation, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputValidation, _impl_.raw_output_),
-        2,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputValidation, _impl_.extracted_json_),
         3,
+        4,
         0,
         1,
+        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StructuredOutputResult, _impl_._has_bits_),
         6, // hasbit index offset
@@ -557,20 +674,22 @@ static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::JSONSchemaProperty)},
         {15, sizeof(::runanywhere::v1::JSONSchema_PropertiesEntry_DoNotUse)},
-        {22, sizeof(::runanywhere::v1::JSONSchema)},
-        {35, sizeof(::runanywhere::v1::StructuredOutputOptions)},
-        {44, sizeof(::runanywhere::v1::StructuredOutputValidation)},
-        {55, sizeof(::runanywhere::v1::StructuredOutputResult)},
-        {64, sizeof(::runanywhere::v1::NamedEntity)},
-        {77, sizeof(::runanywhere::v1::EntityExtractionResult)},
-        {82, sizeof(::runanywhere::v1::ClassificationCandidate)},
-        {89, sizeof(::runanywhere::v1::ClassificationResult)},
-        {98, sizeof(::runanywhere::v1::SentimentResult)},
-        {111, sizeof(::runanywhere::v1::NERResult)},
+        {22, sizeof(::runanywhere::v1::JSONSchema_DefinitionsEntry_DoNotUse)},
+        {29, sizeof(::runanywhere::v1::JSONSchema)},
+        {62, sizeof(::runanywhere::v1::StructuredOutputOptions)},
+        {77, sizeof(::runanywhere::v1::StructuredOutputValidation)},
+        {90, sizeof(::runanywhere::v1::StructuredOutputResult)},
+        {99, sizeof(::runanywhere::v1::NamedEntity)},
+        {112, sizeof(::runanywhere::v1::EntityExtractionResult)},
+        {117, sizeof(::runanywhere::v1::ClassificationCandidate)},
+        {124, sizeof(::runanywhere::v1::ClassificationResult)},
+        {133, sizeof(::runanywhere::v1::SentimentResult)},
+        {146, sizeof(::runanywhere::v1::NERResult)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_JSONSchemaProperty_default_instance_._instance,
     &::runanywhere::v1::_JSONSchema_PropertiesEntry_DoNotUse_default_instance_._instance,
+    &::runanywhere::v1::_JSONSchema_DefinitionsEntry_DoNotUse_default_instance_._instance,
     &::runanywhere::v1::_JSONSchema_default_instance_._instance,
     &::runanywhere::v1::_StructuredOutputOptions_default_instance_._instance,
     &::runanywhere::v1::_StructuredOutputValidation_default_instance_._instance,
@@ -592,70 +711,87 @@ const char descriptor_table_protodef_structured_5foutput_2eproto[] ABSL_ATTRIBUT
     "2\032.runanywhere.v1.JSONSchemaH\002\210\001\001\0226\n\robj"
     "ect_schema\030\006 \001(\0132\032.runanywhere.v1.JSONSc"
     "hemaH\003\210\001\001B\016\n\014_descriptionB\t\n\007_formatB\017\n\r"
-    "_items_schemaB\020\n\016_object_schema\"\343\002\n\nJSON"
+    "_items_schemaB\020\n\016_object_schema\"\373\006\n\nJSON"
     "Schema\022,\n\004type\030\001 \001(\0162\036.runanywhere.v1.JS"
     "ONSchemaType\022>\n\nproperties\030\002 \003(\0132*.runan"
     "ywhere.v1.JSONSchema.PropertiesEntry\022\020\n\010"
     "required\030\003 \003(\t\0226\n\005items\030\004 \001(\0132\".runanywh"
     "ere.v1.JSONSchemaPropertyH\000\210\001\001\022\"\n\025additi"
-    "onal_properties\030\005 \001(\010H\001\210\001\001\032U\n\017Properties"
-    "Entry\022\013\n\003key\030\001 \001(\t\0221\n\005value\030\002 \001(\0132\".runa"
-    "nywhere.v1.JSONSchemaProperty:\0028\001B\010\n\006_it"
-    "emsB\030\n\026_additional_properties\"\221\001\n\027Struct"
-    "uredOutputOptions\022*\n\006schema\030\001 \001(\0132\032.runa"
-    "nywhere.v1.JSONSchema\022 \n\030include_schema_"
-    "in_prompt\030\002 \001(\010\022\030\n\013strict_mode\030\003 \001(\010H\000\210\001"
-    "\001B\016\n\014_strict_mode\"\233\001\n\032StructuredOutputVa"
-    "lidation\022\020\n\010is_valid\030\001 \001(\010\022\025\n\rcontains_j"
-    "son\030\002 \001(\010\022\032\n\rerror_message\030\003 \001(\tH\000\210\001\001\022\027\n"
-    "\nraw_output\030\004 \001(\tH\001\210\001\001B\020\n\016_error_message"
-    "B\r\n\013_raw_output\"\221\001\n\026StructuredOutputResu"
-    "lt\022\023\n\013parsed_json\030\001 \001(\014\022>\n\nvalidation\030\002 "
-    "\001(\0132*.runanywhere.v1.StructuredOutputVal"
-    "idation\022\025\n\010raw_text\030\003 \001(\tH\000\210\001\001B\013\n\t_raw_t"
-    "ext\"n\n\013NamedEntity\022\014\n\004text\030\001 \001(\t\022\023\n\013enti"
-    "ty_type\030\002 \001(\t\022\024\n\014start_offset\030\003 \001(\005\022\022\n\ne"
-    "nd_offset\030\004 \001(\005\022\022\n\nconfidence\030\005 \001(\002\"G\n\026E"
-    "ntityExtractionResult\022-\n\010entities\030\001 \003(\0132"
-    "\033.runanywhere.v1.NamedEntity\"<\n\027Classifi"
-    "cationCandidate\022\r\n\005label\030\001 \001(\t\022\022\n\nconfid"
-    "ence\030\002 \001(\002\"x\n\024ClassificationResult\022\r\n\005la"
-    "bel\030\001 \001(\t\022\022\n\nconfidence\030\002 \001(\002\022=\n\014alterna"
-    "tives\030\003 \003(\0132\'.runanywhere.v1.Classificat"
-    "ionCandidate\"\341\001\n\017SentimentResult\022,\n\tsent"
-    "iment\030\001 \001(\0162\031.runanywhere.v1.Sentiment\022\022"
-    "\n\nconfidence\030\002 \001(\002\022\033\n\016positive_score\030\003 \001"
-    "(\002H\000\210\001\001\022\033\n\016negative_score\030\004 \001(\002H\001\210\001\001\022\032\n\r"
-    "neutral_score\030\005 \001(\002H\002\210\001\001B\021\n\017_positive_sc"
-    "oreB\021\n\017_negative_scoreB\020\n\016_neutral_score"
-    "\":\n\tNERResult\022-\n\010entities\030\001 \003(\0132\033.runany"
-    "where.v1.NamedEntity*\374\001\n\016JSONSchemaType\022"
-    " \n\034JSON_SCHEMA_TYPE_UNSPECIFIED\020\000\022\033\n\027JSO"
-    "N_SCHEMA_TYPE_OBJECT\020\001\022\032\n\026JSON_SCHEMA_TY"
-    "PE_ARRAY\020\002\022\033\n\027JSON_SCHEMA_TYPE_STRING\020\003\022"
-    "\033\n\027JSON_SCHEMA_TYPE_NUMBER\020\004\022\034\n\030JSON_SCH"
-    "EMA_TYPE_INTEGER\020\005\022\034\n\030JSON_SCHEMA_TYPE_B"
-    "OOLEAN\020\006\022\031\n\025JSON_SCHEMA_TYPE_NULL\020\007*\202\001\n\t"
-    "Sentiment\022\031\n\025SENTIMENT_UNSPECIFIED\020\000\022\026\n\022"
-    "SENTIMENT_POSITIVE\020\001\022\026\n\022SENTIMENT_NEGATI"
-    "VE\020\002\022\025\n\021SENTIMENT_NEUTRAL\020\003\022\023\n\017SENTIMENT"
-    "_MIXED\020\004B\220\001\n\027ai.runanywhere.proto.v1B\025St"
-    "ructuredOutputProtoP\001Z<github.com/runany"
-    "where/runanywhere-sdks/idl/v1;runanywher"
-    "ev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
-    "to3"
+    "onal_properties\030\005 \001(\010H\001\210\001\001\022 \n\nschema_uri"
+    "\030\006 \001(\tH\002R\007$schema\210\001\001\022\030\n\006id_uri\030\007 \001(\tH\003R\003"
+    "$id\210\001\001\022\022\n\005title\030\010 \001(\tH\004\210\001\001\022\030\n\013descriptio"
+    "n\030\t \001(\tH\005\210\001\001\022@\n\013definitions\030\n \003(\0132+.runa"
+    "nywhere.v1.JSONSchema.DefinitionsEntry\022\026"
+    "\n\003ref\030\013 \001(\tH\006R\004$ref\210\001\001\022*\n\006all_of\030\014 \003(\0132\032"
+    ".runanywhere.v1.JSONSchema\022*\n\006any_of\030\r \003"
+    "(\0132\032.runanywhere.v1.JSONSchema\022*\n\006one_of"
+    "\030\016 \003(\0132\032.runanywhere.v1.JSONSchema\0223\n\nno"
+    "t_schema\030\017 \001(\0132\032.runanywhere.v1.JSONSche"
+    "maH\007\210\001\001\032U\n\017PropertiesEntry\022\013\n\003key\030\001 \001(\t\022"
+    "1\n\005value\030\002 \001(\0132\".runanywhere.v1.JSONSche"
+    "maProperty:\0028\001\032N\n\020DefinitionsEntry\022\013\n\003ke"
+    "y\030\001 \001(\t\022)\n\005value\030\002 \001(\0132\032.runanywhere.v1."
+    "JSONSchema:\0028\001B\010\n\006_itemsB\030\n\026_additional_"
+    "propertiesB\r\n\013_schema_uriB\t\n\007_id_uriB\010\n\006"
+    "_titleB\016\n\014_descriptionB\006\n\004_refB\r\n\013_not_s"
+    "chema\"\375\001\n\027StructuredOutputOptions\022*\n\006sch"
+    "ema\030\001 \001(\0132\032.runanywhere.v1.JSONSchema\022 \n"
+    "\030include_schema_in_prompt\030\002 \001(\010\022\030\n\013stric"
+    "t_mode\030\003 \001(\010H\000\210\001\001\022\030\n\013json_schema\030\004 \001(\tH\001"
+    "\210\001\001\022\026\n\ttype_name\030\005 \001(\tH\002\210\001\001\022\021\n\004name\030\006 \001("
+    "\tH\003\210\001\001B\016\n\014_strict_modeB\016\n\014_json_schemaB\014"
+    "\n\n_type_nameB\007\n\005_name\"\313\001\n\032StructuredOutp"
+    "utValidation\022\020\n\010is_valid\030\001 \001(\010\022\025\n\rcontai"
+    "ns_json\030\002 \001(\010\022\032\n\rerror_message\030\003 \001(\tH\000\210\001"
+    "\001\022\027\n\nraw_output\030\004 \001(\tH\001\210\001\001\022\033\n\016extracted_"
+    "json\030\005 \001(\tH\002\210\001\001B\020\n\016_error_messageB\r\n\013_ra"
+    "w_outputB\021\n\017_extracted_json\"\221\001\n\026Structur"
+    "edOutputResult\022\023\n\013parsed_json\030\001 \001(\014\022>\n\nv"
+    "alidation\030\002 \001(\0132*.runanywhere.v1.Structu"
+    "redOutputValidation\022\025\n\010raw_text\030\003 \001(\tH\000\210"
+    "\001\001B\013\n\t_raw_text\"n\n\013NamedEntity\022\014\n\004text\030\001"
+    " \001(\t\022\023\n\013entity_type\030\002 \001(\t\022\024\n\014start_offse"
+    "t\030\003 \001(\005\022\022\n\nend_offset\030\004 \001(\005\022\022\n\nconfidenc"
+    "e\030\005 \001(\002\"G\n\026EntityExtractionResult\022-\n\010ent"
+    "ities\030\001 \003(\0132\033.runanywhere.v1.NamedEntity"
+    "\"<\n\027ClassificationCandidate\022\r\n\005label\030\001 \001"
+    "(\t\022\022\n\nconfidence\030\002 \001(\002\"x\n\024Classification"
+    "Result\022\r\n\005label\030\001 \001(\t\022\022\n\nconfidence\030\002 \001("
+    "\002\022=\n\014alternatives\030\003 \003(\0132\'.runanywhere.v1"
+    ".ClassificationCandidate\"\341\001\n\017SentimentRe"
+    "sult\022,\n\tsentiment\030\001 \001(\0162\031.runanywhere.v1"
+    ".Sentiment\022\022\n\nconfidence\030\002 \001(\002\022\033\n\016positi"
+    "ve_score\030\003 \001(\002H\000\210\001\001\022\033\n\016negative_score\030\004 "
+    "\001(\002H\001\210\001\001\022\032\n\rneutral_score\030\005 \001(\002H\002\210\001\001B\021\n\017"
+    "_positive_scoreB\021\n\017_negative_scoreB\020\n\016_n"
+    "eutral_score\":\n\tNERResult\022-\n\010entities\030\001 "
+    "\003(\0132\033.runanywhere.v1.NamedEntity*\374\001\n\016JSO"
+    "NSchemaType\022 \n\034JSON_SCHEMA_TYPE_UNSPECIF"
+    "IED\020\000\022\033\n\027JSON_SCHEMA_TYPE_OBJECT\020\001\022\032\n\026JS"
+    "ON_SCHEMA_TYPE_ARRAY\020\002\022\033\n\027JSON_SCHEMA_TY"
+    "PE_STRING\020\003\022\033\n\027JSON_SCHEMA_TYPE_NUMBER\020\004"
+    "\022\034\n\030JSON_SCHEMA_TYPE_INTEGER\020\005\022\034\n\030JSON_S"
+    "CHEMA_TYPE_BOOLEAN\020\006\022\031\n\025JSON_SCHEMA_TYPE"
+    "_NULL\020\007*\202\001\n\tSentiment\022\031\n\025SENTIMENT_UNSPE"
+    "CIFIED\020\000\022\026\n\022SENTIMENT_POSITIVE\020\001\022\026\n\022SENT"
+    "IMENT_NEGATIVE\020\002\022\025\n\021SENTIMENT_NEUTRAL\020\003\022"
+    "\023\n\017SENTIMENT_MIXED\020\004B\220\001\n\027ai.runanywhere."
+    "proto.v1B\025StructuredOutputProtoP\001Z<githu"
+    "b.com/runanywhere/runanywhere-sdks/idl/v"
+    "1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere."
+    "V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_structured_5foutput_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_structured_5foutput_2eproto = {
     false,
     false,
-    2363,
+    3055,
     descriptor_table_protodef_structured_5foutput_2eproto,
     "structured_output.proto",
     &descriptor_table_structured_5foutput_2eproto_once,
     nullptr,
     0,
-    12,
+    13,
     schemas,
     file_default_instances,
     TableStruct_structured_5foutput_2eproto::offsets,
@@ -1265,6 +1401,104 @@ JSONSchema_PropertiesEntry_DoNotUse::_table_ = {
 };
 // ===================================================================
 
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+JSONSchema_DefinitionsEntry_DoNotUse::JSONSchema_DefinitionsEntry_DoNotUse()
+    : SuperType(JSONSchema_DefinitionsEntry_DoNotUse_class_data_.base()) {}
+JSONSchema_DefinitionsEntry_DoNotUse::JSONSchema_DefinitionsEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+    : SuperType(arena, JSONSchema_DefinitionsEntry_DoNotUse_class_data_.base()) {}
+#else   // PROTOBUF_CUSTOM_VTABLE
+JSONSchema_DefinitionsEntry_DoNotUse::JSONSchema_DefinitionsEntry_DoNotUse() : SuperType() {}
+JSONSchema_DefinitionsEntry_DoNotUse::JSONSchema_DefinitionsEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena) : SuperType(arena) {}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+inline void* PROTOBUF_NONNULL JSONSchema_DefinitionsEntry_DoNotUse::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) JSONSchema_DefinitionsEntry_DoNotUse(arena);
+}
+constexpr auto JSONSchema_DefinitionsEntry_DoNotUse::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(JSONSchema_DefinitionsEntry_DoNotUse),
+                                            alignof(JSONSchema_DefinitionsEntry_DoNotUse));
+}
+constexpr auto JSONSchema_DefinitionsEntry_DoNotUse::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_JSONSchema_DefinitionsEntry_DoNotUse_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &JSONSchema_DefinitionsEntry_DoNotUse::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<JSONSchema_DefinitionsEntry_DoNotUse>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &JSONSchema_DefinitionsEntry_DoNotUse::SharedDtor,
+          static_cast<void (::google::protobuf::MessageLite::*)()>(&JSONSchema_DefinitionsEntry_DoNotUse::ClearImpl),
+              ::google::protobuf::Message::ByteSizeLongImpl, ::google::protobuf::Message::_InternalSerializeImpl
+              ,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(JSONSchema_DefinitionsEntry_DoNotUse, _impl_._cached_size_),
+          false,
+      },
+      &JSONSchema_DefinitionsEntry_DoNotUse::kDescriptorMethods,
+      &descriptor_table_structured_5foutput_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull JSONSchema_DefinitionsEntry_DoNotUse_class_data_ =
+        JSONSchema_DefinitionsEntry_DoNotUse::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+JSONSchema_DefinitionsEntry_DoNotUse::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&JSONSchema_DefinitionsEntry_DoNotUse_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(JSONSchema_DefinitionsEntry_DoNotUse_class_data_.tc_table);
+  return JSONSchema_DefinitionsEntry_DoNotUse_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 1, 54, 2>
+JSONSchema_DefinitionsEntry_DoNotUse::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(JSONSchema_DefinitionsEntry_DoNotUse, _impl_._has_bits_),
+    0, // no _extensions_
+    2, 8,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
+    JSONSchema_DefinitionsEntry_DoNotUse_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::DiscardEverythingFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema_DefinitionsEntry_DoNotUse>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // .runanywhere.v1.JSONSchema value = 2;
+    {::_pbi::TcParser::FastMtS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema_DefinitionsEntry_DoNotUse, _impl_.value_)}},
+    // string key = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema_DefinitionsEntry_DoNotUse, _impl_.key_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string key = 1;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema_DefinitionsEntry_DoNotUse, _impl_.key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // .runanywhere.v1.JSONSchema value = 2;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema_DefinitionsEntry_DoNotUse, _impl_.value_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+  }},
+  {{
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
+  }},
+  {{
+    "\52\3\0\0\0\0\0\0"
+    "runanywhere.v1.JSONSchema.DefinitionsEntry"
+    "key"
+  }},
+};
+// ===================================================================
+
 class JSONSchema::_Internal {
  public:
   using HasBits =
@@ -1297,6 +1531,38 @@ PROTOBUF_NDEBUG_INLINE JSONSchema::Impl_::Impl_(
         required_ { visibility, arena, from.required_ }
         #endif
         ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        all_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.all_of_)>()
+        , from.all_of_}
+        #else
+        all_of_ { visibility, arena, from.all_of_ }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        any_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.any_of_)>()
+        , from.any_of_}
+        #else
+        any_of_ { visibility, arena, from.any_of_ }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        one_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.one_of_)>()
+        , from.one_of_}
+        #else
+        one_of_ { visibility, arena, from.one_of_ }
+        #endif
+        ,
+        schema_uri_(arena, from.schema_uri_),
+        id_uri_(arena, from.id_uri_),
+        title_(arena, from.title_),
+        description_(arena, from.description_),
+        ref_(arena, from.ref_),
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
         properties_{visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::JSONSchema,
@@ -1304,6 +1570,15 @@ PROTOBUF_NDEBUG_INLINE JSONSchema::Impl_::Impl_(
         , from.properties_}
         #else
         properties_ { visibility, arena, from.properties_ }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        definitions_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.definitions_)>()
+        , from.definitions_}
+        #else
+        definitions_ { visibility, arena, from.definitions_ }
         #endif
      {}
 
@@ -1321,8 +1596,11 @@ JSONSchema::JSONSchema(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.items_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+  _impl_.items_ = (CheckHasBit(cached_has_bits, 0x00000200U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.items_)
+                : nullptr;
+  _impl_.not_schema_ = (CheckHasBit(cached_has_bits, 0x00000400U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.not_schema_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, type_),
@@ -1347,6 +1625,38 @@ PROTOBUF_NDEBUG_INLINE JSONSchema::Impl_::Impl_(
         required_ { visibility, arena }
         #endif
         ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        all_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.all_of_)>()
+        }
+        #else
+        all_of_ { visibility, arena }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        any_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.any_of_)>()
+        }
+        #else
+        any_of_ { visibility, arena }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        one_of_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.one_of_)>()
+        }
+        #else
+        one_of_ { visibility, arena }
+        #endif
+        ,
+        schema_uri_(arena),
+        id_uri_(arena),
+        title_(arena),
+        description_(arena),
+        ref_(arena),
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
         properties_{visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::JSONSchema,
@@ -1354,6 +1664,15 @@ PROTOBUF_NDEBUG_INLINE JSONSchema::Impl_::Impl_(
         }
         #else
         properties_ { visibility, arena }
+        #endif
+        ,
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        definitions_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::JSONSchema,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::JSONSchema, _impl_.definitions_)>()
+        }
+        #else
+        definitions_ { visibility, arena }
         #endif
      {}
 
@@ -1377,7 +1696,13 @@ inline void JSONSchema::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.schema_uri_.Destroy();
+  this_._impl_.id_uri_.Destroy();
+  this_._impl_.title_.Destroy();
+  this_._impl_.description_.Destroy();
+  this_._impl_.ref_.Destroy();
   delete this_._impl_.items_;
+  delete this_._impl_.not_schema_;
   this_._impl_.~Impl_();
 }
 
@@ -1400,6 +1725,22 @@ constexpr auto JSONSchema::InternalNewImpl_() {
                   ::google::protobuf::Message::internal_visibility()),
       PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.required_) +
           decltype(JSONSchema::_impl_.required_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.definitions_) +
+          decltype(JSONSchema::_impl_.definitions_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.all_of_) +
+          decltype(JSONSchema::_impl_.all_of_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.any_of_) +
+          decltype(JSONSchema::_impl_.any_of_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.one_of_) +
+          decltype(JSONSchema::_impl_.one_of_)::
               InternalGetArenaOffset(
                   ::google::protobuf::Message::internal_visibility()),
   });
@@ -1446,17 +1787,17 @@ JSONSchema::GetClassData() const {
   return JSONSchema_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 5, 3, 52, 2>
+const ::_pbi::TcParseTable<4, 15, 9, 106, 2>
 JSONSchema::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_._has_bits_),
     0, // no _extensions_
-    5, 56,  // max_field_number, fast_idx_mask
+    15, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967264,  // skipmap
+    4294934528,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    5,  // num_field_entries
-    3,  // num_aux_entries
+    15,  // num_field_entries
+    9,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     JSONSchema_class_data_.base(),
     nullptr,  // post_loop_handler
@@ -1467,8 +1808,8 @@ JSONSchema::_table_ = {
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
     // .runanywhere.v1.JSONSchemaType type = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(JSONSchema, _impl_.type_), 2>(),
-     {8, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(JSONSchema, _impl_.type_), 11>(),
+     {8, 11, 0,
       PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.type_)}},
     {::_pbi::TcParser::MiniParse, {}},
     // repeated string required = 3;
@@ -1477,39 +1818,107 @@ JSONSchema::_table_ = {
       PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.required_)}},
     // optional .runanywhere.v1.JSONSchemaProperty items = 4;
     {::_pbi::TcParser::FastMtS1,
-     {34, 1, 0,
+     {34, 9, 0,
       PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.items_)}},
     // optional bool additional_properties = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(JSONSchema, _impl_.additional_properties_), 3>(),
-     {40, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(JSONSchema, _impl_.additional_properties_), 12>(),
+     {40, 12, 0,
       PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.additional_properties_)}},
+    // optional string schema_uri = 6 [json_name = "$schema"];
+    {::_pbi::TcParser::FastUS1,
+     {50, 4, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.schema_uri_)}},
+    // optional string id_uri = 7 [json_name = "$id"];
+    {::_pbi::TcParser::FastUS1,
+     {58, 5, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.id_uri_)}},
+    // optional string title = 8;
+    {::_pbi::TcParser::FastUS1,
+     {66, 6, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.title_)}},
+    // optional string description = 9;
+    {::_pbi::TcParser::FastUS1,
+     {74, 7, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.description_)}},
     {::_pbi::TcParser::MiniParse, {}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // optional string ref = 11 [json_name = "$ref"];
+    {::_pbi::TcParser::FastUS1,
+     {90, 8, 0,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.ref_)}},
+    // repeated .runanywhere.v1.JSONSchema all_of = 12;
+    {::_pbi::TcParser::FastMtR1,
+     {98, 1, 1,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.all_of_)}},
+    // repeated .runanywhere.v1.JSONSchema any_of = 13;
+    {::_pbi::TcParser::FastMtR1,
+     {106, 2, 2,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.any_of_)}},
+    // repeated .runanywhere.v1.JSONSchema one_of = 14;
+    {::_pbi::TcParser::FastMtR1,
+     {114, 3, 3,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.one_of_)}},
+    // optional .runanywhere.v1.JSONSchema not_schema = 15;
+    {::_pbi::TcParser::FastMtS1,
+     {122, 10, 4,
+      PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.not_schema_)}},
   }}, {{
     65535, 65535
   }}, {{
     // .runanywhere.v1.JSONSchemaType type = 1;
-    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.type_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.type_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // map<string, .runanywhere.v1.JSONSchemaProperty> properties = 2;
-    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.properties_), _Internal::kHasBitsOffset + 4, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.properties_), _Internal::kHasBitsOffset + 13, 5, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
     // repeated string required = 3;
     {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.required_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
     // optional .runanywhere.v1.JSONSchemaProperty items = 4;
-    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.items_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.items_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     // optional bool additional_properties = 5;
-    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.additional_properties_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.additional_properties_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // optional string schema_uri = 6 [json_name = "$schema"];
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.schema_uri_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string id_uri = 7 [json_name = "$id"];
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.id_uri_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string title = 8;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.title_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string description = 9;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.description_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // map<string, .runanywhere.v1.JSONSchema> definitions = 10;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.definitions_), _Internal::kHasBitsOffset + 14, 7, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
+    // optional string ref = 11 [json_name = "$ref"];
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.ref_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // repeated .runanywhere.v1.JSONSchema all_of = 12;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.all_of_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // repeated .runanywhere.v1.JSONSchema any_of = 13;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.any_of_), _Internal::kHasBitsOffset + 2, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // repeated .runanywhere.v1.JSONSchema one_of = 14;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.one_of_), _Internal::kHasBitsOffset + 3, 3, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // optional .runanywhere.v1.JSONSchema not_schema = 15;
+    {PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.not_schema_), _Internal::kHasBitsOffset + 10, 4, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchemaProperty>()},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
       {::_pbi::TcParser::GetMapAuxInfo(
           1, 0, 9, 11, 0)},
       {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchemaProperty>()},
+      {::_pbi::TcParser::GetMapAuxInfo(
+          1, 0, 9, 11, 0)},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
   }},
   {{
-    "\31\0\12\10\0\0\0\0"
+    "\31\0\12\10\0\0\12\6\5\13\13\3\0\0\0\0"
     "runanywhere.v1.JSONSchema"
     "properties"
     "required"
+    "schema_uri"
+    "id_uri"
+    "title"
+    "description"
+    "definitions"
+    "ref"
   }},
 };
 PROTOBUF_NOINLINE void JSONSchema::Clear() {
@@ -1520,21 +1929,54 @@ PROTOBUF_NOINLINE void JSONSchema::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _impl_.required_.Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      _impl_.all_of_.Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+      _impl_.any_of_.Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000008U)) {
+      _impl_.one_of_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _impl_.schema_uri_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      _impl_.id_uri_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      _impl_.title_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      _impl_.description_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      _impl_.ref_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       ABSL_DCHECK(_impl_.items_ != nullptr);
       _impl_.items_->Clear();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      ABSL_DCHECK(_impl_.not_schema_ != nullptr);
+      _impl_.not_schema_->Clear();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00007800U)) {
     ::memset(&_impl_.type_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.additional_properties_) -
         reinterpret_cast<char*>(&_impl_.type_)) + sizeof(_impl_.additional_properties_));
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
       _impl_.properties_.Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00004000U)) {
+      _impl_.definitions_.Clear();
     }
   }
   _impl_._has_bits_.Clear();
@@ -1561,7 +2003,7 @@ PROTOBUF_NOINLINE void JSONSchema::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.JSONSchemaType type = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_type() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1570,7 +2012,7 @@ PROTOBUF_NOINLINE void JSONSchema::Clear() {
   }
 
   // map<string, .runanywhere.v1.JSONSchemaProperty> properties = 2;
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
     if (!this_._internal_properties().empty()) {
       using MapType = ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchemaProperty>;
       using WireHelper = _pbi::MapEntryFuncs<::std::string, ::runanywhere::v1::JSONSchemaProperty,
@@ -1609,17 +2051,132 @@ PROTOBUF_NOINLINE void JSONSchema::Clear() {
   }
 
   // optional .runanywhere.v1.JSONSchemaProperty items = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         4, *this_._impl_.items_, this_._impl_.items_->GetCachedSize(), target,
         stream);
   }
 
   // optional bool additional_properties = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteBoolToArray(
         5, this_._internal_additional_properties(), target);
+  }
+
+  // optional string schema_uri = 6 [json_name = "$schema"];
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    const ::std::string& _s = this_._internal_schema_uri();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.schema_uri");
+    target = stream->WriteStringMaybeAliased(6, _s, target);
+  }
+
+  // optional string id_uri = 7 [json_name = "$id"];
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    const ::std::string& _s = this_._internal_id_uri();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.id_uri");
+    target = stream->WriteStringMaybeAliased(7, _s, target);
+  }
+
+  // optional string title = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    const ::std::string& _s = this_._internal_title();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.title");
+    target = stream->WriteStringMaybeAliased(8, _s, target);
+  }
+
+  // optional string description = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    const ::std::string& _s = this_._internal_description();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.description");
+    target = stream->WriteStringMaybeAliased(9, _s, target);
+  }
+
+  // map<string, .runanywhere.v1.JSONSchema> definitions = 10;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00004000U)) {
+    if (!this_._internal_definitions().empty()) {
+      using MapType = ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>;
+      using WireHelper = _pbi::MapEntryFuncs<::std::string, ::runanywhere::v1::JSONSchema,
+                                     _pbi::WireFormatLite::TYPE_STRING,
+                                     _pbi::WireFormatLite::TYPE_MESSAGE>;
+      const auto& field = this_._internal_definitions();
+
+      if (stream->IsSerializationDeterministic() && field.size() > 1) {
+        for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
+          target = WireHelper::InternalSerialize(
+              10, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.definitions");
+        }
+      } else {
+        for (const auto& entry : field) {
+          target = WireHelper::InternalSerialize(
+              10, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.definitions");
+        }
+      }
+    }
+  }
+
+  // optional string ref = 11 [json_name = "$ref"];
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    const ::std::string& _s = this_._internal_ref();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.JSONSchema.ref");
+    target = stream->WriteStringMaybeAliased(11, _s, target);
+  }
+
+  // repeated .runanywhere.v1.JSONSchema all_of = 12;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_all_of_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_all_of().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              12, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  // repeated .runanywhere.v1.JSONSchema any_of = 13;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_any_of_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_any_of().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              13, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  // repeated .runanywhere.v1.JSONSchema one_of = 14;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000008U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_one_of_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_one_of().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              14, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  // optional .runanywhere.v1.JSONSchema not_schema = 15;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        15, *this_._impl_.not_schema_, this_._impl_.not_schema_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -1647,8 +2204,8 @@ PROTOBUF_NOINLINE void JSONSchema::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += static_cast<bool>(0x00000008U & cached_has_bits) * 2;
-  if (BatchCheckHasBit(cached_has_bits, 0x00000017U)) {
+  total_size += static_cast<bool>(0x00001000U & cached_has_bits) * 2;
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // repeated string required = 3;
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       total_size +=
@@ -1658,24 +2215,87 @@ PROTOBUF_NOINLINE void JSONSchema::Clear() {
             this_._internal_required().Get(i));
       }
     }
+    // repeated .runanywhere.v1.JSONSchema all_of = 12;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      total_size += 1UL * this_._internal_all_of_size();
+      for (const auto& msg : this_._internal_all_of()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
+    // repeated .runanywhere.v1.JSONSchema any_of = 13;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+      total_size += 1UL * this_._internal_any_of_size();
+      for (const auto& msg : this_._internal_any_of()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
+    // repeated .runanywhere.v1.JSONSchema one_of = 14;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000008U)) {
+      total_size += 1UL * this_._internal_one_of_size();
+      for (const auto& msg : this_._internal_one_of()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
+    // optional string schema_uri = 6 [json_name = "$schema"];
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_schema_uri());
+    }
+    // optional string id_uri = 7 [json_name = "$id"];
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_id_uri());
+    }
+    // optional string title = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_title());
+    }
+    // optional string description = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_description());
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00006f00U)) {
+    // optional string ref = 11 [json_name = "$ref"];
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_ref());
+    }
     // optional .runanywhere.v1.JSONSchemaProperty items = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.items_);
     }
+    // optional .runanywhere.v1.JSONSchema not_schema = 15;
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.not_schema_);
+    }
     // .runanywhere.v1.JSONSchemaType type = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_type() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_type());
       }
     }
     // map<string, .runanywhere.v1.JSONSchemaProperty> properties = 2;
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
       total_size +=
           1 * ::google::protobuf::internal::FromIntSize(this_._internal_properties_size());
       for (const auto& entry : this_._internal_properties()) {
         total_size += _pbi::MapEntryFuncs<::std::string, ::runanywhere::v1::JSONSchemaProperty,
+                                       _pbi::WireFormatLite::TYPE_STRING,
+                                       _pbi::WireFormatLite::TYPE_MESSAGE>::ByteSizeLong(entry.first, entry.second);
+      }
+    }
+    // map<string, .runanywhere.v1.JSONSchema> definitions = 10;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00004000U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_definitions_size());
+      for (const auto& entry : this_._internal_definitions()) {
+        total_size += _pbi::MapEntryFuncs<::std::string, ::runanywhere::v1::JSONSchema,
                                        _pbi::WireFormatLite::TYPE_STRING,
                                        _pbi::WireFormatLite::TYPE_MESSAGE>::ByteSizeLong(entry.first, entry.second);
       }
@@ -1700,13 +2320,45 @@ void JSONSchema::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_required()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_required());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+      _this->_internal_mutable_all_of()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_all_of());
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+      _this->_internal_mutable_any_of()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_any_of());
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000008U)) {
+      _this->_internal_mutable_one_of()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_one_of());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _this->_internal_set_schema_uri(from._internal_schema_uri());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      _this->_internal_set_id_uri(from._internal_id_uri());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      _this->_internal_set_title(from._internal_title());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      _this->_internal_set_description(from._internal_description());
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      _this->_internal_set_ref(from._internal_ref());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       ABSL_DCHECK(from._impl_.items_ != nullptr);
       if (_this->_impl_.items_ == nullptr) {
         _this->_impl_.items_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.items_);
@@ -1714,16 +2366,27 @@ void JSONSchema::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.items_->MergeFrom(*from._impl_.items_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      ABSL_DCHECK(from._impl_.not_schema_ != nullptr);
+      if (_this->_impl_.not_schema_ == nullptr) {
+        _this->_impl_.not_schema_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.not_schema_);
+      } else {
+        _this->_impl_.not_schema_->MergeFrom(*from._impl_.not_schema_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_type() != 0) {
         _this->_impl_.type_ = from._impl_.type_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       _this->_impl_.additional_properties_ = from._impl_.additional_properties_;
     }
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
       _this->_impl_.properties_.MergeFrom(from._impl_.properties_);
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00004000U)) {
+      _this->_impl_.definitions_.MergeFrom(from._impl_.definitions_);
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -1741,9 +2404,19 @@ void JSONSchema::CopyFrom(const JSONSchema& from) {
 
 void JSONSchema::InternalSwap(JSONSchema* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.required_.InternalSwap(&other->_impl_.required_);
+  _impl_.all_of_.InternalSwap(&other->_impl_.all_of_);
+  _impl_.any_of_.InternalSwap(&other->_impl_.any_of_);
+  _impl_.one_of_.InternalSwap(&other->_impl_.one_of_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.schema_uri_, &other->_impl_.schema_uri_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.id_uri_, &other->_impl_.id_uri_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.title_, &other->_impl_.title_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.description_, &other->_impl_.description_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.ref_, &other->_impl_.ref_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(JSONSchema, _impl_.additional_properties_)
       + sizeof(JSONSchema::_impl_.additional_properties_)
@@ -1751,6 +2424,7 @@ void JSONSchema::InternalSwap(JSONSchema* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
           reinterpret_cast<char*>(&_impl_.items_),
           reinterpret_cast<char*>(&other->_impl_.items_));
   _impl_.properties_.InternalSwap(&other->_impl_.properties_);
+  _impl_.definitions_.InternalSwap(&other->_impl_.definitions_);
 }
 
 ::google::protobuf::Metadata JSONSchema::GetMetadata() const {
@@ -1780,7 +2454,10 @@ PROTOBUF_NDEBUG_INLINE StructuredOutputOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
     [[maybe_unused]] const ::runanywhere::v1::StructuredOutputOptions& from_msg)
       : _has_bits_{from._has_bits_},
-        _cached_size_{0} {}
+        _cached_size_{0},
+        json_schema_(arena, from.json_schema_),
+        type_name_(arena, from.type_name_),
+        name_(arena, from.name_) {}
 
 StructuredOutputOptions::StructuredOutputOptions(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -1796,7 +2473,7 @@ StructuredOutputOptions::StructuredOutputOptions(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.schema_ = (CheckHasBit(cached_has_bits, 0x00000001U))
+  _impl_.schema_ = (CheckHasBit(cached_has_bits, 0x00000008U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.schema_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
@@ -1812,7 +2489,10 @@ StructuredOutputOptions::StructuredOutputOptions(
 PROTOBUF_NDEBUG_INLINE StructuredOutputOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0} {}
+      : _cached_size_{0},
+        json_schema_(arena),
+        type_name_(arena),
+        name_(arena) {}
 
 inline void StructuredOutputOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -1834,6 +2514,9 @@ inline void StructuredOutputOptions::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.json_schema_.Destroy();
+  this_._impl_.type_name_.Destroy();
+  this_._impl_.name_.Destroy();
   delete this_._impl_.schema_;
   this_._impl_.~Impl_();
 }
@@ -1844,7 +2527,7 @@ inline void* PROTOBUF_NONNULL StructuredOutputOptions::PlacementNew_(
   return ::new (mem) StructuredOutputOptions(arena);
 }
 constexpr auto StructuredOutputOptions::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(StructuredOutputOptions),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StructuredOutputOptions),
                                             alignof(StructuredOutputOptions));
 }
 constexpr auto StructuredOutputOptions::InternalGenerateClassData_() {
@@ -1880,16 +2563,16 @@ StructuredOutputOptions::GetClassData() const {
   return StructuredOutputOptions_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 3, 1, 0, 2>
+const ::_pbi::TcParseTable<3, 6, 1, 71, 2>
 StructuredOutputOptions::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_._has_bits_),
     0, // no _extensions_
-    3, 24,  // max_field_number, fast_idx_mask
+    6, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967288,  // skipmap
+    4294967232,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    3,  // num_field_entries
+    6,  // num_field_entries
     1,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     StructuredOutputOptions_class_data_.base(),
@@ -1902,30 +2585,54 @@ StructuredOutputOptions::_table_ = {
     {::_pbi::TcParser::MiniParse, {}},
     // .runanywhere.v1.JSONSchema schema = 1;
     {::_pbi::TcParser::FastMtS1,
-     {10, 0, 0,
+     {10, 3, 0,
       PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.schema_)}},
     // bool include_schema_in_prompt = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputOptions, _impl_.include_schema_in_prompt_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputOptions, _impl_.include_schema_in_prompt_), 4>(),
+     {16, 4, 0,
       PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.include_schema_in_prompt_)}},
     // optional bool strict_mode = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputOptions, _impl_.strict_mode_), 2>(),
-     {24, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputOptions, _impl_.strict_mode_), 5>(),
+     {24, 5, 0,
       PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.strict_mode_)}},
+    // optional string json_schema = 4;
+    {::_pbi::TcParser::FastUS1,
+     {34, 0, 0,
+      PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.json_schema_)}},
+    // optional string type_name = 5;
+    {::_pbi::TcParser::FastUS1,
+     {42, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.type_name_)}},
+    // optional string name = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.name_)}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // .runanywhere.v1.JSONSchema schema = 1;
-    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.schema_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.schema_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     // bool include_schema_in_prompt = 2;
-    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.include_schema_in_prompt_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.include_schema_in_prompt_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // optional bool strict_mode = 3;
-    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.strict_mode_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.strict_mode_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // optional string json_schema = 4;
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.json_schema_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string type_name = 5;
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.type_name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string name = 6;
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.name_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::JSONSchema>()},
   }},
   {{
+    "\46\0\0\0\13\11\4\0"
+    "runanywhere.v1.StructuredOutputOptions"
+    "json_schema"
+    "type_name"
+    "name"
   }},
 };
 PROTOBUF_NOINLINE void StructuredOutputOptions::Clear() {
@@ -1936,9 +2643,20 @@ PROTOBUF_NOINLINE void StructuredOutputOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    ABSL_DCHECK(_impl_.schema_ != nullptr);
-    _impl_.schema_->Clear();
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.json_schema_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.type_name_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.name_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.schema_ != nullptr);
+      _impl_.schema_->Clear();
+    }
   }
   ::memset(&_impl_.include_schema_in_prompt_, 0, static_cast<::size_t>(
       reinterpret_cast<char*>(&_impl_.strict_mode_) -
@@ -1967,14 +2685,14 @@ PROTOBUF_NOINLINE void StructuredOutputOptions::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.JSONSchema schema = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         1, *this_._impl_.schema_, this_._impl_.schema_->GetCachedSize(), target,
         stream);
   }
 
   // bool include_schema_in_prompt = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_include_schema_in_prompt() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -1983,10 +2701,34 @@ PROTOBUF_NOINLINE void StructuredOutputOptions::Clear() {
   }
 
   // optional bool strict_mode = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteBoolToArray(
         3, this_._internal_strict_mode(), target);
+  }
+
+  // optional string json_schema = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    const ::std::string& _s = this_._internal_json_schema();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StructuredOutputOptions.json_schema");
+    target = stream->WriteStringMaybeAliased(4, _s, target);
+  }
+
+  // optional string type_name = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_type_name();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StructuredOutputOptions.type_name");
+    target = stream->WriteStringMaybeAliased(5, _s, target);
+  }
+
+  // optional string name = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_name();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StructuredOutputOptions.name");
+    target = stream->WriteStringMaybeAliased(6, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2014,15 +2756,30 @@ PROTOBUF_NOINLINE void StructuredOutputOptions::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += static_cast<bool>(0x00000004U & cached_has_bits) * 2;
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // .runanywhere.v1.JSONSchema schema = 1;
+  total_size += static_cast<bool>(0x00000020U & cached_has_bits) * 2;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // optional string json_schema = 4;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_json_schema());
+    }
+    // optional string type_name = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_type_name());
+    }
+    // optional string name = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_name());
+    }
+    // .runanywhere.v1.JSONSchema schema = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.schema_);
     }
     // bool include_schema_in_prompt = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_include_schema_in_prompt() != 0) {
         total_size += 2;
       }
@@ -2047,8 +2804,17 @@ void StructuredOutputOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _this->_internal_set_json_schema(from._internal_json_schema());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_type_name(from._internal_type_name());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_name(from._internal_name());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.schema_ != nullptr);
       if (_this->_impl_.schema_ == nullptr) {
         _this->_impl_.schema_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.schema_);
@@ -2056,12 +2822,12 @@ void StructuredOutputOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.schema_->MergeFrom(*from._impl_.schema_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_include_schema_in_prompt() != 0) {
         _this->_impl_.include_schema_in_prompt_ = from._impl_.include_schema_in_prompt_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _this->_impl_.strict_mode_ = from._impl_.strict_mode_;
     }
   }
@@ -2080,8 +2846,13 @@ void StructuredOutputOptions::CopyFrom(const StructuredOutputOptions& from) {
 
 void StructuredOutputOptions::InternalSwap(StructuredOutputOptions* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.json_schema_, &other->_impl_.json_schema_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.type_name_, &other->_impl_.type_name_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(StructuredOutputOptions, _impl_.strict_mode_)
       + sizeof(StructuredOutputOptions::_impl_.strict_mode_)
@@ -2119,7 +2890,8 @@ PROTOBUF_NDEBUG_INLINE StructuredOutputValidation::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         error_message_(arena, from.error_message_),
-        raw_output_(arena, from.raw_output_) {}
+        raw_output_(arena, from.raw_output_),
+        extracted_json_(arena, from.extracted_json_) {}
 
 StructuredOutputValidation::StructuredOutputValidation(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2149,7 +2921,8 @@ PROTOBUF_NDEBUG_INLINE StructuredOutputValidation::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         error_message_(arena),
-        raw_output_(arena) {}
+        raw_output_(arena),
+        extracted_json_(arena) {}
 
 inline void StructuredOutputValidation::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -2173,6 +2946,7 @@ inline void StructuredOutputValidation::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.error_message_.Destroy();
   this_._impl_.raw_output_.Destroy();
+  this_._impl_.extracted_json_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -2218,16 +2992,16 @@ StructuredOutputValidation::GetClassData() const {
   return StructuredOutputValidation_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 4, 0, 73, 2>
+const ::_pbi::TcParseTable<3, 5, 0, 87, 2>
 StructuredOutputValidation::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_._has_bits_),
     0, // no _extensions_
-    4, 24,  // max_field_number, fast_idx_mask
+    5, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967280,  // skipmap
+    4294967264,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    4,  // num_field_entries
+    5,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     StructuredOutputValidation_class_data_.base(),
@@ -2237,40 +3011,50 @@ StructuredOutputValidation::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::StructuredOutputValidation>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // optional string raw_output = 4;
-    {::_pbi::TcParser::FastUS1,
-     {34, 1, 0,
-      PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.raw_output_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // bool is_valid = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputValidation, _impl_.is_valid_), 2>(),
-     {8, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputValidation, _impl_.is_valid_), 3>(),
+     {8, 3, 0,
       PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.is_valid_)}},
     // bool contains_json = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputValidation, _impl_.contains_json_), 3>(),
-     {16, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StructuredOutputValidation, _impl_.contains_json_), 4>(),
+     {16, 4, 0,
       PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.contains_json_)}},
     // optional string error_message = 3;
     {::_pbi::TcParser::FastUS1,
      {26, 0, 0,
       PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.error_message_)}},
+    // optional string raw_output = 4;
+    {::_pbi::TcParser::FastUS1,
+     {34, 1, 0,
+      PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.raw_output_)}},
+    // optional string extracted_json = 5;
+    {::_pbi::TcParser::FastUS1,
+     {42, 2, 0,
+      PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.extracted_json_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // bool is_valid = 1;
-    {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.is_valid_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.is_valid_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // bool contains_json = 2;
-    {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.contains_json_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.contains_json_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // optional string error_message = 3;
     {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // optional string raw_output = 4;
     {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.raw_output_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string extracted_json = 5;
+    {PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.extracted_json_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
-    "\51\0\0\15\12\0\0\0"
+    "\51\0\0\15\12\16\0\0"
     "runanywhere.v1.StructuredOutputValidation"
     "error_message"
     "raw_output"
+    "extracted_json"
   }},
 };
 PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
@@ -2281,12 +3065,15 @@ PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.error_message_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _impl_.raw_output_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.extracted_json_.ClearNonDefaultToEmpty();
     }
   }
   ::memset(&_impl_.is_valid_, 0, static_cast<::size_t>(
@@ -2316,7 +3103,7 @@ PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // bool is_valid = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_is_valid() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -2325,7 +3112,7 @@ PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
   }
 
   // bool contains_json = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_contains_json() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -2347,6 +3134,14 @@ PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StructuredOutputValidation.raw_output");
     target = stream->WriteStringMaybeAliased(4, _s, target);
+  }
+
+  // optional string extracted_json = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_extracted_json();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StructuredOutputValidation.extracted_json");
+    target = stream->WriteStringMaybeAliased(5, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2374,7 +3169,7 @@ PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // optional string error_message = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -2385,14 +3180,19 @@ PROTOBUF_NOINLINE void StructuredOutputValidation::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_raw_output());
     }
-    // bool is_valid = 1;
+    // optional string extracted_json = 5;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_extracted_json());
+    }
+    // bool is_valid = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_is_valid() != 0) {
         total_size += 2;
       }
     }
     // bool contains_json = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_contains_json() != 0) {
         total_size += 2;
       }
@@ -2416,7 +3216,7 @@ void StructuredOutputValidation::MergeImpl(::google::protobuf::MessageLite& to_m
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_set_error_message(from._internal_error_message());
     }
@@ -2424,11 +3224,14 @@ void StructuredOutputValidation::MergeImpl(::google::protobuf::MessageLite& to_m
       _this->_internal_set_raw_output(from._internal_raw_output());
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_extracted_json(from._internal_extracted_json());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_is_valid() != 0) {
         _this->_impl_.is_valid_ = from._impl_.is_valid_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_contains_json() != 0) {
         _this->_impl_.contains_json_ = from._impl_.contains_json_;
       }
@@ -2455,6 +3258,7 @@ void StructuredOutputValidation::InternalSwap(StructuredOutputValidation* PROTOB
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.raw_output_, &other->_impl_.raw_output_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.extracted_json_, &other->_impl_.extracted_json_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(StructuredOutputValidation, _impl_.contains_json_)
       + sizeof(StructuredOutputValidation::_impl_.contains_json_)

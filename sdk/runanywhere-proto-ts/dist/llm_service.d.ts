@@ -18,6 +18,33 @@ export interface LLMGenerateRequest {
     systemPrompt: string;
     /** chain-of-thought tokens emit as TokenKind.THOUGHT */
     emitThoughts: boolean;
+    /**
+     * Additional LLMGenerationOptions fields kept inline to avoid a codegen
+     * package cycle between service stubs and option messages.
+     */
+    repetitionPenalty: number;
+    stopSequences: string[];
+    streamingEnabled: boolean;
+    preferredFramework: string;
+    jsonSchema: string;
+    executionTarget: string;
+}
+/**
+ * Aggregate result carried on the terminal LLMStreamEvent. This intentionally
+ * duplicates the scalar result fields instead of importing llm_options.proto:
+ * Square Wire treats files with/without go_package as different Kotlin
+ * packages, and that import creates a package cycle through sdk_events.
+ */
+export interface LLMStreamFinalResult {
+    text: string;
+    thinkingContent?: string | undefined;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    totalTimeMs: number;
+    timeToFirstTokenMs: number;
+    tokensPerSecond: number;
+    finishReason: string;
 }
 /**
  * v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -63,6 +90,16 @@ export interface LLMStreamEvent {
      * Empty on success.
      */
     errorMessage: string;
+    /**
+     * Final aggregate result. Only populated on terminal events
+     * (is_final=true) when the backend can report result metrics.
+     */
+    result?: LLMStreamFinalResult | undefined;
+    /**
+     * Numeric backend status code when the terminal event represents a
+     * failure. 0 = unset/success.
+     */
+    errorCode: number;
 }
 export declare const LLMGenerateRequest: {
     encode(message: LLMGenerateRequest, writer?: _m0.Writer): _m0.Writer;
@@ -71,6 +108,14 @@ export declare const LLMGenerateRequest: {
     toJSON(message: LLMGenerateRequest): unknown;
     create<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(base?: I): LLMGenerateRequest;
     fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(object: I): LLMGenerateRequest;
+};
+export declare const LLMStreamFinalResult: {
+    encode(message: LLMStreamFinalResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): LLMStreamFinalResult;
+    fromJSON(object: any): LLMStreamFinalResult;
+    toJSON(message: LLMStreamFinalResult): unknown;
+    create<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(base?: I): LLMStreamFinalResult;
+    fromPartial<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(object: I): LLMStreamFinalResult;
 };
 export declare const LLMStreamEvent: {
     encode(message: LLMStreamEvent, writer?: _m0.Writer): _m0.Writer;

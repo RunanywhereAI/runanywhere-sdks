@@ -10,8 +10,9 @@ import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.ModelEvent
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
+import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.STTOptions
 import com.runanywhere.sdk.public.extensions.currentSTTModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
@@ -178,8 +179,8 @@ class SpeechToTextViewModel : ViewModel() {
                 // Listen for model events with STT category
                 EventBus.events.collect { event ->
                     // Filter for model events with STT category
-                    if (event is ModelEvent && event.category == EventCategory.STT) {
-                        handleModelEvent(event)
+                    if (event.category == EVENT_CATEGORY_STT) {
+                        event.model?.let { handleModelEvent(it) }
                     }
                 }
             }
@@ -190,20 +191,20 @@ class SpeechToTextViewModel : ViewModel() {
      * iOS Reference: handleSDKEvent() in STTViewModel.swift
      */
     private fun handleModelEvent(event: ModelEvent) {
-        when (event.eventType) {
-            ModelEvent.ModelEventType.LOADED -> {
-                Timber.i("STT model loaded: ${event.modelId}")
+        when (event.kind) {
+            ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED -> {
+                Timber.i("STT model loaded: ${event.model_id}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
-                        selectedModelId = event.modelId,
-                        selectedModelName = it.selectedModelName ?: event.modelId,
+                        selectedModelId = event.model_id,
+                        selectedModelName = it.selectedModelName ?: event.model_id,
                         isProcessing = false,
                     )
                 }
             }
-            ModelEvent.ModelEventType.UNLOADED -> {
-                Timber.i("STT model unloaded: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED -> {
+                Timber.i("STT model unloaded: ${event.model_id}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,
@@ -213,16 +214,16 @@ class SpeechToTextViewModel : ViewModel() {
                     )
                 }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
-                Timber.i("STT model download started: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED -> {
+                Timber.i("STT model download started: ${event.model_id}")
                 _uiState.update { it.copy(isProcessing = true) }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                Timber.i("STT model download completed: ${event.modelId}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED -> {
+                Timber.i("STT model download completed: ${event.model_id}")
                 _uiState.update { it.copy(isProcessing = false) }
             }
-            ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                Timber.e("STT model download failed: ${event.modelId} - ${event.error}")
+            ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED -> {
+                Timber.e("STT model download failed: ${event.model_id} - ${event.error}")
                 _uiState.update {
                     it.copy(
                         errorMessage = "Download failed: ${event.error}",

@@ -146,7 +146,10 @@ elseif(RAC_PLATFORM_ANDROID)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
     target_compile_options(rac_backend_onnx PRIVATE -O3 -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(rac_backend_onnx PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    target_link_options(rac_backend_onnx PRIVATE
+        -Wl,--gc-sections
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
     # NNAPI / ORT compile definitions belong to runtimes/onnxrt, not this engine.
     message(STATUS "ONNX Backend: NNAPI EP enabled for Android")
 
@@ -207,7 +210,10 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
 
     target_compile_options(rac_backend_onnx_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(rac_backend_onnx_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    target_link_options(rac_backend_onnx_jni PRIVATE
+        -Wl,--gc-sections
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
 endif()
 
 # =============================================================================

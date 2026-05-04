@@ -219,6 +219,14 @@ public struct VLMResult: Sendable {
         self.totalTimeMs = Double(cResult.total_time_ms)
         self.tokensPerSecond = Double(cResult.tokens_per_second)
     }
+
+    internal init(from proto: RAVLMResult) {
+        self.text = proto.text
+        self.promptTokens = Int(proto.promptTokens)
+        self.completionTokens = Int(proto.completionTokens)
+        self.totalTimeMs = Double(proto.processingTimeMs)
+        self.tokensPerSecond = Double(proto.tokensPerSecond)
+    }
 }
 
 // MARK: - VLM Streaming (Swift concurrency)

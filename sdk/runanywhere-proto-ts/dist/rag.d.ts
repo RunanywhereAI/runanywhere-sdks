@@ -31,6 +31,35 @@ export interface RAGConfiguration {
     chunkSize: number;
     /** Overlap tokens between consecutive chunks. Must be < chunk_size. */
     chunkOverlap: number;
+    /** Maximum tokens of retrieved context passed to the LLM. */
+    maxContextTokens: number;
+    /** Prompt template with `{context}` and `{query}` placeholders. */
+    promptTemplate?: string | undefined;
+    /** Backend-specific config JSON passed to the embedding model/provider. */
+    embeddingConfigJson?: string | undefined;
+    /** Backend-specific config JSON passed to the LLM provider. */
+    llmConfigJson?: string | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * RAGDocument — batch-ingest input item.
+ * ---------------------------------------------------------------------------
+ */
+export interface RAGDocument {
+    /** Optional caller-supplied document id. */
+    id: string;
+    /** Plain text content to chunk/embed. */
+    text: string;
+    /** Legacy metadata JSON blob. */
+    metadataJson?: string | undefined;
+    /** Typed metadata map for generated-proto callers. */
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface RAGDocument_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -76,6 +105,11 @@ export interface RAGSearchResult {
     metadata: {
         [key: string]: string;
     };
+    /**
+     * Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
+     * pass metadata without parsing it.
+     */
+    metadataJson?: string | undefined;
 }
 export interface RAGSearchResult_MetadataEntry {
     key: string;
@@ -133,6 +167,13 @@ export interface RAGStatistics {
      * in-memory-only indexes.
      */
     indexPath?: string | undefined;
+    /**
+     * Raw backend statistics JSON for implementations that cannot yet project
+     * every counter into typed fields.
+     */
+    statsJson?: string | undefined;
+    /** Approximate vector-store footprint in bytes, when known. */
+    vectorStoreSizeBytes: number;
 }
 export declare const RAGConfiguration: {
     encode(message: RAGConfiguration, writer?: _m0.Writer): _m0.Writer;
@@ -141,6 +182,22 @@ export declare const RAGConfiguration: {
     toJSON(message: RAGConfiguration): unknown;
     create<I extends Exact<DeepPartial<RAGConfiguration>, I>>(base?: I): RAGConfiguration;
     fromPartial<I extends Exact<DeepPartial<RAGConfiguration>, I>>(object: I): RAGConfiguration;
+};
+export declare const RAGDocument: {
+    encode(message: RAGDocument, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGDocument;
+    fromJSON(object: any): RAGDocument;
+    toJSON(message: RAGDocument): unknown;
+    create<I extends Exact<DeepPartial<RAGDocument>, I>>(base?: I): RAGDocument;
+    fromPartial<I extends Exact<DeepPartial<RAGDocument>, I>>(object: I): RAGDocument;
+};
+export declare const RAGDocument_MetadataEntry: {
+    encode(message: RAGDocument_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGDocument_MetadataEntry;
+    fromJSON(object: any): RAGDocument_MetadataEntry;
+    toJSON(message: RAGDocument_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<RAGDocument_MetadataEntry>, I>>(base?: I): RAGDocument_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<RAGDocument_MetadataEntry>, I>>(object: I): RAGDocument_MetadataEntry;
 };
 export declare const RAGQueryOptions: {
     encode(message: RAGQueryOptions, writer?: _m0.Writer): _m0.Writer;

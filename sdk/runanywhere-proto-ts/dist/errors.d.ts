@@ -51,6 +51,17 @@ export declare enum ErrorCategory {
 }
 export declare function errorCategoryFromJSON(object: any): ErrorCategory;
 export declare function errorCategoryToJSON(object: ErrorCategory): string;
+export declare enum ErrorSeverity {
+    ERROR_SEVERITY_UNSPECIFIED = 0,
+    ERROR_SEVERITY_DEBUG = 1,
+    ERROR_SEVERITY_INFO = 2,
+    ERROR_SEVERITY_WARNING = 3,
+    ERROR_SEVERITY_ERROR = 4,
+    ERROR_SEVERITY_CRITICAL = 5,
+    UNRECOGNIZED = -1
+}
+export declare function errorSeverityFromJSON(object: any): ErrorSeverity;
+export declare function errorSeverityToJSON(object: ErrorSeverity): string;
 /**
  * ---------------------------------------------------------------------------
  * ErrorCode — exhaustive enumeration of every distinct numeric error code in
@@ -455,6 +466,14 @@ export interface SDKError {
     cAbiCode?: number | undefined;
     /** Underlying error's message (the "caused by" chain), if any. */
     nestedMessage?: string | undefined;
+    /**
+     * Envelope metadata for canonical error emission. `component` is a stable
+     * lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
+     * "download", "storage", ...); SDKEvent carries the enum-typed component.
+     */
+    timestampMs: number;
+    severity: ErrorSeverity;
+    component: string;
 }
 export declare const ErrorContext: {
     encode(message: ErrorContext, writer?: _m0.Writer): _m0.Writer;

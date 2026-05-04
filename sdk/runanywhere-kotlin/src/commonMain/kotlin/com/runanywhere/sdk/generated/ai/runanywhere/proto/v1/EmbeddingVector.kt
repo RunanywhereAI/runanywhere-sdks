@@ -63,6 +63,17 @@ public class EmbeddingVector(
     schemaIndex = 2,
   )
   public val text: String? = null,
+  /**
+   * Vector dimension for consumers that need per-vector sizing without
+   * inspecting EmbeddingsResult.dimension.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val dimension: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingVector, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -90,6 +101,7 @@ public class EmbeddingVector(
     if (values != other.values) return false
     if (norm != other.norm) return false
     if (text != other.text) return false
+    if (dimension != other.dimension) return false
     return true
   }
 
@@ -100,6 +112,7 @@ public class EmbeddingVector(
       result = result * 37 + values.hashCode()
       result = result * 37 + (norm?.hashCode() ?: 0)
       result = result * 37 + (text?.hashCode() ?: 0)
+      result = result * 37 + dimension.hashCode()
       super.hashCode = result
     }
     return result
@@ -110,6 +123,7 @@ public class EmbeddingVector(
     if (values.isNotEmpty()) result += """values=$values"""
     if (norm != null) result += """norm=$norm"""
     if (text != null) result += """text=${sanitize(text)}"""
+    result += """dimension=$dimension"""
     return result.joinToString(prefix = "EmbeddingVector{", separator = ", ", postfix = "}")
   }
 
@@ -117,8 +131,9 @@ public class EmbeddingVector(
     values: List<Float> = this.values,
     norm: Float? = this.norm,
     text: String? = this.text,
+    dimension: Int = this.dimension,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingVector = EmbeddingVector(values, norm, text, unknownFields)
+  ): EmbeddingVector = EmbeddingVector(values, norm, text, dimension, unknownFields)
 
   public companion object {
     @JvmField
@@ -135,6 +150,7 @@ public class EmbeddingVector(
         size += ProtoAdapter.FLOAT.asPacked().encodedSizeWithTag(1, value.values)
         size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.norm)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.text)
+        if (value.dimension != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.dimension)
         return size
       }
 
@@ -142,11 +158,13 @@ public class EmbeddingVector(
         ProtoAdapter.FLOAT.asPacked().encodeWithTag(writer, 1, value.values)
         ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.norm)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.text)
+        if (value.dimension != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.dimension)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingVector) {
         writer.writeBytes(value.unknownFields)
+        if (value.dimension != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.dimension)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.text)
         ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.norm)
         ProtoAdapter.FLOAT.asPacked().encodeWithTag(writer, 1, value.values)
@@ -156,6 +174,7 @@ public class EmbeddingVector(
         var values: MutableList<Float>? = null
         var norm: Float? = null
         var text: String? = null
+        var dimension: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> {
@@ -170,6 +189,7 @@ public class EmbeddingVector(
             }
             2 -> norm = ProtoAdapter.FLOAT.decode(reader)
             3 -> text = ProtoAdapter.STRING.decode(reader)
+            4 -> dimension = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -177,6 +197,7 @@ public class EmbeddingVector(
           values = values ?: listOf(),
           norm = norm,
           text = text,
+          dimension = dimension,
           unknownFields = unknownFields
         )
       }

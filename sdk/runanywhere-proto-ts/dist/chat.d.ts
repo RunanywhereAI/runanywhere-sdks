@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { ToolCall, ToolResult } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -58,6 +59,14 @@ export interface ChatMessage {
      * role == MESSAGE_ROLE_TOOL).
      */
     toolCallId?: string | undefined;
+    /**
+     * Typed tool calls embedded in this assistant message. Supersedes
+     * tool_calls_json for generated-proto callers while keeping the legacy
+     * JSON string list available.
+     */
+    toolCalls: ToolCall[];
+    /** Typed tool result carried by role == MESSAGE_ROLE_TOOL messages. */
+    toolResult?: ToolResult | undefined;
 }
 export declare const ChatMessage: {
     encode(message: ChatMessage, writer?: _m0.Writer): _m0.Writer;

@@ -46,12 +46,14 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
     // Sort: Foundation Models first (built-in), then downloaded, then not downloaded
     models.sort((a, b) {
-      final aPriority = a.preferredFramework == LLMFramework.foundationModels
+      final aPriority = a.preferredFramework ==
+              LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
           ? 0
-          : (a.localPath != null ? 1 : 2);
-      final bPriority = b.preferredFramework == LLMFramework.foundationModels
+          : (a.localPath.isNotEmpty ? 1 : 2);
+      final bPriority = b.preferredFramework ==
+              LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
           ? 0
-          : (b.localPath != null ? 1 : 2);
+          : (b.localPath.isNotEmpty ? 1 : 2);
       if (aPriority != bPriority) {
         return aPriority.compareTo(bPriority);
       }
@@ -460,14 +462,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       _loadingProgress = 'Configuring System TTS...';
     });
 
-    // Create pseudo ModelInfo for System TTS
-    const systemTTSModel = ModelInfo(
+    final systemTTSModel = ModelInfo(
       id: 'system-tts',
       name: 'System TTS',
-      category: ModelCategory.speechSynthesis,
-      format: ModelFormat.unknown,
-      compatibleFrameworks: [LLMFramework.systemTTS],
-      preferredFramework: LLMFramework.systemTTS,
+      category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      format: ModelFormat.MODEL_FORMAT_UNKNOWN,
+      framework: LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+      builtIn: true,
     );
 
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -495,8 +496,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
   Future<void> _selectAndLoadModel(ModelInfo model) async {
     // Foundation Models don't need local path check
-    if (model.preferredFramework != LLMFramework.foundationModels) {
-      if (model.localPath == null) {
+    if (model.preferredFramework !=
+        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
+      if (model.localPath.isEmpty) {
         return; // Model not downloaded yet
       }
     }
@@ -510,8 +512,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     try {
       // RAG contexts record the selection only — do NOT pre-load into memory.
       // The RAG pipeline loads models on demand when the document is ingested.
-      final isRagContext = widget.context == ModelSelectionContext.ragEmbedding ||
-          widget.context == ModelSelectionContext.ragLLM;
+      final isRagContext =
+          widget.context == ModelSelectionContext.ragEmbedding ||
+              widget.context == ModelSelectionContext.ragLLM;
 
       if (!isRagContext) {
         // Update view model selection state (loads the model into memory)
@@ -579,15 +582,14 @@ class _FlatModelRowState extends State<_FlatModelRow> {
 
   Color get _frameworkColor {
     final framework = widget.model.preferredFramework;
-    if (framework == null) return Colors.grey;
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return AppColors.primaryBlue;
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return Colors.purple;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.grey;
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return Colors.green;
       default:
         return Colors.grey;
@@ -596,15 +598,14 @@ class _FlatModelRowState extends State<_FlatModelRow> {
 
   String get _frameworkName {
     final framework = widget.model.preferredFramework;
-    if (framework == null) return 'Unknown';
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return 'Fast';
-      case LLMFramework.onnx:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return 'ONNX';
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return 'Apple';
-      case LLMFramework.unknown:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return 'Whisper';
       default:
         return framework.displayName;
@@ -612,9 +613,10 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   IconData get _statusIcon {
-    if (widget.model.preferredFramework == LLMFramework.foundationModels) {
+    if (widget.model.preferredFramework ==
+        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
       return Icons.check_circle;
-    } else if (widget.model.localPath != null) {
+    } else if (widget.model.localPath.isNotEmpty) {
       return Icons.check_circle;
     } else {
       return Icons.download;
@@ -622,8 +624,9 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   Color get _statusColor {
-    if (widget.model.preferredFramework == LLMFramework.foundationModels ||
-        widget.model.localPath != null) {
+    if (widget.model.preferredFramework ==
+            LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+        widget.model.localPath.isNotEmpty) {
       return AppColors.statusGreen;
     } else {
       return AppColors.primaryBlue;
@@ -631,9 +634,10 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   String get _statusText {
-    if (widget.model.preferredFramework == LLMFramework.foundationModels) {
+    if (widget.model.preferredFramework ==
+        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
       return 'Built-in';
-    } else if (widget.model.localPath != null) {
+    } else if (widget.model.localPath.isNotEmpty) {
       return 'Ready';
     } else {
       return 'Download';
@@ -788,7 +792,8 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   Widget _buildActionButton(BuildContext context) {
-    if (widget.model.preferredFramework == LLMFramework.foundationModels) {
+    if (widget.model.preferredFramework ==
+        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
       // Foundation Models are built-in
       return ElevatedButton(
         onPressed:
@@ -803,7 +808,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
       );
     }
 
-    if (widget.model.localPath == null) {
+    if (widget.model.localPath.isEmpty) {
       // Model needs to be downloaded
       if (_isDownloading) {
         return const SizedBox(
@@ -875,7 +880,8 @@ class _FlatModelRowState extends State<_FlatModelRow> {
         if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+        } else if (progress.stage ==
+                sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
             progress.errorMessage.isNotEmpty) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
           throw Exception('Download failed: ${progress.errorMessage}');

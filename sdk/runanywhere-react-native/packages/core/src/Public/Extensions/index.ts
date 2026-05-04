@@ -128,8 +128,31 @@ export type { HardwareProfileResult } from './RunAnywhere+Hardware';
 // Logging
 export { setLogLevel } from './RunAnywhere+Logging';
 
+// Canonical SDK event stream
+export {
+  pollSDKEvent,
+  publishSDKEvent,
+  publishSDKFailure,
+  subscribeSDKEvents,
+} from './RunAnywhere+Events';
+
+// Canonical model/component lifecycle
+export {
+  getComponentLifecycleSnapshot,
+  getCurrentModel,
+  loadModelLifecycle,
+  unloadModelLifecycle,
+} from './RunAnywhere+Lifecycle';
+
 // Storage
-export { getStorageInfo, clearCache } from './RunAnywhere+Storage';
+export {
+  checkStorageAvailability,
+  clearCache,
+  deleteStorage,
+  getStorageInfo,
+  getStorageInfoProto,
+  planStorageDelete,
+} from './RunAnywhere+Storage';
 
 // Models
 export {
@@ -181,7 +204,6 @@ export {
   clearTools,
   parseToolCall,
   executeTool,
-  formatToolsForPrompt,
   formatToolsForPromptAsync,
   generateWithTools,
   continueWithToolResult,

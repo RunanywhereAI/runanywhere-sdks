@@ -17,6 +17,7 @@
  */
 
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
+import { SDKException } from '../Foundation/SDKException';
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,
@@ -24,10 +25,34 @@ import {
 
 /** Mirrors `RAC_SUCCESS` from `rac_error.h`. */
 const RAC_SUCCESS = 0;
+const RAC_ERROR_FEATURE_NOT_AVAILABLE = -801;
 
 function assertOk(op: string, rc: number): void {
+  if (rc === RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+    throw SDKException.backendNotAvailable(
+      `Solution.${op}`,
+      `Native solution runtime returned RAC_ERROR_FEATURE_NOT_AVAILABLE (rc=${rc}). ` +
+      'This Web WASM build does not include the requested solution capability.',
+    );
+  }
+
   if (rc !== RAC_SUCCESS) {
     throw new Error(`rac_solution_${op} failed (rc=${rc})`);
+  }
+}
+
+function isRagSolutionYaml(yaml: string): boolean {
+  return /^\s*rag\s*:/m.test(yaml);
+}
+
+function moduleSupportsRAG(module: EmscriptenRunanywhereModule): boolean {
+  try {
+    return (
+      typeof module._rac_rag_session_create_proto === 'function' &&
+      typeof module._rac_rag_query_proto === 'function'
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -246,6 +271,14 @@ function createFromYaml(
   module: EmscriptenRunanywhereModule,
 ): SolutionHandle {
   const m = module;
+
+  if (isRagSolutionYaml(yaml) && !moduleSupportsRAG(m)) {
+    throw SDKException.backendNotAvailable(
+      'RAG solution YAML',
+      'RAG solution YAML is unavailable in this Web WASM build because the native ' +
+      'rac_rag_* exports are missing, likely because RAC_BACKEND_RAG=OFF.',
+    );
+  }
 
   const yamlLen = m.lengthBytesUTF8(yaml) + 1;
   const yamlPtr = m._malloc(yamlLen);

@@ -218,11 +218,25 @@ public struct RALoraAdapterCatalogEntry: Sendable {
   /// Clears the value of `author`. Subsequent reads from it will return its default value.
   public mutating func clearAuthor() {self._author = nil}
 
+  /// recommended adapter scale
+  public var defaultScale: Float = 0
+
+  /// lowercase hex SHA-256
+  public var checksumSha256: String {
+    get {_checksumSha256 ?? String()}
+    set {_checksumSha256 = newValue}
+  }
+  /// Returns true if `checksumSha256` has been explicitly set.
+  public var hasChecksumSha256: Bool {self._checksumSha256 != nil}
+  /// Clears the value of `checksumSha256`. Subsequent reads from it will return its default value.
+  public mutating func clearChecksumSha256() {self._checksumSha256 = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _author: String? = nil
+  fileprivate var _checksumSha256: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -371,7 +385,7 @@ extension RALoRAAdapterInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogEntry"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}description\0\u{1}url\0\u{1}filename\0\u{3}compatible_models\0\u{3}size_bytes\0\u{1}author\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}description\0\u{1}url\0\u{1}filename\0\u{3}compatible_models\0\u{3}size_bytes\0\u{1}author\0\u{3}default_scale\0\u{3}checksum_sha256\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -387,6 +401,8 @@ extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._Messa
       case 6: try { try decoder.decodeRepeatedStringField(value: &self.compatibleModels) }()
       case 7: try { try decoder.decodeSingularInt64Field(value: &self.sizeBytes) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._author) }()
+      case 9: try { try decoder.decodeSingularFloatField(value: &self.defaultScale) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._checksumSha256) }()
       default: break
       }
     }
@@ -421,6 +437,12 @@ extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._Messa
     try { if let v = self._author {
       try visitor.visitSingularStringField(value: v, fieldNumber: 8)
     } }()
+    if self.defaultScale.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.defaultScale, fieldNumber: 9)
+    }
+    try { if let v = self._checksumSha256 {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -433,6 +455,8 @@ extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs.compatibleModels != rhs.compatibleModels {return false}
     if lhs.sizeBytes != rhs.sizeBytes {return false}
     if lhs._author != rhs._author {return false}
+    if lhs.defaultScale != rhs.defaultScale {return false}
+    if lhs._checksumSha256 != rhs._checksumSha256 {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

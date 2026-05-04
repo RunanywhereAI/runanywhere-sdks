@@ -8,48 +8,23 @@
  * proto canonical types where they suffice.
  */
 
-import type { HardwareAcceleration } from '@runanywhere/web';
+import type {
+  VLMImage as ProtoVLMImage,
+  VLMGenerationOptions as ProtoVLMGenerationOptions,
+  VLMResult,
+} from '@runanywhere/proto-ts/vlm_options';
+export { VLMImageFormat } from '@runanywhere/proto-ts/vlm_options';
 
-/** Web-only ergonomic VLM image format enum. */
-export enum VLMImageFormat {
-  FilePath = 0,
-  RGBPixels = 1,
-  Base64 = 2,
-}
+export type VLMImage = ProtoVLMImage;
 
-/** Web-only image input shape (carries TypedArray + base64 in addition to proto bytes/path). */
-export interface VLMImage {
-  format: VLMImageFormat;
-  filePath?: string;
-  pixelData?: Uint8Array;
-  base64Data?: string;
-  width?: number;
-  height?: number;
-}
-
-/** Web-only generation options — adds streaming + system prompt + family hint. */
-export interface VLMGenerationOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
+/** Backend-only knobs that are not part of the cross-SDK VLM proto surface. */
+export type VLMGenerationOptions = Partial<Omit<ProtoVLMGenerationOptions, 'prompt'>> & {
   systemPrompt?: string;
   modelFamily?: number;
   streaming?: boolean;
-}
+};
 
-/** Web-only generation result — adds image-encode timing + hardware mode. */
-export interface VLMGenerationResult {
-  text: string;
-  promptTokens: number;
-  imageTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  timeToFirstTokenMs: number;
-  imageEncodeTimeMs: number;
-  totalTimeMs: number;
-  tokensPerSecond: number;
-  hardwareUsed: HardwareAcceleration;
-}
+export type VLMGenerationResult = VLMResult;
 
 export interface VLMStreamingResult {
   result: Promise<VLMGenerationResult>;

@@ -17,28 +17,24 @@
  *   console.log(`Storage backend: ${info.backend}, used ${info.usedSpace}b`);
  */
 
+import { ModelManager } from '../../Infrastructure/ModelManager';
 import { OPFSStorage } from '../../Infrastructure/OPFSStorage';
 import { LocalFileStorage } from '../../Infrastructure/LocalFileStorage';
-import { ModelManager } from '../../Infrastructure/ModelManager';
 import { SDKLogger } from '../../Foundation/SDKLogger';
-import type { StorageInfo } from '../../types/models';
 import type { StorageProviderId } from '../../Infrastructure/StorageProvider';
+import { StorageAdapter } from '../../Adapters/StorageAdapter';
+import type {
+  StorageAvailabilityRequest,
+  StorageAvailabilityResult,
+  StorageDeletePlan,
+  StorageDeletePlanRequest,
+  StorageDeleteRequest,
+  StorageDeleteResult,
+  StorageInfoRequest,
+  StorageInfoResult,
+} from '@runanywhere/proto-ts/storage_types';
 
 const logger = new SDKLogger('Storage');
-
-/**
- * Aggregate storage info — extends the Web SDK `StorageInfo` shape with the
- * active backend identifier so apps can render "Stored on disk" /
- * "Stored in browser storage" hints without duplicating the resolution logic.
- */
-export interface StorageInfoExtended extends StorageInfo {
-  /** Stable identifier for the active backend ('fsAccess' | 'opfs' | 'memory'). */
-  backend: StorageProviderId;
-  /** Whether the backend persists across page reloads. */
-  isPersistent: boolean;
-  /** Whether the user explicitly picked a directory (true only for fsAccess). */
-  isUserChosen: boolean;
-}
 
 /**
  * Free-function namespace mirroring Swift's `RunAnywhere.Storage` extension.
@@ -49,13 +45,13 @@ export const Storage = {
    * and active backend identifier. Uses `navigator.storage.estimate()` when
    * available; falls back to zeroes when unsupported.
    */
-  async info(): Promise<StorageInfoExtended> {
-    const backend: StorageProviderId =
-      LocalFileStorage.isSupported && LocalFileStorage.storedDirectoryName
-        ? 'fsAccess'
-        : OPFSStorage.isSupported
-          ? 'opfs'
-          : 'memory';
+  async info(request: StorageInfoRequest = {
+    includeDevice: true,
+    includeApp: true,
+    includeModels: true,
+  }): Promise<StorageInfoResult> {
+    const protoResult = StorageAdapter.tryDefault()?.info(request);
+    if (protoResult) return protoResult;
 
     let totalSpace = 0;
     let usedSpace = 0;
@@ -73,14 +69,47 @@ export const Storage = {
 
     const freeSpace = Math.max(0, totalSpace - usedSpace);
     return {
-      totalSpace,
-      usedSpace,
-      freeSpace,
-      modelsPath: 'models',
-      backend,
-      isPersistent: backend !== 'memory',
-      isUserChosen: backend === 'fsAccess',
+      success: true,
+      info: {
+        app: request.includeApp
+          ? {
+              documentsBytes: Storage.modelsUsedBytes(),
+              cacheBytes: 0,
+              appSupportBytes: 0,
+              totalBytes: Storage.modelsUsedBytes(),
+            }
+          : undefined,
+        device: request.includeDevice
+          ? {
+              totalBytes: totalSpace,
+              freeBytes: freeSpace,
+              usedBytes: usedSpace,
+              usedPercent: totalSpace > 0 ? (usedSpace / totalSpace) * 100 : 0,
+            }
+          : undefined,
+        models: request.includeModels
+          ? ModelManager.getModels().map((model) => ({
+              modelId: model.id,
+              sizeOnDiskBytes: model.sizeBytes ?? 0,
+            }))
+          : [],
+        totalModels: request.includeModels ? ModelManager.getModels().length : 0,
+        totalModelsBytes: request.includeModels ? Storage.modelsUsedBytes() : 0,
+      },
+      errorMessage: '',
     };
+  },
+
+  availability(request: StorageAvailabilityRequest): StorageAvailabilityResult | null {
+    return StorageAdapter.tryDefault()?.availability(request) ?? null;
+  },
+
+  deletePlan(request: StorageDeletePlanRequest): StorageDeletePlan | null {
+    return StorageAdapter.tryDefault()?.deletePlan(request) ?? null;
+  },
+
+  delete(request: StorageDeleteRequest): StorageDeleteResult | null {
+    return StorageAdapter.tryDefault()?.delete(request) ?? null;
   },
 
   /**

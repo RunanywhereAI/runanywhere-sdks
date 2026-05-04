@@ -31,6 +31,7 @@
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "model_types.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -60,10 +61,46 @@ enum DownloadStage : int;
 extern const uint32_t DownloadStage_internal_data_[];
 enum DownloadState : int;
 extern const uint32_t DownloadState_internal_data_[];
+class DownloadCancelRequest;
+struct DownloadCancelRequestDefaultTypeInternal;
+extern DownloadCancelRequestDefaultTypeInternal _DownloadCancelRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadCancelRequest_class_data_;
+class DownloadCancelResult;
+struct DownloadCancelResultDefaultTypeInternal;
+extern DownloadCancelResultDefaultTypeInternal _DownloadCancelResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadCancelResult_class_data_;
+class DownloadFilePlan;
+struct DownloadFilePlanDefaultTypeInternal;
+extern DownloadFilePlanDefaultTypeInternal _DownloadFilePlan_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadFilePlan_class_data_;
+class DownloadPlanRequest;
+struct DownloadPlanRequestDefaultTypeInternal;
+extern DownloadPlanRequestDefaultTypeInternal _DownloadPlanRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadPlanRequest_class_data_;
+class DownloadPlanResult;
+struct DownloadPlanResultDefaultTypeInternal;
+extern DownloadPlanResultDefaultTypeInternal _DownloadPlanResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadPlanResult_class_data_;
 class DownloadProgress;
 struct DownloadProgressDefaultTypeInternal;
 extern DownloadProgressDefaultTypeInternal _DownloadProgress_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull DownloadProgress_class_data_;
+class DownloadResumeRequest;
+struct DownloadResumeRequestDefaultTypeInternal;
+extern DownloadResumeRequestDefaultTypeInternal _DownloadResumeRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadResumeRequest_class_data_;
+class DownloadResumeResult;
+struct DownloadResumeResultDefaultTypeInternal;
+extern DownloadResumeResultDefaultTypeInternal _DownloadResumeResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadResumeResult_class_data_;
+class DownloadStartRequest;
+struct DownloadStartRequestDefaultTypeInternal;
+extern DownloadStartRequestDefaultTypeInternal _DownloadStartRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadStartRequest_class_data_;
+class DownloadStartResult;
+struct DownloadStartResultDefaultTypeInternal;
+extern DownloadStartResultDefaultTypeInternal _DownloadStartResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull DownloadStartResult_class_data_;
 class DownloadSubscribeRequest;
 struct DownloadSubscribeRequestDefaultTypeInternal;
 extern DownloadSubscribeRequestDefaultTypeInternal _DownloadSubscribeRequest_default_instance_;
@@ -135,6 +172,8 @@ enum DownloadState : int {
   DOWNLOAD_STATE_COMPLETED = 5,
   DOWNLOAD_STATE_FAILED = 6,
   DOWNLOAD_STATE_CANCELLED = 7,
+  DOWNLOAD_STATE_PAUSED = 8,
+  DOWNLOAD_STATE_RESUMING = 9,
   DownloadState_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   DownloadState_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -145,11 +184,11 @@ extern const uint32_t DownloadState_internal_data_[];
 inline constexpr DownloadState DownloadState_MIN =
     static_cast<DownloadState>(0);
 inline constexpr DownloadState DownloadState_MAX =
-    static_cast<DownloadState>(7);
+    static_cast<DownloadState>(9);
 [[nodiscard]] inline bool DownloadState_IsValid(int value) {
-  return 0 <= value && value <= 7;
+  return 0 <= value && value <= 9;
 }
-inline constexpr int DownloadState_ARRAYSIZE = 7 + 1;
+inline constexpr int DownloadState_ARRAYSIZE = 9 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 DownloadState_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(DownloadState) {
@@ -164,7 +203,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& DownloadState_Name(DownloadState value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<DownloadState_descriptor, 0, 7>(
+  return ::google::protobuf::internal::NameOfDenseEnum<DownloadState_descriptor, 0, 9>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool DownloadState_Parse(
@@ -325,6 +364,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadSubscribeRequest final : pu
   // accessors -------------------------------------------------------
   enum : int {
     kModelIdFieldNumber = 1,
+    kTaskIdFieldNumber = 2,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -341,12 +381,27 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadSubscribeRequest final : pu
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
+  // string task_id = 2;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadSubscribeRequest)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<0, 1,
-                                   0, 56,
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   0, 63,
                                    2>
       _table_;
 
@@ -370,6 +425,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadSubscribeRequest final : pu
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -377,6 +433,236 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadSubscribeRequest final : pu
 };
 
 extern const ::google::protobuf::internal::ClassDataFull DownloadSubscribeRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadResumeRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadResumeRequest) */ {
+ public:
+  inline DownloadResumeRequest() : DownloadResumeRequest(nullptr) {}
+  ~DownloadResumeRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadResumeRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadResumeRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadResumeRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadResumeRequest(const DownloadResumeRequest& from) : DownloadResumeRequest(nullptr, from) {}
+  inline DownloadResumeRequest(DownloadResumeRequest&& from) noexcept
+      : DownloadResumeRequest(nullptr, ::std::move(from)) {}
+  inline DownloadResumeRequest& operator=(const DownloadResumeRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadResumeRequest& operator=(DownloadResumeRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadResumeRequest& default_instance() {
+    return *reinterpret_cast<const DownloadResumeRequest*>(
+        &_DownloadResumeRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 9;
+  friend void swap(DownloadResumeRequest& a, DownloadResumeRequest& b) { a.Swap(&b); }
+  inline void Swap(DownloadResumeRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadResumeRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadResumeRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadResumeRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadResumeRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadResumeRequest& from) { DownloadResumeRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadResumeRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadResumeRequest"; }
+
+  explicit DownloadResumeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadResumeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadResumeRequest& from);
+  DownloadResumeRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadResumeRequest&& from) noexcept
+      : DownloadResumeRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTaskIdFieldNumber = 1,
+    kModelIdFieldNumber = 2,
+    kResumeFromBytesFieldNumber = 3,
+  };
+  // string task_id = 1;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
+  // string model_id = 2;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // int64 resume_from_bytes = 3;
+  void clear_resume_from_bytes() ;
+  [[nodiscard]] ::int64_t resume_from_bytes() const;
+  void set_resume_from_bytes(::int64_t value);
+
+  private:
+  ::int64_t _internal_resume_from_bytes() const;
+  void _internal_set_resume_from_bytes(::int64_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadResumeRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 3,
+                                   0, 60,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadResumeRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::int64_t resume_from_bytes_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadResumeRequest_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::google::protobuf::Message
@@ -527,6 +813,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
   enum : int {
     kModelIdFieldNumber = 1,
     kErrorMessageFieldNumber = 10,
+    kTaskIdFieldNumber = 11,
+    kStorageKeyFieldNumber = 14,
+    kLocalPathFieldNumber = 15,
     kBytesDownloadedFieldNumber = 3,
     kStageFieldNumber = 2,
     kStageProgressFieldNumber = 5,
@@ -535,6 +824,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
     kOverallSpeedBpsFieldNumber = 6,
     kStateFieldNumber = 8,
     kRetryAttemptFieldNumber = 9,
+    kCurrentFileIndexFieldNumber = 12,
+    kTotalFilesFieldNumber = 13,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -564,6 +855,51 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
   const ::std::string& _internal_error_message() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // string task_id = 11;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
+  // string storage_key = 14;
+  void clear_storage_key() ;
+  [[nodiscard]] const ::std::string& storage_key() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_storage_key(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_storage_key();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_storage_key();
+  void set_allocated_storage_key(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_storage_key() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_storage_key(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_storage_key();
+
+  public:
+  // string local_path = 15;
+  void clear_local_path() ;
+  [[nodiscard]] const ::std::string& local_path() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_local_path(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_local_path();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_local_path();
+  void set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_local_path() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_local_path(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_local_path();
 
   public:
   // int64 bytes_downloaded = 3;
@@ -646,12 +982,32 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
   void _internal_set_retry_attempt(::int32_t value);
 
   public:
+  // int32 current_file_index = 12;
+  void clear_current_file_index() ;
+  [[nodiscard]] ::int32_t current_file_index() const;
+  void set_current_file_index(::int32_t value);
+
+  private:
+  ::int32_t _internal_current_file_index() const;
+  void _internal_set_current_file_index(::int32_t value);
+
+  public:
+  // int32 total_files = 13;
+  void clear_total_files() ;
+  [[nodiscard]] ::int32_t total_files() const;
+  void set_total_files(::int32_t value);
+
+  private:
+  ::int32_t _internal_total_files() const;
+  void _internal_set_total_files(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadProgress)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 10,
-                                   0, 69,
+  static const ::google::protobuf::internal::TcParseTable<4, 15,
+                                   0, 97,
                                    2>
       _table_;
 
@@ -676,6 +1032,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
+    ::google::protobuf::internal::ArenaStringPtr storage_key_;
+    ::google::protobuf::internal::ArenaStringPtr local_path_;
     ::int64_t bytes_downloaded_;
     int stage_;
     float stage_progress_;
@@ -684,6 +1043,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
     float overall_speed_bps_;
     int state_;
     ::int32_t retry_attempt_;
+    ::int32_t current_file_index_;
+    ::int32_t total_files_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -691,6 +1052,2115 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadProgress final : public ::g
 };
 
 extern const ::google::protobuf::internal::ClassDataFull DownloadProgress_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadCancelResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadCancelResult) */ {
+ public:
+  inline DownloadCancelResult() : DownloadCancelResult(nullptr) {}
+  ~DownloadCancelResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadCancelResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadCancelResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadCancelResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadCancelResult(const DownloadCancelResult& from) : DownloadCancelResult(nullptr, from) {}
+  inline DownloadCancelResult(DownloadCancelResult&& from) noexcept
+      : DownloadCancelResult(nullptr, ::std::move(from)) {}
+  inline DownloadCancelResult& operator=(const DownloadCancelResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadCancelResult& operator=(DownloadCancelResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadCancelResult& default_instance() {
+    return *reinterpret_cast<const DownloadCancelResult*>(
+        &_DownloadCancelResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 8;
+  friend void swap(DownloadCancelResult& a, DownloadCancelResult& b) { a.Swap(&b); }
+  inline void Swap(DownloadCancelResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadCancelResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadCancelResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadCancelResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadCancelResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadCancelResult& from) { DownloadCancelResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadCancelResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadCancelResult"; }
+
+  explicit DownloadCancelResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadCancelResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadCancelResult& from);
+  DownloadCancelResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadCancelResult&& from) noexcept
+      : DownloadCancelResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTaskIdFieldNumber = 2,
+    kModelIdFieldNumber = 3,
+    kErrorMessageFieldNumber = 5,
+    kPartialBytesDeletedFieldNumber = 4,
+    kSuccessFieldNumber = 1,
+  };
+  // string task_id = 2;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
+  // string model_id = 3;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // string error_message = 5;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // int64 partial_bytes_deleted = 4;
+  void clear_partial_bytes_deleted() ;
+  [[nodiscard]] ::int64_t partial_bytes_deleted() const;
+  void set_partial_bytes_deleted(::int64_t value);
+
+  private:
+  ::int64_t _internal_partial_bytes_deleted() const;
+  void _internal_set_partial_bytes_deleted(::int64_t value);
+
+  public:
+  // bool success = 1;
+  void clear_success() ;
+  [[nodiscard]] bool success() const;
+  void set_success(bool value);
+
+  private:
+  bool _internal_success() const;
+  void _internal_set_success(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadCancelResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   0, 72,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadCancelResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::int64_t partial_bytes_deleted_;
+    bool success_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadCancelResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadCancelRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadCancelRequest) */ {
+ public:
+  inline DownloadCancelRequest() : DownloadCancelRequest(nullptr) {}
+  ~DownloadCancelRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadCancelRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadCancelRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadCancelRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadCancelRequest(const DownloadCancelRequest& from) : DownloadCancelRequest(nullptr, from) {}
+  inline DownloadCancelRequest(DownloadCancelRequest&& from) noexcept
+      : DownloadCancelRequest(nullptr, ::std::move(from)) {}
+  inline DownloadCancelRequest& operator=(const DownloadCancelRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadCancelRequest& operator=(DownloadCancelRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadCancelRequest& default_instance() {
+    return *reinterpret_cast<const DownloadCancelRequest*>(
+        &_DownloadCancelRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 7;
+  friend void swap(DownloadCancelRequest& a, DownloadCancelRequest& b) { a.Swap(&b); }
+  inline void Swap(DownloadCancelRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadCancelRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadCancelRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadCancelRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadCancelRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadCancelRequest& from) { DownloadCancelRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadCancelRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadCancelRequest"; }
+
+  explicit DownloadCancelRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadCancelRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadCancelRequest& from);
+  DownloadCancelRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadCancelRequest&& from) noexcept
+      : DownloadCancelRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTaskIdFieldNumber = 1,
+    kModelIdFieldNumber = 2,
+    kDeletePartialBytesFieldNumber = 3,
+  };
+  // string task_id = 1;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
+  // string model_id = 2;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // bool delete_partial_bytes = 3;
+  void clear_delete_partial_bytes() ;
+  [[nodiscard]] bool delete_partial_bytes() const;
+  void set_delete_partial_bytes(bool value);
+
+  private:
+  bool _internal_delete_partial_bytes() const;
+  void _internal_set_delete_partial_bytes(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadCancelRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 3,
+                                   0, 60,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadCancelRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    bool delete_partial_bytes_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadCancelRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadStartResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadStartResult) */ {
+ public:
+  inline DownloadStartResult() : DownloadStartResult(nullptr) {}
+  ~DownloadStartResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadStartResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadStartResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadStartResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadStartResult(const DownloadStartResult& from) : DownloadStartResult(nullptr, from) {}
+  inline DownloadStartResult(DownloadStartResult&& from) noexcept
+      : DownloadStartResult(nullptr, ::std::move(from)) {}
+  inline DownloadStartResult& operator=(const DownloadStartResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadStartResult& operator=(DownloadStartResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadStartResult& default_instance() {
+    return *reinterpret_cast<const DownloadStartResult*>(
+        &_DownloadStartResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 6;
+  friend void swap(DownloadStartResult& a, DownloadStartResult& b) { a.Swap(&b); }
+  inline void Swap(DownloadStartResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadStartResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadStartResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadStartResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadStartResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadStartResult& from) { DownloadStartResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadStartResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadStartResult"; }
+
+  explicit DownloadStartResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadStartResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadStartResult& from);
+  DownloadStartResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadStartResult&& from) noexcept
+      : DownloadStartResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTaskIdFieldNumber = 2,
+    kModelIdFieldNumber = 3,
+    kErrorMessageFieldNumber = 5,
+    kInitialProgressFieldNumber = 4,
+    kAcceptedFieldNumber = 1,
+  };
+  // string task_id = 2;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
+  // string model_id = 3;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // string error_message = 5;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // .runanywhere.v1.DownloadProgress initial_progress = 4;
+  [[nodiscard]] bool has_initial_progress()
+      const;
+  void clear_initial_progress() ;
+  [[nodiscard]] const ::runanywhere::v1::DownloadProgress& initial_progress() const;
+  [[nodiscard]] ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE release_initial_progress();
+  ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL mutable_initial_progress();
+  void set_allocated_initial_progress(::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_initial_progress(::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE unsafe_arena_release_initial_progress();
+
+  private:
+  const ::runanywhere::v1::DownloadProgress& _internal_initial_progress() const;
+  ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL _internal_mutable_initial_progress();
+
+  public:
+  // bool accepted = 1;
+  void clear_accepted() ;
+  [[nodiscard]] bool accepted() const;
+  void set_accepted(bool value);
+
+  private:
+  bool _internal_accepted() const;
+  void _internal_set_accepted(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadStartResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   1, 71,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadStartResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE initial_progress_;
+    bool accepted_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadStartResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadResumeResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadResumeResult) */ {
+ public:
+  inline DownloadResumeResult() : DownloadResumeResult(nullptr) {}
+  ~DownloadResumeResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadResumeResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadResumeResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadResumeResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadResumeResult(const DownloadResumeResult& from) : DownloadResumeResult(nullptr, from) {}
+  inline DownloadResumeResult(DownloadResumeResult&& from) noexcept
+      : DownloadResumeResult(nullptr, ::std::move(from)) {}
+  inline DownloadResumeResult& operator=(const DownloadResumeResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadResumeResult& operator=(DownloadResumeResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadResumeResult& default_instance() {
+    return *reinterpret_cast<const DownloadResumeResult*>(
+        &_DownloadResumeResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 10;
+  friend void swap(DownloadResumeResult& a, DownloadResumeResult& b) { a.Swap(&b); }
+  inline void Swap(DownloadResumeResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadResumeResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadResumeResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadResumeResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadResumeResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadResumeResult& from) { DownloadResumeResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadResumeResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadResumeResult"; }
+
+  explicit DownloadResumeResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadResumeResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadResumeResult& from);
+  DownloadResumeResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadResumeResult&& from) noexcept
+      : DownloadResumeResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTaskIdFieldNumber = 2,
+    kModelIdFieldNumber = 3,
+    kErrorMessageFieldNumber = 5,
+    kInitialProgressFieldNumber = 4,
+    kAcceptedFieldNumber = 1,
+  };
+  // string task_id = 2;
+  void clear_task_id() ;
+  [[nodiscard]] const ::std::string& task_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_task_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_task_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_task_id();
+  void set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_task_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_task_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_task_id();
+
+  public:
+  // string model_id = 3;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // string error_message = 5;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // .runanywhere.v1.DownloadProgress initial_progress = 4;
+  [[nodiscard]] bool has_initial_progress()
+      const;
+  void clear_initial_progress() ;
+  [[nodiscard]] const ::runanywhere::v1::DownloadProgress& initial_progress() const;
+  [[nodiscard]] ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE release_initial_progress();
+  ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL mutable_initial_progress();
+  void set_allocated_initial_progress(::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_initial_progress(::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE unsafe_arena_release_initial_progress();
+
+  private:
+  const ::runanywhere::v1::DownloadProgress& _internal_initial_progress() const;
+  ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL _internal_mutable_initial_progress();
+
+  public:
+  // bool accepted = 1;
+  void clear_accepted() ;
+  [[nodiscard]] bool accepted() const;
+  void set_accepted(bool value);
+
+  private:
+  bool _internal_accepted() const;
+  void _internal_set_accepted(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadResumeResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   1, 72,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadResumeResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr task_id_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE initial_progress_;
+    bool accepted_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadResumeResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadFilePlan final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadFilePlan) */ {
+ public:
+  inline DownloadFilePlan() : DownloadFilePlan(nullptr) {}
+  ~DownloadFilePlan() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadFilePlan* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadFilePlan));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadFilePlan(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadFilePlan(const DownloadFilePlan& from) : DownloadFilePlan(nullptr, from) {}
+  inline DownloadFilePlan(DownloadFilePlan&& from) noexcept
+      : DownloadFilePlan(nullptr, ::std::move(from)) {}
+  inline DownloadFilePlan& operator=(const DownloadFilePlan& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadFilePlan& operator=(DownloadFilePlan&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadFilePlan& default_instance() {
+    return *reinterpret_cast<const DownloadFilePlan*>(
+        &_DownloadFilePlan_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 3;
+  friend void swap(DownloadFilePlan& a, DownloadFilePlan& b) { a.Swap(&b); }
+  inline void Swap(DownloadFilePlan* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadFilePlan* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadFilePlan* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadFilePlan>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadFilePlan& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadFilePlan& from) { DownloadFilePlan::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadFilePlan* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadFilePlan"; }
+
+  explicit DownloadFilePlan(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadFilePlan(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadFilePlan& from);
+  DownloadFilePlan(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadFilePlan&& from) noexcept
+      : DownloadFilePlan(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kStorageKeyFieldNumber = 2,
+    kDestinationPathFieldNumber = 3,
+    kChecksumSha256FieldNumber = 6,
+    kFileFieldNumber = 1,
+    kExpectedBytesFieldNumber = 4,
+    kRequiresExtractionFieldNumber = 5,
+  };
+  // string storage_key = 2;
+  void clear_storage_key() ;
+  [[nodiscard]] const ::std::string& storage_key() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_storage_key(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_storage_key();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_storage_key();
+  void set_allocated_storage_key(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_storage_key() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_storage_key(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_storage_key();
+
+  public:
+  // string destination_path = 3;
+  void clear_destination_path() ;
+  [[nodiscard]] const ::std::string& destination_path() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_destination_path(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_destination_path();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_destination_path();
+  void set_allocated_destination_path(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_destination_path() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_destination_path(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_destination_path();
+
+  public:
+  // string checksum_sha256 = 6;
+  void clear_checksum_sha256() ;
+  [[nodiscard]] const ::std::string& checksum_sha256() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_checksum_sha256(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_checksum_sha256();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_checksum_sha256();
+  void set_allocated_checksum_sha256(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_checksum_sha256() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_checksum_sha256(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_checksum_sha256();
+
+  public:
+  // .runanywhere.v1.ModelFileDescriptor file = 1;
+  [[nodiscard]] bool has_file()
+      const;
+  void clear_file() ;
+  [[nodiscard]] const ::runanywhere::v1::ModelFileDescriptor& file() const;
+  [[nodiscard]] ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE release_file();
+  ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NONNULL mutable_file();
+  void set_allocated_file(::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_file(::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE unsafe_arena_release_file();
+
+  private:
+  const ::runanywhere::v1::ModelFileDescriptor& _internal_file() const;
+  ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NONNULL _internal_mutable_file();
+
+  public:
+  // int64 expected_bytes = 4;
+  void clear_expected_bytes() ;
+  [[nodiscard]] ::int64_t expected_bytes() const;
+  void set_expected_bytes(::int64_t value);
+
+  private:
+  ::int64_t _internal_expected_bytes() const;
+  void _internal_set_expected_bytes(::int64_t value);
+
+  public:
+  // bool requires_extraction = 5;
+  void clear_requires_extraction() ;
+  [[nodiscard]] bool requires_extraction() const;
+  void set_requires_extraction(bool value);
+
+  private:
+  bool _internal_requires_extraction() const;
+  void _internal_set_requires_extraction(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadFilePlan)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
+                                   1, 82,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadFilePlan& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr storage_key_;
+    ::google::protobuf::internal::ArenaStringPtr destination_path_;
+    ::google::protobuf::internal::ArenaStringPtr checksum_sha256_;
+    ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE file_;
+    ::int64_t expected_bytes_;
+    bool requires_extraction_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadFilePlan_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadPlanResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadPlanResult) */ {
+ public:
+  inline DownloadPlanResult() : DownloadPlanResult(nullptr) {}
+  ~DownloadPlanResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadPlanResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadPlanResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadPlanResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadPlanResult(const DownloadPlanResult& from) : DownloadPlanResult(nullptr, from) {}
+  inline DownloadPlanResult(DownloadPlanResult&& from) noexcept
+      : DownloadPlanResult(nullptr, ::std::move(from)) {}
+  inline DownloadPlanResult& operator=(const DownloadPlanResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadPlanResult& operator=(DownloadPlanResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadPlanResult& default_instance() {
+    return *reinterpret_cast<const DownloadPlanResult*>(
+        &_DownloadPlanResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 4;
+  friend void swap(DownloadPlanResult& a, DownloadPlanResult& b) { a.Swap(&b); }
+  inline void Swap(DownloadPlanResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadPlanResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadPlanResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadPlanResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadPlanResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadPlanResult& from) { DownloadPlanResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadPlanResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadPlanResult"; }
+
+  explicit DownloadPlanResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadPlanResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadPlanResult& from);
+  DownloadPlanResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadPlanResult&& from) noexcept
+      : DownloadPlanResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kFilesFieldNumber = 3,
+    kWarningsFieldNumber = 8,
+    kModelIdFieldNumber = 2,
+    kErrorMessageFieldNumber = 9,
+    kTotalBytesFieldNumber = 4,
+    kResumeFromBytesFieldNumber = 7,
+    kCanStartFieldNumber = 1,
+    kRequiresExtractionFieldNumber = 5,
+    kCanResumeFieldNumber = 6,
+  };
+  // repeated .runanywhere.v1.DownloadFilePlan files = 3;
+  [[nodiscard]] int files_size()
+      const;
+  private:
+  int _internal_files_size() const;
+
+  public:
+  void clear_files() ;
+  [[nodiscard]] ::runanywhere::v1::DownloadFilePlan* PROTOBUF_NONNULL mutable_files(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>* PROTOBUF_NONNULL
+  mutable_files();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>& _internal_files() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>* PROTOBUF_NONNULL _internal_mutable_files();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::DownloadFilePlan& files(int index) const;
+  ::runanywhere::v1::DownloadFilePlan* PROTOBUF_NONNULL add_files();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>& files()
+      const;
+  // repeated string warnings = 8;
+  [[nodiscard]] int warnings_size()
+      const;
+  private:
+  int _internal_warnings_size() const;
+
+  public:
+  void clear_warnings() ;
+  [[nodiscard]] const ::std::string& warnings(int index) const;
+  ::std::string* PROTOBUF_NONNULL mutable_warnings(int index);
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_warnings(int index, Arg_&& value, Args_... args);
+  ::std::string* PROTOBUF_NONNULL add_warnings();
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void add_warnings(Arg_&& value, Args_... args);
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::std::string>&
+  warnings() const;
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
+  mutable_warnings();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_warnings() const;
+  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_warnings();
+
+  public:
+  // string model_id = 2;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // string error_message = 9;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // int64 total_bytes = 4;
+  void clear_total_bytes() ;
+  [[nodiscard]] ::int64_t total_bytes() const;
+  void set_total_bytes(::int64_t value);
+
+  private:
+  ::int64_t _internal_total_bytes() const;
+  void _internal_set_total_bytes(::int64_t value);
+
+  public:
+  // int64 resume_from_bytes = 7;
+  void clear_resume_from_bytes() ;
+  [[nodiscard]] ::int64_t resume_from_bytes() const;
+  void set_resume_from_bytes(::int64_t value);
+
+  private:
+  ::int64_t _internal_resume_from_bytes() const;
+  void _internal_set_resume_from_bytes(::int64_t value);
+
+  public:
+  // bool can_start = 1;
+  void clear_can_start() ;
+  [[nodiscard]] bool can_start() const;
+  void set_can_start(bool value);
+
+  private:
+  bool _internal_can_start() const;
+  void _internal_set_can_start(bool value);
+
+  public:
+  // bool requires_extraction = 5;
+  void clear_requires_extraction() ;
+  [[nodiscard]] bool requires_extraction() const;
+  void set_requires_extraction(bool value);
+
+  private:
+  bool _internal_requires_extraction() const;
+  void _internal_set_requires_extraction(bool value);
+
+  public:
+  // bool can_resume = 6;
+  void clear_can_resume() ;
+  [[nodiscard]] bool can_resume() const;
+  void set_can_resume(bool value);
+
+  private:
+  bool _internal_can_resume() const;
+  void _internal_set_can_resume(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadPlanResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<4, 9,
+                                   1, 79,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadPlanResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::DownloadFilePlan > files_;
+    ::google::protobuf::RepeatedPtrField<::std::string> warnings_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::int64_t total_bytes_;
+    ::int64_t resume_from_bytes_;
+    bool can_start_;
+    bool requires_extraction_;
+    bool can_resume_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadPlanResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadStartRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadStartRequest) */ {
+ public:
+  inline DownloadStartRequest() : DownloadStartRequest(nullptr) {}
+  ~DownloadStartRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadStartRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadStartRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadStartRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadStartRequest(const DownloadStartRequest& from) : DownloadStartRequest(nullptr, from) {}
+  inline DownloadStartRequest(DownloadStartRequest&& from) noexcept
+      : DownloadStartRequest(nullptr, ::std::move(from)) {}
+  inline DownloadStartRequest& operator=(const DownloadStartRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadStartRequest& operator=(DownloadStartRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadStartRequest& default_instance() {
+    return *reinterpret_cast<const DownloadStartRequest*>(
+        &_DownloadStartRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 5;
+  friend void swap(DownloadStartRequest& a, DownloadStartRequest& b) { a.Swap(&b); }
+  inline void Swap(DownloadStartRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadStartRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadStartRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadStartRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadStartRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadStartRequest& from) { DownloadStartRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadStartRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadStartRequest"; }
+
+  explicit DownloadStartRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadStartRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadStartRequest& from);
+  DownloadStartRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadStartRequest&& from) noexcept
+      : DownloadStartRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kModelIdFieldNumber = 1,
+    kPlanFieldNumber = 2,
+    kResumeFieldNumber = 3,
+  };
+  // string model_id = 1;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // .runanywhere.v1.DownloadPlanResult plan = 2;
+  [[nodiscard]] bool has_plan()
+      const;
+  void clear_plan() ;
+  [[nodiscard]] const ::runanywhere::v1::DownloadPlanResult& plan() const;
+  [[nodiscard]] ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE release_plan();
+  ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NONNULL mutable_plan();
+  void set_allocated_plan(::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_plan(::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE unsafe_arena_release_plan();
+
+  private:
+  const ::runanywhere::v1::DownloadPlanResult& _internal_plan() const;
+  ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NONNULL _internal_mutable_plan();
+
+  public:
+  // bool resume = 3;
+  void clear_resume() ;
+  [[nodiscard]] bool resume() const;
+  void set_resume(bool value);
+
+  private:
+  bool _internal_resume() const;
+  void _internal_set_resume(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadStartRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 3,
+                                   1, 52,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadStartRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE plan_;
+    bool resume_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadStartRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadPlanRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DownloadPlanRequest) */ {
+ public:
+  inline DownloadPlanRequest() : DownloadPlanRequest(nullptr) {}
+  ~DownloadPlanRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DownloadPlanRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DownloadPlanRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DownloadPlanRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline DownloadPlanRequest(const DownloadPlanRequest& from) : DownloadPlanRequest(nullptr, from) {}
+  inline DownloadPlanRequest(DownloadPlanRequest&& from) noexcept
+      : DownloadPlanRequest(nullptr, ::std::move(from)) {}
+  inline DownloadPlanRequest& operator=(const DownloadPlanRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DownloadPlanRequest& operator=(DownloadPlanRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DownloadPlanRequest& default_instance() {
+    return *reinterpret_cast<const DownloadPlanRequest*>(
+        &_DownloadPlanRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 2;
+  friend void swap(DownloadPlanRequest& a, DownloadPlanRequest& b) { a.Swap(&b); }
+  inline void Swap(DownloadPlanRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DownloadPlanRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DownloadPlanRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DownloadPlanRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DownloadPlanRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DownloadPlanRequest& from) { DownloadPlanRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DownloadPlanRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DownloadPlanRequest"; }
+
+  explicit DownloadPlanRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DownloadPlanRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DownloadPlanRequest& from);
+  DownloadPlanRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DownloadPlanRequest&& from) noexcept
+      : DownloadPlanRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kModelIdFieldNumber = 1,
+    kModelFieldNumber = 2,
+    kAvailableStorageBytesFieldNumber = 4,
+    kResumeExistingFieldNumber = 3,
+    kAllowMeteredNetworkFieldNumber = 5,
+  };
+  // string model_id = 1;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // optional .runanywhere.v1.ModelInfo model = 2;
+  [[nodiscard]] bool has_model()
+      const;
+  void clear_model() ;
+  [[nodiscard]] const ::runanywhere::v1::ModelInfo& model() const;
+  [[nodiscard]] ::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE release_model();
+  ::runanywhere::v1::ModelInfo* PROTOBUF_NONNULL mutable_model();
+  void set_allocated_model(::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_model(::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE unsafe_arena_release_model();
+
+  private:
+  const ::runanywhere::v1::ModelInfo& _internal_model() const;
+  ::runanywhere::v1::ModelInfo* PROTOBUF_NONNULL _internal_mutable_model();
+
+  public:
+  // int64 available_storage_bytes = 4;
+  void clear_available_storage_bytes() ;
+  [[nodiscard]] ::int64_t available_storage_bytes() const;
+  void set_available_storage_bytes(::int64_t value);
+
+  private:
+  ::int64_t _internal_available_storage_bytes() const;
+  void _internal_set_available_storage_bytes(::int64_t value);
+
+  public:
+  // bool resume_existing = 3;
+  void clear_resume_existing() ;
+  [[nodiscard]] bool resume_existing() const;
+  void set_resume_existing(bool value);
+
+  private:
+  bool _internal_resume_existing() const;
+  void _internal_set_resume_existing(bool value);
+
+  public:
+  // bool allow_metered_network = 5;
+  void clear_allow_metered_network() ;
+  [[nodiscard]] bool allow_metered_network() const;
+  void set_allow_metered_network(bool value);
+
+  private:
+  bool _internal_allow_metered_network() const;
+  void _internal_set_allow_metered_network(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadPlanRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   1, 51,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DownloadPlanRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE model_;
+    ::int64_t available_storage_bytes_;
+    bool resume_existing_;
+    bool allow_metered_network_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_download_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull DownloadPlanRequest_class_data_;
 
 // ===================================================================
 
@@ -773,6 +3243,71 @@ inline void DownloadSubscribeRequest::set_allocated_model_id(::std::string* PROT
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadSubscribeRequest.model_id)
 }
 
+// string task_id = 2;
+inline void DownloadSubscribeRequest::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadSubscribeRequest::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadSubscribeRequest.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadSubscribeRequest::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadSubscribeRequest.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadSubscribeRequest::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadSubscribeRequest.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadSubscribeRequest::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadSubscribeRequest::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadSubscribeRequest::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadSubscribeRequest::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadSubscribeRequest.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadSubscribeRequest::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadSubscribeRequest.task_id)
+}
+
 // -------------------------------------------------------------------
 
 // DownloadProgress
@@ -847,7 +3382,7 @@ inline void DownloadProgress::clear_stage() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stage_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000040U);
 }
 inline ::runanywhere::v1::DownloadStage DownloadProgress::stage() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.stage)
@@ -855,7 +3390,7 @@ inline ::runanywhere::v1::DownloadStage DownloadProgress::stage() const {
 }
 inline void DownloadProgress::set_stage(::runanywhere::v1::DownloadStage value) {
   _internal_set_stage(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.stage)
 }
 inline ::runanywhere::v1::DownloadStage DownloadProgress::_internal_stage() const {
@@ -872,7 +3407,7 @@ inline void DownloadProgress::clear_bytes_downloaded() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.bytes_downloaded_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000020U);
 }
 inline ::int64_t DownloadProgress::bytes_downloaded() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.bytes_downloaded)
@@ -880,7 +3415,7 @@ inline ::int64_t DownloadProgress::bytes_downloaded() const {
 }
 inline void DownloadProgress::set_bytes_downloaded(::int64_t value) {
   _internal_set_bytes_downloaded(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.bytes_downloaded)
 }
 inline ::int64_t DownloadProgress::_internal_bytes_downloaded() const {
@@ -897,7 +3432,7 @@ inline void DownloadProgress::clear_total_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_bytes_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000100U);
 }
 inline ::int64_t DownloadProgress::total_bytes() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.total_bytes)
@@ -905,7 +3440,7 @@ inline ::int64_t DownloadProgress::total_bytes() const {
 }
 inline void DownloadProgress::set_total_bytes(::int64_t value) {
   _internal_set_total_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.total_bytes)
 }
 inline ::int64_t DownloadProgress::_internal_total_bytes() const {
@@ -922,7 +3457,7 @@ inline void DownloadProgress::clear_stage_progress() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stage_progress_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000080U);
 }
 inline float DownloadProgress::stage_progress() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.stage_progress)
@@ -930,7 +3465,7 @@ inline float DownloadProgress::stage_progress() const {
 }
 inline void DownloadProgress::set_stage_progress(float value) {
   _internal_set_stage_progress(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.stage_progress)
 }
 inline float DownloadProgress::_internal_stage_progress() const {
@@ -947,7 +3482,7 @@ inline void DownloadProgress::clear_overall_speed_bps() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.overall_speed_bps_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000400U);
 }
 inline float DownloadProgress::overall_speed_bps() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.overall_speed_bps)
@@ -955,7 +3490,7 @@ inline float DownloadProgress::overall_speed_bps() const {
 }
 inline void DownloadProgress::set_overall_speed_bps(float value) {
   _internal_set_overall_speed_bps(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.overall_speed_bps)
 }
 inline float DownloadProgress::_internal_overall_speed_bps() const {
@@ -972,7 +3507,7 @@ inline void DownloadProgress::clear_eta_seconds() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.eta_seconds_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000200U);
 }
 inline ::int64_t DownloadProgress::eta_seconds() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.eta_seconds)
@@ -980,7 +3515,7 @@ inline ::int64_t DownloadProgress::eta_seconds() const {
 }
 inline void DownloadProgress::set_eta_seconds(::int64_t value) {
   _internal_set_eta_seconds(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.eta_seconds)
 }
 inline ::int64_t DownloadProgress::_internal_eta_seconds() const {
@@ -997,7 +3532,7 @@ inline void DownloadProgress::clear_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.state_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000800U);
 }
 inline ::runanywhere::v1::DownloadState DownloadProgress::state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.state)
@@ -1005,7 +3540,7 @@ inline ::runanywhere::v1::DownloadState DownloadProgress::state() const {
 }
 inline void DownloadProgress::set_state(::runanywhere::v1::DownloadState value) {
   _internal_set_state(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.state)
 }
 inline ::runanywhere::v1::DownloadState DownloadProgress::_internal_state() const {
@@ -1022,7 +3557,7 @@ inline void DownloadProgress::clear_retry_attempt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.retry_attempt_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000200U);
+                  0x00001000U);
 }
 inline ::int32_t DownloadProgress::retry_attempt() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.retry_attempt)
@@ -1030,7 +3565,7 @@ inline ::int32_t DownloadProgress::retry_attempt() const {
 }
 inline void DownloadProgress::set_retry_attempt(::int32_t value) {
   _internal_set_retry_attempt(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.retry_attempt)
 }
 inline ::int32_t DownloadProgress::_internal_retry_attempt() const {
@@ -1105,6 +3640,2623 @@ inline void DownloadProgress::set_allocated_error_message(::std::string* PROTOBU
     _impl_.error_message_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadProgress.error_message)
+}
+
+// string task_id = 11;
+inline void DownloadProgress::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& DownloadProgress::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadProgress::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadProgress::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadProgress.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadProgress::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadProgress::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadProgress::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadProgress::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadProgress.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadProgress::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadProgress.task_id)
+}
+
+// int32 current_file_index = 12;
+inline void DownloadProgress::clear_current_file_index() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.current_file_index_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00002000U);
+}
+inline ::int32_t DownloadProgress::current_file_index() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.current_file_index)
+  return _internal_current_file_index();
+}
+inline void DownloadProgress::set_current_file_index(::int32_t value) {
+  _internal_set_current_file_index(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.current_file_index)
+}
+inline ::int32_t DownloadProgress::_internal_current_file_index() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.current_file_index_;
+}
+inline void DownloadProgress::_internal_set_current_file_index(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.current_file_index_ = value;
+}
+
+// int32 total_files = 13;
+inline void DownloadProgress::clear_total_files() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_files_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00004000U);
+}
+inline ::int32_t DownloadProgress::total_files() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.total_files)
+  return _internal_total_files();
+}
+inline void DownloadProgress::set_total_files(::int32_t value) {
+  _internal_set_total_files(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.total_files)
+}
+inline ::int32_t DownloadProgress::_internal_total_files() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.total_files_;
+}
+inline void DownloadProgress::_internal_set_total_files(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_files_ = value;
+}
+
+// string storage_key = 14;
+inline void DownloadProgress::clear_storage_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.storage_key_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::std::string& DownloadProgress::storage_key() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.storage_key)
+  return _internal_storage_key();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadProgress::set_storage_key(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.storage_key_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.storage_key)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadProgress::mutable_storage_key()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_storage_key();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadProgress.storage_key)
+  return _s;
+}
+inline const ::std::string& DownloadProgress::_internal_storage_key() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.storage_key_.Get();
+}
+inline void DownloadProgress::_internal_set_storage_key(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.storage_key_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadProgress::_internal_mutable_storage_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.storage_key_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadProgress::release_storage_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadProgress.storage_key)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.storage_key_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.storage_key_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadProgress::set_allocated_storage_key(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.storage_key_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.storage_key_.IsDefault()) {
+    _impl_.storage_key_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadProgress.storage_key)
+}
+
+// string local_path = 15;
+inline void DownloadProgress::clear_local_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.local_path_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline const ::std::string& DownloadProgress::local_path() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadProgress.local_path)
+  return _internal_local_path();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadProgress::set_local_path(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.local_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadProgress.local_path)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadProgress::mutable_local_path()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_local_path();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadProgress.local_path)
+  return _s;
+}
+inline const ::std::string& DownloadProgress::_internal_local_path() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.local_path_.Get();
+}
+inline void DownloadProgress::_internal_set_local_path(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.local_path_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadProgress::_internal_mutable_local_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.local_path_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadProgress::release_local_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadProgress.local_path)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.local_path_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.local_path_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadProgress::set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.local_path_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.local_path_.IsDefault()) {
+    _impl_.local_path_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadProgress.local_path)
+}
+
+// -------------------------------------------------------------------
+
+// DownloadPlanRequest
+
+// string model_id = 1;
+inline void DownloadPlanRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadPlanRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadPlanRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadPlanRequest.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadPlanRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadPlanRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadPlanRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadPlanRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadPlanRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadPlanRequest.model_id)
+}
+
+// optional .runanywhere.v1.ModelInfo model = 2;
+inline bool DownloadPlanRequest::has_model() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  PROTOBUF_ASSUME(!value || _impl_.model_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::ModelInfo& DownloadPlanRequest::_internal_model() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::ModelInfo* p = _impl_.model_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::ModelInfo&>(::runanywhere::v1::_ModelInfo_default_instance_);
+}
+inline const ::runanywhere::v1::ModelInfo& DownloadPlanRequest::model() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanRequest.model)
+  return _internal_model();
+}
+inline void DownloadPlanRequest::unsafe_arena_set_allocated_model(
+    ::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.model_);
+  }
+  _impl_.model_ = reinterpret_cast<::runanywhere::v1::ModelInfo*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DownloadPlanRequest.model)
+}
+inline ::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE DownloadPlanRequest::release_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::ModelInfo* released = _impl_.model_;
+  _impl_.model_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE DownloadPlanRequest::unsafe_arena_release_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadPlanRequest.model)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::ModelInfo* temp = _impl_.model_;
+  _impl_.model_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::ModelInfo* PROTOBUF_NONNULL DownloadPlanRequest::_internal_mutable_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.model_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ModelInfo>(GetArena());
+    _impl_.model_ = reinterpret_cast<::runanywhere::v1::ModelInfo*>(p);
+  }
+  return _impl_.model_;
+}
+inline ::runanywhere::v1::ModelInfo* PROTOBUF_NONNULL DownloadPlanRequest::mutable_model()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::ModelInfo* _msg = _internal_mutable_model();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadPlanRequest.model)
+  return _msg;
+}
+inline void DownloadPlanRequest::set_allocated_model(::runanywhere::v1::ModelInfo* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.model_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+
+  _impl_.model_ = reinterpret_cast<::runanywhere::v1::ModelInfo*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadPlanRequest.model)
+}
+
+// bool resume_existing = 3;
+inline void DownloadPlanRequest::clear_resume_existing() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_existing_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline bool DownloadPlanRequest::resume_existing() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanRequest.resume_existing)
+  return _internal_resume_existing();
+}
+inline void DownloadPlanRequest::set_resume_existing(bool value) {
+  _internal_set_resume_existing(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanRequest.resume_existing)
+}
+inline bool DownloadPlanRequest::_internal_resume_existing() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.resume_existing_;
+}
+inline void DownloadPlanRequest::_internal_set_resume_existing(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_existing_ = value;
+}
+
+// int64 available_storage_bytes = 4;
+inline void DownloadPlanRequest::clear_available_storage_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.available_storage_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::int64_t DownloadPlanRequest::available_storage_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanRequest.available_storage_bytes)
+  return _internal_available_storage_bytes();
+}
+inline void DownloadPlanRequest::set_available_storage_bytes(::int64_t value) {
+  _internal_set_available_storage_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanRequest.available_storage_bytes)
+}
+inline ::int64_t DownloadPlanRequest::_internal_available_storage_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.available_storage_bytes_;
+}
+inline void DownloadPlanRequest::_internal_set_available_storage_bytes(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.available_storage_bytes_ = value;
+}
+
+// bool allow_metered_network = 5;
+inline void DownloadPlanRequest::clear_allow_metered_network() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.allow_metered_network_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline bool DownloadPlanRequest::allow_metered_network() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanRequest.allow_metered_network)
+  return _internal_allow_metered_network();
+}
+inline void DownloadPlanRequest::set_allow_metered_network(bool value) {
+  _internal_set_allow_metered_network(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanRequest.allow_metered_network)
+}
+inline bool DownloadPlanRequest::_internal_allow_metered_network() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.allow_metered_network_;
+}
+inline void DownloadPlanRequest::_internal_set_allow_metered_network(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.allow_metered_network_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// DownloadFilePlan
+
+// .runanywhere.v1.ModelFileDescriptor file = 1;
+inline bool DownloadFilePlan::has_file() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.file_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::ModelFileDescriptor& DownloadFilePlan::_internal_file() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::ModelFileDescriptor* p = _impl_.file_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::ModelFileDescriptor&>(::runanywhere::v1::_ModelFileDescriptor_default_instance_);
+}
+inline const ::runanywhere::v1::ModelFileDescriptor& DownloadFilePlan::file() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadFilePlan.file)
+  return _internal_file();
+}
+inline void DownloadFilePlan::unsafe_arena_set_allocated_file(
+    ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.file_);
+  }
+  _impl_.file_ = reinterpret_cast<::runanywhere::v1::ModelFileDescriptor*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DownloadFilePlan.file)
+}
+inline ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE DownloadFilePlan::release_file() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::ModelFileDescriptor* released = _impl_.file_;
+  _impl_.file_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE DownloadFilePlan::unsafe_arena_release_file() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadFilePlan.file)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::ModelFileDescriptor* temp = _impl_.file_;
+  _impl_.file_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NONNULL DownloadFilePlan::_internal_mutable_file() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.file_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ModelFileDescriptor>(GetArena());
+    _impl_.file_ = reinterpret_cast<::runanywhere::v1::ModelFileDescriptor*>(p);
+  }
+  return _impl_.file_;
+}
+inline ::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NONNULL DownloadFilePlan::mutable_file()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::ModelFileDescriptor* _msg = _internal_mutable_file();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadFilePlan.file)
+  return _msg;
+}
+inline void DownloadFilePlan::set_allocated_file(::runanywhere::v1::ModelFileDescriptor* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.file_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.file_ = reinterpret_cast<::runanywhere::v1::ModelFileDescriptor*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadFilePlan.file)
+}
+
+// string storage_key = 2;
+inline void DownloadFilePlan::clear_storage_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.storage_key_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadFilePlan::storage_key() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadFilePlan.storage_key)
+  return _internal_storage_key();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadFilePlan::set_storage_key(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.storage_key_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadFilePlan.storage_key)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadFilePlan::mutable_storage_key()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_storage_key();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadFilePlan.storage_key)
+  return _s;
+}
+inline const ::std::string& DownloadFilePlan::_internal_storage_key() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.storage_key_.Get();
+}
+inline void DownloadFilePlan::_internal_set_storage_key(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.storage_key_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadFilePlan::_internal_mutable_storage_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.storage_key_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadFilePlan::release_storage_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadFilePlan.storage_key)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.storage_key_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.storage_key_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadFilePlan::set_allocated_storage_key(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.storage_key_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.storage_key_.IsDefault()) {
+    _impl_.storage_key_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadFilePlan.storage_key)
+}
+
+// string destination_path = 3;
+inline void DownloadFilePlan::clear_destination_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.destination_path_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadFilePlan::destination_path() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadFilePlan.destination_path)
+  return _internal_destination_path();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadFilePlan::set_destination_path(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.destination_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadFilePlan.destination_path)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadFilePlan::mutable_destination_path()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_destination_path();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadFilePlan.destination_path)
+  return _s;
+}
+inline const ::std::string& DownloadFilePlan::_internal_destination_path() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.destination_path_.Get();
+}
+inline void DownloadFilePlan::_internal_set_destination_path(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.destination_path_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadFilePlan::_internal_mutable_destination_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.destination_path_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadFilePlan::release_destination_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadFilePlan.destination_path)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.destination_path_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.destination_path_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadFilePlan::set_allocated_destination_path(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.destination_path_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.destination_path_.IsDefault()) {
+    _impl_.destination_path_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadFilePlan.destination_path)
+}
+
+// int64 expected_bytes = 4;
+inline void DownloadFilePlan::clear_expected_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.expected_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline ::int64_t DownloadFilePlan::expected_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadFilePlan.expected_bytes)
+  return _internal_expected_bytes();
+}
+inline void DownloadFilePlan::set_expected_bytes(::int64_t value) {
+  _internal_set_expected_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadFilePlan.expected_bytes)
+}
+inline ::int64_t DownloadFilePlan::_internal_expected_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.expected_bytes_;
+}
+inline void DownloadFilePlan::_internal_set_expected_bytes(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.expected_bytes_ = value;
+}
+
+// bool requires_extraction = 5;
+inline void DownloadFilePlan::clear_requires_extraction() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.requires_extraction_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline bool DownloadFilePlan::requires_extraction() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadFilePlan.requires_extraction)
+  return _internal_requires_extraction();
+}
+inline void DownloadFilePlan::set_requires_extraction(bool value) {
+  _internal_set_requires_extraction(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadFilePlan.requires_extraction)
+}
+inline bool DownloadFilePlan::_internal_requires_extraction() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.requires_extraction_;
+}
+inline void DownloadFilePlan::_internal_set_requires_extraction(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.requires_extraction_ = value;
+}
+
+// string checksum_sha256 = 6;
+inline void DownloadFilePlan::clear_checksum_sha256() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.checksum_sha256_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& DownloadFilePlan::checksum_sha256() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadFilePlan.checksum_sha256)
+  return _internal_checksum_sha256();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadFilePlan::set_checksum_sha256(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.checksum_sha256_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadFilePlan.checksum_sha256)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadFilePlan::mutable_checksum_sha256()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_checksum_sha256();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadFilePlan.checksum_sha256)
+  return _s;
+}
+inline const ::std::string& DownloadFilePlan::_internal_checksum_sha256() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.checksum_sha256_.Get();
+}
+inline void DownloadFilePlan::_internal_set_checksum_sha256(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.checksum_sha256_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadFilePlan::_internal_mutable_checksum_sha256() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.checksum_sha256_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadFilePlan::release_checksum_sha256() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadFilePlan.checksum_sha256)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.checksum_sha256_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.checksum_sha256_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadFilePlan::set_allocated_checksum_sha256(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.checksum_sha256_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.checksum_sha256_.IsDefault()) {
+    _impl_.checksum_sha256_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadFilePlan.checksum_sha256)
+}
+
+// -------------------------------------------------------------------
+
+// DownloadPlanResult
+
+// bool can_start = 1;
+inline void DownloadPlanResult::clear_can_start() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.can_start_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline bool DownloadPlanResult::can_start() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.can_start)
+  return _internal_can_start();
+}
+inline void DownloadPlanResult::set_can_start(bool value) {
+  _internal_set_can_start(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.can_start)
+}
+inline bool DownloadPlanResult::_internal_can_start() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.can_start_;
+}
+inline void DownloadPlanResult::_internal_set_can_start(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.can_start_ = value;
+}
+
+// string model_id = 2;
+inline void DownloadPlanResult::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& DownloadPlanResult::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadPlanResult::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanResult::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadPlanResult.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadPlanResult::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadPlanResult::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanResult::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadPlanResult::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadPlanResult.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadPlanResult::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadPlanResult.model_id)
+}
+
+// repeated .runanywhere.v1.DownloadFilePlan files = 3;
+inline int DownloadPlanResult::_internal_files_size() const {
+  return _internal_files().size();
+}
+inline int DownloadPlanResult::files_size() const {
+  return _internal_files_size();
+}
+inline void DownloadPlanResult::clear_files() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.files_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline ::runanywhere::v1::DownloadFilePlan* PROTOBUF_NONNULL DownloadPlanResult::mutable_files(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadPlanResult.files)
+  return _internal_mutable_files()->Mutable(index);
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>* PROTOBUF_NONNULL DownloadPlanResult::mutable_files()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.DownloadPlanResult.files)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_files();
+}
+inline const ::runanywhere::v1::DownloadFilePlan& DownloadPlanResult::files(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.files)
+  return _internal_files().Get(index);
+}
+inline ::runanywhere::v1::DownloadFilePlan* PROTOBUF_NONNULL DownloadPlanResult::add_files()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::DownloadFilePlan* _add =
+      _internal_mutable_files()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.DownloadPlanResult.files)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>& DownloadPlanResult::files() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.DownloadPlanResult.files)
+  return _internal_files();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>&
+DownloadPlanResult::_internal_files() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.files_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::DownloadFilePlan>* PROTOBUF_NONNULL
+DownloadPlanResult::_internal_mutable_files() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.files_;
+}
+
+// int64 total_bytes = 4;
+inline void DownloadPlanResult::clear_total_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline ::int64_t DownloadPlanResult::total_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.total_bytes)
+  return _internal_total_bytes();
+}
+inline void DownloadPlanResult::set_total_bytes(::int64_t value) {
+  _internal_set_total_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.total_bytes)
+}
+inline ::int64_t DownloadPlanResult::_internal_total_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.total_bytes_;
+}
+inline void DownloadPlanResult::_internal_set_total_bytes(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_bytes_ = value;
+}
+
+// bool requires_extraction = 5;
+inline void DownloadPlanResult::clear_requires_extraction() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.requires_extraction_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline bool DownloadPlanResult::requires_extraction() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.requires_extraction)
+  return _internal_requires_extraction();
+}
+inline void DownloadPlanResult::set_requires_extraction(bool value) {
+  _internal_set_requires_extraction(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.requires_extraction)
+}
+inline bool DownloadPlanResult::_internal_requires_extraction() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.requires_extraction_;
+}
+inline void DownloadPlanResult::_internal_set_requires_extraction(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.requires_extraction_ = value;
+}
+
+// bool can_resume = 6;
+inline void DownloadPlanResult::clear_can_resume() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.can_resume_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline bool DownloadPlanResult::can_resume() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.can_resume)
+  return _internal_can_resume();
+}
+inline void DownloadPlanResult::set_can_resume(bool value) {
+  _internal_set_can_resume(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.can_resume)
+}
+inline bool DownloadPlanResult::_internal_can_resume() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.can_resume_;
+}
+inline void DownloadPlanResult::_internal_set_can_resume(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.can_resume_ = value;
+}
+
+// int64 resume_from_bytes = 7;
+inline void DownloadPlanResult::clear_resume_from_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_from_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::int64_t DownloadPlanResult::resume_from_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.resume_from_bytes)
+  return _internal_resume_from_bytes();
+}
+inline void DownloadPlanResult::set_resume_from_bytes(::int64_t value) {
+  _internal_set_resume_from_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.resume_from_bytes)
+}
+inline ::int64_t DownloadPlanResult::_internal_resume_from_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.resume_from_bytes_;
+}
+inline void DownloadPlanResult::_internal_set_resume_from_bytes(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_from_bytes_ = value;
+}
+
+// repeated string warnings = 8;
+inline int DownloadPlanResult::_internal_warnings_size() const {
+  return _internal_warnings().size();
+}
+inline int DownloadPlanResult::warnings_size() const {
+  return _internal_warnings_size();
+}
+inline void DownloadPlanResult::clear_warnings() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.warnings_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanResult::add_warnings()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::std::string* _s =
+      _internal_mutable_warnings()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.DownloadPlanResult.warnings)
+  return _s;
+}
+inline const ::std::string& DownloadPlanResult::warnings(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.warnings)
+  return _internal_warnings().Get(index);
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanResult::mutable_warnings(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadPlanResult.warnings)
+  return _internal_mutable_warnings()->Mutable(index);
+}
+template <typename Arg_, typename... Args_>
+inline void DownloadPlanResult::set_warnings(int index, Arg_&& value, Args_... args) {
+  ::google::protobuf::internal::AssignToString(*_internal_mutable_warnings()->Mutable(index), ::std::forward<Arg_>(value),
+                        args... );
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.warnings)
+}
+template <typename Arg_, typename... Args_>
+inline void DownloadPlanResult::add_warnings(Arg_&& value, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::google::protobuf::internal::AddToRepeatedPtrField(
+      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
+      *_internal_mutable_warnings(), ::std::forward<Arg_>(value),
+      args... );
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.DownloadPlanResult.warnings)
+}
+inline const ::google::protobuf::RepeatedPtrField<::std::string>& DownloadPlanResult::warnings()
+    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.DownloadPlanResult.warnings)
+  return _internal_warnings();
+}
+inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
+DownloadPlanResult::mutable_warnings() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.DownloadPlanResult.warnings)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_warnings();
+}
+inline const ::google::protobuf::RepeatedPtrField<::std::string>&
+DownloadPlanResult::_internal_warnings() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.warnings_;
+}
+inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
+DownloadPlanResult::_internal_mutable_warnings() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.warnings_;
+}
+
+// string error_message = 9;
+inline void DownloadPlanResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::std::string& DownloadPlanResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadPlanResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadPlanResult.error_message)
+  return _s;
+}
+inline const ::std::string& DownloadPlanResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void DownloadPlanResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadPlanResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadPlanResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadPlanResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadPlanResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadPlanResult.error_message)
+}
+
+// -------------------------------------------------------------------
+
+// DownloadStartRequest
+
+// string model_id = 1;
+inline void DownloadStartRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadStartRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadStartRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadStartRequest.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadStartRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadStartRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadStartRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadStartRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadStartRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartRequest.model_id)
+}
+
+// .runanywhere.v1.DownloadPlanResult plan = 2;
+inline bool DownloadStartRequest::has_plan() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  PROTOBUF_ASSUME(!value || _impl_.plan_ != nullptr);
+  return value;
+}
+inline void DownloadStartRequest::clear_plan() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.plan_ != nullptr) _impl_.plan_->Clear();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::runanywhere::v1::DownloadPlanResult& DownloadStartRequest::_internal_plan() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::DownloadPlanResult* p = _impl_.plan_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::DownloadPlanResult&>(::runanywhere::v1::_DownloadPlanResult_default_instance_);
+}
+inline const ::runanywhere::v1::DownloadPlanResult& DownloadStartRequest::plan() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartRequest.plan)
+  return _internal_plan();
+}
+inline void DownloadStartRequest::unsafe_arena_set_allocated_plan(
+    ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.plan_);
+  }
+  _impl_.plan_ = reinterpret_cast<::runanywhere::v1::DownloadPlanResult*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DownloadStartRequest.plan)
+}
+inline ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE DownloadStartRequest::release_plan() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::DownloadPlanResult* released = _impl_.plan_;
+  _impl_.plan_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE DownloadStartRequest::unsafe_arena_release_plan() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadStartRequest.plan)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::DownloadPlanResult* temp = _impl_.plan_;
+  _impl_.plan_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NONNULL DownloadStartRequest::_internal_mutable_plan() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.plan_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::DownloadPlanResult>(GetArena());
+    _impl_.plan_ = reinterpret_cast<::runanywhere::v1::DownloadPlanResult*>(p);
+  }
+  return _impl_.plan_;
+}
+inline ::runanywhere::v1::DownloadPlanResult* PROTOBUF_NONNULL DownloadStartRequest::mutable_plan()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::DownloadPlanResult* _msg = _internal_mutable_plan();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadStartRequest.plan)
+  return _msg;
+}
+inline void DownloadStartRequest::set_allocated_plan(::runanywhere::v1::DownloadPlanResult* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.plan_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+
+  _impl_.plan_ = reinterpret_cast<::runanywhere::v1::DownloadPlanResult*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartRequest.plan)
+}
+
+// bool resume = 3;
+inline void DownloadStartRequest::clear_resume() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline bool DownloadStartRequest::resume() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartRequest.resume)
+  return _internal_resume();
+}
+inline void DownloadStartRequest::set_resume(bool value) {
+  _internal_set_resume(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartRequest.resume)
+}
+inline bool DownloadStartRequest::_internal_resume() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.resume_;
+}
+inline void DownloadStartRequest::_internal_set_resume(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// DownloadStartResult
+
+// bool accepted = 1;
+inline void DownloadStartResult::clear_accepted() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.accepted_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline bool DownloadStartResult::accepted() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartResult.accepted)
+  return _internal_accepted();
+}
+inline void DownloadStartResult::set_accepted(bool value) {
+  _internal_set_accepted(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartResult.accepted)
+}
+inline bool DownloadStartResult::_internal_accepted() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.accepted_;
+}
+inline void DownloadStartResult::_internal_set_accepted(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.accepted_ = value;
+}
+
+// string task_id = 2;
+inline void DownloadStartResult::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadStartResult::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartResult.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadStartResult::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartResult.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartResult::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadStartResult.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadStartResult::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadStartResult::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartResult::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadStartResult::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadStartResult.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadStartResult::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartResult.task_id)
+}
+
+// string model_id = 3;
+inline void DownloadStartResult::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadStartResult::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartResult.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadStartResult::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartResult.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartResult::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadStartResult.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadStartResult::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadStartResult::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartResult::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadStartResult::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadStartResult.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadStartResult::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartResult.model_id)
+}
+
+// .runanywhere.v1.DownloadProgress initial_progress = 4;
+inline bool DownloadStartResult::has_initial_progress() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.initial_progress_ != nullptr);
+  return value;
+}
+inline void DownloadStartResult::clear_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.initial_progress_ != nullptr) _impl_.initial_progress_->Clear();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::runanywhere::v1::DownloadProgress& DownloadStartResult::_internal_initial_progress() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::DownloadProgress* p = _impl_.initial_progress_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::DownloadProgress&>(::runanywhere::v1::_DownloadProgress_default_instance_);
+}
+inline const ::runanywhere::v1::DownloadProgress& DownloadStartResult::initial_progress() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartResult.initial_progress)
+  return _internal_initial_progress();
+}
+inline void DownloadStartResult::unsafe_arena_set_allocated_initial_progress(
+    ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.initial_progress_);
+  }
+  _impl_.initial_progress_ = reinterpret_cast<::runanywhere::v1::DownloadProgress*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DownloadStartResult.initial_progress)
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE DownloadStartResult::release_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::DownloadProgress* released = _impl_.initial_progress_;
+  _impl_.initial_progress_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE DownloadStartResult::unsafe_arena_release_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadStartResult.initial_progress)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::DownloadProgress* temp = _impl_.initial_progress_;
+  _impl_.initial_progress_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL DownloadStartResult::_internal_mutable_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.initial_progress_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::DownloadProgress>(GetArena());
+    _impl_.initial_progress_ = reinterpret_cast<::runanywhere::v1::DownloadProgress*>(p);
+  }
+  return _impl_.initial_progress_;
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL DownloadStartResult::mutable_initial_progress()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::DownloadProgress* _msg = _internal_mutable_initial_progress();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadStartResult.initial_progress)
+  return _msg;
+}
+inline void DownloadStartResult::set_allocated_initial_progress(::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.initial_progress_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.initial_progress_ = reinterpret_cast<::runanywhere::v1::DownloadProgress*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartResult.initial_progress)
+}
+
+// string error_message = 5;
+inline void DownloadStartResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& DownloadStartResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadStartResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadStartResult.error_message)
+  return _s;
+}
+inline const ::std::string& DownloadStartResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void DownloadStartResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadStartResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadStartResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadStartResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadStartResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartResult.error_message)
+}
+
+// -------------------------------------------------------------------
+
+// DownloadCancelRequest
+
+// string task_id = 1;
+inline void DownloadCancelRequest::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadCancelRequest::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelRequest.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadCancelRequest::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelRequest.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelRequest::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadCancelRequest.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadCancelRequest::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadCancelRequest::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelRequest::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadCancelRequest::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadCancelRequest.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadCancelRequest::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadCancelRequest.task_id)
+}
+
+// string model_id = 2;
+inline void DownloadCancelRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadCancelRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadCancelRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadCancelRequest.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadCancelRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadCancelRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadCancelRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadCancelRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadCancelRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadCancelRequest.model_id)
+}
+
+// bool delete_partial_bytes = 3;
+inline void DownloadCancelRequest::clear_delete_partial_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.delete_partial_bytes_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline bool DownloadCancelRequest::delete_partial_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelRequest.delete_partial_bytes)
+  return _internal_delete_partial_bytes();
+}
+inline void DownloadCancelRequest::set_delete_partial_bytes(bool value) {
+  _internal_set_delete_partial_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelRequest.delete_partial_bytes)
+}
+inline bool DownloadCancelRequest::_internal_delete_partial_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.delete_partial_bytes_;
+}
+inline void DownloadCancelRequest::_internal_set_delete_partial_bytes(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.delete_partial_bytes_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// DownloadCancelResult
+
+// bool success = 1;
+inline void DownloadCancelResult::clear_success() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.success_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline bool DownloadCancelResult::success() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelResult.success)
+  return _internal_success();
+}
+inline void DownloadCancelResult::set_success(bool value) {
+  _internal_set_success(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelResult.success)
+}
+inline bool DownloadCancelResult::_internal_success() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.success_;
+}
+inline void DownloadCancelResult::_internal_set_success(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.success_ = value;
+}
+
+// string task_id = 2;
+inline void DownloadCancelResult::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadCancelResult::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelResult.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadCancelResult::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelResult.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelResult::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadCancelResult.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadCancelResult::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadCancelResult::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelResult::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadCancelResult::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadCancelResult.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadCancelResult::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadCancelResult.task_id)
+}
+
+// string model_id = 3;
+inline void DownloadCancelResult::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadCancelResult::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelResult.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadCancelResult::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelResult.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelResult::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadCancelResult.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadCancelResult::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadCancelResult::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelResult::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadCancelResult::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadCancelResult.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadCancelResult::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadCancelResult.model_id)
+}
+
+// int64 partial_bytes_deleted = 4;
+inline void DownloadCancelResult::clear_partial_bytes_deleted() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.partial_bytes_deleted_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::int64_t DownloadCancelResult::partial_bytes_deleted() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelResult.partial_bytes_deleted)
+  return _internal_partial_bytes_deleted();
+}
+inline void DownloadCancelResult::set_partial_bytes_deleted(::int64_t value) {
+  _internal_set_partial_bytes_deleted(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelResult.partial_bytes_deleted)
+}
+inline ::int64_t DownloadCancelResult::_internal_partial_bytes_deleted() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.partial_bytes_deleted_;
+}
+inline void DownloadCancelResult::_internal_set_partial_bytes_deleted(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.partial_bytes_deleted_ = value;
+}
+
+// string error_message = 5;
+inline void DownloadCancelResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& DownloadCancelResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadCancelResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadCancelResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadCancelResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadCancelResult.error_message)
+  return _s;
+}
+inline const ::std::string& DownloadCancelResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void DownloadCancelResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadCancelResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadCancelResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadCancelResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadCancelResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadCancelResult.error_message)
+}
+
+// -------------------------------------------------------------------
+
+// DownloadResumeRequest
+
+// string task_id = 1;
+inline void DownloadResumeRequest::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadResumeRequest::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeRequest.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadResumeRequest::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeRequest.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeRequest::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadResumeRequest.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadResumeRequest::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadResumeRequest::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeRequest::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadResumeRequest::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadResumeRequest.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadResumeRequest::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeRequest.task_id)
+}
+
+// string model_id = 2;
+inline void DownloadResumeRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadResumeRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadResumeRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadResumeRequest.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadResumeRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadResumeRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadResumeRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadResumeRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadResumeRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeRequest.model_id)
+}
+
+// int64 resume_from_bytes = 3;
+inline void DownloadResumeRequest::clear_resume_from_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_from_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::int64_t DownloadResumeRequest::resume_from_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeRequest.resume_from_bytes)
+  return _internal_resume_from_bytes();
+}
+inline void DownloadResumeRequest::set_resume_from_bytes(::int64_t value) {
+  _internal_set_resume_from_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeRequest.resume_from_bytes)
+}
+inline ::int64_t DownloadResumeRequest::_internal_resume_from_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.resume_from_bytes_;
+}
+inline void DownloadResumeRequest::_internal_set_resume_from_bytes(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.resume_from_bytes_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// DownloadResumeResult
+
+// bool accepted = 1;
+inline void DownloadResumeResult::clear_accepted() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.accepted_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline bool DownloadResumeResult::accepted() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeResult.accepted)
+  return _internal_accepted();
+}
+inline void DownloadResumeResult::set_accepted(bool value) {
+  _internal_set_accepted(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeResult.accepted)
+}
+inline bool DownloadResumeResult::_internal_accepted() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.accepted_;
+}
+inline void DownloadResumeResult::_internal_set_accepted(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.accepted_ = value;
+}
+
+// string task_id = 2;
+inline void DownloadResumeResult::clear_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& DownloadResumeResult::task_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeResult.task_id)
+  return _internal_task_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadResumeResult::set_task_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.task_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeResult.task_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeResult::mutable_task_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_task_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadResumeResult.task_id)
+  return _s;
+}
+inline const ::std::string& DownloadResumeResult::_internal_task_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.task_id_.Get();
+}
+inline void DownloadResumeResult::_internal_set_task_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.task_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeResult::_internal_mutable_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.task_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadResumeResult::release_task_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadResumeResult.task_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.task_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadResumeResult::set_allocated_task_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.task_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.task_id_.IsDefault()) {
+    _impl_.task_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeResult.task_id)
+}
+
+// string model_id = 3;
+inline void DownloadResumeResult::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& DownloadResumeResult::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeResult.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadResumeResult::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeResult.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeResult::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadResumeResult.model_id)
+  return _s;
+}
+inline const ::std::string& DownloadResumeResult::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void DownloadResumeResult::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeResult::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadResumeResult::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadResumeResult.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadResumeResult::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeResult.model_id)
+}
+
+// .runanywhere.v1.DownloadProgress initial_progress = 4;
+inline bool DownloadResumeResult::has_initial_progress() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.initial_progress_ != nullptr);
+  return value;
+}
+inline void DownloadResumeResult::clear_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.initial_progress_ != nullptr) _impl_.initial_progress_->Clear();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::runanywhere::v1::DownloadProgress& DownloadResumeResult::_internal_initial_progress() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::DownloadProgress* p = _impl_.initial_progress_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::DownloadProgress&>(::runanywhere::v1::_DownloadProgress_default_instance_);
+}
+inline const ::runanywhere::v1::DownloadProgress& DownloadResumeResult::initial_progress() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeResult.initial_progress)
+  return _internal_initial_progress();
+}
+inline void DownloadResumeResult::unsafe_arena_set_allocated_initial_progress(
+    ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.initial_progress_);
+  }
+  _impl_.initial_progress_ = reinterpret_cast<::runanywhere::v1::DownloadProgress*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DownloadResumeResult.initial_progress)
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE DownloadResumeResult::release_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::DownloadProgress* released = _impl_.initial_progress_;
+  _impl_.initial_progress_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE DownloadResumeResult::unsafe_arena_release_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadResumeResult.initial_progress)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::DownloadProgress* temp = _impl_.initial_progress_;
+  _impl_.initial_progress_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL DownloadResumeResult::_internal_mutable_initial_progress() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.initial_progress_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::DownloadProgress>(GetArena());
+    _impl_.initial_progress_ = reinterpret_cast<::runanywhere::v1::DownloadProgress*>(p);
+  }
+  return _impl_.initial_progress_;
+}
+inline ::runanywhere::v1::DownloadProgress* PROTOBUF_NONNULL DownloadResumeResult::mutable_initial_progress()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::DownloadProgress* _msg = _internal_mutable_initial_progress();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadResumeResult.initial_progress)
+  return _msg;
+}
+inline void DownloadResumeResult::set_allocated_initial_progress(::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.initial_progress_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.initial_progress_ = reinterpret_cast<::runanywhere::v1::DownloadProgress*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeResult.initial_progress)
+}
+
+// string error_message = 5;
+inline void DownloadResumeResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& DownloadResumeResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void DownloadResumeResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DownloadResumeResult.error_message)
+  return _s;
+}
+inline const ::std::string& DownloadResumeResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void DownloadResumeResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL DownloadResumeResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE DownloadResumeResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DownloadResumeResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void DownloadResumeResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeResult.error_message)
 }
 
 #ifdef __GNUC__

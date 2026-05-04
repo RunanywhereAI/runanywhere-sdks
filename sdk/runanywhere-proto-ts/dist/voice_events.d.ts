@@ -1,5 +1,47 @@
 import _m0 from "protobufjs/minimal";
 export declare const protobufPackage = "runanywhere.v1";
+export declare enum VoiceEventCategory {
+    VOICE_EVENT_CATEGORY_UNSPECIFIED = 0,
+    VOICE_EVENT_CATEGORY_VOICE_AGENT = 1,
+    VOICE_EVENT_CATEGORY_STT = 2,
+    VOICE_EVENT_CATEGORY_ASR = 3,
+    VOICE_EVENT_CATEGORY_TTS = 4,
+    VOICE_EVENT_CATEGORY_VAD = 5,
+    VOICE_EVENT_CATEGORY_STD = 6,
+    VOICE_EVENT_CATEGORY_LLM = 7,
+    VOICE_EVENT_CATEGORY_AUDIO = 8,
+    VOICE_EVENT_CATEGORY_METRICS = 9,
+    VOICE_EVENT_CATEGORY_ERROR = 10,
+    VOICE_EVENT_CATEGORY_WAKEWORD = 11,
+    UNRECOGNIZED = -1
+}
+export declare function voiceEventCategoryFromJSON(object: any): VoiceEventCategory;
+export declare function voiceEventCategoryToJSON(object: VoiceEventCategory): string;
+export declare enum VoiceEventSeverity {
+    VOICE_EVENT_SEVERITY_DEBUG = 0,
+    VOICE_EVENT_SEVERITY_INFO = 1,
+    VOICE_EVENT_SEVERITY_WARNING = 2,
+    VOICE_EVENT_SEVERITY_ERROR = 3,
+    VOICE_EVENT_SEVERITY_CRITICAL = 4,
+    UNRECOGNIZED = -1
+}
+export declare function voiceEventSeverityFromJSON(object: any): VoiceEventSeverity;
+export declare function voiceEventSeverityToJSON(object: VoiceEventSeverity): string;
+export declare enum VoicePipelineComponent {
+    VOICE_PIPELINE_COMPONENT_UNSPECIFIED = 0,
+    VOICE_PIPELINE_COMPONENT_AGENT = 1,
+    VOICE_PIPELINE_COMPONENT_STT = 2,
+    VOICE_PIPELINE_COMPONENT_ASR = 3,
+    VOICE_PIPELINE_COMPONENT_TTS = 4,
+    VOICE_PIPELINE_COMPONENT_VAD = 5,
+    VOICE_PIPELINE_COMPONENT_STD = 6,
+    VOICE_PIPELINE_COMPONENT_LLM = 7,
+    VOICE_PIPELINE_COMPONENT_AUDIO = 8,
+    VOICE_PIPELINE_COMPONENT_WAKEWORD = 9,
+    UNRECOGNIZED = -1
+}
+export declare function voicePipelineComponentFromJSON(object: any): VoicePipelineComponent;
+export declare function voicePipelineComponentToJSON(object: VoicePipelineComponent): string;
 export declare enum TokenKind {
     TOKEN_KIND_UNSPECIFIED = 0,
     /** TOKEN_KIND_ANSWER - Regular content token */
@@ -26,6 +68,8 @@ export declare enum VADEventType {
     VAD_EVENT_VOICE_END_OF_UTTERANCE = 2,
     VAD_EVENT_BARGE_IN = 3,
     VAD_EVENT_SILENCE = 4,
+    VAD_EVENT_STATISTICS = 5,
+    VAD_EVENT_STATE_CHANGED = 6,
     UNRECOGNIZED = -1
 }
 export declare function vADEventTypeFromJSON(object: any): VADEventType;
@@ -47,6 +91,12 @@ export declare enum PipelineState {
     PIPELINE_STATE_THINKING = 3,
     PIPELINE_STATE_SPEAKING = 4,
     PIPELINE_STATE_STOPPED = 5,
+    PIPELINE_STATE_WAITING_WAKEWORD = 6,
+    PIPELINE_STATE_PROCESSING_SPEECH = 7,
+    PIPELINE_STATE_GENERATING_RESPONSE = 8,
+    PIPELINE_STATE_PLAYING_TTS = 9,
+    PIPELINE_STATE_COOLDOWN = 10,
+    PIPELINE_STATE_ERROR = 11,
     UNRECOGNIZED = -1
 }
 export declare function pipelineStateFromJSON(object: any): PipelineState;
@@ -76,6 +126,31 @@ export declare enum VoiceSessionErrorCode {
 }
 export declare function voiceSessionErrorCodeFromJSON(object: any): VoiceSessionErrorCode;
 export declare function voiceSessionErrorCodeToJSON(object: VoiceSessionErrorCode): string;
+export declare enum SpeechTurnDetectionEventKind {
+    SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
+    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
+    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED = 2,
+    SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED = 3,
+    SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS = 4,
+    UNRECOGNIZED = -1
+}
+export declare function speechTurnDetectionEventKindFromJSON(object: any): SpeechTurnDetectionEventKind;
+export declare function speechTurnDetectionEventKindToJSON(object: SpeechTurnDetectionEventKind): string;
+export declare enum TurnLifecycleEventKind {
+    TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
+    TURN_LIFECYCLE_EVENT_KIND_STARTED = 1,
+    TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED = 2,
+    TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED = 3,
+    TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL = 4,
+    TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED = 5,
+    TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED = 6,
+    TURN_LIFECYCLE_EVENT_KIND_COMPLETED = 7,
+    TURN_LIFECYCLE_EVENT_KIND_CANCELLED = 8,
+    TURN_LIFECYCLE_EVENT_KIND_FAILED = 9,
+    UNRECOGNIZED = -1
+}
+export declare function turnLifecycleEventKindFromJSON(object: any): TurnLifecycleEventKind;
+export declare function turnLifecycleEventKindToJSON(object: TurnLifecycleEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * Sum type emitted on the output edge of the VoiceAgent pipeline.
@@ -92,6 +167,9 @@ export interface VoiceEvent {
      * Unix epoch. Frontends may re-timestamp for UI display.
      */
     timestampUs: number;
+    category: VoiceEventCategory;
+    severity: VoiceEventSeverity;
+    component: VoicePipelineComponent;
     userSaid?: UserSaidEvent | undefined;
     assistantToken?: AssistantTokenEvent | undefined;
     audio?: AudioFrameEvent | undefined;
@@ -114,6 +192,9 @@ export interface VoiceEvent {
     sessionStopped?: SessionStoppedEvent | undefined;
     agentResponseStarted?: AgentResponseStartedEvent | undefined;
     agentResponseCompleted?: AgentResponseCompletedEvent | undefined;
+    speechTurnDetection?: SpeechTurnDetectionEvent | undefined;
+    turnLifecycle?: TurnLifecycleEvent | undefined;
+    wakewordDetected?: WakeWordDetectedEvent | undefined;
 }
 /** User speech finalized by STT (is_final=false → partial hypothesis). */
 export interface UserSaidEvent {
@@ -145,6 +226,8 @@ export interface AudioFrameEvent {
     /** 1 for mono */
     channels: number;
     encoding: AudioEncoding;
+    /** True for the final audio chunk in a TTS/voice-agent audio stream. */
+    isFinal: boolean;
 }
 /**
  * Voice Activity Detection output. Frontends usually do not need this —
@@ -153,6 +236,11 @@ export interface AudioFrameEvent {
 export interface VADEvent {
     type: VADEventType;
     frameOffsetUs: number;
+    confidence: number;
+    isSpeech: boolean;
+    speechDurationMs: number;
+    silenceDurationMs: number;
+    noiseFloorDb: number;
 }
 /**
  * Assistant playback was interrupted by a barge-in. The reason distinguishes
@@ -235,6 +323,31 @@ export interface SessionStoppedEvent {
 export interface AgentResponseStartedEvent {
 }
 export interface AgentResponseCompletedEvent {
+}
+export interface SpeechTurnDetectionEvent {
+    kind: SpeechTurnDetectionEventKind;
+    speakerId: string;
+    turnStartUs: number;
+    turnEndUs: number;
+    confidence: number;
+    speechDurationMs: number;
+    silenceDurationMs: number;
+}
+export interface TurnLifecycleEvent {
+    kind: TurnLifecycleEventKind;
+    turnId: string;
+    sessionId: string;
+    transcript: string;
+    response: string;
+    error: string;
+}
+export interface WakeWordDetectedEvent {
+    wakeWord: string;
+    confidence: number;
+    timestampMs: number;
+    modelId: string;
+    modelIndex: number;
+    durationMs: number;
 }
 export declare const VoiceEvent: {
     encode(message: VoiceEvent, writer?: _m0.Writer): _m0.Writer;
@@ -355,6 +468,30 @@ export declare const AgentResponseCompletedEvent: {
     toJSON(_: AgentResponseCompletedEvent): unknown;
     create<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(base?: I): AgentResponseCompletedEvent;
     fromPartial<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(_: I): AgentResponseCompletedEvent;
+};
+export declare const SpeechTurnDetectionEvent: {
+    encode(message: SpeechTurnDetectionEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): SpeechTurnDetectionEvent;
+    fromJSON(object: any): SpeechTurnDetectionEvent;
+    toJSON(message: SpeechTurnDetectionEvent): unknown;
+    create<I extends Exact<DeepPartial<SpeechTurnDetectionEvent>, I>>(base?: I): SpeechTurnDetectionEvent;
+    fromPartial<I extends Exact<DeepPartial<SpeechTurnDetectionEvent>, I>>(object: I): SpeechTurnDetectionEvent;
+};
+export declare const TurnLifecycleEvent: {
+    encode(message: TurnLifecycleEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TurnLifecycleEvent;
+    fromJSON(object: any): TurnLifecycleEvent;
+    toJSON(message: TurnLifecycleEvent): unknown;
+    create<I extends Exact<DeepPartial<TurnLifecycleEvent>, I>>(base?: I): TurnLifecycleEvent;
+    fromPartial<I extends Exact<DeepPartial<TurnLifecycleEvent>, I>>(object: I): TurnLifecycleEvent;
+};
+export declare const WakeWordDetectedEvent: {
+    encode(message: WakeWordDetectedEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): WakeWordDetectedEvent;
+    fromJSON(object: any): WakeWordDetectedEvent;
+    toJSON(message: WakeWordDetectedEvent): unknown;
+    create<I extends Exact<DeepPartial<WakeWordDetectedEvent>, I>>(base?: I): WakeWordDetectedEvent;
+    fromPartial<I extends Exact<DeepPartial<WakeWordDetectedEvent>, I>>(object: I): WakeWordDetectedEvent;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

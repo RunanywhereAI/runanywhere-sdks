@@ -22,9 +22,10 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+import tool_calling_pb2 as tool__calling__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nchat.proto\x12\x0erunanywhere.v1\"\xcc\x01\n\x0b\x43hatMessage\x12\n\n\x02id\x18\x01 \x01(\t\x12)\n\x04role\x18\x02 \x01(\x0e\x32\x1b.runanywhere.v1.MessageRole\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x14\n\x0ctimestamp_us\x18\x04 \x01(\x03\x12\x11\n\x04name\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0ftool_calls_json\x18\x06 \x03(\t\x12\x19\n\x0ctool_call_id\x18\x07 \x01(\tH\x01\x88\x01\x01\x42\x07\n\x05_nameB\x0f\n\r_tool_call_id*\x8e\x01\n\x0bMessageRole\x12\x1c\n\x18MESSAGE_ROLE_UNSPECIFIED\x10\x00\x12\x15\n\x11MESSAGE_ROLE_USER\x10\x01\x12\x1a\n\x16MESSAGE_ROLE_ASSISTANT\x10\x02\x12\x17\n\x13MESSAGE_ROLE_SYSTEM\x10\x03\x12\x15\n\x11MESSAGE_ROLE_TOOL\x10\x04\x42\x84\x01\n\x17\x61i.runanywhere.proto.v1B\tChatProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nchat.proto\x12\x0erunanywhere.v1\x1a\x12tool_calling.proto\"\xc0\x02\n\x0b\x43hatMessage\x12\n\n\x02id\x18\x01 \x01(\t\x12)\n\x04role\x18\x02 \x01(\x0e\x32\x1b.runanywhere.v1.MessageRole\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x14\n\x0ctimestamp_us\x18\x04 \x01(\x03\x12\x11\n\x04name\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0ftool_calls_json\x18\x06 \x03(\t\x12\x19\n\x0ctool_call_id\x18\x07 \x01(\tH\x01\x88\x01\x01\x12,\n\ntool_calls\x18\x08 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x34\n\x0btool_result\x18\t \x01(\x0b\x32\x1a.runanywhere.v1.ToolResultH\x02\x88\x01\x01\x42\x07\n\x05_nameB\x0f\n\r_tool_call_idB\x0e\n\x0c_tool_result*\x8e\x01\n\x0bMessageRole\x12\x1c\n\x18MESSAGE_ROLE_UNSPECIFIED\x10\x00\x12\x15\n\x11MESSAGE_ROLE_USER\x10\x01\x12\x1a\n\x16MESSAGE_ROLE_ASSISTANT\x10\x02\x12\x17\n\x13MESSAGE_ROLE_SYSTEM\x10\x03\x12\x15\n\x11MESSAGE_ROLE_TOOL\x10\x04\x42\x84\x01\n\x17\x61i.runanywhere.proto.v1B\tChatProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,8 +33,8 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chat_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\tChatProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_MESSAGEROLE']._serialized_start=238
-  _globals['_MESSAGEROLE']._serialized_end=380
-  _globals['_CHATMESSAGE']._serialized_start=31
-  _globals['_CHATMESSAGE']._serialized_end=235
+  _globals['_MESSAGEROLE']._serialized_start=374
+  _globals['_MESSAGEROLE']._serialized_end=516
+  _globals['_CHATMESSAGE']._serialized_start=51
+  _globals['_CHATMESSAGE']._serialized_end=371
 # @@protoc_insertion_point(module_scope)

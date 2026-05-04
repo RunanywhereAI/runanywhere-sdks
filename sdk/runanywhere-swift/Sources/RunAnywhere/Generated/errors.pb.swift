@@ -287,6 +287,56 @@ public enum RAErrorCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+public enum RAErrorSeverity: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case debug // = 1
+  case info // = 2
+  case warning // = 3
+  case error // = 4
+  case critical // = 5
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .debug
+    case 2: self = .info
+    case 3: self = .warning
+    case 4: self = .error
+    case 5: self = .critical
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .debug: return 1
+    case .info: return 2
+    case .warning: return 3
+    case .error: return 4
+    case .critical: return 5
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAErrorSeverity] = [
+    .unspecified,
+    .debug,
+    .info,
+    .warning,
+    .error,
+    .critical,
+  ]
+
+}
+
 /// ---------------------------------------------------------------------------
 /// ErrorCode — exhaustive enumeration of every distinct numeric error code in
 /// the C ABI (`rac_result_t`).
@@ -1260,6 +1310,15 @@ public struct RASDKError: Sendable {
   /// Clears the value of `nestedMessage`. Subsequent reads from it will return its default value.
   public mutating func clearNestedMessage() {self._nestedMessage = nil}
 
+  /// Envelope metadata for canonical error emission. `component` is a stable
+  /// lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
+  /// "download", "storage", ...); SDKEvent carries the enum-typed component.
+  public var timestampMs: Int64 = 0
+
+  public var severity: RAErrorSeverity = .unspecified
+
+  public var component: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1275,6 +1334,10 @@ fileprivate let _protobuf_package = "runanywhere.v1"
 
 extension RAErrorCategory: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CATEGORY_UNSPECIFIED\0\u{1}ERROR_CATEGORY_NETWORK\0\u{1}ERROR_CATEGORY_VALIDATION\0\u{1}ERROR_CATEGORY_MODEL\0\u{1}ERROR_CATEGORY_COMPONENT\0\u{1}ERROR_CATEGORY_IO\0\u{1}ERROR_CATEGORY_AUTH\0\u{1}ERROR_CATEGORY_INTERNAL\0\u{1}ERROR_CATEGORY_CONFIGURATION\0")
+}
+
+extension RAErrorSeverity: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_SEVERITY_UNSPECIFIED\0\u{1}ERROR_SEVERITY_DEBUG\0\u{1}ERROR_SEVERITY_INFO\0\u{1}ERROR_SEVERITY_WARNING\0\u{1}ERROR_SEVERITY_ERROR\0\u{1}ERROR_SEVERITY_CRITICAL\0")
 }
 
 extension RAErrorCode: SwiftProtobuf._ProtoNameProviding {
@@ -1332,7 +1395,7 @@ extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
 extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKError"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{1}context\0\u{3}c_abi_code\0\u{3}nested_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{1}context\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1346,6 +1409,9 @@ extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       case 4: try { try decoder.decodeSingularMessageField(value: &self._context) }()
       case 5: try { try decoder.decodeSingularInt32Field(value: &self._cAbiCode) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._nestedMessage) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.component) }()
       default: break
       }
     }
@@ -1374,6 +1440,15 @@ extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     try { if let v = self._nestedMessage {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
+    if self.timestampMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 7)
+    }
+    if self.severity != .unspecified {
+      try visitor.visitSingularEnumField(value: self.severity, fieldNumber: 8)
+    }
+    if !self.component.isEmpty {
+      try visitor.visitSingularStringField(value: self.component, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1384,6 +1459,9 @@ extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if lhs._context != rhs._context {return false}
     if lhs._cAbiCode != rhs._cAbiCode {return false}
     if lhs._nestedMessage != rhs._nestedMessage {return false}
+    if lhs.timestampMs != rhs.timestampMs {return false}
+    if lhs.severity != rhs.severity {return false}
+    if lhs.component != rhs.component {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

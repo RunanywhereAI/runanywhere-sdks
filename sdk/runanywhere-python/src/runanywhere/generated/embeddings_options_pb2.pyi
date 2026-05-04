@@ -1,4 +1,6 @@
+import model_types_pb2 as _model_types_pb2
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
@@ -6,37 +8,83 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class EmbeddingsNormalizeMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED: _ClassVar[EmbeddingsNormalizeMode]
+    EMBEDDINGS_NORMALIZE_MODE_NONE: _ClassVar[EmbeddingsNormalizeMode]
+    EMBEDDINGS_NORMALIZE_MODE_L2: _ClassVar[EmbeddingsNormalizeMode]
+
+class EmbeddingsPoolingStrategy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED: _ClassVar[EmbeddingsPoolingStrategy]
+    EMBEDDINGS_POOLING_STRATEGY_MEAN: _ClassVar[EmbeddingsPoolingStrategy]
+    EMBEDDINGS_POOLING_STRATEGY_CLS: _ClassVar[EmbeddingsPoolingStrategy]
+    EMBEDDINGS_POOLING_STRATEGY_LAST: _ClassVar[EmbeddingsPoolingStrategy]
+EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED: EmbeddingsNormalizeMode
+EMBEDDINGS_NORMALIZE_MODE_NONE: EmbeddingsNormalizeMode
+EMBEDDINGS_NORMALIZE_MODE_L2: EmbeddingsNormalizeMode
+EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED: EmbeddingsPoolingStrategy
+EMBEDDINGS_POOLING_STRATEGY_MEAN: EmbeddingsPoolingStrategy
+EMBEDDINGS_POOLING_STRATEGY_CLS: EmbeddingsPoolingStrategy
+EMBEDDINGS_POOLING_STRATEGY_LAST: EmbeddingsPoolingStrategy
+
 class EmbeddingsConfiguration(_message.Message):
-    __slots__ = ("model_id", "embedding_dimension", "max_sequence_length", "normalize")
+    __slots__ = ("model_id", "embedding_dimension", "max_sequence_length", "normalize", "preferred_framework", "max_tokens", "normalize_mode", "pooling", "config_json")
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     EMBEDDING_DIMENSION_FIELD_NUMBER: _ClassVar[int]
     MAX_SEQUENCE_LENGTH_FIELD_NUMBER: _ClassVar[int]
     NORMALIZE_FIELD_NUMBER: _ClassVar[int]
+    PREFERRED_FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
+    MAX_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    NORMALIZE_MODE_FIELD_NUMBER: _ClassVar[int]
+    POOLING_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_JSON_FIELD_NUMBER: _ClassVar[int]
     model_id: str
     embedding_dimension: int
     max_sequence_length: int
     normalize: bool
-    def __init__(self, model_id: _Optional[str] = ..., embedding_dimension: _Optional[int] = ..., max_sequence_length: _Optional[int] = ..., normalize: _Optional[bool] = ...) -> None: ...
+    preferred_framework: _model_types_pb2.InferenceFramework
+    max_tokens: int
+    normalize_mode: EmbeddingsNormalizeMode
+    pooling: EmbeddingsPoolingStrategy
+    config_json: str
+    def __init__(self, model_id: _Optional[str] = ..., embedding_dimension: _Optional[int] = ..., max_sequence_length: _Optional[int] = ..., normalize: _Optional[bool] = ..., preferred_framework: _Optional[_Union[_model_types_pb2.InferenceFramework, str]] = ..., max_tokens: _Optional[int] = ..., normalize_mode: _Optional[_Union[EmbeddingsNormalizeMode, str]] = ..., pooling: _Optional[_Union[EmbeddingsPoolingStrategy, str]] = ..., config_json: _Optional[str] = ...) -> None: ...
 
 class EmbeddingsOptions(_message.Message):
-    __slots__ = ("normalize", "truncate", "batch_size")
+    __slots__ = ("normalize", "truncate", "batch_size", "normalize_mode", "pooling", "n_threads")
     NORMALIZE_FIELD_NUMBER: _ClassVar[int]
     TRUNCATE_FIELD_NUMBER: _ClassVar[int]
     BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
+    NORMALIZE_MODE_FIELD_NUMBER: _ClassVar[int]
+    POOLING_FIELD_NUMBER: _ClassVar[int]
+    N_THREADS_FIELD_NUMBER: _ClassVar[int]
     normalize: bool
     truncate: bool
     batch_size: int
-    def __init__(self, normalize: _Optional[bool] = ..., truncate: _Optional[bool] = ..., batch_size: _Optional[int] = ...) -> None: ...
+    normalize_mode: EmbeddingsNormalizeMode
+    pooling: EmbeddingsPoolingStrategy
+    n_threads: int
+    def __init__(self, normalize: _Optional[bool] = ..., truncate: _Optional[bool] = ..., batch_size: _Optional[int] = ..., normalize_mode: _Optional[_Union[EmbeddingsNormalizeMode, str]] = ..., pooling: _Optional[_Union[EmbeddingsPoolingStrategy, str]] = ..., n_threads: _Optional[int] = ...) -> None: ...
 
 class EmbeddingVector(_message.Message):
-    __slots__ = ("values", "norm", "text")
+    __slots__ = ("values", "norm", "text", "dimension")
     VALUES_FIELD_NUMBER: _ClassVar[int]
     NORM_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
+    DIMENSION_FIELD_NUMBER: _ClassVar[int]
     values: _containers.RepeatedScalarFieldContainer[float]
     norm: float
     text: str
-    def __init__(self, values: _Optional[_Iterable[float]] = ..., norm: _Optional[float] = ..., text: _Optional[str] = ...) -> None: ...
+    dimension: int
+    def __init__(self, values: _Optional[_Iterable[float]] = ..., norm: _Optional[float] = ..., text: _Optional[str] = ..., dimension: _Optional[int] = ...) -> None: ...
+
+class EmbeddingsRequest(_message.Message):
+    __slots__ = ("texts", "options")
+    TEXTS_FIELD_NUMBER: _ClassVar[int]
+    OPTIONS_FIELD_NUMBER: _ClassVar[int]
+    texts: _containers.RepeatedScalarFieldContainer[str]
+    options: EmbeddingsOptions
+    def __init__(self, texts: _Optional[_Iterable[str]] = ..., options: _Optional[_Union[EmbeddingsOptions, _Mapping]] = ...) -> None: ...
 
 class EmbeddingsResult(_message.Message):
     __slots__ = ("vectors", "dimension", "processing_time_ms", "tokens_used")

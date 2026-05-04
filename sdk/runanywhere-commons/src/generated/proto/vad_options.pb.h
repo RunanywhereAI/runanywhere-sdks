@@ -31,6 +31,7 @@
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "model_types.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -289,6 +290,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStatistics final : public ::goog
     kAmbientLevelFieldNumber = 3,
     kRecentAvgFieldNumber = 4,
     kRecentMaxFieldNumber = 5,
+    kTotalSpeechSegmentsFieldNumber = 6,
+    kTotalSpeechDurationMsFieldNumber = 7,
+    kAverageEnergyFieldNumber = 8,
+    kPeakEnergyFieldNumber = 9,
   };
   // float current_energy = 1;
   void clear_current_energy() ;
@@ -340,11 +345,51 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStatistics final : public ::goog
   void _internal_set_recent_max(float value);
 
   public:
+  // int32 total_speech_segments = 6;
+  void clear_total_speech_segments() ;
+  [[nodiscard]] ::int32_t total_speech_segments() const;
+  void set_total_speech_segments(::int32_t value);
+
+  private:
+  ::int32_t _internal_total_speech_segments() const;
+  void _internal_set_total_speech_segments(::int32_t value);
+
+  public:
+  // int64 total_speech_duration_ms = 7;
+  void clear_total_speech_duration_ms() ;
+  [[nodiscard]] ::int64_t total_speech_duration_ms() const;
+  void set_total_speech_duration_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_total_speech_duration_ms() const;
+  void _internal_set_total_speech_duration_ms(::int64_t value);
+
+  public:
+  // float average_energy = 8;
+  void clear_average_energy() ;
+  [[nodiscard]] float average_energy() const;
+  void set_average_energy(float value);
+
+  private:
+  float _internal_average_energy() const;
+  void _internal_set_average_energy(float value);
+
+  public:
+  // float peak_energy = 9;
+  void clear_peak_energy() ;
+  [[nodiscard]] float peak_energy() const;
+  void set_peak_energy(float value);
+
+  private:
+  float _internal_peak_energy() const;
+  void _internal_set_peak_energy(float value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADStatistics)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
+  static const ::google::protobuf::internal::TcParseTable<4, 9,
                                    0, 0,
                                    2>
       _table_;
@@ -373,6 +418,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStatistics final : public ::goog
     float ambient_level_;
     float recent_avg_;
     float recent_max_;
+    ::int32_t total_speech_segments_;
+    ::int64_t total_speech_duration_ms_;
+    float average_energy_;
+    float peak_energy_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -532,6 +581,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
     kConfidenceFieldNumber = 2,
     kEnergyFieldNumber = 3,
     kDurationMsFieldNumber = 4,
+    kTimestampMsFieldNumber = 5,
+    kStartTimeMsFieldNumber = 6,
+    kEndTimeMsFieldNumber = 7,
   };
   // bool is_speech = 1;
   void clear_is_speech() ;
@@ -573,11 +625,41 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
   void _internal_set_duration_ms(::int32_t value);
 
   public:
+  // int64 timestamp_ms = 5;
+  void clear_timestamp_ms() ;
+  [[nodiscard]] ::int64_t timestamp_ms() const;
+  void set_timestamp_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_timestamp_ms() const;
+  void _internal_set_timestamp_ms(::int64_t value);
+
+  public:
+  // int64 start_time_ms = 6;
+  void clear_start_time_ms() ;
+  [[nodiscard]] ::int64_t start_time_ms() const;
+  void set_start_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_start_time_ms() const;
+  void _internal_set_start_time_ms(::int64_t value);
+
+  public:
+  // int64 end_time_ms = 7;
+  void clear_end_time_ms() ;
+  [[nodiscard]] ::int64_t end_time_ms() const;
+  void set_end_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_end_time_ms() const;
+  void _internal_set_end_time_ms(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADResult)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<2, 4,
+  static const ::google::protobuf::internal::TcParseTable<3, 7,
                                    0, 0,
                                    2>
       _table_;
@@ -605,6 +687,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
     float confidence_;
     float energy_;
     ::int32_t duration_ms_;
+    ::int64_t timestamp_ms_;
+    ::int64_t start_time_ms_;
+    ::int64_t end_time_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -763,6 +848,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
     kThresholdFieldNumber = 1,
     kMinSpeechDurationMsFieldNumber = 2,
     kMinSilenceDurationMsFieldNumber = 3,
+    kMaxSpeechDurationMsFieldNumber = 4,
   };
   // float threshold = 1;
   void clear_threshold() ;
@@ -794,11 +880,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
   void _internal_set_min_silence_duration_ms(::int32_t value);
 
   public:
+  // int32 max_speech_duration_ms = 4;
+  void clear_max_speech_duration_ms() ;
+  [[nodiscard]] ::int32_t max_speech_duration_ms() const;
+  void set_max_speech_duration_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_speech_duration_ms() const;
+  void _internal_set_max_speech_duration_ms(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADOptions)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<2, 3,
+  static const ::google::protobuf::internal::TcParseTable<2, 4,
                                    0, 0,
                                    2>
       _table_;
@@ -825,6 +921,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
     float threshold_;
     ::int32_t min_speech_duration_ms_;
     ::int32_t min_silence_duration_ms_;
+    ::int32_t max_speech_duration_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -981,10 +1078,15 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   // accessors -------------------------------------------------------
   enum : int {
     kModelIdFieldNumber = 1,
+    kModelPathFieldNumber = 8,
     kSampleRateFieldNumber = 2,
     kFrameLengthMsFieldNumber = 3,
     kThresholdFieldNumber = 4,
     kEnableAutoCalibrationFieldNumber = 5,
+    kCalibrationMultiplierFieldNumber = 6,
+    kPreferredFrameworkFieldNumber = 7,
+    kWindowSizeSamplesFieldNumber = 9,
+    kMaxSpeechDurationMsFieldNumber = 10,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -999,6 +1101,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   const ::std::string& _internal_model_id() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // optional string model_path = 8;
+  [[nodiscard]] bool has_model_path()
+      const;
+  void clear_model_path() ;
+  [[nodiscard]] const ::std::string& model_path() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_path(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_path();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_path();
+  void set_allocated_model_path(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_path() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_path(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_path();
 
   public:
   // int32 sample_rate = 2;
@@ -1041,12 +1160,54 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_enable_auto_calibration(bool value);
 
   public:
+  // float calibration_multiplier = 6;
+  void clear_calibration_multiplier() ;
+  [[nodiscard]] float calibration_multiplier() const;
+  void set_calibration_multiplier(float value);
+
+  private:
+  float _internal_calibration_multiplier() const;
+  void _internal_set_calibration_multiplier(float value);
+
+  public:
+  // optional .runanywhere.v1.InferenceFramework preferred_framework = 7;
+  [[nodiscard]] bool has_preferred_framework()
+      const;
+  void clear_preferred_framework() ;
+  [[nodiscard]] ::runanywhere::v1::InferenceFramework preferred_framework() const;
+  void set_preferred_framework(::runanywhere::v1::InferenceFramework value);
+
+  private:
+  ::runanywhere::v1::InferenceFramework _internal_preferred_framework() const;
+  void _internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value);
+
+  public:
+  // int32 window_size_samples = 9;
+  void clear_window_size_samples() ;
+  [[nodiscard]] ::int32_t window_size_samples() const;
+  void set_window_size_samples(::int32_t value);
+
+  private:
+  ::int32_t _internal_window_size_samples() const;
+  void _internal_set_window_size_samples(::int32_t value);
+
+  public:
+  // int32 max_speech_duration_ms = 10;
+  void clear_max_speech_duration_ms() ;
+  [[nodiscard]] ::int32_t max_speech_duration_ms() const;
+  void set_max_speech_duration_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_speech_duration_ms() const;
+  void _internal_set_max_speech_duration_ms(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADConfiguration)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
-                                   0, 48,
+  static const ::google::protobuf::internal::TcParseTable<4, 10,
+                                   0, 66,
                                    2>
       _table_;
 
@@ -1070,10 +1231,15 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr model_path_;
     ::int32_t sample_rate_;
     ::int32_t frame_length_ms_;
     float threshold_;
     bool enable_auto_calibration_;
+    float calibration_multiplier_;
+    int preferred_framework_;
+    ::int32_t window_size_samples_;
+    ::int32_t max_speech_duration_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1388,7 +1554,7 @@ inline void VADConfiguration::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
+                  0x00000004U);
 }
 inline ::int32_t VADConfiguration::sample_rate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.sample_rate)
@@ -1396,7 +1562,7 @@ inline ::int32_t VADConfiguration::sample_rate() const {
 }
 inline void VADConfiguration::set_sample_rate(::int32_t value) {
   _internal_set_sample_rate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.sample_rate)
 }
 inline ::int32_t VADConfiguration::_internal_sample_rate() const {
@@ -1413,7 +1579,7 @@ inline void VADConfiguration::clear_frame_length_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.frame_length_ms_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000008U);
 }
 inline ::int32_t VADConfiguration::frame_length_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.frame_length_ms)
@@ -1421,7 +1587,7 @@ inline ::int32_t VADConfiguration::frame_length_ms() const {
 }
 inline void VADConfiguration::set_frame_length_ms(::int32_t value) {
   _internal_set_frame_length_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.frame_length_ms)
 }
 inline ::int32_t VADConfiguration::_internal_frame_length_ms() const {
@@ -1438,7 +1604,7 @@ inline void VADConfiguration::clear_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.threshold_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000010U);
 }
 inline float VADConfiguration::threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.threshold)
@@ -1446,7 +1612,7 @@ inline float VADConfiguration::threshold() const {
 }
 inline void VADConfiguration::set_threshold(float value) {
   _internal_set_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.threshold)
 }
 inline float VADConfiguration::_internal_threshold() const {
@@ -1463,7 +1629,7 @@ inline void VADConfiguration::clear_enable_auto_calibration() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_auto_calibration_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000020U);
 }
 inline bool VADConfiguration::enable_auto_calibration() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.enable_auto_calibration)
@@ -1471,7 +1637,7 @@ inline bool VADConfiguration::enable_auto_calibration() const {
 }
 inline void VADConfiguration::set_enable_auto_calibration(bool value) {
   _internal_set_enable_auto_calibration(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.enable_auto_calibration)
 }
 inline bool VADConfiguration::_internal_enable_auto_calibration() const {
@@ -1481,6 +1647,179 @@ inline bool VADConfiguration::_internal_enable_auto_calibration() const {
 inline void VADConfiguration::_internal_set_enable_auto_calibration(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_auto_calibration_ = value;
+}
+
+// float calibration_multiplier = 6;
+inline void VADConfiguration::clear_calibration_multiplier() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.calibration_multiplier_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline float VADConfiguration::calibration_multiplier() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.calibration_multiplier)
+  return _internal_calibration_multiplier();
+}
+inline void VADConfiguration::set_calibration_multiplier(float value) {
+  _internal_set_calibration_multiplier(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.calibration_multiplier)
+}
+inline float VADConfiguration::_internal_calibration_multiplier() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.calibration_multiplier_;
+}
+inline void VADConfiguration::_internal_set_calibration_multiplier(float value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.calibration_multiplier_ = value;
+}
+
+// optional .runanywhere.v1.InferenceFramework preferred_framework = 7;
+inline bool VADConfiguration::has_preferred_framework() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
+inline void VADConfiguration::clear_preferred_framework() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.preferred_framework_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline ::runanywhere::v1::InferenceFramework VADConfiguration::preferred_framework() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.preferred_framework)
+  return _internal_preferred_framework();
+}
+inline void VADConfiguration::set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
+  _internal_set_preferred_framework(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.preferred_framework)
+}
+inline ::runanywhere::v1::InferenceFramework VADConfiguration::_internal_preferred_framework() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::InferenceFramework>(_impl_.preferred_framework_);
+}
+inline void VADConfiguration::_internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.preferred_framework_ = value;
+}
+
+// optional string model_path = 8;
+inline bool VADConfiguration::has_model_path() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void VADConfiguration::clear_model_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_path_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& VADConfiguration::model_path() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.model_path)
+  return _internal_model_path();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VADConfiguration::set_model_path(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.model_path)
+}
+inline ::std::string* PROTOBUF_NONNULL VADConfiguration::mutable_model_path()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_path();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADConfiguration.model_path)
+  return _s;
+}
+inline const ::std::string& VADConfiguration::_internal_model_path() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_path_.Get();
+}
+inline void VADConfiguration::_internal_set_model_path(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_path_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VADConfiguration::_internal_mutable_model_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_path_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VADConfiguration::release_model_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VADConfiguration.model_path)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_path_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_path_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VADConfiguration::set_allocated_model_path(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_path_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_path_.IsDefault()) {
+    _impl_.model_path_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADConfiguration.model_path)
+}
+
+// int32 window_size_samples = 9;
+inline void VADConfiguration::clear_window_size_samples() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.window_size_samples_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline ::int32_t VADConfiguration::window_size_samples() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.window_size_samples)
+  return _internal_window_size_samples();
+}
+inline void VADConfiguration::set_window_size_samples(::int32_t value) {
+  _internal_set_window_size_samples(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.window_size_samples)
+}
+inline ::int32_t VADConfiguration::_internal_window_size_samples() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.window_size_samples_;
+}
+inline void VADConfiguration::_internal_set_window_size_samples(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.window_size_samples_ = value;
+}
+
+// int32 max_speech_duration_ms = 10;
+inline void VADConfiguration::clear_max_speech_duration_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speech_duration_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000200U);
+}
+inline ::int32_t VADConfiguration::max_speech_duration_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.max_speech_duration_ms)
+  return _internal_max_speech_duration_ms();
+}
+inline void VADConfiguration::set_max_speech_duration_ms(::int32_t value) {
+  _internal_set_max_speech_duration_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.max_speech_duration_ms)
+}
+inline ::int32_t VADConfiguration::_internal_max_speech_duration_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_speech_duration_ms_;
+}
+inline void VADConfiguration::_internal_set_max_speech_duration_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speech_duration_ms_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -1560,6 +1899,31 @@ inline ::int32_t VADOptions::_internal_min_silence_duration_ms() const {
 inline void VADOptions::_internal_set_min_silence_duration_ms(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_silence_duration_ms_ = value;
+}
+
+// int32 max_speech_duration_ms = 4;
+inline void VADOptions::clear_max_speech_duration_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speech_duration_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::int32_t VADOptions::max_speech_duration_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.max_speech_duration_ms)
+  return _internal_max_speech_duration_ms();
+}
+inline void VADOptions::set_max_speech_duration_ms(::int32_t value) {
+  _internal_set_max_speech_duration_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.max_speech_duration_ms)
+}
+inline ::int32_t VADOptions::_internal_max_speech_duration_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_speech_duration_ms_;
+}
+inline void VADOptions::_internal_set_max_speech_duration_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speech_duration_ms_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -1664,6 +2028,81 @@ inline ::int32_t VADResult::_internal_duration_ms() const {
 inline void VADResult::_internal_set_duration_ms(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.duration_ms_ = value;
+}
+
+// int64 timestamp_ms = 5;
+inline void VADResult::clear_timestamp_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.timestamp_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline ::int64_t VADResult::timestamp_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.timestamp_ms)
+  return _internal_timestamp_ms();
+}
+inline void VADResult::set_timestamp_ms(::int64_t value) {
+  _internal_set_timestamp_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.timestamp_ms)
+}
+inline ::int64_t VADResult::_internal_timestamp_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.timestamp_ms_;
+}
+inline void VADResult::_internal_set_timestamp_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.timestamp_ms_ = value;
+}
+
+// int64 start_time_ms = 6;
+inline void VADResult::clear_start_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.start_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::int64_t VADResult::start_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.start_time_ms)
+  return _internal_start_time_ms();
+}
+inline void VADResult::set_start_time_ms(::int64_t value) {
+  _internal_set_start_time_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.start_time_ms)
+}
+inline ::int64_t VADResult::_internal_start_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.start_time_ms_;
+}
+inline void VADResult::_internal_set_start_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.start_time_ms_ = value;
+}
+
+// int64 end_time_ms = 7;
+inline void VADResult::clear_end_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.end_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline ::int64_t VADResult::end_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.end_time_ms)
+  return _internal_end_time_ms();
+}
+inline void VADResult::set_end_time_ms(::int64_t value) {
+  _internal_set_end_time_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.end_time_ms)
+}
+inline ::int64_t VADResult::_internal_end_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.end_time_ms_;
+}
+inline void VADResult::_internal_set_end_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.end_time_ms_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -1793,6 +2232,106 @@ inline float VADStatistics::_internal_recent_max() const {
 inline void VADStatistics::_internal_set_recent_max(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.recent_max_ = value;
+}
+
+// int32 total_speech_segments = 6;
+inline void VADStatistics::clear_total_speech_segments() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_speech_segments_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::int32_t VADStatistics::total_speech_segments() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADStatistics.total_speech_segments)
+  return _internal_total_speech_segments();
+}
+inline void VADStatistics::set_total_speech_segments(::int32_t value) {
+  _internal_set_total_speech_segments(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADStatistics.total_speech_segments)
+}
+inline ::int32_t VADStatistics::_internal_total_speech_segments() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.total_speech_segments_;
+}
+inline void VADStatistics::_internal_set_total_speech_segments(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_speech_segments_ = value;
+}
+
+// int64 total_speech_duration_ms = 7;
+inline void VADStatistics::clear_total_speech_duration_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_speech_duration_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline ::int64_t VADStatistics::total_speech_duration_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADStatistics.total_speech_duration_ms)
+  return _internal_total_speech_duration_ms();
+}
+inline void VADStatistics::set_total_speech_duration_ms(::int64_t value) {
+  _internal_set_total_speech_duration_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADStatistics.total_speech_duration_ms)
+}
+inline ::int64_t VADStatistics::_internal_total_speech_duration_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.total_speech_duration_ms_;
+}
+inline void VADStatistics::_internal_set_total_speech_duration_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_speech_duration_ms_ = value;
+}
+
+// float average_energy = 8;
+inline void VADStatistics::clear_average_energy() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.average_energy_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline float VADStatistics::average_energy() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADStatistics.average_energy)
+  return _internal_average_energy();
+}
+inline void VADStatistics::set_average_energy(float value) {
+  _internal_set_average_energy(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADStatistics.average_energy)
+}
+inline float VADStatistics::_internal_average_energy() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.average_energy_;
+}
+inline void VADStatistics::_internal_set_average_energy(float value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.average_energy_ = value;
+}
+
+// float peak_energy = 9;
+inline void VADStatistics::clear_peak_energy() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.peak_energy_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline float VADStatistics::peak_energy() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADStatistics.peak_energy)
+  return _internal_peak_energy();
+}
+inline void VADStatistics::set_peak_energy(float value) {
+  _internal_set_peak_energy(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADStatistics.peak_energy)
+}
+inline float VADStatistics::_internal_peak_energy() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.peak_energy_;
+}
+inline void VADStatistics::_internal_set_peak_energy(float value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.peak_energy_ = value;
 }
 
 // -------------------------------------------------------------------

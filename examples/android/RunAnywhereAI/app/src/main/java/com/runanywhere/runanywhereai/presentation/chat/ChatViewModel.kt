@@ -3,6 +3,11 @@ package com.runanywhere.runanywhereai.presentation.chat
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.GenerationEvent
+import ai.runanywhere.proto.v1.GenerationEventKind
+import ai.runanywhere.proto.v1.ToolCallingOptions
+import ai.runanywhere.proto.v1.ToolValue
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
@@ -15,11 +20,7 @@ import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.LLMEvent
-import ai.runanywhere.proto.v1.LLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
-import com.runanywhere.sdk.public.extensions.LLM.ToolValue
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
@@ -33,6 +34,7 @@ import com.runanywhere.sdk.public.extensions.loadLLMModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
@@ -99,7 +101,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Subscribe to LLM events from SDK EventBus
         viewModelScope.launch {
             EventBus.events
-                .filterIsInstance<LLMEvent>()
+                .mapNotNull { it.generation }
                 .collect { event ->
                     handleLLMEvent(event)
                 }
@@ -115,13 +117,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * Handle LLM events from SDK EventBus
      * Uses the new data class with enum event types pattern
      */
-    private fun handleLLMEvent(event: LLMEvent) {
-        when (event.eventType) {
-            LLMEvent.LLMEventType.GENERATION_STARTED -> {
-                Timber.d("LLM generation started: ${event.modelId}")
+    private fun handleLLMEvent(event: GenerationEvent) {
+        when (event.kind) {
+            GenerationEventKind.GENERATION_EVENT_KIND_STARTED -> {
+                Timber.d("LLM generation started: ${event.model_id}")
             }
-            LLMEvent.LLMEventType.GENERATION_COMPLETED -> {
-                Timber.i("✅ Generation completed: ${event.tokensGenerated} tokens")
+            GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
+                Timber.i("✅ Generation completed: ${event.tokens_used} tokens")
                 // B-AK-7-002 — force-clear isGenerating in case generateAndCollect's
                 // Flow never received is_final=true. Also sync the conversation store.
                 if (_uiState.value.isGenerating) {
@@ -129,18 +131,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     syncCurrentConversationToStore()
                 }
             }
-            LLMEvent.LLMEventType.GENERATION_FAILED -> {
+            GenerationEventKind.GENERATION_EVENT_KIND_FAILED -> {
                 Timber.e("Generation failed: ${event.error}")
                 _uiState.value =
                     _uiState.value.copy(
                         isGenerating = false,
-                        error = Exception(event.error ?: "Generation failed"),
+                        error = Exception(event.error.ifBlank { "Generation failed" }),
                     )
             }
-            LLMEvent.LLMEventType.STREAM_TOKEN -> {
+            GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED -> {
                 // Token received during streaming - handled by flow collection
             }
-            LLMEvent.LLMEventType.STREAM_COMPLETED -> {
+            GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED -> {
                 Timber.d("Stream completed")
                 // Fallback: if the Flow collector never sees is_final=true the UI stays
                 // stuck in isGenerating=true. STREAM_COMPLETED is the definitive signal
@@ -150,6 +152,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     syncCurrentConversationToStore()
                 }
             }
+            else -> Unit
         }
     }
 
@@ -262,11 +265,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             // Create tool calling options
             val toolOptions =
                 ToolCallingOptions(
-                    maxToolCalls = 3,
-                    autoExecute = true,
+                    max_iterations = 3,
+                    auto_execute = true,
                     temperature = 0.7f,
-                    maxTokens = 1024,
-                    format = format,
+                    max_tokens = 1024,
+                    format_hint = format,
                 )
 
             // Generate with tools
@@ -278,22 +281,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             updateAssistantMessage(messageId, response, null)
 
             // Log tool calls and create tool call info
-            if (result.toolCalls.isNotEmpty()) {
-                Timber.i("🔧 Tool calls made: ${result.toolCalls.map { it.toolName }}")
-                result.toolResults.forEach { toolResult ->
-                    Timber.i("📋 Tool result: ${toolResult.toolName} - success: ${toolResult.success}")
+            if (result.tool_calls.isNotEmpty()) {
+                Timber.i("🔧 Tool calls made: ${result.tool_calls.map { it.name }}")
+                result.tool_results.forEach { toolResult ->
+                    Timber.i("📋 Tool result: ${toolResult.name} - success: ${toolResult.error.isNullOrBlank()}")
                 }
 
                 // Create ToolCallInfo from the first tool call and result
-                val firstToolCall = result.toolCalls.first()
-                val firstToolResult = result.toolResults.firstOrNull { it.toolName == firstToolCall.toolName }
+                val firstToolCall = result.tool_calls.first()
+                val firstToolResult = result.tool_results.firstOrNull { it.name == firstToolCall.name }
 
                 val toolCallInfo =
                     ToolCallInfo(
-                        toolName = firstToolCall.toolName,
-                        arguments = formatToolValueMapToJson(firstToolCall.arguments),
-                        result = firstToolResult?.result?.let { formatToolValueMapToJson(it) },
-                        success = firstToolResult?.success ?: false,
+                        toolName = firstToolCall.name,
+                        arguments = firstToolCall.arguments_json,
+                        result = firstToolResult?.result_json,
+                        success = firstToolResult != null && firstToolResult.error.isNullOrBlank(),
                         error = firstToolResult?.error,
                     )
 
@@ -973,19 +976,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * Handles all ToolValue variants with proper JSON escaping.
      */
     private fun formatToolValueToJsonElement(value: ToolValue): JsonElement {
-        return when (value) {
-            is ToolValue.StringValue -> JsonPrimitive(value.value)
-            is ToolValue.NumberValue -> JsonPrimitive(value.value)
-            is ToolValue.BoolValue -> JsonPrimitive(value.value)
-            is ToolValue.NullValue -> JsonNull
-            is ToolValue.ArrayValue ->
-                buildJsonArray {
-                    value.value.forEach { add(formatToolValueToJsonElement(it)) }
-                }
-            is ToolValue.ObjectValue ->
-                buildJsonObject {
-                    value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
-                }
+        value.string_value?.let { return JsonPrimitive(it) }
+        value.number_value?.let { return JsonPrimitive(it) }
+        value.bool_value?.let { return JsonPrimitive(it) }
+        value.array_value?.let { arrayValue ->
+            return buildJsonArray {
+                arrayValue.values.forEach { add(formatToolValueToJsonElement(it)) }
+            }
         }
+        value.object_value?.let { objectValue ->
+            return buildJsonObject {
+                objectValue.fields.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
+            }
+        }
+        return JsonNull
     }
 }

@@ -111,6 +111,40 @@ public class VLMResult(
     schemaIndex = 5,
   )
   public val tokens_per_second: Float = 0f,
+  /**
+   * Detailed VLM metrics from Kotlin/Web/C ABI.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "imageTokens",
+    schemaIndex = 6,
+  )
+  public val image_tokens: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timeToFirstTokenMs",
+    schemaIndex = 7,
+  )
+  public val time_to_first_token_ms: Long = 0L,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "imageEncodeTimeMs",
+    schemaIndex = 8,
+  )
+  public val image_encode_time_ms: Long = 0L,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "hardwareUsed",
+    schemaIndex = 9,
+  )
+  public val hardware_used: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -130,6 +164,10 @@ public class VLMResult(
     if (total_tokens != other.total_tokens) return false
     if (processing_time_ms != other.processing_time_ms) return false
     if (tokens_per_second != other.tokens_per_second) return false
+    if (image_tokens != other.image_tokens) return false
+    if (time_to_first_token_ms != other.time_to_first_token_ms) return false
+    if (image_encode_time_ms != other.image_encode_time_ms) return false
+    if (hardware_used != other.hardware_used) return false
     return true
   }
 
@@ -143,6 +181,10 @@ public class VLMResult(
       result = result * 37 + total_tokens.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
       result = result * 37 + tokens_per_second.hashCode()
+      result = result * 37 + image_tokens.hashCode()
+      result = result * 37 + time_to_first_token_ms.hashCode()
+      result = result * 37 + image_encode_time_ms.hashCode()
+      result = result * 37 + (hardware_used?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -156,6 +198,10 @@ public class VLMResult(
     result += """total_tokens=$total_tokens"""
     result += """processing_time_ms=$processing_time_ms"""
     result += """tokens_per_second=$tokens_per_second"""
+    result += """image_tokens=$image_tokens"""
+    result += """time_to_first_token_ms=$time_to_first_token_ms"""
+    result += """image_encode_time_ms=$image_encode_time_ms"""
+    if (hardware_used != null) result += """hardware_used=${sanitize(hardware_used)}"""
     return result.joinToString(prefix = "VLMResult{", separator = ", ", postfix = "}")
   }
 
@@ -166,9 +212,14 @@ public class VLMResult(
     total_tokens: Long = this.total_tokens,
     processing_time_ms: Long = this.processing_time_ms,
     tokens_per_second: Float = this.tokens_per_second,
+    image_tokens: Int = this.image_tokens,
+    time_to_first_token_ms: Long = this.time_to_first_token_ms,
+    image_encode_time_ms: Long = this.image_encode_time_ms,
+    hardware_used: String? = this.hardware_used,
     unknownFields: ByteString = this.unknownFields,
   ): VLMResult = VLMResult(text, prompt_tokens, completion_tokens, total_tokens, processing_time_ms,
-      tokens_per_second, unknownFields)
+      tokens_per_second, image_tokens, time_to_first_token_ms, image_encode_time_ms, hardware_used,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -193,6 +244,13 @@ public class VLMResult(
             value.processing_time_ms)
         if (!value.tokens_per_second.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(6,
             value.tokens_per_second)
+        if (value.image_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.image_tokens)
+        if (value.time_to_first_token_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
+            value.time_to_first_token_ms)
+        if (value.image_encode_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(9,
+            value.image_encode_time_ms)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.hardware_used)
         return size
       }
 
@@ -208,11 +266,23 @@ public class VLMResult(
             value.processing_time_ms)
         if (!value.tokens_per_second.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 6,
             value.tokens_per_second)
+        if (value.image_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7, value.image_tokens)
+        if (value.time_to_first_token_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.time_to_first_token_ms)
+        if (value.image_encode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9,
+            value.image_encode_time_ms)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.hardware_used)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.hardware_used)
+        if (value.image_encode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9,
+            value.image_encode_time_ms)
+        if (value.time_to_first_token_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.time_to_first_token_ms)
+        if (value.image_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7, value.image_tokens)
         if (!value.tokens_per_second.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 6,
             value.tokens_per_second)
         if (value.processing_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 5,
@@ -233,6 +303,10 @@ public class VLMResult(
         var total_tokens: Long = 0L
         var processing_time_ms: Long = 0L
         var tokens_per_second: Float = 0f
+        var image_tokens: Int = 0
+        var time_to_first_token_ms: Long = 0L
+        var image_encode_time_ms: Long = 0L
+        var hardware_used: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -241,6 +315,10 @@ public class VLMResult(
             4 -> total_tokens = ProtoAdapter.INT64.decode(reader)
             5 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             6 -> tokens_per_second = ProtoAdapter.FLOAT.decode(reader)
+            7 -> image_tokens = ProtoAdapter.INT32.decode(reader)
+            8 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
+            9 -> image_encode_time_ms = ProtoAdapter.INT64.decode(reader)
+            10 -> hardware_used = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -251,6 +329,10 @@ public class VLMResult(
           total_tokens = total_tokens,
           processing_time_ms = processing_time_ms,
           tokens_per_second = tokens_per_second,
+          image_tokens = image_tokens,
+          time_to_first_token_ms = time_to_first_token_ms,
+          image_encode_time_ms = image_encode_time_ms,
+          hardware_used = hardware_used,
           unknownFields = unknownFields
         )
       }

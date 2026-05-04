@@ -53,6 +53,18 @@ public class DiffusionTokenizerSource(
     schemaIndex = 1,
   )
   public val custom_path: String? = null,
+  /**
+   * Automatically download missing tokenizer files. Defaults to backend
+   * policy when unset/false.
+   */
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "autoDownload",
+    schemaIndex = 2,
+  )
+  public val auto_download: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionTokenizerSource, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -68,6 +80,7 @@ public class DiffusionTokenizerSource(
     if (unknownFields != other.unknownFields) return false
     if (kind != other.kind) return false
     if (custom_path != other.custom_path) return false
+    if (auto_download != other.auto_download) return false
     return true
   }
 
@@ -77,6 +90,7 @@ public class DiffusionTokenizerSource(
       result = unknownFields.hashCode()
       result = result * 37 + kind.hashCode()
       result = result * 37 + (custom_path?.hashCode() ?: 0)
+      result = result * 37 + auto_download.hashCode()
       super.hashCode = result
     }
     return result
@@ -86,6 +100,7 @@ public class DiffusionTokenizerSource(
     val result = mutableListOf<String>()
     result += """kind=$kind"""
     if (custom_path != null) result += """custom_path=${sanitize(custom_path)}"""
+    result += """auto_download=$auto_download"""
     return result.joinToString(prefix = "DiffusionTokenizerSource{", separator = ", ", postfix =
         "}")
   }
@@ -93,8 +108,10 @@ public class DiffusionTokenizerSource(
   public fun copy(
     kind: DiffusionTokenizerSourceKind = this.kind,
     custom_path: String? = this.custom_path,
+    auto_download: Boolean = this.auto_download,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionTokenizerSource = DiffusionTokenizerSource(kind, custom_path, unknownFields)
+  ): DiffusionTokenizerSource = DiffusionTokenizerSource(kind, custom_path, auto_download,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -112,6 +129,8 @@ public class DiffusionTokenizerSource(
         if (value.kind != DiffusionTokenizerSourceKind.DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED)
             size += DiffusionTokenizerSourceKind.ADAPTER.encodedSizeWithTag(1, value.kind)
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.custom_path)
+        if (value.auto_download != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
+            value.auto_download)
         return size
       }
 
@@ -119,11 +138,15 @@ public class DiffusionTokenizerSource(
         if (value.kind != DiffusionTokenizerSourceKind.DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED)
             DiffusionTokenizerSourceKind.ADAPTER.encodeWithTag(writer, 1, value.kind)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.custom_path)
+        if (value.auto_download != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
+            value.auto_download)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionTokenizerSource) {
         writer.writeBytes(value.unknownFields)
+        if (value.auto_download != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
+            value.auto_download)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.custom_path)
         if (value.kind != DiffusionTokenizerSourceKind.DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED)
             DiffusionTokenizerSourceKind.ADAPTER.encodeWithTag(writer, 1, value.kind)
@@ -133,6 +156,7 @@ public class DiffusionTokenizerSource(
         var kind: DiffusionTokenizerSourceKind =
             DiffusionTokenizerSourceKind.DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED
         var custom_path: String? = null
+        var auto_download: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -141,12 +165,14 @@ public class DiffusionTokenizerSource(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             2 -> custom_path = ProtoAdapter.STRING.decode(reader)
+            3 -> auto_download = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DiffusionTokenizerSource(
           kind = kind,
           custom_path = custom_path,
+          auto_download = auto_download,
           unknownFields = unknownFields
         )
       }

@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -99,6 +100,35 @@ public class DiffusionConfiguration(
     schemaIndex = 3,
   )
   public val max_memory_mb: Int = 0,
+  /**
+   * C ABI / SDK component fields that identify and route the component.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "modelId",
+    schemaIndex = 4,
+  )
+  public val model_id: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    jsonName = "preferredFramework",
+    schemaIndex = 5,
+  )
+  public val preferred_framework: InferenceFramework? = null,
+  /**
+   * Legacy low-memory boolean. Backends may translate true to an internal
+   * memory cap when max_memory_mb is unset.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "reduceMemory",
+    schemaIndex = 6,
+  )
+  public val reduce_memory: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -116,6 +146,9 @@ public class DiffusionConfiguration(
     if (tokenizer_source != other.tokenizer_source) return false
     if (enable_safety_checker != other.enable_safety_checker) return false
     if (max_memory_mb != other.max_memory_mb) return false
+    if (model_id != other.model_id) return false
+    if (preferred_framework != other.preferred_framework) return false
+    if (reduce_memory != other.reduce_memory) return false
     return true
   }
 
@@ -127,6 +160,9 @@ public class DiffusionConfiguration(
       result = result * 37 + (tokenizer_source?.hashCode() ?: 0)
       result = result * 37 + enable_safety_checker.hashCode()
       result = result * 37 + max_memory_mb.hashCode()
+      result = result * 37 + (model_id?.hashCode() ?: 0)
+      result = result * 37 + (preferred_framework?.hashCode() ?: 0)
+      result = result * 37 + reduce_memory.hashCode()
       super.hashCode = result
     }
     return result
@@ -138,6 +174,9 @@ public class DiffusionConfiguration(
     if (tokenizer_source != null) result += """tokenizer_source=$tokenizer_source"""
     result += """enable_safety_checker=$enable_safety_checker"""
     result += """max_memory_mb=$max_memory_mb"""
+    if (model_id != null) result += """model_id=${sanitize(model_id)}"""
+    if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
+    result += """reduce_memory=$reduce_memory"""
     return result.joinToString(prefix = "DiffusionConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -146,9 +185,13 @@ public class DiffusionConfiguration(
     tokenizer_source: DiffusionTokenizerSource? = this.tokenizer_source,
     enable_safety_checker: Boolean = this.enable_safety_checker,
     max_memory_mb: Int = this.max_memory_mb,
+    model_id: String? = this.model_id,
+    preferred_framework: InferenceFramework? = this.preferred_framework,
+    reduce_memory: Boolean = this.reduce_memory,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionConfiguration = DiffusionConfiguration(model_variant, tokenizer_source,
-      enable_safety_checker, max_memory_mb, unknownFields)
+      enable_safety_checker, max_memory_mb, model_id, preferred_framework, reduce_memory,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -171,6 +214,10 @@ public class DiffusionConfiguration(
             value.enable_safety_checker)
         if (value.max_memory_mb != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
             value.max_memory_mb)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_id)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(6, value.preferred_framework)
+        if (value.reduce_memory != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.reduce_memory)
         return size
       }
 
@@ -183,11 +230,19 @@ public class DiffusionConfiguration(
             value.enable_safety_checker)
         if (value.max_memory_mb != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
             value.max_memory_mb)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
+        if (value.reduce_memory != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.reduce_memory)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionConfiguration) {
         writer.writeBytes(value.unknownFields)
+        if (value.reduce_memory != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.reduce_memory)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         if (value.max_memory_mb != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
             value.max_memory_mb)
         if (value.enable_safety_checker != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
@@ -204,6 +259,9 @@ public class DiffusionConfiguration(
         var tokenizer_source: DiffusionTokenizerSource? = null
         var enable_safety_checker: Boolean = false
         var max_memory_mb: Int = 0
+        var model_id: String? = null
+        var preferred_framework: InferenceFramework? = null
+        var reduce_memory: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -214,6 +272,13 @@ public class DiffusionConfiguration(
             2 -> tokenizer_source = DiffusionTokenizerSource.ADAPTER.decode(reader)
             3 -> enable_safety_checker = ProtoAdapter.BOOL.decode(reader)
             4 -> max_memory_mb = ProtoAdapter.INT32.decode(reader)
+            5 -> model_id = ProtoAdapter.STRING.decode(reader)
+            6 -> try {
+              preferred_framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            7 -> reduce_memory = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -222,6 +287,9 @@ public class DiffusionConfiguration(
           tokenizer_source = tokenizer_source,
           enable_safety_checker = enable_safety_checker,
           max_memory_mb = max_memory_mb,
+          model_id = model_id,
+          preferred_framework = preferred_framework,
+          reduce_memory = reduce_memory,
           unknownFields = unknownFields
         )
       }

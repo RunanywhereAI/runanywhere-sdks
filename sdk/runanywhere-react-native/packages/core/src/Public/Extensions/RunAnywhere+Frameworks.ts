@@ -56,12 +56,13 @@ function relevantCategoriesFor(capability: SDKComponent): Set<ModelCategory> {
     case SDKComponent.SDK_COMPONENT_TTS:
       return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS]);
     case SDKComponent.SDK_COMPONENT_VAD:
-      return new Set([ModelCategory.MODEL_CATEGORY_AUDIO]);
+      return new Set([ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION]);
     case SDKComponent.SDK_COMPONENT_VOICE_AGENT:
       return new Set([
         ModelCategory.MODEL_CATEGORY_LANGUAGE,
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       ]);
     case SDKComponent.SDK_COMPONENT_EMBEDDINGS:
       return new Set([ModelCategory.MODEL_CATEGORY_EMBEDDING]);

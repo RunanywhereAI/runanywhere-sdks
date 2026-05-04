@@ -75,6 +75,7 @@ object CppBridgeTelemetry {
 
     private const val TAG = "CppBridgeTelemetry"
     private const val DEFAULT_TIMEOUT_MS = 30_000
+    private val placeholderPattern = Regex("YOUR_|<your|REPLACE_ME|PLACEHOLDER", RegexOption.IGNORE_CASE)
 
     /**
      * Background executor for HTTP requests. Cached thread pool so
@@ -134,6 +135,15 @@ object CppBridgeTelemetry {
         synchronized(lock) {
             currentEnvironment = environment
 
+            if (!hasUsableNetworkConfig(environment)) {
+                telemetryManagerHandle = 0
+                log(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    "Telemetry disabled: no usable external config for env=$environment",
+                )
+                return
+            }
+
             telemetryManagerHandle =
                 RunAnywhereBridge.racTelemetryManagerCreate(environment, deviceId, "android", sdkVersion)
 
@@ -186,6 +196,30 @@ object CppBridgeTelemetry {
 
     fun getApiKey(): String? = _apiKey
 
+    fun looksLikePlaceholder(value: String?): Boolean =
+        value.isNullOrBlank() || placeholderPattern.containsMatchIn(value)
+
+    fun isUsableHttpUrl(value: String?): Boolean {
+        if (value.isNullOrBlank() || looksLikePlaceholder(value)) return false
+        return value.startsWith("https://") || value.startsWith("http://")
+    }
+
+    fun hasUsableDevelopmentConfig(): Boolean =
+        try {
+            val supabaseUrl = RunAnywhereBridge.racDevConfigGetSupabaseUrl()
+            val supabaseKey = RunAnywhereBridge.racDevConfigGetSupabaseKey()
+            isUsableHttpUrl(supabaseUrl) && !looksLikePlaceholder(supabaseKey)
+        } catch (e: Exception) {
+            false
+        }
+
+    fun hasUsableNetworkConfig(environment: Int = currentEnvironment): Boolean =
+        if (environment == 0) {
+            hasUsableDevelopmentConfig()
+        } else {
+            isUsableHttpUrl(_baseUrl) && !looksLikePlaceholder(_apiKey)
+        }
+
     /**
      * Resolve the effective base URL for the given environment.
      *
@@ -199,19 +233,21 @@ object CppBridgeTelemetry {
 
         if (environment == 0) {
             try {
-                val supabaseUrl = RunAnywhereBridge.racDevConfigGetSupabaseUrl()
-                if (!supabaseUrl.isNullOrEmpty()) {
+                val supabaseUrl = RunAnywhereBridge.racDevConfigGetSupabaseUrl()?.trim()
+                if (supabaseUrl != null && isUsableHttpUrl(supabaseUrl)) {
                     log(CppBridgePlatformAdapter.LogLevel.INFO, "Using Supabase URL from C++ dev config: $supabaseUrl")
                     return supabaseUrl
                 }
-                log(CppBridgePlatformAdapter.LogLevel.WARN, "C++ dev config returned null/empty Supabase URL")
+                log(CppBridgePlatformAdapter.LogLevel.DEBUG, "C++ dev config has no usable Supabase URL")
             } catch (e: Exception) {
                 log(CppBridgePlatformAdapter.LogLevel.ERROR, "Failed to get Supabase URL from dev config: ${e.message}")
             }
         } else {
             _baseUrl?.let {
-                log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Using explicitly configured _baseUrl for env=$environment: $it")
-                return it
+                if (isUsableHttpUrl(it)) {
+                    log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Using explicitly configured _baseUrl for env=$environment: $it")
+                    return it
+                }
             }
         }
 
@@ -251,17 +287,19 @@ object CppBridgeTelemetry {
 
     /** True when a base URL has been configured (or the environment has a default). */
     val isHttpConfigured: Boolean
-        get() = _baseUrl != null || currentEnvironment > 0
+        get() = hasUsableNetworkConfig(currentEnvironment)
 
     @Volatile
     private var cachedApiKey: String? = null
 
     /** Supabase anon API key (dev mode only). */
     private fun getSupabaseApiKey(): String? {
-        cachedApiKey?.let { return it }
+        cachedApiKey?.let {
+            if (!looksLikePlaceholder(it)) return it
+        }
         return try {
             val apiKey = RunAnywhereBridge.racDevConfigGetSupabaseKey()
-            if (!apiKey.isNullOrEmpty()) {
+            if (!looksLikePlaceholder(apiKey)) {
                 cachedApiKey = apiKey
                 apiKey
             } else {

@@ -1,6 +1,6 @@
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework } from "./model_types";
-import { StructuredOutputOptions } from "./structured_output";
+import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -74,6 +74,11 @@ export interface LLMGenerationOptions {
      * here. When set, supersedes the simpler `json_schema` string above.
      */
     structuredOutput?: StructuredOutputOptions | undefined;
+    /**
+     * Enable per-token/cost dashboard tracking for SDKs that surface live
+     * generation telemetry. No-op for backends without a telemetry sink.
+     */
+    enableRealTimeTracking: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -129,6 +134,21 @@ export interface LLMGenerationResult {
      * when execution_target was AUTO and the SDK picked the route.
      */
     executedOn?: ExecutionTarget | undefined;
+    /**
+     * Structured-output validation details, when a structured-output request
+     * was used. Mirrors the Swift/RN validation payload.
+     */
+    structuredOutputValidation?: StructuredOutputValidation | undefined;
+    /**
+     * Total tokens consumed (prompt + completion). Some C ABI paths expose
+     * this directly; consumers may also compute it from the per-field counts.
+     */
+    totalTokens: number;
+    /**
+     * Backend error text for result-producing APIs that return a terminal
+     * result envelope instead of throwing through the host language.
+     */
+    errorMessage?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -148,6 +168,16 @@ export interface LLMConfiguration {
     systemPrompt?: string | undefined;
     /** Whether streaming generation is enabled by default for this component. */
     streaming: boolean;
+    /**
+     * Model identifier/path resolved by the component loader. Present in the
+     * C ABI rac_llm_config_t and needed for generated-proto service handles.
+     */
+    modelId?: string | undefined;
+    /**
+     * Preferred inference framework for this component. UNSPECIFIED / absent
+     * means "auto".
+     */
+    preferredFramework?: InferenceFramework | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

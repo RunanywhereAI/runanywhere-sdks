@@ -16,6 +16,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #if !defined(RAC_PLATFORM_ANDROID)
@@ -89,17 +90,24 @@ void rac_log(rac_log_level_t level, const char* category, const char* message) {
 
 rac_result_t rac_init(const rac_config_t* config) {
     std::lock_guard<std::mutex> lock(s_init_mutex);
+    rac::events::publish_initialization_started();
 
     if (s_initialized.load()) {
+        rac::events::publish_initialization_failed(RAC_ERROR_ALREADY_INITIALIZED,
+                                                   "Commons already initialized");
         return RAC_ERROR_ALREADY_INITIALIZED;
     }
 
     if (config == nullptr) {
+        rac::events::publish_initialization_failed(RAC_ERROR_NULL_POINTER,
+                                                   "Config is required");
         return RAC_ERROR_NULL_POINTER;
     }
 
     if (config->platform_adapter == nullptr) {
         rac_error_set_details("Platform adapter is required for initialization");
+        rac::events::publish_initialization_failed(RAC_ERROR_ADAPTER_NOT_SET,
+                                                   "Platform adapter is required");
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
@@ -118,6 +126,7 @@ rac_result_t rac_init(const rac_config_t* config) {
 #endif
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons initialized");
+    rac::events::publish_initialization_completed();
 
     return RAC_SUCCESS;
 }
@@ -130,6 +139,7 @@ void rac_shutdown(void) {
     }
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
+    rac::events::publish_shutdown();
 
 #if !defined(RAC_PLATFORM_ANDROID)
     // Cleanup diffusion model registry (iOS/Apple only)

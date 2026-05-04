@@ -87,6 +87,28 @@ public class LLMConfiguration(
     schemaIndex = 4,
   )
   public val streaming: Boolean = false,
+  /**
+   * Model identifier/path resolved by the component loader. Present in the
+   * C ABI rac_llm_config_t and needed for generated-proto service handles.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "modelId",
+    schemaIndex = 5,
+  )
+  public val model_id: String? = null,
+  /**
+   * Preferred inference framework for this component. UNSPECIFIED / absent
+   * means "auto".
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    jsonName = "preferredFramework",
+    schemaIndex = 6,
+  )
+  public val preferred_framework: InferenceFramework? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -105,6 +127,8 @@ public class LLMConfiguration(
     if (max_tokens != other.max_tokens) return false
     if (system_prompt != other.system_prompt) return false
     if (streaming != other.streaming) return false
+    if (model_id != other.model_id) return false
+    if (preferred_framework != other.preferred_framework) return false
     return true
   }
 
@@ -117,6 +141,8 @@ public class LLMConfiguration(
       result = result * 37 + max_tokens.hashCode()
       result = result * 37 + (system_prompt?.hashCode() ?: 0)
       result = result * 37 + streaming.hashCode()
+      result = result * 37 + (model_id?.hashCode() ?: 0)
+      result = result * 37 + (preferred_framework?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -129,6 +155,8 @@ public class LLMConfiguration(
     result += """max_tokens=$max_tokens"""
     if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
     result += """streaming=$streaming"""
+    if (model_id != null) result += """model_id=${sanitize(model_id)}"""
+    if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
     return result.joinToString(prefix = "LLMConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -138,9 +166,11 @@ public class LLMConfiguration(
     max_tokens: Int = this.max_tokens,
     system_prompt: String? = this.system_prompt,
     streaming: Boolean = this.streaming,
+    model_id: String? = this.model_id,
+    preferred_framework: InferenceFramework? = this.preferred_framework,
     unknownFields: ByteString = this.unknownFields,
   ): LLMConfiguration = LLMConfiguration(context_length, temperature, max_tokens, system_prompt,
-      streaming, unknownFields)
+      streaming, model_id, preferred_framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -163,6 +193,8 @@ public class LLMConfiguration(
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.system_prompt)
         if (value.streaming != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
             value.streaming)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.model_id)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(7, value.preferred_framework)
         return size
       }
 
@@ -174,11 +206,15 @@ public class LLMConfiguration(
         if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_tokens)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.system_prompt)
         if (value.streaming != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.streaming)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.model_id)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 7, value.preferred_framework)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMConfiguration) {
         writer.writeBytes(value.unknownFields)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 7, value.preferred_framework)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.model_id)
         if (value.streaming != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.streaming)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.system_prompt)
         if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_tokens)
@@ -194,6 +230,8 @@ public class LLMConfiguration(
         var max_tokens: Int = 0
         var system_prompt: String? = null
         var streaming: Boolean = false
+        var model_id: String? = null
+        var preferred_framework: InferenceFramework? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> context_length = ProtoAdapter.INT32.decode(reader)
@@ -201,6 +239,12 @@ public class LLMConfiguration(
             3 -> max_tokens = ProtoAdapter.INT32.decode(reader)
             4 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             5 -> streaming = ProtoAdapter.BOOL.decode(reader)
+            6 -> model_id = ProtoAdapter.STRING.decode(reader)
+            7 -> try {
+              preferred_framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -210,6 +254,8 @@ public class LLMConfiguration(
           max_tokens = max_tokens,
           system_prompt = system_prompt,
           streaming = streaming,
+          model_id = model_id,
+          preferred_framework = preferred_framework,
           unknownFields = unknownFields
         )
       }

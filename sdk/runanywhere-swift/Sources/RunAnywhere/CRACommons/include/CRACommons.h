@@ -17,6 +17,7 @@
 
 #include "rac_types.h"
 #include "rac_error.h"
+#include "rac_proto_buffer.h"
 #include "rac_structured_error.h"
 #include "rac_logger.h"
 #include "rac_core.h"
@@ -26,6 +27,7 @@
 
 // Lifecycle management
 #include "rac_lifecycle.h"
+#include "rac_model_lifecycle.h"
 
 // SDK State (centralized state management)
 #include "rac_sdk_state.h"
@@ -92,6 +94,7 @@
 // Voice Agent
 #include "rac_voice_agent.h"
 #include "rac_voice_event_abi.h"
+#include "rac_modality_proto_abi.h"
 
 // Embeddings
 #include "rac_embeddings.h"
@@ -109,6 +112,7 @@
 
 // Event system
 #include "rac_events.h"
+#include "rac_sdk_event_stream.h"
 #include "rac_analytics_events.h"
 
 // Download management

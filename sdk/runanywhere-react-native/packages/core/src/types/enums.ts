@@ -80,14 +80,10 @@ export enum ConfigurationSource {
 }
 
 /**
- * Supported LLM frameworks (RN-local labels, mirrored across SDKs but
- * NOT proto-canonical). The proto `InferenceFramework` covers a subset
- * (LlamaCpp / ExecuTorch / MLX / FoundationModels / etc.) but uses
- * SCREAMING_SNAKE_CASE values that are unsuitable as a drop-in
- * replacement for the string labels surfaced to RN consumers.
- *
- * For typed proto-encoded transport, use `InferenceFramework` from
- * `@runanywhere/proto-ts/model_types` directly.
+ * @deprecated Legacy RN registry bridge labels. New public APIs must use
+ * `InferenceFramework` from `@runanywhere/proto-ts/model_types` directly.
+ * This survives only until the RN model registry/native JSON bridge returns
+ * generated `ModelInfo` proto messages.
  */
 export enum LLMFramework {
   CoreML = 'CoreML',
@@ -142,8 +138,9 @@ import type { ModelCategory as ModelCategoryProto } from '@runanywhere/proto-ts/
 export const ModelCategoryDisplayNames: Partial<Record<ModelCategoryProto, string>> = {};
 
 /**
- * Hardware acceleration types. RN-local — no proto counterpart yet
- * (G-B1 introduces `hardware_profile.proto` post-Round-1).
+ * @deprecated Legacy RN display labels. Public hardware data is generated
+ * `HardwareProfileResult` / `AcceleratorPreference` from
+ * `@runanywhere/proto-ts/hardware_profile`.
  */
 export enum HardwareAcceleration {
   CPU = 'cpu',
@@ -163,9 +160,8 @@ export enum PrivacyMode {
 }
 
 /**
- * Event types for categorisation. RN-local — used by the JS-side
- * `EventBus` topic dispatch; the proto `SDKEvent` envelope uses
- * different category enums.
+ * @deprecated Legacy JS EventBus topics. Public event streams should use the
+ * generated `SDKEvent` envelope from `@runanywhere/proto-ts/sdk_events`.
  */
 export enum SDKEventType {
   Initialization = 'initialization',

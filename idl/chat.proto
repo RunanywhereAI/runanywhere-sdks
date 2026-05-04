@@ -15,6 +15,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "tool_calling.proto";
+
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
@@ -68,4 +70,12 @@ message ChatMessage {
     // Optional tool-call ID this message is responding to (only set when
     // role == MESSAGE_ROLE_TOOL).
     optional string tool_call_id = 7;
+
+    // Typed tool calls embedded in this assistant message. Supersedes
+    // tool_calls_json for generated-proto callers while keeping the legacy
+    // JSON string list available.
+    repeated ToolCall tool_calls = 8;
+
+    // Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
+    optional ToolResult tool_result = 9;
 }

@@ -13,8 +13,8 @@
     "format": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --check",
     "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
     "unused": "knip",
-    "pod-install": "cd ios && pod install",
-    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && cd ios && pod install",
+    "pod-install": "cd ios && bundle exec pod install",
+    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && cd ios && bundle exec pod install",
     "postinstall": "patch-package"
   },
   "dependencies": {

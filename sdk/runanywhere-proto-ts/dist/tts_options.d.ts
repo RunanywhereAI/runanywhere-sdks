@@ -1,5 +1,5 @@
 import _m0 from "protobufjs/minimal";
-import { AudioFormat } from "./model_types";
+import { AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -69,6 +69,11 @@ export interface TTSConfiguration {
     enableNeuralVoice: boolean;
     /** Whether to enable SSML markup support. */
     enableSsml: boolean;
+    /**
+     * Preferred framework for the component. Absent = auto. Mirrors the C
+     * ABI rac_tts_config_t preferred_framework field.
+     */
+    preferredFramework?: InferenceFramework | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -106,6 +111,11 @@ export interface TTSOptions {
     enableSsml: boolean;
     /** Output audio format. */
     audioFormat: AudioFormat;
+    /**
+     * Output sample rate override in Hz. 0 = component/default sample rate.
+     * Present in rac_tts_options_t and several SDK option structs.
+     */
+    sampleRate: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -151,6 +161,11 @@ export interface TTSSynthesisMetadata {
      * metadata-only paths (e.g. TTSSpeakResult).
      */
     audioDurationMs: number;
+    /**
+     * Characters processed per second. Some native paths expose this directly;
+     * consumers may also compute it from character_count / processing_time_ms.
+     */
+    charactersPerSecond: number;
 }
 /**
  * ---------------------------------------------------------------------------

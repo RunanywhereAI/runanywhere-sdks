@@ -102,10 +102,30 @@ export interface JSONSchema {
     items?: JSONSchemaProperty | undefined;
     /** Whether properties not declared in `properties` are allowed. */
     additionalProperties?: boolean | undefined;
+    /**
+     * JSON Schema document metadata / composition fields. Field names avoid
+     * `$` in generated APIs while preserving JSON names for serializers.
+     */
+    schemaUri?: string | undefined;
+    idUri?: string | undefined;
+    title?: string | undefined;
+    description?: string | undefined;
+    definitions: {
+        [key: string]: JSONSchema;
+    };
+    ref?: string | undefined;
+    allOf: JSONSchema[];
+    anyOf: JSONSchema[];
+    oneOf: JSONSchema[];
+    notSchema?: JSONSchema | undefined;
 }
 export interface JSONSchema_PropertiesEntry {
     key: string;
     value?: JSONSchemaProperty | undefined;
+}
+export interface JSONSchema_DefinitionsEntry {
+    key: string;
+    value?: JSONSchema | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -125,6 +145,14 @@ export interface StructuredOutputOptions {
     includeSchemaInPrompt: boolean;
     /** Strict schema adherence — rejects outputs that don't fully validate. */
     strictMode?: boolean | undefined;
+    /**
+     * Raw JSON Schema string for C ABI and SDKs that already carry schema as
+     * serialized JSON instead of the typed JSONSchema tree.
+     */
+    jsonSchema?: string | undefined;
+    /** Optional generated type/name hints used by Swift/Kotlin/Dart wrappers. */
+    typeName?: string | undefined;
+    name?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -144,6 +172,11 @@ export interface StructuredOutputValidation {
     errorMessage?: string | undefined;
     /** Original raw model output (for debugging / fallback parsing). */
     rawOutput?: string | undefined;
+    /**
+     * JSON substring extracted from raw_output before validation, when the
+     * extractor found one.
+     */
+    extractedJson?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -277,6 +310,14 @@ export declare const JSONSchema_PropertiesEntry: {
     toJSON(message: JSONSchema_PropertiesEntry): unknown;
     create<I extends Exact<DeepPartial<JSONSchema_PropertiesEntry>, I>>(base?: I): JSONSchema_PropertiesEntry;
     fromPartial<I extends Exact<DeepPartial<JSONSchema_PropertiesEntry>, I>>(object: I): JSONSchema_PropertiesEntry;
+};
+export declare const JSONSchema_DefinitionsEntry: {
+    encode(message: JSONSchema_DefinitionsEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): JSONSchema_DefinitionsEntry;
+    fromJSON(object: any): JSONSchema_DefinitionsEntry;
+    toJSON(message: JSONSchema_DefinitionsEntry): unknown;
+    create<I extends Exact<DeepPartial<JSONSchema_DefinitionsEntry>, I>>(base?: I): JSONSchema_DefinitionsEntry;
+    fromPartial<I extends Exact<DeepPartial<JSONSchema_DefinitionsEntry>, I>>(object: I): JSONSchema_DefinitionsEntry;
 };
 export declare const StructuredOutputOptions: {
     encode(message: StructuredOutputOptions, writer?: _m0.Writer): _m0.Writer;

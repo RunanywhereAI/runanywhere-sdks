@@ -184,9 +184,22 @@ public struct RATTSConfiguration: Sendable {
   /// Whether to enable SSML markup support.
   public var enableSsml: Bool = false
 
+  /// Preferred framework for the component. Absent = auto. Mirrors the C
+  /// ABI rac_tts_config_t preferred_framework field.
+  public var preferredFramework: RAInferenceFramework {
+    get {_preferredFramework ?? .unspecified}
+    set {_preferredFramework = newValue}
+  }
+  /// Returns true if `preferredFramework` has been explicitly set.
+  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
+  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _preferredFramework: RAInferenceFramework? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -229,6 +242,10 @@ public struct RATTSOptions: Sendable {
 
   /// Output audio format.
   public var audioFormat: RAAudioFormat = .unspecified
+
+  /// Output sample rate override in Hz. 0 = component/default sample rate.
+  /// Present in rac_tts_options_t and several SDK option structs.
+  public var sampleRate: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -290,6 +307,10 @@ public struct RATTSSynthesisMetadata: Sendable {
   /// mirrored here so metadata is self-describing for clients that consume
   /// metadata-only paths (e.g. TTSSpeakResult).
   public var audioDurationMs: Int64 = 0
+
+  /// Characters processed per second. Some native paths expose this directly;
+  /// consumers may also compute it from character_count / processing_time_ms.
+  public var charactersPerSecond: Float = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -437,7 +458,7 @@ extension RATTSVoiceGender: SwiftProtobuf._ProtoNameProviding {
 
 extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}enable_neural_voice\0\u{3}enable_ssml\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}enable_neural_voice\0\u{3}enable_ssml\0\u{3}preferred_framework\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -455,12 +476,17 @@ extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 8: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self.enableNeuralVoice) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self.enableSsml) }()
+      case 11: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
@@ -491,6 +517,9 @@ extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if self.enableSsml != false {
       try visitor.visitSingularBoolField(value: self.enableSsml, fieldNumber: 10)
     }
+    try { if let v = self._preferredFramework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -505,6 +534,7 @@ extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.enableNeuralVoice != rhs.enableNeuralVoice {return false}
     if lhs.enableSsml != rhs.enableSsml {return false}
+    if lhs._preferredFramework != rhs._preferredFramework {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -512,7 +542,7 @@ extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -527,6 +557,7 @@ extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       case 5: try { try decoder.decodeSingularFloatField(value: &self.volume) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.enableSsml) }()
       case 7: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       default: break
       }
     }
@@ -554,6 +585,9 @@ extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if self.audioFormat != .unspecified {
       try visitor.visitSingularEnumField(value: self.audioFormat, fieldNumber: 7)
     }
+    if self.sampleRate != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -565,6 +599,7 @@ extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.volume != rhs.volume {return false}
     if lhs.enableSsml != rhs.enableSsml {return false}
     if lhs.audioFormat != rhs.audioFormat {return false}
+    if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -612,7 +647,7 @@ extension RATTSPhonemeTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
 
 extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSSynthesisMetadata"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_id\0\u{3}language_code\0\u{3}processing_time_ms\0\u{3}character_count\0\u{3}audio_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_id\0\u{3}language_code\0\u{3}processing_time_ms\0\u{3}character_count\0\u{3}audio_duration_ms\0\u{3}characters_per_second\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -625,6 +660,7 @@ extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.processingTimeMs) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.characterCount) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.audioDurationMs) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self.charactersPerSecond) }()
       default: break
       }
     }
@@ -646,6 +682,9 @@ extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if self.audioDurationMs != 0 {
       try visitor.visitSingularInt64Field(value: self.audioDurationMs, fieldNumber: 5)
     }
+    if self.charactersPerSecond.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.charactersPerSecond, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -655,6 +694,7 @@ extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.processingTimeMs != rhs.processingTimeMs {return false}
     if lhs.characterCount != rhs.characterCount {return false}
     if lhs.audioDurationMs != rhs.audioDurationMs {return false}
+    if lhs.charactersPerSecond != rhs.charactersPerSecond {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

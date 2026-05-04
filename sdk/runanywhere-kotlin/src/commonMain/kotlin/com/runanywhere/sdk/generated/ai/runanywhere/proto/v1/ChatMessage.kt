@@ -14,6 +14,7 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -100,6 +101,17 @@ public class ChatMessage(
     schemaIndex = 6,
   )
   public val tool_call_id: String? = null,
+  tool_calls: List<ToolCall> = emptyList(),
+  /**
+   * Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",
+    jsonName = "toolResult",
+    schemaIndex = 8,
+  )
+  public val tool_result: ToolResult? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ChatMessage, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -115,6 +127,20 @@ public class ChatMessage(
     schemaIndex = 5,
   )
   public val tool_calls_json: List<String> = immutableCopyOf("tool_calls_json", tool_calls_json)
+
+  /**
+   * Typed tool calls embedded in this assistant message. Supersedes
+   * tool_calls_json for generated-proto callers while keeping the legacy
+   * JSON string list available.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "toolCalls",
+    schemaIndex = 7,
+  )
+  public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -134,6 +160,8 @@ public class ChatMessage(
     if (name != other.name) return false
     if (tool_calls_json != other.tool_calls_json) return false
     if (tool_call_id != other.tool_call_id) return false
+    if (tool_calls != other.tool_calls) return false
+    if (tool_result != other.tool_result) return false
     return true
   }
 
@@ -148,6 +176,8 @@ public class ChatMessage(
       result = result * 37 + (name?.hashCode() ?: 0)
       result = result * 37 + tool_calls_json.hashCode()
       result = result * 37 + (tool_call_id?.hashCode() ?: 0)
+      result = result * 37 + tool_calls.hashCode()
+      result = result * 37 + (tool_result?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -162,6 +192,8 @@ public class ChatMessage(
     if (name != null) result += """name=${sanitize(name)}"""
     if (tool_calls_json.isNotEmpty()) result += """tool_calls_json=${sanitize(tool_calls_json)}"""
     if (tool_call_id != null) result += """tool_call_id=${sanitize(tool_call_id)}"""
+    if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
+    if (tool_result != null) result += """tool_result=$tool_result"""
     return result.joinToString(prefix = "ChatMessage{", separator = ", ", postfix = "}")
   }
 
@@ -173,9 +205,11 @@ public class ChatMessage(
     name: String? = this.name,
     tool_calls_json: List<String> = this.tool_calls_json,
     tool_call_id: String? = this.tool_call_id,
+    tool_calls: List<ToolCall> = this.tool_calls,
+    tool_result: ToolResult? = this.tool_result,
     unknownFields: ByteString = this.unknownFields,
   ): ChatMessage = ChatMessage(id, role, content, timestamp_us, name, tool_calls_json, tool_call_id,
-      unknownFields)
+      tool_calls, tool_result, unknownFields)
 
   public companion object {
     @JvmField
@@ -198,6 +232,8 @@ public class ChatMessage(
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.name)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.tool_calls_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.tool_call_id)
+        size += ToolCall.ADAPTER.asRepeated().encodedSizeWithTag(8, value.tool_calls)
+        size += ToolResult.ADAPTER.encodedSizeWithTag(9, value.tool_result)
         return size
       }
 
@@ -211,11 +247,15 @@ public class ChatMessage(
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.name)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.tool_calls_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tool_call_id)
+        ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.tool_calls)
+        ToolResult.ADAPTER.encodeWithTag(writer, 9, value.tool_result)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ChatMessage) {
         writer.writeBytes(value.unknownFields)
+        ToolResult.ADAPTER.encodeWithTag(writer, 9, value.tool_result)
+        ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.tool_calls)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tool_call_id)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.tool_calls_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.name)
@@ -235,6 +275,8 @@ public class ChatMessage(
         var name: String? = null
         val tool_calls_json = mutableListOf<String>()
         var tool_call_id: String? = null
+        val tool_calls = mutableListOf<ToolCall>()
+        var tool_result: ToolResult? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -248,6 +290,8 @@ public class ChatMessage(
             5 -> name = ProtoAdapter.STRING.decode(reader)
             6 -> tool_calls_json.add(ProtoAdapter.STRING.decode(reader))
             7 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
+            8 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
+            9 -> tool_result = ToolResult.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -259,11 +303,15 @@ public class ChatMessage(
           name = name,
           tool_calls_json = tool_calls_json,
           tool_call_id = tool_call_id,
+          tool_calls = tool_calls,
+          tool_result = tool_result,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ChatMessage): ChatMessage = value.copy(
+        tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
+        tool_result = value.tool_result?.let(ToolResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

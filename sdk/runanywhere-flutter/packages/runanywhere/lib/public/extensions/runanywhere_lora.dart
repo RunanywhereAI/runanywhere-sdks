@@ -3,9 +3,9 @@
 // runanywhere_lora.dart — LoRA (Low-Rank Adaptation) adapter helpers.
 // Mirrors Swift `RunAnywhere+LoRA.swift` and Kotlin `RunAnywhere+LoRA.kt`.
 
+import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/generated/lora_options.pb.dart';
 
 /// Static helpers for managing LoRA adapters.
 ///

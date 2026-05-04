@@ -197,6 +197,40 @@ public class LLMGenerationResult(
     schemaIndex = 14,
   )
   public val executed_on: ExecutionTarget? = null,
+  /**
+   * Structured-output validation details, when a structured-output request
+   * was used. Mirrors the Swift/RN validation payload.
+   */
+  @field:WireField(
+    tag = 16,
+    adapter = "ai.runanywhere.proto.v1.StructuredOutputValidation#ADAPTER",
+    jsonName = "structuredOutputValidation",
+    schemaIndex = 15,
+  )
+  public val structured_output_validation: StructuredOutputValidation? = null,
+  /**
+   * Total tokens consumed (prompt + completion). Some C ABI paths expose
+   * this directly; consumers may also compute it from the per-field counts.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalTokens",
+    schemaIndex = 16,
+  )
+  public val total_tokens: Int = 0,
+  /**
+   * Backend error text for result-producing APIs that return a terminal
+   * result envelope instead of throwing through the host language.
+   */
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 17,
+  )
+  public val error_message: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -225,6 +259,9 @@ public class LLMGenerationResult(
     if (json_output != other.json_output) return false
     if (performance != other.performance) return false
     if (executed_on != other.executed_on) return false
+    if (structured_output_validation != other.structured_output_validation) return false
+    if (total_tokens != other.total_tokens) return false
+    if (error_message != other.error_message) return false
     return true
   }
 
@@ -247,6 +284,9 @@ public class LLMGenerationResult(
       result = result * 37 + (json_output?.hashCode() ?: 0)
       result = result * 37 + (performance?.hashCode() ?: 0)
       result = result * 37 + (executed_on?.hashCode() ?: 0)
+      result = result * 37 + (structured_output_validation?.hashCode() ?: 0)
+      result = result * 37 + total_tokens.hashCode()
+      result = result * 37 + (error_message?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -269,6 +309,10 @@ public class LLMGenerationResult(
     if (json_output != null) result += """json_output=${sanitize(json_output)}"""
     if (performance != null) result += """performance=$performance"""
     if (executed_on != null) result += """executed_on=$executed_on"""
+    if (structured_output_validation != null) result +=
+        """structured_output_validation=$structured_output_validation"""
+    result += """total_tokens=$total_tokens"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     return result.joinToString(prefix = "LLMGenerationResult{", separator = ", ", postfix = "}")
   }
 
@@ -288,11 +332,14 @@ public class LLMGenerationResult(
     json_output: String? = this.json_output,
     performance: PerformanceMetrics? = this.performance,
     executed_on: ExecutionTarget? = this.executed_on,
+    structured_output_validation: StructuredOutputValidation? = this.structured_output_validation,
+    total_tokens: Int = this.total_tokens,
+    error_message: String? = this.error_message,
     unknownFields: ByteString = this.unknownFields,
   ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, input_tokens,
       tokens_generated, model_used, generation_time_ms, ttft_ms, tokens_per_second, framework,
       finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on,
-      unknownFields)
+      structured_output_validation, total_tokens, error_message, unknownFields)
 
   public companion object {
     @JvmField
@@ -330,6 +377,11 @@ public class LLMGenerationResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.json_output)
         size += PerformanceMetrics.ADAPTER.encodedSizeWithTag(14, value.performance)
         size += ExecutionTarget.ADAPTER.encodedSizeWithTag(15, value.executed_on)
+        size += StructuredOutputValidation.ADAPTER.encodedSizeWithTag(16,
+            value.structured_output_validation)
+        if (value.total_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(17,
+            value.total_tokens)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.error_message)
         return size
       }
 
@@ -355,11 +407,21 @@ public class LLMGenerationResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.json_output)
         PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
+        StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 16,
+            value.structured_output_validation)
+        if (value.total_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 17,
+            value.total_tokens)
+        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.error_message)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.error_message)
+        if (value.total_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 17,
+            value.total_tokens)
+        StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 16,
+            value.structured_output_validation)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
         PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.json_output)
@@ -399,6 +461,9 @@ public class LLMGenerationResult(
         var json_output: String? = null
         var performance: PerformanceMetrics? = null
         var executed_on: ExecutionTarget? = null
+        var structured_output_validation: StructuredOutputValidation? = null
+        var total_tokens: Int = 0
+        var error_message: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -420,6 +485,9 @@ public class LLMGenerationResult(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            16 -> structured_output_validation = StructuredOutputValidation.ADAPTER.decode(reader)
+            17 -> total_tokens = ProtoAdapter.INT32.decode(reader)
+            18 -> error_message = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -439,12 +507,17 @@ public class LLMGenerationResult(
           json_output = json_output,
           performance = performance,
           executed_on = executed_on,
+          structured_output_validation = structured_output_validation,
+          total_tokens = total_tokens,
+          error_message = error_message,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerationResult): LLMGenerationResult = value.copy(
         performance = value.performance?.let(PerformanceMetrics.ADAPTER::redact),
+        structured_output_validation =
+            value.structured_output_validation?.let(StructuredOutputValidation.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

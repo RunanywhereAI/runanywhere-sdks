@@ -14,8 +14,10 @@ import 'dart:io';
 ///
 /// ## iOS
 /// XCFrameworks are statically linked into the app binary via CocoaPods.
-/// Symbols are available via `DynamicLibrary.executable()` which can find
-/// both global and local symbols in the main executable.
+/// Symbols are available through the process symbol table. In Xcode debug
+/// builds, the app code can be linked into `Runner.debug.dylib` instead of the
+/// small launcher executable, so the loader falls back to the executable only
+/// after process-wide lookup fails.
 ///
 /// ## Android
 /// .so files are loaded from jniLibs via `DynamicLibrary.open()`.
@@ -120,18 +122,25 @@ class PlatformLoader {
     );
   }
 
-  /// Load on iOS using executable() for statically linked XCFramework.
+  /// Load on iOS using the process symbol table for statically linked XCFramework.
   ///
   /// On iOS, all XCFrameworks (RACommons, RABackendLlamaCPP, RABackendONNX)
   /// are statically linked into the app binary via CocoaPods.
   ///
-  /// IMPORTANT: We use DynamicLibrary.executable() instead of process() because:
-  /// - process() uses dlsym(RTLD_DEFAULT) which only finds GLOBAL symbols
-  /// - executable() can find both global and LOCAL symbols in the main binary
-  /// - With static linkage, symbols from xcframeworks become local ('t' in nm)
-  /// - This is the correct approach for statically linked Flutter plugins
+  /// In simulator debug builds, Xcode can place the app implementation and
+  /// statically linked pod objects in `Runner.debug.dylib`. `executable()`
+  /// targets the launcher executable and misses those symbols, while
+  /// `process()` uses RTLD_DEFAULT and finds exported symbols in all loaded
+  /// images. Fall back to `executable()` for app configurations that still link
+  /// RACommons into the main executable.
   static DynamicLibrary _loadIOS(String libraryName) {
-    return DynamicLibrary.executable();
+    try {
+      final lib = DynamicLibrary.process();
+      lib.lookup('rac_init');
+      return lib;
+    } catch (_) {
+      return DynamicLibrary.executable();
+    }
   }
 
   /// Load on macOS for development/testing.

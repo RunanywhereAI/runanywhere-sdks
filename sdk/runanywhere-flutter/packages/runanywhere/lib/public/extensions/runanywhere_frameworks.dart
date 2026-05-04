@@ -3,8 +3,11 @@
 // runanywhere_frameworks.dart — framework discovery / querying.
 // Mirrors Swift `RunAnywhere+Frameworks.swift`.
 
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework, ModelCategory;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 /// Framework discovery helpers.
@@ -38,33 +41,44 @@ class RunAnywhereFrameworks {
 
     final Set<ModelCategory> relevantCategories;
     switch (capability) {
-      case SDKComponent.llm:
+      case SDKComponent.SDK_COMPONENT_LLM:
         relevantCategories = {
-          ModelCategory.language,
-          ModelCategory.multimodal,
+          ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         };
         break;
-      case SDKComponent.stt:
-        relevantCategories = {ModelCategory.speechRecognition};
+      case SDKComponent.SDK_COMPONENT_STT:
+        relevantCategories = {ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION};
         break;
-      case SDKComponent.tts:
-        relevantCategories = {ModelCategory.speechSynthesis};
+      case SDKComponent.SDK_COMPONENT_TTS:
+        relevantCategories = {ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS};
         break;
-      case SDKComponent.vad:
-        relevantCategories = {ModelCategory.audio};
-        break;
-      case SDKComponent.voice:
+      case SDKComponent.SDK_COMPONENT_VAD:
         relevantCategories = {
-          ModelCategory.language,
-          ModelCategory.speechRecognition,
-          ModelCategory.speechSynthesis,
+          ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         };
         break;
-      case SDKComponent.embedding:
-        relevantCategories = {ModelCategory.embedding};
+      case SDKComponent.SDK_COMPONENT_VOICE_AGENT:
+        relevantCategories = {
+          ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+          ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        };
         break;
-      case SDKComponent.vlm:
-        relevantCategories = {ModelCategory.multimodal};
+      case SDKComponent.SDK_COMPONENT_EMBEDDINGS:
+        relevantCategories = {ModelCategory.MODEL_CATEGORY_EMBEDDING};
+        break;
+      case SDKComponent.SDK_COMPONENT_VLM:
+        relevantCategories = {ModelCategory.MODEL_CATEGORY_MULTIMODAL};
+        break;
+      case SDKComponent.SDK_COMPONENT_DIFFUSION:
+      case SDKComponent.SDK_COMPONENT_RAG:
+      case SDKComponent.SDK_COMPONENT_WAKEWORD:
+      case SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION:
+      case SDKComponent.SDK_COMPONENT_UNSPECIFIED:
+      default:
+        relevantCategories = {};
         break;
     }
 

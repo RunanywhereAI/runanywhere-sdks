@@ -86,7 +86,13 @@ class ServiceContainer {
 
     final shouldEnable = environment == SDKEnvironment.development ||
         environment == SDKEnvironment.production;
-    TelemetryService.shared.setEnabled(shouldEnable);
+    final hasHttpTarget = HTTPClientAdapter.shared.isConfigured;
+    if (shouldEnable && !hasHttpTarget) {
+      logger.debug(
+        'Telemetry disabled: no usable HTTP target configured for ${environment.name}',
+      );
+    }
+    TelemetryService.shared.setEnabled(shouldEnable && hasHttpTarget);
   }
 
   void reset() {

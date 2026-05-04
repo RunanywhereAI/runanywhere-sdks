@@ -53,7 +53,8 @@ actual suspend fun RunAnywhere.generateWithTools(
     // the result into the canonical LLMGenerationResult shape.
     val toolOptions =
         ToolCallingOptions(
-            autoExecute = true,
+            max_iterations = 5,
+            auto_execute = true,
         )
     val tcResult: ToolCallingResult = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
     return LLMGenerationResult(

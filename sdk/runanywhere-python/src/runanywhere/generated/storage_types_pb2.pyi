@@ -101,3 +101,119 @@ class StoredModel(_message.Message):
     local_path: str
     downloaded_at_ms: int
     def __init__(self, model_id: _Optional[str] = ..., name: _Optional[str] = ..., size_bytes: _Optional[int] = ..., local_path: _Optional[str] = ..., downloaded_at_ms: _Optional[int] = ...) -> None: ...
+
+class StorageInfoRequest(_message.Message):
+    __slots__ = ("include_device", "include_app", "include_models")
+    INCLUDE_DEVICE_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_APP_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_MODELS_FIELD_NUMBER: _ClassVar[int]
+    include_device: bool
+    include_app: bool
+    include_models: bool
+    def __init__(self, include_device: _Optional[bool] = ..., include_app: _Optional[bool] = ..., include_models: _Optional[bool] = ...) -> None: ...
+
+class StorageInfoResult(_message.Message):
+    __slots__ = ("success", "info", "error_message")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    INFO_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    info: StorageInfo
+    error_message: str
+    def __init__(self, success: _Optional[bool] = ..., info: _Optional[_Union[StorageInfo, _Mapping]] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class StorageAvailabilityRequest(_message.Message):
+    __slots__ = ("model_id", "required_bytes", "safety_margin", "include_existing_model_bytes")
+    MODEL_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUIRED_BYTES_FIELD_NUMBER: _ClassVar[int]
+    SAFETY_MARGIN_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_EXISTING_MODEL_BYTES_FIELD_NUMBER: _ClassVar[int]
+    model_id: str
+    required_bytes: int
+    safety_margin: float
+    include_existing_model_bytes: bool
+    def __init__(self, model_id: _Optional[str] = ..., required_bytes: _Optional[int] = ..., safety_margin: _Optional[float] = ..., include_existing_model_bytes: _Optional[bool] = ...) -> None: ...
+
+class StorageAvailabilityResult(_message.Message):
+    __slots__ = ("success", "availability", "warnings", "error_message")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    availability: StorageAvailability
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    error_message: str
+    def __init__(self, success: _Optional[bool] = ..., availability: _Optional[_Union[StorageAvailability, _Mapping]] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class StorageDeletePlanRequest(_message.Message):
+    __slots__ = ("model_ids", "required_bytes", "include_cache", "oldest_first")
+    MODEL_IDS_FIELD_NUMBER: _ClassVar[int]
+    REQUIRED_BYTES_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_CACHE_FIELD_NUMBER: _ClassVar[int]
+    OLDEST_FIRST_FIELD_NUMBER: _ClassVar[int]
+    model_ids: _containers.RepeatedScalarFieldContainer[str]
+    required_bytes: int
+    include_cache: bool
+    oldest_first: bool
+    def __init__(self, model_ids: _Optional[_Iterable[str]] = ..., required_bytes: _Optional[int] = ..., include_cache: _Optional[bool] = ..., oldest_first: _Optional[bool] = ...) -> None: ...
+
+class StorageDeleteCandidate(_message.Message):
+    __slots__ = ("model_id", "reclaimable_bytes", "last_used_ms", "is_loaded", "local_path")
+    MODEL_ID_FIELD_NUMBER: _ClassVar[int]
+    RECLAIMABLE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    LAST_USED_MS_FIELD_NUMBER: _ClassVar[int]
+    IS_LOADED_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_PATH_FIELD_NUMBER: _ClassVar[int]
+    model_id: str
+    reclaimable_bytes: int
+    last_used_ms: int
+    is_loaded: bool
+    local_path: str
+    def __init__(self, model_id: _Optional[str] = ..., reclaimable_bytes: _Optional[int] = ..., last_used_ms: _Optional[int] = ..., is_loaded: _Optional[bool] = ..., local_path: _Optional[str] = ...) -> None: ...
+
+class StorageDeletePlan(_message.Message):
+    __slots__ = ("can_reclaim_required_bytes", "required_bytes", "reclaimable_bytes", "candidates", "warnings", "error_message")
+    CAN_RECLAIM_REQUIRED_BYTES_FIELD_NUMBER: _ClassVar[int]
+    REQUIRED_BYTES_FIELD_NUMBER: _ClassVar[int]
+    RECLAIMABLE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    CANDIDATES_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    can_reclaim_required_bytes: bool
+    required_bytes: int
+    reclaimable_bytes: int
+    candidates: _containers.RepeatedCompositeFieldContainer[StorageDeleteCandidate]
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    error_message: str
+    def __init__(self, can_reclaim_required_bytes: _Optional[bool] = ..., required_bytes: _Optional[int] = ..., reclaimable_bytes: _Optional[int] = ..., candidates: _Optional[_Iterable[_Union[StorageDeleteCandidate, _Mapping]]] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class StorageDeleteRequest(_message.Message):
+    __slots__ = ("model_ids", "delete_files", "clear_registry_paths", "unload_if_loaded", "dry_run")
+    MODEL_IDS_FIELD_NUMBER: _ClassVar[int]
+    DELETE_FILES_FIELD_NUMBER: _ClassVar[int]
+    CLEAR_REGISTRY_PATHS_FIELD_NUMBER: _ClassVar[int]
+    UNLOAD_IF_LOADED_FIELD_NUMBER: _ClassVar[int]
+    DRY_RUN_FIELD_NUMBER: _ClassVar[int]
+    model_ids: _containers.RepeatedScalarFieldContainer[str]
+    delete_files: bool
+    clear_registry_paths: bool
+    unload_if_loaded: bool
+    dry_run: bool
+    def __init__(self, model_ids: _Optional[_Iterable[str]] = ..., delete_files: _Optional[bool] = ..., clear_registry_paths: _Optional[bool] = ..., unload_if_loaded: _Optional[bool] = ..., dry_run: _Optional[bool] = ...) -> None: ...
+
+class StorageDeleteResult(_message.Message):
+    __slots__ = ("success", "deleted_bytes", "deleted_model_ids", "failed_model_ids", "warnings", "error_message")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    DELETED_BYTES_FIELD_NUMBER: _ClassVar[int]
+    DELETED_MODEL_IDS_FIELD_NUMBER: _ClassVar[int]
+    FAILED_MODEL_IDS_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    deleted_bytes: int
+    deleted_model_ids: _containers.RepeatedScalarFieldContainer[str]
+    failed_model_ids: _containers.RepeatedScalarFieldContainer[str]
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    error_message: str
+    def __init__(self, success: _Optional[bool] = ..., deleted_bytes: _Optional[int] = ..., deleted_model_ids: _Optional[_Iterable[str]] = ..., failed_model_ids: _Optional[_Iterable[str]] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...

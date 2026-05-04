@@ -172,12 +172,12 @@ class TTSImpl {
    * @returns Synthesis result with PCM audio data
    */
   async synthesize(text: string, options: TTSSynthesizeOptions = {}): Promise<TTSSynthesisResult> {
-    const sherpa = requireSherpa();
-    const m = sherpa.module;
-
     if (this._ttsHandle === 0) {
       throw new SDKException(SDKErrorCode.ModelNotLoaded, 'No TTS voice loaded. Call loadVoice() first.');
     }
+
+    const sherpa = requireSherpa();
+    const m = sherpa.module;
 
     const startMs = performance.now();
     const sid = options.speakerId ?? 0;

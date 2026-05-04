@@ -5,12 +5,14 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
-
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/core/types/model_types.dart' as public_types;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 
 // =============================================================================
 // Exception Return Constants
@@ -39,6 +41,9 @@ class DartBridgeModelRegistry {
   /// Registry handle
   static Pointer<Void>? _registryHandle;
   static bool _isInitialized = false;
+
+  /// Native global registry handle for other proto-byte bridge surfaces.
+  Pointer<Void>? get nativeHandle => _registryHandle;
 
   /// Discovery callbacks pointer
   static Pointer<RacDiscoveryCallbacksStruct>? _discoveryCallbacksPtr;
@@ -138,6 +143,7 @@ class DartBridgeModelRegistry {
       final nameDart = model.name.toNativeUtf8();
       final urlDart = model.downloadURL?.toNativeUtf8();
       final pathDart = model.localPath?.toNativeUtf8();
+      final descriptionDart = model.description?.toNativeUtf8();
 
       try {
         // Use strdup to allocate strings in C heap (matches Kotlin JNI pattern)
@@ -153,6 +159,10 @@ class DartBridgeModelRegistry {
             pathDart != null ? strdupFn(pathDart) : nullptr;
         modelPtr.ref.downloadSize = model.sizeBytes;
         modelPtr.ref.contextLength = model.contextLength;
+        modelPtr.ref.supportsThinking = model.supportsThinking ? 1 : 0;
+        modelPtr.ref.supportsLora = model.supportsLora ? 1 : 0;
+        modelPtr.ref.description =
+            descriptionDart != null ? strdupFn(descriptionDart) : nullptr;
         modelPtr.ref.source = model.source;
 
         final result = saveFn(_registryHandle!, modelPtr);
@@ -166,6 +176,7 @@ class DartBridgeModelRegistry {
         calloc.free(nameDart);
         if (urlDart != null) calloc.free(urlDart);
         if (pathDart != null) calloc.free(pathDart);
+        if (descriptionDart != null) calloc.free(descriptionDart);
 
         // Free C-allocated struct and its strings
         freeFn(modelPtr);
@@ -196,8 +207,7 @@ class DartBridgeModelRegistry {
       //   (null means "unknown"), while the internal FFI ModelInfo uses
       //   non-nullable `int` to mirror the C struct (which uses 0 as the
       //   sentinel for "unset"). The `?? 0` here encodes that null -> 0
-      //   convention; the reverse conversion in `_ffiModelToPublic` maps
-      //   `> 0 ? value : null` back to public types.
+      //   convention used by the registry ABI.
       final ffiModel = ModelInfo(
         id: model.id,
         name: model.name,
@@ -210,6 +220,9 @@ class DartBridgeModelRegistry {
         downloadURL: model.downloadURL?.toString(),
         localPath: model.localPath?.toFilePath(),
         version: null,
+        supportsThinking: model.supportsThinking,
+        supportsLora: false,
+        description: model.description,
       );
 
       final result = await saveModel(ffiModel);
@@ -228,201 +241,22 @@ class DartBridgeModelRegistry {
   // ===========================================================================
 
   /// Convert public ModelCategory to C++ RAC_MODEL_CATEGORY int
-  static int _categoryToFfi(public_types.ModelCategory category) {
-    switch (category) {
-      case public_types.ModelCategory.language:
-        return 0; // RAC_MODEL_CATEGORY_LANGUAGE
-      case public_types.ModelCategory.speechRecognition:
-        return 1; // RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
-      case public_types.ModelCategory.speechSynthesis:
-        return 2; // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-      case public_types.ModelCategory.vision:
-        return 3; // RAC_MODEL_CATEGORY_VISION
-      case public_types.ModelCategory.imageGeneration:
-        return 4; // RAC_MODEL_CATEGORY_IMAGE_GENERATION
-      case public_types.ModelCategory.multimodal:
-        return 5; // RAC_MODEL_CATEGORY_MULTIMODAL
-      case public_types.ModelCategory.audio:
-        return 6; // RAC_MODEL_CATEGORY_AUDIO
-      case public_types.ModelCategory.embedding:
-        return 7; // RAC_MODEL_CATEGORY_EMBEDDING
-    }
-  }
+  static int _categoryToFfi(public_types.ModelCategory category) =>
+      category.toC();
 
   /// Convert public ModelFormat to C++ RAC_MODEL_FORMAT int
-  static int _formatToFfi(public_types.ModelFormat format) {
-    switch (format) {
-      case public_types.ModelFormat.onnx:
-        return 0; // RAC_MODEL_FORMAT_ONNX
-      case public_types.ModelFormat.ort:
-        return 1; // RAC_MODEL_FORMAT_ORT
-      case public_types.ModelFormat.gguf:
-        return 2; // RAC_MODEL_FORMAT_GGUF
-      case public_types.ModelFormat.bin:
-        return 3; // RAC_MODEL_FORMAT_BIN
-      case public_types.ModelFormat.unknown:
-        return 99; // RAC_MODEL_FORMAT_UNKNOWN
-    }
-  }
+  static int _formatToFfi(public_types.ModelFormat format) => format.toC();
 
   /// Convert public InferenceFramework to C++ RAC_FRAMEWORK int
-  static int _frameworkToFfi(public_types.InferenceFramework framework) {
-    switch (framework) {
-      case public_types.InferenceFramework.onnx:
-        return 0; // RAC_FRAMEWORK_ONNX
-      case public_types.InferenceFramework.llamaCpp:
-        return 1; // RAC_FRAMEWORK_LLAMACPP
-      case public_types.InferenceFramework.foundationModels:
-        return 2; // RAC_FRAMEWORK_FOUNDATION_MODELS
-      case public_types.InferenceFramework.systemTTS:
-        return 3; // RAC_FRAMEWORK_SYSTEM_TTS
-      case public_types.InferenceFramework.fluidAudio:
-        return 4; // RAC_FRAMEWORK_FLUID_AUDIO
-      case public_types.InferenceFramework.builtIn:
-        return 5; // RAC_FRAMEWORK_BUILTIN
-      case public_types.InferenceFramework.none:
-        return 6; // RAC_FRAMEWORK_NONE
-      case public_types.InferenceFramework.genie:
-        return 11; // RAC_FRAMEWORK_GENIE
-      case public_types.InferenceFramework.sherpa:
-        return 12; // RAC_FRAMEWORK_SHERPA
-      case public_types.InferenceFramework.unknown:
-        return 99; // RAC_FRAMEWORK_UNKNOWN
-    }
-  }
+  static int _frameworkToFfi(public_types.InferenceFramework framework) =>
+      framework.toC();
 
   /// Convert public ModelSource to C++ RAC_MODEL_SOURCE int
-  static int _sourceToFfi(public_types.ModelSource source) {
-    switch (source) {
-      case public_types.ModelSource.remote:
-        return 0; // RAC_MODEL_SOURCE_REMOTE
-      case public_types.ModelSource.local:
-        return 1; // RAC_MODEL_SOURCE_LOCAL
-    }
-  }
+  static int _sourceToFfi(public_types.ModelSource source) => source.toC();
 
   /// Get the FFI framework value (for external use)
   static int getFrameworkFfiValue(public_types.InferenceFramework framework) {
     return _frameworkToFfi(framework);
-  }
-
-  // ===========================================================================
-  // Reverse FFI Type Conversion (C++ → Dart public types)
-  // ===========================================================================
-
-  /// Convert C++ RAC_MODEL_CATEGORY int to public ModelCategory
-  static public_types.ModelCategory _categoryFromFfi(int category) {
-    switch (category) {
-      case 0:
-        return public_types.ModelCategory.language;
-      case 1:
-        return public_types.ModelCategory.speechRecognition;
-      case 2:
-        return public_types.ModelCategory.speechSynthesis;
-      case 3:
-        return public_types.ModelCategory.vision;
-      case 4:
-        return public_types.ModelCategory.imageGeneration;
-      case 5:
-        return public_types.ModelCategory.multimodal;
-      case 6:
-        return public_types.ModelCategory.audio;
-      case 7:
-        return public_types.ModelCategory.embedding;
-      default:
-        return public_types.ModelCategory.language;
-    }
-  }
-
-  /// Convert C++ RAC_MODEL_FORMAT int to public ModelFormat
-  static public_types.ModelFormat _formatFromFfi(int format) {
-    switch (format) {
-      case 0:
-        return public_types.ModelFormat.onnx;
-      case 1:
-        return public_types.ModelFormat.ort;
-      case 2:
-        return public_types.ModelFormat.gguf;
-      case 3:
-        return public_types.ModelFormat.bin;
-      default:
-        return public_types.ModelFormat.unknown;
-    }
-  }
-
-  /// Convert C++ RAC_FRAMEWORK int to public InferenceFramework
-  ///
-  /// Apple-specific frameworks (MLX=7, CoreML=8, WhisperKitCoreML=9,
-  /// MetalRT=10) are not part of the public Flutter SDK enum. They are
-  /// folded back to the registered framework family so iOS round-trips
-  /// don't lose their identity:
-  ///   * WhisperKitCoreML/CoreML/MLX/MetalRT → onnx (iOS STT/TTS pipelines
-  ///     register Whisper/VITS models with InferenceFramework.onnx; without
-  ///     this mapping they would round-trip to `unknown` and land in
-  ///     `Models/Unknown/` instead of `Models/ONNX/`).
-  ///   * SHERPA=12 → sherpa (Sherpa-ONNX STT/TTS/VAD/wakeword models; must
-  ///     be explicitly mapped so they land in `Models/Sherpa/` rather than
-  ///     `Models/Unknown/`).
-  static public_types.InferenceFramework _frameworkFromFfi(int framework) {
-    switch (framework) {
-      case 0:
-        return public_types.InferenceFramework.onnx;
-      case 1:
-        return public_types.InferenceFramework.llamaCpp;
-      case 2:
-        return public_types.InferenceFramework.foundationModels;
-      case 3:
-        return public_types.InferenceFramework.systemTTS;
-      case 4:
-        return public_types.InferenceFramework.fluidAudio;
-      case 5:
-        return public_types.InferenceFramework.builtIn;
-      case 6:
-        return public_types.InferenceFramework.none;
-      case 7: // RAC_FRAMEWORK_MLX
-      case 8: // RAC_FRAMEWORK_COREML
-      case 9: // RAC_FRAMEWORK_WHISPERKIT_COREML (iOS Whisper STT)
-      case 10: // RAC_FRAMEWORK_METALRT
-        return public_types.InferenceFramework.onnx;
-      case 11: // RAC_FRAMEWORK_GENIE
-        return public_types.InferenceFramework.genie;
-      case 12: // RAC_FRAMEWORK_SHERPA (Sherpa-ONNX STT/TTS/VAD/wakeword)
-        return public_types.InferenceFramework.sherpa;
-      default:
-        return public_types.InferenceFramework.unknown;
-    }
-  }
-
-  /// Convert C++ RAC_MODEL_SOURCE int to public ModelSource
-  static public_types.ModelSource _sourceFromFfi(int source) {
-    switch (source) {
-      case 0:
-        return public_types.ModelSource.remote;
-      case 1:
-        return public_types.ModelSource.local;
-      default:
-        return public_types.ModelSource.remote;
-    }
-  }
-
-  /// Convert FFI ModelInfo to public ModelInfo
-  static public_types.ModelInfo _ffiModelToPublic(ModelInfo ffiModel) {
-    return public_types.ModelInfo(
-      id: ffiModel.id,
-      name: ffiModel.name,
-      category: _categoryFromFfi(ffiModel.category),
-      format: _formatFromFfi(ffiModel.format),
-      framework: _frameworkFromFfi(ffiModel.framework),
-      downloadURL: ffiModel.downloadURL != null
-          ? Uri.tryParse(ffiModel.downloadURL!)
-          : null,
-      localPath: ffiModel.localPath != null && ffiModel.localPath!.isNotEmpty
-          ? Uri.file(ffiModel.localPath!)
-          : null,
-      downloadSize: ffiModel.sizeBytes > 0 ? ffiModel.sizeBytes : null,
-      contextLength: ffiModel.contextLength > 0 ? ffiModel.contextLength : null,
-      source: _sourceFromFfi(ffiModel.source),
-    );
   }
 
   // ===========================================================================
@@ -433,15 +267,405 @@ class DartBridgeModelRegistry {
   ///
   /// Matches Swift: `CppBridge.ModelRegistry.shared.getAll()`
   Future<List<public_types.ModelInfo>> getAllPublicModels() async {
+    final protoModels = await getAllProtoModels();
+    return protoModels.map(_protoModelToPublic).toList();
+  }
+
+  /// Save a generated proto ModelInfo to the C++ registry.
+  Future<bool> saveProtoModel(model_pb.ModelInfo model) async {
+    if (_registryHandle == null) {
+      _logger.debug('Registry not initialized, cannot save proto model');
+      return false;
+    }
+
+    final protoResult = _writeProtoModel(
+      model,
+      RacNative.bindings.rac_model_registry_register_proto,
+      'rac_model_registry_register_proto',
+    );
+    if (protoResult != null) {
+      return protoResult;
+    }
+
+    try {
+      final ffiModel = ModelInfo(
+        id: model.id,
+        name: model.name,
+        category: model.category.toC(),
+        format: model.format.toC(),
+        framework: model.framework.toC(),
+        source: model.source.toC(),
+        sizeBytes: model.downloadSizeBytes.toInt(),
+        contextLength: model.contextLength,
+        downloadURL: model.hasDownloadUrl() && model.downloadUrl.isNotEmpty
+            ? model.downloadUrl
+            : null,
+        localPath: model.hasLocalPath() && model.localPath.isNotEmpty
+            ? model.localPath
+            : null,
+        version: null,
+        supportsThinking: model.supportsThinking,
+        supportsLora: model.supportsLora,
+        description: model.hasDescription() && model.description.isNotEmpty
+            ? model.description
+            : null,
+      );
+
+      final result = await saveModel(ffiModel);
+      if (result) {
+        _logger.debug('Saved proto model to C++ registry: ${model.id}');
+      }
+      return result;
+    } catch (e) {
+      _logger.debug('saveProtoModel error: $e');
+      return false;
+    }
+  }
+
+  /// Update an existing generated proto ModelInfo in the C++ registry.
+  Future<bool> updateProtoModel(model_pb.ModelInfo model) async {
+    if (_registryHandle == null) {
+      _logger.debug('Registry not initialized, cannot update proto model');
+      return false;
+    }
+
+    final protoResult = _writeProtoModel(
+      model,
+      RacNative.bindings.rac_model_registry_update_proto,
+      'rac_model_registry_update_proto',
+    );
+    if (protoResult != null) {
+      return protoResult;
+    }
+
+    return saveProtoModel(model);
+  }
+
+  /// Get all models from C++ registry as generated ModelInfo protos.
+  Future<List<model_pb.ModelInfo>> getAllProtoModels() async {
+    final protoModels = _listProtoModels();
+    if (protoModels != null) return protoModels;
+
     final ffiModels = await getAllModels();
-    return ffiModels.map(_ffiModelToPublic).toList();
+    return ffiModels.map(_ffiModelToProto).toList();
+  }
+
+  /// Get a single model from C++ registry as a generated ModelInfo proto.
+  Future<model_pb.ModelInfo?> getProtoModel(String modelId) async {
+    final protoModel = _getProtoModel(modelId);
+    if (protoModel != null) return protoModel;
+
+    final ffiModel = await getModel(modelId);
+    if (ffiModel == null) return null;
+    return _ffiModelToProto(ffiModel);
+  }
+
+  /// Query the C++ registry with a generated ModelQuery proto.
+  Future<List<model_pb.ModelInfo>> queryProtoModels(
+    model_pb.ModelQuery query,
+  ) async {
+    final protoModels = _queryProtoModels(query);
+    if (protoModels != null) return protoModels;
+
+    final allModels = await getAllProtoModels();
+    return allModels.where((model) {
+      if (query.downloadedOnly && model.localPath.isEmpty) return false;
+      if (query.hasFramework() && model.framework != query.framework) {
+        return false;
+      }
+      if (query.hasCategory() && model.category != query.category) {
+        return false;
+      }
+      if (query.hasFormat() && model.format != query.format) {
+        return false;
+      }
+      if (query.hasSource() && model.source != query.source) {
+        return false;
+      }
+      if (query.searchQuery.isNotEmpty) {
+        final needle = query.searchQuery.toLowerCase();
+        final haystack =
+            '${model.id} ${model.name} ${model.description}'.toLowerCase();
+        if (!haystack.contains(needle)) return false;
+      }
+      if (query.maxSizeBytes.toInt() > 0 &&
+          model.downloadSizeBytes > query.maxSizeBytes) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
+  }
+
+  /// List downloaded models via the registry proto-byte ABI.
+  Future<List<model_pb.ModelInfo>> listDownloadedProtoModels() async {
+    final protoModels = _listDownloadedProtoModels();
+    if (protoModels != null) return protoModels;
+
+    return queryProtoModels(model_pb.ModelQuery(downloadedOnly: true));
   }
 
   /// Get a single model from C++ registry as public ModelInfo.
   Future<public_types.ModelInfo?> getPublicModel(String modelId) async {
-    final ffiModel = await getModel(modelId);
-    if (ffiModel == null) return null;
-    return _ffiModelToPublic(ffiModel);
+    final protoModel = await getProtoModel(modelId);
+    if (protoModel == null) return null;
+    return _protoModelToPublic(protoModel);
+  }
+
+  static model_pb.ModelInfo _ffiModelToProto(ModelInfo ffiModel) {
+    return withInferredArtifact(protoModelInfoFromCFields(
+      id: ffiModel.id,
+      name: ffiModel.name,
+      category: ffiModel.category,
+      format: ffiModel.format,
+      framework: ffiModel.framework,
+      source: ffiModel.source,
+      downloadSizeBytes: ffiModel.sizeBytes,
+      contextLength: ffiModel.contextLength,
+      downloadUrl: ffiModel.downloadURL,
+      localPath: ffiModel.localPath,
+      supportsThinking: ffiModel.supportsThinking ? 1 : 0,
+      supportsLora: ffiModel.supportsLora ? 1 : 0,
+      description: ffiModel.description,
+      createdAtUnixMs: ffiModel.createdAt,
+      updatedAtUnixMs: ffiModel.updatedAt,
+    ));
+  }
+
+  static public_types.ModelInfo _protoModelToPublic(model_pb.ModelInfo model) {
+    final downloadSize = model.downloadSize;
+    return public_types.ModelInfo(
+      id: model.id,
+      name: model.name,
+      category: public_types.ModelCategory.fromProto(model.category),
+      format: public_types.ModelFormat.fromProto(model.format),
+      framework: _publicFrameworkFromProto(model.framework),
+      downloadURL: model.downloadUri,
+      localPath: _localPathUri(model.localFilePath),
+      downloadSize:
+          downloadSize != null && downloadSize > 0 ? downloadSize : null,
+      contextLength: model.nullableContextLength,
+      supportsThinking: model.supportsThinking,
+      description: model.hasDescription() && model.description.isNotEmpty
+          ? model.description
+          : null,
+      source: public_types.ModelSource.fromProto(model.source),
+      createdAt: _dateTimeFromUnixMs(model.createdAtUnixMs.toInt()),
+      updatedAt: _dateTimeFromUnixMs(model.updatedAtUnixMs.toInt()),
+    );
+  }
+
+  static public_types.InferenceFramework _publicFrameworkFromProto(
+      model_pb.InferenceFramework framework) {
+    switch (framework) {
+      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
+      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
+        return public_types.InferenceFramework.onnx;
+      default:
+        return public_types.InferenceFramework.fromProto(framework);
+    }
+  }
+
+  static Uri? _localPathUri(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('builtin:') || path.contains('://')) {
+      return Uri.tryParse(path);
+    }
+    return Uri.file(path);
+  }
+
+  static DateTime? _dateTimeFromUnixMs(int unixMs) {
+    if (unixMs <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(unixMs);
+  }
+
+  bool? _writeProtoModel(
+    model_pb.ModelInfo model,
+    int Function(Pointer<Void>, Pointer<Uint8>, int)? fn,
+    String symbol,
+  ) {
+    if (_registryHandle == null || fn == null) return null;
+
+    final bytes = model.writeToBuffer();
+    final bytesPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    try {
+      if (bytes.isNotEmpty) {
+        bytesPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+
+      final result = fn(_registryHandle!, bytesPtr, bytes.length);
+      if (result == RacResultCode.errorFeatureNotAvailable) {
+        return null;
+      }
+      if (result != RacResultCode.success) {
+        _logger.debug('$symbol failed for ${model.id}: result=$result');
+      }
+      return result == RacResultCode.success;
+    } catch (e) {
+      _logger.debug('$symbol error: $e');
+      return null;
+    } finally {
+      calloc.free(bytesPtr);
+    }
+  }
+
+  model_pb.ModelInfo? _getProtoModel(String modelId) {
+    if (_registryHandle == null) return null;
+
+    final bindings = RacNative.bindings;
+    final getFn = bindings.rac_model_registry_get_proto;
+    final freeFn = bindings.rac_model_registry_proto_free;
+    if (getFn == null || freeFn == null) return null;
+
+    final modelIdPtr = modelId.toNativeUtf8();
+    final outBytesPtr = calloc<Pointer<Uint8>>();
+    final outSizePtr = calloc<Size>();
+
+    try {
+      final result =
+          getFn(_registryHandle!, modelIdPtr, outBytesPtr, outSizePtr);
+      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+        if (result != RacResultCode.errorNotFound) {
+          _logger.debug(
+              'rac_model_registry_get_proto failed for $modelId: result=$result');
+        }
+        return null;
+      }
+
+      final bytes = outBytesPtr.value
+          .asTypedList(outSizePtr.value)
+          .toList(growable: false);
+      return withInferredArtifact(model_pb.ModelInfo.fromBuffer(bytes));
+    } catch (e) {
+      _logger.debug('rac_model_registry_get_proto error: $e');
+      return null;
+    } finally {
+      if (outBytesPtr.value != nullptr) {
+        freeFn(outBytesPtr.value);
+      }
+      calloc.free(modelIdPtr);
+      calloc.free(outBytesPtr);
+      calloc.free(outSizePtr);
+    }
+  }
+
+  List<model_pb.ModelInfo>? _listProtoModels() {
+    if (_registryHandle == null) return null;
+
+    final bindings = RacNative.bindings;
+    final listFn = bindings.rac_model_registry_list_proto;
+    final freeFn = bindings.rac_model_registry_proto_free;
+    if (listFn == null || freeFn == null) return null;
+
+    final outBytesPtr = calloc<Pointer<Uint8>>();
+    final outSizePtr = calloc<Size>();
+
+    try {
+      final result = listFn(_registryHandle!, outBytesPtr, outSizePtr);
+      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+        _logger.debug('rac_model_registry_list_proto failed: result=$result');
+        return null;
+      }
+
+      final bytes = outBytesPtr.value
+          .asTypedList(outSizePtr.value)
+          .toList(growable: false);
+      final list = model_pb.ModelInfoList.fromBuffer(bytes);
+      return list.models.map(withInferredArtifact).toList(growable: false);
+    } catch (e) {
+      _logger.debug('rac_model_registry_list_proto error: $e');
+      return null;
+    } finally {
+      if (outBytesPtr.value != nullptr) {
+        freeFn(outBytesPtr.value);
+      }
+      calloc.free(outBytesPtr);
+      calloc.free(outSizePtr);
+    }
+  }
+
+  List<model_pb.ModelInfo>? _queryProtoModels(model_pb.ModelQuery query) {
+    if (_registryHandle == null) return null;
+
+    final bindings = RacNative.bindings;
+    final queryFn = bindings.rac_model_registry_query_proto;
+    final freeFn = bindings.rac_model_registry_proto_free;
+    if (queryFn == null || freeFn == null) return null;
+
+    final bytes = query.writeToBuffer();
+    final bytesPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final outBytesPtr = calloc<Pointer<Uint8>>();
+    final outSizePtr = calloc<Size>();
+
+    try {
+      if (bytes.isNotEmpty) {
+        bytesPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      final result = queryFn(
+        _registryHandle!,
+        bytesPtr,
+        bytes.length,
+        outBytesPtr,
+        outSizePtr,
+      );
+      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+        _logger.debug('rac_model_registry_query_proto failed: result=$result');
+        return null;
+      }
+
+      final resultBytes = outBytesPtr.value
+          .asTypedList(outSizePtr.value)
+          .toList(growable: false);
+      final list = model_pb.ModelInfoList.fromBuffer(resultBytes);
+      return list.models.map(withInferredArtifact).toList(growable: false);
+    } catch (e) {
+      _logger.debug('rac_model_registry_query_proto error: $e');
+      return null;
+    } finally {
+      if (outBytesPtr.value != nullptr) {
+        freeFn(outBytesPtr.value);
+      }
+      calloc.free(bytesPtr);
+      calloc.free(outBytesPtr);
+      calloc.free(outSizePtr);
+    }
+  }
+
+  List<model_pb.ModelInfo>? _listDownloadedProtoModels() {
+    if (_registryHandle == null) return null;
+
+    final bindings = RacNative.bindings;
+    final listFn = bindings.rac_model_registry_list_downloaded_proto;
+    final freeFn = bindings.rac_model_registry_proto_free;
+    if (listFn == null || freeFn == null) return null;
+
+    final outBytesPtr = calloc<Pointer<Uint8>>();
+    final outSizePtr = calloc<Size>();
+
+    try {
+      final result = listFn(_registryHandle!, outBytesPtr, outSizePtr);
+      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+        _logger.debug(
+            'rac_model_registry_list_downloaded_proto failed: result=$result');
+        return null;
+      }
+
+      final bytes = outBytesPtr.value
+          .asTypedList(outSizePtr.value)
+          .toList(growable: false);
+      final list = model_pb.ModelInfoList.fromBuffer(bytes);
+      return list.models.map(withInferredArtifact).toList(growable: false);
+    } catch (e) {
+      _logger.debug('rac_model_registry_list_downloaded_proto error: $e');
+      return null;
+    } finally {
+      if (outBytesPtr.value != nullptr) {
+        freeFn(outBytesPtr.value);
+      }
+      calloc.free(outBytesPtr);
+      calloc.free(outSizePtr);
+    }
   }
 
   /// Get model by ID
@@ -651,6 +875,30 @@ class DartBridgeModelRegistry {
       return false;
     }
 
+    final bindings = RacNative.bindings;
+    if (bindings.rac_model_registry_get_proto != null &&
+        bindings.rac_model_registry_update_proto != null &&
+        bindings.rac_model_registry_proto_free != null) {
+      final model = _getProtoModel(modelId);
+      if (model != null) {
+        final updated = model.deepCopy();
+        if (localPath == null || localPath.isEmpty) {
+          updated.clearLocalPath();
+        } else {
+          updated.localPath = localPath;
+        }
+
+        final protoResult = _writeProtoModel(
+          updated,
+          bindings.rac_model_registry_update_proto,
+          'rac_model_registry_update_proto',
+        );
+        if (protoResult != null) {
+          return protoResult;
+        }
+      }
+    }
+
     try {
       final lib = PlatformLoader.loadCommons();
       final updateFn = lib.lookupFunction<
@@ -682,6 +930,27 @@ class DartBridgeModelRegistry {
   /// Remove a model from registry
   Future<bool> removeModel(String modelId) async {
     if (_registryHandle == null) return false;
+
+    final removeProtoFn = RacNative.bindings.rac_model_registry_remove_proto;
+    if (removeProtoFn != null) {
+      final modelIdPtr = modelId.toNativeUtf8();
+      try {
+        final result = removeProtoFn(_registryHandle!, modelIdPtr);
+        if (result == RacResultCode.errorFeatureNotAvailable) {
+          // Fall back to the legacy struct/string remove ABI below.
+        } else {
+          if (result != RacResultCode.success) {
+            _logger.debug(
+                'rac_model_registry_remove_proto failed for $modelId: result=$result');
+          }
+          return result == RacResultCode.success;
+        }
+      } catch (e) {
+        _logger.debug('rac_model_registry_remove_proto error: $e');
+      } finally {
+        calloc.free(modelIdPtr);
+      }
+    }
 
     try {
       final lib = PlatformLoader.loadCommons();
@@ -884,6 +1153,13 @@ class DartBridgeModelRegistry {
       downloadURL: downloadURL,
       localPath: localPath,
       version: null,
+      supportsThinking: struct.ref.supportsThinking != 0,
+      supportsLora: struct.ref.supportsLora != 0,
+      description: struct.ref.description != nullptr
+          ? struct.ref.description.toDartString()
+          : null,
+      createdAt: struct.ref.createdAt,
+      updatedAt: struct.ref.updatedAt,
     );
   }
 }
@@ -1176,6 +1452,11 @@ class ModelInfo {
   final String? downloadURL;
   final String? localPath;
   final String? version;
+  final bool supportsThinking;
+  final bool supportsLora;
+  final String? description;
+  final int createdAt;
+  final int updatedAt;
 
   const ModelInfo({
     required this.id,
@@ -1189,6 +1470,11 @@ class ModelInfo {
     this.downloadURL,
     this.localPath,
     this.version,
+    this.supportsThinking = false,
+    this.supportsLora = false,
+    this.description,
+    this.createdAt = 0,
+    this.updatedAt = 0,
   });
 
   bool get isDownloaded => localPath != null && localPath!.isNotEmpty;
@@ -1205,6 +1491,11 @@ class ModelInfo {
         if (downloadURL != null) 'downloadURL': downloadURL,
         if (localPath != null) 'localPath': localPath,
         if (version != null) 'version': version,
+        'supportsThinking': supportsThinking,
+        'supportsLora': supportsLora,
+        if (description != null) 'description': description,
+        if (createdAt > 0) 'createdAt': createdAt,
+        if (updatedAt > 0) 'updatedAt': updatedAt,
       };
 }
 

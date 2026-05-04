@@ -117,6 +117,11 @@ export class ModelDownloader {
           etaSeconds: -1,
           retryAttempt: 0,
           errorMessage: '',
+          taskId: modelId,
+          currentFileIndex: 0,
+          totalFiles,
+          storageKey: modelId,
+          localPath: '',
         });
       };
 
@@ -162,6 +167,11 @@ export class ModelDownloader {
               etaSeconds: -1,
               retryAttempt: 0,
               errorMessage: '',
+              taskId: modelId,
+              currentFileIndex: i + 1,
+              totalFiles,
+              storageKey: fileKey,
+              localPath: '',
             });
           };
 
@@ -201,6 +211,11 @@ export class ModelDownloader {
         etaSeconds: 0,
         retryAttempt: 0,
         errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
       });
       this.emitDownloadProgress({
         modelId,
@@ -213,6 +228,11 @@ export class ModelDownloader {
         etaSeconds: 0,
         retryAttempt: 0,
         errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
       });
 
       // Validating stage
@@ -227,6 +247,11 @@ export class ModelDownloader {
         etaSeconds: 0,
         retryAttempt: 0,
         errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
       });
 
       this.registry.updateModel(modelId, {
@@ -247,6 +272,11 @@ export class ModelDownloader {
         etaSeconds: 0,
         retryAttempt: 0,
         errorMessage: '',
+        taskId: modelId,
+        currentFileIndex: Math.max(0, totalFiles - 1),
+        totalFiles,
+        storageKey: modelId,
+        localPath: '',
       });
       EventBus.shared.emit('model.downloadCompleted', SDKEventType.Model, { modelId, sizeBytes: totalSize });
       AnalyticsEmitter.emitModelDownloadCompleted(modelId, totalSize, 0);

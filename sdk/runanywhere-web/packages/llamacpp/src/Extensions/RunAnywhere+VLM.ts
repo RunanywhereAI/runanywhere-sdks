@@ -14,7 +14,6 @@
  *   console.log(result.text);
  */
 
-import type { HardwareAcceleration } from '@runanywhere/web';
 import { RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
@@ -24,6 +23,77 @@ import type { VLMImage, VLMGenerationOptions, VLMGenerationResult } from './VLMT
 const logger = new SDKLogger('VLM');
 
 export { VLMModelFamily } from './VLMTypes';
+
+const RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0;
+const RAC_VLM_IMAGE_FORMAT_RGB_PIXELS = 1;
+const RAC_VLM_IMAGE_FORMAT_BASE64 = 2;
+
+interface RacVLMImage {
+  format: number;
+  filePath?: string;
+  pixelData?: Uint8Array;
+  base64?: string;
+  width: number;
+  height: number;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof globalThis.btoa === 'function') {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      const chunk = bytes.subarray(i, i + 8192);
+      binary += String.fromCharCode(...chunk);
+    }
+    return globalThis.btoa(binary);
+  }
+  const g = globalThis as { Buffer?: { from(bytes: Uint8Array): { toString(encoding: 'base64'): string } } };
+  if (g.Buffer) return g.Buffer.from(bytes).toString('base64');
+  throw new SDKException(SDKErrorCode.InvalidConfiguration, 'No base64 encoder available in this runtime.');
+}
+
+function rgbaToRgb(rgba: Uint8Array): Uint8Array {
+  const rgb = new Uint8Array(Math.floor(rgba.length / 4) * 3);
+  for (let src = 0, dst = 0; src + 3 < rgba.length; src += 4) {
+    rgb[dst++] = rgba[src]!;
+    rgb[dst++] = rgba[src + 1]!;
+    rgb[dst++] = rgba[src + 2]!;
+  }
+  return rgb;
+}
+
+function toRacVLMImage(image: VLMImage): RacVLMImage {
+  const width = image.width ?? 0;
+  const height = image.height ?? 0;
+
+  switch (image.format) {
+    case VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH:
+      if (!image.filePath) break;
+      return { format: RAC_VLM_IMAGE_FORMAT_FILE_PATH, filePath: image.filePath, width, height };
+    case VLMImageFormat.VLM_IMAGE_FORMAT_BASE64:
+      if (!image.base64) break;
+      return { format: RAC_VLM_IMAGE_FORMAT_BASE64, base64: image.base64, width, height };
+    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB:
+      if (!image.rawRgb) break;
+      return { format: RAC_VLM_IMAGE_FORMAT_RGB_PIXELS, pixelData: image.rawRgb, width, height };
+    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA:
+      if (!image.rawRgb) break;
+      return { format: RAC_VLM_IMAGE_FORMAT_RGB_PIXELS, pixelData: rgbaToRgb(image.rawRgb), width, height };
+    case VLMImageFormat.VLM_IMAGE_FORMAT_JPEG:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_PNG:
+    case VLMImageFormat.VLM_IMAGE_FORMAT_WEBP:
+      if (!image.encoded) break;
+      return { format: RAC_VLM_IMAGE_FORMAT_BASE64, base64: bytesToBase64(image.encoded), width, height };
+    case VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED:
+    case VLMImageFormat.UNRECOGNIZED:
+    default:
+      if (image.filePath) return { format: RAC_VLM_IMAGE_FORMAT_FILE_PATH, filePath: image.filePath, width, height };
+      if (image.base64) return { format: RAC_VLM_IMAGE_FORMAT_BASE64, base64: image.base64, width, height };
+      if (image.rawRgb) return { format: RAC_VLM_IMAGE_FORMAT_RGB_PIXELS, pixelData: image.rawRgb, width, height };
+      if (image.encoded) return { format: RAC_VLM_IMAGE_FORMAT_BASE64, base64: bytesToBase64(image.encoded), width, height };
+  }
+
+  throw new SDKException(SDKErrorCode.InvalidConfiguration, 'VLM image does not contain data for its declared format.');
+}
 
 // ---------------------------------------------------------------------------
 // VLM Extension
@@ -154,6 +224,10 @@ class VLMImpl {
     } catch { return false; }
   }
 
+  get isVLMModelLoaded(): boolean {
+    return this.isModelLoaded;
+  }
+
   /**
    * Process an image with a text prompt.
    *
@@ -185,27 +259,28 @@ class VLMImpl {
     let filePathPtr = 0;
     let base64Ptr = 0;
     let pixelPtr = 0;
+    const racImage = toRacVLMImage(image);
 
     const vi = Offsets.vlmImage;
-    m.setValue(imagePtr + vi.format, image.format, 'i32');
+    m.setValue(imagePtr + vi.format, racImage.format, 'i32');
 
-    if (image.format === VLMImageFormat.FilePath && image.filePath) {
-      filePathPtr = bridge.allocString(image.filePath);
+    if (racImage.filePath) {
+      filePathPtr = bridge.allocString(racImage.filePath);
       m.setValue(imagePtr + vi.filePath, filePathPtr, '*');
-    } else if (image.format === VLMImageFormat.Base64 && image.base64Data) {
-      base64Ptr = bridge.allocString(image.base64Data);
+    } else if (racImage.base64) {
+      base64Ptr = bridge.allocString(racImage.base64);
       m.setValue(imagePtr + vi.base64Data, base64Ptr, '*');
-    } else if (image.format === VLMImageFormat.RGBPixels && image.pixelData) {
-      pixelPtr = m._malloc(image.pixelData.length);
-      bridge.writeBytes(image.pixelData, pixelPtr);
+    } else if (racImage.pixelData) {
+      pixelPtr = m._malloc(racImage.pixelData.length);
+      bridge.writeBytes(racImage.pixelData, pixelPtr);
       m.setValue(imagePtr + vi.pixelData, pixelPtr, '*');
     }
 
-    m.setValue(imagePtr + vi.width, image.width ?? 0, 'i32');
-    m.setValue(imagePtr + vi.height, image.height ?? 0, 'i32');
+    m.setValue(imagePtr + vi.width, racImage.width, 'i32');
+    m.setValue(imagePtr + vi.height, racImage.height, 'i32');
 
     // data_size: use pixel data length for RGB, base64 string length for base64
-    const dataSize = image.pixelData?.length ?? image.base64Data?.length ?? 0;
+    const dataSize = racImage.pixelData?.length ?? racImage.base64?.length ?? 0;
     m.setValue(imagePtr + vi.dataSize, dataSize, 'i32');
 
     // Build rac_vlm_options_t
@@ -247,14 +322,14 @@ class VLMImpl {
       const vlmResult: VLMGenerationResult = {
         text: bridge.readString(textPtr),
         promptTokens: m.getValue(resPtr + vr.promptTokens, 'i32'),
-        imageTokens: m.getValue(resPtr + vr.imageTokens, 'i32'),
         completionTokens: m.getValue(resPtr + vr.completionTokens, 'i32'),
         totalTokens: m.getValue(resPtr + vr.totalTokens, 'i32'),
-        timeToFirstTokenMs: m.getValue(resPtr + vr.timeToFirstTokenMs, 'i32'),
-        imageEncodeTimeMs: m.getValue(resPtr + vr.imageEncodeTimeMs, 'i32'),
-        totalTimeMs: m.getValue(resPtr + vr.totalTimeMs, 'i32'),
+        processingTimeMs: m.getValue(resPtr + vr.totalTimeMs, 'i32'),
         tokensPerSecond: m.getValue(resPtr + vr.tokensPerSecond, 'float'),
-        hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
+        imageTokens: 0,
+        timeToFirstTokenMs: 0,
+        imageEncodeTimeMs: 0,
+        hardwareUsed: bridge.accelerationMode,
       };
 
       m.ccall('rac_vlm_result_free', null, ['number'], [resPtr]);
@@ -262,7 +337,7 @@ class VLMImpl {
       EventBus.shared.emit('vlm.processed', SDKEventType.Generation, {
         tokensPerSecond: vlmResult.tokensPerSecond,
         totalTokens: vlmResult.totalTokens,
-        hardwareUsed: vlmResult.hardwareUsed,
+        hardwareUsed: bridge.accelerationMode,
       });
 
       return vlmResult;
@@ -277,12 +352,28 @@ class VLMImpl {
     }
   }
 
+  async describeImage(image: VLMImage, prompt = 'Describe this image.'): Promise<string> {
+    return (await this.process(image, prompt)).text;
+  }
+
+  async askAboutImage(question: string, image: VLMImage): Promise<string> {
+    return (await this.process(image, question)).text;
+  }
+
+  async unloadVLMModel(): Promise<void> {
+    return this.unloadModel();
+  }
+
   /** Cancel in-progress VLM generation. */
   cancel(): void {
     if (this._vlmComponentHandle === 0) return;
     LlamaCppBridge.shared.module.ccall(
       'rac_vlm_component_cancel', 'number', ['number'], [this._vlmComponentHandle],
     );
+  }
+
+  cancelVLMGeneration(): void {
+    this.cancel();
   }
 
   /** Clean up the VLM component and unregister backend. */

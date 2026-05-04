@@ -18,6 +18,8 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Double
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -45,6 +47,45 @@ public class VADEvent(
     schemaIndex = 1,
   )
   public val frame_offset_us: Long = 0L,
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 2,
+  )
+  public val confidence: Float = 0f,
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isSpeech",
+    schemaIndex = 3,
+  )
+  public val is_speech: Boolean = false,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "speechDurationMs",
+    schemaIndex = 4,
+  )
+  public val speech_duration_ms: Double = 0.0,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "silenceDurationMs",
+    schemaIndex = 5,
+  )
+  public val silence_duration_ms: Double = 0.0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "noiseFloorDb",
+    schemaIndex = 6,
+  )
+  public val noise_floor_db: Double = 0.0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -60,6 +101,11 @@ public class VADEvent(
     if (unknownFields != other.unknownFields) return false
     if (type != other.type) return false
     if (frame_offset_us != other.frame_offset_us) return false
+    if (confidence != other.confidence) return false
+    if (is_speech != other.is_speech) return false
+    if (speech_duration_ms != other.speech_duration_ms) return false
+    if (silence_duration_ms != other.silence_duration_ms) return false
+    if (noise_floor_db != other.noise_floor_db) return false
     return true
   }
 
@@ -69,6 +115,11 @@ public class VADEvent(
       result = unknownFields.hashCode()
       result = result * 37 + type.hashCode()
       result = result * 37 + frame_offset_us.hashCode()
+      result = result * 37 + confidence.hashCode()
+      result = result * 37 + is_speech.hashCode()
+      result = result * 37 + speech_duration_ms.hashCode()
+      result = result * 37 + silence_duration_ms.hashCode()
+      result = result * 37 + noise_floor_db.hashCode()
       super.hashCode = result
     }
     return result
@@ -78,14 +129,25 @@ public class VADEvent(
     val result = mutableListOf<String>()
     result += """type=$type"""
     result += """frame_offset_us=$frame_offset_us"""
+    result += """confidence=$confidence"""
+    result += """is_speech=$is_speech"""
+    result += """speech_duration_ms=$speech_duration_ms"""
+    result += """silence_duration_ms=$silence_duration_ms"""
+    result += """noise_floor_db=$noise_floor_db"""
     return result.joinToString(prefix = "VADEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     type: VADEventType = this.type,
     frame_offset_us: Long = this.frame_offset_us,
+    confidence: Float = this.confidence,
+    is_speech: Boolean = this.is_speech,
+    speech_duration_ms: Double = this.speech_duration_ms,
+    silence_duration_ms: Double = this.silence_duration_ms,
+    noise_floor_db: Double = this.noise_floor_db,
     unknownFields: ByteString = this.unknownFields,
-  ): VADEvent = VADEvent(type, frame_offset_us, unknownFields)
+  ): VADEvent = VADEvent(type, frame_offset_us, confidence, is_speech, speech_duration_ms,
+      silence_duration_ms, noise_floor_db, unknownFields)
 
   public companion object {
     @JvmField
@@ -103,6 +165,16 @@ public class VADEvent(
             VADEventType.ADAPTER.encodedSizeWithTag(1, value.type)
         if (value.frame_offset_us != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(2,
             value.frame_offset_us)
+        if (!value.confidence.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(3,
+            value.confidence)
+        if (value.is_speech != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
+            value.is_speech)
+        if (!value.speech_duration_ms.equals(0.0)) size += ProtoAdapter.DOUBLE.encodedSizeWithTag(5,
+            value.speech_duration_ms)
+        if (!value.silence_duration_ms.equals(0.0)) size +=
+            ProtoAdapter.DOUBLE.encodedSizeWithTag(6, value.silence_duration_ms)
+        if (!value.noise_floor_db.equals(0.0)) size += ProtoAdapter.DOUBLE.encodedSizeWithTag(7,
+            value.noise_floor_db)
         return size
       }
 
@@ -111,11 +183,29 @@ public class VADEvent(
             VADEventType.ADAPTER.encodeWithTag(writer, 1, value.type)
         if (value.frame_offset_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.frame_offset_us)
+        if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
+            value.confidence)
+        if (value.is_speech != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_speech)
+        if (!value.speech_duration_ms.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 5,
+            value.speech_duration_ms)
+        if (!value.silence_duration_ms.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 6,
+            value.silence_duration_ms)
+        if (!value.noise_floor_db.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 7,
+            value.noise_floor_db)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADEvent) {
         writer.writeBytes(value.unknownFields)
+        if (!value.noise_floor_db.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 7,
+            value.noise_floor_db)
+        if (!value.silence_duration_ms.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 6,
+            value.silence_duration_ms)
+        if (!value.speech_duration_ms.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 5,
+            value.speech_duration_ms)
+        if (value.is_speech != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_speech)
+        if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
+            value.confidence)
         if (value.frame_offset_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.frame_offset_us)
         if (value.type != VADEventType.VAD_EVENT_UNSPECIFIED)
@@ -125,6 +215,11 @@ public class VADEvent(
       override fun decode(reader: ProtoReader): VADEvent {
         var type: VADEventType = VADEventType.VAD_EVENT_UNSPECIFIED
         var frame_offset_us: Long = 0L
+        var confidence: Float = 0f
+        var is_speech: Boolean = false
+        var speech_duration_ms: Double = 0.0
+        var silence_duration_ms: Double = 0.0
+        var noise_floor_db: Double = 0.0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -133,12 +228,22 @@ public class VADEvent(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             2 -> frame_offset_us = ProtoAdapter.INT64.decode(reader)
+            3 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            4 -> is_speech = ProtoAdapter.BOOL.decode(reader)
+            5 -> speech_duration_ms = ProtoAdapter.DOUBLE.decode(reader)
+            6 -> silence_duration_ms = ProtoAdapter.DOUBLE.decode(reader)
+            7 -> noise_floor_db = ProtoAdapter.DOUBLE.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADEvent(
           type = type,
           frame_offset_us = frame_offset_us,
+          confidence = confidence,
+          is_speech = is_speech,
+          speech_duration_ms = speech_duration_ms,
+          silence_duration_ms = silence_duration_ms,
+          noise_floor_db = noise_floor_db,
           unknownFields = unknownFields
         )
       }

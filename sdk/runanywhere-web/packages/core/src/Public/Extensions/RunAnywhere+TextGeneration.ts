@@ -7,12 +7,17 @@
  * `extractStructuredOutput` as flat top-level functions for use by RunAnywhere.ts.
  */
 
-import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+import type {
+  LLMGenerationOptions,
+  LLMGenerationResult,
+} from '@runanywhere/proto-ts/llm_options';
 import type { StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
 import type { LLMStreamingResult } from '../../types/index';
-import { chat, generate, generateStream } from './RunAnywhere+Convenience';
-import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
+import { chat, generate as generateViaProvider, generateStream as generateStreamViaProvider } from './RunAnywhere+Convenience';
+import { AsyncQueue } from '../../Foundation/AsyncQueue';
 import { SDKException } from '../../Foundation/SDKException';
+import { LLMProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
@@ -32,25 +37,134 @@ export interface JSONSchemaDescriptor {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Wrap raw model text into a `StructuredOutputResult`. */
-function toStructuredOutputResult(text: string, parsed: unknown): StructuredOutputResult {
-  const jsonBytes = new TextEncoder().encode(JSON.stringify(parsed));
+function buildLLMGenerateRequest(
+  prompt: string,
+  options: Partial<LLMGenerationOptions> = {},
+  streamingEnabled = false,
+): LLMGenerateRequest {
+  return {
+    prompt,
+    maxTokens: options.maxTokens ?? 0,
+    temperature: options.temperature ?? 0,
+    topP: options.topP ?? 0,
+    topK: options.topK ?? 0,
+    systemPrompt: options.systemPrompt ?? '',
+    emitThoughts: options.thinkingPattern != null,
+    repetitionPenalty: options.repetitionPenalty ?? 0,
+    stopSequences: options.stopSequences ?? [],
+    streamingEnabled,
+    preferredFramework: options.preferredFramework == null
+      ? ''
+      : String(options.preferredFramework),
+    jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema ?? '',
+    executionTarget: options.executionTarget == null
+      ? ''
+      : String(options.executionTarget),
+  };
+}
+
+function structuredResultFromGeneration(result: LLMGenerationResult): StructuredOutputResult {
+  const extractedJson = result.jsonOutput
+    ?? result.structuredOutputValidation?.extractedJson
+    ?? '';
+  const jsonBytes = new TextEncoder().encode(extractedJson || 'null');
   return {
     parsedJson: jsonBytes,
-    rawText: text,
-    validation: {
-      isValid: true,
-      containsJson: true,
+    rawText: result.text,
+    validation: result.structuredOutputValidation ?? {
+      isValid: extractedJson.length > 0,
+      containsJson: extractedJson.length > 0,
+      errorMessage: result.errorMessage || undefined,
+      rawOutput: result.text,
+      extractedJson: extractedJson || undefined,
     },
   };
 }
 
-/** Best-effort JSON extractor — strips markdown fences and returns parsed value. */
-function extractJsonFromText(text: string): unknown {
-  const cleaned = text.trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '');
-  return JSON.parse(cleaned);
+function streamingResultFromEvents(
+  events: AsyncIterable<LLMStreamEvent>,
+  cancelNative: () => void,
+): LLMStreamingResult {
+  const queue = new AsyncQueue<string>();
+  let started = false;
+  let cancelled = false;
+  let fullText = '';
+  let tokenCount = 0;
+  let finalEvent: LLMStreamEvent | undefined;
+  const startedAt = performance.now();
+
+  const result = new Promise<LLMGenerationResult>((resolve, reject) => {
+    const start = (): void => {
+      if (started) return;
+      started = true;
+      void (async () => {
+        try {
+          for await (const event of events) {
+            finalEvent = event;
+            if (event.token) {
+              fullText += event.token;
+              tokenCount += 1;
+              queue.push(event.token);
+            }
+            if (event.errorMessage) {
+              throw SDKException.generationFailed(event.errorMessage);
+            }
+          }
+          queue.complete();
+          resolve(finalLLMResult(fullText, tokenCount, startedAt, finalEvent));
+        } catch (error) {
+          queue.fail(error instanceof Error ? error : new Error(String(error)));
+          reject(error);
+        }
+      })();
+    };
+
+    const originalIterator = queue[Symbol.asyncIterator].bind(queue);
+    queue[Symbol.asyncIterator] = () => {
+      start();
+      return originalIterator();
+    };
+    start();
+  });
+
+  return {
+    stream: queue,
+    result,
+    cancel() {
+      if (cancelled) return;
+      cancelled = true;
+      cancelNative();
+      queue.complete();
+    },
+  };
+}
+
+function finalLLMResult(
+  fullText: string,
+  tokenCount: number,
+  startedAt: number,
+  finalEvent?: LLMStreamEvent,
+): LLMGenerationResult {
+  const final = finalEvent?.result;
+  const generationTimeMs = final?.totalTimeMs ?? performance.now() - startedAt;
+  const inputTokens = final?.promptTokens ?? 0;
+  const tokensGenerated = final?.completionTokens ?? tokenCount;
+  return {
+    text: final?.text ?? fullText,
+    thinkingContent: final?.thinkingContent,
+    inputTokens,
+    tokensGenerated,
+    modelUsed: '',
+    generationTimeMs,
+    ttftMs: final?.timeToFirstTokenMs,
+    tokensPerSecond: final?.tokensPerSecond
+      ?? (generationTimeMs > 0 ? (tokensGenerated / generationTimeMs) * 1000 : 0),
+    finishReason: finalEvent?.finishReason || final?.finishReason || '',
+    thinkingTokens: 0,
+    responseTokens: tokensGenerated,
+    totalTokens: final?.totalTokens ?? inputTokens + tokensGenerated,
+    errorMessage: finalEvent?.errorMessage || undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -60,56 +174,20 @@ function extractJsonFromText(text: string): unknown {
 /**
  * Streaming structured output (§3 `generateStructuredStream`).
  *
- * Delegates to the LLM provider's native `generateStructuredStream` if available;
- * otherwise adapts `generateStream` by buffering and JSON-parsing the complete
- * token stream before yielding a single `StructuredOutputResult` event.
+ * Uses the generated-proto LLM request shape and lets the native LLM service
+ * own schema prompting, JSON extraction, and validation.
  */
 export async function* generateStructuredStream(
   prompt: string,
   schema: JSONSchemaDescriptor,
   options?: Partial<LLMGenerationOptions>,
 ): AsyncIterable<StructuredOutputResult> {
-  const llm = ExtensionPoint.getProvider('llm') as {
-    generateStructuredStream?: (
-      prompt: string,
-      schema: { jsonSchema: string },
-      options?: Partial<LLMGenerationOptions>,
-    ) => AsyncIterable<StructuredOutputResult>;
-  } | undefined;
-
-  if (typeof llm?.generateStructuredStream === 'function') {
-    yield* llm.generateStructuredStream(prompt, schema, options);
-    return;
-  }
-
-  // Fallback: stream the raw text, collect it, then parse once at the end.
-  const fullPrompt =
-    'Respond ONLY with JSON matching this JSON Schema. ' +
-    'Do not include explanations or markdown.\n' +
-    `Schema:\n${schema.jsonSchema}\n\nPrompt:\n${prompt}`;
-
-  const streaming = await generateStream(fullPrompt, options);
-  let accumulated = '';
-  for await (const chunk of streaming.stream) {
-    // The LLM stream emits string tokens directly.
-    if (typeof chunk === 'string') {
-      accumulated += chunk;
-    } else if (chunk != null && typeof (chunk as unknown as { text?: string }).text === 'string') {
-      accumulated += (chunk as unknown as { text: string }).text;
-    }
-  }
-
-  const text = accumulated.trim();
-  try {
-    const parsed = typeof schema.parse === 'function'
-      ? schema.parse(text)
-      : extractJsonFromText(text);
-    yield toStructuredOutputResult(text, parsed);
-  } catch (err) {
-    throw SDKException.generationFailed(
-      `generateStructuredStream JSON parse failed: ${(err as Error).message}; raw: ${text.slice(0, 200)}`,
-    );
-  }
+  const result = await TextGeneration.generate({
+    ...options,
+    prompt,
+    jsonSchema: schema.jsonSchema,
+  } as Partial<LLMGenerationOptions> & { prompt: string });
+  yield structuredResultFromGeneration(result);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,68 +197,18 @@ export async function* generateStructuredStream(
 /**
  * Extract and validate structured output from already-generated text (§3).
  *
- * Pure TypeScript: attempts to locate and parse a JSON object from `text`
- * that matches the provided schema. Never calls the LLM backend.
+ * Native structured-output extraction is owned by the C++ modality layer.
  */
 export function extractStructuredOutput(
   text: string,
   schema: JSONSchemaDescriptor,
 ): StructuredOutputResult {
-  if (typeof schema.parse === 'function') {
-    try {
-      const parsed = schema.parse(text);
-      return toStructuredOutputResult(text, parsed);
-    } catch (parseErr) {
-      const jsonBytes = new TextEncoder().encode('null');
-      return {
-        parsedJson: jsonBytes,
-        rawText: text,
-        validation: {
-          isValid: false,
-          containsJson: false,
-          errorMessage: (parseErr as Error).message,
-          rawOutput: text,
-        },
-      };
-    }
-  }
-
-  // Try a sequence of increasingly lenient extractions:
-  // 1. The entire text as JSON
-  // 2. First JSON object found via brace-matching
-  // 3. Markdown-fence stripped text
-  const candidates: string[] = [
-    text.trim(),
-    text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim(),
-  ];
-
-  // Try to extract first {...} or [...] block
-  const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (jsonMatch) {
-    candidates.push(jsonMatch[1]);
-  }
-
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      return toStructuredOutputResult(text, parsed);
-    } catch {
-      // Try next candidate
-    }
-  }
-
-  // All extractions failed — return a validation-failed result.
-  const jsonBytes = new TextEncoder().encode('null');
-  return {
-    parsedJson: jsonBytes,
-    rawText: text,
-    validation: {
-      isValid: false,
-      containsJson: false,
-      errorMessage: 'No valid JSON found in text',
-      rawOutput: text,
-    },
-  };
+  void text;
+  void schema;
+  throw SDKException.backendNotAvailable(
+    'extractStructuredOutput',
+    'Use generateStructuredStream/generate with jsonSchema so C++ can extract and validate structured output.',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -190,12 +218,24 @@ export function extractStructuredOutput(
 export const TextGeneration = {
   async generate(options: Partial<LLMGenerationOptions>): Promise<LLMGenerationResult> {
     const prompt = (options as { prompt?: string }).prompt ?? '';
-    return generate(prompt, options);
+    const adapter = LLMProtoAdapter.tryDefault();
+    if (adapter?.supportsProtoLLM()) {
+      const result = adapter.generate(buildLLMGenerateRequest(prompt, options, false));
+      if (result) return result;
+    }
+    return generateViaProvider(prompt, options);
   },
 
   async generateStream(options: Partial<LLMGenerationOptions>): Promise<LLMStreamingResult> {
     const prompt = (options as { prompt?: string }).prompt ?? '';
-    return generateStream(prompt, options);
+    const adapter = LLMProtoAdapter.tryDefault();
+    if (adapter?.supportsProtoLLM()) {
+      const events = adapter.generateStream(buildLLMGenerateRequest(prompt, options, true));
+      return streamingResultFromEvents(events, () => {
+        adapter.cancel();
+      });
+    }
+    return generateStreamViaProvider(prompt, options);
   },
 
   async chat(prompt: string, options?: Partial<LLMGenerationOptions>): Promise<string> {

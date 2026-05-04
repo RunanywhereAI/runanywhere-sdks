@@ -165,11 +165,12 @@ export interface ToolValue {
   stringValue?: string | undefined;
   numberValue?: number | undefined;
   boolValue?: boolean | undefined;
-  arrayValue?:
-    | ToolValueArray
+  arrayValue?: ToolValueArray | undefined;
+  objectValue?:
+    | ToolValueObject
     | undefined;
-  /** No "null" arm — proto3 scalar defaults already represent absence. */
-  objectValue?: ToolValueObject | undefined;
+  /** true means JSON null */
+  nullValue?: boolean | undefined;
 }
 
 export interface ToolValueArray {
@@ -230,6 +231,19 @@ export interface ToolCall {
    * value at the moment). Empty = unset.
    */
   type: string;
+  /**
+   * Strongly-typed arguments map for SDKs that do not want to parse
+   * arguments_json. Producers should keep arguments_json populated for C++
+   * tokenizer compatibility.
+   */
+  arguments: { [key: string]: ToolValue };
+  /** Alias for id used by pre-proto SDK surfaces. */
+  callId?: string | undefined;
+}
+
+export interface ToolCall_ArgumentsEntry {
+  key: string;
+  value?: ToolValue | undefined;
 }
 
 /**
@@ -242,7 +256,27 @@ export interface ToolResult {
   toolCallId: string;
   name: string;
   resultJson: string;
-  error?: string | undefined;
+  error?:
+    | string
+    | undefined;
+  /**
+   * Whether execution succeeded. If unset/false and error is empty,
+   * consumers should fall back to legacy result_json/error semantics.
+   */
+  success: boolean;
+  /**
+   * Strongly-typed result map for SDKs that do not want to parse
+   * result_json. Producers should keep result_json populated for C++
+   * tokenizer compatibility.
+   */
+  result: { [key: string]: ToolValue };
+  /** Alias for tool_call_id used by pre-proto SDK surfaces. */
+  callId?: string | undefined;
+}
+
+export interface ToolResult_ResultEntry {
+  key: string;
+  value?: ToolValue | undefined;
 }
 
 /**
@@ -304,7 +338,14 @@ export interface ToolCallingOptions {
    * Distinct from `system_prompt` (field 6), which is merged unless
    * `replace_system_prompt` is true.
    */
-  customSystemPrompt?: string | undefined;
+  customSystemPrompt?:
+    | string
+    | undefined;
+  /**
+   * C ABI / SDK field name for max_iterations. 0 = use max_iterations or
+   * SDK default.
+   */
+  maxToolCalls?: number | undefined;
 }
 
 /**
@@ -336,6 +377,7 @@ function createBaseToolValue(): ToolValue {
     boolValue: undefined,
     arrayValue: undefined,
     objectValue: undefined,
+    nullValue: undefined,
   };
 }
 
@@ -355,6 +397,9 @@ export const ToolValue = {
     }
     if (message.objectValue !== undefined) {
       ToolValueObject.encode(message.objectValue, writer.uint32(42).fork()).ldelim();
+    }
+    if (message.nullValue !== undefined) {
+      writer.uint32(48).bool(message.nullValue);
     }
     return writer;
   },
@@ -401,6 +446,13 @@ export const ToolValue = {
 
           message.objectValue = ToolValueObject.decode(reader, reader.uint32());
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.nullValue = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -417,6 +469,7 @@ export const ToolValue = {
       boolValue: isSet(object.boolValue) ? globalThis.Boolean(object.boolValue) : undefined,
       arrayValue: isSet(object.arrayValue) ? ToolValueArray.fromJSON(object.arrayValue) : undefined,
       objectValue: isSet(object.objectValue) ? ToolValueObject.fromJSON(object.objectValue) : undefined,
+      nullValue: isSet(object.nullValue) ? globalThis.Boolean(object.nullValue) : undefined,
     };
   },
 
@@ -437,6 +490,9 @@ export const ToolValue = {
     if (message.objectValue !== undefined) {
       obj.objectValue = ToolValueObject.toJSON(message.objectValue);
     }
+    if (message.nullValue !== undefined) {
+      obj.nullValue = message.nullValue;
+    }
     return obj;
   },
 
@@ -454,6 +510,7 @@ export const ToolValue = {
     message.objectValue = (object.objectValue !== undefined && object.objectValue !== null)
       ? ToolValueObject.fromPartial(object.objectValue)
       : undefined;
+    message.nullValue = object.nullValue ?? undefined;
     return message;
   },
 };
@@ -899,7 +956,7 @@ export const ToolDefinition = {
 };
 
 function createBaseToolCall(): ToolCall {
-  return { id: "", name: "", argumentsJson: "", type: "" };
+  return { id: "", name: "", argumentsJson: "", type: "", arguments: {}, callId: undefined };
 }
 
 export const ToolCall = {
@@ -915,6 +972,12 @@ export const ToolCall = {
     }
     if (message.type !== "") {
       writer.uint32(34).string(message.type);
+    }
+    Object.entries(message.arguments).forEach(([key, value]) => {
+      ToolCall_ArgumentsEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).ldelim();
+    });
+    if (message.callId !== undefined) {
+      writer.uint32(50).string(message.callId);
     }
     return writer;
   },
@@ -954,6 +1017,23 @@ export const ToolCall = {
 
           message.type = reader.string();
           continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          const entry5 = ToolCall_ArgumentsEntry.decode(reader, reader.uint32());
+          if (entry5.value !== undefined) {
+            message.arguments[entry5.key] = entry5.value;
+          }
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.callId = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -969,6 +1049,13 @@ export const ToolCall = {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       argumentsJson: isSet(object.argumentsJson) ? globalThis.String(object.argumentsJson) : "",
       type: isSet(object.type) ? globalThis.String(object.type) : "",
+      arguments: isObject(object.arguments)
+        ? Object.entries(object.arguments).reduce<{ [key: string]: ToolValue }>((acc, [key, value]) => {
+          acc[key] = ToolValue.fromJSON(value);
+          return acc;
+        }, {})
+        : {},
+      callId: isSet(object.callId) ? globalThis.String(object.callId) : undefined,
     };
   },
 
@@ -986,6 +1073,18 @@ export const ToolCall = {
     if (message.type !== "") {
       obj.type = message.type;
     }
+    if (message.arguments) {
+      const entries = Object.entries(message.arguments);
+      if (entries.length > 0) {
+        obj.arguments = {};
+        entries.forEach(([k, v]) => {
+          obj.arguments[k] = ToolValue.toJSON(v);
+        });
+      }
+    }
+    if (message.callId !== undefined) {
+      obj.callId = message.callId;
+    }
     return obj;
   },
 
@@ -998,12 +1097,98 @@ export const ToolCall = {
     message.name = object.name ?? "";
     message.argumentsJson = object.argumentsJson ?? "";
     message.type = object.type ?? "";
+    message.arguments = Object.entries(object.arguments ?? {}).reduce<{ [key: string]: ToolValue }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = ToolValue.fromPartial(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    message.callId = object.callId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseToolCall_ArgumentsEntry(): ToolCall_ArgumentsEntry {
+  return { key: "", value: undefined };
+}
+
+export const ToolCall_ArgumentsEntry = {
+  encode(message: ToolCall_ArgumentsEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      ToolValue.encode(message.value, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ToolCall_ArgumentsEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCall_ArgumentsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = ToolValue.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCall_ArgumentsEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? ToolValue.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: ToolCall_ArgumentsEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = ToolValue.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCall_ArgumentsEntry>, I>>(base?: I): ToolCall_ArgumentsEntry {
+    return ToolCall_ArgumentsEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCall_ArgumentsEntry>, I>>(object: I): ToolCall_ArgumentsEntry {
+    const message = createBaseToolCall_ArgumentsEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? ToolValue.fromPartial(object.value)
+      : undefined;
     return message;
   },
 };
 
 function createBaseToolResult(): ToolResult {
-  return { toolCallId: "", name: "", resultJson: "", error: undefined };
+  return { toolCallId: "", name: "", resultJson: "", error: undefined, success: false, result: {}, callId: undefined };
 }
 
 export const ToolResult = {
@@ -1019,6 +1204,15 @@ export const ToolResult = {
     }
     if (message.error !== undefined) {
       writer.uint32(34).string(message.error);
+    }
+    if (message.success !== false) {
+      writer.uint32(40).bool(message.success);
+    }
+    Object.entries(message.result).forEach(([key, value]) => {
+      ToolResult_ResultEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).ldelim();
+    });
+    if (message.callId !== undefined) {
+      writer.uint32(58).string(message.callId);
     }
     return writer;
   },
@@ -1058,6 +1252,30 @@ export const ToolResult = {
 
           message.error = reader.string();
           continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          const entry6 = ToolResult_ResultEntry.decode(reader, reader.uint32());
+          if (entry6.value !== undefined) {
+            message.result[entry6.key] = entry6.value;
+          }
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.callId = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1073,6 +1291,14 @@ export const ToolResult = {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       resultJson: isSet(object.resultJson) ? globalThis.String(object.resultJson) : "",
       error: isSet(object.error) ? globalThis.String(object.error) : undefined,
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      result: isObject(object.result)
+        ? Object.entries(object.result).reduce<{ [key: string]: ToolValue }>((acc, [key, value]) => {
+          acc[key] = ToolValue.fromJSON(value);
+          return acc;
+        }, {})
+        : {},
+      callId: isSet(object.callId) ? globalThis.String(object.callId) : undefined,
     };
   },
 
@@ -1090,6 +1316,21 @@ export const ToolResult = {
     if (message.error !== undefined) {
       obj.error = message.error;
     }
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.result) {
+      const entries = Object.entries(message.result);
+      if (entries.length > 0) {
+        obj.result = {};
+        entries.forEach(([k, v]) => {
+          obj.result[k] = ToolValue.toJSON(v);
+        });
+      }
+    }
+    if (message.callId !== undefined) {
+      obj.callId = message.callId;
+    }
     return obj;
   },
 
@@ -1102,6 +1343,90 @@ export const ToolResult = {
     message.name = object.name ?? "";
     message.resultJson = object.resultJson ?? "";
     message.error = object.error ?? undefined;
+    message.success = object.success ?? false;
+    message.result = Object.entries(object.result ?? {}).reduce<{ [key: string]: ToolValue }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = ToolValue.fromPartial(value);
+      }
+      return acc;
+    }, {});
+    message.callId = object.callId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseToolResult_ResultEntry(): ToolResult_ResultEntry {
+  return { key: "", value: undefined };
+}
+
+export const ToolResult_ResultEntry = {
+  encode(message: ToolResult_ResultEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      ToolValue.encode(message.value, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult_ResultEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolResult_ResultEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = ToolValue.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolResult_ResultEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? ToolValue.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: ToolResult_ResultEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = ToolValue.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolResult_ResultEntry>, I>>(base?: I): ToolResult_ResultEntry {
+    return ToolResult_ResultEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolResult_ResultEntry>, I>>(object: I): ToolResult_ResultEntry {
+    const message = createBaseToolResult_ResultEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? ToolValue.fromPartial(object.value)
+      : undefined;
     return message;
   },
 };
@@ -1119,6 +1444,7 @@ function createBaseToolCallingOptions(): ToolCallingOptions {
     formatHint: "",
     format: undefined,
     customSystemPrompt: undefined,
+    maxToolCalls: undefined,
   };
 }
 
@@ -1156,6 +1482,9 @@ export const ToolCallingOptions = {
     }
     if (message.customSystemPrompt !== undefined) {
       writer.uint32(90).string(message.customSystemPrompt);
+    }
+    if (message.maxToolCalls !== undefined) {
+      writer.uint32(96).int32(message.maxToolCalls);
     }
     return writer;
   },
@@ -1244,6 +1573,13 @@ export const ToolCallingOptions = {
 
           message.customSystemPrompt = reader.string();
           continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.maxToolCalls = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1266,6 +1602,7 @@ export const ToolCallingOptions = {
       formatHint: isSet(object.formatHint) ? globalThis.String(object.formatHint) : "",
       format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
       customSystemPrompt: isSet(object.customSystemPrompt) ? globalThis.String(object.customSystemPrompt) : undefined,
+      maxToolCalls: isSet(object.maxToolCalls) ? globalThis.Number(object.maxToolCalls) : undefined,
     };
   },
 
@@ -1304,6 +1641,9 @@ export const ToolCallingOptions = {
     if (message.customSystemPrompt !== undefined) {
       obj.customSystemPrompt = message.customSystemPrompt;
     }
+    if (message.maxToolCalls !== undefined) {
+      obj.maxToolCalls = Math.round(message.maxToolCalls);
+    }
     return obj;
   },
 
@@ -1323,6 +1663,7 @@ export const ToolCallingOptions = {
     message.formatHint = object.formatHint ?? "";
     message.format = object.format ?? undefined;
     message.customSystemPrompt = object.customSystemPrompt ?? undefined;
+    message.maxToolCalls = object.maxToolCalls ?? undefined;
     return message;
   },
 };

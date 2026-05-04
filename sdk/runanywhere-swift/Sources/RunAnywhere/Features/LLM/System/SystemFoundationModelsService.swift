@@ -55,6 +55,11 @@ public class SystemFoundationModelsService {
     public func initialize(modelPath _: String?) async throws {
         logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
 
+        if let reason = SystemFoundationModels.unavailableReason {
+            logger.error("Foundation Models unavailable: \(reason)")
+            throw SDKException.llm(.serviceNotAvailable, reason)
+        }
+
         #if canImport(FoundationModels)
         guard #available(iOS 26.0, macOS 26.0, *) else {
             logger.error("iOS 26.0+ or macOS 26.0+ not available")

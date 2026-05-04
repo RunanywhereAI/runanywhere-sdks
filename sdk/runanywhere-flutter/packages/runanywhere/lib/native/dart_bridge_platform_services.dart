@@ -4,7 +4,13 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+
+typedef _PlatformServiceAvailabilityCallbackNative = Int32 Function(
+  Int32 service,
+  Pointer<Void> userData,
+);
 
 /// Platform services bridge for Foundation Models and System TTS.
 /// Matches Swift's `CppBridge+Platform.swift`.
@@ -12,9 +18,17 @@ class DartBridgePlatformServices {
   DartBridgePlatformServices._();
 
   static final _logger = SDKLogger('DartBridge.PlatformServices');
-  static final DartBridgePlatformServices instance = DartBridgePlatformServices._();
+  static final DartBridgePlatformServices instance =
+      DartBridgePlatformServices._();
 
   static bool _isRegistered = false;
+  static Pointer<NativeFunction<_PlatformServiceAvailabilityCallbackNative>>?
+      _availabilityCallback;
+
+  static const int _serviceFoundationModels = 1;
+  static const int _serviceSystemTts = 2;
+  static const int _serviceSystemStt = 3;
+  static const int _exceptionalReturnFalse = 0;
 
   /// Register platform services with C++
   static Future<void> register() async {
@@ -23,16 +37,28 @@ class DartBridgePlatformServices {
     try {
       final lib = PlatformLoader.load();
 
-      // Register platform service availability callback
-      // ignore: unused_local_variable
       final registerCallback = lib.lookupFunction<
-          Int32 Function(Pointer<NativeFunction<Int32 Function(Int32, Pointer<Void>)>>),
-          int Function(Pointer<NativeFunction<Int32 Function(Int32, Pointer<Void>)>>)>(
+          Int32 Function(
+              Pointer<NativeFunction<Int32 Function(Int32, Pointer<Void>)>>),
+          int Function(
+              Pointer<NativeFunction<Int32 Function(Int32, Pointer<Void>)>>)>(
         'rac_platform_services_register_availability_callback',
       );
 
-      // For now, we note that registration is available
-      // Full implementation would check iOS/macOS Foundation Models availability
+      _availabilityCallback ??=
+          Pointer.fromFunction<_PlatformServiceAvailabilityCallbackNative>(
+        _availabilityCallbackNative,
+        _exceptionalReturnFalse,
+      );
+
+      final result = registerCallback(_availabilityCallback!);
+      if (result != RacResultCode.success) {
+        _logger.warning(
+          'Failed to register platform services availability callback',
+          metadata: {'error_code': result},
+        );
+        return;
+      }
 
       _isRegistered = true;
       _logger.debug('Platform services registered');
@@ -43,6 +69,21 @@ class DartBridgePlatformServices {
       // non-debug builds, then mark as registered to avoid retry.
       _logger.warning('Platform services registration not available: $e');
       _isRegistered = true;
+    }
+  }
+
+  static int _availabilityCallbackNative(
+    int service,
+    Pointer<Void> userData,
+  ) {
+    switch (service) {
+      case _serviceFoundationModels:
+        return 0;
+      case _serviceSystemTts:
+      case _serviceSystemStt:
+        return 1;
+      default:
+        return 0;
     }
   }
 

@@ -17,8 +17,12 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
+import 'package:runanywhere/generated/vlm_options.pb.dart'
+    show VLMGenerationOptions, VLMImage, VLMResult;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
@@ -46,6 +50,7 @@ class DartBridgeVLM {
   // MARK: - State (matches Swift CppBridge.VLM exactly)
 
   RacHandle? _handle;
+  RacHandle? _serviceHandle;
   String? _loadedModelId;
   String? _loadedModelPath;
   String? _loadedMmprojPath;
@@ -93,6 +98,7 @@ class DartBridgeVLM {
 
   /// Check if a model is loaded.
   bool get isLoaded {
+    if (_serviceHandle != null) return true;
     if (_handle == null) return false;
 
     try {
@@ -147,55 +153,11 @@ class DartBridgeVLM {
     String modelId,
     String modelName,
   ) async {
-    final handle = getHandle();
-
-    final pathPtr = modelPath.toNativeUtf8();
-    Pointer<Utf8>? mmprojPtr;
-    final idPtr = modelId.toNativeUtf8();
-    final namePtr = modelName.toNativeUtf8();
-
-    try {
-      if (mmprojPath != null) {
-        mmprojPtr = mmprojPath.toNativeUtf8();
-      }
-
-      final lib = PlatformLoader.loadCommons();
-      final loadModelFn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>, Pointer<Utf8>)>('rac_vlm_component_load_model');
-
-      _logger.debug(
-          'Calling rac_vlm_component_load_model with handle: $_handle, path: $modelPath, mmproj: $mmprojPath');
-      final result = loadModelFn(
-        handle,
-        pathPtr,
-        mmprojPtr ?? nullptr,
-        idPtr,
-        namePtr,
-      );
-      _logger.debug(
-          'rac_vlm_component_load_model returned: $result (${RacResultCode.getMessage(result)})');
-
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to load VLM model: Error (code: $result)',
-        );
-      }
-
-      _loadedModelId = modelId;
-      _loadedModelPath = modelPath;
-      _loadedMmprojPath = mmprojPath;
-      _logger.info('VLM model loaded: $modelId');
-    } finally {
-      calloc.free(pathPtr);
-      if (mmprojPtr != null) {
-        calloc.free(mmprojPtr);
-      }
-      calloc.free(idPtr);
-      calloc.free(namePtr);
-    }
+    _createAndInitializeService(modelId, modelPath, mmprojPath);
+    _loadedModelId = modelId;
+    _loadedModelPath = modelPath;
+    _loadedMmprojPath = mmprojPath;
+    _logger.info('VLM service loaded: $modelId ($modelName)');
   }
 
   /// Load a VLM model by ID.
@@ -238,17 +200,22 @@ class DartBridgeVLM {
 
   /// Unload the current model.
   void unload() {
-    if (_handle == null) return;
-
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_vlm_component_cleanup');
-
-      cleanupFn(_handle!);
+      final serviceHandle = _serviceHandle;
+      if (serviceHandle != null) {
+        RacNative.bindings.rac_vlm_destroy?.call(serviceHandle);
+      }
+      _serviceHandle = null;
       _loadedModelId = null;
       _loadedModelPath = null;
       _loadedMmprojPath = null;
+      if (_handle != null) {
+        final lib = PlatformLoader.loadCommons();
+        final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
+            int Function(RacHandle)>('rac_vlm_component_cleanup');
+
+        cleanupFn(_handle!);
+      }
       _logger.info('VLM model unloaded');
     } catch (e) {
       _logger.error('Failed to unload VLM model: $e');
@@ -257,6 +224,14 @@ class DartBridgeVLM {
 
   /// Cancel ongoing image processing.
   void cancel() {
+    final serviceHandle = _serviceHandle;
+    if (serviceHandle != null) {
+      final rc = RacNative.bindings.rac_vlm_cancel_proto?.call(serviceHandle);
+      if (rc == RAC_SUCCESS) {
+        _logger.debug('VLM service processing cancelled');
+        return;
+      }
+    }
     if (_handle == null) return;
 
     try {
@@ -272,6 +247,192 @@ class DartBridgeVLM {
   }
 
   // MARK: - Image Processing (Non-Streaming)
+
+  VLMResult processImageProto(
+    VLMImage image,
+    VLMGenerationOptions options,
+  ) {
+    final handle = _requireServiceHandle();
+    final fn = RacNative.bindings.rac_vlm_process_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vlm_process_proto is unavailable');
+    }
+
+    final imageBytes = image.writeToBuffer();
+    final optionsBytes = options.writeToBuffer();
+    final imagePtr = DartBridgeProtoUtils.copyBytes(imageBytes);
+    final optionsPtr = DartBridgeProtoUtils.copyBytes(optionsBytes);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(
+        handle,
+        imagePtr,
+        imageBytes.length,
+        optionsPtr,
+        optionsBytes.length,
+        out,
+      );
+      DartBridgeProtoUtils.ensureSuccess(out, code, 'rac_vlm_process_proto');
+      return DartBridgeProtoUtils.decodeBuffer(out, VLMResult.fromBuffer);
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(imagePtr);
+      calloc.free(optionsPtr);
+      calloc.free(out);
+    }
+  }
+
+  VlmProtoStreamingResult processImageStreamProto(
+    VLMImage image,
+    VLMGenerationOptions options,
+  ) {
+    final handle = _requireServiceHandle();
+    final fn = RacNative.bindings.rac_vlm_process_stream_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vlm_process_stream_proto is unavailable');
+    }
+
+    final controller = StreamController<String>();
+    final metrics = Completer<VLMResult>();
+    NativeCallable<RacVlmStreamProtoCallbackNative>? callback;
+
+    unawaited(Future<void>(() {
+      final imageBytes = image.writeToBuffer();
+      final optionsBytes = options.writeToBuffer();
+      final imagePtr = DartBridgeProtoUtils.copyBytes(imageBytes);
+      final optionsPtr = DartBridgeProtoUtils.copyBytes(optionsBytes);
+      final out = calloc<RacProtoBuffer>();
+      final bindings = RacNative.bindings;
+
+      try {
+        bindings.rac_proto_buffer_init(out);
+        callback = NativeCallable<RacVlmStreamProtoCallbackNative>.isolateLocal(
+          (
+            Pointer<Uint8> data,
+            int size,
+            Pointer<Void> userData,
+          ) {
+            try {
+              final event =
+                  sdk_events_pb.SDKEvent.fromBuffer(data.asTypedList(size));
+              if (event.hasGeneration() && event.generation.token.isNotEmpty) {
+                controller.add(event.generation.token);
+              }
+              return RAC_TRUE;
+            } catch (e, st) {
+              controller.addError(e, st);
+              return RAC_FALSE;
+            }
+          },
+          exceptionalReturn: RAC_FALSE,
+        );
+
+        final code = fn(
+          handle,
+          imagePtr,
+          imageBytes.length,
+          optionsPtr,
+          optionsBytes.length,
+          callback!.nativeFunction,
+          nullptr,
+          out,
+        );
+        DartBridgeProtoUtils.ensureSuccess(
+          out,
+          code,
+          'rac_vlm_process_stream_proto',
+        );
+        final result =
+            DartBridgeProtoUtils.decodeBuffer(out, VLMResult.fromBuffer);
+        if (!metrics.isCompleted) {
+          metrics.complete(result);
+        }
+      } catch (e, st) {
+        if (!metrics.isCompleted) {
+          metrics.completeError(e, st);
+        }
+        controller.addError(e, st);
+      } finally {
+        bindings.rac_proto_buffer_free(out);
+        calloc.free(imagePtr);
+        calloc.free(optionsPtr);
+        calloc.free(out);
+        callback?.close();
+        callback = null;
+        unawaited(controller.close());
+      }
+    }));
+
+    return VlmProtoStreamingResult(
+      stream: controller.stream,
+      metrics: metrics.future,
+      cancel: () {
+        cancel();
+        callback?.close();
+        callback = null;
+      },
+    );
+  }
+
+  RacHandle _requireServiceHandle() {
+    final handle = _serviceHandle;
+    if (handle == null) {
+      throw StateError('No VLM service loaded. Call loadModel() first.');
+    }
+    return handle;
+  }
+
+  void _createAndInitializeService(
+    String modelId,
+    String modelPath,
+    String? mmprojPath,
+  ) {
+    final create = RacNative.bindings.rac_vlm_create;
+    final initialize = RacNative.bindings.rac_vlm_initialize;
+    if (create == null || initialize == null) {
+      throw UnsupportedError('VLM service proto ABI is unavailable');
+    }
+
+    final oldHandle = _serviceHandle;
+    if (oldHandle != null) {
+      RacNative.bindings.rac_vlm_destroy?.call(oldHandle);
+      _serviceHandle = null;
+    }
+
+    final modelIdPtr = modelId.toNativeUtf8();
+    final modelPathPtr = modelPath.toNativeUtf8();
+    final mmprojPtr = mmprojPath?.toNativeUtf8();
+    final out = calloc<RacHandle>();
+
+    try {
+      var rc = create(modelIdPtr, out);
+      if (rc != RAC_SUCCESS) {
+        throw StateError(
+          'rac_vlm_create failed: ${RacResultCode.getMessage(rc)}',
+        );
+      }
+
+      rc = initialize(out.value, modelPathPtr, mmprojPtr ?? nullptr);
+      if (rc != RAC_SUCCESS) {
+        RacNative.bindings.rac_vlm_destroy?.call(out.value);
+        throw StateError(
+          'rac_vlm_initialize failed: ${RacResultCode.getMessage(rc)}',
+        );
+      }
+
+      _serviceHandle = out.value;
+    } finally {
+      calloc.free(modelIdPtr);
+      calloc.free(modelPathPtr);
+      if (mmprojPtr != null) {
+        calloc.free(mmprojPtr);
+      }
+      calloc.free(out);
+    }
+  }
 
   /// Process an image with a text prompt (non-streaming).
   ///
@@ -490,6 +651,11 @@ class DartBridgeVLM {
 
   /// Destroy the component and release resources.
   void destroy() {
+    final serviceHandle = _serviceHandle;
+    if (serviceHandle != null) {
+      RacNative.bindings.rac_vlm_destroy?.call(serviceHandle);
+      _serviceHandle = null;
+    }
     if (_handle != null) {
       try {
         final lib = PlatformLoader.loadCommons();
@@ -507,6 +673,18 @@ class DartBridgeVLM {
       }
     }
   }
+}
+
+class VlmProtoStreamingResult {
+  const VlmProtoStreamingResult({
+    required this.stream,
+    required this.metrics,
+    required this.cancel,
+  });
+
+  final Stream<String> stream;
+  final Future<VLMResult> metrics;
+  final void Function() cancel;
 }
 
 /// Result from VLM image processing.
@@ -638,7 +816,8 @@ VlmBridgeResult _processInIsolate(
             Pointer<RacVlmOptionsStruct>,
             Pointer<RacVlmResultStruct>)>('rac_vlm_component_process');
 
-    final status = processFn(handle, imagePtr, promptPtr, optionsPtr, resultPtr);
+    final status =
+        processFn(handle, imagePtr, promptPtr, optionsPtr, resultPtr);
 
     if (status != RAC_SUCCESS) {
       return VlmBridgeResult(
@@ -813,38 +992,36 @@ void _vlmStreamingIsolateEntry(_VlmStreamingIsolateParams params) {
         Void Function(Pointer<RacVlmResultStruct>,
             Pointer<Void>)>(_vlmIsolateCompleteCallback);
     final errorCallbackPtr = Pointer.fromFunction<
-        Void Function(Int32, Pointer<Utf8>,
-            Pointer<Void>)>(_vlmIsolateErrorCallback);
+        Void Function(
+            Int32, Pointer<Utf8>, Pointer<Void>)>(_vlmIsolateErrorCallback);
 
     final processStreamFn = lib.lookupFunction<
         Int32 Function(
-          RacHandle,
-          Pointer<RacVlmImageStruct>,
-          Pointer<Utf8>,
-          Pointer<RacVlmOptionsStruct>,
-          Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Pointer<RacVlmResultStruct>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<Void>,
-        ),
+      RacHandle,
+      Pointer<RacVlmImageStruct>,
+      Pointer<Utf8>,
+      Pointer<RacVlmOptionsStruct>,
+      Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
+      Pointer<
+          NativeFunction<
+              Void Function(Pointer<RacVlmResultStruct>, Pointer<Void>)>>,
+      Pointer<
+          NativeFunction<Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
+      Pointer<Void>,
+    ),
         int Function(
-          RacHandle,
-          Pointer<RacVlmImageStruct>,
-          Pointer<Utf8>,
-          Pointer<RacVlmOptionsStruct>,
-          Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Pointer<RacVlmResultStruct>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<Void>,
-        )>('rac_vlm_component_process_stream');
+      RacHandle,
+      Pointer<RacVlmImageStruct>,
+      Pointer<Utf8>,
+      Pointer<RacVlmOptionsStruct>,
+      Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
+      Pointer<
+          NativeFunction<
+              Void Function(Pointer<RacVlmResultStruct>, Pointer<Void>)>>,
+      Pointer<
+          NativeFunction<Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
+      Pointer<Void>,
+    )>('rac_vlm_component_process_stream');
 
     // This FFI call blocks until processing is complete
     final status = processStreamFn(
@@ -860,12 +1037,12 @@ void _vlmStreamingIsolateEntry(_VlmStreamingIsolateParams params) {
 
     if (status != RAC_SUCCESS) {
       params.sendPort.send(_VlmStreamingMessage(
-        error:
-            'Failed to start streaming: ${RacResultCode.getMessage(status)}',
+        error: 'Failed to start streaming: ${RacResultCode.getMessage(status)}',
       ));
     }
   } catch (e) {
-    params.sendPort.send(_VlmStreamingMessage(error: 'Streaming exception: $e'));
+    params.sendPort
+        .send(_VlmStreamingMessage(error: 'Streaming exception: $e'));
   } finally {
     calloc.free(promptPtr);
     calloc.free(imagePtr);

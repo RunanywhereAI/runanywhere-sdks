@@ -6,6 +6,11 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { DownloadCancelResult, DownloadPlanResult, DownloadProgress, DownloadResumeResult, DownloadStartResult, } from "./download_service";
+import { SDKError } from "./errors";
+import { HardwareProfileResult } from "./hardware_profile";
+import { CurrentModelResult, inferenceFrameworkFromJSON, inferenceFrameworkToJSON, ModelCompatibilityResult, ModelDeleteResult, ModelDiscoveryResult, ModelGetResult, ModelImportResult, ModelListResult, ModelLoadResult, ModelRegistryRefreshResult, ModelUnloadResult, } from "./model_types";
+import { StorageAvailabilityResult, StorageDeletePlan, StorageDeleteResult, StorageInfoResult } from "./storage_types";
 import { VoiceEvent } from "./voice_events";
 export const protobufPackage = "runanywhere.v1";
 /**
@@ -224,6 +229,315 @@ export function eventDestinationToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+/**
+ * Canonical event category carried by every SDKEvent envelope. The oneof arm
+ * identifies the concrete payload shape; this field preserves the stable bus /
+ * analytics route used by Swift, Kotlin, Dart/Flutter, React Native, Web, and
+ * C++ commons.
+ */
+export var EventCategory;
+(function (EventCategory) {
+    EventCategory[EventCategory["EVENT_CATEGORY_UNSPECIFIED"] = 0] = "EVENT_CATEGORY_UNSPECIFIED";
+    EventCategory[EventCategory["EVENT_CATEGORY_SDK"] = 1] = "EVENT_CATEGORY_SDK";
+    EventCategory[EventCategory["EVENT_CATEGORY_INITIALIZATION"] = 2] = "EVENT_CATEGORY_INITIALIZATION";
+    EventCategory[EventCategory["EVENT_CATEGORY_SHUTDOWN"] = 3] = "EVENT_CATEGORY_SHUTDOWN";
+    EventCategory[EventCategory["EVENT_CATEGORY_SESSION"] = 4] = "EVENT_CATEGORY_SESSION";
+    EventCategory[EventCategory["EVENT_CATEGORY_AUTH"] = 5] = "EVENT_CATEGORY_AUTH";
+    EventCategory[EventCategory["EVENT_CATEGORY_DEVICE"] = 6] = "EVENT_CATEGORY_DEVICE";
+    EventCategory[EventCategory["EVENT_CATEGORY_REGISTRY"] = 7] = "EVENT_CATEGORY_REGISTRY";
+    EventCategory[EventCategory["EVENT_CATEGORY_ASSIGNMENT"] = 8] = "EVENT_CATEGORY_ASSIGNMENT";
+    EventCategory[EventCategory["EVENT_CATEGORY_IMPORT"] = 9] = "EVENT_CATEGORY_IMPORT";
+    EventCategory[EventCategory["EVENT_CATEGORY_DISCOVERY"] = 10] = "EVENT_CATEGORY_DISCOVERY";
+    EventCategory[EventCategory["EVENT_CATEGORY_DOWNLOAD"] = 11] = "EVENT_CATEGORY_DOWNLOAD";
+    EventCategory[EventCategory["EVENT_CATEGORY_STORAGE"] = 12] = "EVENT_CATEGORY_STORAGE";
+    EventCategory[EventCategory["EVENT_CATEGORY_HARDWARE"] = 13] = "EVENT_CATEGORY_HARDWARE";
+    EventCategory[EventCategory["EVENT_CATEGORY_ROUTING"] = 14] = "EVENT_CATEGORY_ROUTING";
+    EventCategory[EventCategory["EVENT_CATEGORY_FRAMEWORK"] = 15] = "EVENT_CATEGORY_FRAMEWORK";
+    EventCategory[EventCategory["EVENT_CATEGORY_MODEL"] = 16] = "EVENT_CATEGORY_MODEL";
+    EventCategory[EventCategory["EVENT_CATEGORY_COMPONENT"] = 17] = "EVENT_CATEGORY_COMPONENT";
+    EventCategory[EventCategory["EVENT_CATEGORY_LLM"] = 18] = "EVENT_CATEGORY_LLM";
+    EventCategory[EventCategory["EVENT_CATEGORY_STT"] = 19] = "EVENT_CATEGORY_STT";
+    EventCategory[EventCategory["EVENT_CATEGORY_ASR"] = 20] = "EVENT_CATEGORY_ASR";
+    EventCategory[EventCategory["EVENT_CATEGORY_TTS"] = 21] = "EVENT_CATEGORY_TTS";
+    EventCategory[EventCategory["EVENT_CATEGORY_VAD"] = 22] = "EVENT_CATEGORY_VAD";
+    /** EVENT_CATEGORY_STD - speech-turn detection / diarization */
+    EventCategory[EventCategory["EVENT_CATEGORY_STD"] = 23] = "EVENT_CATEGORY_STD";
+    EventCategory[EventCategory["EVENT_CATEGORY_VOICE_AGENT"] = 24] = "EVENT_CATEGORY_VOICE_AGENT";
+    EventCategory[EventCategory["EVENT_CATEGORY_VLM"] = 25] = "EVENT_CATEGORY_VLM";
+    EventCategory[EventCategory["EVENT_CATEGORY_DIFFUSION"] = 26] = "EVENT_CATEGORY_DIFFUSION";
+    EventCategory[EventCategory["EVENT_CATEGORY_EMBEDDINGS"] = 27] = "EVENT_CATEGORY_EMBEDDINGS";
+    EventCategory[EventCategory["EVENT_CATEGORY_RAG"] = 28] = "EVENT_CATEGORY_RAG";
+    EventCategory[EventCategory["EVENT_CATEGORY_LORA"] = 29] = "EVENT_CATEGORY_LORA";
+    EventCategory[EventCategory["EVENT_CATEGORY_TELEMETRY"] = 30] = "EVENT_CATEGORY_TELEMETRY";
+    EventCategory[EventCategory["EVENT_CATEGORY_PERFORMANCE"] = 31] = "EVENT_CATEGORY_PERFORMANCE";
+    EventCategory[EventCategory["EVENT_CATEGORY_CANCELLATION"] = 32] = "EVENT_CATEGORY_CANCELLATION";
+    EventCategory[EventCategory["EVENT_CATEGORY_FAILURE"] = 33] = "EVENT_CATEGORY_FAILURE";
+    EventCategory[EventCategory["EVENT_CATEGORY_NETWORK"] = 34] = "EVENT_CATEGORY_NETWORK";
+    EventCategory[EventCategory["EVENT_CATEGORY_ERROR"] = 35] = "EVENT_CATEGORY_ERROR";
+    EventCategory[EventCategory["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(EventCategory || (EventCategory = {}));
+export function eventCategoryFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "EVENT_CATEGORY_UNSPECIFIED":
+            return EventCategory.EVENT_CATEGORY_UNSPECIFIED;
+        case 1:
+        case "EVENT_CATEGORY_SDK":
+            return EventCategory.EVENT_CATEGORY_SDK;
+        case 2:
+        case "EVENT_CATEGORY_INITIALIZATION":
+            return EventCategory.EVENT_CATEGORY_INITIALIZATION;
+        case 3:
+        case "EVENT_CATEGORY_SHUTDOWN":
+            return EventCategory.EVENT_CATEGORY_SHUTDOWN;
+        case 4:
+        case "EVENT_CATEGORY_SESSION":
+            return EventCategory.EVENT_CATEGORY_SESSION;
+        case 5:
+        case "EVENT_CATEGORY_AUTH":
+            return EventCategory.EVENT_CATEGORY_AUTH;
+        case 6:
+        case "EVENT_CATEGORY_DEVICE":
+            return EventCategory.EVENT_CATEGORY_DEVICE;
+        case 7:
+        case "EVENT_CATEGORY_REGISTRY":
+            return EventCategory.EVENT_CATEGORY_REGISTRY;
+        case 8:
+        case "EVENT_CATEGORY_ASSIGNMENT":
+            return EventCategory.EVENT_CATEGORY_ASSIGNMENT;
+        case 9:
+        case "EVENT_CATEGORY_IMPORT":
+            return EventCategory.EVENT_CATEGORY_IMPORT;
+        case 10:
+        case "EVENT_CATEGORY_DISCOVERY":
+            return EventCategory.EVENT_CATEGORY_DISCOVERY;
+        case 11:
+        case "EVENT_CATEGORY_DOWNLOAD":
+            return EventCategory.EVENT_CATEGORY_DOWNLOAD;
+        case 12:
+        case "EVENT_CATEGORY_STORAGE":
+            return EventCategory.EVENT_CATEGORY_STORAGE;
+        case 13:
+        case "EVENT_CATEGORY_HARDWARE":
+            return EventCategory.EVENT_CATEGORY_HARDWARE;
+        case 14:
+        case "EVENT_CATEGORY_ROUTING":
+            return EventCategory.EVENT_CATEGORY_ROUTING;
+        case 15:
+        case "EVENT_CATEGORY_FRAMEWORK":
+            return EventCategory.EVENT_CATEGORY_FRAMEWORK;
+        case 16:
+        case "EVENT_CATEGORY_MODEL":
+            return EventCategory.EVENT_CATEGORY_MODEL;
+        case 17:
+        case "EVENT_CATEGORY_COMPONENT":
+            return EventCategory.EVENT_CATEGORY_COMPONENT;
+        case 18:
+        case "EVENT_CATEGORY_LLM":
+            return EventCategory.EVENT_CATEGORY_LLM;
+        case 19:
+        case "EVENT_CATEGORY_STT":
+            return EventCategory.EVENT_CATEGORY_STT;
+        case 20:
+        case "EVENT_CATEGORY_ASR":
+            return EventCategory.EVENT_CATEGORY_ASR;
+        case 21:
+        case "EVENT_CATEGORY_TTS":
+            return EventCategory.EVENT_CATEGORY_TTS;
+        case 22:
+        case "EVENT_CATEGORY_VAD":
+            return EventCategory.EVENT_CATEGORY_VAD;
+        case 23:
+        case "EVENT_CATEGORY_STD":
+            return EventCategory.EVENT_CATEGORY_STD;
+        case 24:
+        case "EVENT_CATEGORY_VOICE_AGENT":
+            return EventCategory.EVENT_CATEGORY_VOICE_AGENT;
+        case 25:
+        case "EVENT_CATEGORY_VLM":
+            return EventCategory.EVENT_CATEGORY_VLM;
+        case 26:
+        case "EVENT_CATEGORY_DIFFUSION":
+            return EventCategory.EVENT_CATEGORY_DIFFUSION;
+        case 27:
+        case "EVENT_CATEGORY_EMBEDDINGS":
+            return EventCategory.EVENT_CATEGORY_EMBEDDINGS;
+        case 28:
+        case "EVENT_CATEGORY_RAG":
+            return EventCategory.EVENT_CATEGORY_RAG;
+        case 29:
+        case "EVENT_CATEGORY_LORA":
+            return EventCategory.EVENT_CATEGORY_LORA;
+        case 30:
+        case "EVENT_CATEGORY_TELEMETRY":
+            return EventCategory.EVENT_CATEGORY_TELEMETRY;
+        case 31:
+        case "EVENT_CATEGORY_PERFORMANCE":
+            return EventCategory.EVENT_CATEGORY_PERFORMANCE;
+        case 32:
+        case "EVENT_CATEGORY_CANCELLATION":
+            return EventCategory.EVENT_CATEGORY_CANCELLATION;
+        case 33:
+        case "EVENT_CATEGORY_FAILURE":
+            return EventCategory.EVENT_CATEGORY_FAILURE;
+        case 34:
+        case "EVENT_CATEGORY_NETWORK":
+            return EventCategory.EVENT_CATEGORY_NETWORK;
+        case 35:
+        case "EVENT_CATEGORY_ERROR":
+            return EventCategory.EVENT_CATEGORY_ERROR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return EventCategory.UNRECOGNIZED;
+    }
+}
+export function eventCategoryToJSON(object) {
+    switch (object) {
+        case EventCategory.EVENT_CATEGORY_UNSPECIFIED:
+            return "EVENT_CATEGORY_UNSPECIFIED";
+        case EventCategory.EVENT_CATEGORY_SDK:
+            return "EVENT_CATEGORY_SDK";
+        case EventCategory.EVENT_CATEGORY_INITIALIZATION:
+            return "EVENT_CATEGORY_INITIALIZATION";
+        case EventCategory.EVENT_CATEGORY_SHUTDOWN:
+            return "EVENT_CATEGORY_SHUTDOWN";
+        case EventCategory.EVENT_CATEGORY_SESSION:
+            return "EVENT_CATEGORY_SESSION";
+        case EventCategory.EVENT_CATEGORY_AUTH:
+            return "EVENT_CATEGORY_AUTH";
+        case EventCategory.EVENT_CATEGORY_DEVICE:
+            return "EVENT_CATEGORY_DEVICE";
+        case EventCategory.EVENT_CATEGORY_REGISTRY:
+            return "EVENT_CATEGORY_REGISTRY";
+        case EventCategory.EVENT_CATEGORY_ASSIGNMENT:
+            return "EVENT_CATEGORY_ASSIGNMENT";
+        case EventCategory.EVENT_CATEGORY_IMPORT:
+            return "EVENT_CATEGORY_IMPORT";
+        case EventCategory.EVENT_CATEGORY_DISCOVERY:
+            return "EVENT_CATEGORY_DISCOVERY";
+        case EventCategory.EVENT_CATEGORY_DOWNLOAD:
+            return "EVENT_CATEGORY_DOWNLOAD";
+        case EventCategory.EVENT_CATEGORY_STORAGE:
+            return "EVENT_CATEGORY_STORAGE";
+        case EventCategory.EVENT_CATEGORY_HARDWARE:
+            return "EVENT_CATEGORY_HARDWARE";
+        case EventCategory.EVENT_CATEGORY_ROUTING:
+            return "EVENT_CATEGORY_ROUTING";
+        case EventCategory.EVENT_CATEGORY_FRAMEWORK:
+            return "EVENT_CATEGORY_FRAMEWORK";
+        case EventCategory.EVENT_CATEGORY_MODEL:
+            return "EVENT_CATEGORY_MODEL";
+        case EventCategory.EVENT_CATEGORY_COMPONENT:
+            return "EVENT_CATEGORY_COMPONENT";
+        case EventCategory.EVENT_CATEGORY_LLM:
+            return "EVENT_CATEGORY_LLM";
+        case EventCategory.EVENT_CATEGORY_STT:
+            return "EVENT_CATEGORY_STT";
+        case EventCategory.EVENT_CATEGORY_ASR:
+            return "EVENT_CATEGORY_ASR";
+        case EventCategory.EVENT_CATEGORY_TTS:
+            return "EVENT_CATEGORY_TTS";
+        case EventCategory.EVENT_CATEGORY_VAD:
+            return "EVENT_CATEGORY_VAD";
+        case EventCategory.EVENT_CATEGORY_STD:
+            return "EVENT_CATEGORY_STD";
+        case EventCategory.EVENT_CATEGORY_VOICE_AGENT:
+            return "EVENT_CATEGORY_VOICE_AGENT";
+        case EventCategory.EVENT_CATEGORY_VLM:
+            return "EVENT_CATEGORY_VLM";
+        case EventCategory.EVENT_CATEGORY_DIFFUSION:
+            return "EVENT_CATEGORY_DIFFUSION";
+        case EventCategory.EVENT_CATEGORY_EMBEDDINGS:
+            return "EVENT_CATEGORY_EMBEDDINGS";
+        case EventCategory.EVENT_CATEGORY_RAG:
+            return "EVENT_CATEGORY_RAG";
+        case EventCategory.EVENT_CATEGORY_LORA:
+            return "EVENT_CATEGORY_LORA";
+        case EventCategory.EVENT_CATEGORY_TELEMETRY:
+            return "EVENT_CATEGORY_TELEMETRY";
+        case EventCategory.EVENT_CATEGORY_PERFORMANCE:
+            return "EVENT_CATEGORY_PERFORMANCE";
+        case EventCategory.EVENT_CATEGORY_CANCELLATION:
+            return "EVENT_CATEGORY_CANCELLATION";
+        case EventCategory.EVENT_CATEGORY_FAILURE:
+            return "EVENT_CATEGORY_FAILURE";
+        case EventCategory.EVENT_CATEGORY_NETWORK:
+            return "EVENT_CATEGORY_NETWORK";
+        case EventCategory.EVENT_CATEGORY_ERROR:
+            return "EVENT_CATEGORY_ERROR";
+        case EventCategory.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+/**
+ * Component runtime lifecycle state for model-backed SDK components. This is
+ * distinct from voice_events.proto's ComponentLoadState, which is scoped to
+ * the voice-agent sub-pipeline. Platform adapters own native component handles;
+ * this enum carries the C++ lifecycle state every SDK can expose uniformly.
+ */
+export var ComponentLifecycleState;
+(function (ComponentLifecycleState) {
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_UNSPECIFIED"] = 0] = "COMPONENT_LIFECYCLE_STATE_UNSPECIFIED";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_NOT_LOADED"] = 1] = "COMPONENT_LIFECYCLE_STATE_NOT_LOADED";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_LOADING"] = 2] = "COMPONENT_LIFECYCLE_STATE_LOADING";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_READY"] = 3] = "COMPONENT_LIFECYCLE_STATE_READY";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_UNLOADING"] = 4] = "COMPONENT_LIFECYCLE_STATE_UNLOADING";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_ERROR"] = 5] = "COMPONENT_LIFECYCLE_STATE_ERROR";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_SHUTDOWN"] = 6] = "COMPONENT_LIFECYCLE_STATE_SHUTDOWN";
+    ComponentLifecycleState[ComponentLifecycleState["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ComponentLifecycleState || (ComponentLifecycleState = {}));
+export function componentLifecycleStateFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "COMPONENT_LIFECYCLE_STATE_UNSPECIFIED":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED;
+        case 1:
+        case "COMPONENT_LIFECYCLE_STATE_NOT_LOADED":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+        case 2:
+        case "COMPONENT_LIFECYCLE_STATE_LOADING":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_LOADING;
+        case 3:
+        case "COMPONENT_LIFECYCLE_STATE_READY":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
+        case 4:
+        case "COMPONENT_LIFECYCLE_STATE_UNLOADING":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNLOADING;
+        case 5:
+        case "COMPONENT_LIFECYCLE_STATE_ERROR":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR;
+        case 6:
+        case "COMPONENT_LIFECYCLE_STATE_SHUTDOWN":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ComponentLifecycleState.UNRECOGNIZED;
+    }
+}
+export function componentLifecycleStateToJSON(object) {
+    switch (object) {
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED:
+            return "COMPONENT_LIFECYCLE_STATE_UNSPECIFIED";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED:
+            return "COMPONENT_LIFECYCLE_STATE_NOT_LOADED";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_LOADING:
+            return "COMPONENT_LIFECYCLE_STATE_LOADING";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY:
+            return "COMPONENT_LIFECYCLE_STATE_READY";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNLOADING:
+            return "COMPONENT_LIFECYCLE_STATE_UNLOADING";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR:
+            return "COMPONENT_LIFECYCLE_STATE_ERROR";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN:
+            return "COMPONENT_LIFECYCLE_STATE_SHUTDOWN";
+        case ComponentLifecycleState.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 export var InitializationStage;
 (function (InitializationStage) {
     InitializationStage[InitializationStage["INITIALIZATION_STAGE_UNSPECIFIED"] = 0] = "INITIALIZATION_STAGE_UNSPECIFIED";
@@ -437,6 +751,17 @@ export var GenerationEventKind;
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_ROUTING_DECISION"] = 12] = "GENERATION_EVENT_KIND_ROUTING_DECISION";
     /** GENERATION_EVENT_KIND_STREAM_COMPLETED - Kotlin LLMEvent.STREAM_COMPLETED */
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAM_COMPLETED"] = 13] = "GENERATION_EVENT_KIND_STREAM_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCEL_REQUESTED"] = 14] = "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCELLED"] = 15] = "GENERATION_EVENT_KIND_CANCELLED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_STARTED"] = 16] = "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED"] = 17] = "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_FAILED"] = 18] = "GENERATION_EVENT_KIND_TOOL_CALL_FAILED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED"] = 19] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED"] = 20] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED"] = 21] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_STARTED"] = 22] = "GENERATION_EVENT_KIND_THINKING_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_DELTA"] = 23] = "GENERATION_EVENT_KIND_THINKING_DELTA";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_COMPLETED"] = 24] = "GENERATION_EVENT_KIND_THINKING_COMPLETED";
     GenerationEventKind[GenerationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(GenerationEventKind || (GenerationEventKind = {}));
 export function generationEventKindFromJSON(object) {
@@ -483,6 +808,39 @@ export function generationEventKindFromJSON(object) {
         case 13:
         case "GENERATION_EVENT_KIND_STREAM_COMPLETED":
             return GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED;
+        case 14:
+        case "GENERATION_EVENT_KIND_CANCEL_REQUESTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED;
+        case 15:
+        case "GENERATION_EVENT_KIND_CANCELLED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED;
+        case 16:
+        case "GENERATION_EVENT_KIND_TOOL_CALL_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED;
+        case 17:
+        case "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED;
+        case 18:
+        case "GENERATION_EVENT_KIND_TOOL_CALL_FAILED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_FAILED;
+        case 19:
+        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED;
+        case 20:
+        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED;
+        case 21:
+        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED;
+        case 22:
+        case "GENERATION_EVENT_KIND_THINKING_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_STARTED;
+        case 23:
+        case "GENERATION_EVENT_KIND_THINKING_DELTA":
+            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_DELTA;
+        case 24:
+        case "GENERATION_EVENT_KIND_THINKING_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_COMPLETED;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -519,6 +877,28 @@ export function generationEventKindToJSON(object) {
             return "GENERATION_EVENT_KIND_ROUTING_DECISION";
         case GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED:
             return "GENERATION_EVENT_KIND_STREAM_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED:
+            return "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED:
+            return "GENERATION_EVENT_KIND_CANCELLED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED:
+            return "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED:
+            return "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_FAILED:
+            return "GENERATION_EVENT_KIND_TOOL_CALL_FAILED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED:
+            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED:
+            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED:
+            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_STARTED:
+            return "GENERATION_EVENT_KIND_THINKING_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_DELTA:
+            return "GENERATION_EVENT_KIND_THINKING_DELTA";
+        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_COMPLETED:
+            return "GENERATION_EVENT_KIND_THINKING_COMPLETED";
         case GenerationEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -1540,6 +1920,717 @@ export function componentInitializationEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+export var SessionEventKind;
+(function (SessionEventKind) {
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_UNSPECIFIED"] = 0] = "SESSION_EVENT_KIND_UNSPECIFIED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_CREATED"] = 1] = "SESSION_EVENT_KIND_CREATED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_STARTED"] = 2] = "SESSION_EVENT_KIND_STARTED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_RESUMED"] = 3] = "SESSION_EVENT_KIND_RESUMED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_PAUSED"] = 4] = "SESSION_EVENT_KIND_PAUSED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_ENDED"] = 5] = "SESSION_EVENT_KIND_ENDED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_EXPIRED"] = 6] = "SESSION_EVENT_KIND_EXPIRED";
+    SessionEventKind[SessionEventKind["SESSION_EVENT_KIND_FAILED"] = 7] = "SESSION_EVENT_KIND_FAILED";
+    SessionEventKind[SessionEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(SessionEventKind || (SessionEventKind = {}));
+export function sessionEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "SESSION_EVENT_KIND_UNSPECIFIED":
+            return SessionEventKind.SESSION_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "SESSION_EVENT_KIND_CREATED":
+            return SessionEventKind.SESSION_EVENT_KIND_CREATED;
+        case 2:
+        case "SESSION_EVENT_KIND_STARTED":
+            return SessionEventKind.SESSION_EVENT_KIND_STARTED;
+        case 3:
+        case "SESSION_EVENT_KIND_RESUMED":
+            return SessionEventKind.SESSION_EVENT_KIND_RESUMED;
+        case 4:
+        case "SESSION_EVENT_KIND_PAUSED":
+            return SessionEventKind.SESSION_EVENT_KIND_PAUSED;
+        case 5:
+        case "SESSION_EVENT_KIND_ENDED":
+            return SessionEventKind.SESSION_EVENT_KIND_ENDED;
+        case 6:
+        case "SESSION_EVENT_KIND_EXPIRED":
+            return SessionEventKind.SESSION_EVENT_KIND_EXPIRED;
+        case 7:
+        case "SESSION_EVENT_KIND_FAILED":
+            return SessionEventKind.SESSION_EVENT_KIND_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return SessionEventKind.UNRECOGNIZED;
+    }
+}
+export function sessionEventKindToJSON(object) {
+    switch (object) {
+        case SessionEventKind.SESSION_EVENT_KIND_UNSPECIFIED:
+            return "SESSION_EVENT_KIND_UNSPECIFIED";
+        case SessionEventKind.SESSION_EVENT_KIND_CREATED:
+            return "SESSION_EVENT_KIND_CREATED";
+        case SessionEventKind.SESSION_EVENT_KIND_STARTED:
+            return "SESSION_EVENT_KIND_STARTED";
+        case SessionEventKind.SESSION_EVENT_KIND_RESUMED:
+            return "SESSION_EVENT_KIND_RESUMED";
+        case SessionEventKind.SESSION_EVENT_KIND_PAUSED:
+            return "SESSION_EVENT_KIND_PAUSED";
+        case SessionEventKind.SESSION_EVENT_KIND_ENDED:
+            return "SESSION_EVENT_KIND_ENDED";
+        case SessionEventKind.SESSION_EVENT_KIND_EXPIRED:
+            return "SESSION_EVENT_KIND_EXPIRED";
+        case SessionEventKind.SESSION_EVENT_KIND_FAILED:
+            return "SESSION_EVENT_KIND_FAILED";
+        case SessionEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var AuthEventKind;
+(function (AuthEventKind) {
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_UNSPECIFIED"] = 0] = "AUTH_EVENT_KIND_UNSPECIFIED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_REQUESTED"] = 1] = "AUTH_EVENT_KIND_REQUESTED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_SUCCEEDED"] = 2] = "AUTH_EVENT_KIND_SUCCEEDED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_FAILED"] = 3] = "AUTH_EVENT_KIND_FAILED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_TOKEN_REFRESHED"] = 4] = "AUTH_EVENT_KIND_TOKEN_REFRESHED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_TOKEN_EXPIRED"] = 5] = "AUTH_EVENT_KIND_TOKEN_EXPIRED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_DEVICE_REGISTERED"] = 6] = "AUTH_EVENT_KIND_DEVICE_REGISTERED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED"] = 7] = "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
+    AuthEventKind[AuthEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(AuthEventKind || (AuthEventKind = {}));
+export function authEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "AUTH_EVENT_KIND_UNSPECIFIED":
+            return AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "AUTH_EVENT_KIND_REQUESTED":
+            return AuthEventKind.AUTH_EVENT_KIND_REQUESTED;
+        case 2:
+        case "AUTH_EVENT_KIND_SUCCEEDED":
+            return AuthEventKind.AUTH_EVENT_KIND_SUCCEEDED;
+        case 3:
+        case "AUTH_EVENT_KIND_FAILED":
+            return AuthEventKind.AUTH_EVENT_KIND_FAILED;
+        case 4:
+        case "AUTH_EVENT_KIND_TOKEN_REFRESHED":
+            return AuthEventKind.AUTH_EVENT_KIND_TOKEN_REFRESHED;
+        case 5:
+        case "AUTH_EVENT_KIND_TOKEN_EXPIRED":
+            return AuthEventKind.AUTH_EVENT_KIND_TOKEN_EXPIRED;
+        case 6:
+        case "AUTH_EVENT_KIND_DEVICE_REGISTERED":
+            return AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTERED;
+        case 7:
+        case "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED":
+            return AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return AuthEventKind.UNRECOGNIZED;
+    }
+}
+export function authEventKindToJSON(object) {
+    switch (object) {
+        case AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED:
+            return "AUTH_EVENT_KIND_UNSPECIFIED";
+        case AuthEventKind.AUTH_EVENT_KIND_REQUESTED:
+            return "AUTH_EVENT_KIND_REQUESTED";
+        case AuthEventKind.AUTH_EVENT_KIND_SUCCEEDED:
+            return "AUTH_EVENT_KIND_SUCCEEDED";
+        case AuthEventKind.AUTH_EVENT_KIND_FAILED:
+            return "AUTH_EVENT_KIND_FAILED";
+        case AuthEventKind.AUTH_EVENT_KIND_TOKEN_REFRESHED:
+            return "AUTH_EVENT_KIND_TOKEN_REFRESHED";
+        case AuthEventKind.AUTH_EVENT_KIND_TOKEN_EXPIRED:
+            return "AUTH_EVENT_KIND_TOKEN_EXPIRED";
+        case AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTERED:
+            return "AUTH_EVENT_KIND_DEVICE_REGISTERED";
+        case AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
+            return "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
+        case AuthEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var ModelRegistryEventKind;
+(function (ModelRegistryEventKind) {
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED"] = 0] = "MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED"] = 1] = "MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED"] = 2] = "MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED"] = 3] = "MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED"] = 4] = "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED"] = 5] = "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED"] = 6] = "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED"] = 7] = "MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED"] = 8] = "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED"] = 9] = "MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED"] = 10] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED"] = 11] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED"] = 12] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED"] = 13] = "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED";
+    ModelRegistryEventKind[ModelRegistryEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ModelRegistryEventKind || (ModelRegistryEventKind = {}));
+export function modelRegistryEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED;
+        case 2:
+        case "MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED;
+        case 3:
+        case "MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED;
+        case 4:
+        case "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED;
+        case 5:
+        case "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED;
+        case 6:
+        case "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED;
+        case 7:
+        case "MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED;
+        case 8:
+        case "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED;
+        case 9:
+        case "MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED;
+        case 10:
+        case "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED;
+        case 11:
+        case "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED;
+        case 12:
+        case "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED;
+        case 13:
+        case "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ModelRegistryEventKind.UNRECOGNIZED;
+    }
+}
+export function modelRegistryEventKindToJSON(object) {
+    switch (object) {
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED:
+            return "MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED:
+            return "MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED:
+            return "MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED:
+            return "MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED:
+            return "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED:
+            return "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED:
+            return "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED:
+            return "MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED:
+            return "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED:
+            return "MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED:
+            return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED:
+            return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED:
+            return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED:
+            return "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED";
+        case ModelRegistryEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var DownloadEventKind;
+(function (DownloadEventKind) {
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_UNSPECIFIED"] = 0] = "DOWNLOAD_EVENT_KIND_UNSPECIFIED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PLAN_STARTED"] = 1] = "DOWNLOAD_EVENT_KIND_PLAN_STARTED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PLAN_COMPLETED"] = 2] = "DOWNLOAD_EVENT_KIND_PLAN_COMPLETED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PLAN_FAILED"] = 3] = "DOWNLOAD_EVENT_KIND_PLAN_FAILED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_STARTED"] = 4] = "DOWNLOAD_EVENT_KIND_STARTED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PROGRESS"] = 5] = "DOWNLOAD_EVENT_KIND_PROGRESS";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED"] = 6] = "DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_CANCELLED"] = 7] = "DOWNLOAD_EVENT_KIND_CANCELLED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_RESUME_REQUESTED"] = 8] = "DOWNLOAD_EVENT_KIND_RESUME_REQUESTED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_RESUMED"] = 9] = "DOWNLOAD_EVENT_KIND_RESUMED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_COMPLETED"] = 10] = "DOWNLOAD_EVENT_KIND_COMPLETED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_FAILED"] = 11] = "DOWNLOAD_EVENT_KIND_FAILED";
+    DownloadEventKind[DownloadEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(DownloadEventKind || (DownloadEventKind = {}));
+export function downloadEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "DOWNLOAD_EVENT_KIND_UNSPECIFIED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "DOWNLOAD_EVENT_KIND_PLAN_STARTED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_STARTED;
+        case 2:
+        case "DOWNLOAD_EVENT_KIND_PLAN_COMPLETED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_COMPLETED;
+        case 3:
+        case "DOWNLOAD_EVENT_KIND_PLAN_FAILED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_FAILED;
+        case 4:
+        case "DOWNLOAD_EVENT_KIND_STARTED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_STARTED;
+        case 5:
+        case "DOWNLOAD_EVENT_KIND_PROGRESS":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PROGRESS;
+        case 6:
+        case "DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED;
+        case 7:
+        case "DOWNLOAD_EVENT_KIND_CANCELLED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCELLED;
+        case 8:
+        case "DOWNLOAD_EVENT_KIND_RESUME_REQUESTED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUME_REQUESTED;
+        case 9:
+        case "DOWNLOAD_EVENT_KIND_RESUMED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUMED;
+        case 10:
+        case "DOWNLOAD_EVENT_KIND_COMPLETED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_COMPLETED;
+        case 11:
+        case "DOWNLOAD_EVENT_KIND_FAILED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return DownloadEventKind.UNRECOGNIZED;
+    }
+}
+export function downloadEventKindToJSON(object) {
+    switch (object) {
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_UNSPECIFIED:
+            return "DOWNLOAD_EVENT_KIND_UNSPECIFIED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_STARTED:
+            return "DOWNLOAD_EVENT_KIND_PLAN_STARTED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_COMPLETED:
+            return "DOWNLOAD_EVENT_KIND_PLAN_COMPLETED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_FAILED:
+            return "DOWNLOAD_EVENT_KIND_PLAN_FAILED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_STARTED:
+            return "DOWNLOAD_EVENT_KIND_STARTED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PROGRESS:
+            return "DOWNLOAD_EVENT_KIND_PROGRESS";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED:
+            return "DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCELLED:
+            return "DOWNLOAD_EVENT_KIND_CANCELLED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUME_REQUESTED:
+            return "DOWNLOAD_EVENT_KIND_RESUME_REQUESTED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUMED:
+            return "DOWNLOAD_EVENT_KIND_RESUMED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_COMPLETED:
+            return "DOWNLOAD_EVENT_KIND_COMPLETED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED:
+            return "DOWNLOAD_EVENT_KIND_FAILED";
+        case DownloadEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var StorageLifecycleEventKind;
+(function (StorageLifecycleEventKind) {
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED"] = 0] = "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED"] = 1] = "STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED"] = 2] = "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED"] = 3] = "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED"] = 4] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED"] = 5] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED"] = 6] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED"] = 7] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED"] = 8] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED"] = 9] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED"] = 10] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(StorageLifecycleEventKind || (StorageLifecycleEventKind = {}));
+export function storageLifecycleEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED;
+        case 2:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED;
+        case 3:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED;
+        case 4:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED;
+        case 5:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED;
+        case 6:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED;
+        case 7:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED;
+        case 8:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED;
+        case 9:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED;
+        case 10:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return StorageLifecycleEventKind.UNRECOGNIZED;
+    }
+}
+export function storageLifecycleEventKindToJSON(object) {
+    switch (object) {
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED";
+        case StorageLifecycleEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var HardwareRoutingEventKind;
+(function (HardwareRoutingEventKind) {
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED"] = 0] = "HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED"] = 1] = "HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED"] = 2] = "HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED"] = 3] = "HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED"] = 4] = "HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED"] = 5] = "HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED"] = 6] = "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING"] = 7] = "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING";
+    HardwareRoutingEventKind[HardwareRoutingEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(HardwareRoutingEventKind || (HardwareRoutingEventKind = {}));
+export function hardwareRoutingEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED;
+        case 2:
+        case "HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED;
+        case 3:
+        case "HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED;
+        case 4:
+        case "HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED;
+        case 5:
+        case "HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED;
+        case 6:
+        case "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED;
+        case 7:
+        case "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING":
+            return HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return HardwareRoutingEventKind.UNRECOGNIZED;
+    }
+}
+export function hardwareRoutingEventKindToJSON(object) {
+    switch (object) {
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED:
+            return "HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED:
+            return "HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED:
+            return "HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED:
+            return "HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED:
+            return "HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED:
+            return "HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED:
+            return "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED";
+        case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING:
+            return "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING";
+        case HardwareRoutingEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var CapabilityOperationEventKind;
+(function (CapabilityOperationEventKind) {
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED"] = 0] = "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED"] = 1] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED"] = 2] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED"] = 3] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED"] = 4] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS"] = 5] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED"] = 6] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED"] = 7] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED"] = 8] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED"] = 9] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED"] = 10] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED"] = 11] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED"] = 12] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED"] = 13] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED"] = 14] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED"] = 15] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED"] = 16] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED"] = 17] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED"] = 18] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(CapabilityOperationEventKind || (CapabilityOperationEventKind = {}));
+export function capabilityOperationEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED;
+        case 2:
+        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED;
+        case 3:
+        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED;
+        case 4:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED;
+        case 5:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS;
+        case 6:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED;
+        case 7:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED;
+        case 8:
+        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED;
+        case 9:
+        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED;
+        case 10:
+        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED;
+        case 11:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED;
+        case 12:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED;
+        case 13:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED;
+        case 14:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED;
+        case 15:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED;
+        case 16:
+        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED;
+        case 17:
+        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED;
+        case 18:
+        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return CapabilityOperationEventKind.UNRECOGNIZED;
+    }
+}
+export function capabilityOperationEventKindToJSON(object) {
+    switch (object) {
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED";
+        case CapabilityOperationEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var TelemetryEventKind;
+(function (TelemetryEventKind) {
+    TelemetryEventKind[TelemetryEventKind["TELEMETRY_EVENT_KIND_UNSPECIFIED"] = 0] = "TELEMETRY_EVENT_KIND_UNSPECIFIED";
+    TelemetryEventKind[TelemetryEventKind["TELEMETRY_EVENT_KIND_COUNTER"] = 1] = "TELEMETRY_EVENT_KIND_COUNTER";
+    TelemetryEventKind[TelemetryEventKind["TELEMETRY_EVENT_KIND_GAUGE"] = 2] = "TELEMETRY_EVENT_KIND_GAUGE";
+    TelemetryEventKind[TelemetryEventKind["TELEMETRY_EVENT_KIND_HISTOGRAM"] = 3] = "TELEMETRY_EVENT_KIND_HISTOGRAM";
+    TelemetryEventKind[TelemetryEventKind["TELEMETRY_EVENT_KIND_TRACE"] = 4] = "TELEMETRY_EVENT_KIND_TRACE";
+    TelemetryEventKind[TelemetryEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(TelemetryEventKind || (TelemetryEventKind = {}));
+export function telemetryEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "TELEMETRY_EVENT_KIND_UNSPECIFIED":
+            return TelemetryEventKind.TELEMETRY_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "TELEMETRY_EVENT_KIND_COUNTER":
+            return TelemetryEventKind.TELEMETRY_EVENT_KIND_COUNTER;
+        case 2:
+        case "TELEMETRY_EVENT_KIND_GAUGE":
+            return TelemetryEventKind.TELEMETRY_EVENT_KIND_GAUGE;
+        case 3:
+        case "TELEMETRY_EVENT_KIND_HISTOGRAM":
+            return TelemetryEventKind.TELEMETRY_EVENT_KIND_HISTOGRAM;
+        case 4:
+        case "TELEMETRY_EVENT_KIND_TRACE":
+            return TelemetryEventKind.TELEMETRY_EVENT_KIND_TRACE;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return TelemetryEventKind.UNRECOGNIZED;
+    }
+}
+export function telemetryEventKindToJSON(object) {
+    switch (object) {
+        case TelemetryEventKind.TELEMETRY_EVENT_KIND_UNSPECIFIED:
+            return "TELEMETRY_EVENT_KIND_UNSPECIFIED";
+        case TelemetryEventKind.TELEMETRY_EVENT_KIND_COUNTER:
+            return "TELEMETRY_EVENT_KIND_COUNTER";
+        case TelemetryEventKind.TELEMETRY_EVENT_KIND_GAUGE:
+            return "TELEMETRY_EVENT_KIND_GAUGE";
+        case TelemetryEventKind.TELEMETRY_EVENT_KIND_HISTOGRAM:
+            return "TELEMETRY_EVENT_KIND_HISTOGRAM";
+        case TelemetryEventKind.TELEMETRY_EVENT_KIND_TRACE:
+            return "TELEMETRY_EVENT_KIND_TRACE";
+        case TelemetryEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var CancellationEventKind;
+(function (CancellationEventKind) {
+    CancellationEventKind[CancellationEventKind["CANCELLATION_EVENT_KIND_UNSPECIFIED"] = 0] = "CANCELLATION_EVENT_KIND_UNSPECIFIED";
+    CancellationEventKind[CancellationEventKind["CANCELLATION_EVENT_KIND_REQUESTED"] = 1] = "CANCELLATION_EVENT_KIND_REQUESTED";
+    CancellationEventKind[CancellationEventKind["CANCELLATION_EVENT_KIND_ACKNOWLEDGED"] = 2] = "CANCELLATION_EVENT_KIND_ACKNOWLEDGED";
+    CancellationEventKind[CancellationEventKind["CANCELLATION_EVENT_KIND_COMPLETED"] = 3] = "CANCELLATION_EVENT_KIND_COMPLETED";
+    CancellationEventKind[CancellationEventKind["CANCELLATION_EVENT_KIND_FAILED"] = 4] = "CANCELLATION_EVENT_KIND_FAILED";
+    CancellationEventKind[CancellationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(CancellationEventKind || (CancellationEventKind = {}));
+export function cancellationEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "CANCELLATION_EVENT_KIND_UNSPECIFIED":
+            return CancellationEventKind.CANCELLATION_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "CANCELLATION_EVENT_KIND_REQUESTED":
+            return CancellationEventKind.CANCELLATION_EVENT_KIND_REQUESTED;
+        case 2:
+        case "CANCELLATION_EVENT_KIND_ACKNOWLEDGED":
+            return CancellationEventKind.CANCELLATION_EVENT_KIND_ACKNOWLEDGED;
+        case 3:
+        case "CANCELLATION_EVENT_KIND_COMPLETED":
+            return CancellationEventKind.CANCELLATION_EVENT_KIND_COMPLETED;
+        case 4:
+        case "CANCELLATION_EVENT_KIND_FAILED":
+            return CancellationEventKind.CANCELLATION_EVENT_KIND_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return CancellationEventKind.UNRECOGNIZED;
+    }
+}
+export function cancellationEventKindToJSON(object) {
+    switch (object) {
+        case CancellationEventKind.CANCELLATION_EVENT_KIND_UNSPECIFIED:
+            return "CANCELLATION_EVENT_KIND_UNSPECIFIED";
+        case CancellationEventKind.CANCELLATION_EVENT_KIND_REQUESTED:
+            return "CANCELLATION_EVENT_KIND_REQUESTED";
+        case CancellationEventKind.CANCELLATION_EVENT_KIND_ACKNOWLEDGED:
+            return "CANCELLATION_EVENT_KIND_ACKNOWLEDGED";
+        case CancellationEventKind.CANCELLATION_EVENT_KIND_COMPLETED:
+            return "CANCELLATION_EVENT_KIND_COMPLETED";
+        case CancellationEventKind.CANCELLATION_EVENT_KIND_FAILED:
+            return "CANCELLATION_EVENT_KIND_FAILED";
+        case CancellationEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseInitializationEvent() {
     return { stage: 0, source: "", error: "", version: "" };
 }
@@ -1843,6 +2934,13 @@ function createBaseGenerationEvent() {
         costSavedAmount: 0,
         routingTarget: "",
         routingReason: "",
+        cancelReason: "",
+        toolCallId: "",
+        toolName: "",
+        toolPayloadJson: "",
+        structuredSchemaJson: "",
+        structuredOutputJson: "",
+        thinkingText: "",
     };
 }
 export const GenerationEvent = {
@@ -1894,6 +2992,27 @@ export const GenerationEvent = {
         }
         if (message.routingReason !== "") {
             writer.uint32(130).string(message.routingReason);
+        }
+        if (message.cancelReason !== "") {
+            writer.uint32(138).string(message.cancelReason);
+        }
+        if (message.toolCallId !== "") {
+            writer.uint32(146).string(message.toolCallId);
+        }
+        if (message.toolName !== "") {
+            writer.uint32(154).string(message.toolName);
+        }
+        if (message.toolPayloadJson !== "") {
+            writer.uint32(162).string(message.toolPayloadJson);
+        }
+        if (message.structuredSchemaJson !== "") {
+            writer.uint32(170).string(message.structuredSchemaJson);
+        }
+        if (message.structuredOutputJson !== "") {
+            writer.uint32(178).string(message.structuredOutputJson);
+        }
+        if (message.thinkingText !== "") {
+            writer.uint32(186).string(message.thinkingText);
         }
         return writer;
     },
@@ -2000,6 +3119,48 @@ export const GenerationEvent = {
                     }
                     message.routingReason = reader.string();
                     continue;
+                case 17:
+                    if (tag !== 138) {
+                        break;
+                    }
+                    message.cancelReason = reader.string();
+                    continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.toolCallId = reader.string();
+                    continue;
+                case 19:
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.toolName = reader.string();
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.toolPayloadJson = reader.string();
+                    continue;
+                case 21:
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.structuredSchemaJson = reader.string();
+                    continue;
+                case 22:
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.structuredOutputJson = reader.string();
+                    continue;
+                case 23:
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.thinkingText = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2026,6 +3187,13 @@ export const GenerationEvent = {
             costSavedAmount: isSet(object.costSavedAmount) ? globalThis.Number(object.costSavedAmount) : 0,
             routingTarget: isSet(object.routingTarget) ? globalThis.String(object.routingTarget) : "",
             routingReason: isSet(object.routingReason) ? globalThis.String(object.routingReason) : "",
+            cancelReason: isSet(object.cancelReason) ? globalThis.String(object.cancelReason) : "",
+            toolCallId: isSet(object.toolCallId) ? globalThis.String(object.toolCallId) : "",
+            toolName: isSet(object.toolName) ? globalThis.String(object.toolName) : "",
+            toolPayloadJson: isSet(object.toolPayloadJson) ? globalThis.String(object.toolPayloadJson) : "",
+            structuredSchemaJson: isSet(object.structuredSchemaJson) ? globalThis.String(object.structuredSchemaJson) : "",
+            structuredOutputJson: isSet(object.structuredOutputJson) ? globalThis.String(object.structuredOutputJson) : "",
+            thinkingText: isSet(object.thinkingText) ? globalThis.String(object.thinkingText) : "",
         };
     },
     toJSON(message) {
@@ -2078,6 +3246,27 @@ export const GenerationEvent = {
         if (message.routingReason !== "") {
             obj.routingReason = message.routingReason;
         }
+        if (message.cancelReason !== "") {
+            obj.cancelReason = message.cancelReason;
+        }
+        if (message.toolCallId !== "") {
+            obj.toolCallId = message.toolCallId;
+        }
+        if (message.toolName !== "") {
+            obj.toolName = message.toolName;
+        }
+        if (message.toolPayloadJson !== "") {
+            obj.toolPayloadJson = message.toolPayloadJson;
+        }
+        if (message.structuredSchemaJson !== "") {
+            obj.structuredSchemaJson = message.structuredSchemaJson;
+        }
+        if (message.structuredOutputJson !== "") {
+            obj.structuredOutputJson = message.structuredOutputJson;
+        }
+        if (message.thinkingText !== "") {
+            obj.thinkingText = message.thinkingText;
+        }
         return obj;
     },
     create(base) {
@@ -2101,6 +3290,13 @@ export const GenerationEvent = {
         message.costSavedAmount = object.costSavedAmount ?? 0;
         message.routingTarget = object.routingTarget ?? "";
         message.routingReason = object.routingReason ?? "";
+        message.cancelReason = object.cancelReason ?? "";
+        message.toolCallId = object.toolCallId ?? "";
+        message.toolName = object.toolName ?? "";
+        message.toolPayloadJson = object.toolPayloadJson ?? "";
+        message.structuredSchemaJson = object.structuredSchemaJson ?? "";
+        message.structuredOutputJson = object.structuredOutputJson ?? "";
+        message.thinkingText = object.thinkingText ?? "";
         return message;
     },
 };
@@ -3384,6 +4580,8 @@ function createBaseComponentInitializationEvent() {
         initSuccess: false,
         readyCount: 0,
         failedCount: 0,
+        previousLifecycleState: 0,
+        currentLifecycleState: 0,
     };
 }
 export const ComponentInitializationEvent = {
@@ -3435,6 +4633,12 @@ export const ComponentInitializationEvent = {
         }
         if (message.failedCount !== 0) {
             writer.uint32(112).int32(message.failedCount);
+        }
+        if (message.previousLifecycleState !== 0) {
+            writer.uint32(120).int32(message.previousLifecycleState);
+        }
+        if (message.currentLifecycleState !== 0) {
+            writer.uint32(128).int32(message.currentLifecycleState);
         }
         return writer;
     },
@@ -3550,6 +4754,18 @@ export const ComponentInitializationEvent = {
                     }
                     message.failedCount = reader.int32();
                     continue;
+                case 15:
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.previousLifecycleState = reader.int32();
+                    continue;
+                case 16:
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.currentLifecycleState = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3580,6 +4796,12 @@ export const ComponentInitializationEvent = {
             initSuccess: isSet(object.initSuccess) ? globalThis.Boolean(object.initSuccess) : false,
             readyCount: isSet(object.readyCount) ? globalThis.Number(object.readyCount) : 0,
             failedCount: isSet(object.failedCount) ? globalThis.Number(object.failedCount) : 0,
+            previousLifecycleState: isSet(object.previousLifecycleState)
+                ? componentLifecycleStateFromJSON(object.previousLifecycleState)
+                : 0,
+            currentLifecycleState: isSet(object.currentLifecycleState)
+                ? componentLifecycleStateFromJSON(object.currentLifecycleState)
+                : 0,
         };
     },
     toJSON(message) {
@@ -3626,6 +4848,12 @@ export const ComponentInitializationEvent = {
         if (message.failedCount !== 0) {
             obj.failedCount = Math.round(message.failedCount);
         }
+        if (message.previousLifecycleState !== 0) {
+            obj.previousLifecycleState = componentLifecycleStateToJSON(message.previousLifecycleState);
+        }
+        if (message.currentLifecycleState !== 0) {
+            obj.currentLifecycleState = componentLifecycleStateToJSON(message.currentLifecycleState);
+        }
         return obj;
     },
     create(base) {
@@ -3647,6 +4875,1972 @@ export const ComponentInitializationEvent = {
         message.initSuccess = object.initSuccess ?? false;
         message.readyCount = object.readyCount ?? 0;
         message.failedCount = object.failedCount ?? 0;
+        message.previousLifecycleState = object.previousLifecycleState ?? 0;
+        message.currentLifecycleState = object.currentLifecycleState ?? 0;
+        return message;
+    },
+};
+function createBaseComponentLifecycleSnapshot() {
+    return { component: 0, state: 0, modelId: "", updatedAtMs: 0, errorMessage: "" };
+}
+export const ComponentLifecycleSnapshot = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.component !== 0) {
+            writer.uint32(8).int32(message.component);
+        }
+        if (message.state !== 0) {
+            writer.uint32(16).int32(message.state);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(26).string(message.modelId);
+        }
+        if (message.updatedAtMs !== 0) {
+            writer.uint32(32).int64(message.updatedAtMs);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(42).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseComponentLifecycleSnapshot();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.state = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.updatedAtMs = longToNumber(reader.int64());
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            state: isSet(object.state) ? componentLifecycleStateFromJSON(object.state) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            updatedAtMs: isSet(object.updatedAtMs) ? globalThis.Number(object.updatedAtMs) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.state !== 0) {
+            obj.state = componentLifecycleStateToJSON(message.state);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.updatedAtMs !== 0) {
+            obj.updatedAtMs = Math.round(message.updatedAtMs);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return ComponentLifecycleSnapshot.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseComponentLifecycleSnapshot();
+        message.component = object.component ?? 0;
+        message.state = object.state ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.updatedAtMs = object.updatedAtMs ?? 0;
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseComponentLifecycleEvent() {
+    return {
+        component: 0,
+        previousState: 0,
+        currentState: 0,
+        modelId: "",
+        timestampMs: 0,
+        modelLoadResult: undefined,
+        modelUnloadResult: undefined,
+        modelDeleteResult: undefined,
+        downloadProgress: undefined,
+        storageAvailability: undefined,
+        storageDeleteResult: undefined,
+    };
+}
+export const ComponentLifecycleEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.component !== 0) {
+            writer.uint32(8).int32(message.component);
+        }
+        if (message.previousState !== 0) {
+            writer.uint32(16).int32(message.previousState);
+        }
+        if (message.currentState !== 0) {
+            writer.uint32(24).int32(message.currentState);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(34).string(message.modelId);
+        }
+        if (message.timestampMs !== 0) {
+            writer.uint32(40).int64(message.timestampMs);
+        }
+        if (message.modelLoadResult !== undefined) {
+            ModelLoadResult.encode(message.modelLoadResult, writer.uint32(82).fork()).ldelim();
+        }
+        if (message.modelUnloadResult !== undefined) {
+            ModelUnloadResult.encode(message.modelUnloadResult, writer.uint32(90).fork()).ldelim();
+        }
+        if (message.modelDeleteResult !== undefined) {
+            ModelDeleteResult.encode(message.modelDeleteResult, writer.uint32(98).fork()).ldelim();
+        }
+        if (message.downloadProgress !== undefined) {
+            DownloadProgress.encode(message.downloadProgress, writer.uint32(106).fork()).ldelim();
+        }
+        if (message.storageAvailability !== undefined) {
+            StorageAvailabilityResult.encode(message.storageAvailability, writer.uint32(114).fork()).ldelim();
+        }
+        if (message.storageDeleteResult !== undefined) {
+            StorageDeleteResult.encode(message.storageDeleteResult, writer.uint32(122).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseComponentLifecycleEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.previousState = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.currentState = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.timestampMs = longToNumber(reader.int64());
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.modelLoadResult = ModelLoadResult.decode(reader, reader.uint32());
+                    continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.modelUnloadResult = ModelUnloadResult.decode(reader, reader.uint32());
+                    continue;
+                case 12:
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.modelDeleteResult = ModelDeleteResult.decode(reader, reader.uint32());
+                    continue;
+                case 13:
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.downloadProgress = DownloadProgress.decode(reader, reader.uint32());
+                    continue;
+                case 14:
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.storageAvailability = StorageAvailabilityResult.decode(reader, reader.uint32());
+                    continue;
+                case 15:
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.storageDeleteResult = StorageDeleteResult.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            previousState: isSet(object.previousState) ? componentLifecycleStateFromJSON(object.previousState) : 0,
+            currentState: isSet(object.currentState) ? componentLifecycleStateFromJSON(object.currentState) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+            modelLoadResult: isSet(object.modelLoadResult) ? ModelLoadResult.fromJSON(object.modelLoadResult) : undefined,
+            modelUnloadResult: isSet(object.modelUnloadResult)
+                ? ModelUnloadResult.fromJSON(object.modelUnloadResult)
+                : undefined,
+            modelDeleteResult: isSet(object.modelDeleteResult)
+                ? ModelDeleteResult.fromJSON(object.modelDeleteResult)
+                : undefined,
+            downloadProgress: isSet(object.downloadProgress) ? DownloadProgress.fromJSON(object.downloadProgress) : undefined,
+            storageAvailability: isSet(object.storageAvailability)
+                ? StorageAvailabilityResult.fromJSON(object.storageAvailability)
+                : undefined,
+            storageDeleteResult: isSet(object.storageDeleteResult)
+                ? StorageDeleteResult.fromJSON(object.storageDeleteResult)
+                : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.previousState !== 0) {
+            obj.previousState = componentLifecycleStateToJSON(message.previousState);
+        }
+        if (message.currentState !== 0) {
+            obj.currentState = componentLifecycleStateToJSON(message.currentState);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.timestampMs !== 0) {
+            obj.timestampMs = Math.round(message.timestampMs);
+        }
+        if (message.modelLoadResult !== undefined) {
+            obj.modelLoadResult = ModelLoadResult.toJSON(message.modelLoadResult);
+        }
+        if (message.modelUnloadResult !== undefined) {
+            obj.modelUnloadResult = ModelUnloadResult.toJSON(message.modelUnloadResult);
+        }
+        if (message.modelDeleteResult !== undefined) {
+            obj.modelDeleteResult = ModelDeleteResult.toJSON(message.modelDeleteResult);
+        }
+        if (message.downloadProgress !== undefined) {
+            obj.downloadProgress = DownloadProgress.toJSON(message.downloadProgress);
+        }
+        if (message.storageAvailability !== undefined) {
+            obj.storageAvailability = StorageAvailabilityResult.toJSON(message.storageAvailability);
+        }
+        if (message.storageDeleteResult !== undefined) {
+            obj.storageDeleteResult = StorageDeleteResult.toJSON(message.storageDeleteResult);
+        }
+        return obj;
+    },
+    create(base) {
+        return ComponentLifecycleEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseComponentLifecycleEvent();
+        message.component = object.component ?? 0;
+        message.previousState = object.previousState ?? 0;
+        message.currentState = object.currentState ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.timestampMs = object.timestampMs ?? 0;
+        message.modelLoadResult = (object.modelLoadResult !== undefined && object.modelLoadResult !== null)
+            ? ModelLoadResult.fromPartial(object.modelLoadResult)
+            : undefined;
+        message.modelUnloadResult = (object.modelUnloadResult !== undefined && object.modelUnloadResult !== null)
+            ? ModelUnloadResult.fromPartial(object.modelUnloadResult)
+            : undefined;
+        message.modelDeleteResult = (object.modelDeleteResult !== undefined && object.modelDeleteResult !== null)
+            ? ModelDeleteResult.fromPartial(object.modelDeleteResult)
+            : undefined;
+        message.downloadProgress = (object.downloadProgress !== undefined && object.downloadProgress !== null)
+            ? DownloadProgress.fromPartial(object.downloadProgress)
+            : undefined;
+        message.storageAvailability = (object.storageAvailability !== undefined && object.storageAvailability !== null)
+            ? StorageAvailabilityResult.fromPartial(object.storageAvailability)
+            : undefined;
+        message.storageDeleteResult = (object.storageDeleteResult !== undefined && object.storageDeleteResult !== null)
+            ? StorageDeleteResult.fromPartial(object.storageDeleteResult)
+            : undefined;
+        return message;
+    },
+};
+function createBaseSessionEvent() {
+    return { kind: 0, sessionId: "", userId: "", reason: "", error: "", startedAtMs: 0, endedAtMs: 0 };
+}
+export const SessionEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.sessionId !== "") {
+            writer.uint32(18).string(message.sessionId);
+        }
+        if (message.userId !== "") {
+            writer.uint32(26).string(message.userId);
+        }
+        if (message.reason !== "") {
+            writer.uint32(34).string(message.reason);
+        }
+        if (message.error !== "") {
+            writer.uint32(42).string(message.error);
+        }
+        if (message.startedAtMs !== 0) {
+            writer.uint32(48).int64(message.startedAtMs);
+        }
+        if (message.endedAtMs !== 0) {
+            writer.uint32(56).int64(message.endedAtMs);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSessionEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.userId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.reason = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.startedAtMs = longToNumber(reader.int64());
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.endedAtMs = longToNumber(reader.int64());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? sessionEventKindFromJSON(object.kind) : 0,
+            sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+            userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
+            reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            startedAtMs: isSet(object.startedAtMs) ? globalThis.Number(object.startedAtMs) : 0,
+            endedAtMs: isSet(object.endedAtMs) ? globalThis.Number(object.endedAtMs) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = sessionEventKindToJSON(message.kind);
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.userId !== "") {
+            obj.userId = message.userId;
+        }
+        if (message.reason !== "") {
+            obj.reason = message.reason;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.startedAtMs !== 0) {
+            obj.startedAtMs = Math.round(message.startedAtMs);
+        }
+        if (message.endedAtMs !== 0) {
+            obj.endedAtMs = Math.round(message.endedAtMs);
+        }
+        return obj;
+    },
+    create(base) {
+        return SessionEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSessionEvent();
+        message.kind = object.kind ?? 0;
+        message.sessionId = object.sessionId ?? "";
+        message.userId = object.userId ?? "";
+        message.reason = object.reason ?? "";
+        message.error = object.error ?? "";
+        message.startedAtMs = object.startedAtMs ?? 0;
+        message.endedAtMs = object.endedAtMs ?? 0;
+        return message;
+    },
+};
+function createBaseAuthEvent() {
+    return { kind: 0, provider: "", subjectId: "", scope: "", error: "" };
+}
+export const AuthEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.provider !== "") {
+            writer.uint32(18).string(message.provider);
+        }
+        if (message.subjectId !== "") {
+            writer.uint32(26).string(message.subjectId);
+        }
+        if (message.scope !== "") {
+            writer.uint32(34).string(message.scope);
+        }
+        if (message.error !== "") {
+            writer.uint32(42).string(message.error);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseAuthEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.provider = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.subjectId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.scope = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? authEventKindFromJSON(object.kind) : 0,
+            provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+            subjectId: isSet(object.subjectId) ? globalThis.String(object.subjectId) : "",
+            scope: isSet(object.scope) ? globalThis.String(object.scope) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = authEventKindToJSON(message.kind);
+        }
+        if (message.provider !== "") {
+            obj.provider = message.provider;
+        }
+        if (message.subjectId !== "") {
+            obj.subjectId = message.subjectId;
+        }
+        if (message.scope !== "") {
+            obj.scope = message.scope;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        return obj;
+    },
+    create(base) {
+        return AuthEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseAuthEvent();
+        message.kind = object.kind ?? 0;
+        message.provider = object.provider ?? "";
+        message.subjectId = object.subjectId ?? "";
+        message.scope = object.scope ?? "";
+        message.error = object.error ?? "";
+        return message;
+    },
+};
+function createBaseModelRegistryEvent() {
+    return {
+        kind: 0,
+        modelId: "",
+        assignmentId: "",
+        assignedComponent: 0,
+        framework: 0,
+        sourcePath: "",
+        error: "",
+        refreshResult: undefined,
+        listResult: undefined,
+        getResult: undefined,
+        importResult: undefined,
+        discoveryResult: undefined,
+        compatibilityResult: undefined,
+        currentModelResult: undefined,
+    };
+}
+export const ModelRegistryEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.assignmentId !== "") {
+            writer.uint32(26).string(message.assignmentId);
+        }
+        if (message.assignedComponent !== 0) {
+            writer.uint32(32).int32(message.assignedComponent);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(40).int32(message.framework);
+        }
+        if (message.sourcePath !== "") {
+            writer.uint32(50).string(message.sourcePath);
+        }
+        if (message.error !== "") {
+            writer.uint32(58).string(message.error);
+        }
+        if (message.refreshResult !== undefined) {
+            ModelRegistryRefreshResult.encode(message.refreshResult, writer.uint32(162).fork()).ldelim();
+        }
+        if (message.listResult !== undefined) {
+            ModelListResult.encode(message.listResult, writer.uint32(170).fork()).ldelim();
+        }
+        if (message.getResult !== undefined) {
+            ModelGetResult.encode(message.getResult, writer.uint32(178).fork()).ldelim();
+        }
+        if (message.importResult !== undefined) {
+            ModelImportResult.encode(message.importResult, writer.uint32(186).fork()).ldelim();
+        }
+        if (message.discoveryResult !== undefined) {
+            ModelDiscoveryResult.encode(message.discoveryResult, writer.uint32(194).fork()).ldelim();
+        }
+        if (message.compatibilityResult !== undefined) {
+            ModelCompatibilityResult.encode(message.compatibilityResult, writer.uint32(202).fork()).ldelim();
+        }
+        if (message.currentModelResult !== undefined) {
+            CurrentModelResult.encode(message.currentModelResult, writer.uint32(210).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelRegistryEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.assignmentId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.assignedComponent = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.sourcePath = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.refreshResult = ModelRegistryRefreshResult.decode(reader, reader.uint32());
+                    continue;
+                case 21:
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.listResult = ModelListResult.decode(reader, reader.uint32());
+                    continue;
+                case 22:
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.getResult = ModelGetResult.decode(reader, reader.uint32());
+                    continue;
+                case 23:
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.importResult = ModelImportResult.decode(reader, reader.uint32());
+                    continue;
+                case 24:
+                    if (tag !== 194) {
+                        break;
+                    }
+                    message.discoveryResult = ModelDiscoveryResult.decode(reader, reader.uint32());
+                    continue;
+                case 25:
+                    if (tag !== 202) {
+                        break;
+                    }
+                    message.compatibilityResult = ModelCompatibilityResult.decode(reader, reader.uint32());
+                    continue;
+                case 26:
+                    if (tag !== 210) {
+                        break;
+                    }
+                    message.currentModelResult = CurrentModelResult.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? modelRegistryEventKindFromJSON(object.kind) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            assignmentId: isSet(object.assignmentId) ? globalThis.String(object.assignmentId) : "",
+            assignedComponent: isSet(object.assignedComponent) ? sDKComponentFromJSON(object.assignedComponent) : 0,
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
+            sourcePath: isSet(object.sourcePath) ? globalThis.String(object.sourcePath) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            refreshResult: isSet(object.refreshResult)
+                ? ModelRegistryRefreshResult.fromJSON(object.refreshResult)
+                : undefined,
+            listResult: isSet(object.listResult) ? ModelListResult.fromJSON(object.listResult) : undefined,
+            getResult: isSet(object.getResult) ? ModelGetResult.fromJSON(object.getResult) : undefined,
+            importResult: isSet(object.importResult) ? ModelImportResult.fromJSON(object.importResult) : undefined,
+            discoveryResult: isSet(object.discoveryResult)
+                ? ModelDiscoveryResult.fromJSON(object.discoveryResult)
+                : undefined,
+            compatibilityResult: isSet(object.compatibilityResult)
+                ? ModelCompatibilityResult.fromJSON(object.compatibilityResult)
+                : undefined,
+            currentModelResult: isSet(object.currentModelResult)
+                ? CurrentModelResult.fromJSON(object.currentModelResult)
+                : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = modelRegistryEventKindToJSON(message.kind);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.assignmentId !== "") {
+            obj.assignmentId = message.assignmentId;
+        }
+        if (message.assignedComponent !== 0) {
+            obj.assignedComponent = sDKComponentToJSON(message.assignedComponent);
+        }
+        if (message.framework !== 0) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.sourcePath !== "") {
+            obj.sourcePath = message.sourcePath;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.refreshResult !== undefined) {
+            obj.refreshResult = ModelRegistryRefreshResult.toJSON(message.refreshResult);
+        }
+        if (message.listResult !== undefined) {
+            obj.listResult = ModelListResult.toJSON(message.listResult);
+        }
+        if (message.getResult !== undefined) {
+            obj.getResult = ModelGetResult.toJSON(message.getResult);
+        }
+        if (message.importResult !== undefined) {
+            obj.importResult = ModelImportResult.toJSON(message.importResult);
+        }
+        if (message.discoveryResult !== undefined) {
+            obj.discoveryResult = ModelDiscoveryResult.toJSON(message.discoveryResult);
+        }
+        if (message.compatibilityResult !== undefined) {
+            obj.compatibilityResult = ModelCompatibilityResult.toJSON(message.compatibilityResult);
+        }
+        if (message.currentModelResult !== undefined) {
+            obj.currentModelResult = CurrentModelResult.toJSON(message.currentModelResult);
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelRegistryEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelRegistryEvent();
+        message.kind = object.kind ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.assignmentId = object.assignmentId ?? "";
+        message.assignedComponent = object.assignedComponent ?? 0;
+        message.framework = object.framework ?? 0;
+        message.sourcePath = object.sourcePath ?? "";
+        message.error = object.error ?? "";
+        message.refreshResult = (object.refreshResult !== undefined && object.refreshResult !== null)
+            ? ModelRegistryRefreshResult.fromPartial(object.refreshResult)
+            : undefined;
+        message.listResult = (object.listResult !== undefined && object.listResult !== null)
+            ? ModelListResult.fromPartial(object.listResult)
+            : undefined;
+        message.getResult = (object.getResult !== undefined && object.getResult !== null)
+            ? ModelGetResult.fromPartial(object.getResult)
+            : undefined;
+        message.importResult = (object.importResult !== undefined && object.importResult !== null)
+            ? ModelImportResult.fromPartial(object.importResult)
+            : undefined;
+        message.discoveryResult = (object.discoveryResult !== undefined && object.discoveryResult !== null)
+            ? ModelDiscoveryResult.fromPartial(object.discoveryResult)
+            : undefined;
+        message.compatibilityResult = (object.compatibilityResult !== undefined && object.compatibilityResult !== null)
+            ? ModelCompatibilityResult.fromPartial(object.compatibilityResult)
+            : undefined;
+        message.currentModelResult = (object.currentModelResult !== undefined && object.currentModelResult !== null)
+            ? CurrentModelResult.fromPartial(object.currentModelResult)
+            : undefined;
+        return message;
+    },
+};
+function createBaseDownloadEvent() {
+    return {
+        kind: 0,
+        modelId: "",
+        taskId: "",
+        error: "",
+        planResult: undefined,
+        startResult: undefined,
+        progress: undefined,
+        cancelResult: undefined,
+        resumeResult: undefined,
+    };
+}
+export const DownloadEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.taskId !== "") {
+            writer.uint32(26).string(message.taskId);
+        }
+        if (message.error !== "") {
+            writer.uint32(34).string(message.error);
+        }
+        if (message.planResult !== undefined) {
+            DownloadPlanResult.encode(message.planResult, writer.uint32(162).fork()).ldelim();
+        }
+        if (message.startResult !== undefined) {
+            DownloadStartResult.encode(message.startResult, writer.uint32(170).fork()).ldelim();
+        }
+        if (message.progress !== undefined) {
+            DownloadProgress.encode(message.progress, writer.uint32(178).fork()).ldelim();
+        }
+        if (message.cancelResult !== undefined) {
+            DownloadCancelResult.encode(message.cancelResult, writer.uint32(186).fork()).ldelim();
+        }
+        if (message.resumeResult !== undefined) {
+            DownloadResumeResult.encode(message.resumeResult, writer.uint32(194).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseDownloadEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.taskId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.planResult = DownloadPlanResult.decode(reader, reader.uint32());
+                    continue;
+                case 21:
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.startResult = DownloadStartResult.decode(reader, reader.uint32());
+                    continue;
+                case 22:
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.progress = DownloadProgress.decode(reader, reader.uint32());
+                    continue;
+                case 23:
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.cancelResult = DownloadCancelResult.decode(reader, reader.uint32());
+                    continue;
+                case 24:
+                    if (tag !== 194) {
+                        break;
+                    }
+                    message.resumeResult = DownloadResumeResult.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? downloadEventKindFromJSON(object.kind) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            planResult: isSet(object.planResult) ? DownloadPlanResult.fromJSON(object.planResult) : undefined,
+            startResult: isSet(object.startResult) ? DownloadStartResult.fromJSON(object.startResult) : undefined,
+            progress: isSet(object.progress) ? DownloadProgress.fromJSON(object.progress) : undefined,
+            cancelResult: isSet(object.cancelResult) ? DownloadCancelResult.fromJSON(object.cancelResult) : undefined,
+            resumeResult: isSet(object.resumeResult) ? DownloadResumeResult.fromJSON(object.resumeResult) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = downloadEventKindToJSON(message.kind);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.taskId !== "") {
+            obj.taskId = message.taskId;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.planResult !== undefined) {
+            obj.planResult = DownloadPlanResult.toJSON(message.planResult);
+        }
+        if (message.startResult !== undefined) {
+            obj.startResult = DownloadStartResult.toJSON(message.startResult);
+        }
+        if (message.progress !== undefined) {
+            obj.progress = DownloadProgress.toJSON(message.progress);
+        }
+        if (message.cancelResult !== undefined) {
+            obj.cancelResult = DownloadCancelResult.toJSON(message.cancelResult);
+        }
+        if (message.resumeResult !== undefined) {
+            obj.resumeResult = DownloadResumeResult.toJSON(message.resumeResult);
+        }
+        return obj;
+    },
+    create(base) {
+        return DownloadEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseDownloadEvent();
+        message.kind = object.kind ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.taskId = object.taskId ?? "";
+        message.error = object.error ?? "";
+        message.planResult = (object.planResult !== undefined && object.planResult !== null)
+            ? DownloadPlanResult.fromPartial(object.planResult)
+            : undefined;
+        message.startResult = (object.startResult !== undefined && object.startResult !== null)
+            ? DownloadStartResult.fromPartial(object.startResult)
+            : undefined;
+        message.progress = (object.progress !== undefined && object.progress !== null)
+            ? DownloadProgress.fromPartial(object.progress)
+            : undefined;
+        message.cancelResult = (object.cancelResult !== undefined && object.cancelResult !== null)
+            ? DownloadCancelResult.fromPartial(object.cancelResult)
+            : undefined;
+        message.resumeResult = (object.resumeResult !== undefined && object.resumeResult !== null)
+            ? DownloadResumeResult.fromPartial(object.resumeResult)
+            : undefined;
+        return message;
+    },
+};
+function createBaseStorageLifecycleEvent() {
+    return {
+        kind: 0,
+        modelId: "",
+        cacheKey: "",
+        bytes: 0,
+        error: "",
+        infoResult: undefined,
+        availabilityResult: undefined,
+        deletePlan: undefined,
+        deleteResult: undefined,
+    };
+}
+export const StorageLifecycleEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.cacheKey !== "") {
+            writer.uint32(26).string(message.cacheKey);
+        }
+        if (message.bytes !== 0) {
+            writer.uint32(32).int64(message.bytes);
+        }
+        if (message.error !== "") {
+            writer.uint32(42).string(message.error);
+        }
+        if (message.infoResult !== undefined) {
+            StorageInfoResult.encode(message.infoResult, writer.uint32(162).fork()).ldelim();
+        }
+        if (message.availabilityResult !== undefined) {
+            StorageAvailabilityResult.encode(message.availabilityResult, writer.uint32(170).fork()).ldelim();
+        }
+        if (message.deletePlan !== undefined) {
+            StorageDeletePlan.encode(message.deletePlan, writer.uint32(178).fork()).ldelim();
+        }
+        if (message.deleteResult !== undefined) {
+            StorageDeleteResult.encode(message.deleteResult, writer.uint32(186).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageLifecycleEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.cacheKey = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.bytes = longToNumber(reader.int64());
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.infoResult = StorageInfoResult.decode(reader, reader.uint32());
+                    continue;
+                case 21:
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.availabilityResult = StorageAvailabilityResult.decode(reader, reader.uint32());
+                    continue;
+                case 22:
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.deletePlan = StorageDeletePlan.decode(reader, reader.uint32());
+                    continue;
+                case 23:
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.deleteResult = StorageDeleteResult.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? storageLifecycleEventKindFromJSON(object.kind) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            cacheKey: isSet(object.cacheKey) ? globalThis.String(object.cacheKey) : "",
+            bytes: isSet(object.bytes) ? globalThis.Number(object.bytes) : 0,
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            infoResult: isSet(object.infoResult) ? StorageInfoResult.fromJSON(object.infoResult) : undefined,
+            availabilityResult: isSet(object.availabilityResult)
+                ? StorageAvailabilityResult.fromJSON(object.availabilityResult)
+                : undefined,
+            deletePlan: isSet(object.deletePlan) ? StorageDeletePlan.fromJSON(object.deletePlan) : undefined,
+            deleteResult: isSet(object.deleteResult) ? StorageDeleteResult.fromJSON(object.deleteResult) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = storageLifecycleEventKindToJSON(message.kind);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.cacheKey !== "") {
+            obj.cacheKey = message.cacheKey;
+        }
+        if (message.bytes !== 0) {
+            obj.bytes = Math.round(message.bytes);
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.infoResult !== undefined) {
+            obj.infoResult = StorageInfoResult.toJSON(message.infoResult);
+        }
+        if (message.availabilityResult !== undefined) {
+            obj.availabilityResult = StorageAvailabilityResult.toJSON(message.availabilityResult);
+        }
+        if (message.deletePlan !== undefined) {
+            obj.deletePlan = StorageDeletePlan.toJSON(message.deletePlan);
+        }
+        if (message.deleteResult !== undefined) {
+            obj.deleteResult = StorageDeleteResult.toJSON(message.deleteResult);
+        }
+        return obj;
+    },
+    create(base) {
+        return StorageLifecycleEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageLifecycleEvent();
+        message.kind = object.kind ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.cacheKey = object.cacheKey ?? "";
+        message.bytes = object.bytes ?? 0;
+        message.error = object.error ?? "";
+        message.infoResult = (object.infoResult !== undefined && object.infoResult !== null)
+            ? StorageInfoResult.fromPartial(object.infoResult)
+            : undefined;
+        message.availabilityResult = (object.availabilityResult !== undefined && object.availabilityResult !== null)
+            ? StorageAvailabilityResult.fromPartial(object.availabilityResult)
+            : undefined;
+        message.deletePlan = (object.deletePlan !== undefined && object.deletePlan !== null)
+            ? StorageDeletePlan.fromPartial(object.deletePlan)
+            : undefined;
+        message.deleteResult = (object.deleteResult !== undefined && object.deleteResult !== null)
+            ? StorageDeleteResult.fromPartial(object.deleteResult)
+            : undefined;
+        return message;
+    },
+};
+function createBaseHardwareRoutingEvent() {
+    return {
+        kind: 0,
+        component: 0,
+        framework: 0,
+        capability: "",
+        route: "",
+        reason: "",
+        error: "",
+        hardwareProfile: undefined,
+    };
+}
+export const HardwareRoutingEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.component !== 0) {
+            writer.uint32(16).int32(message.component);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(24).int32(message.framework);
+        }
+        if (message.capability !== "") {
+            writer.uint32(34).string(message.capability);
+        }
+        if (message.route !== "") {
+            writer.uint32(42).string(message.route);
+        }
+        if (message.reason !== "") {
+            writer.uint32(50).string(message.reason);
+        }
+        if (message.error !== "") {
+            writer.uint32(58).string(message.error);
+        }
+        if (message.hardwareProfile !== undefined) {
+            HardwareProfileResult.encode(message.hardwareProfile, writer.uint32(162).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseHardwareRoutingEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.capability = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.route = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.reason = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                case 20:
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.hardwareProfile = HardwareProfileResult.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? hardwareRoutingEventKindFromJSON(object.kind) : 0,
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
+            capability: isSet(object.capability) ? globalThis.String(object.capability) : "",
+            route: isSet(object.route) ? globalThis.String(object.route) : "",
+            reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            hardwareProfile: isSet(object.hardwareProfile)
+                ? HardwareProfileResult.fromJSON(object.hardwareProfile)
+                : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = hardwareRoutingEventKindToJSON(message.kind);
+        }
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.framework !== 0) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.capability !== "") {
+            obj.capability = message.capability;
+        }
+        if (message.route !== "") {
+            obj.route = message.route;
+        }
+        if (message.reason !== "") {
+            obj.reason = message.reason;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.hardwareProfile !== undefined) {
+            obj.hardwareProfile = HardwareProfileResult.toJSON(message.hardwareProfile);
+        }
+        return obj;
+    },
+    create(base) {
+        return HardwareRoutingEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseHardwareRoutingEvent();
+        message.kind = object.kind ?? 0;
+        message.component = object.component ?? 0;
+        message.framework = object.framework ?? 0;
+        message.capability = object.capability ?? "";
+        message.route = object.route ?? "";
+        message.reason = object.reason ?? "";
+        message.error = object.error ?? "";
+        message.hardwareProfile = (object.hardwareProfile !== undefined && object.hardwareProfile !== null)
+            ? HardwareProfileResult.fromPartial(object.hardwareProfile)
+            : undefined;
+        return message;
+    },
+};
+function createBaseCapabilityOperationEvent() {
+    return {
+        kind: 0,
+        component: 0,
+        modelId: "",
+        operationId: "",
+        operation: "",
+        progress: 0,
+        inputCount: 0,
+        outputCount: 0,
+        resultJson: "",
+        error: "",
+    };
+}
+export const CapabilityOperationEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.component !== 0) {
+            writer.uint32(16).int32(message.component);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(26).string(message.modelId);
+        }
+        if (message.operationId !== "") {
+            writer.uint32(34).string(message.operationId);
+        }
+        if (message.operation !== "") {
+            writer.uint32(42).string(message.operation);
+        }
+        if (message.progress !== 0) {
+            writer.uint32(53).float(message.progress);
+        }
+        if (message.inputCount !== 0) {
+            writer.uint32(56).int64(message.inputCount);
+        }
+        if (message.outputCount !== 0) {
+            writer.uint32(64).int64(message.outputCount);
+        }
+        if (message.resultJson !== "") {
+            writer.uint32(74).string(message.resultJson);
+        }
+        if (message.error !== "") {
+            writer.uint32(82).string(message.error);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCapabilityOperationEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.operationId = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.operation = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 53) {
+                        break;
+                    }
+                    message.progress = reader.float();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.inputCount = longToNumber(reader.int64());
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.outputCount = longToNumber(reader.int64());
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.resultJson = reader.string();
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? capabilityOperationEventKindFromJSON(object.kind) : 0,
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            operationId: isSet(object.operationId) ? globalThis.String(object.operationId) : "",
+            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+            inputCount: isSet(object.inputCount) ? globalThis.Number(object.inputCount) : 0,
+            outputCount: isSet(object.outputCount) ? globalThis.Number(object.outputCount) : 0,
+            resultJson: isSet(object.resultJson) ? globalThis.String(object.resultJson) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = capabilityOperationEventKindToJSON(message.kind);
+        }
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.operationId !== "") {
+            obj.operationId = message.operationId;
+        }
+        if (message.operation !== "") {
+            obj.operation = message.operation;
+        }
+        if (message.progress !== 0) {
+            obj.progress = message.progress;
+        }
+        if (message.inputCount !== 0) {
+            obj.inputCount = Math.round(message.inputCount);
+        }
+        if (message.outputCount !== 0) {
+            obj.outputCount = Math.round(message.outputCount);
+        }
+        if (message.resultJson !== "") {
+            obj.resultJson = message.resultJson;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        return obj;
+    },
+    create(base) {
+        return CapabilityOperationEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseCapabilityOperationEvent();
+        message.kind = object.kind ?? 0;
+        message.component = object.component ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.operationId = object.operationId ?? "";
+        message.operation = object.operation ?? "";
+        message.progress = object.progress ?? 0;
+        message.inputCount = object.inputCount ?? 0;
+        message.outputCount = object.outputCount ?? 0;
+        message.resultJson = object.resultJson ?? "";
+        message.error = object.error ?? "";
+        return message;
+    },
+};
+function createBaseTelemetryEvent() {
+    return { kind: 0, name: "", attributes: {}, value: 0, unit: "" };
+}
+export const TelemetryEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.name !== "") {
+            writer.uint32(18).string(message.name);
+        }
+        Object.entries(message.attributes).forEach(([key, value]) => {
+            TelemetryEvent_AttributesEntry.encode({ key: key, value }, writer.uint32(26).fork()).ldelim();
+        });
+        if (message.value !== 0) {
+            writer.uint32(33).double(message.value);
+        }
+        if (message.unit !== "") {
+            writer.uint32(42).string(message.unit);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseTelemetryEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.name = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    const entry3 = TelemetryEvent_AttributesEntry.decode(reader, reader.uint32());
+                    if (entry3.value !== undefined) {
+                        message.attributes[entry3.key] = entry3.value;
+                    }
+                    continue;
+                case 4:
+                    if (tag !== 33) {
+                        break;
+                    }
+                    message.value = reader.double();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.unit = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? telemetryEventKindFromJSON(object.kind) : 0,
+            name: isSet(object.name) ? globalThis.String(object.name) : "",
+            attributes: isObject(object.attributes)
+                ? Object.entries(object.attributes).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
+            value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+            unit: isSet(object.unit) ? globalThis.String(object.unit) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = telemetryEventKindToJSON(message.kind);
+        }
+        if (message.name !== "") {
+            obj.name = message.name;
+        }
+        if (message.attributes) {
+            const entries = Object.entries(message.attributes);
+            if (entries.length > 0) {
+                obj.attributes = {};
+                entries.forEach(([k, v]) => {
+                    obj.attributes[k] = v;
+                });
+            }
+        }
+        if (message.value !== 0) {
+            obj.value = message.value;
+        }
+        if (message.unit !== "") {
+            obj.unit = message.unit;
+        }
+        return obj;
+    },
+    create(base) {
+        return TelemetryEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseTelemetryEvent();
+        message.kind = object.kind ?? 0;
+        message.name = object.name ?? "";
+        message.attributes = Object.entries(object.attributes ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        message.value = object.value ?? 0;
+        message.unit = object.unit ?? "";
+        return message;
+    },
+};
+function createBaseTelemetryEvent_AttributesEntry() {
+    return { key: "", value: "" };
+}
+export const TelemetryEvent_AttributesEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseTelemetryEvent_AttributesEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return TelemetryEvent_AttributesEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseTelemetryEvent_AttributesEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
+        return message;
+    },
+};
+function createBaseCancellationEvent() {
+    return { kind: 0, component: 0, operationId: "", reason: "", userInitiated: false };
+}
+export const CancellationEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.component !== 0) {
+            writer.uint32(16).int32(message.component);
+        }
+        if (message.operationId !== "") {
+            writer.uint32(26).string(message.operationId);
+        }
+        if (message.reason !== "") {
+            writer.uint32(34).string(message.reason);
+        }
+        if (message.userInitiated !== false) {
+            writer.uint32(40).bool(message.userInitiated);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCancellationEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.operationId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.reason = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.userInitiated = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? cancellationEventKindFromJSON(object.kind) : 0,
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            operationId: isSet(object.operationId) ? globalThis.String(object.operationId) : "",
+            reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+            userInitiated: isSet(object.userInitiated) ? globalThis.Boolean(object.userInitiated) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = cancellationEventKindToJSON(message.kind);
+        }
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.operationId !== "") {
+            obj.operationId = message.operationId;
+        }
+        if (message.reason !== "") {
+            obj.reason = message.reason;
+        }
+        if (message.userInitiated !== false) {
+            obj.userInitiated = message.userInitiated;
+        }
+        return obj;
+    },
+    create(base) {
+        return CancellationEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseCancellationEvent();
+        message.kind = object.kind ?? 0;
+        message.component = object.component ?? 0;
+        message.operationId = object.operationId ?? "";
+        message.reason = object.reason ?? "";
+        message.userInitiated = object.userInitiated ?? false;
+        return message;
+    },
+};
+function createBaseFailureEvent() {
+    return { component: 0, operation: "", error: undefined, recoverable: false };
+}
+export const FailureEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.component !== 0) {
+            writer.uint32(8).int32(message.component);
+        }
+        if (message.operation !== "") {
+            writer.uint32(18).string(message.operation);
+        }
+        if (message.error !== undefined) {
+            SDKError.encode(message.error, writer.uint32(26).fork()).ldelim();
+        }
+        if (message.recoverable !== false) {
+            writer.uint32(32).bool(message.recoverable);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseFailureEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.operation = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.error = SDKError.decode(reader, reader.uint32());
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.recoverable = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+            error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+            recoverable: isSet(object.recoverable) ? globalThis.Boolean(object.recoverable) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.operation !== "") {
+            obj.operation = message.operation;
+        }
+        if (message.error !== undefined) {
+            obj.error = SDKError.toJSON(message.error);
+        }
+        if (message.recoverable !== false) {
+            obj.recoverable = message.recoverable;
+        }
+        return obj;
+    },
+    create(base) {
+        return FailureEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseFailureEvent();
+        message.component = object.component ?? 0;
+        message.operation = object.operation ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? SDKError.fromPartial(object.error)
+            : undefined;
+        message.recoverable = object.recoverable ?? false;
         return message;
     },
 };
@@ -3654,6 +6848,9 @@ function createBaseSDKEvent() {
     return {
         timestampMs: 0,
         severity: 0,
+        category: 0,
+        component: 0,
+        error: undefined,
         id: "",
         sessionId: "",
         destination: 0,
@@ -3670,6 +6867,17 @@ function createBaseSDKEvent() {
         componentInit: undefined,
         voice: undefined,
         voicePipeline: undefined,
+        componentLifecycle: undefined,
+        session: undefined,
+        auth: undefined,
+        modelRegistry: undefined,
+        download: undefined,
+        storageLifecycle: undefined,
+        hardwareRouting: undefined,
+        capability: undefined,
+        telemetry: undefined,
+        cancellation: undefined,
+        failure: undefined,
     };
 }
 export const SDKEvent = {
@@ -3679,6 +6887,15 @@ export const SDKEvent = {
         }
         if (message.severity !== 0) {
             writer.uint32(16).int32(message.severity);
+        }
+        if (message.category !== 0) {
+            writer.uint32(160).int32(message.category);
+        }
+        if (message.component !== 0) {
+            writer.uint32(168).int32(message.component);
+        }
+        if (message.error !== undefined) {
+            SDKError.encode(message.error, writer.uint32(178).fork()).ldelim();
         }
         if (message.id !== "") {
             writer.uint32(106).string(message.id);
@@ -3728,6 +6945,39 @@ export const SDKEvent = {
         if (message.voicePipeline !== undefined) {
             VoiceEvent.encode(message.voicePipeline, writer.uint32(146).fork()).ldelim();
         }
+        if (message.componentLifecycle !== undefined) {
+            ComponentLifecycleEvent.encode(message.componentLifecycle, writer.uint32(154).fork()).ldelim();
+        }
+        if (message.session !== undefined) {
+            SessionEvent.encode(message.session, writer.uint32(186).fork()).ldelim();
+        }
+        if (message.auth !== undefined) {
+            AuthEvent.encode(message.auth, writer.uint32(194).fork()).ldelim();
+        }
+        if (message.modelRegistry !== undefined) {
+            ModelRegistryEvent.encode(message.modelRegistry, writer.uint32(202).fork()).ldelim();
+        }
+        if (message.download !== undefined) {
+            DownloadEvent.encode(message.download, writer.uint32(210).fork()).ldelim();
+        }
+        if (message.storageLifecycle !== undefined) {
+            StorageLifecycleEvent.encode(message.storageLifecycle, writer.uint32(218).fork()).ldelim();
+        }
+        if (message.hardwareRouting !== undefined) {
+            HardwareRoutingEvent.encode(message.hardwareRouting, writer.uint32(226).fork()).ldelim();
+        }
+        if (message.capability !== undefined) {
+            CapabilityOperationEvent.encode(message.capability, writer.uint32(234).fork()).ldelim();
+        }
+        if (message.telemetry !== undefined) {
+            TelemetryEvent.encode(message.telemetry, writer.uint32(242).fork()).ldelim();
+        }
+        if (message.cancellation !== undefined) {
+            CancellationEvent.encode(message.cancellation, writer.uint32(250).fork()).ldelim();
+        }
+        if (message.failure !== undefined) {
+            FailureEvent.encode(message.failure, writer.uint32(258).fork()).ldelim();
+        }
         return writer;
     },
     decode(input, length) {
@@ -3748,6 +6998,24 @@ export const SDKEvent = {
                         break;
                     }
                     message.severity = reader.int32();
+                    continue;
+                case 20:
+                    if (tag !== 160) {
+                        break;
+                    }
+                    message.category = reader.int32();
+                    continue;
+                case 21:
+                    if (tag !== 168) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 22:
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.error = SDKError.decode(reader, reader.uint32());
                     continue;
                 case 13:
                     if (tag !== 106) {
@@ -3848,6 +7116,72 @@ export const SDKEvent = {
                     }
                     message.voicePipeline = VoiceEvent.decode(reader, reader.uint32());
                     continue;
+                case 19:
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.componentLifecycle = ComponentLifecycleEvent.decode(reader, reader.uint32());
+                    continue;
+                case 23:
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.session = SessionEvent.decode(reader, reader.uint32());
+                    continue;
+                case 24:
+                    if (tag !== 194) {
+                        break;
+                    }
+                    message.auth = AuthEvent.decode(reader, reader.uint32());
+                    continue;
+                case 25:
+                    if (tag !== 202) {
+                        break;
+                    }
+                    message.modelRegistry = ModelRegistryEvent.decode(reader, reader.uint32());
+                    continue;
+                case 26:
+                    if (tag !== 210) {
+                        break;
+                    }
+                    message.download = DownloadEvent.decode(reader, reader.uint32());
+                    continue;
+                case 27:
+                    if (tag !== 218) {
+                        break;
+                    }
+                    message.storageLifecycle = StorageLifecycleEvent.decode(reader, reader.uint32());
+                    continue;
+                case 28:
+                    if (tag !== 226) {
+                        break;
+                    }
+                    message.hardwareRouting = HardwareRoutingEvent.decode(reader, reader.uint32());
+                    continue;
+                case 29:
+                    if (tag !== 234) {
+                        break;
+                    }
+                    message.capability = CapabilityOperationEvent.decode(reader, reader.uint32());
+                    continue;
+                case 30:
+                    if (tag !== 242) {
+                        break;
+                    }
+                    message.telemetry = TelemetryEvent.decode(reader, reader.uint32());
+                    continue;
+                case 31:
+                    if (tag !== 250) {
+                        break;
+                    }
+                    message.cancellation = CancellationEvent.decode(reader, reader.uint32());
+                    continue;
+                case 32:
+                    if (tag !== 258) {
+                        break;
+                    }
+                    message.failure = FailureEvent.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3860,6 +7194,9 @@ export const SDKEvent = {
         return {
             timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
             severity: isSet(object.severity) ? eventSeverityFromJSON(object.severity) : 0,
+            category: isSet(object.category) ? eventCategoryFromJSON(object.category) : 0,
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
             id: isSet(object.id) ? globalThis.String(object.id) : "",
             sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
             destination: isSet(object.destination) ? eventDestinationFromJSON(object.destination) : 0,
@@ -3883,6 +7220,23 @@ export const SDKEvent = {
                 : undefined,
             voice: isSet(object.voice) ? VoiceLifecycleEvent.fromJSON(object.voice) : undefined,
             voicePipeline: isSet(object.voicePipeline) ? VoiceEvent.fromJSON(object.voicePipeline) : undefined,
+            componentLifecycle: isSet(object.componentLifecycle)
+                ? ComponentLifecycleEvent.fromJSON(object.componentLifecycle)
+                : undefined,
+            session: isSet(object.session) ? SessionEvent.fromJSON(object.session) : undefined,
+            auth: isSet(object.auth) ? AuthEvent.fromJSON(object.auth) : undefined,
+            modelRegistry: isSet(object.modelRegistry) ? ModelRegistryEvent.fromJSON(object.modelRegistry) : undefined,
+            download: isSet(object.download) ? DownloadEvent.fromJSON(object.download) : undefined,
+            storageLifecycle: isSet(object.storageLifecycle)
+                ? StorageLifecycleEvent.fromJSON(object.storageLifecycle)
+                : undefined,
+            hardwareRouting: isSet(object.hardwareRouting)
+                ? HardwareRoutingEvent.fromJSON(object.hardwareRouting)
+                : undefined,
+            capability: isSet(object.capability) ? CapabilityOperationEvent.fromJSON(object.capability) : undefined,
+            telemetry: isSet(object.telemetry) ? TelemetryEvent.fromJSON(object.telemetry) : undefined,
+            cancellation: isSet(object.cancellation) ? CancellationEvent.fromJSON(object.cancellation) : undefined,
+            failure: isSet(object.failure) ? FailureEvent.fromJSON(object.failure) : undefined,
         };
     },
     toJSON(message) {
@@ -3892,6 +7246,15 @@ export const SDKEvent = {
         }
         if (message.severity !== 0) {
             obj.severity = eventSeverityToJSON(message.severity);
+        }
+        if (message.category !== 0) {
+            obj.category = eventCategoryToJSON(message.category);
+        }
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.error !== undefined) {
+            obj.error = SDKError.toJSON(message.error);
         }
         if (message.id !== "") {
             obj.id = message.id;
@@ -3947,6 +7310,39 @@ export const SDKEvent = {
         if (message.voicePipeline !== undefined) {
             obj.voicePipeline = VoiceEvent.toJSON(message.voicePipeline);
         }
+        if (message.componentLifecycle !== undefined) {
+            obj.componentLifecycle = ComponentLifecycleEvent.toJSON(message.componentLifecycle);
+        }
+        if (message.session !== undefined) {
+            obj.session = SessionEvent.toJSON(message.session);
+        }
+        if (message.auth !== undefined) {
+            obj.auth = AuthEvent.toJSON(message.auth);
+        }
+        if (message.modelRegistry !== undefined) {
+            obj.modelRegistry = ModelRegistryEvent.toJSON(message.modelRegistry);
+        }
+        if (message.download !== undefined) {
+            obj.download = DownloadEvent.toJSON(message.download);
+        }
+        if (message.storageLifecycle !== undefined) {
+            obj.storageLifecycle = StorageLifecycleEvent.toJSON(message.storageLifecycle);
+        }
+        if (message.hardwareRouting !== undefined) {
+            obj.hardwareRouting = HardwareRoutingEvent.toJSON(message.hardwareRouting);
+        }
+        if (message.capability !== undefined) {
+            obj.capability = CapabilityOperationEvent.toJSON(message.capability);
+        }
+        if (message.telemetry !== undefined) {
+            obj.telemetry = TelemetryEvent.toJSON(message.telemetry);
+        }
+        if (message.cancellation !== undefined) {
+            obj.cancellation = CancellationEvent.toJSON(message.cancellation);
+        }
+        if (message.failure !== undefined) {
+            obj.failure = FailureEvent.toJSON(message.failure);
+        }
         return obj;
     },
     create(base) {
@@ -3956,6 +7352,11 @@ export const SDKEvent = {
         const message = createBaseSDKEvent();
         message.timestampMs = object.timestampMs ?? 0;
         message.severity = object.severity ?? 0;
+        message.category = object.category ?? 0;
+        message.component = object.component ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? SDKError.fromPartial(object.error)
+            : undefined;
         message.id = object.id ?? "";
         message.sessionId = object.sessionId ?? "";
         message.destination = object.destination ?? 0;
@@ -4000,6 +7401,37 @@ export const SDKEvent = {
             : undefined;
         message.voicePipeline = (object.voicePipeline !== undefined && object.voicePipeline !== null)
             ? VoiceEvent.fromPartial(object.voicePipeline)
+            : undefined;
+        message.componentLifecycle = (object.componentLifecycle !== undefined && object.componentLifecycle !== null)
+            ? ComponentLifecycleEvent.fromPartial(object.componentLifecycle)
+            : undefined;
+        message.session = (object.session !== undefined && object.session !== null)
+            ? SessionEvent.fromPartial(object.session)
+            : undefined;
+        message.auth = (object.auth !== undefined && object.auth !== null) ? AuthEvent.fromPartial(object.auth) : undefined;
+        message.modelRegistry = (object.modelRegistry !== undefined && object.modelRegistry !== null)
+            ? ModelRegistryEvent.fromPartial(object.modelRegistry)
+            : undefined;
+        message.download = (object.download !== undefined && object.download !== null)
+            ? DownloadEvent.fromPartial(object.download)
+            : undefined;
+        message.storageLifecycle = (object.storageLifecycle !== undefined && object.storageLifecycle !== null)
+            ? StorageLifecycleEvent.fromPartial(object.storageLifecycle)
+            : undefined;
+        message.hardwareRouting = (object.hardwareRouting !== undefined && object.hardwareRouting !== null)
+            ? HardwareRoutingEvent.fromPartial(object.hardwareRouting)
+            : undefined;
+        message.capability = (object.capability !== undefined && object.capability !== null)
+            ? CapabilityOperationEvent.fromPartial(object.capability)
+            : undefined;
+        message.telemetry = (object.telemetry !== undefined && object.telemetry !== null)
+            ? TelemetryEvent.fromPartial(object.telemetry)
+            : undefined;
+        message.cancellation = (object.cancellation !== undefined && object.cancellation !== null)
+            ? CancellationEvent.fromPartial(object.cancellation)
+            : undefined;
+        message.failure = (object.failure !== undefined && object.failure !== null)
+            ? FailureEvent.fromPartial(object.failure)
             : undefined;
         return message;
     },

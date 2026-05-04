@@ -78,11 +78,23 @@ public class ToolValue(
     schemaIndex = 4,
   )
   public val object_value: ToolValueObject? = null,
+  /**
+   * true means JSON null
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "nullValue",
+    oneofName = "kind",
+    schemaIndex = 5,
+  )
+  public val null_value: Boolean? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolValue, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(string_value, number_value, bool_value, array_value, object_value) <= 1) {
-      "At most one of string_value, number_value, bool_value, array_value, object_value may be non-null"
+    require(countNonNull(string_value, number_value, bool_value, array_value, object_value,
+        null_value) <= 1) {
+      "At most one of string_value, number_value, bool_value, array_value, object_value, null_value may be non-null"
     }
   }
 
@@ -102,6 +114,7 @@ public class ToolValue(
     if (bool_value != other.bool_value) return false
     if (array_value != other.array_value) return false
     if (object_value != other.object_value) return false
+    if (null_value != other.null_value) return false
     return true
   }
 
@@ -114,6 +127,7 @@ public class ToolValue(
       result = result * 37 + (bool_value?.hashCode() ?: 0)
       result = result * 37 + (array_value?.hashCode() ?: 0)
       result = result * 37 + (object_value?.hashCode() ?: 0)
+      result = result * 37 + (null_value?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -126,6 +140,7 @@ public class ToolValue(
     if (bool_value != null) result += """bool_value=$bool_value"""
     if (array_value != null) result += """array_value=$array_value"""
     if (object_value != null) result += """object_value=$object_value"""
+    if (null_value != null) result += """null_value=$null_value"""
     return result.joinToString(prefix = "ToolValue{", separator = ", ", postfix = "}")
   }
 
@@ -135,9 +150,10 @@ public class ToolValue(
     bool_value: Boolean? = this.bool_value,
     array_value: ToolValueArray? = this.array_value,
     object_value: ToolValueObject? = this.object_value,
+    null_value: Boolean? = this.null_value,
     unknownFields: ByteString = this.unknownFields,
   ): ToolValue = ToolValue(string_value, number_value, bool_value, array_value, object_value,
-      unknownFields)
+      null_value, unknownFields)
 
   public companion object {
     @JvmField
@@ -156,6 +172,7 @@ public class ToolValue(
         size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.bool_value)
         size += ToolValueArray.ADAPTER.encodedSizeWithTag(4, value.array_value)
         size += ToolValueObject.ADAPTER.encodedSizeWithTag(5, value.object_value)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.null_value)
         return size
       }
 
@@ -165,11 +182,13 @@ public class ToolValue(
         ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.bool_value)
         ToolValueArray.ADAPTER.encodeWithTag(writer, 4, value.array_value)
         ToolValueObject.ADAPTER.encodeWithTag(writer, 5, value.object_value)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.null_value)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolValue) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.null_value)
         ToolValueObject.ADAPTER.encodeWithTag(writer, 5, value.object_value)
         ToolValueArray.ADAPTER.encodeWithTag(writer, 4, value.array_value)
         ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.bool_value)
@@ -183,6 +202,7 @@ public class ToolValue(
         var bool_value: Boolean? = null
         var array_value: ToolValueArray? = null
         var object_value: ToolValueObject? = null
+        var null_value: Boolean? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> string_value = ProtoAdapter.STRING.decode(reader)
@@ -190,6 +210,7 @@ public class ToolValue(
             3 -> bool_value = ProtoAdapter.BOOL.decode(reader)
             4 -> array_value = ToolValueArray.ADAPTER.decode(reader)
             5 -> object_value = ToolValueObject.ADAPTER.decode(reader)
+            6 -> null_value = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -199,6 +220,7 @@ public class ToolValue(
           bool_value = bool_value,
           array_value = array_value,
           object_value = object_value,
+          null_value = null_value,
           unknownFields = unknownFields
         )
       }

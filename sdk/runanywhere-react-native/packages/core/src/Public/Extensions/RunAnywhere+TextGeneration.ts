@@ -18,10 +18,65 @@ import type {
   LLMGenerationOptions,
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
-import type { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
-import { LLMStreamAdapter } from '../../Adapters/LLMStreamAdapter';
+import {
+  executionTargetToJSON,
+} from '@runanywhere/proto-ts/llm_options';
+import {
+  LLMGenerationResult as LLMGenerationResultMessage,
+} from '@runanywhere/proto-ts/llm_options';
+import {
+  LLMGenerateRequest,
+  LLMStreamEvent,
+  type LLMStreamEvent as LLMStreamEventType,
+} from '@runanywhere/proto-ts/llm_service';
+import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
+import { LlmThinking } from '../../Features/LLM/LlmThinking';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
+
+function buildLLMGenerateRequest(
+  prompt: string,
+  options?: LLMGenerationOptions,
+  streamingEnabled: boolean = false
+) {
+  return LLMGenerateRequest.create({
+    prompt,
+    maxTokens: options?.maxTokens ?? 1000,
+    temperature: options?.temperature ?? 0.7,
+    topP: options?.topP ?? 1.0,
+    topK: options?.topK ?? 0,
+    systemPrompt: options?.systemPrompt ?? '',
+    emitThoughts: !!options?.thinkingPattern,
+    repetitionPenalty: options?.repetitionPenalty ?? 1.0,
+    stopSequences: options?.stopSequences ?? [],
+    streamingEnabled,
+    preferredFramework:
+      options?.preferredFramework !== undefined
+        ? inferenceFrameworkToJSON(options.preferredFramework)
+        : '',
+    jsonSchema: options?.jsonSchema ?? options?.structuredOutput?.jsonSchema ?? '',
+    executionTarget:
+      options?.executionTarget !== undefined
+        ? executionTargetToJSON(options.executionTarget)
+        : '',
+  });
+}
+
+function encodeLLMGenerateRequest(request: ReturnType<typeof buildLLMGenerateRequest>): ArrayBuffer {
+  return bytesToArrayBuffer(LLMGenerateRequest.encode(request).finish());
+}
+
+function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    throw new Error('LLM proto generation returned an empty result');
+  }
+  return LLMGenerationResultMessage.decode(bytes);
+}
 
 // ============================================================================
 // Text Generation (LLM) Extension - Backend Agnostic
@@ -93,48 +148,11 @@ export async function generate(
     throw new Error('Native module not available');
   }
   const native = requireNativeModule();
-
-  const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 1000,
-    temperature: options?.temperature ?? 0.7,
-    system_prompt: options?.systemPrompt ?? null,
-  });
-
-  const resultJson = await native.generate(prompt, optionsJson);
-
-  try {
-    const result = JSON.parse(resultJson);
-    return {
-      text: result.text ?? '',
-      thinkingContent: result.thinkingContent,
-      inputTokens: result.inputTokens ?? Math.ceil(prompt.length / 4),
-      tokensGenerated: result.tokensGenerated ?? result.tokensUsed ?? 0,
-      modelUsed: result.modelUsed ?? 'unknown',
-      generationTimeMs: result.generationTimeMs ?? result.latencyMs ?? 0,
-      ttftMs: result.ttftMs ?? result.performanceMetrics?.timeToFirstTokenMs,
-      tokensPerSecond: result.tokensPerSecond ?? result.performanceMetrics?.tokensPerSecond ?? 0,
-      framework: result.framework,
-      finishReason: result.finishReason ?? 'stop',
-      thinkingTokens: result.thinkingTokens ?? 0,
-      responseTokens: result.responseTokens ?? result.tokensUsed ?? 0,
-      jsonOutput: result.jsonOutput,
-    };
-  } catch {
-    if (resultJson.includes('error')) {
-      throw new Error(resultJson);
-    }
-    return {
-      text: resultJson,
-      inputTokens: 0,
-      tokensGenerated: 0,
-      modelUsed: 'unknown',
-      generationTimeMs: 0,
-      tokensPerSecond: 0,
-      finishReason: 'stop',
-      thinkingTokens: 0,
-      responseTokens: 0,
-    };
-  }
+  const requestBytes = encodeLLMGenerateRequest(
+    buildLLMGenerateRequest(prompt, options, false)
+  );
+  const resultBytes = await native.llmGenerateProto(requestBytes);
+  return decodeLLMGenerationResult(resultBytes);
 }
 
 /**
@@ -159,87 +177,85 @@ export async function generate(
 export function generateStream(
   prompt: string,
   options?: LLMGenerationOptions,
-): AsyncIterable<LLMStreamEvent> {
+): AsyncIterable<LLMStreamEventType> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
 
   const native = requireNativeModule();
+  const requestBytes = encodeLLMGenerateRequest(
+    buildLLMGenerateRequest(prompt, options, true)
+  );
 
   return {
-    [Symbol.asyncIterator](): AsyncIterator<LLMStreamEvent> {
-      let inner: AsyncIterator<LLMStreamEvent> | null = null;
-      let kickoff: Promise<void> | null = null;
-      let kickoffError: Error | null = null;
+    [Symbol.asyncIterator](): AsyncIterator<LLMStreamEventType> {
+      const queue: LLMStreamEventType[] = [];
+      let resolver: ((value: IteratorResult<LLMStreamEventType>) => void) | null = null;
+      let done = false;
+      let started = false;
+      let streamError: Error | null = null;
 
-      const ensureStarted = async (): Promise<AsyncIterator<LLMStreamEvent>> => {
-        if (inner) return inner;
-        if (!kickoff) {
-          kickoff = (async () => {
-            try {
-              const handle = await native.getLLMHandle();
-              if (!handle || handle === 0) {
-                throw new Error(
-                  'LLM handle not available. Load an LLM model first via RunAnywhere.loadModel().',
-                );
-              }
-
-              const adapter = new LLMStreamAdapter(handle);
-              const iterable = adapter.stream({
-                prompt,
-                maxTokens: options?.maxTokens ?? 0,
-                temperature: options?.temperature ?? 0,
-                topP: options?.topP ?? 0,
-                topK: options?.topK ?? 0,
-                systemPrompt: options?.systemPrompt ?? '',
-                emitThoughts: false,
-              });
-              inner = iterable[Symbol.asyncIterator]();
-
-              // Kick the C++ generator after the callback is wired.
-              const optionsJson = JSON.stringify({
-                max_tokens: options?.maxTokens ?? 1000,
-                temperature: options?.temperature ?? 0.7,
-                top_p: options?.topP ?? undefined,
-                top_k: options?.topK ?? undefined,
-                system_prompt: options?.systemPrompt ?? null,
-              });
-              // Fire-and-forget — events flow through the proto callback.
-              // Errors from the native promise propagate as stream errors via
-              // the adapter's onError path (Nitro raises via the native side
-              // when generation fails).
-              native
-                .generateStream(prompt, optionsJson, () => { /* legacy callback ignored */ })
-                .catch((err: Error) => {
-                  logger.warning(
-                    `generateStream native promise rejected: ${err.message}`,
-                  );
-                });
-            } catch (e) {
-              kickoffError = e instanceof Error ? e : new Error(String(e));
-              throw kickoffError;
-            }
-          })();
+      const finish = (): void => {
+        done = true;
+        if (resolver) {
+          resolver({ value: undefined as unknown as LLMStreamEventType, done: true });
+          resolver = null;
         }
-        await kickoff;
-        if (kickoffError) throw kickoffError;
-        return inner!;
+      };
+
+      const start = (): void => {
+        if (started) return;
+        started = true;
+        native
+          .llmGenerateStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
+            try {
+              const event = LLMStreamEvent.decode(arrayBufferToBytes(eventBytes));
+              if (event.errorMessage) {
+                streamError = new Error(event.errorMessage);
+              }
+              if (resolver) {
+                resolver({ value: event, done: false });
+                resolver = null;
+              } else {
+                queue.push(event);
+              }
+              if (event.isFinal) finish();
+            } catch (error) {
+              streamError = error instanceof Error ? error : new Error(String(error));
+              finish();
+            }
+          })
+          .then(() => {
+            if (!done) finish();
+          })
+          .catch((err: Error) => {
+            streamError = err;
+            logger.warning(`llmGenerateStreamProto rejected: ${err.message}`);
+            finish();
+          });
       };
 
       return {
-        async next(): Promise<IteratorResult<LLMStreamEvent>> {
-          const it = await ensureStarted();
-          return it.next();
-        },
-        async return(): Promise<IteratorResult<LLMStreamEvent>> {
-          // Best-effort cancellation through both the inner iterator and the
-          // native generator (covers consumers who break out of for-await
-          // before any token has arrived).
-          try { native.cancelGeneration(); } catch { /* noop */ }
-          if (inner && inner.return) {
-            return inner.return(undefined as unknown as LLMStreamEvent);
+        async next(): Promise<IteratorResult<LLMStreamEventType>> {
+          start();
+          if (queue.length > 0) {
+            return { value: queue.shift()!, done: false };
           }
-          return { value: undefined as unknown as LLMStreamEvent, done: true };
+          if (streamError) throw streamError;
+          if (done) {
+            return { value: undefined as unknown as LLMStreamEventType, done: true };
+          }
+          return new Promise<IteratorResult<LLMStreamEventType>>((resolve) => {
+            resolver = resolve;
+          }).then((result) => {
+            if (streamError) throw streamError;
+            return result;
+          });
+        },
+        async return(): Promise<IteratorResult<LLMStreamEventType>> {
+          try { await native.llmCancelProto(); } catch { /* noop */ }
+          finish();
+          return { value: undefined as unknown as LLMStreamEventType, done: true };
         },
       };
     },
@@ -254,7 +270,7 @@ export function cancelGeneration(): void {
     return;
   }
   const native = requireNativeModule();
-  native.cancelGeneration();
+  void native.llmCancelProto();
 }
 
 // ============================================================================
@@ -271,7 +287,7 @@ interface LLMIntrospectionNativeModule {
 }
 
 // ============================================================================
-// Thinking Token Utilities (§3 — pure TS, no native bridge needed)
+// Thinking Token Utilities (§3 — delegated to C++ rac_llm_thinking)
 // ============================================================================
 
 /** Result of extracting thinking tokens from text. */
@@ -282,64 +298,44 @@ export interface ThinkingExtractionResult {
   responseText: string;
 }
 
-/** Regex that matches a single `<think>…</think>` block (non-greedy, dotAll). */
-const THINK_BLOCK_RE = /<think>([\s\S]*?)<\/think>/g;
-
 /**
- * Extract all `<think>…</think>` blocks from `text`.
+ * Extract thinking content from `text` using the shared C++ parser.
  *
  * Returns a `ThinkingExtractionResult` containing the raw thinking content
- * of each block and the text with all thinking blocks removed.
+ * and the text with thinking content removed.
  *
  * Matches Swift SDK: `RunAnywhere.extractThinkingTokens(_:)`.
  */
-export function extractThinkingTokens(text: string): ThinkingExtractionResult {
-  const thinkingBlocks: string[] = [];
-  let responseText = text.replace(THINK_BLOCK_RE, (_match, content: string) => {
-    thinkingBlocks.push(content.trim());
-    return '';
-  });
-  responseText = responseText.trim();
-  return { thinkingBlocks, responseText };
+export async function extractThinkingTokens(text: string): Promise<ThinkingExtractionResult> {
+  const result = await LlmThinking.extract(text);
+  return {
+    thinkingBlocks: result.thinking ? [result.thinking] : [],
+    responseText: result.response,
+  };
 }
 
 /**
- * Remove all `<think>…</think>` blocks from `text`.
+ * Remove all thinking blocks from `text` using the shared C++ parser.
  *
  * Matches Swift SDK: `RunAnywhere.stripThinkingTokens(_:)`.
  */
-export function stripThinkingTokens(text: string): string {
-  return text.replace(THINK_BLOCK_RE, '').trim();
+export async function stripThinkingTokens(text: string): Promise<string> {
+  return LlmThinking.strip(text);
 }
 
 /**
- * Split `text` at the first `<think>` tag into a `(thinking, response)` pair.
- *
- * - If the text contains no `<think>` tag the whole text is returned as
- *   `response` and `thinking` is the empty string.
- * - If the text contains multiple thinking blocks, only the content up to (and
- *   including) the first `</think>` is treated as `thinking`; the remainder
- *   (including any further `<think>` blocks) is returned as `response`.
+ * Split `text` into a `(thinking, response)` pair using shared C++ behavior.
  *
  * Matches Swift SDK: `RunAnywhere.splitThinkingAndResponse(_:)`.
  */
-export function splitThinkingAndResponse(text: string): { thinking: string; response: string } {
-  const firstOpen = text.indexOf('<think>');
-  if (firstOpen === -1) {
-    return { thinking: '', response: text.trim() };
-  }
-  const closeTag = '</think>';
-  const firstClose = text.indexOf(closeTag, firstOpen);
-  if (firstClose === -1) {
-    // Unclosed <think> block — treat everything after <think> as thinking.
-    return {
-      thinking: text.slice(firstOpen + '<think>'.length).trim(),
-      response: text.slice(0, firstOpen).trim(),
-    };
-  }
-  const thinkingContent = text.slice(firstOpen + '<think>'.length, firstClose).trim();
-  const response = (text.slice(0, firstOpen) + text.slice(firstClose + closeTag.length)).trim();
-  return { thinking: thinkingContent, response };
+export async function splitThinkingAndResponse(
+  text: string
+): Promise<{ thinking: string; response: string }> {
+  const result = await LlmThinking.extract(text);
+  return {
+    thinking: result.thinking ?? '',
+    response: result.response,
+  };
 }
 
 // ============================================================================

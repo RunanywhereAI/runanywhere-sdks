@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -71,6 +72,8 @@ export declare enum DiffusionScheduler {
     DIFFUSION_SCHEDULER_LMS = 8,
     /** DIFFUSION_SCHEDULER_LCM - forward-looking — pairs with the LCM model variant */
     DIFFUSION_SCHEDULER_LCM = 9,
+    /** DIFFUSION_SCHEDULER_DPMPP_2M_SDE - Swift/Kotlin/RN/Web/C-ABI */
+    DIFFUSION_SCHEDULER_DPMPP_2M_SDE = 10,
     UNRECOGNIZED = -1
 }
 export declare function diffusionSchedulerFromJSON(object: any): DiffusionScheduler;
@@ -139,6 +142,11 @@ export interface DiffusionTokenizerSource {
      * unset for the bundled presets.
      */
     customPath?: string | undefined;
+    /**
+     * Automatically download missing tokenizer files. Defaults to backend
+     * policy when unset/false.
+     */
+    autoDownload: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -185,6 +193,26 @@ export interface DiffusionConfiguration {
      * `reduceMemory` bool flag.
      */
     maxMemoryMb: number;
+    /** C ABI / SDK component fields that identify and route the component. */
+    modelId?: string | undefined;
+    preferredFramework?: InferenceFramework | undefined;
+    /**
+     * Legacy low-memory boolean. Backends may translate true to an internal
+     * memory cap when max_memory_mb is unset.
+     */
+    reduceMemory: boolean;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Canonical load-model wrapper used by SDKs that require a single argument
+ * for diffusion model lifecycle calls.
+ * ---------------------------------------------------------------------------
+ */
+export interface DiffusionConfig {
+    modelPath: string;
+    modelId: string;
+    modelName: string;
+    configuration?: DiffusionConfiguration | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -242,6 +270,19 @@ export interface DiffusionGenerationOptions {
      * TEXT_TO_IMAGE.
      */
     mode: DiffusionMode;
+    /** Image-to-image / inpainting payloads from rac_diffusion_options_t. */
+    inputImage?: Uint8Array | undefined;
+    maskImage?: Uint8Array | undefined;
+    denoiseStrength: number;
+    /** Progress reporting controls. */
+    reportIntermediateImages: boolean;
+    progressStride: number;
+    /**
+     * Dimensions for raw input_image payloads when the backend cannot infer
+     * them from an encoded container.
+     */
+    inputImageWidth: number;
+    inputImageHeight: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -269,6 +310,9 @@ export interface DiffusionProgress {
      * engine has produced one for this step.
      */
     intermediateImageData?: Uint8Array | undefined;
+    /** Dimensions for intermediate_image_data when it is raw pixel data. */
+    intermediateImageWidth: number;
+    intermediateImageHeight: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -315,6 +359,9 @@ export interface DiffusionResult {
      * DIFFUSION_SCHEDULER_UNSPECIFIED.
      */
     usedScheduler: DiffusionScheduler;
+    /** Failure details for result-envelope APIs. */
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -352,6 +399,16 @@ export interface DiffusionCapabilities {
      * generation. 0 = unknown / not advertised.
      */
     maxResolutionPx: number;
+    /** Generation modes this backend supports. */
+    supportedModes: DiffusionMode[];
+    /** Asymmetric maximum dimensions when known. 0 = unknown. */
+    maxWidthPx: number;
+    maxHeightPx: number;
+    supportsIntermediateImages: boolean;
+    supportsSafetyChecker: boolean;
+    isReady: boolean;
+    currentModel?: string | undefined;
+    safetyCheckerEnabled: boolean;
 }
 export declare const DiffusionTokenizerSource: {
     encode(message: DiffusionTokenizerSource, writer?: _m0.Writer): _m0.Writer;
@@ -368,6 +425,14 @@ export declare const DiffusionConfiguration: {
     toJSON(message: DiffusionConfiguration): unknown;
     create<I extends Exact<DeepPartial<DiffusionConfiguration>, I>>(base?: I): DiffusionConfiguration;
     fromPartial<I extends Exact<DeepPartial<DiffusionConfiguration>, I>>(object: I): DiffusionConfiguration;
+};
+export declare const DiffusionConfig: {
+    encode(message: DiffusionConfig, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionConfig;
+    fromJSON(object: any): DiffusionConfig;
+    toJSON(message: DiffusionConfig): unknown;
+    create<I extends Exact<DeepPartial<DiffusionConfig>, I>>(base?: I): DiffusionConfig;
+    fromPartial<I extends Exact<DeepPartial<DiffusionConfig>, I>>(object: I): DiffusionConfig;
 };
 export declare const DiffusionGenerationOptions: {
     encode(message: DiffusionGenerationOptions, writer?: _m0.Writer): _m0.Writer;

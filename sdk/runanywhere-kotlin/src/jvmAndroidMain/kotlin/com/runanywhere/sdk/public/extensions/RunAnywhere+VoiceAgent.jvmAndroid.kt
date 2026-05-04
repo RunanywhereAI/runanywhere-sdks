@@ -27,21 +27,24 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.ComponentLoadState
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
+import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
-import ai.runanywhere.proto.v1.TTSSynthesisMetadata
-import ai.runanywhere.proto.v1.TranscriptionMetadata
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
+import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import ai.runanywhere.proto.v1.VoiceAgentConfig
+import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgentProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import okio.ByteString.Companion.toByteString
 // v3.1: VoiceAgentResult / VoiceSessionConfig / VoiceSessionEvent /
 // Flow / flow imports removed — the actual declarations using them
 // (processVoice / startVoiceSession / streamVoiceSession) were deleted.
@@ -68,34 +71,29 @@ private fun getMissingComponents(): List<String> {
 actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceAgentInitialized = false
-    // Store config intent; actual model loading is caller's responsibility
-    // before calling initializeVoiceAgentWithLoadedModels().
-    voiceAgentLogger.info("Voice agent configured with VoiceAgentConfig: llm=${config.llm_model_id}, stt=${config.stt_model_id}, tts=${config.tts_model_id}")
+    val composeConfig =
+        VoiceAgentComposeConfig(
+            stt_model_id = config.stt_model_id.takeIf { it.isNotBlank() },
+            llm_model_id = config.llm_model_id.takeIf { it.isNotBlank() },
+            tts_voice_id = config.tts_model_id.takeIf { it.isNotBlank() },
+            vad_sample_rate = config.sample_rate_hz,
+        )
+    val states =
+        CppBridgeVoiceAgentProto.initialize(
+            CppBridgeVoiceAgent.getRawHandle(),
+            composeConfig,
+        )
+    voiceAgentInitialized = states.ready
+    voiceAgentLogger.info("Voice agent initialized from VoiceAgentConfig: ready=${states.ready}")
 }
 
 actual suspend fun RunAnywhere.getVoiceAgentComponentStates(): VoiceAgentComponentStates {
-    fun toProtoState(isLoaded: Boolean): ComponentLoadState =
-        if (isLoaded) {
-            ComponentLoadState.COMPONENT_LOAD_STATE_LOADED
-        } else {
-            ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED
-        }
-    val sttState = toProtoState(CppBridgeSTT.isLoaded)
-    val llmState = toProtoState(CppBridgeLLM.isLoaded)
-    val ttsState = toProtoState(CppBridgeTTS.isLoaded)
-    val allLoaded = CppBridgeSTT.isLoaded && CppBridgeLLM.isLoaded && CppBridgeTTS.isLoaded
-    val anyLoading = false // No async loading state tracked at this layer
-    return VoiceAgentComponentStates(
-        stt_state = sttState,
-        llm_state = llmState,
-        tts_state = ttsState,
-        vad_state = ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
-        ready = allLoaded,
-        any_loading = anyLoading,
-    )
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    return CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle())
 }
 
-actual suspend fun RunAnywhere.isVoiceAgentReady(): Boolean = areAllComponentsLoaded()
+actual suspend fun RunAnywhere.isVoiceAgentReady(): Boolean =
+    isInitialized && CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle()).ready
 
 actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
@@ -104,6 +102,7 @@ actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
         val missing = getMissingComponents()
         throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
     }
+    CppBridgeVoiceAgent.getHandle()
     voiceAgentInitialized = true
     voiceAgentLogger.info("VoiceAgent initialized successfully")
 }
@@ -142,81 +141,32 @@ actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
 
 actual suspend fun RunAnywhere.processVoiceTurn(
     audioData: ByteArray,
-): com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult {
+): VoiceAgentResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    if (!areAllComponentsLoaded()) {
-        val missing = getMissingComponents().joinToString(", ")
-        throw SDKException.voiceAgent("Voice agent not ready: missing components: $missing")
-    }
-
-    val sttOutput = voiceAgentTranscribe(audioData)
-    val transcription = sttOutput.text
-    val response = voiceAgentGenerateResponse(transcription)
-    val ttsOutput = voiceAgentSynthesizeSpeech(response)
-    val audio = ttsOutput.audio_data.toByteArray()
-
-    return com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult(
-        speechDetected = transcription.isNotBlank(),
-        transcription = transcription.takeIf { it.isNotBlank() },
-        response = response.takeIf { it.isNotBlank() },
-        synthesizedAudio = audio.takeIf { it.isNotEmpty() },
-    )
+    return CppBridgeVoiceAgentProto.processVoiceTurn(CppBridgeVoiceAgent.getRawHandle(), audioData)
 }
 
 actual suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): STTOutput {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val result = CppBridgeSTT.transcribe(audioData)
-    val audioLengthSec = audioData.size.toDouble() / 2.0 / 16000.0
-    return STTOutput(
-        text = result.text,
-        confidence = result.confidence,
-        metadata =
-            TranscriptionMetadata(
-                model_id = CppBridgeSTT.getLoadedModelId() ?: "unknown",
-                processing_time_ms = result.processingTimeMs,
-                audio_length_ms = (audioLengthSec * 1000).toLong(),
-            ),
-    )
+    return transcribeWithOptions(audioData, STTOptions())
 }
 
 actual suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val systemPrompt = currentSystemPrompt
-    val cfg =
-        if (systemPrompt != null) {
-            CppBridgeLLM.GenerationConfig(systemPrompt = systemPrompt)
-        } else {
-            CppBridgeLLM.GenerationConfig.DEFAULT
-        }
-    val result = CppBridgeLLM.generate(prompt, cfg)
+    val result = generate(prompt, LLMGenerationOptions(system_prompt = currentSystemPrompt))
     return result.text
 }
 
 actual suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): TTSOutput {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val result = CppBridgeTTS.synthesize(text)
-    val voiceId = CppBridgeTTS.getLoadedModelId() ?: "unknown"
-    return TTSOutput(
-        audio_data = result.audioData.toByteString(),
-        audio_format = AudioFormat.AUDIO_FORMAT_PCM,
-        sample_rate = 22050,
-        duration_ms = result.durationMs,
-        metadata =
-            TTSSynthesisMetadata(
-                voice_id = voiceId,
-                processing_time_ms = result.processingTimeMs,
-                character_count = text.length,
-                audio_duration_ms = result.durationMs,
-            ),
-    )
+    return synthesize(text, TTSOptions())
 }
 
 actual suspend fun RunAnywhere.cleanupVoiceAgent() {
     // Match Swift: cleanup voice-agent handle + reset flag.
     voiceAgentInitialized = false
     voiceSessionActive = false
-    com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
-        .destroy()
+    CppBridgeVoiceAgent.destroy()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,9 +177,7 @@ actual suspend fun RunAnywhere.cleanupVoiceAgent() {
 
 actual fun RunAnywhere.streamVoiceAgent(): kotlinx.coroutines.flow.Flow<ai.runanywhere.proto.v1.VoiceEvent> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val handle =
-        com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
-            .getHandle()
+    val handle = CppBridgeVoiceAgent.getHandle()
     return com.runanywhere.sdk.adapters
         .VoiceAgentStreamAdapter(handle)
         .stream()

@@ -141,6 +141,7 @@ struct LoadingDeviceRow: View {
 /// A model row designed for flat list display with prominent framework badge
 struct FlatModelRow: View {
     let model: ModelInfo
+    let availabilityReason: String?
     let isSelected: Bool
     let isLoading: Bool
     let onDownloadCompleted: () -> Void
@@ -183,7 +184,9 @@ struct FlatModelRow: View {
     }
 
     private var statusIcon: String {
-        if isBuiltIn {
+        if availabilityReason != nil {
+            return "exclamationmark.triangle.fill"
+        } else if isBuiltIn {
             return "checkmark.circle.fill"
         } else if model.localPath != nil {
             return "checkmark.circle.fill"
@@ -193,7 +196,9 @@ struct FlatModelRow: View {
     }
 
     private var statusColor: Color {
-        if isBuiltIn || model.localPath != nil {
+        if availabilityReason != nil {
+            return AppColors.statusOrange
+        } else if isBuiltIn || model.localPath != nil {
             return AppColors.statusGreen
         } else {
             return AppColors.primaryAccent
@@ -201,7 +206,9 @@ struct FlatModelRow: View {
     }
 
     private var statusText: String {
-        if isBuiltIn {
+        if let availabilityReason {
+            return availabilityReason
+        } else if isBuiltIn {
             return "Built-in"
         } else if model.localPath != nil {
             return "Ready"
@@ -277,6 +284,8 @@ struct FlatModelRow: View {
                     Text(statusText)
                         .font(AppTypography.caption2)
                         .foregroundColor(statusColor)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -311,7 +320,14 @@ struct FlatModelRow: View {
     }
 
     @ViewBuilder private var actionButton: some View {
-        if isBuiltIn {
+        if availabilityReason != nil {
+            Button("Unavailable") {}
+                .font(AppTypography.caption)
+                .fontWeight(.semibold)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(true)
+        } else if isBuiltIn {
             // Built-in models (Foundation Models, System TTS) - always ready
             Button("Use") {
                 onSelectModel()

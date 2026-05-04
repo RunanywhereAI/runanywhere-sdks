@@ -72,6 +72,54 @@ public class JSONSchema(
     schemaIndex = 4,
   )
   public val additional_properties: Boolean? = null,
+  /**
+   * JSON Schema document metadata / composition fields. Field names avoid
+   * `$` in generated APIs while preserving JSON names for serializers.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "${'$'}schema",
+    schemaIndex = 5,
+  )
+  public val schema_uri: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "${'$'}id",
+    schemaIndex = 6,
+  )
+  public val id_uri: String? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 7,
+  )
+  public val title: String? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 8,
+  )
+  public val description: String? = null,
+  definitions: Map<String, JSONSchema> = emptyMap(),
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "${'$'}ref",
+    schemaIndex = 10,
+  )
+  public val ref: String? = null,
+  all_of: List<JSONSchema> = emptyList(),
+  any_of: List<JSONSchema> = emptyList(),
+  one_of: List<JSONSchema> = emptyList(),
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
+    jsonName = "notSchema",
+    schemaIndex = 14,
+  )
+  public val not_schema: JSONSchema? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<JSONSchema, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -96,6 +144,41 @@ public class JSONSchema(
   )
   public val required: List<String> = immutableCopyOf("required", required)
 
+  @field:WireField(
+    tag = 10,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
+    schemaIndex = 9,
+  )
+  public val definitions: Map<String, JSONSchema> = immutableCopyOf("definitions", definitions)
+
+  @field:WireField(
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "allOf",
+    schemaIndex = 11,
+  )
+  public val all_of: List<JSONSchema> = immutableCopyOf("all_of", all_of)
+
+  @field:WireField(
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "anyOf",
+    schemaIndex = 12,
+  )
+  public val any_of: List<JSONSchema> = immutableCopyOf("any_of", any_of)
+
+  @field:WireField(
+    tag = 14,
+    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "oneOf",
+    schemaIndex = 13,
+  )
+  public val one_of: List<JSONSchema> = immutableCopyOf("one_of", one_of)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -112,6 +195,16 @@ public class JSONSchema(
     if (required != other.required) return false
     if (items != other.items) return false
     if (additional_properties != other.additional_properties) return false
+    if (schema_uri != other.schema_uri) return false
+    if (id_uri != other.id_uri) return false
+    if (title != other.title) return false
+    if (description != other.description) return false
+    if (definitions != other.definitions) return false
+    if (ref != other.ref) return false
+    if (all_of != other.all_of) return false
+    if (any_of != other.any_of) return false
+    if (one_of != other.one_of) return false
+    if (not_schema != other.not_schema) return false
     return true
   }
 
@@ -124,6 +217,16 @@ public class JSONSchema(
       result = result * 37 + required.hashCode()
       result = result * 37 + (items?.hashCode() ?: 0)
       result = result * 37 + (additional_properties?.hashCode() ?: 0)
+      result = result * 37 + (schema_uri?.hashCode() ?: 0)
+      result = result * 37 + (id_uri?.hashCode() ?: 0)
+      result = result * 37 + (title?.hashCode() ?: 0)
+      result = result * 37 + (description?.hashCode() ?: 0)
+      result = result * 37 + definitions.hashCode()
+      result = result * 37 + (ref?.hashCode() ?: 0)
+      result = result * 37 + all_of.hashCode()
+      result = result * 37 + any_of.hashCode()
+      result = result * 37 + one_of.hashCode()
+      result = result * 37 + (not_schema?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -136,6 +239,16 @@ public class JSONSchema(
     if (required.isNotEmpty()) result += """required=${sanitize(required)}"""
     if (items != null) result += """items=$items"""
     if (additional_properties != null) result += """additional_properties=$additional_properties"""
+    if (schema_uri != null) result += """schema_uri=${sanitize(schema_uri)}"""
+    if (id_uri != null) result += """id_uri=${sanitize(id_uri)}"""
+    if (title != null) result += """title=${sanitize(title)}"""
+    if (description != null) result += """description=${sanitize(description)}"""
+    if (definitions.isNotEmpty()) result += """definitions=$definitions"""
+    if (ref != null) result += """ref=${sanitize(ref)}"""
+    if (all_of.isNotEmpty()) result += """all_of=$all_of"""
+    if (any_of.isNotEmpty()) result += """any_of=$any_of"""
+    if (one_of.isNotEmpty()) result += """one_of=$one_of"""
+    if (not_schema != null) result += """not_schema=$not_schema"""
     return result.joinToString(prefix = "JSONSchema{", separator = ", ", postfix = "}")
   }
 
@@ -145,8 +258,19 @@ public class JSONSchema(
     required: List<String> = this.required,
     items: JSONSchemaProperty? = this.items,
     additional_properties: Boolean? = this.additional_properties,
+    schema_uri: String? = this.schema_uri,
+    id_uri: String? = this.id_uri,
+    title: String? = this.title,
+    description: String? = this.description,
+    definitions: Map<String, JSONSchema> = this.definitions,
+    ref: String? = this.ref,
+    all_of: List<JSONSchema> = this.all_of,
+    any_of: List<JSONSchema> = this.any_of,
+    one_of: List<JSONSchema> = this.one_of,
+    not_schema: JSONSchema? = this.not_schema,
     unknownFields: ByteString = this.unknownFields,
-  ): JSONSchema = JSONSchema(type, properties, required, items, additional_properties,
+  ): JSONSchema = JSONSchema(type, properties, required, items, additional_properties, schema_uri,
+      id_uri, title, description, definitions, ref, all_of, any_of, one_of, not_schema,
       unknownFields)
 
   public companion object {
@@ -162,6 +286,9 @@ public class JSONSchema(
       private val propertiesAdapter: ProtoAdapter<Map<String, JSONSchemaProperty>> by lazy {
           ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, JSONSchemaProperty.ADAPTER) }
 
+      private val definitionsAdapter: ProtoAdapter<Map<String, JSONSchema>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, JSONSchema.ADAPTER) }
+
       override fun encodedSize(`value`: JSONSchema): Int {
         var size = value.unknownFields.size
         if (value.type != JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED) size +=
@@ -170,6 +297,16 @@ public class JSONSchema(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.required)
         size += JSONSchemaProperty.ADAPTER.encodedSizeWithTag(4, value.items)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.additional_properties)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.schema_uri)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.id_uri)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.title)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.description)
+        size += definitionsAdapter.encodedSizeWithTag(10, value.definitions)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.ref)
+        size += JSONSchema.ADAPTER.asRepeated().encodedSizeWithTag(12, value.all_of)
+        size += JSONSchema.ADAPTER.asRepeated().encodedSizeWithTag(13, value.any_of)
+        size += JSONSchema.ADAPTER.asRepeated().encodedSizeWithTag(14, value.one_of)
+        size += JSONSchema.ADAPTER.encodedSizeWithTag(15, value.not_schema)
         return size
       }
 
@@ -180,11 +317,31 @@ public class JSONSchema(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required)
         JSONSchemaProperty.ADAPTER.encodeWithTag(writer, 4, value.items)
         ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.additional_properties)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.schema_uri)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.id_uri)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.title)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.description)
+        definitionsAdapter.encodeWithTag(writer, 10, value.definitions)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.ref)
+        JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 12, value.all_of)
+        JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 13, value.any_of)
+        JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.one_of)
+        JSONSchema.ADAPTER.encodeWithTag(writer, 15, value.not_schema)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: JSONSchema) {
         writer.writeBytes(value.unknownFields)
+        JSONSchema.ADAPTER.encodeWithTag(writer, 15, value.not_schema)
+        JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.one_of)
+        JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 13, value.any_of)
+        JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 12, value.all_of)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.ref)
+        definitionsAdapter.encodeWithTag(writer, 10, value.definitions)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.description)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.title)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.id_uri)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.schema_uri)
         ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.additional_properties)
         JSONSchemaProperty.ADAPTER.encodeWithTag(writer, 4, value.items)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required)
@@ -199,6 +356,16 @@ public class JSONSchema(
         val required = mutableListOf<String>()
         var items: JSONSchemaProperty? = null
         var additional_properties: Boolean? = null
+        var schema_uri: String? = null
+        var id_uri: String? = null
+        var title: String? = null
+        var description: String? = null
+        val definitions = mutableMapOf<String, JSONSchema>()
+        var ref: String? = null
+        val all_of = mutableListOf<JSONSchema>()
+        val any_of = mutableListOf<JSONSchema>()
+        val one_of = mutableListOf<JSONSchema>()
+        var not_schema: JSONSchema? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -210,6 +377,16 @@ public class JSONSchema(
             3 -> required.add(ProtoAdapter.STRING.decode(reader))
             4 -> items = JSONSchemaProperty.ADAPTER.decode(reader)
             5 -> additional_properties = ProtoAdapter.BOOL.decode(reader)
+            6 -> schema_uri = ProtoAdapter.STRING.decode(reader)
+            7 -> id_uri = ProtoAdapter.STRING.decode(reader)
+            8 -> title = ProtoAdapter.STRING.decode(reader)
+            9 -> description = ProtoAdapter.STRING.decode(reader)
+            10 -> definitions.putAll(definitionsAdapter.decode(reader))
+            11 -> ref = ProtoAdapter.STRING.decode(reader)
+            12 -> all_of.add(JSONSchema.ADAPTER.decode(reader))
+            13 -> any_of.add(JSONSchema.ADAPTER.decode(reader))
+            14 -> one_of.add(JSONSchema.ADAPTER.decode(reader))
+            15 -> not_schema = JSONSchema.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -219,6 +396,16 @@ public class JSONSchema(
           required = required,
           items = items,
           additional_properties = additional_properties,
+          schema_uri = schema_uri,
+          id_uri = id_uri,
+          title = title,
+          description = description,
+          definitions = definitions,
+          ref = ref,
+          all_of = all_of,
+          any_of = any_of,
+          one_of = one_of,
+          not_schema = not_schema,
           unknownFields = unknownFields
         )
       }
@@ -226,6 +413,11 @@ public class JSONSchema(
       override fun redact(`value`: JSONSchema): JSONSchema = value.copy(
         properties = value.properties.redactElements(JSONSchemaProperty.ADAPTER),
         items = value.items?.let(JSONSchemaProperty.ADAPTER::redact),
+        definitions = value.definitions.redactElements(JSONSchema.ADAPTER),
+        all_of = value.all_of.redactElements(JSONSchema.ADAPTER),
+        any_of = value.any_of.redactElements(JSONSchema.ADAPTER),
+        one_of = value.one_of.redactElements(JSONSchema.ADAPTER),
+        not_schema = value.not_schema?.let(JSONSchema.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

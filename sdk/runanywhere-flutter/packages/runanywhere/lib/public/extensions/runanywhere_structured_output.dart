@@ -1,14 +1,14 @@
-// Wave 3: StructuredOutput namespace extension.
-// Mirrors Swift RunAnywhere+StructuredOutput.swift.
-// Delegates to the JSON-schema path in the native LLM bridge.
+// StructuredOutput namespace extension.
+// Delegates to the generated-proto LLM request/result path.
 
 import 'dart:convert';
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_structured_output.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 
 class RunAnywhereStructuredOutput {
   RunAnywhereStructuredOutput._();
@@ -26,38 +26,22 @@ class RunAnywhereStructuredOutput {
       throw SDKException.componentNotReady('LLM model not loaded.');
     }
 
-    final systemPrompt =
-        DartBridgeStructuredOutput.shared.getSystemPrompt(jsonSchema);
-
-    final raw = await DartBridge.llm.generate(
+    final raw = await RunAnywhereLLM.shared.generate(
       prompt,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-    );
-
-    final jsonStr =
-        DartBridgeStructuredOutput.shared.extractJson(raw.text) ?? '';
-    final parsedBytes = _tryEncodeJson(jsonStr);
-
-    final validation = StructuredOutputValidation(
-      isValid: parsedBytes != null,
+      LLMGenerationOptions(
+        maxTokens: maxTokens,
+        temperature: temperature,
+        jsonSchema: jsonSchema,
+        structuredOutput: StructuredOutputOptions(jsonSchema: jsonSchema),
+      ),
     );
 
     return StructuredOutputResult(
       rawText: raw.text,
-      parsedJson: parsedBytes ?? [],
-      validation: validation,
+      parsedJson: raw.jsonOutput.isEmpty ? [] : utf8.encode(raw.jsonOutput),
+      validation: raw.hasStructuredOutputValidation()
+          ? raw.structuredOutputValidation
+          : StructuredOutputValidation(isValid: raw.jsonOutput.isNotEmpty),
     );
-  }
-
-  static List<int>? _tryEncodeJson(String s) {
-    if (s.isEmpty) return null;
-    try {
-      jsonDecode(s);
-      return utf8.encode(s);
-    } catch (_) {
-      return null;
-    }
   }
 }

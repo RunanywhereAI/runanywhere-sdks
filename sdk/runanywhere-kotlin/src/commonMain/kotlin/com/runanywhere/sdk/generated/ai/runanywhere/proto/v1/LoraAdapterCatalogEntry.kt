@@ -20,6 +20,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -111,6 +112,27 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 7,
   )
   public val author: String? = null,
+  /**
+   * recommended adapter scale
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "defaultScale",
+    schemaIndex = 8,
+  )
+  public val default_scale: Float = 0f,
+  /**
+   * lowercase hex SHA-256
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "checksumSha256",
+    schemaIndex = 9,
+  )
+  public val checksum_sha256: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterCatalogEntry, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -145,6 +167,8 @@ public class LoraAdapterCatalogEntry(
     if (compatible_models != other.compatible_models) return false
     if (size_bytes != other.size_bytes) return false
     if (author != other.author) return false
+    if (default_scale != other.default_scale) return false
+    if (checksum_sha256 != other.checksum_sha256) return false
     return true
   }
 
@@ -160,6 +184,8 @@ public class LoraAdapterCatalogEntry(
       result = result * 37 + compatible_models.hashCode()
       result = result * 37 + size_bytes.hashCode()
       result = result * 37 + (author?.hashCode() ?: 0)
+      result = result * 37 + default_scale.hashCode()
+      result = result * 37 + (checksum_sha256?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -176,6 +202,8 @@ public class LoraAdapterCatalogEntry(
         """compatible_models=${sanitize(compatible_models)}"""
     result += """size_bytes=$size_bytes"""
     if (author != null) result += """author=${sanitize(author)}"""
+    result += """default_scale=$default_scale"""
+    if (checksum_sha256 != null) result += """checksum_sha256=${sanitize(checksum_sha256)}"""
     return result.joinToString(prefix = "LoraAdapterCatalogEntry{", separator = ", ", postfix = "}")
   }
 
@@ -188,9 +216,11 @@ public class LoraAdapterCatalogEntry(
     compatible_models: List<String> = this.compatible_models,
     size_bytes: Long = this.size_bytes,
     author: String? = this.author,
+    default_scale: Float = this.default_scale,
+    checksum_sha256: String? = this.checksum_sha256,
     unknownFields: ByteString = this.unknownFields,
   ): LoraAdapterCatalogEntry = LoraAdapterCatalogEntry(id, name, description, url, filename,
-      compatible_models, size_bytes, author, unknownFields)
+      compatible_models, size_bytes, author, default_scale, checksum_sha256, unknownFields)
 
   public companion object {
     @JvmField
@@ -215,6 +245,9 @@ public class LoraAdapterCatalogEntry(
         if (value.size_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
             value.size_bytes)
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.author)
+        if (!value.default_scale.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(9,
+            value.default_scale)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.checksum_sha256)
         return size
       }
 
@@ -227,11 +260,17 @@ public class LoraAdapterCatalogEntry(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.compatible_models)
         if (value.size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7, value.size_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.author)
+        if (!value.default_scale.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 9,
+            value.default_scale)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterCatalogEntry) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
+        if (!value.default_scale.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 9,
+            value.default_scale)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.author)
         if (value.size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7, value.size_bytes)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.compatible_models)
@@ -251,6 +290,8 @@ public class LoraAdapterCatalogEntry(
         val compatible_models = mutableListOf<String>()
         var size_bytes: Long = 0L
         var author: String? = null
+        var default_scale: Float = 0f
+        var checksum_sha256: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -261,6 +302,8 @@ public class LoraAdapterCatalogEntry(
             6 -> compatible_models.add(ProtoAdapter.STRING.decode(reader))
             7 -> size_bytes = ProtoAdapter.INT64.decode(reader)
             8 -> author = ProtoAdapter.STRING.decode(reader)
+            9 -> default_scale = ProtoAdapter.FLOAT.decode(reader)
+            10 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -273,6 +316,8 @@ public class LoraAdapterCatalogEntry(
           compatible_models = compatible_models,
           size_bytes = size_bytes,
           author = author,
+          default_scale = default_scale,
+          checksum_sha256 = checksum_sha256,
           unknownFields = unknownFields
         )
       }

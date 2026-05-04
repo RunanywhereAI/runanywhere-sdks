@@ -435,13 +435,8 @@ class SettingsViewModel: ObservableObject {
 
     /// Delete a stored model
     func deleteModel(_ model: StoredModel) async {
-        guard let framework = model.framework else {
-            errorMessage = "Cannot delete model: unknown framework"
-            return
-        }
-
         do {
-            try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
+            try await RunAnywhere.deleteModel(model.id)
             await refreshStorageData()
             print("Settings: Model \(model.name) deleted successfully")
         } catch {

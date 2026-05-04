@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -124,6 +125,24 @@ public class DiffusionResult(
   )
   public val used_scheduler: DiffusionScheduler =
       DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED,
+  /**
+   * Failure details for result-envelope APIs.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 7,
+  )
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 8,
+  )
+  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -144,6 +163,8 @@ public class DiffusionResult(
     if (total_time_ms != other.total_time_ms) return false
     if (safety_flag != other.safety_flag) return false
     if (used_scheduler != other.used_scheduler) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
     return true
   }
 
@@ -158,6 +179,8 @@ public class DiffusionResult(
       result = result * 37 + total_time_ms.hashCode()
       result = result * 37 + safety_flag.hashCode()
       result = result * 37 + used_scheduler.hashCode()
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
       super.hashCode = result
     }
     return result
@@ -172,6 +195,8 @@ public class DiffusionResult(
     result += """total_time_ms=$total_time_ms"""
     result += """safety_flag=$safety_flag"""
     result += """used_scheduler=$used_scheduler"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
     return result.joinToString(prefix = "DiffusionResult{", separator = ", ", postfix = "}")
   }
 
@@ -183,9 +208,11 @@ public class DiffusionResult(
     total_time_ms: Long = this.total_time_ms,
     safety_flag: Boolean = this.safety_flag,
     used_scheduler: DiffusionScheduler = this.used_scheduler,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionResult = DiffusionResult(image_data, width, height, seed_used, total_time_ms,
-      safety_flag, used_scheduler, unknownFields)
+      safety_flag, used_scheduler, error_message, error_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -210,6 +237,9 @@ public class DiffusionResult(
             value.safety_flag)
         if (value.used_scheduler != DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) size +=
             DiffusionScheduler.ADAPTER.encodedSizeWithTag(7, value.used_scheduler)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(9,
+            value.error_code)
         return size
       }
 
@@ -225,11 +255,15 @@ public class DiffusionResult(
             value.safety_flag)
         if (value.used_scheduler != DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED)
             DiffusionScheduler.ADAPTER.encodeWithTag(writer, 7, value.used_scheduler)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
         if (value.used_scheduler != DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED)
             DiffusionScheduler.ADAPTER.encodeWithTag(writer, 7, value.used_scheduler)
         if (value.safety_flag != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
@@ -251,6 +285,8 @@ public class DiffusionResult(
         var total_time_ms: Long = 0L
         var safety_flag: Boolean = false
         var used_scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
+        var error_message: String? = null
+        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> image_data = ProtoAdapter.BYTES.decode(reader)
@@ -264,6 +300,8 @@ public class DiffusionResult(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            8 -> error_message = ProtoAdapter.STRING.decode(reader)
+            9 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -275,6 +313,8 @@ public class DiffusionResult(
           total_time_ms = total_time_ms,
           safety_flag = safety_flag,
           used_scheduler = used_scheduler,
+          error_message = error_message,
+          error_code = error_code,
           unknownFields = unknownFields
         )
       }

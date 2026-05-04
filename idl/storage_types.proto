@@ -189,3 +189,80 @@ message StoredModel {
     string         local_path      = 4;
     optional int64 downloaded_at_ms = 5;   // Unix epoch ms of download completion
 }
+
+// ---------------------------------------------------------------------------
+// Storage operation contracts.
+//
+// Platform callbacks own filesystem permissions, OS quota APIs, and any
+// sandbox-specific file handles. These messages carry normalized byte counts,
+// paths, model identifiers, and C++ workflow decisions/results so Swift,
+// Kotlin, Dart/Flutter, React Native, and Web can expose one generated API
+// surface for availability checks and deletion planning.
+// ---------------------------------------------------------------------------
+
+message StorageInfoRequest {
+    bool include_device = 1;
+    bool include_app    = 2;
+    bool include_models = 3;
+}
+
+message StorageInfoResult {
+    bool        success       = 1;
+    StorageInfo info          = 2;
+    string      error_message = 3;
+}
+
+message StorageAvailabilityRequest {
+    string model_id                  = 1;
+    int64  required_bytes            = 2;
+    double safety_margin             = 3;
+    bool   include_existing_model_bytes = 4;
+}
+
+message StorageAvailabilityResult {
+    bool                success       = 1;
+    StorageAvailability availability  = 2;
+    repeated string     warnings      = 3;
+    string              error_message = 4;
+}
+
+message StorageDeletePlanRequest {
+    repeated string model_ids       = 1;
+    int64           required_bytes  = 2;
+    bool            include_cache   = 3;
+    bool            oldest_first    = 4;
+}
+
+message StorageDeleteCandidate {
+    string         model_id          = 1;
+    int64          reclaimable_bytes = 2;
+    optional int64 last_used_ms      = 3;
+    bool           is_loaded         = 4;
+    string         local_path        = 5;
+}
+
+message StorageDeletePlan {
+    bool                            can_reclaim_required_bytes = 1;
+    int64                           required_bytes             = 2;
+    int64                           reclaimable_bytes          = 3;
+    repeated StorageDeleteCandidate candidates                 = 4;
+    repeated string                 warnings                   = 5;
+    string                          error_message              = 6;
+}
+
+message StorageDeleteRequest {
+    repeated string model_ids            = 1;
+    bool            delete_files         = 2;
+    bool            clear_registry_paths = 3;
+    bool            unload_if_loaded     = 4;
+    bool            dry_run              = 5;
+}
+
+message StorageDeleteResult {
+    bool            success           = 1;
+    int64           deleted_bytes     = 2;
+    repeated string deleted_model_ids = 3;
+    repeated string failed_model_ids  = 4;
+    repeated string warnings          = 5;
+    string          error_message     = 6;
+}

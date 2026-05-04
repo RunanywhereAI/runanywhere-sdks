@@ -55,6 +55,12 @@ export class LLMStreamAdapter {
       topK: 0,
       systemPrompt: '',
       emitThoughts: false,
+      repetitionPenalty: 0,
+      stopSequences: [],
+      streamingEnabled: true,
+      preferredFramework: '',
+      jsonSchema: '',
+      executionTarget: '',
     },
   ): AsyncIterable<LLMStreamEvent> {
     return generateLLM(this.transport(), req);

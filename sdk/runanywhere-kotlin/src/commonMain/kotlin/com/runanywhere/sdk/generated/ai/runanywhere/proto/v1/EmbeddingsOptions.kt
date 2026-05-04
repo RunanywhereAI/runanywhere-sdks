@@ -66,6 +66,37 @@ public class EmbeddingsOptions(
     schemaIndex = 2,
   )
   public val batch_size: Int? = null,
+  /**
+   * Exact C ABI per-call overrides. UNSPECIFIED = use component config.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.EmbeddingsNormalizeMode#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "normalizeMode",
+    schemaIndex = 3,
+  )
+  public val normalize_mode: EmbeddingsNormalizeMode =
+      EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val pooling: EmbeddingsPoolingStrategy =
+      EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED,
+  /**
+   * 0 = auto
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "nThreads",
+    schemaIndex = 5,
+  )
+  public val n_threads: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingsOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -82,6 +113,9 @@ public class EmbeddingsOptions(
     if (normalize != other.normalize) return false
     if (truncate != other.truncate) return false
     if (batch_size != other.batch_size) return false
+    if (normalize_mode != other.normalize_mode) return false
+    if (pooling != other.pooling) return false
+    if (n_threads != other.n_threads) return false
     return true
   }
 
@@ -92,6 +126,9 @@ public class EmbeddingsOptions(
       result = result * 37 + normalize.hashCode()
       result = result * 37 + (truncate?.hashCode() ?: 0)
       result = result * 37 + (batch_size?.hashCode() ?: 0)
+      result = result * 37 + normalize_mode.hashCode()
+      result = result * 37 + pooling.hashCode()
+      result = result * 37 + n_threads.hashCode()
       super.hashCode = result
     }
     return result
@@ -102,6 +139,9 @@ public class EmbeddingsOptions(
     result += """normalize=$normalize"""
     if (truncate != null) result += """truncate=$truncate"""
     if (batch_size != null) result += """batch_size=$batch_size"""
+    result += """normalize_mode=$normalize_mode"""
+    result += """pooling=$pooling"""
+    result += """n_threads=$n_threads"""
     return result.joinToString(prefix = "EmbeddingsOptions{", separator = ", ", postfix = "}")
   }
 
@@ -109,8 +149,12 @@ public class EmbeddingsOptions(
     normalize: Boolean = this.normalize,
     truncate: Boolean? = this.truncate,
     batch_size: Int? = this.batch_size,
+    normalize_mode: EmbeddingsNormalizeMode = this.normalize_mode,
+    pooling: EmbeddingsPoolingStrategy = this.pooling,
+    n_threads: Int = this.n_threads,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsOptions = EmbeddingsOptions(normalize, truncate, batch_size, unknownFields)
+  ): EmbeddingsOptions = EmbeddingsOptions(normalize, truncate, batch_size, normalize_mode, pooling,
+      n_threads, unknownFields)
 
   public companion object {
     @JvmField
@@ -128,6 +172,11 @@ public class EmbeddingsOptions(
             value.normalize)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.truncate)
         size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.batch_size)
+        if (value.normalize_mode != EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED)
+            size += EmbeddingsNormalizeMode.ADAPTER.encodedSizeWithTag(4, value.normalize_mode)
+        if (value.pooling != EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED)
+            size += EmbeddingsPoolingStrategy.ADAPTER.encodedSizeWithTag(5, value.pooling)
+        if (value.n_threads != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.n_threads)
         return size
       }
 
@@ -135,11 +184,21 @@ public class EmbeddingsOptions(
         if (value.normalize != false) ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.normalize)
         ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.truncate)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.batch_size)
+        if (value.normalize_mode != EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED)
+            EmbeddingsNormalizeMode.ADAPTER.encodeWithTag(writer, 4, value.normalize_mode)
+        if (value.pooling != EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED)
+            EmbeddingsPoolingStrategy.ADAPTER.encodeWithTag(writer, 5, value.pooling)
+        if (value.n_threads != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.n_threads)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.n_threads != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.n_threads)
+        if (value.pooling != EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED)
+            EmbeddingsPoolingStrategy.ADAPTER.encodeWithTag(writer, 5, value.pooling)
+        if (value.normalize_mode != EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED)
+            EmbeddingsNormalizeMode.ADAPTER.encodeWithTag(writer, 4, value.normalize_mode)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.batch_size)
         ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.truncate)
         if (value.normalize != false) ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.normalize)
@@ -149,11 +208,27 @@ public class EmbeddingsOptions(
         var normalize: Boolean = false
         var truncate: Boolean? = null
         var batch_size: Int? = null
+        var normalize_mode: EmbeddingsNormalizeMode =
+            EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED
+        var pooling: EmbeddingsPoolingStrategy =
+            EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED
+        var n_threads: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> normalize = ProtoAdapter.BOOL.decode(reader)
             2 -> truncate = ProtoAdapter.BOOL.decode(reader)
             3 -> batch_size = ProtoAdapter.INT32.decode(reader)
+            4 -> try {
+              normalize_mode = EmbeddingsNormalizeMode.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            5 -> try {
+              pooling = EmbeddingsPoolingStrategy.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            6 -> n_threads = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -161,6 +236,9 @@ public class EmbeddingsOptions(
           normalize = normalize,
           truncate = truncate,
           batch_size = batch_size,
+          normalize_mode = normalize_mode,
+          pooling = pooling,
+          n_threads = n_threads,
           unknownFields = unknownFields
         )
       }

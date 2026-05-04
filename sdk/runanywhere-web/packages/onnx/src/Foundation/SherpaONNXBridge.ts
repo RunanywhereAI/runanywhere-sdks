@@ -100,6 +100,81 @@ interface SherpaFS {
   analyzePath: (path: string) => { exists: boolean };
 }
 
+type SherpaCreateModule = (options: Record<string, unknown>) => SherpaONNXModule | Promise<SherpaONNXModule>;
+
+const BROWSER_PATH_FS_SHIM =
+  'var PATH_FS={resolve:(...paths)=>PATH.normalize([FS.cwd(),...paths].filter(Boolean).join("/")),relative:(from,to)=>{from=PATH.normalize(from||FS.cwd());to=PATH.normalize(to||FS.cwd());var f=from.split("/").filter(Boolean);var t=to.split("/").filter(Boolean);while(f.length&&t.length&&f[0]===t[0]){f.shift();t.shift()}return f.map(() => "..").concat(t).join("/")||"."}};';
+
+function patchSherpaGlueForBrowser(source: string): string {
+  let patched = source;
+
+  patched = patched.replace(/var ENVIRONMENT_IS_NODE=[^;]+;/, 'var ENVIRONMENT_IS_NODE=false;');
+  patched = patched.replace(
+    /var nodeTTY=require\(["']node:tty["']\);/g,
+    'var nodeTTY={isatty:function(){return false}};',
+  );
+  patched = patched.replace(
+    /var PATH_FS=\{resolve:\(\.\.\.paths\)=>\{paths\.unshift\(FS\.cwd\(\)\);return nodePath\.posix\.resolve\(\.\.\.paths\)\},relative:\(from,to\)=>nodePath\.posix\.relative\(from\|\|FS\.cwd\(\),to\|\|FS\.cwd\(\)\)\};/g,
+    BROWSER_PATH_FS_SHIM,
+  );
+  patched = patched.replace(
+    /var VFS=\{\.\.\.FS\};for\(const\[key,value\]of Object\.entries\(NODERAWFS\)\)\{FS\[key\]=_wrapNodeError\(value\)\}for\(const\[key,value\]of Object\.entries\(NODERAWFS_stream_funcs\)\)\{FS\[key\]=_wrapNodeStreamFunc\(value,FS\[key\]\)\}/g,
+    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+  );
+  patched = patched.replace(
+    /var VFS=\{\.\.\.FS\};for\(var _key in NODERAWFS\)\{FS\[_key\]=_wrapNodeError\(NODERAWFS\[_key\]\)\}/g,
+    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+  );
+
+  if (!/\bexport\s+default\s+Module\b/.test(patched)) {
+    patched += '\nexport default Module;\n';
+  }
+
+  return patched;
+}
+
+function coerceSherpaCreateModule(moduleNamespace: unknown): SherpaCreateModule {
+  if (typeof moduleNamespace === 'function') {
+    return moduleNamespace as SherpaCreateModule;
+  }
+
+  const namespace = moduleNamespace as Record<string, unknown>;
+  const candidate = namespace.default ?? namespace.Module;
+  if (typeof candidate !== 'function') {
+    throw new Error('sherpa-onnx-glue.js did not export a module factory');
+  }
+
+  return candidate as SherpaCreateModule;
+}
+
+async function importSherpaGlue(moduleUrl: string): Promise<SherpaCreateModule> {
+  const canPatchBrowserModule =
+    typeof window !== 'undefined' &&
+    typeof Blob !== 'undefined' &&
+    typeof URL !== 'undefined' &&
+    typeof fetch !== 'undefined';
+
+  if (!canPatchBrowserModule) {
+    const imported = await import(/* @vite-ignore */ moduleUrl);
+    return coerceSherpaCreateModule(imported);
+  }
+
+  const response = await fetch(moduleUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sherpa-onnx-glue.js: ${response.status} ${response.statusText}`);
+  }
+
+  const patchedSource = patchSherpaGlueForBrowser(await response.text());
+  const objectUrl = URL.createObjectURL(new Blob([patchedSource], { type: 'text/javascript' }));
+
+  try {
+    const imported = await import(/* @vite-ignore */ objectUrl);
+    return coerceSherpaCreateModule(imported);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SherpaONNXBridge
 // ---------------------------------------------------------------------------
@@ -180,8 +255,11 @@ export class SherpaONNXBridge {
     }
 
     this._loading = this._doLoad(wasmUrl);
-    await this._loading;
-    this._loading = null;
+    try {
+      await this._loading;
+    } finally {
+      this._loading = null;
+    }
   }
 
   private async _doLoad(wasmUrl?: string): Promise<void> {
@@ -189,7 +267,7 @@ export class SherpaONNXBridge {
 
     try {
       const moduleUrl = wasmUrl ?? this.wasmUrl ?? new URL('../../wasm/sherpa/sherpa-onnx-glue.js', import.meta.url).href;
-      const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
+      const createModule = await importSherpaGlue(moduleUrl);
 
       // Derive the base URL for the .wasm binary
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);

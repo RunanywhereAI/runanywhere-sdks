@@ -7,6 +7,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -114,6 +115,29 @@ export interface VADConfiguration {
    * in the C ABI). Defaults to false.
    */
   enableAutoCalibration: boolean;
+  /**
+   * Calibration multiplier (threshold = ambient noise * multiplier).
+   * Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+   */
+  calibrationMultiplier: number;
+  /** Preferred framework for VAD. Absent = auto. */
+  preferredFramework?:
+    | InferenceFramework
+    | undefined;
+  /** Optional model path for backend-specific VADs (e.g. Silero ONNX). */
+  modelPath?:
+    | string
+    | undefined;
+  /**
+   * Window size in samples for frame-based neural VAD backends. 0 =
+   * backend/default.
+   */
+  windowSizeSamples: number;
+  /**
+   * Maximum continuous speech segment duration in milliseconds. 0 =
+   * backend/default.
+   */
+  maxSpeechDurationMs: number;
 }
 
 /**
@@ -154,6 +178,11 @@ export interface VADOptions {
    * Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
    */
   minSilenceDurationMs: number;
+  /**
+   * Maximum continuous speech duration (ms) before forcing a segment split.
+   * 0 = backend/default.
+   */
+  maxSpeechDurationMs: number;
 }
 
 /**
@@ -192,6 +221,11 @@ export interface VADResult {
   energy: number;
   /** Length of the analyzed frame in milliseconds. */
   durationMs: number;
+  /** Wall-clock timestamp for this frame/result, in milliseconds since epoch. */
+  timestampMs: number;
+  /** Optional detected segment start/end times, in milliseconds. 0 = unset. */
+  startTimeMs: number;
+  endTimeMs: number;
 }
 
 /**
@@ -231,6 +265,14 @@ export interface VADStatistics {
   recentAvg: number;
   /** Recent moving-window peak energy. (Swift/Kotlin: `recentMax`) */
   recentMax: number;
+  /**
+   * Richer service-level counters from rac_vad_statistics_t. Zero = unset
+   * for energy-only implementations.
+   */
+  totalSpeechSegments: number;
+  totalSpeechDurationMs: number;
+  averageEnergy: number;
+  peakEnergy: number;
 }
 
 /**
@@ -267,7 +309,18 @@ export interface SpeechActivityEvent {
 }
 
 function createBaseVADConfiguration(): VADConfiguration {
-  return { modelId: "", sampleRate: 0, frameLengthMs: 0, threshold: 0, enableAutoCalibration: false };
+  return {
+    modelId: "",
+    sampleRate: 0,
+    frameLengthMs: 0,
+    threshold: 0,
+    enableAutoCalibration: false,
+    calibrationMultiplier: 0,
+    preferredFramework: undefined,
+    modelPath: undefined,
+    windowSizeSamples: 0,
+    maxSpeechDurationMs: 0,
+  };
 }
 
 export const VADConfiguration = {
@@ -286,6 +339,21 @@ export const VADConfiguration = {
     }
     if (message.enableAutoCalibration !== false) {
       writer.uint32(40).bool(message.enableAutoCalibration);
+    }
+    if (message.calibrationMultiplier !== 0) {
+      writer.uint32(53).float(message.calibrationMultiplier);
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(56).int32(message.preferredFramework);
+    }
+    if (message.modelPath !== undefined) {
+      writer.uint32(66).string(message.modelPath);
+    }
+    if (message.windowSizeSamples !== 0) {
+      writer.uint32(72).int32(message.windowSizeSamples);
+    }
+    if (message.maxSpeechDurationMs !== 0) {
+      writer.uint32(80).int32(message.maxSpeechDurationMs);
     }
     return writer;
   },
@@ -332,6 +400,41 @@ export const VADConfiguration = {
 
           message.enableAutoCalibration = reader.bool();
           continue;
+        case 6:
+          if (tag !== 53) {
+            break;
+          }
+
+          message.calibrationMultiplier = reader.float();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.modelPath = reader.string();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.windowSizeSamples = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.maxSpeechDurationMs = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -350,6 +453,13 @@ export const VADConfiguration = {
       enableAutoCalibration: isSet(object.enableAutoCalibration)
         ? globalThis.Boolean(object.enableAutoCalibration)
         : false,
+      calibrationMultiplier: isSet(object.calibrationMultiplier) ? globalThis.Number(object.calibrationMultiplier) : 0,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
+      modelPath: isSet(object.modelPath) ? globalThis.String(object.modelPath) : undefined,
+      windowSizeSamples: isSet(object.windowSizeSamples) ? globalThis.Number(object.windowSizeSamples) : 0,
+      maxSpeechDurationMs: isSet(object.maxSpeechDurationMs) ? globalThis.Number(object.maxSpeechDurationMs) : 0,
     };
   },
 
@@ -370,6 +480,21 @@ export const VADConfiguration = {
     if (message.enableAutoCalibration !== false) {
       obj.enableAutoCalibration = message.enableAutoCalibration;
     }
+    if (message.calibrationMultiplier !== 0) {
+      obj.calibrationMultiplier = message.calibrationMultiplier;
+    }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
+    if (message.modelPath !== undefined) {
+      obj.modelPath = message.modelPath;
+    }
+    if (message.windowSizeSamples !== 0) {
+      obj.windowSizeSamples = Math.round(message.windowSizeSamples);
+    }
+    if (message.maxSpeechDurationMs !== 0) {
+      obj.maxSpeechDurationMs = Math.round(message.maxSpeechDurationMs);
+    }
     return obj;
   },
 
@@ -383,12 +508,17 @@ export const VADConfiguration = {
     message.frameLengthMs = object.frameLengthMs ?? 0;
     message.threshold = object.threshold ?? 0;
     message.enableAutoCalibration = object.enableAutoCalibration ?? false;
+    message.calibrationMultiplier = object.calibrationMultiplier ?? 0;
+    message.preferredFramework = object.preferredFramework ?? undefined;
+    message.modelPath = object.modelPath ?? undefined;
+    message.windowSizeSamples = object.windowSizeSamples ?? 0;
+    message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? 0;
     return message;
   },
 };
 
 function createBaseVADOptions(): VADOptions {
-  return { threshold: 0, minSpeechDurationMs: 0, minSilenceDurationMs: 0 };
+  return { threshold: 0, minSpeechDurationMs: 0, minSilenceDurationMs: 0, maxSpeechDurationMs: 0 };
 }
 
 export const VADOptions = {
@@ -401,6 +531,9 @@ export const VADOptions = {
     }
     if (message.minSilenceDurationMs !== 0) {
       writer.uint32(24).int32(message.minSilenceDurationMs);
+    }
+    if (message.maxSpeechDurationMs !== 0) {
+      writer.uint32(32).int32(message.maxSpeechDurationMs);
     }
     return writer;
   },
@@ -433,6 +566,13 @@ export const VADOptions = {
 
           message.minSilenceDurationMs = reader.int32();
           continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.maxSpeechDurationMs = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -447,6 +587,7 @@ export const VADOptions = {
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
       minSpeechDurationMs: isSet(object.minSpeechDurationMs) ? globalThis.Number(object.minSpeechDurationMs) : 0,
       minSilenceDurationMs: isSet(object.minSilenceDurationMs) ? globalThis.Number(object.minSilenceDurationMs) : 0,
+      maxSpeechDurationMs: isSet(object.maxSpeechDurationMs) ? globalThis.Number(object.maxSpeechDurationMs) : 0,
     };
   },
 
@@ -461,6 +602,9 @@ export const VADOptions = {
     if (message.minSilenceDurationMs !== 0) {
       obj.minSilenceDurationMs = Math.round(message.minSilenceDurationMs);
     }
+    if (message.maxSpeechDurationMs !== 0) {
+      obj.maxSpeechDurationMs = Math.round(message.maxSpeechDurationMs);
+    }
     return obj;
   },
 
@@ -472,12 +616,13 @@ export const VADOptions = {
     message.threshold = object.threshold ?? 0;
     message.minSpeechDurationMs = object.minSpeechDurationMs ?? 0;
     message.minSilenceDurationMs = object.minSilenceDurationMs ?? 0;
+    message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? 0;
     return message;
   },
 };
 
 function createBaseVADResult(): VADResult {
-  return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
+  return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0, timestampMs: 0, startTimeMs: 0, endTimeMs: 0 };
 }
 
 export const VADResult = {
@@ -493,6 +638,15 @@ export const VADResult = {
     }
     if (message.durationMs !== 0) {
       writer.uint32(32).int32(message.durationMs);
+    }
+    if (message.timestampMs !== 0) {
+      writer.uint32(40).int64(message.timestampMs);
+    }
+    if (message.startTimeMs !== 0) {
+      writer.uint32(48).int64(message.startTimeMs);
+    }
+    if (message.endTimeMs !== 0) {
+      writer.uint32(56).int64(message.endTimeMs);
     }
     return writer;
   },
@@ -532,6 +686,27 @@ export const VADResult = {
 
           message.durationMs = reader.int32();
           continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.timestampMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.startTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.endTimeMs = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -547,6 +722,9 @@ export const VADResult = {
       confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
       energy: isSet(object.energy) ? globalThis.Number(object.energy) : 0,
       durationMs: isSet(object.durationMs) ? globalThis.Number(object.durationMs) : 0,
+      timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+      startTimeMs: isSet(object.startTimeMs) ? globalThis.Number(object.startTimeMs) : 0,
+      endTimeMs: isSet(object.endTimeMs) ? globalThis.Number(object.endTimeMs) : 0,
     };
   },
 
@@ -564,6 +742,15 @@ export const VADResult = {
     if (message.durationMs !== 0) {
       obj.durationMs = Math.round(message.durationMs);
     }
+    if (message.timestampMs !== 0) {
+      obj.timestampMs = Math.round(message.timestampMs);
+    }
+    if (message.startTimeMs !== 0) {
+      obj.startTimeMs = Math.round(message.startTimeMs);
+    }
+    if (message.endTimeMs !== 0) {
+      obj.endTimeMs = Math.round(message.endTimeMs);
+    }
     return obj;
   },
 
@@ -576,12 +763,25 @@ export const VADResult = {
     message.confidence = object.confidence ?? 0;
     message.energy = object.energy ?? 0;
     message.durationMs = object.durationMs ?? 0;
+    message.timestampMs = object.timestampMs ?? 0;
+    message.startTimeMs = object.startTimeMs ?? 0;
+    message.endTimeMs = object.endTimeMs ?? 0;
     return message;
   },
 };
 
 function createBaseVADStatistics(): VADStatistics {
-  return { currentEnergy: 0, currentThreshold: 0, ambientLevel: 0, recentAvg: 0, recentMax: 0 };
+  return {
+    currentEnergy: 0,
+    currentThreshold: 0,
+    ambientLevel: 0,
+    recentAvg: 0,
+    recentMax: 0,
+    totalSpeechSegments: 0,
+    totalSpeechDurationMs: 0,
+    averageEnergy: 0,
+    peakEnergy: 0,
+  };
 }
 
 export const VADStatistics = {
@@ -600,6 +800,18 @@ export const VADStatistics = {
     }
     if (message.recentMax !== 0) {
       writer.uint32(45).float(message.recentMax);
+    }
+    if (message.totalSpeechSegments !== 0) {
+      writer.uint32(48).int32(message.totalSpeechSegments);
+    }
+    if (message.totalSpeechDurationMs !== 0) {
+      writer.uint32(56).int64(message.totalSpeechDurationMs);
+    }
+    if (message.averageEnergy !== 0) {
+      writer.uint32(69).float(message.averageEnergy);
+    }
+    if (message.peakEnergy !== 0) {
+      writer.uint32(77).float(message.peakEnergy);
     }
     return writer;
   },
@@ -646,6 +858,34 @@ export const VADStatistics = {
 
           message.recentMax = reader.float();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.totalSpeechSegments = reader.int32();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.totalSpeechDurationMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 69) {
+            break;
+          }
+
+          message.averageEnergy = reader.float();
+          continue;
+        case 9:
+          if (tag !== 77) {
+            break;
+          }
+
+          message.peakEnergy = reader.float();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -662,6 +902,10 @@ export const VADStatistics = {
       ambientLevel: isSet(object.ambientLevel) ? globalThis.Number(object.ambientLevel) : 0,
       recentAvg: isSet(object.recentAvg) ? globalThis.Number(object.recentAvg) : 0,
       recentMax: isSet(object.recentMax) ? globalThis.Number(object.recentMax) : 0,
+      totalSpeechSegments: isSet(object.totalSpeechSegments) ? globalThis.Number(object.totalSpeechSegments) : 0,
+      totalSpeechDurationMs: isSet(object.totalSpeechDurationMs) ? globalThis.Number(object.totalSpeechDurationMs) : 0,
+      averageEnergy: isSet(object.averageEnergy) ? globalThis.Number(object.averageEnergy) : 0,
+      peakEnergy: isSet(object.peakEnergy) ? globalThis.Number(object.peakEnergy) : 0,
     };
   },
 
@@ -682,6 +926,18 @@ export const VADStatistics = {
     if (message.recentMax !== 0) {
       obj.recentMax = message.recentMax;
     }
+    if (message.totalSpeechSegments !== 0) {
+      obj.totalSpeechSegments = Math.round(message.totalSpeechSegments);
+    }
+    if (message.totalSpeechDurationMs !== 0) {
+      obj.totalSpeechDurationMs = Math.round(message.totalSpeechDurationMs);
+    }
+    if (message.averageEnergy !== 0) {
+      obj.averageEnergy = message.averageEnergy;
+    }
+    if (message.peakEnergy !== 0) {
+      obj.peakEnergy = message.peakEnergy;
+    }
     return obj;
   },
 
@@ -695,6 +951,10 @@ export const VADStatistics = {
     message.ambientLevel = object.ambientLevel ?? 0;
     message.recentAvg = object.recentAvg ?? 0;
     message.recentMax = object.recentMax ?? 0;
+    message.totalSpeechSegments = object.totalSpeechSegments ?? 0;
+    message.totalSpeechDurationMs = object.totalSpeechDurationMs ?? 0;
+    message.averageEnergy = object.averageEnergy ?? 0;
+    message.peakEnergy = object.peakEnergy ?? 0;
     return message;
   },
 };

@@ -6,8 +6,7 @@
  * Scenarios:
  *   1. set_stream_proto_callback(NULL handle) returns RAC_ERROR_INVALID_HANDLE.
  *   2. set_stream_proto_callback(non-NULL, callback, ud) returns RAC_SUCCESS
- *      when Protobuf is compiled in (RAC_HAVE_PROTOBUF), or
- *      RAC_ERROR_FEATURE_NOT_AVAILABLE otherwise.
+ *      both with Protobuf and with the hand-encoded fallback.
  *   3. Register a callback, drive the dispatcher with a synthetic token
  *      schedule, decode the bytes, assert:
  *        - per-token seq is monotonic and starts > 0
@@ -95,12 +94,8 @@ int test_invalid_handle_rejected() {
 
 int test_set_callback_returns_correct_status() {
     rac_result_t rc = rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
-#ifdef RAC_HAVE_PROTOBUF
     ASSERT_EQ(rc, RAC_SUCCESS);
     rac_llm_unset_stream_proto_callback(fake_handle());
-#else
-    ASSERT_EQ(rc, RAC_ERROR_FEATURE_NOT_AVAILABLE);
-#endif
     return 0;
 }
 

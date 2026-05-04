@@ -12,12 +12,14 @@ const workspaceRoot = path.resolve(__dir, '../../..');
 // SDK WASM directories (each backend ships its own WASM)
 const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
 const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm/sherpa');
+const webCoreSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts');
+const llamacppSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/index.ts');
+const onnxSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/src/index.ts');
+const vlmWorkerSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/workers/vlm-worker.ts');
 
-// proto-ts package.json has an `exports` field (./* → ./dist/*) so Node/Vite
-// can resolve subpath imports like `@runanywhere/proto-ts/llm_service` natively.
-// Phase C-prime: alias kept as a belt-and-suspenders fallback for the rare
-// edge cases where the workspace symlink isn't visible to the bundler.
-const protoTsDist = path.resolve(workspaceRoot, 'sdk/runanywhere-proto-ts/dist');
+// Local source alias for proto-ts keeps the example on package-root import
+// paths while avoiding direct `dist/*` imports in application code/config.
+const protoTsSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-proto-ts/src');
 
 /**
  * Vite plugin to copy WASM binaries into the build output.
@@ -59,12 +61,14 @@ export default defineConfig({
   resolve: {
     alias: [
       // Ensure all packages resolve to the same source modules during development.
-      // Without this, @runanywhere/web imports from llamacpp/onnx packages resolve
-      // to dist/ while main.ts imports from src/, creating duplicate singletons.
-      { find: '@runanywhere/web', replacement: path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts') },
-      // Map @runanywhere/proto-ts/<subpath> -> dist/<subpath>.js (proto-ts has no exports field)
-      { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: protoTsDist + '/$1.js' },
-      { find: '@runanywhere/proto-ts', replacement: protoTsDist + '/index.js' },
+      // Without this, package-root imports can resolve to dist/ and create
+      // duplicate singletons while the demo runs against local source.
+      { find: /^@runanywhere\/web-llamacpp\/vlm-worker(.*)$/, replacement: `${vlmWorkerSrc}$1` },
+      { find: /^@runanywhere\/web-llamacpp$/, replacement: llamacppSrc },
+      { find: /^@runanywhere\/web-onnx$/, replacement: onnxSrc },
+      { find: /^@runanywhere\/web$/, replacement: webCoreSrc },
+      { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: protoTsSrc + '/$1.ts' },
+      { find: '@runanywhere/proto-ts', replacement: protoTsSrc + '/index.ts' },
     ],
   },
   server: {
@@ -83,7 +87,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@runanywhere/web'],
+    exclude: ['@runanywhere/web', '@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
   },
   assetsInclude: ['**/*.wasm'],
 });

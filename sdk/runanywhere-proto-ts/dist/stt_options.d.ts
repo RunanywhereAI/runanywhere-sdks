@@ -1,5 +1,5 @@
 import _m0 from "protobufjs/minimal";
-import { AudioFormat } from "./model_types";
+import { AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -59,6 +59,23 @@ export interface STTConfiguration {
     sampleRate: number;
     enableVad: boolean;
     audioFormat: AudioFormat;
+    /**
+     * C ABI / legacy SDK config-level transcription defaults. These may be
+     * mirrored into STTOptions by adapters for per-call overrides.
+     */
+    enablePunctuation: boolean;
+    enableDiarization: boolean;
+    vocabularyList: string[];
+    /** 0 = backend/default */
+    maxAlternatives: number;
+    enableWordTimestamps: boolean;
+    /** Preferred framework for the component. Absent = auto. */
+    preferredFramework?: InferenceFramework | undefined;
+    /**
+     * Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
+     * that cannot be represented by STTLanguage's base-code enum.
+     */
+    languageCode?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -89,6 +106,21 @@ export interface STTOptions {
     enableWordTimestamps: boolean;
     /** 0 = backend default */
     beamSize: number;
+    /**
+     * Free-form BCP-47 language tag. When set, consumers should prefer this
+     * over the base-language enum above.
+     */
+    languageCode?: string | undefined;
+    /**
+     * Explicit language auto-detection flag for C ABI parity. Equivalent to
+     * language == STT_LANGUAGE_AUTO for generated-only consumers.
+     */
+    detectLanguage: boolean;
+    /** Per-call input audio hints mirrored from rac_stt_options_t. */
+    audioFormat: AudioFormat;
+    sampleRate: number;
+    /** Maximum number of alternatives to return. 0 = backend/default. */
+    maxAlternatives: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -173,6 +205,15 @@ export interface STTOutput {
     words: WordTimestamp[];
     alternatives: TranscriptionAlternative[];
     metadata?: TranscriptionMetadata | undefined;
+    /** Free-form detected language tag, preserving regional variants. */
+    languageCode?: string | undefined;
+    /** Wall-clock output timestamp in milliseconds since Unix epoch. */
+    timestampMs: number;
+    /**
+     * Audio duration in milliseconds for SDKs that expose duration directly.
+     * Often duplicates metadata.audio_length_ms.
+     */
+    durationMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -193,6 +234,12 @@ export interface STTPartialResult {
     text: string;
     isFinal: boolean;
     stability: number;
+    /** Additional partial-hypothesis fields carried by Dart/RN live streams. */
+    confidence: number;
+    language: STTLanguage;
+    timestampMs: number;
+    alternatives: TranscriptionAlternative[];
+    languageCode?: string | undefined;
 }
 export declare const STTConfiguration: {
     encode(message: STTConfiguration, writer?: _m0.Writer): _m0.Writer;

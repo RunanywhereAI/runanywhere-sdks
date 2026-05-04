@@ -6,8 +6,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-iOS%2013.0%2B%20%7C%20Android%207.0%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="iOS 13.0+ | Android 7.0+" />
-  <img src="https://img.shields.io/badge/Flutter-3.10%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.10+" />
-  <img src="https://img.shields.io/badge/Dart-3.0%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.0+" />
+  <img src="https://img.shields.io/badge/Flutter-3.24%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.24+" />
+  <img src="https://img.shields.io/badge/Dart-3.5%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.5+" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
 </p>
 
@@ -23,7 +23,7 @@
 
 Prerequisites:
 
-- Flutter 3.10+ and Dart 3+ on `PATH`.
+- Flutter 3.24+ and Dart 3.5+ on `PATH`.
 - Android Studio with Android SDK 24+, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
 - Xcode 15+ and CocoaPods for iOS simulator builds.
 - JDK 17 and enough disk for native artifacts and downloaded AI models.

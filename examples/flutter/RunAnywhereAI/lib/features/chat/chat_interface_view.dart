@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
-import 'package:runanywhere/runanywhere.dart' show ToolCallingOptions, ToolCallFormatNames;
+import 'package:runanywhere/runanywhere.dart'
+    show ToolCallingOptions, ToolCallFormatNames;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -132,7 +133,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final systemPrompt =
           systemPromptRaw.isNotEmpty ? systemPromptRaw : defaultSystemPrompt;
 
-      debugPrint('[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)');
+      debugPrint(
+          '[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)');
 
       // Check if tool calling is enabled and has registered tools
       final toolSettings = ToolSettingsViewModel.shared;
@@ -189,7 +191,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
     // Auto-detect the tool calling format based on the loaded model
     final format = _detectToolCallFormat(modelName);
-    debugPrint('Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
+    debugPrint(
+        'Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
 
     // Add empty assistant message
     final assistantMessage = ChatMessage(
@@ -224,12 +227,12 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       // Create ToolCallInfo from the result if tools were called
       ToolCallInfo? toolCallInfo;
-      debugPrint('📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
+      debugPrint(
+          '📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
-        final lastResult = result.toolResults.isNotEmpty
-            ? result.toolResults.last
-            : null;
+        final lastResult =
+            result.toolResults.isNotEmpty ? result.toolResults.last : null;
         debugPrint('📊 Creating ToolCallInfo for: ${lastCall.name}');
 
         final hasError = lastResult != null && lastResult.error.isNotEmpty;
@@ -242,7 +245,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           success: lastResult != null && !hasError,
           error: hasError ? lastResult.error : null,
         );
-        debugPrint('📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
+        debugPrint(
+            '📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
       } else {
         debugPrint('📊 No tool calls in result - badge will NOT show');
       }
@@ -299,8 +303,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     try {
       // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
       // collect token text off each non-terminal event.
-      final eventStream = sdk.RunAnywhereSDK.instance.llm
-          .generateStream(prompt, options);
+      final eventStream =
+          sdk.RunAnywhereSDK.instance.llm.generateStream(prompt, options);
 
       await for (final event in eventStream) {
         if (event.isFinal) {
@@ -374,8 +378,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final modelName = _loadedModelName;
 
     try {
-      final result = await sdk.RunAnywhereSDK.instance.llm
-          .generate(prompt, options);
+      final result =
+          await sdk.RunAnywhereSDK.instance.llm.generate(prompt, options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -441,7 +445,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat'),
-      actions: [
+        actions: [
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: _showConversationHistory,
@@ -542,7 +546,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   /// Map SDK InferenceFramework to LLMFramework (identity — both are the same type).
   LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) =>
-      framework ?? LLMFramework.unknown;
+      framework ?? LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 
   Widget _buildModelStatusBanner() {
     // Use local state synced from SDK (matches Swift pattern)
@@ -722,8 +726,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                        borderRadius: BorderRadius.circular(
+                            AppSpacing.cornerRadiusBubble),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.large,

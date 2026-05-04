@@ -7,25 +7,57 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
+import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.CurrentModelResult
+import ai.runanywhere.proto.v1.ArchiveArtifact as ProtoArchiveArtifact
+import ai.runanywhere.proto.v1.ModelArtifactType as ProtoModelArtifactType
+import ai.runanywhere.proto.v1.ModelFileDescriptor as ProtoModelFileDescriptor
+import ai.runanywhere.proto.v1.ModelInfo as ProtoModelInfo
+import ai.runanywhere.proto.v1.ModelInfoList as ProtoModelInfoList
+import ai.runanywhere.proto.v1.ModelQuery as ProtoModelQuery
+import ai.runanywhere.proto.v1.MultiFileArtifact as ProtoMultiFileArtifact
+import ai.runanywhere.proto.v1.SingleFileArtifact as ProtoSingleFileArtifact
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
+import ai.runanywhere.proto.v1.ModelLoadRequest
+import ai.runanywhere.proto.v1.ModelLoadResult
+import ai.runanywhere.proto.v1.ModelUnloadRequest
+import ai.runanywhere.proto.v1.ModelUnloadResult
+import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownloadProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
+import ai.runanywhere.proto.v1.DownloadCancelRequest
+import ai.runanywhere.proto.v1.DownloadCancelResult
+import ai.runanywhere.proto.v1.DownloadPlanRequest
+import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.DownloadStage
+import ai.runanywhere.proto.v1.DownloadResumeRequest
+import ai.runanywhere.proto.v1.DownloadResumeResult
 import ai.runanywhere.proto.v1.DownloadState
+import ai.runanywhere.proto.v1.DownloadStartRequest
+import ai.runanywhere.proto.v1.DownloadStartResult
+import ai.runanywhere.proto.v1.DownloadSubscribeRequest
+import com.runanywhere.sdk.public.extensions.Models.ArchiveStructure
+import com.runanywhere.sdk.public.extensions.Models.ArchiveType
+import com.runanywhere.sdk.public.extensions.Models.ExpectedModelFiles
+import com.runanywhere.sdk.public.extensions.Models.ModelArtifactType
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.public.extensions.Models.ModelFormat
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import com.runanywhere.sdk.public.extensions.Models.ModelSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -67,58 +99,8 @@ private val modelsLogger = SDKLogger.models
  */
 internal actual fun registerModelInternal(modelInfo: ModelInfo) {
     try {
-        // Convert public ModelInfo to bridge ModelInfo
-        // CRITICAL: The framework field must be set correctly for C++ can_handle() to work
-        val bridgeModelInfo =
-            CppBridgeModelRegistry.ModelInfo(
-                modelId = modelInfo.id,
-                name = modelInfo.name,
-                category =
-                    when (modelInfo.category) {
-                        ModelCategory.LANGUAGE -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
-                        ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
-                        ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
-                        ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
-                        ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
-                        ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
-                        ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
-                        ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
-                    },
-                format =
-                    when (modelInfo.format) {
-                        ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
-                        ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
-                        ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
-                        ModelFormat.BIN -> CppBridgeModelRegistry.ModelFormat.BIN
-                        ModelFormat.QNN_CONTEXT -> CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT
-                        else -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
-                    },
-                // CRITICAL: Map InferenceFramework to C++ framework constant
-                framework =
-                    when (modelInfo.framework) {
-                        InferenceFramework.LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
-                        InferenceFramework.ONNX -> CppBridgeModelRegistry.Framework.ONNX
-                        InferenceFramework.SHERPA -> CppBridgeModelRegistry.Framework.SHERPA
-                        InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
-                        InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
-                        InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
-                        InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
-                        InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
-                        InferenceFramework.GENIE -> CppBridgeModelRegistry.Framework.GENIE
-                        InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
-                    },
-                downloadUrl = modelInfo.downloadURL,
-                localPath = modelInfo.localPath,
-                downloadSize = modelInfo.downloadSize ?: 0,
-                contextLength = modelInfo.contextLength ?: 0,
-                supportsThinking = modelInfo.supportsThinking,
-                supportsLora = modelInfo.supportsLora,
-                description = modelInfo.description,
-                status = CppBridgeModelRegistry.ModelStatus.AVAILABLE,
-            )
-
-        // Save directly to C++ registry - this is where C++ backends look for models
-        CppBridgeModelRegistry.save(bridgeModelInfo)
+        // Save directly to C++ registry - this is where C++ backends look for models.
+        CppBridgeModelRegistry.save(modelInfo.toRegistryProto())
 
         // Also add to the in-memory cache for immediate availability from Kotlin
         addToModelCache(modelInfo)
@@ -171,12 +153,7 @@ actual fun getMultiFileDescriptors(modelId: String): List<ModelFileDescriptor>? 
     }
 }
 
-// Convert CppBridgeModelRegistry.ModelInfo to public ModelInfo
-private fun CppBridgeModelRegistry.ModelInfo.toPublicModelInfo(): ModelInfo {
-    return bridgeModelToPublic(this)
-}
-
-private fun getAllBridgeModels(): List<CppBridgeModelRegistry.ModelInfo> {
+private fun getAllBridgeModels(): List<ProtoModelInfo> {
     // Get all models directly from C++ registry
     return CppBridgeModelRegistry.getAll()
 }
@@ -206,12 +183,14 @@ actual suspend fun RunAnywhere.availableModels(): List<ModelInfo> {
     // Get models from C++ bridge
     val bridgeModels = getAllBridgeModels().map { it.toPublicModelInfo() }
 
-    // Merge both lists, with registered models taking precedence
+    // Merge both lists, with the C++ registry taking precedence. The Kotlin
+    // cache is a temporary fallback for descriptors not yet preserved by the
+    // registry ABI; it must not override native download/lifecycle state.
     val allModels = mutableMapOf<String, ModelInfo>()
-    for (model in bridgeModels) {
+    for (model in registeredModelList) {
         allModels[model.id] = model
     }
-    for (model in registeredModelList) {
+    for (model in bridgeModels) {
         allModels[model.id] = model
     }
 
@@ -228,9 +207,9 @@ private fun syncRegisteredModelsWithBridge() {
         for (model in registeredModels) {
             // Check bridge registry for updated info (especially localPath)
             val bridgeModel = CppBridgeModelRegistry.get(model.id)
-            if (bridgeModel != null && bridgeModel.localPath != null) {
+            if (bridgeModel != null && bridgeModel.local_path.isNotEmpty()) {
                 // Model was found on disk, update local path (isDownloaded is computed from localPath)
-                updatedModels.add(model.copy(localPath = bridgeModel.localPath))
+                updatedModels.add(model.copy(localPath = bridgeModel.local_path))
             } else {
                 updatedModels.add(model)
             }
@@ -244,25 +223,14 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    val type =
-        when (category) {
-            ModelCategory.LANGUAGE -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
-            ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
-            ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
-            ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
-            ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
-            ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
-            ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
-            ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
-        }
-    return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
+    return CppBridgeModelRegistry.getModelsByCategory(category.toProto()).map { it.toPublicModelInfo() }
 }
 
 actual suspend fun RunAnywhere.downloadedModels(): List<ModelInfo> {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    return CppBridgeModelRegistry.getDownloaded().map { bridgeModelToPublic(it) }
+    return CppBridgeModelRegistry.getDownloaded().map { it.toPublicModelInfo() }
 }
 
 actual suspend fun RunAnywhere.model(modelId: String): ModelInfo? {
@@ -271,53 +239,226 @@ actual suspend fun RunAnywhere.model(modelId: String): ModelInfo? {
     }
     // Get model from C++ registry
     val bridgeModel = CppBridgeModelRegistry.get(modelId) ?: return null
-    return bridgeModelToPublic(bridgeModel)
+    return bridgeModel.toPublicModelInfo()
 }
 
-// Convert CppBridgeModelRegistry.ModelInfo to public ModelInfo
-private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): ModelInfo {
+actual suspend fun RunAnywhere.queryModels(query: ProtoModelQuery): ProtoModelInfoList {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeModelRegistry.query(query)
+}
+
+actual suspend fun RunAnywhere.downloadedModelsProto(): ProtoModelInfoList {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeModelRegistry.listDownloaded()
+}
+
+actual suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return withContext(Dispatchers.IO) {
+        CppBridgeModelLifecycleProto.load(request)
+            ?: throw SDKException.model("Native model lifecycle load proto API unavailable")
+    }
+}
+
+actual suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeModelLifecycleProto.unload(request)
+        ?: throw SDKException.model("Native model lifecycle unload proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.currentModel(request: CurrentModelRequest): CurrentModelResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeModelLifecycleProto.currentModel(request)
+        ?: throw SDKException.model("Native current model proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.componentLifecycleSnapshot(
+    component: SDKComponent,
+): ComponentLifecycleSnapshot {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeModelLifecycleProto.snapshot(component)
+        ?: throw SDKException.model("Native component lifecycle snapshot proto API unavailable")
+}
+
+private fun ProtoModelInfo.toPublicModelInfo(): ModelInfo {
+    val now = System.currentTimeMillis()
     return ModelInfo(
-        id = bridge.modelId,
-        name = bridge.name,
-        category =
-            when (bridge.category) {
-                CppBridgeModelRegistry.ModelCategory.LANGUAGE -> ModelCategory.LANGUAGE
-                CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
-                CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
-                CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
-                CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
-                CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
-                CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
-                else -> ModelCategory.LANGUAGE
-            },
-        format =
-            when (bridge.format) {
-                CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
-                CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
-                CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
-                CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
-                CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT -> ModelFormat.QNN_CONTEXT
-                else -> ModelFormat.UNKNOWN
-            },
-        framework =
-            when (bridge.framework) {
-                CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
-                CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
-                CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.SHERPA
-                CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
-                CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
-                CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
-                else -> InferenceFramework.UNKNOWN
-            },
-        downloadURL = bridge.downloadUrl,
-        localPath = bridge.localPath,
-        downloadSize = if (bridge.downloadSize > 0) bridge.downloadSize else null,
-        contextLength = if (bridge.contextLength > 0) bridge.contextLength else null,
-        supportsThinking = bridge.supportsThinking,
-        supportsLora = bridge.supportsLora,
-        description = bridge.description,
+        id = id,
+        name = name,
+        category = ModelCategory.fromProto(category),
+        format = ModelFormat.fromProto(format),
+        downloadURL = download_url.takeIf { it.isNotEmpty() },
+        localPath = local_path.takeIf { it.isNotEmpty() },
+        artifactType = toPublicArtifactType(),
+        downloadSize = if (download_size_bytes > 0) download_size_bytes else null,
+        framework = InferenceFramework.fromProto(framework),
+        contextLength = if (context_length > 0) context_length else null,
+        supportsThinking = supports_thinking,
+        supportsLora = supports_lora,
+        description = description.takeIf { it.isNotEmpty() },
+        source = ModelSource.fromProto(source),
+        createdAt = created_at_unix_ms.takeIf { it > 0 } ?: now,
+        updatedAt = updated_at_unix_ms.takeIf { it > 0 } ?: now,
     )
 }
+
+private fun ModelInfo.toRegistryProto(): ProtoModelInfo {
+    val artifact = artifactType.toRegistryArtifactFields()
+    return ProtoModelInfo(
+        id = id,
+        name = name,
+        category = category.toProto(),
+        format = format.toProto(),
+        framework = framework.toProto(),
+        download_url = downloadURL.orEmpty(),
+        local_path = localPath.orEmpty(),
+        download_size_bytes = downloadSize ?: 0,
+        context_length = contextLength ?: 0,
+        supports_thinking = supportsThinking,
+        supports_lora = supportsLora,
+        description = description.orEmpty(),
+        source = source.toProto(),
+        created_at_unix_ms = createdAt,
+        updated_at_unix_ms = updatedAt,
+        single_file = artifact.singleFile,
+        archive = artifact.archive,
+        multi_file = artifact.multiFile,
+        custom_strategy_id = artifact.customStrategyId,
+        built_in = artifact.builtIn,
+        artifact_type = artifact.artifactType,
+    )
+}
+
+private data class RegistryArtifactFields(
+    val singleFile: ProtoSingleFileArtifact? = null,
+    val archive: ProtoArchiveArtifact? = null,
+    val multiFile: ProtoMultiFileArtifact? = null,
+    val customStrategyId: String? = null,
+    val builtIn: Boolean? = null,
+    val artifactType: ProtoModelArtifactType? = null,
+)
+
+private fun ModelArtifactType.toRegistryArtifactFields(): RegistryArtifactFields =
+    when (this) {
+        is ModelArtifactType.SingleFile ->
+            RegistryArtifactFields(
+                singleFile = expectedFiles.toProtoSingleFileArtifact(),
+                artifactType = ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+            )
+        is ModelArtifactType.Archive ->
+            RegistryArtifactFields(
+                archive =
+                    ProtoArchiveArtifact(
+                        type = archiveType.toProto(),
+                        structure = structure.toProto(),
+                        required_patterns = expectedFiles.requiredPatterns,
+                        optional_patterns = expectedFiles.optionalPatterns,
+                    ),
+                artifactType = archiveType.toProtoArtifactType(),
+            )
+        is ModelArtifactType.MultiFile ->
+            RegistryArtifactFields(
+                multiFile = ProtoMultiFileArtifact(files = files.map { it.toProtoFileDescriptor() }),
+                artifactType = ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+            )
+        is ModelArtifactType.Custom ->
+            RegistryArtifactFields(
+                customStrategyId = strategyId,
+                artifactType = ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM,
+            )
+        ModelArtifactType.BuiltIn ->
+            RegistryArtifactFields(builtIn = true)
+    }
+
+private fun ExpectedModelFiles.toProtoSingleFileArtifact(): ProtoSingleFileArtifact =
+    ProtoSingleFileArtifact(
+        required_patterns = requiredPatterns,
+        optional_patterns = optionalPatterns,
+    )
+
+private fun ArchiveType.toProtoArtifactType(): ProtoModelArtifactType? =
+    when (this) {
+        ArchiveType.ZIP -> ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
+        ArchiveType.TAR_GZ -> ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+        ArchiveType.TAR_BZ2,
+        ArchiveType.TAR_XZ,
+        -> null
+    }
+
+private fun ModelFileDescriptor.toProtoFileDescriptor(): ProtoModelFileDescriptor =
+    ProtoModelFileDescriptor(
+        url = url,
+        filename = filename,
+        is_required = isRequired,
+        checksum = checksumSha256,
+    )
+
+private fun ProtoModelInfo.toPublicArtifactType(): ModelArtifactType {
+    single_file?.let {
+        return ModelArtifactType.SingleFile(
+            expectedFiles =
+                ExpectedModelFiles(
+                    requiredPatterns = it.required_patterns,
+                    optionalPatterns = it.optional_patterns,
+                ),
+        )
+    }
+    archive?.let {
+        return ModelArtifactType.Archive(
+            archiveType = ArchiveType.fromProto(it.type) ?: ArchiveType.from(download_url) ?: ArchiveType.TAR_GZ,
+            structure = ArchiveStructure.fromProto(it.structure),
+            expectedFiles =
+                ExpectedModelFiles(
+                    requiredPatterns = it.required_patterns,
+                    optionalPatterns = it.optional_patterns,
+                ),
+        )
+    }
+    multi_file?.let {
+        return ModelArtifactType.MultiFile(files = it.files.map { file -> file.toPublicFileDescriptor() })
+    }
+    custom_strategy_id?.let {
+        return ModelArtifactType.Custom(strategyId = it)
+    }
+    if (built_in == true) {
+        return ModelArtifactType.BuiltIn
+    }
+
+    return when (artifact_type) {
+        ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE ->
+            ModelArtifactType.Archive(ArchiveType.ZIP, ArchiveStructure.UNKNOWN)
+        ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE ->
+            ModelArtifactType.Archive(ArchiveType.TAR_GZ, ArchiveStructure.UNKNOWN)
+        ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY ->
+            ModelArtifactType.MultiFile(emptyList())
+        ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM ->
+            ModelArtifactType.Custom("")
+        ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+        ProtoModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED,
+        null,
+        -> ModelArtifactType.infer(download_url.takeIf { it.isNotEmpty() }, ModelFormat.fromProto(format))
+    }
+}
+
+private fun ProtoModelFileDescriptor.toPublicFileDescriptor(): ModelFileDescriptor =
+    ModelFileDescriptor(
+        url = url,
+        filename = filename,
+        isRequired = is_required,
+        checksumSha256 = checksum,
+    )
 
 /**
  * Download a model by ID.
@@ -353,7 +494,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         // Resolve model info: registered-first, then remote catalog fallback.
         val modelInfo =
             getRegisteredModels().find { it.id == modelId }
-                ?: getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
+                ?: getAllBridgeModels().find { it.id == modelId }?.toPublicModelInfo()
                 ?: throw SDKException.model("Model '$modelId' not found in registry")
 
         val downloadUrl =
@@ -434,6 +575,79 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
             downloadLogger.debug("Download flow closed for: $modelId")
         }
     }
+
+actual suspend fun RunAnywhere.planDownload(request: DownloadPlanRequest): DownloadPlanResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeDownloadProto.plan(request)
+        ?: throw SDKException.download("Native download plan proto API unavailable")
+}
+
+actual fun RunAnywhere.startDownload(request: DownloadStartRequest): Flow<DownloadProgress> =
+    callbackFlow {
+        if (!isInitialized) {
+            close(SDKException.notInitialized("SDK not initialized"))
+            return@callbackFlow
+        }
+
+        var taskId = request.plan?.model_id.orEmpty()
+        CppBridgeDownloadProto.setProgressCallback { progress ->
+            if (taskId.isBlank() || progress.model_id == request.model_id || progress.task_id == taskId) {
+                trySend(progress).isSuccess
+            } else {
+                true
+            }
+        }
+
+        val result =
+            CppBridgeDownloadProto.start(request)
+                ?: run {
+                    close(SDKException.download("Native download start proto API unavailable"))
+                    return@callbackFlow
+                }
+        taskId = result.task_id
+        result.initial_progress?.let { trySend(it) }
+        if (!result.accepted) {
+            close(SDKException.download(result.error_message.ifBlank { "Download was not accepted" }))
+            return@callbackFlow
+        }
+
+        awaitClose {
+            CppBridgeDownloadProto.setProgressCallback(null)
+        }
+    }
+
+actual suspend fun RunAnywhere.startDownloadProto(request: DownloadStartRequest): DownloadStartResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeDownloadProto.start(request)
+        ?: throw SDKException.download("Native download start proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.cancelDownload(request: DownloadCancelRequest): DownloadCancelResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeDownloadProto.cancel(request)
+        ?: throw SDKException.download("Native download cancel proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.resumeDownload(request: DownloadResumeRequest): DownloadResumeResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeDownloadProto.resume(request)
+        ?: throw SDKException.download("Native download resume proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.downloadProgress(request: DownloadSubscribeRequest): DownloadProgress? {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeDownloadProto.pollProgress(request)
+}
 
 /**
  * Unified download helper used by all model kinds (single-file, multi-file/VLM,
@@ -832,7 +1046,7 @@ actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
         throw SDKException.notInitialized("SDK not initialized")
     }
     val model = CppBridgeModelRegistry.get(modelId) ?: return false
-    return model.localPath != null && model.localPath.isNotEmpty()
+    return model.local_path.isNotEmpty()
 }
 
 actual suspend fun RunAnywhere.deleteModel(modelId: String) {
@@ -849,13 +1063,13 @@ actual suspend fun RunAnywhere.deleteAllModels() {
     }
     val downloaded = CppBridgeModelRegistry.getDownloaded()
     downloaded.forEach { model ->
-        val localPath = model.localPath
-        if (!localPath.isNullOrEmpty()) {
+        val localPath = model.local_path
+        if (localPath.isNotEmpty()) {
             runCatching { File(localPath).deleteRecursively() }
-                .onFailure { modelsLogger.warning("Failed to delete ${model.modelId} at $localPath: ${it.message}") }
+                .onFailure { modelsLogger.warning("Failed to delete ${model.id} at $localPath: ${it.message}") }
         }
-        CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, model.modelId)
-        CppBridgeModelRegistry.updateDownloadStatus(model.modelId, null)
+        CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, model.id)
+        CppBridgeModelRegistry.updateDownloadStatus(model.id, null)
     }
     synchronized(modelCacheLock) {
         registeredModels.replaceAll { it.copy(localPath = null) }
@@ -886,14 +1100,11 @@ actual suspend fun RunAnywhere.loadModel(modelId: String) {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    val model =
-        CppBridgeModelRegistry.get(modelId)
-            ?: throw SDKException.model("Model '$modelId' not found in registry")
-    // Route to the type-specific loader based on registered category.
-    when (model.category) {
-        CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> loadSTTModel(modelId)
-        CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> loadTTSModel(modelId)
-        else -> loadLLMModel(modelId)
+    val result = loadModel(ModelLoadRequest(model_id = modelId))
+    if (!result.success) {
+        throw SDKException.model(
+            result.error_message.ifBlank { "Failed to load model '$modelId'" },
+        )
     }
 }
 
@@ -907,13 +1118,21 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
             ?: throw SDKException.model("Model '$modelId' not found in registry")
 
     val localPath =
-        model.localPath
+        model.local_path.takeIf { it.isNotEmpty() }
             ?: throw SDKException.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
-    if (result != 0) {
-        throw SDKException.llm("Failed to load LLM model '$modelId' (error code: $result)")
+    val result =
+        loadModel(
+            ModelLoadRequest(
+                model_id = modelId,
+                category = ProtoModelCategory.MODEL_CATEGORY_LANGUAGE,
+                framework = model.framework,
+            ),
+        )
+    if (!result.success) {
+        throw SDKException.llm(
+            result.error_message.ifBlank { "Failed to load LLM model '$modelId' from $localPath" },
+        )
     }
 }
 
@@ -921,32 +1140,37 @@ actual suspend fun RunAnywhere.unloadLLMModel() {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    CppBridgeLLM.unload()
+    unloadModel(ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_LANGUAGE))
 }
 
 actual val RunAnywhere.isLLMModelLoaded: Boolean
-    get() = CppBridgeLLM.isLoaded
+    get() =
+        CppBridgeModelLifecycleProto.snapshot(SDKComponent.SDK_COMPONENT_LLM)
+            ?.let {
+                it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                    it.model_id.isNotEmpty()
+            } ?: false
 
 // Round 1 KOTLIN (G-A8): `currentLLMModelId` deleted — callers use
 // `currentLLMModel?.id` for the legacy ID-only access pattern.
 
 actual val RunAnywhere.currentLLMModel: ModelInfo?
     get() {
-        val modelId = CppBridgeLLM.getLoadedModelId() ?: return null
-        // Look up in registered models first
-        val registeredModel = getRegisteredModels().find { it.id == modelId }
-        if (registeredModel != null) return registeredModel
-        // Fall back to bridge models
-        return getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
+        val current =
+            CppBridgeModelLifecycleProto.currentModel(
+                CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_LANGUAGE),
+            ) ?: return null
+        current.model?.toPublicModelInfo()?.let { return it }
+        val modelId = current.model_id.takeIf { it.isNotEmpty() } ?: return null
+        return getRegisteredModels().find { it.id == modelId }
     }
 
 actual suspend fun RunAnywhere.currentSTTModel(): ModelInfo? {
-    val modelId = CppBridgeSTT.getLoadedModelId() ?: return null
-    // Look up in registered models first
-    val registeredModel = getRegisteredModels().find { it.id == modelId }
-    if (registeredModel != null) return registeredModel
-    // Fall back to bridge models
-    return getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
+    val current =
+        currentModel(CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION))
+    current.model?.toPublicModelInfo()?.let { return it }
+    val modelId = current.model_id.takeIf { it.isNotEmpty() } ?: return null
+    return getRegisteredModels().find { it.id == modelId }
 }
 
 actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
@@ -959,49 +1183,20 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
             ?: throw SDKException.model("Model '$modelId' not found in registry")
 
     val localPath =
-        model.localPath
+        model.local_path.takeIf { it.isNotEmpty() }
             ?: throw SDKException.model("Model '$modelId' is not downloaded")
 
-    // Run native load on IO thread to avoid ANR and native crashes on main thread
     val result =
-        withContext(Dispatchers.IO) {
-            val dir = File(localPath)
-            if (!dir.exists()) {
-                return@withContext -1
-            }
-            if (!dir.isDirectory) {
-                modelsLogger.error("STT model path is not a directory (expected extracted model dir): $localPath")
-                return@withContext -1
-            }
-            // C++ backend (sherpa_backend.cpp SherpaSTT::load_model) globs the
-            // directory for *encoder*.onnx, *decoder*.onnx, *tokens*.txt — the
-            // Sherpa-ONNX upstream archives use prefixed names like
-            // `tiny.en-encoder.onnx` / `tiny.en-encoder.int8.onnx`. We match
-            // the same substring rule here so the pre-check accepts every
-            // archive layout the native loader can actually consume.
-            val files = dir.listFiles().orEmpty()
-            val hasEncoder = files.any { it.name.contains("encoder") && it.name.endsWith(".onnx") }
-            val hasDecoder = files.any { it.name.contains("decoder") && it.name.endsWith(".onnx") }
-            val hasTokens = files.any { it.name == "tokens.txt" || (it.name.contains("tokens") && it.name.endsWith(".txt")) }
-            val hasSingleFileCtc = files.any { it.name == "model.onnx" || it.name == "model.int8.onnx" }
-            // Whisper / transducer models need both encoder + decoder; NeMo CTC
-            // ships a single `model.onnx` (or quantized variant) with tokens.
-            val hasUsableLayout = (hasEncoder && hasDecoder && hasTokens) || (hasSingleFileCtc && hasTokens)
-            if (!hasUsableLayout) {
-                modelsLogger.error(
-                    "STT model directory missing required files at $localPath. " +
-                        "Expected either (*encoder*.onnx + *decoder*.onnx + *tokens*.txt) " +
-                        "or (model.onnx|model.int8.onnx + tokens.txt). Re-download the model.",
-                )
-                return@withContext -1
-            }
-            CppBridgeSTT.loadModel(localPath, modelId, model.name)
-        }
-    if (result != 0) {
+        loadModel(
+            ModelLoadRequest(
+                model_id = modelId,
+                category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+                framework = model.framework,
+            ),
+        )
+    if (!result.success) {
         throw SDKException.stt(
-            "Failed to load STT model '$modelId' (error code: $result). " +
-                "Ensure the model is extracted and contains either an *encoder*.onnx + *decoder*.onnx + *tokens*.txt " +
-                "set (Whisper / transducer) or a model.onnx + tokens.txt pair (NeMo CTC).",
+            result.error_message.ifBlank { "Failed to load STT model '$modelId' from $localPath" },
         )
     }
 }
@@ -1109,6 +1304,7 @@ private data class ModelAssignmentDto(
                     CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
                     CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
                     CppBridgeModelRegistry.ModelCategory.EMBEDDING -> ModelCategory.EMBEDDING
+                    CppBridgeModelRegistry.ModelCategory.VOICE_ACTIVITY_DETECTION -> ModelCategory.VOICE_ACTIVITY_DETECTION
                     else -> ModelCategory.LANGUAGE
                 },
             format =
@@ -1124,8 +1320,12 @@ private data class ModelAssignmentDto(
                 when (framework) {
                     CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
                     CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
+                    CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.SHERPA
                     CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
                     CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
+                    CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.FLUID_AUDIO
+                    CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.BUILT_IN
+                    CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.NONE
                     CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
                     else -> InferenceFramework.UNKNOWN
                 },

@@ -32,12 +32,7 @@ class RunAnywhereLoRACapability {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeLora.shared.loadAdapter(config.adapterPath, config.scale);
-    return LoRAAdapterInfo(
-      adapterPath: config.adapterPath,
-      scale: config.scale,
-      applied: true,
-    );
+    return DartBridgeLora.shared.loadAdapterProto(config);
   }
 
   /// Remove a specific LoRA adapter by id (path).
@@ -45,7 +40,9 @@ class RunAnywhereLoRACapability {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeLora.shared.removeAdapter(adapterId);
+    DartBridgeLora.shared.removeAdapterProto(
+      LoRAAdapterConfig(adapterId: adapterId, adapterPath: adapterId),
+    );
   }
 
   /// Remove all LoRA adapters.
@@ -53,7 +50,7 @@ class RunAnywhereLoRACapability {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeLora.shared.clearAdapters();
+    DartBridgeLora.shared.clearAdaptersProto();
   }
 
   /// Currently-loaded LoRA adapters; empty when none.
@@ -63,20 +60,18 @@ class RunAnywhereLoRACapability {
   }
 
   /// Whether the current backend supports the given adapter for [modelId].
-  Future<LoRACompatibilityResult> checkCompatibility(
+  Future<LoraCompatibilityResult> checkCompatibility(
     String adapterId,
     String modelId,
   ) async {
     if (!SdkState.shared.isInitialized) {
-      return const LoRACompatibilityResult(
+      return LoraCompatibilityResult(
         isCompatible: false,
         errorMessage: 'SDK not initialized',
       );
     }
-    final raw = DartBridgeLora.shared.checkCompatibility(adapterId);
-    return LoRACompatibilityResult(
-      isCompatible: raw.isCompatible,
-      errorMessage: raw.errorMessage,
+    return DartBridgeLora.shared.checkCompatibilityProto(
+      LoRAAdapterConfig(adapterId: adapterId, adapterPath: adapterId),
     );
   }
 
@@ -126,14 +121,4 @@ class RunAnywhereLoRACapability {
             ))
         .toList();
   }
-}
-
-/// Compatibility result re-exported alongside proto types.
-class LoRACompatibilityResult {
-  final bool isCompatible;
-  final String errorMessage;
-  const LoRACompatibilityResult({
-    required this.isCompatible,
-    this.errorMessage = '',
-  });
 }

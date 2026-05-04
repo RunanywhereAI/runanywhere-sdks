@@ -54,7 +54,7 @@ export async function loadModelByCategory(modelId: string): Promise<void> {
     case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
       await loadTTSModel(modelId);
       return;
-    case ModelCategory.MODEL_CATEGORY_AUDIO: {
+    case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION: {
       const vadPath = await getModelPath(modelId);
       if (!vadPath) throw SDKException.modelNotFound(modelId);
       await loadVADModel(vadPath);

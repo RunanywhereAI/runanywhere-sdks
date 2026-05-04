@@ -73,6 +73,7 @@ extension CppBridge {
         // The lock guards an opaque manager pointer; Swift `OpaquePointer` is
         // a value type so the locked state holds it directly.
         private static let manager = OSAllocatedUnfairLock<OpaquePointer?>(initialState: nil)
+        private static let activeEnvironment = OSAllocatedUnfairLock<SDKEnvironment?>(initialState: nil)
 
         /// Initialize telemetry manager
         static func initialize(environment: SDKEnvironment) {
@@ -81,6 +82,8 @@ extension CppBridge {
             if let existing {
                 rac_telemetry_manager_destroy(existing)
             }
+
+            activeEnvironment.withLock { $0 = environment }
 
             let deviceId = DeviceIdentity.persistentUUID
             let deviceInfo = DeviceInfo.current
@@ -109,6 +112,8 @@ extension CppBridge {
 
         /// Shutdown telemetry manager
         static func shutdown() {
+            activeEnvironment.withLock { $0 = nil }
+
             let mgr = manager.withLock { current -> OpaquePointer? in
                 let snapshot = current
                 current = nil
@@ -135,6 +140,10 @@ extension CppBridge {
             guard let mgr = manager.withLock({ $0 }) else { return }
             rac_telemetry_manager_flush(mgr)
         }
+
+        static var environment: SDKEnvironment? {
+            activeEnvironment.withLock { $0 }
+        }
     }
 }
 
@@ -159,11 +168,23 @@ private func telemetryHttpCallback(
 
 private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool) async {
     let logger = SDKLogger(category: "CppBridge.Telemetry")
+    let environment = CppBridge.Telemetry.environment
+
+    if environment == .development && !CppBridge.DevConfig.hasUsableSupabaseConfig {
+        logger.debug("Skipping telemetry/device registration: no usable config")
+        return
+    }
+
+    let hasUsableConfiguration = await CppBridge.HTTP.hasUsableConfiguration
+    guard hasUsableConfiguration else {
+        logger.debug("Skipping telemetry/device registration: no usable config")
+        return
+    }
 
     // Check if HTTP is configured before attempting request
     let isConfigured = await CppBridge.HTTP.shared.isConfigured
     guard isConfigured else {
-        logger.debug("HTTP not configured, cannot send telemetry to \(path). Events will be queued.")
+        logger.debug("Skipping telemetry/device registration: no usable config")
         return
     }
 

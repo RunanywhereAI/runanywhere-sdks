@@ -110,7 +110,10 @@ rac_add_engine_plugin(genie
 if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_genie PRIVATE log)
     target_compile_options(rac_backend_genie PRIVATE -O3 -ffunction-sections -fdata-sections)
-    target_link_options(rac_backend_genie PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    target_link_options(rac_backend_genie PRIVATE
+        -Wl,--gc-sections
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
 endif()
 
 message(STATUS "Genie Backend Configuration:")

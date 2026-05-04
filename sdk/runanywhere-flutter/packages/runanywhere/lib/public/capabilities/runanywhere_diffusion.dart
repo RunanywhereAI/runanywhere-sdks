@@ -1,36 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Wave 2: Diffusion namespace extension. Mirrors Swift's
-// `RunAnywhere+Diffusion.swift`. Each public method now calls the
-// `rac_diffusion_*` C ABI through `lib/native/dart_bridge_diffusion.dart`.
-// If commons returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` (Apple-only
-// engine), the SDKException naturally propagates — we no longer
-// pre-empt the call.
-//
-// §15 type-discipline: all `dart:ffi` work lives in the native bridge;
-// this capability holds no FFI types.
+// Diffusion capability using the generated-proto C++ service ABI.
 
-import 'dart:typed_data';
-
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
     show
+        DiffusionCapabilities,
         DiffusionConfiguration,
         DiffusionGenerationOptions,
-        DiffusionResult,
-        DiffusionCapabilities,
-        DiffusionProgress;
+        DiffusionProgress,
+        DiffusionResult;
 import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_diffusion.dart';
-import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
+import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 /// Diffusion (image generation) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.diffusion`. Mirrors Swift
-/// `RunAnywhere.Diffusion`. Wired to the `rac_diffusion_*` C ABI; if
-/// the underlying engine isn't available the C layer returns
-/// `RAC_ERROR_FEATURE_NOT_AVAILABLE` and we surface that as
-/// `SDKException.featureNotAvailable`.
+/// Access via `RunAnywhereSDK.instance.diffusion`.
 class RunAnywhereDiffusion {
   RunAnywhereDiffusion._();
   static final RunAnywhereDiffusion _instance = RunAnywhereDiffusion._();
@@ -38,45 +26,38 @@ class RunAnywhereDiffusion {
 
   String? _currentModelId;
 
-  // -- state ---------------------------------------------------------------
-
   /// True when a diffusion model is currently loaded.
   bool get isLoaded => DartBridgeDiffusion.isLoaded();
 
   /// Currently-loaded diffusion model id, or null.
   String? get currentModelId => _currentModelId;
 
-  // -- internal helpers ----------------------------------------------------
-
-  static Never _throwForCode(String op, int code) {
-    if (code == RacResultCode.errorFeatureNotAvailable ||
-        code == RacResultCode.errorNotImplemented ||
-        code == RacResultCode.errorBackendNotFound ||
-        code == RacResultCode.errorBackendUnavailable) {
-      throw SDKException.featureNotAvailable('Diffusion: $op');
-    }
-    throw SDKException.generationFailed(
-      '$op failed: ${RacResultCode.getMessage(code)}',
-    );
-  }
-
-  void _ensureHandle() {
-    final rc = DartBridgeDiffusion.ensureHandle();
-    if (rc != 0) {
-      _throwForCode('rac_diffusion_component_create', rc);
-    }
-  }
-
-  /// Load a diffusion model by ID.
+  /// Load a diffusion model by registry ID.
   Future<void> load(String modelId, [DiffusionConfiguration? config]) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    _ensureHandle();
-    final rc = DartBridgeDiffusion.loadModel(modelId);
-    if (rc != 0) {
-      _throwForCode('rac_diffusion_component_load_model', rc);
+
+    final models = await RunAnywhereModels.shared.available();
+    final model = models.where((m) => m.id == modelId).firstOrNull;
+    if (model == null) {
+      throw SDKException.modelNotFound('Diffusion model not found: $modelId');
     }
+    if (model.localPath.isEmpty) {
+      throw SDKException.modelNotDownloaded(
+        'Diffusion model is not downloaded. Call downloadModel() first.',
+      );
+    }
+
+    final resolvedPath =
+        await DartBridge.modelPaths.resolveModelFilePath(model);
+    if (resolvedPath == null) {
+      throw SDKException.modelNotFound(
+        'Could not resolve diffusion model file path for: $modelId',
+      );
+    }
+
+    DartBridgeDiffusion.loadModel(modelId, resolvedPath);
     _currentModelId = modelId;
   }
 
@@ -85,11 +66,7 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!DartBridgeDiffusion.hasHandle) return;
-    final rc = DartBridgeDiffusion.unload();
-    if (rc != 0) {
-      _throwForCode('rac_diffusion_component_unload', rc);
-    }
+    DartBridgeDiffusion.unload();
     _currentModelId = null;
   }
 
@@ -101,34 +78,20 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    _ensureHandle();
-    final optsBytes = options?.writeToBuffer() ?? Uint8List(0);
-    final result = DartBridgeDiffusion.generate(prompt, optsBytes);
-    if (!result.success || result.payload == null) {
-      _throwForCode('rac_diffusion_component_generate', result.resultCode);
-    }
-    return DiffusionResult.fromBuffer(result.payload!);
+    return DartBridgeDiffusion.generateProto(
+        _effectiveOptions(prompt, options));
   }
 
   /// Stream generation progress.
-  ///
-  /// Subscribes to the `rac_diffusion_component_set_progress_callback`
-  /// proto-byte stream. If the engine has no streaming support the C
-  /// ABI returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` which propagates.
   Stream<DiffusionProgress> generateStream(
     String prompt, [
     DiffusionGenerationOptions? options,
-  ]) async* {
-    // Streaming variant is implemented in commons via a proto-byte
-    // callback (mirrors the LLM/voice agent pattern). The callback wiring
-    // is non-trivial; we emit the final result as a single progress event
-    // until the streaming bridge lands. The blocking call still executes
-    // through the C ABI so the SDKException semantics are preserved.
-    final result = await generate(prompt, options);
-    yield DiffusionProgress(
-      progressPercent: 100.0,
-      stage: 'completed',
-      intermediateImageData: result.imageData,
+  ]) {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeDiffusion.generateWithProgressProto(
+      _effectiveOptions(prompt, options, reportProgress: true),
     );
   }
 
@@ -137,22 +100,28 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!DartBridgeDiffusion.hasHandle) return;
-    final rc = DartBridgeDiffusion.cancel();
-    if (rc != 0) {
-      _throwForCode('rac_diffusion_component_cancel', rc);
-    }
+    DartBridgeDiffusion.cancel();
   }
 
   /// Backend capability discovery.
   DiffusionCapabilities capabilities() {
     if (!SdkState.shared.isInitialized) return DiffusionCapabilities();
-    _ensureHandle();
-    final result = DartBridgeDiffusion.capabilities();
-    if (!result.success || result.payload == null) {
-      _throwForCode('rac_diffusion_component_get_capabilities',
-          result.resultCode);
+    return DartBridgeDiffusion.capabilitiesProto();
+  }
+
+  DiffusionGenerationOptions _effectiveOptions(
+    String prompt,
+    DiffusionGenerationOptions? options, {
+    bool reportProgress = false,
+  }) {
+    final request = options?.deepCopy() ?? DiffusionGenerationOptions();
+    request.prompt = prompt;
+    if (reportProgress && !request.hasReportIntermediateImages()) {
+      request.reportIntermediateImages = true;
     }
-    return DiffusionCapabilities.fromBuffer(result.payload!);
+    if (reportProgress && !request.hasProgressStride()) {
+      request.progressStride = 1;
+    }
+    return request;
   }
 }

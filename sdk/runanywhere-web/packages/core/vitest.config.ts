@@ -17,7 +17,6 @@ import { fileURLToPath, URL } from 'node:url';
 export default defineConfig({
   resolve: {
     alias: {
-      '@runanywhere/proto-ts': fileURLToPath(new URL('../../../runanywhere-proto-ts/dist', import.meta.url)),
       'protobufjs/minimal': fileURLToPath(new URL('../../node_modules/protobufjs/minimal.js', import.meta.url)),
     },
   },

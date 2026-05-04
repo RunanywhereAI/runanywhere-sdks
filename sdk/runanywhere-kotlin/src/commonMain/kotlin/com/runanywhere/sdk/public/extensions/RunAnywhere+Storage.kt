@@ -11,7 +11,15 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.StorageAvailability
+import ai.runanywhere.proto.v1.StorageAvailabilityRequest
+import ai.runanywhere.proto.v1.StorageAvailabilityResult
+import ai.runanywhere.proto.v1.StorageDeletePlan
+import ai.runanywhere.proto.v1.StorageDeletePlanRequest
+import ai.runanywhere.proto.v1.StorageDeleteRequest
+import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfo
+import ai.runanywhere.proto.v1.StorageInfoRequest
+import ai.runanywhere.proto.v1.StorageInfoResult
 import com.runanywhere.sdk.public.RunAnywhere
 
 // MARK: - Storage Information
@@ -24,12 +32,34 @@ import com.runanywhere.sdk.public.RunAnywhere
 expect suspend fun RunAnywhere.storageInfo(): StorageInfo
 
 /**
+ * Get storage information through the stable generated proto API.
+ */
+expect suspend fun RunAnywhere.storageInfo(request: StorageInfoRequest): StorageInfoResult
+
+/**
  * Check if storage is available for a download.
  *
  * @param requiredBytes Required bytes for the operation
  * @return Storage availability result
  */
 expect suspend fun RunAnywhere.checkStorageAvailability(requiredBytes: Long): StorageAvailability
+
+/**
+ * Check storage availability through the stable generated proto API.
+ */
+expect suspend fun RunAnywhere.checkStorageAvailability(
+    request: StorageAvailabilityRequest,
+): StorageAvailabilityResult
+
+/**
+ * Build a C++-owned safe delete plan.
+ */
+expect suspend fun RunAnywhere.storageDeletePlan(request: StorageDeletePlanRequest): StorageDeletePlan
+
+/**
+ * Execute or dry-run a C++-planned storage delete.
+ */
+expect suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDeleteResult
 
 // MARK: - Cache Management
 

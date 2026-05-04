@@ -22,24 +22,43 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+import model_types_pb2 as model__types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x64ownload_service.proto\x12\x0erunanywhere.v1\",\n\x18\x44ownloadSubscribeRequest\x12\x10\n\x08model_id\x18\x01 \x01(\t\"\xa5\x02\n\x10\x44ownloadProgress\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12,\n\x05stage\x18\x02 \x01(\x0e\x32\x1d.runanywhere.v1.DownloadStage\x12\x18\n\x10\x62ytes_downloaded\x18\x03 \x01(\x03\x12\x13\n\x0btotal_bytes\x18\x04 \x01(\x03\x12\x16\n\x0estage_progress\x18\x05 \x01(\x02\x12\x19\n\x11overall_speed_bps\x18\x06 \x01(\x02\x12\x13\n\x0b\x65ta_seconds\x18\x07 \x01(\x03\x12,\n\x05state\x18\x08 \x01(\x0e\x32\x1d.runanywhere.v1.DownloadState\x12\x15\n\rretry_attempt\x18\t \x01(\x05\x12\x15\n\rerror_message\x18\n \x01(\t*\xab\x01\n\rDownloadStage\x12\x1e\n\x1a\x44OWNLOAD_STAGE_UNSPECIFIED\x10\x00\x12\x1e\n\x1a\x44OWNLOAD_STAGE_DOWNLOADING\x10\x01\x12\x1d\n\x19\x44OWNLOAD_STAGE_EXTRACTING\x10\x02\x12\x1d\n\x19\x44OWNLOAD_STAGE_VALIDATING\x10\x03\x12\x1c\n\x18\x44OWNLOAD_STAGE_COMPLETED\x10\x04*\xfe\x01\n\rDownloadState\x12\x1e\n\x1a\x44OWNLOAD_STATE_UNSPECIFIED\x10\x00\x12\x1a\n\x16\x44OWNLOAD_STATE_PENDING\x10\x01\x12\x1e\n\x1a\x44OWNLOAD_STATE_DOWNLOADING\x10\x02\x12\x1d\n\x19\x44OWNLOAD_STATE_EXTRACTING\x10\x03\x12\x1b\n\x17\x44OWNLOAD_STATE_RETRYING\x10\x04\x12\x1c\n\x18\x44OWNLOAD_STATE_COMPLETED\x10\x05\x12\x19\n\x15\x44OWNLOAD_STATE_FAILED\x10\x06\x12\x1c\n\x18\x44OWNLOAD_STATE_CANCELLED\x10\x07\x32\x65\n\x08\x44ownload\x12Y\n\tSubscribe\x12(.runanywhere.v1.DownloadSubscribeRequest\x1a .runanywhere.v1.DownloadProgress0\x01\x42@\n\x17\x61i.runanywhere.proto.v1B\x14\x44ownloadServiceProtoP\x01\xf8\x01\x01\xa2\x02\x04RAV1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x64ownload_service.proto\x12\x0erunanywhere.v1\x1a\x11model_types.proto\"=\n\x18\x44ownloadSubscribeRequest\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\"\x90\x03\n\x10\x44ownloadProgress\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12,\n\x05stage\x18\x02 \x01(\x0e\x32\x1d.runanywhere.v1.DownloadStage\x12\x18\n\x10\x62ytes_downloaded\x18\x03 \x01(\x03\x12\x13\n\x0btotal_bytes\x18\x04 \x01(\x03\x12\x16\n\x0estage_progress\x18\x05 \x01(\x02\x12\x19\n\x11overall_speed_bps\x18\x06 \x01(\x02\x12\x13\n\x0b\x65ta_seconds\x18\x07 \x01(\x03\x12,\n\x05state\x18\x08 \x01(\x0e\x32\x1d.runanywhere.v1.DownloadState\x12\x15\n\rretry_attempt\x18\t \x01(\x05\x12\x15\n\rerror_message\x18\n \x01(\t\x12\x0f\n\x07task_id\x18\x0b \x01(\t\x12\x1a\n\x12\x63urrent_file_index\x18\x0c \x01(\x05\x12\x13\n\x0btotal_files\x18\r \x01(\x05\x12\x13\n\x0bstorage_key\x18\x0e \x01(\t\x12\x12\n\nlocal_path\x18\x0f \x01(\t\"\xb9\x01\n\x13\x44ownloadPlanRequest\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12-\n\x05model\x18\x02 \x01(\x0b\x32\x19.runanywhere.v1.ModelInfoH\x00\x88\x01\x01\x12\x17\n\x0fresume_existing\x18\x03 \x01(\x08\x12\x1f\n\x17\x61vailable_storage_bytes\x18\x04 \x01(\x03\x12\x1d\n\x15\x61llow_metered_network\x18\x05 \x01(\x08\x42\x08\n\x06_model\"\xc2\x01\n\x10\x44ownloadFilePlan\x12\x31\n\x04\x66ile\x18\x01 \x01(\x0b\x32#.runanywhere.v1.ModelFileDescriptor\x12\x13\n\x0bstorage_key\x18\x02 \x01(\t\x12\x18\n\x10\x64\x65stination_path\x18\x03 \x01(\t\x12\x16\n\x0e\x65xpected_bytes\x18\x04 \x01(\x03\x12\x1b\n\x13requires_extraction\x18\x05 \x01(\x08\x12\x17\n\x0f\x63hecksum_sha256\x18\x06 \x01(\t\"\xf4\x01\n\x12\x44ownloadPlanResult\x12\x11\n\tcan_start\x18\x01 \x01(\x08\x12\x10\n\x08model_id\x18\x02 \x01(\t\x12/\n\x05\x66iles\x18\x03 \x03(\x0b\x32 .runanywhere.v1.DownloadFilePlan\x12\x13\n\x0btotal_bytes\x18\x04 \x01(\x03\x12\x1b\n\x13requires_extraction\x18\x05 \x01(\x08\x12\x12\n\ncan_resume\x18\x06 \x01(\x08\x12\x19\n\x11resume_from_bytes\x18\x07 \x01(\x03\x12\x10\n\x08warnings\x18\x08 \x03(\t\x12\x15\n\rerror_message\x18\t \x01(\t\"j\n\x14\x44ownloadStartRequest\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x30\n\x04plan\x18\x02 \x01(\x0b\x32\".runanywhere.v1.DownloadPlanResult\x12\x0e\n\x06resume\x18\x03 \x01(\x08\"\x9d\x01\n\x13\x44ownloadStartResult\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x10\n\x08model_id\x18\x03 \x01(\t\x12:\n\x10initial_progress\x18\x04 \x01(\x0b\x32 .runanywhere.v1.DownloadProgress\x12\x15\n\rerror_message\x18\x05 \x01(\t\"X\n\x15\x44ownloadCancelRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x10\n\x08model_id\x18\x02 \x01(\t\x12\x1c\n\x14\x64\x65lete_partial_bytes\x18\x03 \x01(\x08\"\x80\x01\n\x14\x44ownloadCancelResult\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x10\n\x08model_id\x18\x03 \x01(\t\x12\x1d\n\x15partial_bytes_deleted\x18\x04 \x01(\x03\x12\x15\n\rerror_message\x18\x05 \x01(\t\"U\n\x15\x44ownloadResumeRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x10\n\x08model_id\x18\x02 \x01(\t\x12\x19\n\x11resume_from_bytes\x18\x03 \x01(\x03\"\x9e\x01\n\x14\x44ownloadResumeResult\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x10\n\x08model_id\x18\x03 \x01(\t\x12:\n\x10initial_progress\x18\x04 \x01(\x0b\x32 .runanywhere.v1.DownloadProgress\x12\x15\n\rerror_message\x18\x05 \x01(\t*\xab\x01\n\rDownloadStage\x12\x1e\n\x1a\x44OWNLOAD_STAGE_UNSPECIFIED\x10\x00\x12\x1e\n\x1a\x44OWNLOAD_STAGE_DOWNLOADING\x10\x01\x12\x1d\n\x19\x44OWNLOAD_STAGE_EXTRACTING\x10\x02\x12\x1d\n\x19\x44OWNLOAD_STAGE_VALIDATING\x10\x03\x12\x1c\n\x18\x44OWNLOAD_STAGE_COMPLETED\x10\x04*\xb6\x02\n\rDownloadState\x12\x1e\n\x1a\x44OWNLOAD_STATE_UNSPECIFIED\x10\x00\x12\x1a\n\x16\x44OWNLOAD_STATE_PENDING\x10\x01\x12\x1e\n\x1a\x44OWNLOAD_STATE_DOWNLOADING\x10\x02\x12\x1d\n\x19\x44OWNLOAD_STATE_EXTRACTING\x10\x03\x12\x1b\n\x17\x44OWNLOAD_STATE_RETRYING\x10\x04\x12\x1c\n\x18\x44OWNLOAD_STATE_COMPLETED\x10\x05\x12\x19\n\x15\x44OWNLOAD_STATE_FAILED\x10\x06\x12\x1c\n\x18\x44OWNLOAD_STATE_CANCELLED\x10\x07\x12\x19\n\x15\x44OWNLOAD_STATE_PAUSED\x10\x08\x12\x1b\n\x17\x44OWNLOAD_STATE_RESUMING\x10\t2\xb8\x03\n\x08\x44ownload\x12O\n\x04Plan\x12#.runanywhere.v1.DownloadPlanRequest\x1a\".runanywhere.v1.DownloadPlanResult\x12R\n\x05Start\x12$.runanywhere.v1.DownloadStartRequest\x1a#.runanywhere.v1.DownloadStartResult\x12Y\n\tSubscribe\x12(.runanywhere.v1.DownloadSubscribeRequest\x1a .runanywhere.v1.DownloadProgress0\x01\x12U\n\x06\x43\x61ncel\x12%.runanywhere.v1.DownloadCancelRequest\x1a$.runanywhere.v1.DownloadCancelResult\x12U\n\x06Resume\x12%.runanywhere.v1.DownloadResumeRequest\x1a$.runanywhere.v1.DownloadResumeResultB~\n\x17\x61i.runanywhere.proto.v1B\x14\x44ownloadServiceProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'download_service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\024DownloadServiceProtoP\001\370\001\001\242\002\004RAV1\272\002\002RA'
-  _globals['_DOWNLOADSTAGE']._serialized_start=385
-  _globals['_DOWNLOADSTAGE']._serialized_end=556
-  _globals['_DOWNLOADSTATE']._serialized_start=559
-  _globals['_DOWNLOADSTATE']._serialized_end=813
-  _globals['_DOWNLOADSUBSCRIBEREQUEST']._serialized_start=42
-  _globals['_DOWNLOADSUBSCRIBEREQUEST']._serialized_end=86
-  _globals['_DOWNLOADPROGRESS']._serialized_start=89
-  _globals['_DOWNLOADPROGRESS']._serialized_end=382
-  _globals['_DOWNLOAD']._serialized_start=815
-  _globals['_DOWNLOAD']._serialized_end=916
+  _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\024DownloadServiceProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\272\002\002RA'
+  _globals['_DOWNLOADSTAGE']._serialized_start=1897
+  _globals['_DOWNLOADSTAGE']._serialized_end=2068
+  _globals['_DOWNLOADSTATE']._serialized_start=2071
+  _globals['_DOWNLOADSTATE']._serialized_end=2381
+  _globals['_DOWNLOADSUBSCRIBEREQUEST']._serialized_start=61
+  _globals['_DOWNLOADSUBSCRIBEREQUEST']._serialized_end=122
+  _globals['_DOWNLOADPROGRESS']._serialized_start=125
+  _globals['_DOWNLOADPROGRESS']._serialized_end=525
+  _globals['_DOWNLOADPLANREQUEST']._serialized_start=528
+  _globals['_DOWNLOADPLANREQUEST']._serialized_end=713
+  _globals['_DOWNLOADFILEPLAN']._serialized_start=716
+  _globals['_DOWNLOADFILEPLAN']._serialized_end=910
+  _globals['_DOWNLOADPLANRESULT']._serialized_start=913
+  _globals['_DOWNLOADPLANRESULT']._serialized_end=1157
+  _globals['_DOWNLOADSTARTREQUEST']._serialized_start=1159
+  _globals['_DOWNLOADSTARTREQUEST']._serialized_end=1265
+  _globals['_DOWNLOADSTARTRESULT']._serialized_start=1268
+  _globals['_DOWNLOADSTARTRESULT']._serialized_end=1425
+  _globals['_DOWNLOADCANCELREQUEST']._serialized_start=1427
+  _globals['_DOWNLOADCANCELREQUEST']._serialized_end=1515
+  _globals['_DOWNLOADCANCELRESULT']._serialized_start=1518
+  _globals['_DOWNLOADCANCELRESULT']._serialized_end=1646
+  _globals['_DOWNLOADRESUMEREQUEST']._serialized_start=1648
+  _globals['_DOWNLOADRESUMEREQUEST']._serialized_end=1733
+  _globals['_DOWNLOADRESUMERESULT']._serialized_start=1736
+  _globals['_DOWNLOADRESUMERESULT']._serialized_end=1894
+  _globals['_DOWNLOAD']._serialized_start=2384
+  _globals['_DOWNLOAD']._serialized_end=2824
 # @@protoc_insertion_point(module_scope)

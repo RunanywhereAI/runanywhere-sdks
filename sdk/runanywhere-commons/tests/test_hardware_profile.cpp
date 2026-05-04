@@ -14,7 +14,12 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "rac/router/rac_hardware_abi.h"
 #include "rac/router/rac_hardware_profile.h"
+
+#ifdef RAC_HAVE_PROTOBUF
+#include "hardware_profile.pb.h"
+#endif
 
 int main() {
     using rac::router::HardwareProfile;
@@ -66,6 +71,71 @@ int main() {
     }
     unsetenv("RAC_FORCE_RUNTIME");
     HardwareProfile::refresh();  /* leave cache in normal state for any later tests */
+
+#ifdef RAC_HAVE_PROTOBUF
+    /* (5) Hardware C ABI returns canonical HardwareProfileResult proto bytes. */
+    uint8_t* profile_bytes = nullptr;
+    size_t profile_size = 0;
+    rac_result_t profile_rc = rac_hardware_profile_get(&profile_bytes, &profile_size);
+    if (profile_rc != RAC_SUCCESS || profile_bytes == nullptr || profile_size == 0) {
+        std::fprintf(stderr,
+                     "  FAIL: rac_hardware_profile_get returned rc=%d size=%zu\n",
+                     static_cast<int>(profile_rc),
+                     profile_size);
+        ++fails;
+    } else {
+        runanywhere::v1::HardwareProfileResult decoded;
+        if (!decoded.ParseFromArray(profile_bytes, static_cast<int>(profile_size))) {
+            std::fprintf(stderr, "  FAIL: hardware profile proto bytes did not decode\n");
+            ++fails;
+        } else if (!decoded.has_profile()) {
+            std::fprintf(stderr, "  FAIL: hardware profile proto missing profile field\n");
+            ++fails;
+        } else if (decoded.profile().platform().empty()) {
+            std::fprintf(stderr, "  FAIL: hardware profile proto missing platform\n");
+            ++fails;
+        } else if (decoded.accelerators_size() == 0) {
+            std::fprintf(stderr, "  FAIL: hardware profile proto missing accelerators\n");
+            ++fails;
+        } else {
+            std::fprintf(stdout,
+                         "  ok:   hardware C ABI returns decodable HardwareProfileResult\n");
+        }
+    }
+    rac_hardware_profile_free(profile_bytes);
+
+    uint8_t* accelerator_bytes = nullptr;
+    size_t accelerator_size = 0;
+    rac_result_t accelerator_rc =
+        rac_hardware_get_accelerators(&accelerator_bytes, &accelerator_size);
+    if (accelerator_rc != RAC_SUCCESS || accelerator_bytes == nullptr ||
+        accelerator_size == 0) {
+        std::fprintf(stderr,
+                     "  FAIL: rac_hardware_get_accelerators returned rc=%d size=%zu\n",
+                     static_cast<int>(accelerator_rc),
+                     accelerator_size);
+        ++fails;
+    } else {
+        runanywhere::v1::HardwareProfileResult decoded;
+        if (!decoded.ParseFromArray(accelerator_bytes, static_cast<int>(accelerator_size))) {
+            std::fprintf(stderr, "  FAIL: accelerator proto bytes did not decode\n");
+            ++fails;
+        } else if (decoded.has_profile()) {
+            std::fprintf(stderr,
+                         "  FAIL: accelerator-only proto unexpectedly included profile\n");
+            ++fails;
+        } else if (decoded.accelerators_size() == 0) {
+            std::fprintf(stderr, "  FAIL: accelerator-only proto missing accelerators\n");
+            ++fails;
+        } else {
+            std::fprintf(stdout,
+                         "  ok:   accelerator C ABI returns decodable proto list\n");
+        }
+    }
+    rac_hardware_profile_free(accelerator_bytes);
+#else
+    std::fprintf(stdout, "  skip: hardware proto-byte decode test (no protobuf)\n");
+#endif
 
     return fails == 0 ? 0 : 1;
 }

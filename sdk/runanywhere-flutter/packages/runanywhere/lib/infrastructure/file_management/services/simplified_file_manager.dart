@@ -10,8 +10,8 @@ import 'dart:io';
 import 'package:fixnum/fixnum.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 
 /// File manager for RunAnywhere SDK

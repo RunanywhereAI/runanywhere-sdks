@@ -27,7 +27,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
   final _urlController = TextEditingController();
   final _sizeController = TextEditingController();
 
-  LLMFramework _selectedFramework = LLMFramework.llamaCpp;
+  LLMFramework _selectedFramework = LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
   bool _supportsThinking = false;
   bool _useCustomThinkingTags = false;
   String _thinkingOpenTag = '<thinking>';
@@ -36,9 +36,9 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
   String? _errorMessage;
 
   final List<LLMFramework> _availableFrameworks = [
-    LLMFramework.llamaCpp,
-    LLMFramework.onnx,
-    LLMFramework.genie,
+    LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    LLMFramework.INFERENCE_FRAMEWORK_ONNX,
+    LLMFramework.INFERENCE_FRAMEWORK_GENIE,
   ];
 
   @override
@@ -391,8 +391,8 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
       sdk.RunAnywhereSDK.instance.models.register(
         name: name,
         url: Uri.parse(url),
-        framework: _toSDKFramework(_selectedFramework),
-        modality: sdk.ModelCategory.language,
+        framework: _selectedFramework,
+        modality: sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: estimatedSize,
         supportsThinking: _supportsThinking,
       );
@@ -405,10 +405,5 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
         _isAdding = false;
       });
     }
-  }
-
-  sdk.InferenceFramework _toSDKFramework(LLMFramework framework) {
-    // LLMFramework is a typedef for sdk.InferenceFramework — identity conversion.
-    return framework;
   }
 }

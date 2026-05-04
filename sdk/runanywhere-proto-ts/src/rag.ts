@@ -41,6 +41,41 @@ export interface RAGConfiguration {
   chunkSize: number;
   /** Overlap tokens between consecutive chunks. Must be < chunk_size. */
   chunkOverlap: number;
+  /** Maximum tokens of retrieved context passed to the LLM. */
+  maxContextTokens: number;
+  /** Prompt template with `{context}` and `{query}` placeholders. */
+  promptTemplate?:
+    | string
+    | undefined;
+  /** Backend-specific config JSON passed to the embedding model/provider. */
+  embeddingConfigJson?:
+    | string
+    | undefined;
+  /** Backend-specific config JSON passed to the LLM provider. */
+  llmConfigJson?: string | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * RAGDocument — batch-ingest input item.
+ * ---------------------------------------------------------------------------
+ */
+export interface RAGDocument {
+  /** Optional caller-supplied document id. */
+  id: string;
+  /** Plain text content to chunk/embed. */
+  text: string;
+  /** Legacy metadata JSON blob. */
+  metadataJson?:
+    | string
+    | undefined;
+  /** Typed metadata map for generated-proto callers. */
+  metadata: { [key: string]: string };
+}
+
+export interface RAGDocument_MetadataEntry {
+  key: string;
+  value: string;
 }
 
 /**
@@ -90,6 +125,11 @@ export interface RAGSearchResult {
    * canonicalized here as a typed map so consumers don't re-parse.
    */
   metadata: { [key: string]: string };
+  /**
+   * Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
+   * pass metadata without parsing it.
+   */
+  metadataJson?: string | undefined;
 }
 
 export interface RAGSearchResult_MetadataEntry {
@@ -149,7 +189,18 @@ export interface RAGStatistics {
    * Filesystem path to the on-disk index, when applicable. Unset for
    * in-memory-only indexes.
    */
-  indexPath?: string | undefined;
+  indexPath?:
+    | string
+    | undefined;
+  /**
+   * Raw backend statistics JSON for implementations that cannot yet project
+   * every counter into typed fields.
+   */
+  statsJson?:
+    | string
+    | undefined;
+  /** Approximate vector-store footprint in bytes, when known. */
+  vectorStoreSizeBytes: number;
 }
 
 function createBaseRAGConfiguration(): RAGConfiguration {
@@ -161,6 +212,10 @@ function createBaseRAGConfiguration(): RAGConfiguration {
     similarityThreshold: 0,
     chunkSize: 0,
     chunkOverlap: 0,
+    maxContextTokens: 0,
+    promptTemplate: undefined,
+    embeddingConfigJson: undefined,
+    llmConfigJson: undefined,
   };
 }
 
@@ -186,6 +241,18 @@ export const RAGConfiguration = {
     }
     if (message.chunkOverlap !== 0) {
       writer.uint32(56).int32(message.chunkOverlap);
+    }
+    if (message.maxContextTokens !== 0) {
+      writer.uint32(64).int32(message.maxContextTokens);
+    }
+    if (message.promptTemplate !== undefined) {
+      writer.uint32(74).string(message.promptTemplate);
+    }
+    if (message.embeddingConfigJson !== undefined) {
+      writer.uint32(82).string(message.embeddingConfigJson);
+    }
+    if (message.llmConfigJson !== undefined) {
+      writer.uint32(90).string(message.llmConfigJson);
     }
     return writer;
   },
@@ -246,6 +313,34 @@ export const RAGConfiguration = {
 
           message.chunkOverlap = reader.int32();
           continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.maxContextTokens = reader.int32();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.promptTemplate = reader.string();
+          continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.embeddingConfigJson = reader.string();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.llmConfigJson = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -264,6 +359,12 @@ export const RAGConfiguration = {
       similarityThreshold: isSet(object.similarityThreshold) ? globalThis.Number(object.similarityThreshold) : 0,
       chunkSize: isSet(object.chunkSize) ? globalThis.Number(object.chunkSize) : 0,
       chunkOverlap: isSet(object.chunkOverlap) ? globalThis.Number(object.chunkOverlap) : 0,
+      maxContextTokens: isSet(object.maxContextTokens) ? globalThis.Number(object.maxContextTokens) : 0,
+      promptTemplate: isSet(object.promptTemplate) ? globalThis.String(object.promptTemplate) : undefined,
+      embeddingConfigJson: isSet(object.embeddingConfigJson)
+        ? globalThis.String(object.embeddingConfigJson)
+        : undefined,
+      llmConfigJson: isSet(object.llmConfigJson) ? globalThis.String(object.llmConfigJson) : undefined,
     };
   },
 
@@ -290,6 +391,18 @@ export const RAGConfiguration = {
     if (message.chunkOverlap !== 0) {
       obj.chunkOverlap = Math.round(message.chunkOverlap);
     }
+    if (message.maxContextTokens !== 0) {
+      obj.maxContextTokens = Math.round(message.maxContextTokens);
+    }
+    if (message.promptTemplate !== undefined) {
+      obj.promptTemplate = message.promptTemplate;
+    }
+    if (message.embeddingConfigJson !== undefined) {
+      obj.embeddingConfigJson = message.embeddingConfigJson;
+    }
+    if (message.llmConfigJson !== undefined) {
+      obj.llmConfigJson = message.llmConfigJson;
+    }
     return obj;
   },
 
@@ -305,6 +418,207 @@ export const RAGConfiguration = {
     message.similarityThreshold = object.similarityThreshold ?? 0;
     message.chunkSize = object.chunkSize ?? 0;
     message.chunkOverlap = object.chunkOverlap ?? 0;
+    message.maxContextTokens = object.maxContextTokens ?? 0;
+    message.promptTemplate = object.promptTemplate ?? undefined;
+    message.embeddingConfigJson = object.embeddingConfigJson ?? undefined;
+    message.llmConfigJson = object.llmConfigJson ?? undefined;
+    return message;
+  },
+};
+
+function createBaseRAGDocument(): RAGDocument {
+  return { id: "", text: "", metadataJson: undefined, metadata: {} };
+}
+
+export const RAGDocument = {
+  encode(message: RAGDocument, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.text !== "") {
+      writer.uint32(18).string(message.text);
+    }
+    if (message.metadataJson !== undefined) {
+      writer.uint32(26).string(message.metadataJson);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      RAGDocument_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGDocument {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGDocument();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.metadataJson = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = RAGDocument_MetadataEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.metadata[entry4.key] = entry4.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGDocument {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      metadataJson: isSet(object.metadataJson) ? globalThis.String(object.metadataJson) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: RAGDocument): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.metadataJson !== undefined) {
+      obj.metadataJson = message.metadataJson;
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGDocument>, I>>(base?: I): RAGDocument {
+    return RAGDocument.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGDocument>, I>>(object: I): RAGDocument {
+    const message = createBaseRAGDocument();
+    message.id = object.id ?? "";
+    message.text = object.text ?? "";
+    message.metadataJson = object.metadataJson ?? undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseRAGDocument_MetadataEntry(): RAGDocument_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const RAGDocument_MetadataEntry = {
+  encode(message: RAGDocument_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGDocument_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGDocument_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGDocument_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: RAGDocument_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGDocument_MetadataEntry>, I>>(base?: I): RAGDocument_MetadataEntry {
+    return RAGDocument_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGDocument_MetadataEntry>, I>>(object: I): RAGDocument_MetadataEntry {
+    const message = createBaseRAGDocument_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
     return message;
   },
 };
@@ -444,7 +758,14 @@ export const RAGQueryOptions = {
 };
 
 function createBaseRAGSearchResult(): RAGSearchResult {
-  return { chunkId: "", text: "", similarityScore: 0, sourceDocument: undefined, metadata: {} };
+  return {
+    chunkId: "",
+    text: "",
+    similarityScore: 0,
+    sourceDocument: undefined,
+    metadata: {},
+    metadataJson: undefined,
+  };
 }
 
 export const RAGSearchResult = {
@@ -464,6 +785,9 @@ export const RAGSearchResult = {
     Object.entries(message.metadata).forEach(([key, value]) => {
       RAGSearchResult_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).ldelim();
     });
+    if (message.metadataJson !== undefined) {
+      writer.uint32(50).string(message.metadataJson);
+    }
     return writer;
   },
 
@@ -512,6 +836,13 @@ export const RAGSearchResult = {
             message.metadata[entry5.key] = entry5.value;
           }
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.metadataJson = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -533,6 +864,7 @@ export const RAGSearchResult = {
           return acc;
         }, {})
         : {},
+      metadataJson: isSet(object.metadataJson) ? globalThis.String(object.metadataJson) : undefined,
     };
   },
 
@@ -559,6 +891,9 @@ export const RAGSearchResult = {
         });
       }
     }
+    if (message.metadataJson !== undefined) {
+      obj.metadataJson = message.metadataJson;
+    }
     return obj;
   },
 
@@ -577,6 +912,7 @@ export const RAGSearchResult = {
       }
       return acc;
     }, {});
+    message.metadataJson = object.metadataJson ?? undefined;
     return message;
   },
 };
@@ -794,7 +1130,15 @@ export const RAGResult = {
 };
 
 function createBaseRAGStatistics(): RAGStatistics {
-  return { indexedDocuments: 0, indexedChunks: 0, totalTokensIndexed: 0, lastUpdatedMs: 0, indexPath: undefined };
+  return {
+    indexedDocuments: 0,
+    indexedChunks: 0,
+    totalTokensIndexed: 0,
+    lastUpdatedMs: 0,
+    indexPath: undefined,
+    statsJson: undefined,
+    vectorStoreSizeBytes: 0,
+  };
 }
 
 export const RAGStatistics = {
@@ -813,6 +1157,12 @@ export const RAGStatistics = {
     }
     if (message.indexPath !== undefined) {
       writer.uint32(42).string(message.indexPath);
+    }
+    if (message.statsJson !== undefined) {
+      writer.uint32(50).string(message.statsJson);
+    }
+    if (message.vectorStoreSizeBytes !== 0) {
+      writer.uint32(56).int64(message.vectorStoreSizeBytes);
     }
     return writer;
   },
@@ -859,6 +1209,20 @@ export const RAGStatistics = {
 
           message.indexPath = reader.string();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.statsJson = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.vectorStoreSizeBytes = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -875,6 +1239,8 @@ export const RAGStatistics = {
       totalTokensIndexed: isSet(object.totalTokensIndexed) ? globalThis.Number(object.totalTokensIndexed) : 0,
       lastUpdatedMs: isSet(object.lastUpdatedMs) ? globalThis.Number(object.lastUpdatedMs) : 0,
       indexPath: isSet(object.indexPath) ? globalThis.String(object.indexPath) : undefined,
+      statsJson: isSet(object.statsJson) ? globalThis.String(object.statsJson) : undefined,
+      vectorStoreSizeBytes: isSet(object.vectorStoreSizeBytes) ? globalThis.Number(object.vectorStoreSizeBytes) : 0,
     };
   },
 
@@ -895,6 +1261,12 @@ export const RAGStatistics = {
     if (message.indexPath !== undefined) {
       obj.indexPath = message.indexPath;
     }
+    if (message.statsJson !== undefined) {
+      obj.statsJson = message.statsJson;
+    }
+    if (message.vectorStoreSizeBytes !== 0) {
+      obj.vectorStoreSizeBytes = Math.round(message.vectorStoreSizeBytes);
+    }
     return obj;
   },
 
@@ -908,6 +1280,8 @@ export const RAGStatistics = {
     message.totalTokensIndexed = object.totalTokensIndexed ?? 0;
     message.lastUpdatedMs = object.lastUpdatedMs ?? 0;
     message.indexPath = object.indexPath ?? undefined;
+    message.statsJson = object.statsJson ?? undefined;
+    message.vectorStoreSizeBytes = object.vectorStoreSizeBytes ?? 0;
     return message;
   },
 };

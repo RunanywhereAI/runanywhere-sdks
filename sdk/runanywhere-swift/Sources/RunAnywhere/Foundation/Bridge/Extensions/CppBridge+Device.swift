@@ -169,6 +169,19 @@ extension CppBridge {
                 throw SDKException.general(.notInitialized, "Device manager callbacks not registered")
             }
 
+            if environment == .development && !CppBridge.DevConfig.hasUsableDevelopmentRegistrationConfig {
+                SDKLogger(category: "CppBridge.Device")
+                    .debug("Skipping telemetry/device registration: no usable config")
+                return
+            }
+
+            let hasUsableHTTPConfiguration = await CppBridge.HTTP.hasUsableConfiguration
+            if environment != .development && !hasUsableHTTPConfiguration {
+                SDKLogger(category: "CppBridge.Device")
+                    .debug("Skipping telemetry/device registration: no usable config")
+                return
+            }
+
             // Get build token for development mode
             let buildTokenString = environment == .development ? CppBridge.DevConfig.buildToken : nil
 

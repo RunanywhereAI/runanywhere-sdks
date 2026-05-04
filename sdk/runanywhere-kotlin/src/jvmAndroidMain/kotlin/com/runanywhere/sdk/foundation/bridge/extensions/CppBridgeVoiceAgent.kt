@@ -28,6 +28,28 @@ object CppBridgeVoiceAgent {
     private val logger = SDKLogger("CppBridgeVoiceAgent")
     private val handleRef = AtomicLong(INVALID_HANDLE)
 
+    private fun createStandaloneHandle(): Long {
+        val newHandle = RunAnywhereBridge.racVoiceAgentCreateStandalone()
+        if (newHandle == INVALID_HANDLE) {
+            throw IllegalStateException(
+                "rac_voice_agent_create_standalone returned 0 — " +
+                    "likely OOM or missing rac_commons linkage.",
+            )
+        }
+        return newHandle
+    }
+
+    @Synchronized
+    fun getRawHandle(): Long {
+        val existing = handleRef.get()
+        if (existing != INVALID_HANDLE) return existing
+
+        val newHandle = createStandaloneHandle()
+        handleRef.set(newHandle)
+        logger.info("Voice agent handle created: $newHandle")
+        return newHandle
+    }
+
     /**
      * Get or create a voice-agent handle. Lazy; the first call allocates
      * a native voice-agent via rac_voice_agent_create_standalone and
@@ -43,13 +65,7 @@ object CppBridgeVoiceAgent {
         val existing = handleRef.get()
         if (existing != INVALID_HANDLE) return existing
 
-        val newHandle = RunAnywhereBridge.racVoiceAgentCreateStandalone()
-        if (newHandle == INVALID_HANDLE) {
-            throw IllegalStateException(
-                "rac_voice_agent_create_standalone returned 0 — " +
-                    "likely OOM or missing rac_commons linkage.",
-            )
-        }
+        val newHandle = createStandaloneHandle()
 
         val initResult = RunAnywhereBridge.racVoiceAgentInitializeWithLoadedModels(newHandle)
         if (initResult != 0) {

@@ -1,19 +1,23 @@
 /**
- * RunAnywhere Web SDK - Web-only Data Models.
+ * RunAnywhere Web SDK - Model and environment types.
  *
  * Wave 2: Proto-aligned types live in `@runanywhere/proto-ts/*` and are
- * re-exported from `types/index.ts`. This file holds Web-only browser-shape
- * models (storage info, device info, etc.) that proto doesn't cover.
+ * re-exported from `types/index.ts`. Generated model/storage shapes are
+ * aliases here; browser-only environment and storage summary types remain
+ * Web-local.
  */
 
 import type {
   AccelerationPreference,
-  ConfigurationSource,
-  LLMFramework,
-  ModelCategory,
-  ModelFormat,
   SDKEnvironment,
 } from './enums';
+import type {
+  ModelInfo as ProtoModelInfo,
+} from '@runanywhere/proto-ts/model_types';
+import type {
+  StorageInfo as ProtoStorageInfo,
+  StoredModel as ProtoStoredModel,
+} from '@runanywhere/proto-ts/storage_types';
 
 export interface ThinkingTagPattern {
   openTag: string;
@@ -28,30 +32,7 @@ export interface ModelInfoMetadata {
   version?: string;
 }
 
-export interface ModelInfo {
-  id: string;
-  name: string;
-  category: ModelCategory;
-  format: ModelFormat;
-  downloadURL?: string;
-  localPath?: string;
-  downloadSize?: number;
-  memoryRequired?: number;
-  compatibleFrameworks: LLMFramework[];
-  preferredFramework?: LLMFramework;
-  contextLength?: number;
-  supportsThinking: boolean;
-  thinkingPattern?: ThinkingTagPattern;
-  metadata?: ModelInfoMetadata;
-  source: ConfigurationSource;
-  createdAt: string;
-  updatedAt: string;
-  syncPending: boolean;
-  lastUsed?: string;
-  usageCount: number;
-  isDownloaded: boolean;
-  isAvailable: boolean;
-}
+export type ModelInfo = ProtoModelInfo;
 
 
 export interface SDKInitOptions {
@@ -68,20 +49,8 @@ export interface SDKInitOptions {
   webgpuWasmUrl?: string;
 }
 
-export interface StorageInfo {
-  totalSpace: number;
-  usedSpace: number;
-  freeSpace: number;
-  modelsPath: string;
-}
-
-export interface StoredModel {
-  id: string;
-  name: string;
-  sizeOnDisk: number;
-  downloadedAt: string;
-  lastUsed?: string;
-}
+export type StorageInfo = ProtoStorageInfo;
+export type StoredModel = ProtoStoredModel;
 
 export interface DeviceInfoData {
   model: string;

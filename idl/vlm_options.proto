@@ -89,6 +89,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "model_types.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -139,6 +141,29 @@ enum VLMImageFormat {
 }
 
 // ---------------------------------------------------------------------------
+// VLM model family for chat-template selection.
+// Mirrors rac_vlm_model_family_t.
+// ---------------------------------------------------------------------------
+enum VLMModelFamily {
+    VLM_MODEL_FAMILY_UNSPECIFIED = 0;
+    VLM_MODEL_FAMILY_AUTO        = 1;
+    VLM_MODEL_FAMILY_QWEN2_VL    = 2;
+    VLM_MODEL_FAMILY_SMOLVLM     = 3;
+    VLM_MODEL_FAMILY_LLAVA       = 4;
+    VLM_MODEL_FAMILY_CUSTOM      = 99;
+}
+
+// ---------------------------------------------------------------------------
+// Custom VLM chat template.
+// Mirrors rac_vlm_chat_template_t.
+// ---------------------------------------------------------------------------
+message VLMChatTemplate {
+    string template_text         = 1;
+    optional string image_marker = 2;
+    optional string default_system_prompt = 3;
+}
+
+// ---------------------------------------------------------------------------
 // VLM image input.
 //
 // `source` is a oneof so that exactly one of {file_path, encoded, raw_rgb,
@@ -186,6 +211,13 @@ message VLMConfiguration {
     int32  max_image_size_px   = 2;   // Kotlin maxImageSize / C ABI max_image_size
                                       // (0 = backend default)
     int32  max_tokens          = 3;   // Kotlin maxTokens / C ABI max_tokens
+
+    // Additional component-level fields from rac_vlm_config_t.
+    int32  context_length      = 4;
+    float  temperature         = 5;
+    optional string system_prompt = 6;
+    bool   streaming_enabled   = 7;
+    optional InferenceFramework preferred_framework = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +247,17 @@ message VLMGenerationOptions {
     float  temperature = 3;
     float  top_p       = 4;
     int32  top_k       = 5;
+
+    // Full rac_vlm_options_t coverage.
+    repeated string stop_sequences = 6;
+    bool   streaming_enabled = 7;
+    optional string system_prompt = 8;
+    int32  max_image_size = 9;
+    int32  n_threads = 10;
+    bool   use_gpu = 11;
+    VLMModelFamily model_family = 12;
+    optional VLMChatTemplate custom_chat_template = 13;
+    optional string image_marker_override = 14;
 }
 
 // ---------------------------------------------------------------------------
@@ -253,6 +296,12 @@ message VLMResult {
     int64  processing_time_ms  = 5;   // Kotlin/C ABI total_time_ms;
                                       // Swift VLMResult totalTimeMs (Double ms).
     float  tokens_per_second   = 6;
+
+    // Detailed VLM metrics from Kotlin/Web/C ABI.
+    int32  image_tokens             = 7;
+    int64  time_to_first_token_ms   = 8;
+    int64  image_encode_time_ms     = 9;
+    optional string hardware_used   = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,4 +333,8 @@ enum VLMErrorCode {
                                              // backend cannot decode
     VLM_ERROR_CODE_IMAGE_TOO_LARGE    = 4;   // Image exceeds
                                              // VLMConfiguration.max_image_size_px
+    VLM_ERROR_CODE_NOT_INITIALIZED    = 5;
+    VLM_ERROR_CODE_MODEL_LOAD_FAILED  = 6;
+    VLM_ERROR_CODE_PROCESSING_FAILED  = 7;
+    VLM_ERROR_CODE_CANCELLED          = 8;
 }

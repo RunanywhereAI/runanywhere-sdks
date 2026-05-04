@@ -195,6 +195,33 @@ public struct TTSOutput: ComponentOutput, Sendable {
             timestamp: Date(timeIntervalSince1970: TimeInterval(cOutput.timestamp_ms) / 1000.0)
         )
     }
+
+    /// Initialize from the generated-proto C++ TTS output.
+    public init(from proto: RATTSOutput) {
+        let phonemes: [TTSPhonemeTimestamp]? = proto.phonemeTimestamps.isEmpty ? nil : proto.phonemeTimestamps.map {
+            TTSPhonemeTimestamp(
+                phoneme: $0.phoneme,
+                startTime: TimeInterval($0.startMs) / 1000.0,
+                endTime: TimeInterval($0.endMs) / 1000.0
+            )
+        }
+        let metadata = TTSSynthesisMetadata(
+            voice: proto.hasMetadata ? proto.metadata.voiceID : "",
+            language: proto.hasMetadata ? proto.metadata.languageCode : "",
+            processingTime: proto.hasMetadata ? TimeInterval(proto.metadata.processingTimeMs) / 1000.0 : 0,
+            characterCount: proto.hasMetadata ? Int(proto.metadata.characterCount) : 0
+        )
+        self.init(
+            audioData: proto.audioData,
+            format: proto.audioFormat,
+            duration: TimeInterval(proto.durationMs) / 1000.0,
+            phonemeTimestamps: phonemes,
+            metadata: metadata,
+            timestamp: proto.timestampMs > 0
+                ? Date(timeIntervalSince1970: TimeInterval(proto.timestampMs) / 1000.0)
+                : Date()
+        )
+    }
 }
 
 // MARK: - Supporting Types
@@ -295,6 +322,21 @@ public struct TTSSpeakResult: Sendable {
         self.audioSizeBytes = output.audioSizeBytes
         self.metadata = output.metadata
         self.timestamp = output.timestamp
+    }
+
+    internal init(from proto: RATTSSpeakResult) {
+        self.duration = TimeInterval(proto.durationMs) / 1000.0
+        self.format = proto.audioFormat
+        self.audioSizeBytes = Int(proto.audioSizeBytes)
+        self.metadata = TTSSynthesisMetadata(
+            voice: proto.hasMetadata ? proto.metadata.voiceID : "",
+            language: proto.hasMetadata ? proto.metadata.languageCode : "",
+            processingTime: proto.hasMetadata ? TimeInterval(proto.metadata.processingTimeMs) / 1000.0 : 0,
+            characterCount: proto.hasMetadata ? Int(proto.metadata.characterCount) : 0
+        )
+        self.timestamp = proto.timestampMs > 0
+            ? Date(timeIntervalSince1970: TimeInterval(proto.timestampMs) / 1000.0)
+            : Date()
     }
 }
 

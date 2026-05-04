@@ -27,7 +27,7 @@
 
 import {
   RunAnywhere, SDKException, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
-  LLMFramework, LLMStreamAdapter, applyLLMGenerationDefaults,
+  LLMStreamAdapter, applyLLMGenerationDefaults,
 } from '@runanywhere/web';
 import type {
   ModelLoadContext, EmscriptenRunanywhereModule,
@@ -388,11 +388,13 @@ class TextGenerationImpl {
         tokensGenerated: outputTokens,
         modelUsed: bridge.readString(m._rac_llm_component_get_model_id(handle)),
         generationTimeMs: latencyMs,
-        framework: LLMFramework.LlamaCpp,
+        framework: 'llama.cpp',
         tokensPerSecond,
         finishReason: '',
         thinkingTokens: 0,
         responseTokens: outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        errorMessage: undefined,
       };
 
       EventBus.shared.emit('generation.completed', SDKEventType.Generation, {
@@ -462,6 +464,14 @@ class TextGenerationImpl {
       topK: 0,
       systemPrompt: options.systemPrompt ?? '',
       emitThoughts: false,
+      repetitionPenalty: options.repetitionPenalty ?? 0,
+      stopSequences: options.stopSequences ?? [],
+      streamingEnabled: true,
+      preferredFramework: '',
+      jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema ?? '',
+      executionTarget: options.executionTarget == null
+        ? ''
+        : String(options.executionTarget),
     })[Symbol.asyncIterator]();
 
     let resolveResult!: (result: LLMGenerationResult) => void;
@@ -576,12 +586,14 @@ class TextGenerationImpl {
           tokensGenerated: tokenCount,
           modelUsed: '',
           generationTimeMs: latencyMs,
-          framework: LLMFramework.LlamaCpp,
+          framework: 'llama.cpp',
           tokensPerSecond,
           ttftMs: timeToFirstToken,
           finishReason: '',
           thinkingTokens: 0,
           responseTokens: tokenCount,
+          totalTokens: tokenCount,
+          errorMessage: undefined,
         });
       } finally {
         await eventIterator.return?.();

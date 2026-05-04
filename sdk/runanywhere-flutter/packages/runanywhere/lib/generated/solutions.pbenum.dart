@@ -1,21 +1,31 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: solutions.proto
 //
 // @dart = 2.12
-// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
 
-// ignore_for_file: UNDEFINED_SHOWN_NAME
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+
 import 'dart:core' as $core;
+
 import 'package:protobuf/protobuf.dart' as $pb;
 
+/// ---------------------------------------------------------------------------
+/// SolutionType — discriminator for the kind of solution backing a
+/// `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
+/// oneof arms so frontends can switch on a single enum value rather than
+/// inspecting the oneof shape.
+/// ---------------------------------------------------------------------------
 class SolutionType extends $pb.ProtobufEnum {
-  static const SolutionType SOLUTION_TYPE_UNSPECIFIED = SolutionType._(0, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'SOLUTION_TYPE_UNSPECIFIED');
-  static const SolutionType SOLUTION_TYPE_VOICE_AGENT = SolutionType._(1, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'SOLUTION_TYPE_VOICE_AGENT');
-  static const SolutionType SOLUTION_TYPE_RAG = SolutionType._(2, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'SOLUTION_TYPE_RAG');
-  static const SolutionType SOLUTION_TYPE_WAKEWORD = SolutionType._(3, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'SOLUTION_TYPE_WAKEWORD');
-  static const SolutionType SOLUTION_TYPE_TIME_SERIES = SolutionType._(4, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'SOLUTION_TYPE_TIME_SERIES');
-  static const SolutionType SOLUTION_TYPE_AGENT_LOOP = SolutionType._(5, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'SOLUTION_TYPE_AGENT_LOOP');
+  static const SolutionType SOLUTION_TYPE_UNSPECIFIED = SolutionType._(0, _omitEnumNames ? '' : 'SOLUTION_TYPE_UNSPECIFIED');
+  static const SolutionType SOLUTION_TYPE_VOICE_AGENT = SolutionType._(1, _omitEnumNames ? '' : 'SOLUTION_TYPE_VOICE_AGENT');
+  static const SolutionType SOLUTION_TYPE_RAG = SolutionType._(2, _omitEnumNames ? '' : 'SOLUTION_TYPE_RAG');
+  static const SolutionType SOLUTION_TYPE_WAKEWORD = SolutionType._(3, _omitEnumNames ? '' : 'SOLUTION_TYPE_WAKEWORD');
+  static const SolutionType SOLUTION_TYPE_TIME_SERIES = SolutionType._(4, _omitEnumNames ? '' : 'SOLUTION_TYPE_TIME_SERIES');
+  static const SolutionType SOLUTION_TYPE_AGENT_LOOP = SolutionType._(5, _omitEnumNames ? '' : 'SOLUTION_TYPE_AGENT_LOOP');
 
   static const $core.List<SolutionType> values = <SolutionType> [
     SOLUTION_TYPE_UNSPECIFIED,
@@ -33,10 +43,10 @@ class SolutionType extends $pb.ProtobufEnum {
 }
 
 class AudioSource extends $pb.ProtobufEnum {
-  static const AudioSource AUDIO_SOURCE_UNSPECIFIED = AudioSource._(0, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'AUDIO_SOURCE_UNSPECIFIED');
-  static const AudioSource AUDIO_SOURCE_MICROPHONE = AudioSource._(1, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'AUDIO_SOURCE_MICROPHONE');
-  static const AudioSource AUDIO_SOURCE_FILE = AudioSource._(2, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'AUDIO_SOURCE_FILE');
-  static const AudioSource AUDIO_SOURCE_CALLBACK = AudioSource._(3, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'AUDIO_SOURCE_CALLBACK');
+  static const AudioSource AUDIO_SOURCE_UNSPECIFIED = AudioSource._(0, _omitEnumNames ? '' : 'AUDIO_SOURCE_UNSPECIFIED');
+  static const AudioSource AUDIO_SOURCE_MICROPHONE = AudioSource._(1, _omitEnumNames ? '' : 'AUDIO_SOURCE_MICROPHONE');
+  static const AudioSource AUDIO_SOURCE_FILE = AudioSource._(2, _omitEnumNames ? '' : 'AUDIO_SOURCE_FILE');
+  static const AudioSource AUDIO_SOURCE_CALLBACK = AudioSource._(3, _omitEnumNames ? '' : 'AUDIO_SOURCE_CALLBACK');
 
   static const $core.List<AudioSource> values = <AudioSource> [
     AUDIO_SOURCE_UNSPECIFIED,
@@ -52,9 +62,9 @@ class AudioSource extends $pb.ProtobufEnum {
 }
 
 class VectorStore extends $pb.ProtobufEnum {
-  static const VectorStore VECTOR_STORE_UNSPECIFIED = VectorStore._(0, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'VECTOR_STORE_UNSPECIFIED');
-  static const VectorStore VECTOR_STORE_USEARCH = VectorStore._(1, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'VECTOR_STORE_USEARCH');
-  static const VectorStore VECTOR_STORE_PGVECTOR = VectorStore._(2, const $core.bool.fromEnvironment('protobuf.omit_enum_names') ? '' : 'VECTOR_STORE_PGVECTOR');
+  static const VectorStore VECTOR_STORE_UNSPECIFIED = VectorStore._(0, _omitEnumNames ? '' : 'VECTOR_STORE_UNSPECIFIED');
+  static const VectorStore VECTOR_STORE_USEARCH = VectorStore._(1, _omitEnumNames ? '' : 'VECTOR_STORE_USEARCH');
+  static const VectorStore VECTOR_STORE_PGVECTOR = VectorStore._(2, _omitEnumNames ? '' : 'VECTOR_STORE_PGVECTOR');
 
   static const $core.List<VectorStore> values = <VectorStore> [
     VECTOR_STORE_UNSPECIFIED,
@@ -68,3 +78,5 @@ class VectorStore extends $pb.ProtobufEnum {
   const VectorStore._($core.int v, $core.String n) : super(v, n);
 }
 
+
+const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

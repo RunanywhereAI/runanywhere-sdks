@@ -14,6 +14,7 @@ import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentConfig
+import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.public.RunAnywhere
 // v3.1: VoiceAgentResult / VoiceSessionEvent imports removed — the
 // expect declarations that used them (processVoice / startVoiceSession /
@@ -123,7 +124,7 @@ expect suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)
  */
 expect suspend fun RunAnywhere.processVoiceTurn(
     audioData: ByteArray,
-): com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult
+): VoiceAgentResult
 
 /**
  * Transcribe audio using the voice-agent's STT component.

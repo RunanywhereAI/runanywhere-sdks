@@ -18,9 +18,16 @@ import {
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
-  type TranscriptionMetadata,
 } from '@runanywhere/proto-ts/stt_options';
-import { STTOptions as STTOptionsCtor } from '@runanywhere/proto-ts/stt_options';
+import {
+  STTOptions as STTOptionsCtor,
+  STTOutput as STTOutputMessage,
+} from '@runanywhere/proto-ts/stt_options';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.STT');
 
@@ -34,6 +41,10 @@ function defaultSTTOptions(): STTOptions {
     vocabularyList: [],
     enableWordTimestamps: false,
     beamSize: 0,
+    detectLanguage: true,
+    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+    sampleRate: 16000,
+    maxAlternatives: 0,
   });
 }
 
@@ -133,16 +144,51 @@ export async function unloadSTTModel(): Promise<boolean> {
   return native.unloadSTTModel();
 }
 
-/** Convert Uint8Array / ArrayBuffer / string audio input to a base64 string. */
-function audioToBase64(audio: Uint8Array | string | ArrayBuffer): string {
-  if (typeof audio === 'string') return audio;
-  const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio);
+/** Convert Uint8Array / ArrayBuffer / base64 string audio input to ArrayBuffer. */
+function audioToArrayBuffer(audio: Uint8Array | string | ArrayBuffer): ArrayBuffer {
+  if (typeof audio === 'string') {
+    const binary = atob(audio);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytesToArrayBuffer(bytes);
+  }
+  if (audio instanceof Uint8Array) {
+    return bytesToArrayBuffer(audio);
+  }
+  return audio;
+}
+
+/** Convert Uint8Array to base64 for optional streaming adapters. */
+function audioToBase64(audio: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    const byte = bytes[i];
+  for (let i = 0; i < audio.byteLength; i++) {
+    const byte = audio[i];
     if (byte !== undefined) binary += String.fromCharCode(byte);
   }
   return btoa(binary);
+}
+
+function buildSTTOptions(options?: Partial<STTOptions>): STTOptions {
+  return STTOptionsCtor.create({
+    ...defaultSTTOptions(),
+    ...options,
+    language: options?.language ?? STTLanguage.STT_LANGUAGE_AUTO,
+    detectLanguage:
+      options?.detectLanguage ??
+      (options?.language === undefined ||
+        options.language === STTLanguage.STT_LANGUAGE_AUTO),
+    audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
+    sampleRate: options?.sampleRate ?? 16000,
+    maxAlternatives: options?.maxAlternatives ?? 0,
+  });
+}
+
+function decodeSTTOutput(buffer: ArrayBuffer): STTOutput {
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    throw new Error('STT proto transcription returned an empty result');
+  }
+  return STTOutputMessage.decode(bytes);
 }
 
 /**
@@ -161,43 +207,11 @@ export async function transcribe(
     throw new Error('Native module not available');
   }
   const native = requireNativeModule();
-  const startTime = Date.now();
-  const audioBase64 = audioToBase64(audio);
-  const sampleRate = 16000;
-  const language = sttLanguageToCode(options?.language);
-
-  const resultJson = await native.transcribe(audioBase64, sampleRate, language);
-  const endTime = Date.now();
-  const processingTimeMs = endTime - startTime;
-
-  try {
-    const parsed = JSON.parse(resultJson);
-    if (parsed.error) {
-      throw new Error(parsed.error);
-    }
-
-    const audioLengthMs =
-      typeof parsed.duration === 'number' ? parsed.duration * 1000 : 0;
-    const metadata: TranscriptionMetadata = {
-      modelId: parsed.modelId ?? 'unknown',
-      processingTimeMs,
-      audioLengthMs,
-      realTimeFactor:
-        audioLengthMs > 0 ? processingTimeMs / audioLengthMs : 0,
-    };
-
-    return {
-      text: parsed.text ?? '',
-      language: options?.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-      confidence: parsed.confidence ?? 1.0,
-      words: parsed.words ?? parsed.timestamps ?? [],
-      alternatives: parsed.alternatives ?? [],
-      metadata,
-    };
-  } catch (err) {
-    if (err instanceof Error) throw err;
-    throw new Error(`Transcription failed: ${resultJson}`);
-  }
+  const audioBytes = audioToArrayBuffer(audio);
+  const optionBytes = bytesToArrayBuffer(
+    STTOptionsCtor.encode(buildSTTOptions(options)).finish()
+  );
+  return decodeSTTOutput(await native.sttTranscribeProto(audioBytes, optionBytes));
 }
 
 /**
@@ -224,8 +238,7 @@ export async function transcribeBuffer(
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-  const audioBase64 = audioToBase64(samples.buffer as ArrayBuffer);
-  return transcribe(audioBase64, options);
+  return transcribe(samples.buffer as ArrayBuffer, options);
 }
 
 /**
@@ -240,12 +253,7 @@ export async function processStreamingAudio(samples: Uint8Array): Promise<void> 
   if (!isNativeModuleAvailable()) return;
   const native = requireNativeModule() as unknown as StreamingSTTNativeModule;
   if (typeof native.sttProcessAudio === 'function') {
-    // Encode to base64 for the bridge.
-    let binary = '';
-    for (let i = 0; i < samples.byteLength; i++) {
-      binary += String.fromCharCode(samples[i]!);
-    }
-    const base64 = btoa(binary);
+    const base64 = audioToBase64(samples);
     await native.sttProcessAudio(base64);
   }
   // If bridge method absent, silently do nothing — the C++ streaming support
@@ -288,6 +296,10 @@ export async function* transcribeStream(
         text: evt.text ?? '',
         isFinal: false,
         stability: typeof evt.confidence === 'number' ? evt.confidence : 0,
+        confidence: typeof evt.confidence === 'number' ? evt.confidence : 0,
+        language: STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+        timestampMs: Date.now(),
+        alternatives: [],
       };
       if (partialResolver) {
         const res = partialResolver;
@@ -332,6 +344,11 @@ export async function* transcribeStream(
         text: finalOutput.text,
         isFinal: true,
         stability: finalOutput.confidence,
+        confidence: finalOutput.confidence,
+        language: finalOutput.language,
+        timestampMs: finalOutput.timestampMs,
+        alternatives: finalOutput.alternatives,
+        languageCode: finalOutput.languageCode,
       };
     }
   } finally {
@@ -377,6 +394,8 @@ export async function transcribeFile(
         realTimeFactor:
           audioLengthMs > 0 ? processingTimeMs / audioLengthMs : 0,
       },
+      timestampMs: Date.now(),
+      durationMs: audioLengthMs,
     };
   } catch (err) {
     if (err instanceof Error) throw err;
@@ -424,6 +443,8 @@ export async function transcribeStreamAsync(
             confidence: partial.stability ?? 1.0,
             words: [],
             alternatives: [],
+            timestampMs: partial.timestampMs,
+            durationMs: 0,
           };
         }
       }
@@ -433,6 +454,8 @@ export async function transcribeStreamAsync(
         confidence: 0,
         words: [],
         alternatives: [],
+        timestampMs: Date.now(),
+        durationMs: 0,
       });
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

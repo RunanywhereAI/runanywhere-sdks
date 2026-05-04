@@ -103,7 +103,9 @@ enum ModelCategory {
   imageGeneration('image-generation', 'Image Generation'),
   multimodal('multimodal', 'Multimodal'),
   audio('audio', 'Audio Processing'),
-  embedding('embedding', 'Embedding Model');
+  embedding('embedding', 'Embedding Model'),
+  voiceActivityDetection(
+      'voice-activity-detection', 'Voice Activity Detection');
 
   final String rawValue;
   final String displayName;
@@ -160,6 +162,8 @@ enum ModelCategory {
         return pb.ModelCategory.MODEL_CATEGORY_AUDIO;
       case ModelCategory.embedding:
         return pb.ModelCategory.MODEL_CATEGORY_EMBEDDING;
+      case ModelCategory.voiceActivityDetection:
+        return pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
     }
   }
 
@@ -185,7 +189,9 @@ enum ModelCategory {
     if (proto == pb.ModelCategory.MODEL_CATEGORY_EMBEDDING) {
       return ModelCategory.embedding;
     }
-    // AUDIO + VAD both map to the Dart audio case
+    if (proto == pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION) {
+      return ModelCategory.voiceActivityDetection;
+    }
     return ModelCategory.audio;
   }
 }

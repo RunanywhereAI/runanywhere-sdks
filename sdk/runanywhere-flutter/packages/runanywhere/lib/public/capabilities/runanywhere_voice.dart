@@ -14,124 +14,22 @@
 import 'dart:typed_data';
 
 import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
-import 'package:runanywhere/features/vad/vad_configuration.dart' show VADComponentConfig;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/vad_options.pb.dart'
+    show VADConfiguration;
+import 'package:runanywhere/generated/voice_agent_service.pb.dart'
+    as voice_agent_proto;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
+import 'package:runanywhere/generated/voice_events.pb.dart'
+    as voice_event_proto;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_voice_agent.dart'
-    show VoiceTurnResult;
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 
-/// Snapshot of STT / LLM / TTS readiness for the voice agent.
-class VoiceAgentComponentStates {
-  /// True if an STT model is loaded.
-  final bool sttLoaded;
-
-  /// Currently-loaded STT model id (or null).
-  final String? sttModelId;
-
-  /// True if an LLM model is loaded.
-  final bool llmLoaded;
-
-  /// Currently-loaded LLM model id (or null).
-  final String? llmModelId;
-
-  /// True if a TTS voice is loaded.
-  final bool ttsLoaded;
-
-  /// Currently-loaded TTS voice id (or null).
-  final String? ttsVoiceId;
-
-  const VoiceAgentComponentStates({
-    required this.sttLoaded,
-    this.sttModelId,
-    required this.llmLoaded,
-    this.llmModelId,
-    required this.ttsLoaded,
-    this.ttsVoiceId,
-  });
-
-  bool get isFullyReady => sttLoaded && llmLoaded && ttsLoaded;
-
-  bool get hasAnyLoaded => sttLoaded || llmLoaded || ttsLoaded;
-
-  List<String> get missingComponents {
-    final missing = <String>[];
-    if (!sttLoaded) missing.add('stt');
-    if (!llmLoaded) missing.add('llm');
-    if (!ttsLoaded) missing.add('tts');
-    return missing;
-  }
-}
-
-/// Voice-agent configuration for the config-driven init path. Mirrors
-/// Swift's `VoiceAgentConfiguration`.
-class VoiceAgentConfiguration {
-  /// STT model id to load before initializing the agent.
-  final String? sttModelId;
-
-  /// LLM model id to load before initializing the agent.
-  final String? llmModelId;
-
-  /// TTS voice id to load before initializing the agent.
-  final String? ttsVoiceId;
-
-  /// VAD configuration. When supplied, VAD is initialized before the
-  /// agent starts processing audio.
-  final VADComponentConfig? vadConfig;
-
-  const VoiceAgentConfiguration({
-    this.sttModelId,
-    this.llmModelId,
-    this.ttsVoiceId,
-    this.vadConfig,
-  });
-}
-
-/// Result of a synchronous voice-turn (audio in → transcript + response
-/// + synthesized audio). Mirrors Swift's `VoiceAgentResult`.
-class VoiceAgentResult {
-  /// Transcribed user speech.
-  final String transcription;
-
-  /// Generated LLM response text.
-  final String response;
-
-  /// Synthesized response audio (WAV-encoded).
-  final Uint8List audioWavData;
-
-  /// Per-stage durations for telemetry / UI.
-  final int sttDurationMs;
-  final int llmDurationMs;
-  final int ttsDurationMs;
-
-  const VoiceAgentResult({
-    required this.transcription,
-    required this.response,
-    required this.audioWavData,
-    this.sttDurationMs = 0,
-    this.llmDurationMs = 0,
-    this.ttsDurationMs = 0,
-  });
-
-  int get totalDurationMs => sttDurationMs + llmDurationMs + ttsDurationMs;
-
-  /// Build from the bridge-level [VoiceTurnResult].
-  factory VoiceAgentResult.from(VoiceTurnResult result) {
-    return VoiceAgentResult(
-      transcription: result.transcription,
-      response: result.response,
-      audioWavData: result.audioWavData,
-      sttDurationMs: result.sttDurationMs,
-      llmDurationMs: result.llmDurationMs,
-      ttsDurationMs: result.ttsDurationMs,
-    );
-  }
-}
+typedef VoiceAgentConfiguration = voice_agent_proto.VoiceAgentComposeConfig;
 
 /// Voice Agent capability surface.
 ///
@@ -149,16 +47,8 @@ class RunAnywhereVoice {
 
   /// Snapshot of STT/LLM/TTS load state — useful to surface readiness
   /// in voice-agent UI without firing off three separate getters.
-  VoiceAgentComponentStates componentStates() {
-    return VoiceAgentComponentStates(
-      sttLoaded: DartBridge.stt.isLoaded,
-      sttModelId: DartBridge.stt.currentModelId,
-      llmLoaded: DartBridge.llm.isLoaded,
-      llmModelId: DartBridge.llm.currentModelId,
-      ttsLoaded: DartBridge.tts.isLoaded,
-      ttsVoiceId: DartBridge.tts.currentVoiceId,
-    );
-  }
+  Future<voice_event_proto.VoiceAgentComponentStates> componentStates() =>
+      DartBridge.voiceAgent.componentStatesProto();
 
   /// Initialize the voice agent against currently-loaded STT/LLM/TTS
   /// models. Must be called before [eventStream] (or before manually
@@ -173,7 +63,9 @@ class RunAnywhereVoice {
     }
 
     try {
-      await DartBridge.voiceAgent.initializeWithLoadedModels();
+      await DartBridge.voiceAgent.initializeProto(
+        voice_agent_proto.VoiceAgentComposeConfig(),
+      );
       logger.info('Voice agent initialized with loaded models');
     } catch (e) {
       logger.error('Failed to initialize voice agent: $e');
@@ -188,20 +80,32 @@ class RunAnywhereVoice {
   Future<void> initializeVoiceAgent(VoiceAgentConfiguration config) async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
 
-    if (config.sttModelId != null) {
-      await RunAnywhereSTT.shared.load(config.sttModelId!);
+    if (config.hasSttModelId()) {
+      await RunAnywhereSTT.shared.load(config.sttModelId);
     }
-    if (config.llmModelId != null) {
-      await RunAnywhereLLM.shared.load(config.llmModelId!);
+    if (config.hasLlmModelId()) {
+      await RunAnywhereLLM.shared.load(config.llmModelId);
     }
-    if (config.ttsVoiceId != null) {
-      await RunAnywhereTTS.shared.loadVoice(config.ttsVoiceId!);
+    if (config.hasTtsVoiceId()) {
+      await RunAnywhereTTS.shared.loadVoice(config.ttsVoiceId);
     }
-    if (config.vadConfig != null) {
-      await RunAnywhereVAD.shared.initializeVAD(config.vadConfig);
+    if (config.hasVadSampleRate() ||
+        config.hasVadFrameLength() ||
+        config.hasVadEnergyThreshold()) {
+      await RunAnywhereVAD.shared.initializeVAD(
+        VADConfiguration(
+          sampleRate: config.hasVadSampleRate() ? config.vadSampleRate : 16000,
+          frameLengthMs: config.hasVadFrameLength()
+              ? (config.vadFrameLength * 1000).round()
+              : 30,
+          threshold: config.hasVadEnergyThreshold()
+              ? config.vadEnergyThreshold
+              : 0.015,
+        ),
+      );
     }
 
-    await initializeWithLoadedModels();
+    await DartBridge.voiceAgent.initializeProto(config);
     logger.info('Voice agent initialized from configuration');
   }
 
@@ -223,10 +127,10 @@ class RunAnywhereVoice {
 
   /// Synchronous one-shot voice turn (audio in → triple-result out).
   /// Mirrors Swift's `processVoiceTurn(_:)`.
-  Future<VoiceAgentResult> processVoiceTurn(Uint8List audioData) async {
-    final result = await DartBridge.voiceAgent.processVoiceTurn(audioData);
-    return VoiceAgentResult.from(result);
-  }
+  Future<voice_agent_proto.VoiceAgentResult> processVoiceTurn(
+    Uint8List audioData,
+  ) =>
+      DartBridge.voiceAgent.processVoiceTurnProto(audioData);
 
   /// Decomposed verb: transcribe via the voice agent. Mirrors Swift's
   /// `voiceAgentTranscribe(_:)`.

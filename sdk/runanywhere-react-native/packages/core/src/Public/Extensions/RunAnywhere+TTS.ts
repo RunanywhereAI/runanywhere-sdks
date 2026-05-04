@@ -11,14 +11,23 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { AudioPlaybackManager } from '../../Features/VoiceSession/AudioPlaybackManager';
+import { ModelRegistry } from '../../services/ModelRegistry';
 import {
   type TTSOptions,
   type TTSOutput,
   type TTSSpeakResult,
-  type TTSSynthesisMetadata,
   type TTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
+import {
+  TTSOptions as TTSOptionsMessage,
+  TTSOutput as TTSOutputMessage,
+  TTSVoiceInfo as TTSVoiceInfoMessage,
+} from '@runanywhere/proto-ts/tts_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.TTS');
 
@@ -32,14 +41,6 @@ function getAudioPlayback(): AudioPlaybackManager {
   return ttsAudioPlayback;
 }
 
-/** Decode a base64 string to a `Uint8Array`. */
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
 /** Encode a `Uint8Array` to a base64 string. */
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -48,6 +49,31 @@ function bytesToBase64(bytes: Uint8Array): string {
     if (byte !== undefined) binary += String.fromCharCode(byte);
   }
   return btoa(binary);
+}
+
+function buildTTSOptions(options?: Partial<TTSOptions>): TTSOptions {
+  return TTSOptionsMessage.create({
+    voice: options?.voice ?? '',
+    languageCode: options?.languageCode ?? '',
+    speakingRate: options?.speakingRate ?? 1.0,
+    pitch: options?.pitch ?? 1.0,
+    volume: options?.volume ?? 1.0,
+    enableSsml: options?.enableSsml ?? false,
+    audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
+    sampleRate: options?.sampleRate ?? 0,
+  });
+}
+
+function encodeTTSOptions(options?: Partial<TTSOptions>): ArrayBuffer {
+  return bytesToArrayBuffer(TTSOptionsMessage.encode(buildTTSOptions(options)).finish());
+}
+
+function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    throw new Error('TTS proto synthesis returned an empty result');
+  }
+  return TTSOutputMessage.decode(bytes);
 }
 
 // ============================================================================
@@ -79,9 +105,8 @@ export async function loadTTSVoice(voiceId: string): Promise<void> {
   }
   logger.info(`Loading TTS voice: ${voiceId}`);
   const native = requireNativeModule();
-  const modelInfoJson = await native.getModelInfo(voiceId);
-  const modelInfo = JSON.parse(modelInfoJson);
-  if (!modelInfo.localPath) {
+  const modelInfo = await ModelRegistry.getModel(voiceId);
+  if (!modelInfo?.localPath) {
     throw new Error(`Voice '${voiceId}' is not downloaded`);
   }
   const loaded = await native.loadTTSModel(modelInfo.localPath, 'piper');
@@ -128,49 +153,19 @@ export async function unloadTTSModel(): Promise<boolean> {
  * Matches Swift SDK: `RunAnywhere.availableTTSVoices`.
  */
 export async function availableTTSVoices(): Promise<string[]> {
-  if (!isNativeModuleAvailable()) return [];
-  const native = requireNativeModule();
-  const voicesJson = await native.getTTSVoices();
-  try {
-    const voices = JSON.parse(voicesJson);
-    if (Array.isArray(voices)) {
-      return voices.map((v: TTSVoiceInfo | string) =>
-        typeof v === 'string' ? v : v.id
-      );
-    }
-    return [];
-  } catch {
-    return voicesJson ? [voicesJson] : [];
-  }
+  const voices = await getTTSVoiceInfo();
+  return voices.map((voice) => voice.id);
 }
 
 /** Get detailed voice information. */
 export async function getTTSVoiceInfo(): Promise<TTSVoiceInfo[]> {
   if (!isNativeModuleAvailable()) return [];
   const native = requireNativeModule();
-  const voicesJson = await native.getTTSVoices();
-  try {
-    const voices = JSON.parse(voicesJson);
-    if (!Array.isArray(voices)) return [];
-    return voices.map(
-      (
-        v: Partial<TTSVoiceInfo> & {
-          id?: string;
-          name?: string;
-          displayName?: string;
-          language?: string;
-        }
-      ): TTSVoiceInfo => ({
-        id: v.id ?? '',
-        displayName: v.displayName ?? v.name ?? v.id ?? '',
-        languageCode: v.languageCode ?? v.language ?? 'en-US',
-        gender: v.gender ?? 0,
-        description: v.description ?? '',
-      })
-    );
-  } catch {
-    return [];
-  }
+  const voices: TTSVoiceInfo[] = [];
+  const ok = await native.ttsListVoicesProto((voiceBytes: ArrayBuffer) => {
+    voices.push(TTSVoiceInfoMessage.decode(arrayBufferToBytes(voiceBytes)));
+  });
+  return ok ? voices : [];
 }
 
 // ============================================================================
@@ -189,72 +184,8 @@ export async function synthesize(
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-  const startTime = Date.now();
   const native = requireNativeModule();
-
-  const voiceId = options?.voice ?? '';
-  const speedRate = options?.speakingRate ?? 1.0;
-  const pitchShift = options?.pitch ?? 1.0;
-
-  const resultJson = await native.synthesize(
-    text,
-    voiceId,
-    speedRate,
-    pitchShift
-  );
-  const endTime = Date.now();
-  const processingTimeMs = endTime - startTime;
-
-  try {
-    const result = JSON.parse(resultJson);
-    const sampleRate = result.sampleRate ?? 22050;
-    const audioSize = result.audioSize ?? 0;
-    const numSamples = Math.floor(audioSize / 4);
-    const durationMs = result.durationMs
-      ? result.durationMs
-      : numSamples > 0
-      ? Math.round((numSamples / sampleRate) * 1000)
-      : 0;
-
-    const audioBase64 = result.audioBase64 ?? result.audio ?? '';
-    const audioData = audioBase64 ? base64ToBytes(audioBase64) : new Uint8Array(0);
-
-    const metadata: TTSSynthesisMetadata = {
-      voiceId: voiceId || 'default',
-      languageCode: options?.languageCode ?? '',
-      processingTimeMs,
-      characterCount: text.length,
-      audioDurationMs: durationMs,
-    };
-
-    return {
-      audioData,
-      audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-      sampleRate,
-      durationMs,
-      phonemeTimestamps: result.phonemeTimestamps ?? [],
-      metadata,
-      timestampMs: Date.now(),
-    };
-  } catch (err) {
-    if (err instanceof Error) throw err;
-    if (resultJson.includes('error')) throw new Error(resultJson);
-    return {
-      audioData: new Uint8Array(0),
-      audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-      sampleRate: 22050,
-      durationMs: 0,
-      phonemeTimestamps: [],
-      metadata: {
-        voiceId: voiceId || 'default',
-        languageCode: options?.languageCode ?? '',
-        processingTimeMs,
-        characterCount: text.length,
-        audioDurationMs: 0,
-      },
-      timestampMs: Date.now(),
-    };
-  }
+  return decodeTTSOutput(await native.ttsSynthesizeProto(text, encodeTTSOptions(options)));
 }
 
 /**
@@ -279,18 +210,20 @@ export async function synthesizeStream(
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
-  const output = await synthesize(text, options);
-  if (output.audioData && output.audioData.byteLength > 0) {
-    try {
-      onAudioChunk(output.audioData.buffer.slice(
-        output.audioData.byteOffset,
-        output.audioData.byteOffset + output.audioData.byteLength
-      ) as ArrayBuffer);
-    } catch (error) {
-      logger.error(`Failed to emit audio chunk: ${error}`);
+  const native = requireNativeModule();
+  let lastOutput: TTSOutput | null = null;
+  await native.ttsSynthesizeStreamProto(
+    text,
+    encodeTTSOptions(options),
+    (chunkBytes: ArrayBuffer) => {
+      const output = decodeTTSOutput(chunkBytes);
+      lastOutput = output;
+      if (output.audioData.byteLength > 0) {
+        onAudioChunk(bytesToArrayBuffer(output.audioData));
+      }
     }
-  }
-  return output;
+  );
+  return lastOutput ?? synthesize(text, options);
 }
 
 /** AsyncIterable variant of `synthesizeStream`. */

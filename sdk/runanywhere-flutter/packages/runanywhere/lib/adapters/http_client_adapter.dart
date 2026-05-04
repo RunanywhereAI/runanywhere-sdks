@@ -142,7 +142,17 @@ class HTTPClientAdapter {
     );
   }
 
-  void configureDev({required String supabaseURL, required String supabaseKey}) {
+  void configureDev(
+      {required String supabaseURL, required String supabaseKey}) {
+    if (_looksLikePlaceholder(supabaseURL) ||
+        _looksLikePlaceholder(supabaseKey) ||
+        !_isUsableHttpUrl(supabaseURL)) {
+      _supabaseURL = '';
+      _supabaseKey = '';
+      _logger.warning('Dev Supabase config ignored: missing or placeholder');
+      return;
+    }
+
     _supabaseURL = supabaseURL;
     _supabaseKey = supabaseKey;
     _logger.info('Dev mode configured with Supabase');
@@ -154,10 +164,10 @@ class HTTPClientAdapter {
 
   String? get accessToken => _accessToken;
 
-  String get baseURL => _supabaseURL.isNotEmpty &&
-          _environment == SDKEnvironment.development
-      ? _supabaseURL
-      : _baseURL;
+  String get baseURL =>
+      _supabaseURL.isNotEmpty && _environment == SDKEnvironment.development
+          ? _supabaseURL
+          : _baseURL;
 
   SDKEnvironment get environment => _environment;
 
@@ -215,7 +225,8 @@ class HTTPClientAdapter {
     //   - Desktop / other: libcurl fallback inside commons
     // The former Android-HTTPS bypass via `dart:io HttpClient` has been
     // removed now that commons HTTP is functional on Android (B02/H1).
-    final res = await Isolate.run<_HttpRequestResult>(() => _sendBlocking(spec));
+    final res =
+        await Isolate.run<_HttpRequestResult>(() => _sendBlocking(spec));
     if (res.rc != 0) {
       throw HttpClientException(
         'rac_http_request_send failed with code ${res.rc}',
@@ -449,9 +460,8 @@ class HTTPClientAdapter {
     if (body is List<int>) return Uint8List.fromList(body);
     // Map / List / toJson object — JSON-encode.
     try {
-      final jsonable = (body is Map || body is List)
-          ? body
-          : (body as dynamic).toJson();
+      final jsonable =
+          (body is Map || body is List) ? body : (body as dynamic).toJson();
       return Uint8List.fromList(utf8.encode(json.encode(jsonable)));
     } catch (_) {
       throw ArgumentError(
@@ -464,6 +474,19 @@ class HTTPClientAdapter {
     return match != null
         ? match.group(1)!
         : url.substring(0, url.length.clamp(0, 30));
+  }
+
+  bool _looksLikePlaceholder(String value) {
+    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+        .hasMatch(value);
+  }
+
+  bool _isUsableHttpUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
   }
 }
 
@@ -523,9 +546,8 @@ _HttpRequestResult _sendBlocking(_HttpRequestSpec spec) {
 
   final body = spec.body;
   final bodyLen = body?.length ?? 0;
-  final bodyPtr = bodyLen == 0
-      ? ffi.nullptr.cast<ffi.Uint8>()
-      : calloc<ffi.Uint8>(bodyLen);
+  final bodyPtr =
+      bodyLen == 0 ? ffi.nullptr.cast<ffi.Uint8>() : calloc<ffi.Uint8>(bodyLen);
   if (bodyLen > 0 && body != null) {
     bodyPtr.asTypedList(bodyLen).setAll(0, body);
   }

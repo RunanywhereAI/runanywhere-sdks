@@ -3,17 +3,15 @@
 // runanywhere_hardware.dart — Hardware Profile capability surface
 // (canonical §14 namespace). Mirrors Swift `RunAnywhere.Hardware` and
 // the RN/Web `RunAnywhere.hardware.*` namespace.
-//
-// G-C6 / G-B1 note: hardware_profile.proto + `rac_hardware_profile_*`
-// C ABI are not yet shipped. We expose the canonical namespace shape
-// and synthesize the values from the existing Dart-side device probe
-// (`RunAnywhereDevice.getChip()`) plus platform info.
 
+import 'dart:async' show Future;
 import 'dart:io' show Platform;
 
 import 'package:flutter/services.dart';
 
 import 'package:runanywhere/core/types/npu_chip.dart';
+import 'package:runanywhere/generated/hardware_profile.pb.dart';
+import 'package:runanywhere/native/dart_bridge_hardware.dart';
 
 /// Hardware profile capability surface.
 ///
@@ -26,14 +24,31 @@ class RunAnywhereHardware {
   static const _channel = MethodChannel('runanywhere');
 
   /// Aggregate device profile (chip, NPU presence, recommended accel).
-  Future<HardwareProfile> getProfile() async {
+  Future<HardwareProfileResult> getProfile() async {
+    final nativeProfile = DartBridgeHardware.getProfile();
+    if (nativeProfile != null) return nativeProfile;
+
     final chip = await _detectChip();
-    final hasNPU = chip != null;
+    final hasAccelerator = Platform.isIOS || Platform.isMacOS || chip != null;
     final accel = await _detectAccelerationMode();
-    return HardwareProfile(
-      chip: chip?.displayName ?? _genericChipLabel(),
-      hasNeuralEngine: hasNPU,
-      accelerationMode: accel,
+    return HardwareProfileResult(
+      profile: HardwareProfile(
+        chip: chip?.displayName ?? _genericChipLabel(),
+        hasNeuralEngine: hasAccelerator,
+        accelerationMode: accel,
+        platform: _platformLabel(),
+      ),
+      accelerators: [
+        AcceleratorInfo(
+          name: accel,
+          type: accel == 'ane'
+              ? AcceleratorPreference.ACCELERATOR_PREFERENCE_ANE
+              : accel == 'gpu'
+                  ? AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU
+                  : AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU,
+          available: true,
+        ),
+      ],
     );
   }
 
@@ -56,9 +71,15 @@ class RunAnywhereHardware {
     return (await _detectChip()) != null;
   }
 
-  /// Recommended acceleration mode (`"NPU"`, `"Neural Engine"`, `"GPU"`,
-  /// `"CPU"`). Mirrors the Swift / Web `accelerationMode` getter.
+  /// Recommended acceleration mode (`"ane"`, `"gpu"`, `"cpu"`).
   Future<String> get accelerationMode async => _detectAccelerationMode();
+
+  /// Set the C++ routing preference for future accelerator-aware operations.
+  ///
+  /// Returns false when the bundled native library does not expose the hardware
+  /// ABI yet.
+  bool setAcceleratorPreference(AcceleratorPreference preference) =>
+      DartBridgeHardware.setAcceleratorPreference(preference);
 
   // -- internal helpers --------------------------------------------------
 
@@ -74,10 +95,10 @@ class RunAnywhereHardware {
   }
 
   Future<String> _detectAccelerationMode() async {
-    if (Platform.isIOS || Platform.isMacOS) return 'Neural Engine';
+    if (Platform.isIOS || Platform.isMacOS) return 'ane';
     final chip = await _detectChip();
-    if (chip != null) return 'NPU';
-    return 'CPU';
+    if (chip != null) return 'gpu';
+    return 'cpu';
   }
 
   String _genericChipLabel() {
@@ -88,23 +109,13 @@ class RunAnywhereHardware {
     if (Platform.isLinux) return 'Linux';
     return 'Unknown';
   }
+
+  String _platformLabel() {
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isMacOS) return 'macos';
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isWindows) return 'windows';
+    if (Platform.isLinux) return 'linux';
+    return 'unknown';
+  }
 }
-
-/// Hardware profile snapshot returned from `hardware.getProfile()`.
-class HardwareProfile {
-  final String chip;
-  final bool hasNeuralEngine;
-  final String accelerationMode;
-
-  const HardwareProfile({
-    required this.chip,
-    required this.hasNeuralEngine,
-    required this.accelerationMode,
-  });
-}
-
-/// Canonical alias matching `HardwareProfileResult` from the generated proto
-/// type (`packages/runanywhere/lib/generated/hardware_profile.pb.dart`).
-/// Wave 3 Step 3.2: lets callers spell the type as `HardwareProfileResult`
-/// per CANONICAL_API §14, ahead of the Wave 4 type unification.
-typedef HardwareProfileResult = HardwareProfile;

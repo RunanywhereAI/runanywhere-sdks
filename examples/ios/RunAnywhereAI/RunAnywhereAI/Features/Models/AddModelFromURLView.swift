@@ -189,6 +189,7 @@ struct AddModelFromURLView: View {
                 supportsThinking: supportsThinking
             )
         }
+        await RunAnywhere.flushPendingRegistrations()
 
         await MainActor.run {
             onModelAdded(modelInfo)

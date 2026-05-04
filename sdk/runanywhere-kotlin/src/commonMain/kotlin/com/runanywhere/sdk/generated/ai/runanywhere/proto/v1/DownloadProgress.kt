@@ -121,6 +121,55 @@ public class DownloadProgress(
     schemaIndex = 9,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "taskId",
+    schemaIndex = 10,
+  )
+  public val task_id: String = "",
+  /**
+   * 0-based within the planned file list
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "currentFileIndex",
+    schemaIndex = 11,
+  )
+  public val current_file_index: Int = 0,
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalFiles",
+    schemaIndex = 12,
+  )
+  public val total_files: Int = 0,
+  /**
+   * C++ storage identifier, not a platform file handle
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "storageKey",
+    schemaIndex = 13,
+  )
+  public val storage_key: String = "",
+  /**
+   * final path once known
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "localPath",
+    schemaIndex = 14,
+  )
+  public val local_path: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadProgress, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -144,6 +193,11 @@ public class DownloadProgress(
     if (state != other.state) return false
     if (retry_attempt != other.retry_attempt) return false
     if (error_message != other.error_message) return false
+    if (task_id != other.task_id) return false
+    if (current_file_index != other.current_file_index) return false
+    if (total_files != other.total_files) return false
+    if (storage_key != other.storage_key) return false
+    if (local_path != other.local_path) return false
     return true
   }
 
@@ -161,6 +215,11 @@ public class DownloadProgress(
       result = result * 37 + state.hashCode()
       result = result * 37 + retry_attempt.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + task_id.hashCode()
+      result = result * 37 + current_file_index.hashCode()
+      result = result * 37 + total_files.hashCode()
+      result = result * 37 + storage_key.hashCode()
+      result = result * 37 + local_path.hashCode()
       super.hashCode = result
     }
     return result
@@ -178,6 +237,11 @@ public class DownloadProgress(
     result += """state=$state"""
     result += """retry_attempt=$retry_attempt"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """task_id=${sanitize(task_id)}"""
+    result += """current_file_index=$current_file_index"""
+    result += """total_files=$total_files"""
+    result += """storage_key=${sanitize(storage_key)}"""
+    result += """local_path=${sanitize(local_path)}"""
     return result.joinToString(prefix = "DownloadProgress{", separator = ", ", postfix = "}")
   }
 
@@ -192,10 +256,15 @@ public class DownloadProgress(
     state: DownloadState = this.state,
     retry_attempt: Int = this.retry_attempt,
     error_message: String = this.error_message,
+    task_id: String = this.task_id,
+    current_file_index: Int = this.current_file_index,
+    total_files: Int = this.total_files,
+    storage_key: String = this.storage_key,
+    local_path: String = this.local_path,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadProgress = DownloadProgress(model_id, stage, bytes_downloaded, total_bytes,
-      stage_progress, overall_speed_bps, eta_seconds, state, retry_attempt, error_message,
-      unknownFields)
+      stage_progress, overall_speed_bps, eta_seconds, state, retry_attempt, error_message, task_id,
+      current_file_index, total_files, storage_key, local_path, unknownFields)
 
   public companion object {
     @JvmField
@@ -228,6 +297,15 @@ public class DownloadProgress(
             value.retry_attempt)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(10,
             value.error_message)
+        if (value.task_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.task_id)
+        if (value.current_file_index != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
+            value.current_file_index)
+        if (value.total_files != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(13,
+            value.total_files)
+        if (value.storage_key != "") size += ProtoAdapter.STRING.encodedSizeWithTag(14,
+            value.storage_key)
+        if (value.local_path != "") size += ProtoAdapter.STRING.encodedSizeWithTag(15,
+            value.local_path)
         return size
       }
 
@@ -249,11 +327,25 @@ public class DownloadProgress(
             value.retry_attempt)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 10,
             value.error_message)
+        if (value.task_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 11, value.task_id)
+        if (value.current_file_index != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
+            value.current_file_index)
+        if (value.total_files != 0) ProtoAdapter.INT32.encodeWithTag(writer, 13, value.total_files)
+        if (value.storage_key != "") ProtoAdapter.STRING.encodeWithTag(writer, 14,
+            value.storage_key)
+        if (value.local_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 15, value.local_path)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadProgress) {
         writer.writeBytes(value.unknownFields)
+        if (value.local_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 15, value.local_path)
+        if (value.storage_key != "") ProtoAdapter.STRING.encodeWithTag(writer, 14,
+            value.storage_key)
+        if (value.total_files != 0) ProtoAdapter.INT32.encodeWithTag(writer, 13, value.total_files)
+        if (value.current_file_index != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
+            value.current_file_index)
+        if (value.task_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 11, value.task_id)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 10,
             value.error_message)
         if (value.retry_attempt != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9,
@@ -284,6 +376,11 @@ public class DownloadProgress(
         var state: DownloadState = DownloadState.DOWNLOAD_STATE_UNSPECIFIED
         var retry_attempt: Int = 0
         var error_message: String = ""
+        var task_id: String = ""
+        var current_file_index: Int = 0
+        var total_files: Int = 0
+        var storage_key: String = ""
+        var local_path: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -304,6 +401,11 @@ public class DownloadProgress(
             }
             9 -> retry_attempt = ProtoAdapter.INT32.decode(reader)
             10 -> error_message = ProtoAdapter.STRING.decode(reader)
+            11 -> task_id = ProtoAdapter.STRING.decode(reader)
+            12 -> current_file_index = ProtoAdapter.INT32.decode(reader)
+            13 -> total_files = ProtoAdapter.INT32.decode(reader)
+            14 -> storage_key = ProtoAdapter.STRING.decode(reader)
+            15 -> local_path = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -318,6 +420,11 @@ public class DownloadProgress(
           state = state,
           retry_attempt = retry_attempt,
           error_message = error_message,
+          task_id = task_id,
+          current_file_index = current_file_index,
+          total_files = total_files,
+          storage_key = storage_key,
+          local_path = local_path,
           unknownFields = unknownFields
         )
       }

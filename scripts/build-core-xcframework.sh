@@ -109,6 +109,33 @@ merge_static_archives() {
     run xcrun libtool -static -o "${output}" "${inputs[@]}"
 }
 
+RAC_PROTO_STATIC_DEPS=()
+
+collect_protobuf_static_deps() {
+    local build_root="$1"
+    local dep
+    RAC_PROTO_STATIC_DEPS=()
+
+    if [ "${DRY_RUN}" = "1" ] || [ ! -d "${build_root}/_deps" ]; then
+        return
+    fi
+
+    while IFS= read -r dep; do
+        RAC_PROTO_STATIC_DEPS+=("${dep}")
+    done < <(find "${build_root}/_deps" -type f \( \
+        -name "libprotobuf.a" -o \
+        -name "libprotobuf-lite.a" -o \
+        -name "libabsl*.a" -o \
+        -name "libutf8*.a" \
+    \) | sort)
+
+    if [ "${DRY_RUN}" != "1" ] && [ "${#RAC_PROTO_STATIC_DEPS[@]}" -eq 0 ]; then
+        echo "error: no vendored protobuf/abseil static archives found under ${build_root}/_deps" >&2
+        echo "       RACommons.xcframework must bundle protobuf runtime objects." >&2
+        exit 1
+    fi
+}
+
 merge_commons_slice() {
     local build_root="$1"
     local slice_dir="$2"
@@ -118,8 +145,16 @@ merge_commons_slice() {
     local inputs=(
         "${build_root}/sdk/runanywhere-commons/${slice_dir}/librac_commons.a"
         "${build_root}/_deps/libarchive-build/libarchive/${slice_dir}/libarchive.a"
-        "${build_root}/_deps/curl_fetched-build/lib/${slice_dir}/libcurl.a"
     )
+
+    # libcurl was removed from the native HTTP transport, but older dependency
+    # graphs may still produce it. Bundle it only when it exists.
+    local bundled_curl="${build_root}/_deps/curl_fetched-build/lib/${slice_dir}/libcurl.a"
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${bundled_curl}" ]; then
+        inputs+=("${bundled_curl}")
+    fi
+    collect_protobuf_static_deps "${build_root}"
+    inputs+=("${RAC_PROTO_STATIC_DEPS[@]}")
 
     local prepared=()
     local input
@@ -140,12 +175,14 @@ merge_commons_macos_slice() {
         "${build_root}/_deps/libarchive-build/libarchive/libarchive.a"
     )
 
-    # macOS uses the system libcurl when CMake finds CURL::libcurl. iOS cannot
-    # rely on a system archive, so that slice still bundles curl_fetched above.
+    # libcurl was removed from the native HTTP transport, but older dependency
+    # graphs may still produce it. Bundle it only when it exists.
     local bundled_curl="${build_root}/_deps/curl_fetched-build/lib/libcurl.a"
     if [ "${DRY_RUN}" = "1" ] || [ -f "${bundled_curl}" ]; then
         inputs+=("${bundled_curl}")
     fi
+    collect_protobuf_static_deps "${build_root}"
+    inputs+=("${RAC_PROTO_STATIC_DEPS[@]}")
 
     local prepared=()
     local input
@@ -322,28 +359,29 @@ run mkdir -p "${STAGING_DIR}"
 # 1 & 2. Configure + build iOS slices (device + simulator) plus the macOS
 #        commons slice used by `swift test` on local development machines.
 # ────────────────────────────────────────────────────────────────────────────
-cmake_extra=""
+cmake_extra=(
+    "-DRAC_ENABLE_PROTOBUF=ON"
+    "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
+    "-DRAC_VENDOR_PROTOBUF=ON"
+    "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
+)
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
-    cmake_extra="-DRAC_BACKEND_ONNX=OFF"
+    cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
 fi
 
 echo "▶ Configure ios-device"
-if [ -n "${cmake_extra}" ]; then
-    run cmake --preset ios-device "${cmake_extra}"
-else
-    run cmake --preset ios-device
-fi
+run cmake --preset ios-device "${cmake_extra[@]}"
 echo "▶ Build ios-device (Release)"
-run cmake --build --preset ios-device --config Release
+ios_build_targets=(rac_commons rac_backend_llamacpp)
+if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
+    ios_build_targets+=(rac_backend_onnx)
+fi
+run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}"
 
 echo "▶ Configure ios-simulator"
-if [ -n "${cmake_extra}" ]; then
-    run cmake --preset ios-simulator "${cmake_extra}"
-else
-    run cmake --preset ios-simulator
-fi
+run cmake --preset ios-simulator "${cmake_extra[@]}"
 echo "▶ Build ios-simulator (Release)"
-run cmake --build --preset ios-simulator --config Release
+run cmake --build --preset ios-simulator --config Release --target "${ios_build_targets[@]}"
 
 echo "▶ Configure macos-release"
 macos_cmake_args=(
@@ -357,6 +395,9 @@ macos_cmake_args=(
     "-DRAC_BACKEND_METALRT=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=TRUE"
+    "-DRAC_ENABLE_PROTOBUF=ON"
+    "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
+    "-DRAC_VENDOR_PROTOBUF=ON"
 )
 run cmake --preset macos-release "${macos_cmake_args[@]}"
 echo "▶ Build macos-release"

@@ -21,7 +21,19 @@ import type {
   SDKEnvironment,
 } from './enums';
 
-// Canonical proto-encoded storage / model-info messages.
+// Canonical proto-encoded model / storage messages. Prefer these for every new
+// public API. The hand-written interfaces below are legacy RN bridge DTOs kept
+// only until the native registry/storage JSON surfaces are replaced by proto
+// bytes.
+export type {
+  ModelInfo as ModelInfoProto,
+  ModelFileDescriptor as ModelFileDescriptorProto,
+  SingleFileArtifact as SingleFileArtifactProto,
+  ArchiveArtifact as ArchiveArtifactProto,
+  MultiFileArtifact as MultiFileArtifactProto,
+  ExpectedModelFiles as ExpectedModelFilesProto,
+} from '@runanywhere/proto-ts/model_types';
+
 export type {
   DeviceStorageInfo as DeviceStorageInfoProto,
   AppStorageInfo as AppStorageInfoProto,
@@ -55,8 +67,10 @@ export interface ModelInfoMetadata {
 }
 
 /**
- * Information about a model
- * Reference: ModelInfo.swift
+ * @deprecated Legacy RN registry bridge DTO. New public APIs must use generated
+ * `ModelInfo` from `@runanywhere/proto-ts/model_types`. This shape remains
+ * unsupported for new work and exists only because current native registry
+ * methods still return JSON with `compatibleFrameworks` / `isDownloaded`.
  */
 export interface ModelInfo {
   /** Unique identifier */
@@ -140,7 +154,8 @@ export interface ModelInfo {
 // ============================================================================
 
 /**
- * Result of a model compatibility check
+ * @deprecated Legacy RN compatibility DTO. Replace with C++/proto model routing
+ * and compatibility results when the RN bridge exposes the proto-byte API.
  */
 export interface ModelCompatibilityResult {
   /** Overall compatibility (canRun AND canFit) */
@@ -171,8 +186,8 @@ export interface ModelCompatibilityResult {
 
 
 /**
- * Options for text generation
- * Reference: GenerationOptions.swift
+ * @deprecated Use generated `LLMGenerationOptions` from
+ * `@runanywhere/proto-ts/llm_options`.
  */
 export interface GenerationOptions {
   /** Maximum number of tokens to generate */
@@ -314,7 +329,8 @@ export interface DefaultGenerationSettings {
 }
 
 /**
- * Storage information
+ * @deprecated Use generated `StorageInfo` from
+ * `@runanywhere/proto-ts/storage_types`.
  */
 export interface StorageInfo {
   /** Total storage available in bytes */
@@ -331,7 +347,7 @@ export interface StorageInfo {
 }
 
 /**
- * Stored model information
+ * @deprecated Use generated storage/model registry protos instead.
  */
 export interface StoredModel {
   /** Model ID */

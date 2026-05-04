@@ -2,7 +2,9 @@
 // Mirrors Swift RunAnywhere+ModelManagement.swift.
 // Provides model lifecycle helpers beyond RunAnywhereModels (listing/download).
 
-import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show ModelCategory;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 class RunAnywhereModelManagement {

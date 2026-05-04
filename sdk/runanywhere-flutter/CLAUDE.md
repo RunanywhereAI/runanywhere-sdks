@@ -6,7 +6,7 @@ This is a **Melos-managed monorepo** containing four Flutter plugin packages tha
 
 ```
 sdk/runanywhere-flutter/
-├── melos.yaml                  # Monorepo config (4 packages, 4 scripts)
+├── pubspec.yaml                # Dart workspace + Melos config (4 packages, 4 scripts)
 ├── analysis_options.yaml       # Shared lint rules (strict-casts, strict-inference)
 ├── scripts/package-sdk.sh      # Packaging/validation script
 ├── docs/
@@ -35,11 +35,11 @@ All three backend packages depend on `runanywhere ^0.19.0`. The core package ven
 
 ```bash
 # Melos commands (from sdk/runanywhere-flutter/)
-melos bootstrap        # flutter pub get in all 4 packages (parallel)
-melos analyze          # flutter analyze in all 4 packages
-melos format           # dart format in all 4 packages
-melos test             # flutter test in all 4 packages
-melos clean            # flutter clean in all 4 packages
+melos bootstrap        # flutter pub get for the Dart workspace
+melos run analyze      # flutter analyze --no-pub in all 4 packages
+melos run format       # dart format in all 4 packages
+melos run test         # flutter test in all 4 packages
+melos run clean        # flutter clean in all 4 packages
 melos version          # Bump versions + generate workspace CHANGELOG
 
 # Packaging script
@@ -56,8 +56,8 @@ flutter build ios              # Build iOS
 
 ## System Requirements
 
-- Flutter 3.10.0+ (recommended 3.24.0+)
-- Dart 3.0.0+ (recommended 3.5.0+)
+- Flutter 3.24.0+
+- Dart 3.5.0+
 - iOS 15.1+ deployment target (podspec), 14.0+ minimum supported
 - Android API 24+ (minSdk), compileSdk 34
 - Xcode 15.0+

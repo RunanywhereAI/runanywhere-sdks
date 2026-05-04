@@ -85,6 +85,10 @@ public enum class DiffusionScheduler(
    * forward-looking — pairs with the LCM model variant
    */
   DIFFUSION_SCHEDULER_LCM(9),
+  /**
+   * Swift/Kotlin/RN/Web/C-ABI
+   */
+  DIFFUSION_SCHEDULER_DPMPP_2M_SDE(10),
   ;
 
   public companion object {
@@ -110,6 +114,7 @@ public enum class DiffusionScheduler(
       7 -> DIFFUSION_SCHEDULER_PNDM
       8 -> DIFFUSION_SCHEDULER_LMS
       9 -> DIFFUSION_SCHEDULER_LCM
+      10 -> DIFFUSION_SCHEDULER_DPMPP_2M_SDE
       else -> null
     }
   }

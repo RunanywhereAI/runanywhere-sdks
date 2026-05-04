@@ -90,6 +90,28 @@ public class RAGStatistics(
     schemaIndex = 4,
   )
   public val index_path: String? = null,
+  /**
+   * Raw backend statistics JSON for implementations that cannot yet project
+   * every counter into typed fields.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "statsJson",
+    schemaIndex = 5,
+  )
+  public val stats_json: String? = null,
+  /**
+   * Approximate vector-store footprint in bytes, when known.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "vectorStoreSizeBytes",
+    schemaIndex = 6,
+  )
+  public val vector_store_size_bytes: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGStatistics, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -108,6 +130,8 @@ public class RAGStatistics(
     if (total_tokens_indexed != other.total_tokens_indexed) return false
     if (last_updated_ms != other.last_updated_ms) return false
     if (index_path != other.index_path) return false
+    if (stats_json != other.stats_json) return false
+    if (vector_store_size_bytes != other.vector_store_size_bytes) return false
     return true
   }
 
@@ -120,6 +144,8 @@ public class RAGStatistics(
       result = result * 37 + total_tokens_indexed.hashCode()
       result = result * 37 + last_updated_ms.hashCode()
       result = result * 37 + (index_path?.hashCode() ?: 0)
+      result = result * 37 + (stats_json?.hashCode() ?: 0)
+      result = result * 37 + vector_store_size_bytes.hashCode()
       super.hashCode = result
     }
     return result
@@ -132,6 +158,8 @@ public class RAGStatistics(
     result += """total_tokens_indexed=$total_tokens_indexed"""
     result += """last_updated_ms=$last_updated_ms"""
     if (index_path != null) result += """index_path=${sanitize(index_path)}"""
+    if (stats_json != null) result += """stats_json=${sanitize(stats_json)}"""
+    result += """vector_store_size_bytes=$vector_store_size_bytes"""
     return result.joinToString(prefix = "RAGStatistics{", separator = ", ", postfix = "}")
   }
 
@@ -141,9 +169,11 @@ public class RAGStatistics(
     total_tokens_indexed: Long = this.total_tokens_indexed,
     last_updated_ms: Long = this.last_updated_ms,
     index_path: String? = this.index_path,
+    stats_json: String? = this.stats_json,
+    vector_store_size_bytes: Long = this.vector_store_size_bytes,
     unknownFields: ByteString = this.unknownFields,
   ): RAGStatistics = RAGStatistics(indexed_documents, indexed_chunks, total_tokens_indexed,
-      last_updated_ms, index_path, unknownFields)
+      last_updated_ms, index_path, stats_json, vector_store_size_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -166,6 +196,9 @@ public class RAGStatistics(
         if (value.last_updated_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(4,
             value.last_updated_ms)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.index_path)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.stats_json)
+        if (value.vector_store_size_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.vector_store_size_bytes)
         return size
       }
 
@@ -179,11 +212,17 @@ public class RAGStatistics(
         if (value.last_updated_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
             value.last_updated_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.index_path)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.stats_json)
+        if (value.vector_store_size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.vector_store_size_bytes)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGStatistics) {
         writer.writeBytes(value.unknownFields)
+        if (value.vector_store_size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.vector_store_size_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.stats_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.index_path)
         if (value.last_updated_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
             value.last_updated_ms)
@@ -201,6 +240,8 @@ public class RAGStatistics(
         var total_tokens_indexed: Long = 0L
         var last_updated_ms: Long = 0L
         var index_path: String? = null
+        var stats_json: String? = null
+        var vector_store_size_bytes: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> indexed_documents = ProtoAdapter.INT64.decode(reader)
@@ -208,6 +249,8 @@ public class RAGStatistics(
             3 -> total_tokens_indexed = ProtoAdapter.INT64.decode(reader)
             4 -> last_updated_ms = ProtoAdapter.INT64.decode(reader)
             5 -> index_path = ProtoAdapter.STRING.decode(reader)
+            6 -> stats_json = ProtoAdapter.STRING.decode(reader)
+            7 -> vector_store_size_bytes = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -217,6 +260,8 @@ public class RAGStatistics(
           total_tokens_indexed = total_tokens_indexed,
           last_updated_ms = last_updated_ms,
           index_path = index_path,
+          stats_json = stats_json,
+          vector_store_size_bytes = vector_store_size_bytes,
           unknownFields = unknownFields
         )
       }

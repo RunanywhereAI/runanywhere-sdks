@@ -119,6 +119,18 @@ public class TTSOptions(
     schemaIndex = 6,
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
+  /**
+   * Output sample rate override in Hz. 0 = component/default sample rate.
+   * Present in rac_tts_options_t and several SDK option structs.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sampleRate",
+    schemaIndex = 7,
+  )
+  public val sample_rate: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -139,6 +151,7 @@ public class TTSOptions(
     if (volume != other.volume) return false
     if (enable_ssml != other.enable_ssml) return false
     if (audio_format != other.audio_format) return false
+    if (sample_rate != other.sample_rate) return false
     return true
   }
 
@@ -153,6 +166,7 @@ public class TTSOptions(
       result = result * 37 + volume.hashCode()
       result = result * 37 + enable_ssml.hashCode()
       result = result * 37 + audio_format.hashCode()
+      result = result * 37 + sample_rate.hashCode()
       super.hashCode = result
     }
     return result
@@ -167,6 +181,7 @@ public class TTSOptions(
     result += """volume=$volume"""
     result += """enable_ssml=$enable_ssml"""
     result += """audio_format=$audio_format"""
+    result += """sample_rate=$sample_rate"""
     return result.joinToString(prefix = "TTSOptions{", separator = ", ", postfix = "}")
   }
 
@@ -178,9 +193,10 @@ public class TTSOptions(
     volume: Float = this.volume,
     enable_ssml: Boolean = this.enable_ssml,
     audio_format: AudioFormat = this.audio_format,
+    sample_rate: Int = this.sample_rate,
     unknownFields: ByteString = this.unknownFields,
   ): TTSOptions = TTSOptions(voice, language_code, speaking_rate, pitch, volume, enable_ssml,
-      audio_format, unknownFields)
+      audio_format, sample_rate, unknownFields)
 
   public companion object {
     @JvmField
@@ -205,6 +221,8 @@ public class TTSOptions(
             value.enable_ssml)
         if (value.audio_format != AudioFormat.AUDIO_FORMAT_UNSPECIFIED) size +=
             AudioFormat.ADAPTER.encodedSizeWithTag(7, value.audio_format)
+        if (value.sample_rate != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.sample_rate)
         return size
       }
 
@@ -220,11 +238,13 @@ public class TTSOptions(
             value.enable_ssml)
         if (value.audio_format != AudioFormat.AUDIO_FORMAT_UNSPECIFIED)
             AudioFormat.ADAPTER.encodeWithTag(writer, 7, value.audio_format)
+        if (value.sample_rate != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.sample_rate)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.sample_rate != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.sample_rate)
         if (value.audio_format != AudioFormat.AUDIO_FORMAT_UNSPECIFIED)
             AudioFormat.ADAPTER.encodeWithTag(writer, 7, value.audio_format)
         if (value.enable_ssml != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
@@ -246,6 +266,7 @@ public class TTSOptions(
         var volume: Float = 0f
         var enable_ssml: Boolean = false
         var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
+        var sample_rate: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> voice = ProtoAdapter.STRING.decode(reader)
@@ -259,6 +280,7 @@ public class TTSOptions(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            8 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -270,6 +292,7 @@ public class TTSOptions(
           volume = volume,
           enable_ssml = enable_ssml,
           audio_format = audio_format,
+          sample_rate = sample_rate,
           unknownFields = unknownFields
         )
       }

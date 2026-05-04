@@ -17,9 +17,10 @@
 
 #include <NitroModules/Promise.hpp>
 #include <string>
+#include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
 #include <optional>
-#include <NitroModules/Null.hpp>
+// #include <NitroModules/Null.hpp> // Removed - file does not exist in nitro-modules 0.31.3
 #include <variant>
 
 namespace margelo::nitro::runanywhere {
@@ -66,6 +67,13 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
       virtual std::shared_ptr<Promise<bool>> clearDeviceRegistration() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(const std::string& modelId) = 0;
+      virtual std::shared_ptr<Promise<bool>> registerModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> updateModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() = 0;
       virtual std::shared_ptr<Promise<std::string>> getAvailableModels() = 0;
       virtual std::shared_ptr<Promise<std::string>> getModelInfo(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) = 0;
@@ -75,11 +83,32 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> refreshModelRegistry(bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) = 0;
       virtual std::shared_ptr<Promise<void>> downloadModel(const std::string& url, const std::string& destPath, const std::string& cancelToken, const std::function<void(const std::string& /* progressJson */)>& onProgress, const std::optional<std::string>& expectedSha256Hex) = 0;
       virtual std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadPlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadStartProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadCancelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadResumeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadProgressPollProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* progressBytes */)>& onProgressBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() = 0;
       virtual std::shared_ptr<Promise<std::string>> getStorageInfo() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;
       virtual std::shared_ptr<Promise<bool>> deleteModel(const std::string& modelId) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeletePlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeleteProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hardwareProfileProto() = 0;
       virtual std::shared_ptr<Promise<void>> emitEvent(const std::string& eventJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> pollEvents() = 0;
+      virtual std::shared_ptr<Promise<double>> subscribeSDKEventsProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> unsubscribeSDKEventsProto(double subscriptionId) = 0;
+      virtual std::shared_ptr<Promise<bool>> publishSDKEventProto(const std::shared_ptr<ArrayBuffer>& eventBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> pollSDKEventProto() = 0;
+      virtual std::shared_ptr<Promise<bool>> publishSDKFailureProto(double errorCode, const std::string& message, const std::string& component, const std::string& operation, bool recoverable) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> modelLifecycleLoadProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> modelLifecycleUnloadProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> currentModelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> componentLifecycleSnapshotProto(double component) = 0;
       virtual std::shared_ptr<Promise<bool>> configureHttp(const std::string& baseUrl, const std::string& apiKey) = 0;
       virtual std::shared_ptr<Promise<std::string>> httpRequest(const std::string& method, const std::string& url, const std::string& headersJson, const std::string& bodyJson, double timeoutMs) = 0;
       virtual std::shared_ptr<Promise<std::string>> authAuthenticate(const std::string& apiKey, const std::string& baseURL, const std::string& deviceId, const std::string& platform, const std::string& sdkVersion) = 0;
@@ -96,6 +125,9 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<double>> getLLMHandle() = 0;
       virtual std::shared_ptr<Promise<bool>> cancelGeneration() = 0;
       virtual std::shared_ptr<Promise<std::string>> generateStructured(const std::string& prompt, const std::string& schema, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmGenerateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> llmGenerateStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmCancelProto() = 0;
       virtual std::shared_ptr<Promise<std::string>> llmExtractThinking(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<std::string>> llmStripThinking(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(double totalCompletionTokens, const std::string& responseText, const std::string& thinkingText) = 0;
@@ -104,17 +136,26 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::string>> transcribe(const std::string& audioBase64, double sampleRate, const std::optional<std::string>& language) = 0;
       virtual std::shared_ptr<Promise<std::string>> transcribeFile(const std::string& filePath, const std::optional<std::string>& language) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& audioBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> sttTranscribeStreamProto(const std::shared_ptr<ArrayBuffer>& audioBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* partialBytes */)>& onPartialBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> loadTTSModel(const std::string& modelPath, const std::string& modelType, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTTSModel() = 0;
       virtual std::shared_ptr<Promise<std::string>> synthesize(const std::string& text, const std::string& voiceId, double speedRate, double pitchShift) = 0;
       virtual std::shared_ptr<Promise<std::string>> getTTSVoices() = 0;
       virtual std::shared_ptr<Promise<bool>> cancelTTS() = 0;
+      virtual std::shared_ptr<Promise<bool>> ttsListVoicesProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* voiceBytes */)>& onVoiceBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsSynthesizeProto(const std::string& text, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> ttsSynthesizeStreamProto(const std::string& text, const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunkBytes */)>& onChunkBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> loadVADModel(const std::string& modelPath, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isVADModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadVADModel() = 0;
       virtual std::shared_ptr<Promise<std::string>> processVAD(const std::string& audioBase64, const std::optional<std::string>& optionsJson) = 0;
       virtual std::shared_ptr<Promise<void>> resetVAD() = 0;
+      virtual std::shared_ptr<Promise<bool>> vadConfigureProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadProcessProto(const std::shared_ptr<ArrayBuffer>& samplesBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadGetStatisticsProto() = 0;
+      virtual std::shared_ptr<Promise<bool>> vadSetActivityCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* activityBytes */)>& onActivityBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageSet(const std::string& key, const std::string& value) = 0;
       virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) = 0;
@@ -134,6 +175,9 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(const std::string& prompt) = 0;
       virtual std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<void>> cleanupVoiceAgent() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentComponentStatesProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentProcessTurnProto(const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
       virtual std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) = 0;
       virtual std::shared_ptr<Promise<std::string>> formatToolsForPrompt(const std::string& toolsJson, const std::string& format) = 0;
       virtual std::shared_ptr<Promise<std::string>> buildInitialPrompt(const std::string& userPrompt, const std::string& toolsJson, const std::string& optionsJson) = 0;
@@ -146,6 +190,19 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> ragClearDocuments() = 0;
       virtual std::shared_ptr<Promise<double>> ragGetDocumentCount() = 0;
       virtual std::shared_ptr<Promise<std::string>> ragGetStatistics() = 0;
+      virtual std::shared_ptr<Promise<bool>> ragCreatePipelineProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> ragDestroyPipelineProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragIngestProto(const std::shared_ptr<ArrayBuffer>& documentBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragClearProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragStatsProto() = 0;
+      virtual std::shared_ptr<Promise<double>> embeddingsCreateProto(const std::string& modelId, const std::optional<std::string>& configJson) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchProto(double handle, const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraLoadProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraClearProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCompatibilityProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::string& configBytesBase64) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionStart(double handle) = 0;

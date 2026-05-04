@@ -47,12 +47,20 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolResult
  *         name = "get_weather",
  *         description = "Gets current weather for a location",
  *         parameters = listOf(
- *             ToolParameter("location", ToolParameterType.STRING, "City name"),
+ *             ToolParameter(
+ *                 name = "location",
+ *                 type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+ *                 description = "City name",
+ *                 required = true,
+ *             ),
  *         ),
  *     ),
  * ) { args ->
- *     val location = args["location"]?.stringValue ?: "Unknown"
- *     mapOf("temperature" to ToolValue.number(72), "condition" to ToolValue.string("Sunny"))
+ *     val location = args["location"]?.string_value ?: "Unknown"
+ *     mapOf(
+ *         "temperature" to ToolValue(number_value = 72.0),
+ *         "condition" to ToolValue(string_value = "Sunny"),
+ *     )
  * }
  * ```
  *
@@ -104,8 +112,8 @@ expect suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult
  * 1. Builds a system prompt describing available tools (via C++ bridge).
  * 2. Generates LLM response.
  * 3. Parses output for `<tool_call>` tags (via C++ bridge).
- * 4. If a tool call is found and `autoExecute` is true, executes and continues.
- * 5. Repeats until no more tool calls or `maxToolCalls` is reached.
+ * 4. If a tool call is found and auto-execution is enabled, executes and continues.
+ * 5. Repeats until no more tool calls or the iteration limit is reached.
  *
  * @param prompt The user's prompt
  * @param options LLM generation options (tool definitions passed via

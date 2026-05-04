@@ -25,6 +25,10 @@
 
 RunAnywhere Commons (`runanywhere-commons`) is the shared C++ foundation for the RunAnywhere SDK ecosystem. It provides a unified abstraction layer over multiple ML inference backends, enabling platform SDKs (Swift, Kotlin, Flutter) to access on-device AI capabilities through a consistent C API.
 
+The cross-SDK ownership rules for proto types, public SDK models, and shared
+C++ business logic are documented in
+[`docs/CPP_PROTO_OWNERSHIP.md`](../../../docs/CPP_PROTO_OWNERSHIP.md).
+
 ### Key Architectural Goals
 
 1. **Cross-Platform Consistency** - Single C++ codebase, identical API semantics across iOS, Android, macOS, Linux

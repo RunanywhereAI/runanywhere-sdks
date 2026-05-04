@@ -45,6 +45,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "model_types.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -53,6 +55,25 @@ option objc_class_prefix         = "RAV1";
 option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
+// ---------------------------------------------------------------------------
+enum EmbeddingsNormalizeMode {
+    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0;
+    EMBEDDINGS_NORMALIZE_MODE_NONE        = 1;
+    EMBEDDINGS_NORMALIZE_MODE_L2          = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
+// ---------------------------------------------------------------------------
+enum EmbeddingsPoolingStrategy {
+    EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0;
+    EMBEDDINGS_POOLING_STRATEGY_MEAN        = 1;
+    EMBEDDINGS_POOLING_STRATEGY_CLS         = 2;
+    EMBEDDINGS_POOLING_STRATEGY_LAST        = 3;
+}
 
 // ---------------------------------------------------------------------------
 // Component-level configuration applied at service creation. Mirrors the
@@ -74,6 +95,21 @@ message EmbeddingsConfiguration {
     // Default L2 normalization for produced vectors. When unset the backend
     // applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
     optional bool normalize             = 4;
+
+    // Preferred framework for the component. Absent = auto.
+    optional InferenceFramework preferred_framework = 5;
+
+    // C ABI name for max_sequence_length. 0 = use max_sequence_length or
+    // backend default.
+    int32         max_tokens            = 6;
+
+    // Exact C ABI normalization/pooling modes for backends that need more
+    // than the bool normalize flag.
+    EmbeddingsNormalizeMode normalize_mode = 7;
+    EmbeddingsPoolingStrategy pooling      = 8;
+
+    // Backend-specific JSON config (e.g. tokenizer/vocab companion paths).
+    optional string config_json         = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +130,11 @@ message EmbeddingsOptions {
     // Override batch size for embed_batch. Unset = backend chooses
     // (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
     optional int32 batch_size = 3;
+
+    // Exact C ABI per-call overrides. UNSPECIFIED = use component config.
+    EmbeddingsNormalizeMode normalize_mode = 4;
+    EmbeddingsPoolingStrategy pooling      = 5;
+    int32 n_threads                        = 6;  // 0 = auto
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +158,19 @@ message EmbeddingVector {
     // multi-input batches where the caller wants to correlate without
     // tracking ordering separately.
     optional string text   = 3;
+
+    // Vector dimension for consumers that need per-vector sizing without
+    // inspecting EmbeddingsResult.dimension.
+    int32 dimension        = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Request envelope for service-handle APIs. One text = embed, multiple texts =
+// embed_batch.
+// ---------------------------------------------------------------------------
+message EmbeddingsRequest {
+    repeated string texts = 1;
+    optional EmbeddingsOptions options = 2;
 }
 
 // ---------------------------------------------------------------------------

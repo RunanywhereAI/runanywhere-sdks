@@ -101,6 +101,11 @@ case "${HOST_UNAME}" in
         ;;
 esac
 NDK_SYSROOT_LIB="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${NDK_HOST_TAG}/sysroot/usr/lib"
+ANDROID_READELF="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${NDK_HOST_TAG}/bin/llvm-readelf"
+if [ ! -x "${ANDROID_READELF}" ]; then
+    echo "error: llvm-readelf not found at ${ANDROID_READELF}. Is ANDROID_NDK_HOME correct?" >&2
+    exit 1
+fi
 
 mkdir -p \
     "${KOTLIN_JNI_DEST}" \
@@ -128,6 +133,51 @@ copy_if_exists() {
             mkdir -p "${dst}"
             cp -v "${src}" "${dst}/"
         done
+    fi
+}
+
+validate_elf_16kb_alignment() {
+    local so_file="$1"
+    local align_hex
+    local align_dec
+    local failed=0
+
+    while IFS= read -r align_hex; do
+        [ -n "${align_hex}" ] || continue
+        case "${align_hex}" in
+            0x*) align_dec=$((align_hex)) ;;
+            *) continue ;;
+        esac
+        if [ "${align_dec}" -lt 16384 ]; then
+            echo "error: ${so_file} has LOAD segment alignment ${align_hex}; expected >= 0x4000" >&2
+            failed=1
+        fi
+    done < <("${ANDROID_READELF}" -l "${so_file}" 2>/dev/null | awk '/^[[:space:]]*LOAD[[:space:]]/ {print $NF}')
+
+    return "${failed}"
+}
+
+validate_staged_abi_16kb_alignment() {
+    local abi="$1"; shift
+    local dst
+    local so_file
+    local failed=0
+
+    case "${abi}" in
+        arm64-v8a|x86_64) ;;
+        *) return 0 ;;
+    esac
+
+    for dst in "$@"; do
+        [ -d "${dst}" ] || continue
+        while IFS= read -r so_file; do
+            validate_elf_16kb_alignment "${so_file}" || failed=1
+        done < <(find "${dst}" -maxdepth 1 -type f -name "*.so" -print)
+    done
+
+    if [ "${failed}" -ne 0 ]; then
+        echo "error: staged ${abi} Android native libs are not 16KB compatible" >&2
+        exit 1
     fi
 }
 
@@ -243,6 +293,11 @@ for ABI in "${ABIS[@]}"; do
     for dst in "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}" ; do
         cp -v "${LIBOMP_SHARED}" "${dst}/"
     done
+
+    validate_staged_abi_16kb_alignment "${ABI}" \
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}"
 done
 
 echo ""

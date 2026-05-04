@@ -209,13 +209,21 @@ public struct RAToolValue: Sendable {
     set {kind = .arrayValue(newValue)}
   }
 
-  /// No "null" arm — proto3 scalar defaults already represent absence.
   public var objectValue: RAToolValueObject {
     get {
       if case .objectValue(let v)? = kind {return v}
       return RAToolValueObject()
     }
     set {kind = .objectValue(newValue)}
+  }
+
+  /// true means JSON null
+  public var nullValue: Bool {
+    get {
+      if case .nullValue(let v)? = kind {return v}
+      return false
+    }
+    set {kind = .nullValue(newValue)}
   }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -225,8 +233,9 @@ public struct RAToolValue: Sendable {
     case numberValue(Double)
     case boolValue(Bool)
     case arrayValue(RAToolValueArray)
-    /// No "null" arm — proto3 scalar defaults already represent absence.
     case objectValue(RAToolValueObject)
+    /// true means JSON null
+    case nullValue(Bool)
 
   }
 
@@ -334,9 +343,26 @@ public struct RAToolCall: Sendable {
   /// value at the moment). Empty = unset.
   public var type: String = String()
 
+  /// Strongly-typed arguments map for SDKs that do not want to parse
+  /// arguments_json. Producers should keep arguments_json populated for C++
+  /// tokenizer compatibility.
+  public var arguments: Dictionary<String,RAToolValue> = [:]
+
+  /// Alias for id used by pre-proto SDK surfaces.
+  public var callID: String {
+    get {_callID ?? String()}
+    set {_callID = newValue}
+  }
+  /// Returns true if `callID` has been explicitly set.
+  public var hasCallID: Bool {self._callID != nil}
+  /// Clears the value of `callID`. Subsequent reads from it will return its default value.
+  public mutating func clearCallID() {self._callID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _callID: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -363,11 +389,31 @@ public struct RAToolResult: Sendable {
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {self._error = nil}
 
+  /// Whether execution succeeded. If unset/false and error is empty,
+  /// consumers should fall back to legacy result_json/error semantics.
+  public var success: Bool = false
+
+  /// Strongly-typed result map for SDKs that do not want to parse
+  /// result_json. Producers should keep result_json populated for C++
+  /// tokenizer compatibility.
+  public var result: Dictionary<String,RAToolValue> = [:]
+
+  /// Alias for tool_call_id used by pre-proto SDK surfaces.
+  public var callID: String {
+    get {_callID ?? String()}
+    set {_callID = newValue}
+  }
+  /// Returns true if `callID` has been explicitly set.
+  public var hasCallID: Bool {self._callID != nil}
+  /// Clears the value of `callID`. Subsequent reads from it will return its default value.
+  public mutating func clearCallID() {self._callID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _error: String? = nil
+  fileprivate var _callID: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -456,6 +502,17 @@ public struct RAToolCallingOptions: Sendable {
   /// Clears the value of `customSystemPrompt`. Subsequent reads from it will return its default value.
   public mutating func clearCustomSystemPrompt() {self._customSystemPrompt = nil}
 
+  /// C ABI / SDK field name for max_iterations. 0 = use max_iterations or
+  /// SDK default.
+  public var maxToolCalls: Int32 {
+    get {_maxToolCalls ?? 0}
+    set {_maxToolCalls = newValue}
+  }
+  /// Returns true if `maxToolCalls` has been explicitly set.
+  public var hasMaxToolCalls: Bool {self._maxToolCalls != nil}
+  /// Clears the value of `maxToolCalls`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxToolCalls() {self._maxToolCalls = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -465,6 +522,7 @@ public struct RAToolCallingOptions: Sendable {
   fileprivate var _systemPrompt: String? = nil
   fileprivate var _format: RAToolCallFormatName? = nil
   fileprivate var _customSystemPrompt: String? = nil
+  fileprivate var _maxToolCalls: Int32? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -521,7 +579,7 @@ extension RAToolCallFormatName: SwiftProtobuf._ProtoNameProviding {
 
 extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolValue"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}string_value\0\u{3}number_value\0\u{3}bool_value\0\u{3}array_value\0\u{3}object_value\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}string_value\0\u{3}number_value\0\u{3}bool_value\0\u{3}array_value\0\u{3}object_value\0\u{3}null_value\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -579,6 +637,14 @@ extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
           self.kind = .objectValue(v)
         }
       }()
+      case 6: try {
+        var v: Bool?
+        try decoder.decodeSingularBoolField(value: &v)
+        if let v = v {
+          if self.kind != nil {try decoder.handleConflictingOneOf()}
+          self.kind = .nullValue(v)
+        }
+      }()
       default: break
       }
     }
@@ -609,6 +675,10 @@ extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     case .objectValue?: try {
       guard case .objectValue(let v)? = self.kind else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }()
+    case .nullValue?: try {
+      guard case .nullValue(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
     }()
     case nil: break
     }
@@ -783,7 +853,7 @@ extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
 
 extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCall"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{1}type\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{1}type\0\u{1}arguments\0\u{3}call_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -795,12 +865,18 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.argumentsJson) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.type) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: &self.arguments) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._callID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.id.isEmpty {
       try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
@@ -813,6 +889,12 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if !self.type.isEmpty {
       try visitor.visitSingularStringField(value: self.type, fieldNumber: 4)
     }
+    if !self.arguments.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: self.arguments, fieldNumber: 5)
+    }
+    try { if let v = self._callID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -821,6 +903,8 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if lhs.name != rhs.name {return false}
     if lhs.argumentsJson != rhs.argumentsJson {return false}
     if lhs.type != rhs.type {return false}
+    if lhs.arguments != rhs.arguments {return false}
+    if lhs._callID != rhs._callID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -828,7 +912,7 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
 
 extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0\u{1}success\0\u{1}result\0\u{3}call_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -840,6 +924,9 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.resultJson) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._error) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: &self.result) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._callID) }()
       default: break
       }
     }
@@ -862,6 +949,15 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     try { if let v = self._error {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 5)
+    }
+    if !self.result.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: self.result, fieldNumber: 6)
+    }
+    try { if let v = self._callID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -870,6 +966,9 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.name != rhs.name {return false}
     if lhs.resultJson != rhs.resultJson {return false}
     if lhs._error != rhs._error {return false}
+    if lhs.success != rhs.success {return false}
+    if lhs.result != rhs.result {return false}
+    if lhs._callID != rhs._callID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -877,7 +976,7 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
 
 extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}max_iterations\0\u{3}auto_execute\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{3}format_hint\0\u{1}format\0\u{3}custom_system_prompt\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}max_iterations\0\u{3}auto_execute\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{3}format_hint\0\u{1}format\0\u{3}custom_system_prompt\0\u{3}max_tool_calls\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -896,6 +995,7 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 9: try { try decoder.decodeSingularStringField(value: &self.formatHint) }()
       case 10: try { try decoder.decodeSingularEnumField(value: &self._format) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._customSystemPrompt) }()
+      case 12: try { try decoder.decodeSingularInt32Field(value: &self._maxToolCalls) }()
       default: break
       }
     }
@@ -939,6 +1039,9 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     try { if let v = self._customSystemPrompt {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
     } }()
+    try { if let v = self._maxToolCalls {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 12)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -954,6 +1057,7 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.formatHint != rhs.formatHint {return false}
     if lhs._format != rhs._format {return false}
     if lhs._customSystemPrompt != rhs._customSystemPrompt {return false}
+    if lhs._maxToolCalls != rhs._maxToolCalls {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

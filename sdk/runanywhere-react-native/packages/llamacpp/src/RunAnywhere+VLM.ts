@@ -32,6 +32,136 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 
 const logger = new SDKLogger('RunAnywhere.VLM');
 
+function buildVLMOptionsJson(
+  prompt: string,
+  options: VLMGenerationOptions | undefined,
+  streamingEnabled: boolean
+): string {
+  const customChatTemplate = options?.customChatTemplate;
+
+  return JSON.stringify({
+    prompt: options?.prompt ?? prompt,
+    max_tokens: options?.maxTokens ?? 2048,
+    temperature: options?.temperature ?? 0.7,
+    top_p: options?.topP ?? 0.9,
+    top_k: options?.topK ?? 0,
+    stop_sequences: options?.stopSequences ?? [],
+    streaming_enabled: streamingEnabled,
+    system_prompt: options?.systemPrompt,
+    max_image_size: options?.maxImageSize ?? 0,
+    n_threads: options?.nThreads ?? 0,
+    use_gpu: options?.useGpu ?? true,
+    model_family: options?.modelFamily ?? 0,
+    custom_chat_template: customChatTemplate
+      ? {
+          template_text: customChatTemplate.templateText,
+          image_marker: customChatTemplate.imageMarker,
+          default_system_prompt: customChatTemplate.defaultSystemPrompt,
+        }
+      : undefined,
+    image_marker_override: options?.imageMarkerOverride,
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readNumber(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+}
+
+function readString(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function createVLMResult(fields: {
+  text: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  processingTimeMs?: number;
+  tokensPerSecond?: number;
+  imageTokens?: number;
+  timeToFirstTokenMs?: number;
+  imageEncodeTimeMs?: number;
+  hardwareUsed?: string;
+}): VLMResult {
+  const promptTokens = fields.promptTokens ?? 0;
+  const completionTokens = fields.completionTokens ?? 0;
+
+  return {
+    text: fields.text,
+    promptTokens,
+    completionTokens,
+    totalTokens: fields.totalTokens ?? promptTokens + completionTokens,
+    processingTimeMs: fields.processingTimeMs ?? 0,
+    tokensPerSecond: fields.tokensPerSecond ?? 0,
+    imageTokens: fields.imageTokens ?? 0,
+    timeToFirstTokenMs: fields.timeToFirstTokenMs ?? 0,
+    imageEncodeTimeMs: fields.imageEncodeTimeMs ?? 0,
+    hardwareUsed: fields.hardwareUsed,
+  };
+}
+
+function createVLMResultFromNative(record: Record<string, unknown>): VLMResult {
+  const promptTokens =
+    readNumber(record, ['prompt_tokens', 'promptTokens']) ?? 0;
+  const completionTokens =
+    readNumber(record, ['completion_tokens', 'completionTokens']) ?? 0;
+
+  return createVLMResult({
+    text: readString(record, ['text']) ?? '',
+    promptTokens,
+    completionTokens,
+    totalTokens: readNumber(record, ['total_tokens', 'totalTokens']),
+    processingTimeMs: readNumber(record, [
+      'total_time_ms',
+      'processing_time_ms',
+      'totalTimeMs',
+      'processingTimeMs',
+    ]),
+    tokensPerSecond: readNumber(record, [
+      'tokens_per_second',
+      'tokensPerSecond',
+    ]),
+    imageTokens: readNumber(record, ['image_tokens', 'imageTokens']),
+    timeToFirstTokenMs: readNumber(record, [
+      'time_to_first_token_ms',
+      'timeToFirstTokenMs',
+    ]),
+    imageEncodeTimeMs: readNumber(record, [
+      'image_encode_time_ms',
+      'imageEncodeTimeMs',
+    ]),
+    hardwareUsed: readString(record, ['hardware_used', 'hardwareUsed']),
+  });
+}
+
 // ============================================================================
 // VLM Extension - Backend Agnostic
 // ============================================================================
@@ -184,12 +314,7 @@ export async function processImage(
   const { imageFormat, imageData, imageWidth, imageHeight } =
     convertVLMImageToNative(image);
 
-  // Build options JSON
-  const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 2048,
-    temperature: options?.temperature ?? 0.7,
-    top_p: options?.topP ?? 0.9,
-  });
+  const optionsJson = buildVLMOptionsJson(prompt, options, false);
 
   const resultJson = await native.processVLMImage(
     imageFormat,
@@ -201,29 +326,16 @@ export async function processImage(
   );
 
   try {
-    const result = JSON.parse(resultJson);
-    return {
-      text: result.text ?? '',
-      promptTokens: result.prompt_tokens ?? 0,
-      completionTokens: result.completion_tokens ?? 0,
-      totalTokens:
-        result.total_tokens ??
-        (result.prompt_tokens ?? 0) + (result.completion_tokens ?? 0),
-      processingTimeMs: result.total_time_ms ?? result.processing_time_ms ?? 0,
-      tokensPerSecond: result.tokens_per_second ?? 0,
-    };
+    const result: unknown = JSON.parse(resultJson);
+    if (!isRecord(result)) {
+      return createVLMResult({ text: resultJson });
+    }
+    return createVLMResultFromNative(result);
   } catch {
     if (resultJson.includes('error')) {
       throw new Error(resultJson);
     }
-    return {
-      text: resultJson,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      processingTimeMs: 0,
-      tokensPerSecond: 0,
-    };
+    return createVLMResult({ text: resultJson });
   }
 }
 
@@ -273,12 +385,7 @@ export async function processImageStream(
   const { imageFormat, imageData, imageWidth, imageHeight } =
     convertVLMImageToNative(image);
 
-  // Build options JSON
-  const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 2048,
-    temperature: options?.temperature ?? 0.7,
-    top_p: options?.topP ?? 0.9,
-  });
+  const optionsJson = buildVLMOptionsJson(prompt, options, true);
 
   // Create the result promise
   const resultPromise = new Promise<VLMResult>((resolve, reject) => {
@@ -335,14 +442,15 @@ export async function processImageStream(
               latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0;
 
             const promptTokens = Math.ceil(prompt.length / 4);
-            const finalResult: VLMResult = {
+            const finalResult = createVLMResult({
               text: fullText,
               promptTokens,
               completionTokens: tokenCount,
               totalTokens: promptTokens + tokenCount,
               processingTimeMs: latencyMs,
               tokensPerSecond,
-            };
+              timeToFirstTokenMs,
+            });
 
             if (resolveResult) {
               resolveResult(finalResult);

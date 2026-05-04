@@ -5,18 +5,18 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:fixnum/fixnum.dart';
-import 'package:runanywhere/core/types/model_types.dart';
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/stt_options_helpers.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_stt.dart' show racAudioFormatWav;
 import 'package:runanywhere/native/dart_bridge_stt_streaming.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -80,7 +80,7 @@ class RunAnywhereSTT {
         throw SDKException.modelNotFound('STT model not found: $modelId');
       }
 
-      if (model.localPath == null) {
+      if (model.localPath.isEmpty) {
         throw SDKException.modelNotDownloaded(
           'STT model is not downloaded. Call downloadModel() first.',
         );
@@ -161,10 +161,10 @@ class RunAnywhereSTT {
     }
 
     final logger = SDKLogger('RunAnywhere.Transcribe');
-    final opts = options ?? STTOptions();
+    final opts = _effectiveOptions(options ?? STTOptions());
     final modelId = currentModelId ?? 'unknown';
     final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+        await DartBridgeModelRegistry.instance.getProtoModel(modelId);
     final modelName = modelInfo?.name;
 
     // Audio length estimate: PCM16 at 16kHz mono → bytes / 2 / sampleRate * 1000.
@@ -173,26 +173,19 @@ class RunAnywhereSTT {
 
     final startTime = DateTime.now().millisecondsSinceEpoch;
     try {
-      final result = await DartBridge.stt.transcribe(
-        audio,
-        sampleRate: sampleRate,
-        language: opts.language.bcp47 ?? 'en',
-        audioFormat: racAudioFormatWav,
-        enablePunctuation: opts.hasEnablePunctuation()
-            ? opts.enablePunctuation
-            : true,
-        enableDiarization: opts.enableDiarization,
-        maxSpeakers: opts.maxSpeakers,
-        enableTimestamps: opts.enableWordTimestamps,
-        detectLanguage: opts.language == STTLanguage.STT_LANGUAGE_AUTO,
-      );
+      final result = await DartBridge.stt.transcribeProto(audio, opts);
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      final resultDurationMs =
+          result.hasDurationMs() ? result.durationMs.toInt() : 0;
       final audioDurationMs =
-          result.durationMs > 0 ? result.durationMs : estimatedDurationMs;
+          resultDurationMs > 0 ? resultDurationMs : estimatedDurationMs;
 
       final wordCount = result.text.trim().isEmpty
           ? 0
           : result.text.trim().split(RegExp(r'\s+')).length;
+      final language = result.languageCode.isNotEmpty
+          ? result.languageCode
+          : result.language.name;
 
       TelemetryService.shared.trackTranscription(
         modelId: modelId,
@@ -201,28 +194,14 @@ class RunAnywhereSTT {
         latencyMs: latencyMs,
         wordCount: wordCount,
         confidence: result.confidence,
-        language: result.language,
+        language: language,
         isStreaming: false,
       );
 
       logger.info('Transcription complete: ${result.text.length} chars, '
           'confidence: ${result.confidence}');
 
-      final metadata = TranscriptionMetadata(
-        modelId: modelId,
-        processingTimeMs: Int64(latencyMs),
-        audioLengthMs: Int64(audioDurationMs),
-        realTimeFactor: audioDurationMs > 0
-            ? latencyMs / audioDurationMs.toDouble()
-            : 0.0,
-      );
-
-      return STTOutput(
-        text: result.text,
-        language: STTLanguageBcp47.fromBcp47(result.language),
-        confidence: result.confidence,
-        metadata: metadata,
-      );
+      return result;
     } catch (e) {
       TelemetryService.shared.trackError(
         errorCode: 'transcription_failed',
@@ -254,18 +233,10 @@ class RunAnywhereSTT {
       ));
     }
 
-    final opts = options ?? STTOptions();
+    final opts = _effectiveOptions(options ?? STTOptions());
     final streaming = DartBridgeSttStreaming.transcribeStream(
       audio: audio,
-      options: SttStreamingOptions(
-        languageBcp47: opts.language.bcp47 ?? 'en',
-        detectLanguage: opts.language == STTLanguage.STT_LANGUAGE_AUTO,
-        enablePunctuation:
-            opts.hasEnablePunctuation() ? opts.enablePunctuation : true,
-        enableDiarization: opts.enableDiarization,
-        maxSpeakers: opts.maxSpeakers,
-        enableTimestamps: opts.enableWordTimestamps,
-      ),
+      options: opts,
     );
 
     _isStreaming = true;
@@ -274,11 +245,7 @@ class RunAnywhereSTT {
     final sub = streaming.stream.listen(
       (event) {
         if (controller.isClosed) return;
-        controller.add(STTPartialResult(
-          text: event.text,
-          isFinal: event.isFinal,
-          stability: event.isFinal ? 1.0 : 0.5,
-        ));
+        controller.add(event);
         if (event.isFinal) {
           unawaited(controller.close());
           _isStreaming = false;
@@ -338,5 +305,29 @@ class RunAnywhereSTT {
       byteData.setFloat32(i * 4, samples[i], Endian.little);
     }
     return transcribe(byteData.buffer.asUint8List(), options);
+  }
+
+  STTOptions _effectiveOptions(STTOptions options) {
+    final opts = options.deepCopy();
+    if (!opts.hasSampleRate()) {
+      opts.sampleRate = 16000;
+    }
+    if (!opts.hasAudioFormat()) {
+      opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_WAV;
+    }
+    if (!opts.hasEnablePunctuation()) {
+      opts.enablePunctuation = true;
+    }
+    if (!opts.hasEnableWordTimestamps()) {
+      opts.enableWordTimestamps = true;
+    }
+    if (!opts.hasDetectLanguage()) {
+      opts.detectLanguage = opts.language == STTLanguage.STT_LANGUAGE_AUTO;
+    }
+    if (!opts.hasLanguageCode() &&
+        opts.language != STTLanguage.STT_LANGUAGE_AUTO) {
+      opts.languageCode = opts.language.bcp47 ?? 'en';
+    }
+    return opts;
   }
 }

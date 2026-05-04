@@ -18,6 +18,12 @@ import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
 import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
 import { TelemetryService } from '../services/Network';
+import {
+  DEFAULT_BASE_URL,
+  hasUsableBackendConfig,
+  hasUsableSupabaseConfig,
+  isUsableCredential,
+} from '../services/Network/NetworkConfiguration';
 
 import type {
   InitializationState,
@@ -40,6 +46,8 @@ import * as STT from './Extensions/RunAnywhere+STT';
 import * as TTS from './Extensions/RunAnywhere+TTS';
 import * as VAD from './Extensions/RunAnywhere+VAD';
 import * as Storage from './Extensions/RunAnywhere+Storage';
+import * as SDKEvents from './Extensions/RunAnywhere+Events';
+import * as Lifecycle from './Extensions/RunAnywhere+Lifecycle';
 import * as Models from './Extensions/RunAnywhere+Models';
 import * as Logging from './Extensions/RunAnywhere+Logging';
 import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
@@ -221,20 +229,27 @@ export const RunAnywhere = {
 
   async initialize(options: SDKInitOptions): Promise<void> {
     const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+    const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
+    const effectiveApiKey = isUsableCredential(options.apiKey)
+      ? options.apiKey!.trim()
+      : '';
 
     // Fail fast: API key is required for production/staging environments
     // Development mode uses C++ dev config (Supabase credentials) instead
-    if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && !options.apiKey) {
+    if (
+      environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
+      !hasUsableBackendConfig({ baseURL: effectiveBaseURL, apiKey: effectiveApiKey })
+    ) {
       const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
       throw new Error(
-        `API key is required for ${envName} environment. ` +
-        `Pass apiKey in initialize() options or use SDKEnvironment.Development for local testing.`
+        `Usable API key and baseURL are required for ${envName} environment. ` +
+        'Pass real apiKey/baseURL values or use SDKEnvironment.Development for local testing.'
       );
     }
 
     const initParams: SDKInitParams = {
-      apiKey: options.apiKey,
-      baseURL: options.baseURL,
+      apiKey: effectiveApiKey,
+      baseURL: effectiveBaseURL,
       environment,
     };
 
@@ -267,20 +282,25 @@ export const RunAnywhere = {
         : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
           : 'production';
 
-      await native.configureHttp(
-        options.baseURL || 'https://api.runanywhere.ai',
-        options.apiKey ?? ''
-      );
+      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+        await native.configureHttp(
+          effectiveBaseURL,
+          effectiveApiKey
+        );
+      }
 
-      if (environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && options.supabaseURL) {
+      if (
+        environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
+        hasUsableSupabaseConfig(options)
+      ) {
         logger.debug('Development mode - Supabase config provided');
       }
 
       // Initialize with config
       // Note: Backend registration (llamacpp, onnx) is done by their respective packages
       const configJson = JSON.stringify({
-        apiKey: options.apiKey,
-        baseURL: options.baseURL,
+        apiKey: effectiveApiKey,
+        baseURL: effectiveBaseURL,
         environment: envString,
         documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
         sdkVersion: SDKConstants.version, // Centralized version for C++ layer
@@ -307,12 +327,12 @@ export const RunAnywhere = {
 
       // For production/staging mode, authenticate with backend to get JWT tokens
       // This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && options.apiKey) {
+      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && effectiveApiKey) {
         try {
           logger.info('Authenticating with backend (production/staging mode)...');
           const authenticated = await this._authenticateWithBackend(
-            options.apiKey,
-            options.baseURL || 'https://api.runanywhere.ai',
+            effectiveApiKey,
+            effectiveBaseURL,
             cachedDeviceId
           );
           if (authenticated) {
@@ -333,7 +353,7 @@ export const RunAnywhere = {
       if (!resolvedBuildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
         const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
         throw new Error(
-          `Build token is required for ${envName} environment. ` +
+          `Usable build token is required for ${envName} environment. ` +
           'Pass `buildToken` in initialize() options or set the ' +
           '`RUNANYWHERE_BUILD_TOKEN` environment variable at build time.'
         );
@@ -432,12 +452,12 @@ export const RunAnywhere = {
    * @internal
    */
   _resolveBuildToken(explicit?: string): string | undefined {
-    if (explicit && explicit.length > 0) return explicit;
+    if (isUsableCredential(explicit)) return explicit!.trim();
     const fromEnv =
       typeof process !== 'undefined' && process.env
         ? process.env.RUNANYWHERE_BUILD_TOKEN
         : undefined;
-    return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
+    return isUsableCredential(fromEnv) ? fromEnv!.trim() : undefined;
   },
 
   /**
@@ -458,7 +478,7 @@ export const RunAnywhere = {
     // Defensive: non-dev must have a token (initialize() already enforces this,
     // but guard here too so we never silently register with an empty token).
     if (!buildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      logger.warning('Skipping device registration: no build token resolved.');
+      logger.debug('Skipping telemetry/device registration: no usable config');
       return;
     }
 
@@ -478,9 +498,9 @@ export const RunAnywhere = {
       }));
 
       if (success) {
-        logger.info('Device registered successfully via native');
+        logger.debug('Device registration request completed via native');
       } else {
-        logger.warning('Device registration returned false');
+        logger.debug('Skipping telemetry/device registration: no usable config');
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -784,7 +804,6 @@ export const RunAnywhere = {
   clearTools: ToolCalling.clearTools,
   parseToolCall: ToolCalling.parseToolCall,
   executeTool: ToolCalling.executeTool,
-  formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
   formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
   generateWithTools: ToolCalling.generateWithTools,
   continueWithToolResult: ToolCalling.continueWithToolResult,
@@ -853,8 +872,25 @@ export const RunAnywhere = {
   // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
+  getStorageInfoProto: Storage.getStorageInfoProto,
+  checkStorageAvailability: Storage.checkStorageAvailability,
+  planStorageDelete: Storage.planStorageDelete,
+  deleteStorage: Storage.deleteStorage,
   getModelsDirectory: Storage.getModelsDirectory,
   clearCache: Storage.clearCache,
+
+  // ============================================================================
+  // Canonical SDK Events / Lifecycle (proto-byte native truth)
+  // ============================================================================
+
+  subscribeSDKEvents: SDKEvents.subscribeSDKEvents,
+  publishSDKEvent: SDKEvents.publishSDKEvent,
+  pollSDKEvent: SDKEvents.pollSDKEvent,
+  publishSDKFailure: SDKEvents.publishSDKFailure,
+  loadModelLifecycle: Lifecycle.loadModelLifecycle,
+  unloadModelLifecycle: Lifecycle.unloadModelLifecycle,
+  getCurrentModel: Lifecycle.getCurrentModel,
+  getComponentLifecycleSnapshot: Lifecycle.getComponentLifecycleSnapshot,
 
   // ============================================================================
   // Model Registry (Delegated to Extension)
@@ -1013,5 +1049,6 @@ export const RunAnywhere = {
 // Type Exports
 // ============================================================================
 
-export type { ModelInfo } from '../types/models';
+/** @deprecated Legacy RN registry DTO; use ProtoModelInfo for new public APIs. */
+export type { ModelInfo, ModelInfoProto as ProtoModelInfo } from '../types/models';
 export type { DownloadProgress } from '../services/DownloadService';

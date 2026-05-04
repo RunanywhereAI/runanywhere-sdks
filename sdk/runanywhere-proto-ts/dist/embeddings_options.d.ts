@@ -1,5 +1,33 @@
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum EmbeddingsNormalizeMode {
+    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0,
+    EMBEDDINGS_NORMALIZE_MODE_NONE = 1,
+    EMBEDDINGS_NORMALIZE_MODE_L2 = 2,
+    UNRECOGNIZED = -1
+}
+export declare function embeddingsNormalizeModeFromJSON(object: any): EmbeddingsNormalizeMode;
+export declare function embeddingsNormalizeModeToJSON(object: EmbeddingsNormalizeMode): string;
+/**
+ * ---------------------------------------------------------------------------
+ * Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum EmbeddingsPoolingStrategy {
+    EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
+    EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
+    EMBEDDINGS_POOLING_STRATEGY_CLS = 2,
+    EMBEDDINGS_POOLING_STRATEGY_LAST = 3,
+    UNRECOGNIZED = -1
+}
+export declare function embeddingsPoolingStrategyFromJSON(object: any): EmbeddingsPoolingStrategy;
+export declare function embeddingsPoolingStrategyToJSON(object: EmbeddingsPoolingStrategy): string;
 /**
  * ---------------------------------------------------------------------------
  * Component-level configuration applied at service creation. Mirrors the
@@ -25,6 +53,21 @@ export interface EmbeddingsConfiguration {
      * applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
      */
     normalize?: boolean | undefined;
+    /** Preferred framework for the component. Absent = auto. */
+    preferredFramework?: InferenceFramework | undefined;
+    /**
+     * C ABI name for max_sequence_length. 0 = use max_sequence_length or
+     * backend default.
+     */
+    maxTokens: number;
+    /**
+     * Exact C ABI normalization/pooling modes for backends that need more
+     * than the bool normalize flag.
+     */
+    normalizeMode: EmbeddingsNormalizeMode;
+    pooling: EmbeddingsPoolingStrategy;
+    /** Backend-specific JSON config (e.g. tokenizer/vocab companion paths). */
+    configJson?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -50,6 +93,11 @@ export interface EmbeddingsOptions {
      * (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
      */
     batchSize?: number | undefined;
+    /** Exact C ABI per-call overrides. UNSPECIFIED = use component config. */
+    normalizeMode: EmbeddingsNormalizeMode;
+    pooling: EmbeddingsPoolingStrategy;
+    /** 0 = auto */
+    nThreads: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -76,6 +124,21 @@ export interface EmbeddingVector {
      * tracking ordering separately.
      */
     text?: string | undefined;
+    /**
+     * Vector dimension for consumers that need per-vector sizing without
+     * inspecting EmbeddingsResult.dimension.
+     */
+    dimension: number;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Request envelope for service-handle APIs. One text = embed, multiple texts =
+ * embed_batch.
+ * ---------------------------------------------------------------------------
+ */
+export interface EmbeddingsRequest {
+    texts: string[];
+    options?: EmbeddingsOptions | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -121,6 +184,14 @@ export declare const EmbeddingVector: {
     toJSON(message: EmbeddingVector): unknown;
     create<I extends Exact<DeepPartial<EmbeddingVector>, I>>(base?: I): EmbeddingVector;
     fromPartial<I extends Exact<DeepPartial<EmbeddingVector>, I>>(object: I): EmbeddingVector;
+};
+export declare const EmbeddingsRequest: {
+    encode(message: EmbeddingsRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsRequest;
+    fromJSON(object: any): EmbeddingsRequest;
+    toJSON(message: EmbeddingsRequest): unknown;
+    create<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(base?: I): EmbeddingsRequest;
+    fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(object: I): EmbeddingsRequest;
 };
 export declare const EmbeddingsResult: {
     encode(message: EmbeddingsResult, writer?: _m0.Writer): _m0.Writer;

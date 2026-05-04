@@ -135,6 +135,43 @@ export interface RunAnywhereCore
   // ============================================================================
 
   /**
+   * Get all registered models as serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  getAvailableModelsProto(): Promise<ArrayBuffer>;
+
+  /**
+   * Get one registered model as serialized runanywhere.v1.ModelInfo bytes.
+   * Returns an empty buffer when the model does not exist.
+   */
+  getModelInfoProto(modelId: string): Promise<ArrayBuffer>;
+
+  /**
+   * Register a model from serialized runanywhere.v1.ModelInfo bytes.
+   */
+  registerModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
+   */
+  updateModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Remove a model registry entry by ID through the proto-byte C ABI.
+   */
+  removeModelProto(modelId: string): Promise<boolean>;
+
+  /**
+   * Query registered models from serialized runanywhere.v1.ModelQuery bytes.
+   * Returns serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  queryModelsProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Get downloaded registered models as serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  getDownloadedModelsProto(): Promise<ArrayBuffer>;
+
+  /**
    * Get list of available models
    * @returns JSON array of model info
    */
@@ -240,6 +277,48 @@ export interface RunAnywhereCore
    */
   cancelDownload(cancelToken: string): Promise<boolean>;
 
+  /**
+   * Plan a download from serialized runanywhere.v1.DownloadPlanRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadPlanResult bytes.
+   */
+  downloadPlanProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Start a native download from serialized runanywhere.v1.DownloadStartRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadStartResult bytes.
+   */
+  downloadStartProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Cancel a native download from serialized runanywhere.v1.DownloadCancelRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadCancelResult bytes.
+   */
+  downloadCancelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Resume a native download from serialized runanywhere.v1.DownloadResumeRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadResumeResult bytes.
+   */
+  downloadResumeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Poll native download progress from serialized runanywhere.v1.DownloadSubscribeRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadProgress bytes, or an empty buffer if no task exists.
+   */
+  downloadProgressPollProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Register a process-wide native DownloadProgress proto callback.
+   */
+  setDownloadProgressCallbackProto(
+    onProgressBytes: (progressBytes: ArrayBuffer) => void
+  ): Promise<boolean>;
+
+  /**
+   * Clear the process-wide native DownloadProgress proto callback.
+   */
+  clearDownloadProgressCallbackProto(): Promise<boolean>;
+
   // ============================================================================
   // Storage
   // Matches Swift: RunAnywhere+Storage.swift
@@ -264,6 +343,40 @@ export interface RunAnywhereCore
    */
   deleteModel(modelId: string): Promise<boolean>;
 
+  /**
+   * Analyze storage from serialized runanywhere.v1.StorageInfoRequest bytes.
+   * Returns serialized runanywhere.v1.StorageInfoResult bytes.
+   */
+  storageInfoProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Check storage availability from serialized runanywhere.v1.StorageAvailabilityRequest bytes.
+   * Returns serialized runanywhere.v1.StorageAvailabilityResult bytes.
+   */
+  storageAvailabilityProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Build a delete plan from serialized runanywhere.v1.StorageDeletePlanRequest bytes.
+   * Returns serialized runanywhere.v1.StorageDeletePlan bytes.
+   */
+  storageDeletePlanProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Execute or dry-run delete from serialized runanywhere.v1.StorageDeleteRequest bytes.
+   * Returns serialized runanywhere.v1.StorageDeleteResult bytes.
+   */
+  storageDeleteProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // Hardware
+  // Matches commons rac_hardware_profile_get proto ABI
+  // ============================================================================
+
+  /**
+   * Get serialized runanywhere.v1.HardwareProfileResult bytes.
+   */
+  hardwareProfileProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // Events
   // Matches Swift: CppBridge+Events.swift
@@ -280,6 +393,69 @@ export interface RunAnywhereCore
    * @returns JSON array of events
    */
   pollEvents(): Promise<string>;
+
+  /**
+   * Subscribe to serialized runanywhere.v1.SDKEvent bytes.
+   * Returns a native subscription id.
+   */
+  subscribeSDKEventsProto(
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<number>;
+
+  /**
+   * Unsubscribe from a native SDKEvent proto stream.
+   */
+  unsubscribeSDKEventsProto(subscriptionId: number): Promise<void>;
+
+  /**
+   * Publish serialized runanywhere.v1.SDKEvent bytes.
+   */
+  publishSDKEventProto(eventBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Poll the next queued serialized runanywhere.v1.SDKEvent bytes.
+   * Returns an empty buffer when no event is queued.
+   */
+  pollSDKEventProto(): Promise<ArrayBuffer>;
+
+  /**
+   * Publish a canonical failure SDKEvent through native commons.
+   */
+  publishSDKFailureProto(
+    errorCode: number,
+    message: string,
+    component: string,
+    operation: string,
+    recoverable: boolean
+  ): Promise<boolean>;
+
+  // ============================================================================
+  // Model Lifecycle
+  // ============================================================================
+
+  /**
+   * Load a model from serialized runanywhere.v1.ModelLoadRequest bytes.
+   * Returns serialized runanywhere.v1.ModelLoadResult bytes.
+   */
+  modelLifecycleLoadProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Unload model(s) from serialized runanywhere.v1.ModelUnloadRequest bytes.
+   * Returns serialized runanywhere.v1.ModelUnloadResult bytes.
+   */
+  modelLifecycleUnloadProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Query current model from serialized runanywhere.v1.CurrentModelRequest bytes.
+   * Returns serialized runanywhere.v1.CurrentModelResult bytes.
+   */
+  currentModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Snapshot one component lifecycle state.
+   * Returns serialized runanywhere.v1.ComponentLifecycleSnapshot bytes.
+   */
+  componentLifecycleSnapshotProto(component: number): Promise<ArrayBuffer>;
 
   // ============================================================================
   // HTTP Client (libcurl-backed — rac_http_client_*)
@@ -443,6 +619,13 @@ export interface RunAnywhereCore
     optionsJson?: string
   ): Promise<string>;
 
+  llmGenerateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  llmGenerateStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  llmCancelProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // LLM Thinking (<think>...</think> parsing)
   // Matches Swift: ThinkingContentParser + CppBridge+LLMThinking.swift
@@ -537,6 +720,16 @@ export interface RunAnywhereCore
    */
   transcribeFile(filePath: string, language?: string): Promise<string>;
 
+  sttTranscribeProto(
+    audioBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  sttTranscribeStreamProto(
+    audioBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer,
+    onPartialBytes: (partialBytes: ArrayBuffer) => void
+  ): Promise<void>;
+
   // ============================================================================
   // TTS Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+TTS.swift - calls rac_tts_component_* APIs
@@ -592,6 +785,19 @@ export interface RunAnywhereCore
    */
   cancelTTS(): Promise<boolean>;
 
+  ttsListVoicesProto(
+    onVoiceBytes: (voiceBytes: ArrayBuffer) => void
+  ): Promise<boolean>;
+  ttsSynthesizeProto(
+    text: string,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  ttsSynthesizeStreamProto(
+    text: string,
+    optionsBytes: ArrayBuffer,
+    onChunkBytes: (chunkBytes: ArrayBuffer) => void
+  ): Promise<void>;
+
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VAD.swift - calls rac_vad_component_* APIs
@@ -628,6 +834,16 @@ export interface RunAnywhereCore
    * Reset VAD state
    */
   resetVAD(): Promise<void>;
+
+  vadConfigureProto(configBytes: ArrayBuffer): Promise<boolean>;
+  vadProcessProto(
+    samplesBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  vadGetStatisticsProto(): Promise<ArrayBuffer>;
+  vadSetActivityCallbackProto(
+    onActivityBytes: (activityBytes: ArrayBuffer) => void
+  ): Promise<boolean>;
 
   // ============================================================================
   // Secure Storage
@@ -776,6 +992,10 @@ export interface RunAnywhereCore
    */
   cleanupVoiceAgent(): Promise<void>;
 
+  voiceAgentInitializeProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  voiceAgentComponentStatesProto(): Promise<ArrayBuffer>;
+  voiceAgentProcessTurnProto(audioBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
   // ============================================================================
   // Tool Calling Capability
   //
@@ -892,6 +1112,25 @@ export interface RunAnywhereCore
    * @returns JSON with stats
    */
   ragGetStatistics(): Promise<string>;
+
+  ragCreatePipelineProto(configBytes: ArrayBuffer): Promise<boolean>;
+  ragDestroyPipelineProto(): Promise<boolean>;
+  ragIngestProto(documentBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragClearProto(): Promise<ArrayBuffer>;
+  ragStatsProto(): Promise<ArrayBuffer>;
+
+  embeddingsCreateProto(modelId: string, configJson?: string): Promise<number>;
+  embeddingsEmbedBatchProto(
+    handle: number,
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  embeddingsDestroyProto(handle: number): Promise<void>;
+
+  loraLoadProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraRemoveProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraClearProto(): Promise<ArrayBuffer>;
+  loraCompatibilityProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ===========================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8

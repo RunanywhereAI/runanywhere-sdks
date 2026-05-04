@@ -22,6 +22,14 @@ Future<void> registerDeviceIfNeeded(
   SDKInitParams params,
   SDKLogger logger,
 ) async {
+  if (params.environment == SDKEnvironment.development &&
+      params.supabaseConfig == null) {
+    logger.debug(
+      'Skipping device registration: development Supabase config is not available',
+    );
+    return;
+  }
+
   try {
     await DartBridgeDevice.register(
       environment: params.environment,
@@ -45,6 +53,30 @@ Future<void> authenticateWithBackend(
   SDKInitParams params,
   SDKLogger logger,
 ) async {
+  if (!params.environment.requiresAuthentication) {
+    logger.debug(
+      'Skipping authentication for ${params.environment.description}',
+    );
+    return;
+  }
+
+  if (params.apiKey.isEmpty || _looksLikePlaceholder(params.apiKey)) {
+    logger.debug(
+      'Skipping authentication: API key is missing or placeholder',
+      metadata: {'environment': params.environment.name},
+    );
+    return;
+  }
+
+  if (!_isUsableHttpUrl(params.baseURL) ||
+      _looksLikePlaceholder(params.baseURL.toString())) {
+    logger.debug(
+      'Skipping authentication: base URL is missing or placeholder',
+      metadata: {'environment': params.environment.name},
+    );
+    return;
+  }
+
   try {
     await DartBridgeAuth.initialize(
       environment: params.environment,
@@ -85,13 +117,24 @@ Future<void> authenticateWithBackend(
   }
 }
 
+bool _looksLikePlaceholder(String value) {
+  return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+      .hasMatch(value);
+}
+
+bool _isUsableHttpUrl(Uri uri) {
+  return uri.hasScheme &&
+      (uri.scheme == 'http' || uri.scheme == 'https') &&
+      uri.host.isNotEmpty;
+}
+
 /// One-shot filesystem discovery of downloaded models. Called lazily
 /// on first `models.available()` call, not during initialize (so that
 /// apps have a chance to register their models first).
 Future<void> runDiscovery() async {
   final logger = SDKLogger('RunAnywhere.Discovery');
-  logger.debug(
-      'Running lazy discovery (models should already be registered)...');
+  logger
+      .debug('Running lazy discovery (models should already be registered)...');
 
   final result =
       await DartBridgeModelRegistry.instance.discoverDownloadedModels();

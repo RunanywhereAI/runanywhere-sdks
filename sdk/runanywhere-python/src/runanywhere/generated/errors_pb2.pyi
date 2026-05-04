@@ -19,6 +19,15 @@ class ErrorCategory(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CATEGORY_INTERNAL: _ClassVar[ErrorCategory]
     ERROR_CATEGORY_CONFIGURATION: _ClassVar[ErrorCategory]
 
+class ErrorSeverity(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_SEVERITY_UNSPECIFIED: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_DEBUG: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_INFO: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_WARNING: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_ERROR: _ClassVar[ErrorSeverity]
+    ERROR_SEVERITY_CRITICAL: _ClassVar[ErrorSeverity]
+
 class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     ERROR_CODE_UNSPECIFIED: _ClassVar[ErrorCode]
@@ -156,6 +165,12 @@ ERROR_CATEGORY_IO: ErrorCategory
 ERROR_CATEGORY_AUTH: ErrorCategory
 ERROR_CATEGORY_INTERNAL: ErrorCategory
 ERROR_CATEGORY_CONFIGURATION: ErrorCategory
+ERROR_SEVERITY_UNSPECIFIED: ErrorSeverity
+ERROR_SEVERITY_DEBUG: ErrorSeverity
+ERROR_SEVERITY_INFO: ErrorSeverity
+ERROR_SEVERITY_WARNING: ErrorSeverity
+ERROR_SEVERITY_ERROR: ErrorSeverity
+ERROR_SEVERITY_CRITICAL: ErrorSeverity
 ERROR_CODE_UNSPECIFIED: ErrorCode
 ERROR_CODE_NOT_INITIALIZED: ErrorCode
 ERROR_CODE_ALREADY_INITIALIZED: ErrorCode
@@ -303,17 +318,23 @@ class ErrorContext(_message.Message):
     def __init__(self, metadata: _Optional[_Mapping[str, str]] = ..., source_file: _Optional[str] = ..., source_line: _Optional[int] = ..., operation: _Optional[str] = ...) -> None: ...
 
 class SDKError(_message.Message):
-    __slots__ = ("code", "category", "message", "context", "c_abi_code", "nested_message")
+    __slots__ = ("code", "category", "message", "context", "c_abi_code", "nested_message", "timestamp_ms", "severity", "component")
     CODE_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     CONTEXT_FIELD_NUMBER: _ClassVar[int]
     C_ABI_CODE_FIELD_NUMBER: _ClassVar[int]
     NESTED_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    SEVERITY_FIELD_NUMBER: _ClassVar[int]
+    COMPONENT_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     category: ErrorCategory
     message: str
     context: ErrorContext
     c_abi_code: int
     nested_message: str
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., category: _Optional[_Union[ErrorCategory, str]] = ..., message: _Optional[str] = ..., context: _Optional[_Union[ErrorContext, _Mapping]] = ..., c_abi_code: _Optional[int] = ..., nested_message: _Optional[str] = ...) -> None: ...
+    timestamp_ms: int
+    severity: ErrorSeverity
+    component: str
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., category: _Optional[_Union[ErrorCategory, str]] = ..., message: _Optional[str] = ..., context: _Optional[_Union[ErrorContext, _Mapping]] = ..., c_abi_code: _Optional[int] = ..., nested_message: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., severity: _Optional[_Union[ErrorSeverity, str]] = ..., component: _Optional[str] = ...) -> None: ...

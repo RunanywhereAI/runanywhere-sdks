@@ -142,7 +142,7 @@ class GenieBindings {
     if (_register == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _register!();
+    return _register();
   }
 
   /// Unregister the Genie backend from C++ registry.
@@ -150,7 +150,7 @@ class GenieBindings {
     if (_unregister == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregister!();
+    return _unregister();
   }
 }
 

@@ -5,6 +5,7 @@ import {
   cancelVLMGeneration,
 } from '@runanywhere/llamacpp';
 import { VLMImageFormat, type VLMImage } from '@runanywhere/core';
+import { VLMModelFamily } from '@runanywhere/proto-ts/vlm_options';
 
 export class VLMService {
   private _isLoaded: boolean = false;
@@ -87,6 +88,12 @@ export class VLMService {
         temperature: 0.7,
         topP: 0.9,
         topK: 0,
+        stopSequences: [],
+        streamingEnabled: true,
+        maxImageSize: 0,
+        nThreads: 0,
+        useGpu: true,
+        modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
       });
 
       // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await

@@ -90,36 +90,6 @@ struct TranscriptionMetadataDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 TranscriptionMetadataDefaultTypeInternal _TranscriptionMetadata_default_instance_;
 
-inline constexpr STTPartialResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        text_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        is_final_{false},
-        stability_{0} {}
-
-template <typename>
-constexpr STTPartialResult::STTPartialResult(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(STTPartialResult_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-struct STTPartialResultDefaultTypeInternal {
-  constexpr STTPartialResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~STTPartialResultDefaultTypeInternal() {}
-  union {
-    STTPartialResult _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 STTPartialResultDefaultTypeInternal _STTPartialResult_default_instance_;
-
 inline constexpr STTOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -133,12 +103,19 @@ inline constexpr STTOptions::Impl_::Impl_(
         vocabulary_list_ {}
         #endif
         ,
+        language_code_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         language_{static_cast< ::runanywhere::v1::STTLanguage >(0)},
+        max_speakers_{0},
         enable_punctuation_{false},
         enable_diarization_{false},
         enable_word_timestamps_{false},
-        max_speakers_{0},
-        beam_size_{0} {}
+        detect_language_{false},
+        beam_size_{0},
+        audio_format_{static_cast< ::runanywhere::v1::AudioFormat >(0)},
+        sample_rate_{0},
+        max_alternatives_{0} {}
 
 template <typename>
 constexpr STTOptions::STTOptions(::_pbi::ConstantInitialized)
@@ -164,13 +141,30 @@ inline constexpr STTConfiguration::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        vocabulary_list_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::STTConfiguration,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.vocabulary_list_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        vocabulary_list_ {}
+        #endif
+        ,
         model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        language_code_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         language_{static_cast< ::runanywhere::v1::STTLanguage >(0)},
         sample_rate_{0},
+        audio_format_{static_cast< ::runanywhere::v1::AudioFormat >(0)},
         enable_vad_{false},
-        audio_format_{static_cast< ::runanywhere::v1::AudioFormat >(0)} {}
+        enable_punctuation_{false},
+        enable_diarization_{false},
+        enable_word_timestamps_{false},
+        max_alternatives_{0},
+        preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)} {}
 
 template <typename>
 constexpr STTConfiguration::STTConfiguration(::_pbi::ConstantInitialized)
@@ -230,6 +224,51 @@ struct TranscriptionAlternativeDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 TranscriptionAlternativeDefaultTypeInternal _TranscriptionAlternative_default_instance_;
 
+inline constexpr STTPartialResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        alternatives_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::STTPartialResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.alternatives_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        alternatives_ {}
+        #endif
+        ,
+        text_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        language_code_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        is_final_{false},
+        stability_{0},
+        confidence_{0},
+        language_{static_cast< ::runanywhere::v1::STTLanguage >(0)},
+        timestamp_ms_{::int64_t{0}} {}
+
+template <typename>
+constexpr STTPartialResult::STTPartialResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(STTPartialResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct STTPartialResultDefaultTypeInternal {
+  constexpr STTPartialResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~STTPartialResultDefaultTypeInternal() {}
+  union {
+    STTPartialResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 STTPartialResultDefaultTypeInternal _STTPartialResult_default_instance_;
+
 inline constexpr STTOutput::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -255,9 +294,14 @@ inline constexpr STTOutput::Impl_::Impl_(
         text_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        language_code_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         metadata_{nullptr},
         language_{static_cast< ::runanywhere::v1::STTLanguage >(0)},
-        confidence_{0} {}
+        confidence_{0},
+        timestamp_ms_{::int64_t{0}},
+        duration_ms_{::int64_t{0}} {}
 
 template <typename>
 constexpr STTOutput::STTOutput(::_pbi::ConstantInitialized)
@@ -289,20 +333,34 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_._has_bits_),
-        8, // hasbit index offset
+        15, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.language_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.enable_vad_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.audio_format_),
-        0,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.enable_punctuation_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.enable_diarization_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.vocabulary_list_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.max_alternatives_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.enable_word_timestamps_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.preferred_framework_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.language_code_),
         1,
-        2,
         3,
         4,
+        6,
+        5,
+        7,
+        8,
+        0,
+        10,
+        9,
+        11,
+        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_._has_bits_),
-        10, // hasbit index offset
+        15, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.language_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.enable_punctuation_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.enable_diarization_),
@@ -310,13 +368,23 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.vocabulary_list_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.enable_word_timestamps_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.beam_size_),
-        1,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.language_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.detect_language_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.audio_format_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.sample_rate_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOptions, _impl_.max_alternatives_),
         2,
-        3,
-        5,
-        0,
         4,
+        5,
+        3,
+        0,
         6,
+        8,
+        1,
+        7,
+        9,
+        10,
+        11,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::WordTimestamp, _impl_._has_bits_),
         7, // hasbit index offset
@@ -350,39 +418,55 @@ const ::uint32_t
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_._has_bits_),
-        9, // hasbit index offset
+        12, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.language_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.confidence_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.words_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.alternatives_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.metadata_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.language_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.timestamp_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTOutput, _impl_.duration_ms_),
         2,
-        4,
         5,
+        6,
         0,
         1,
+        4,
         3,
+        7,
+        8,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_._has_bits_),
-        6, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.is_final_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.stability_),
-        0,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.confidence_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.language_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.timestamp_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.alternatives_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.language_code_),
         1,
+        3,
+        4,
+        5,
+        6,
+        7,
+        0,
         2,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::STTConfiguration)},
-        {13, sizeof(::runanywhere::v1::STTOptions)},
-        {30, sizeof(::runanywhere::v1::WordTimestamp)},
-        {41, sizeof(::runanywhere::v1::TranscriptionAlternative)},
-        {50, sizeof(::runanywhere::v1::TranscriptionMetadata)},
-        {61, sizeof(::runanywhere::v1::STTOutput)},
-        {76, sizeof(::runanywhere::v1::STTPartialResult)},
+        {27, sizeof(::runanywhere::v1::STTOptions)},
+        {54, sizeof(::runanywhere::v1::WordTimestamp)},
+        {65, sizeof(::runanywhere::v1::TranscriptionAlternative)},
+        {74, sizeof(::runanywhere::v1::TranscriptionMetadata)},
+        {85, sizeof(::runanywhere::v1::STTOutput)},
+        {106, sizeof(::runanywhere::v1::STTPartialResult)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_STTConfiguration_default_instance_._instance,
@@ -396,45 +480,63 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 const char descriptor_table_protodef_stt_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021stt_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\"\257\001\n\020STTConfiguration\022\020\n\010m"
+    "el_types.proto\"\306\003\n\020STTConfiguration\022\020\n\010m"
     "odel_id\030\001 \001(\t\022-\n\010language\030\002 \001(\0162\033.runany"
     "where.v1.STTLanguage\022\023\n\013sample_rate\030\003 \001("
     "\005\022\022\n\nenable_vad\030\004 \001(\010\0221\n\014audio_format\030\005 "
-    "\001(\0162\033.runanywhere.v1.AudioFormat\"\325\001\n\nSTT"
-    "Options\022-\n\010language\030\001 \001(\0162\033.runanywhere."
-    "v1.STTLanguage\022\032\n\022enable_punctuation\030\002 \001"
-    "(\010\022\032\n\022enable_diarization\030\003 \001(\010\022\024\n\014max_sp"
-    "eakers\030\004 \001(\005\022\027\n\017vocabulary_list\030\005 \003(\t\022\036\n"
-    "\026enable_word_timestamps\030\006 \001(\010\022\021\n\tbeam_si"
-    "ze\030\007 \001(\005\"S\n\rWordTimestamp\022\014\n\004word\030\001 \001(\t\022"
-    "\020\n\010start_ms\030\002 \001(\003\022\016\n\006end_ms\030\003 \001(\003\022\022\n\ncon"
-    "fidence\030\004 \001(\002\"j\n\030TranscriptionAlternativ"
-    "e\022\014\n\004text\030\001 \001(\t\022\022\n\nconfidence\030\002 \001(\002\022,\n\005w"
-    "ords\030\003 \003(\0132\035.runanywhere.v1.WordTimestam"
-    "p\"x\n\025TranscriptionMetadata\022\020\n\010model_id\030\001"
-    " \001(\t\022\032\n\022processing_time_ms\030\002 \001(\003\022\027\n\017audi"
-    "o_length_ms\030\003 \001(\003\022\030\n\020real_time_factor\030\004 "
-    "\001(\002\"\203\002\n\tSTTOutput\022\014\n\004text\030\001 \001(\t\022-\n\010langu"
-    "age\030\002 \001(\0162\033.runanywhere.v1.STTLanguage\022\022"
-    "\n\nconfidence\030\003 \001(\002\022,\n\005words\030\004 \003(\0132\035.runa"
-    "nywhere.v1.WordTimestamp\022>\n\014alternatives"
-    "\030\005 \003(\0132(.runanywhere.v1.TranscriptionAlt"
-    "ernative\0227\n\010metadata\030\006 \001(\0132%.runanywhere"
-    ".v1.TranscriptionMetadata\"E\n\020STTPartialR"
-    "esult\022\014\n\004text\030\001 \001(\t\022\020\n\010is_final\030\002 \001(\010\022\021\n"
-    "\tstability\030\003 \001(\002*\276\002\n\013STTLanguage\022\034\n\030STT_"
-    "LANGUAGE_UNSPECIFIED\020\000\022\025\n\021STT_LANGUAGE_A"
-    "UTO\020\001\022\023\n\017STT_LANGUAGE_EN\020\002\022\023\n\017STT_LANGUA"
-    "GE_ES\020\003\022\023\n\017STT_LANGUAGE_FR\020\004\022\023\n\017STT_LANG"
-    "UAGE_DE\020\005\022\023\n\017STT_LANGUAGE_ZH\020\006\022\023\n\017STT_LA"
-    "NGUAGE_JA\020\007\022\023\n\017STT_LANGUAGE_KO\020\010\022\023\n\017STT_"
-    "LANGUAGE_IT\020\t\022\023\n\017STT_LANGUAGE_PT\020\n\022\023\n\017ST"
-    "T_LANGUAGE_AR\020\013\022\023\n\017STT_LANGUAGE_RU\020\014\022\023\n\017"
-    "STT_LANGUAGE_HI\020\rB\212\001\n\027ai.runanywhere.pro"
-    "to.v1B\017SttOptionsProtoP\001Z<github.com/run"
-    "anywhere/runanywhere-sdks/idl/v1;runanyw"
-    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
-    "proto3"
+    "\001(\0162\033.runanywhere.v1.AudioFormat\022\032\n\022enab"
+    "le_punctuation\030\006 \001(\010\022\032\n\022enable_diarizati"
+    "on\030\007 \001(\010\022\027\n\017vocabulary_list\030\010 \003(\t\022\030\n\020max"
+    "_alternatives\030\t \001(\005\022\036\n\026enable_word_times"
+    "tamps\030\n \001(\010\022D\n\023preferred_framework\030\013 \001(\016"
+    "2\".runanywhere.v1.InferenceFrameworkH\000\210\001"
+    "\001\022\032\n\rlanguage_code\030\014 \001(\tH\001\210\001\001B\026\n\024_prefer"
+    "red_frameworkB\020\n\016_language_code\"\376\002\n\nSTTO"
+    "ptions\022-\n\010language\030\001 \001(\0162\033.runanywhere.v"
+    "1.STTLanguage\022\032\n\022enable_punctuation\030\002 \001("
+    "\010\022\032\n\022enable_diarization\030\003 \001(\010\022\024\n\014max_spe"
+    "akers\030\004 \001(\005\022\027\n\017vocabulary_list\030\005 \003(\t\022\036\n\026"
+    "enable_word_timestamps\030\006 \001(\010\022\021\n\tbeam_siz"
+    "e\030\007 \001(\005\022\032\n\rlanguage_code\030\010 \001(\tH\000\210\001\001\022\027\n\017d"
+    "etect_language\030\t \001(\010\0221\n\014audio_format\030\n \001"
+    "(\0162\033.runanywhere.v1.AudioFormat\022\023\n\013sampl"
+    "e_rate\030\013 \001(\005\022\030\n\020max_alternatives\030\014 \001(\005B\020"
+    "\n\016_language_code\"S\n\rWordTimestamp\022\014\n\004wor"
+    "d\030\001 \001(\t\022\020\n\010start_ms\030\002 \001(\003\022\016\n\006end_ms\030\003 \001("
+    "\003\022\022\n\nconfidence\030\004 \001(\002\"j\n\030TranscriptionAl"
+    "ternative\022\014\n\004text\030\001 \001(\t\022\022\n\nconfidence\030\002 "
+    "\001(\002\022,\n\005words\030\003 \003(\0132\035.runanywhere.v1.Word"
+    "Timestamp\"x\n\025TranscriptionMetadata\022\020\n\010mo"
+    "del_id\030\001 \001(\t\022\032\n\022processing_time_ms\030\002 \001(\003"
+    "\022\027\n\017audio_length_ms\030\003 \001(\003\022\030\n\020real_time_f"
+    "actor\030\004 \001(\002\"\334\002\n\tSTTOutput\022\014\n\004text\030\001 \001(\t\022"
+    "-\n\010language\030\002 \001(\0162\033.runanywhere.v1.STTLa"
+    "nguage\022\022\n\nconfidence\030\003 \001(\002\022,\n\005words\030\004 \003("
+    "\0132\035.runanywhere.v1.WordTimestamp\022>\n\014alte"
+    "rnatives\030\005 \003(\0132(.runanywhere.v1.Transcri"
+    "ptionAlternative\0227\n\010metadata\030\006 \001(\0132%.run"
+    "anywhere.v1.TranscriptionMetadata\022\032\n\rlan"
+    "guage_code\030\007 \001(\tH\000\210\001\001\022\024\n\014timestamp_ms\030\010 "
+    "\001(\003\022\023\n\013duration_ms\030\t \001(\003B\020\n\016_language_co"
+    "de\"\214\002\n\020STTPartialResult\022\014\n\004text\030\001 \001(\t\022\020\n"
+    "\010is_final\030\002 \001(\010\022\021\n\tstability\030\003 \001(\002\022\022\n\nco"
+    "nfidence\030\004 \001(\002\022-\n\010language\030\005 \001(\0162\033.runan"
+    "ywhere.v1.STTLanguage\022\024\n\014timestamp_ms\030\006 "
+    "\001(\003\022>\n\014alternatives\030\007 \003(\0132(.runanywhere."
+    "v1.TranscriptionAlternative\022\032\n\rlanguage_"
+    "code\030\010 \001(\tH\000\210\001\001B\020\n\016_language_code*\276\002\n\013ST"
+    "TLanguage\022\034\n\030STT_LANGUAGE_UNSPECIFIED\020\000\022"
+    "\025\n\021STT_LANGUAGE_AUTO\020\001\022\023\n\017STT_LANGUAGE_E"
+    "N\020\002\022\023\n\017STT_LANGUAGE_ES\020\003\022\023\n\017STT_LANGUAGE"
+    "_FR\020\004\022\023\n\017STT_LANGUAGE_DE\020\005\022\023\n\017STT_LANGUA"
+    "GE_ZH\020\006\022\023\n\017STT_LANGUAGE_JA\020\007\022\023\n\017STT_LANG"
+    "UAGE_KO\020\010\022\023\n\017STT_LANGUAGE_IT\020\t\022\023\n\017STT_LA"
+    "NGUAGE_PT\020\n\022\023\n\017STT_LANGUAGE_AR\020\013\022\023\n\017STT_"
+    "LANGUAGE_RU\020\014\022\023\n\017STT_LANGUAGE_HI\020\rB\212\001\n\027a"
+    "i.runanywhere.proto.v1B\017SttOptionsProtoP"
+    "\001Z<github.com/runanywhere/runanywhere-sd"
+    "ks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runa"
+    "nywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_stt_5foptions_2eproto_deps[1] = {
@@ -444,7 +546,7 @@ static ::absl::once_flag descriptor_table_stt_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_stt_5foptions_2eproto = {
     false,
     false,
-    1566,
+    2303,
     descriptor_table_protodef_stt_5foptions_2eproto,
     "stt_options.proto",
     &descriptor_table_stt_5foptions_2eproto_once,
@@ -491,7 +593,17 @@ PROTOBUF_NDEBUG_INLINE STTConfiguration::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::STTConfiguration& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        model_id_(arena, from.model_id_) {}
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        vocabulary_list_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::STTConfiguration,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.vocabulary_list_)>()
+        , from.vocabulary_list_}
+        #else
+        vocabulary_list_ { visibility, arena, from.vocabulary_list_ }
+        #endif
+        ,
+        model_id_(arena, from.model_id_),
+        language_code_(arena, from.language_code_) {}
 
 STTConfiguration::STTConfiguration(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -510,9 +622,9 @@ STTConfiguration::STTConfiguration(
                offsetof(Impl_, language_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, language_),
-           offsetof(Impl_, audio_format_) -
+           offsetof(Impl_, preferred_framework_) -
                offsetof(Impl_, language_) +
-               sizeof(Impl_::audio_format_));
+               sizeof(Impl_::preferred_framework_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.STTConfiguration)
 }
@@ -520,16 +632,26 @@ PROTOBUF_NDEBUG_INLINE STTConfiguration::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        model_id_(arena) {}
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        vocabulary_list_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::STTConfiguration,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTConfiguration, _impl_.vocabulary_list_)>()
+        }
+        #else
+        vocabulary_list_ { visibility, arena }
+        #endif
+        ,
+        model_id_(arena),
+        language_code_(arena) {}
 
 inline void STTConfiguration::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, language_),
            0,
-           offsetof(Impl_, audio_format_) -
+           offsetof(Impl_, preferred_framework_) -
                offsetof(Impl_, language_) +
-               sizeof(Impl_::audio_format_));
+               sizeof(Impl_::preferred_framework_));
 }
 STTConfiguration::~STTConfiguration() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.STTConfiguration)
@@ -543,6 +665,7 @@ inline void STTConfiguration::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
+  this_._impl_.language_code_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -551,10 +674,29 @@ inline void* PROTOBUF_NONNULL STTConfiguration::PlacementNew_(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
   return ::new (mem) STTConfiguration(arena);
 }
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
 constexpr auto STTConfiguration::InternalNewImpl_() {
   return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(STTConfiguration),
                                             alignof(STTConfiguration));
 }
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto STTConfiguration::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.vocabulary_list_) +
+          decltype(STTConfiguration::_impl_.vocabulary_list_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(STTConfiguration), alignof(STTConfiguration), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&STTConfiguration::PlacementNew_,
+                                 sizeof(STTConfiguration),
+                                 alignof(STTConfiguration));
+  }
+}
+#endif
 constexpr auto STTConfiguration::InternalGenerateClassData_() {
   return ::google::protobuf::internal::ClassDataFull{
       ::google::protobuf::internal::ClassData{
@@ -588,16 +730,16 @@ STTConfiguration::GetClassData() const {
   return STTConfiguration_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 5, 0, 48, 2>
+const ::_pbi::TcParseTable<4, 12, 0, 84, 2>
 STTConfiguration::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_._has_bits_),
     0, // no _extensions_
-    5, 56,  // max_field_number, fast_idx_mask
+    12, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967264,  // skipmap
+    4294963200,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    5,  // num_field_entries
+    12,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     STTConfiguration_class_data_.base(),
@@ -610,45 +752,90 @@ STTConfiguration::_table_ = {
     {::_pbi::TcParser::MiniParse, {}},
     // string model_id = 1;
     {::_pbi::TcParser::FastUS1,
-     {10, 0, 0,
+     {10, 1, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.model_id_)}},
     // .runanywhere.v1.STTLanguage language = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.language_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.language_), 3>(),
+     {16, 3, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_)}},
     // int32 sample_rate = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.sample_rate_), 2>(),
-     {24, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.sample_rate_), 4>(),
+     {24, 4, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.sample_rate_)}},
     // bool enable_vad = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_vad_), 3>(),
-     {32, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_vad_), 6>(),
+     {32, 6, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_vad_)}},
     // .runanywhere.v1.AudioFormat audio_format = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.audio_format_), 4>(),
-     {40, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.audio_format_), 5>(),
+     {40, 5, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.audio_format_)}},
+    // bool enable_punctuation = 6;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_punctuation_), 7>(),
+     {48, 7, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_punctuation_)}},
+    // bool enable_diarization = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_diarization_), 8>(),
+     {56, 8, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_diarization_)}},
+    // repeated string vocabulary_list = 8;
+    {::_pbi::TcParser::FastUR1,
+     {66, 0, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.vocabulary_list_)}},
+    // int32 max_alternatives = 9;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.max_alternatives_), 10>(),
+     {72, 10, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.max_alternatives_)}},
+    // bool enable_word_timestamps = 10;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_word_timestamps_), 9>(),
+     {80, 9, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_word_timestamps_)}},
+    // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.preferred_framework_), 11>(),
+     {88, 11, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.preferred_framework_)}},
+    // optional string language_code = 12;
+    {::_pbi::TcParser::FastUS1,
+     {98, 2, 0,
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_code_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // string model_id = 1;
-    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // .runanywhere.v1.STTLanguage language = 2;
-    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // int32 sample_rate = 3;
-    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.sample_rate_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.sample_rate_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // bool enable_vad = 4;
-    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_vad_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_vad_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // .runanywhere.v1.AudioFormat audio_format = 5;
-    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.audio_format_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.audio_format_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // bool enable_punctuation = 6;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_punctuation_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // bool enable_diarization = 7;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_diarization_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // repeated string vocabulary_list = 8;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.vocabulary_list_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    // int32 max_alternatives = 9;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.max_alternatives_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // bool enable_word_timestamps = 10;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_word_timestamps_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional string language_code = 12;
+    {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_code_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
-    "\37\10\0\0\0\0\0\0"
+    "\37\10\0\0\0\0\0\0\17\0\0\0\15\0\0\0"
     "runanywhere.v1.STTConfiguration"
     "model_id"
+    "vocabulary_list"
+    "language_code"
   }},
 };
 PROTOBUF_NOINLINE void STTConfiguration::Clear() {
@@ -659,13 +846,26 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.model_id_.ClearNonDefaultToEmpty();
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.vocabulary_list_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.language_code_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001eU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
     ::memset(&_impl_.language_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.audio_format_) -
-        reinterpret_cast<char*>(&_impl_.language_)) + sizeof(_impl_.audio_format_));
+        reinterpret_cast<char*>(&_impl_.enable_punctuation_) -
+        reinterpret_cast<char*>(&_impl_.language_)) + sizeof(_impl_.enable_punctuation_));
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    ::memset(&_impl_.enable_diarization_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.preferred_framework_) -
+        reinterpret_cast<char*>(&_impl_.enable_diarization_)) + sizeof(_impl_.preferred_framework_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -691,7 +891,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // string model_id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (!this_._internal_model_id().empty()) {
       const ::std::string& _s = this_._internal_model_id();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -701,7 +901,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
   }
 
   // .runanywhere.v1.STTLanguage language = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_language() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -710,7 +910,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
   }
 
   // int32 sample_rate = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_sample_rate() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
@@ -719,7 +919,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
   }
 
   // bool enable_vad = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_enable_vad() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -728,12 +928,73 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
   }
 
   // .runanywhere.v1.AudioFormat audio_format = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_audio_format() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
           5, this_._internal_audio_format(), target);
     }
+  }
+
+  // bool enable_punctuation = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_enable_punctuation() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          6, this_._internal_enable_punctuation(), target);
+    }
+  }
+
+  // bool enable_diarization = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (this_._internal_enable_diarization() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          7, this_._internal_enable_diarization(), target);
+    }
+  }
+
+  // repeated string vocabulary_list = 8;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (int i = 0, n = this_._internal_vocabulary_list_size(); i < n; ++i) {
+      const auto& s = this_._internal_vocabulary_list().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.STTConfiguration.vocabulary_list");
+      target = stream->WriteString(8, s, target);
+    }
+  }
+
+  // int32 max_alternatives = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (this_._internal_max_alternatives() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
+              stream, this_._internal_max_alternatives(), target);
+    }
+  }
+
+  // bool enable_word_timestamps = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (this_._internal_enable_word_timestamps() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          10, this_._internal_enable_word_timestamps(), target);
+    }
+  }
+
+  // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        11, this_._internal_preferred_framework(), target);
+  }
+
+  // optional string language_code = 12;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_language_code();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.STTConfiguration.language_code");
+    target = stream->WriteStringMaybeAliased(12, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -761,40 +1022,86 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+    // repeated string vocabulary_list = 8;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_vocabulary_list().size());
+      for (int i = 0, n = this_._internal_vocabulary_list().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_vocabulary_list().Get(i));
+      }
+    }
     // string model_id = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!this_._internal_model_id().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_model_id());
       }
     }
+    // optional string language_code = 12;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_language_code());
+    }
     // .runanywhere.v1.STTLanguage language = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_language() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_language());
       }
     }
     // int32 sample_rate = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_sample_rate() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_sample_rate());
       }
     }
-    // bool enable_vad = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_enable_vad() != 0) {
-        total_size += 2;
-      }
-    }
     // .runanywhere.v1.AudioFormat audio_format = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_audio_format() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_audio_format());
       }
+    }
+    // bool enable_vad = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_enable_vad() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool enable_punctuation = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_enable_punctuation() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    // bool enable_diarization = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (this_._internal_enable_diarization() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool enable_word_timestamps = 10;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (this_._internal_enable_word_timestamps() != 0) {
+        total_size += 2;
+      }
+    }
+    // int32 max_alternatives = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      if (this_._internal_max_alternatives() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_max_alternatives());
+      }
+    }
+    // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_preferred_framework());
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -809,14 +1116,20 @@ void STTConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.STTConfiguration)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_vocabulary_list()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_vocabulary_list());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
       } else {
@@ -825,25 +1138,53 @@ void STTConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_language_code(from._internal_language_code());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_language() != 0) {
         _this->_impl_.language_ = from._impl_.language_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_sample_rate() != 0) {
         _this->_impl_.sample_rate_ = from._impl_.sample_rate_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_audio_format() != 0) {
+        _this->_impl_.audio_format_ = from._impl_.audio_format_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_enable_vad() != 0) {
         _this->_impl_.enable_vad_ = from._impl_.enable_vad_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_audio_format() != 0) {
-        _this->_impl_.audio_format_ = from._impl_.audio_format_;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_enable_punctuation() != 0) {
+        _this->_impl_.enable_punctuation_ = from._impl_.enable_punctuation_;
       }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (from._internal_enable_diarization() != 0) {
+        _this->_impl_.enable_diarization_ = from._impl_.enable_diarization_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (from._internal_enable_word_timestamps() != 0) {
+        _this->_impl_.enable_word_timestamps_ = from._impl_.enable_word_timestamps_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      if (from._internal_max_alternatives() != 0) {
+        _this->_impl_.max_alternatives_ = from._impl_.max_alternatives_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      _this->_impl_.preferred_framework_ = from._impl_.preferred_framework_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -865,10 +1206,12 @@ void STTConfiguration::InternalSwap(STTConfiguration* PROTOBUF_RESTRICT PROTOBUF
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.vocabulary_list_.InternalSwap(&other->_impl_.vocabulary_list_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_code_, &other->_impl_.language_code_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.audio_format_)
-      + sizeof(STTConfiguration::_impl_.audio_format_)
+      PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.preferred_framework_)
+      + sizeof(STTConfiguration::_impl_.preferred_framework_)
       - PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_)>(
           reinterpret_cast<char*>(&_impl_.language_),
           reinterpret_cast<char*>(&other->_impl_.language_));
@@ -910,7 +1253,8 @@ PROTOBUF_NDEBUG_INLINE STTOptions::Impl_::Impl_(
         #else
         vocabulary_list_ { visibility, arena, from.vocabulary_list_ }
         #endif
-     {}
+        ,
+        language_code_(arena, from.language_code_) {}
 
 STTOptions::STTOptions(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -929,9 +1273,9 @@ STTOptions::STTOptions(
                offsetof(Impl_, language_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, language_),
-           offsetof(Impl_, beam_size_) -
+           offsetof(Impl_, max_alternatives_) -
                offsetof(Impl_, language_) +
-               sizeof(Impl_::beam_size_));
+               sizeof(Impl_::max_alternatives_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.STTOptions)
 }
@@ -947,16 +1291,17 @@ PROTOBUF_NDEBUG_INLINE STTOptions::Impl_::Impl_(
         #else
         vocabulary_list_ { visibility, arena }
         #endif
-     {}
+        ,
+        language_code_(arena) {}
 
 inline void STTOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, language_),
            0,
-           offsetof(Impl_, beam_size_) -
+           offsetof(Impl_, max_alternatives_) -
                offsetof(Impl_, language_) +
-               sizeof(Impl_::beam_size_));
+               sizeof(Impl_::max_alternatives_));
 }
 STTOptions::~STTOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.STTOptions)
@@ -969,6 +1314,7 @@ inline void STTOptions::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.language_code_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -991,7 +1337,7 @@ constexpr auto STTOptions::InternalNewImpl_() {
                   ::google::protobuf::Message::internal_visibility()),
   });
   if (arena_bits.has_value()) {
-    return ::google::protobuf::internal::MessageCreator::ZeroInit(
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
         sizeof(STTOptions), alignof(STTOptions), *arena_bits);
   } else {
     return ::google::protobuf::internal::MessageCreator(&STTOptions::PlacementNew_,
@@ -1033,16 +1379,16 @@ STTOptions::GetClassData() const {
   return STTOptions_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 7, 0, 49, 2>
+const ::_pbi::TcParseTable<4, 12, 0, 70, 2>
 STTOptions::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(STTOptions, _impl_._has_bits_),
     0, // no _extensions_
-    7, 56,  // max_field_number, fast_idx_mask
+    12, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967168,  // skipmap
+    4294963200,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    7,  // num_field_entries
+    12,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     STTOptions_class_data_.base(),
@@ -1054,56 +1400,90 @@ STTOptions::_table_ = {
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
     // .runanywhere.v1.STTLanguage language = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.language_), 1>(),
-     {8, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.language_), 2>(),
+     {8, 2, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_)}},
     // bool enable_punctuation = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_punctuation_), 2>(),
-     {16, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_punctuation_), 4>(),
+     {16, 4, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_punctuation_)}},
     // bool enable_diarization = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_diarization_), 3>(),
-     {24, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_diarization_), 5>(),
+     {24, 5, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_diarization_)}},
     // int32 max_speakers = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.max_speakers_), 5>(),
-     {32, 5, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.max_speakers_), 3>(),
+     {32, 3, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_speakers_)}},
     // repeated string vocabulary_list = 5;
     {::_pbi::TcParser::FastUR1,
      {42, 0, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.vocabulary_list_)}},
     // bool enable_word_timestamps = 6;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_word_timestamps_), 4>(),
-     {48, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_word_timestamps_), 6>(),
+     {48, 6, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_word_timestamps_)}},
     // int32 beam_size = 7;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.beam_size_), 6>(),
-     {56, 6, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.beam_size_), 8>(),
+     {56, 8, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.beam_size_)}},
+    // optional string language_code = 8;
+    {::_pbi::TcParser::FastUS1,
+     {66, 1, 0,
+      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_code_)}},
+    // bool detect_language = 9;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.detect_language_), 7>(),
+     {72, 7, 0,
+      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.detect_language_)}},
+    // .runanywhere.v1.AudioFormat audio_format = 10;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.audio_format_), 9>(),
+     {80, 9, 0,
+      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.audio_format_)}},
+    // int32 sample_rate = 11;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.sample_rate_), 10>(),
+     {88, 10, 0,
+      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.sample_rate_)}},
+    // int32 max_alternatives = 12;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.max_alternatives_), 11>(),
+     {96, 11, 0,
+      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_alternatives_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // .runanywhere.v1.STTLanguage language = 1;
-    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // bool enable_punctuation = 2;
-    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_punctuation_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_punctuation_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // bool enable_diarization = 3;
-    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_diarization_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_diarization_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // int32 max_speakers = 4;
-    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_speakers_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_speakers_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // repeated string vocabulary_list = 5;
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.vocabulary_list_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
     // bool enable_word_timestamps = 6;
-    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_word_timestamps_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_word_timestamps_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // int32 beam_size = 7;
-    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.beam_size_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.beam_size_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // optional string language_code = 8;
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_code_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // bool detect_language = 9;
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.detect_language_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // .runanywhere.v1.AudioFormat audio_format = 10;
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.audio_format_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // int32 sample_rate = 11;
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.sample_rate_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // int32 max_alternatives = 12;
+    {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_alternatives_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
   }},
   // no aux_entries
   {{
-    "\31\0\0\0\0\17\0\0"
+    "\31\0\0\0\0\17\0\0\15\0\0\0\0\0\0\0"
     "runanywhere.v1.STTOptions"
     "vocabulary_list"
+    "language_code"
   }},
 };
 PROTOBUF_NOINLINE void STTOptions::Clear() {
@@ -1114,13 +1494,23 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
-    _impl_.vocabulary_list_.Clear();
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.vocabulary_list_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.language_code_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007eU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
     ::memset(&_impl_.language_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.beam_size_) -
-        reinterpret_cast<char*>(&_impl_.language_)) + sizeof(_impl_.beam_size_));
+        reinterpret_cast<char*>(&_impl_.detect_language_) -
+        reinterpret_cast<char*>(&_impl_.language_)) + sizeof(_impl_.detect_language_));
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    ::memset(&_impl_.beam_size_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.max_alternatives_) -
+        reinterpret_cast<char*>(&_impl_.beam_size_)) + sizeof(_impl_.max_alternatives_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -1146,7 +1536,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.STTLanguage language = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_language() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1155,7 +1545,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   }
 
   // bool enable_punctuation = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_enable_punctuation() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -1164,7 +1554,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   }
 
   // bool enable_diarization = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_enable_diarization() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -1173,7 +1563,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   }
 
   // int32 max_speakers = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_max_speakers() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
@@ -1192,7 +1582,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   }
 
   // bool enable_word_timestamps = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_enable_word_timestamps() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -1201,11 +1591,55 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   }
 
   // int32 beam_size = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_beam_size() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
               stream, this_._internal_beam_size(), target);
+    }
+  }
+
+  // optional string language_code = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_language_code();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.STTOptions.language_code");
+    target = stream->WriteStringMaybeAliased(8, _s, target);
+  }
+
+  // bool detect_language = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_detect_language() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          9, this_._internal_detect_language(), target);
+    }
+  }
+
+  // .runanywhere.v1.AudioFormat audio_format = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (this_._internal_audio_format() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          10, this_._internal_audio_format(), target);
+    }
+  }
+
+  // int32 sample_rate = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (this_._internal_sample_rate() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<11>(
+              stream, this_._internal_sample_rate(), target);
+    }
+  }
+
+  // int32 max_alternatives = 12;
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (this_._internal_max_alternatives() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<12>(
+              stream, this_._internal_max_alternatives(), target);
     }
   }
 
@@ -1234,7 +1668,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // repeated string vocabulary_list = 5;
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       total_size +=
@@ -1244,43 +1678,77 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
             this_._internal_vocabulary_list().Get(i));
       }
     }
-    // .runanywhere.v1.STTLanguage language = 1;
+    // optional string language_code = 8;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_language_code());
+    }
+    // .runanywhere.v1.STTLanguage language = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_language() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_language());
       }
     }
-    // bool enable_punctuation = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_enable_punctuation() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool enable_diarization = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_enable_diarization() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool enable_word_timestamps = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_enable_word_timestamps() != 0) {
-        total_size += 2;
-      }
-    }
     // int32 max_speakers = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_max_speakers() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_speakers());
       }
     }
-    // int32 beam_size = 7;
+    // bool enable_punctuation = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_enable_punctuation() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool enable_diarization = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_enable_diarization() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool enable_word_timestamps = 6;
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_enable_word_timestamps() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool detect_language = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_detect_language() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    // int32 beam_size = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_beam_size() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_beam_size());
+      }
+    }
+    // .runanywhere.v1.AudioFormat audio_format = 10;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (this_._internal_audio_format() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_audio_format());
+      }
+    }
+    // int32 sample_rate = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      if (this_._internal_sample_rate() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_sample_rate());
+      }
+    }
+    // int32 max_alternatives = 12;
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      if (this_._internal_max_alternatives() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_max_alternatives());
       }
     }
   }
@@ -1303,40 +1771,65 @@ void STTOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_vocabulary_list()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_vocabulary_list());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_language_code(from._internal_language_code());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_language() != 0) {
         _this->_impl_.language_ = from._impl_.language_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_enable_punctuation() != 0) {
-        _this->_impl_.enable_punctuation_ = from._impl_.enable_punctuation_;
-      }
-    }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_enable_diarization() != 0) {
-        _this->_impl_.enable_diarization_ = from._impl_.enable_diarization_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_enable_word_timestamps() != 0) {
-        _this->_impl_.enable_word_timestamps_ = from._impl_.enable_word_timestamps_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_max_speakers() != 0) {
         _this->_impl_.max_speakers_ = from._impl_.max_speakers_;
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_enable_punctuation() != 0) {
+        _this->_impl_.enable_punctuation_ = from._impl_.enable_punctuation_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_enable_diarization() != 0) {
+        _this->_impl_.enable_diarization_ = from._impl_.enable_diarization_;
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_enable_word_timestamps() != 0) {
+        _this->_impl_.enable_word_timestamps_ = from._impl_.enable_word_timestamps_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_detect_language() != 0) {
+        _this->_impl_.detect_language_ = from._impl_.detect_language_;
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (from._internal_beam_size() != 0) {
         _this->_impl_.beam_size_ = from._impl_.beam_size_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (from._internal_audio_format() != 0) {
+        _this->_impl_.audio_format_ = from._impl_.audio_format_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      if (from._internal_sample_rate() != 0) {
+        _this->_impl_.sample_rate_ = from._impl_.sample_rate_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      if (from._internal_max_alternatives() != 0) {
+        _this->_impl_.max_alternatives_ = from._impl_.max_alternatives_;
       }
     }
   }
@@ -1355,12 +1848,15 @@ void STTOptions::CopyFrom(const STTOptions& from) {
 
 void STTOptions::InternalSwap(STTOptions* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.vocabulary_list_.InternalSwap(&other->_impl_.vocabulary_list_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_code_, &other->_impl_.language_code_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.beam_size_)
-      + sizeof(STTOptions::_impl_.beam_size_)
+      PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_alternatives_)
+      + sizeof(STTOptions::_impl_.max_alternatives_)
       - PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_)>(
           reinterpret_cast<char*>(&_impl_.language_),
           reinterpret_cast<char*>(&other->_impl_.language_));
@@ -2559,7 +3055,8 @@ PROTOBUF_NDEBUG_INLINE STTOutput::Impl_::Impl_(
         alternatives_ { visibility, arena, from.alternatives_ }
         #endif
         ,
-        text_(arena, from.text_) {}
+        text_(arena, from.text_),
+        language_code_(arena, from.language_code_) {}
 
 STTOutput::STTOutput(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2575,16 +3072,16 @@ STTOutput::STTOutput(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.metadata_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.metadata_ = (CheckHasBit(cached_has_bits, 0x00000010U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.metadata_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, language_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, language_),
-           offsetof(Impl_, confidence_) -
+           offsetof(Impl_, duration_ms_) -
                offsetof(Impl_, language_) +
-               sizeof(Impl_::confidence_));
+               sizeof(Impl_::duration_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.STTOutput)
 }
@@ -2610,16 +3107,17 @@ PROTOBUF_NDEBUG_INLINE STTOutput::Impl_::Impl_(
         alternatives_ { visibility, arena }
         #endif
         ,
-        text_(arena) {}
+        text_(arena),
+        language_code_(arena) {}
 
 inline void STTOutput::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, metadata_),
            0,
-           offsetof(Impl_, confidence_) -
+           offsetof(Impl_, duration_ms_) -
                offsetof(Impl_, metadata_) +
-               sizeof(Impl_::confidence_));
+               sizeof(Impl_::duration_ms_));
 }
 STTOutput::~STTOutput() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.STTOutput)
@@ -2633,6 +3131,7 @@ inline void STTOutput::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
+  this_._impl_.language_code_.Destroy();
   delete this_._impl_.metadata_;
   this_._impl_.~Impl_();
 }
@@ -2702,16 +3201,16 @@ STTOutput::GetClassData() const {
   return STTOutput_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 6, 3, 37, 2>
+const ::_pbi::TcParseTable<4, 9, 3, 58, 2>
 STTOutput::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(STTOutput, _impl_._has_bits_),
     0, // no _extensions_
-    6, 56,  // max_field_number, fast_idx_mask
+    9, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967232,  // skipmap
+    4294966784,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    6,  // num_field_entries
+    9,  // num_field_entries
     3,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     STTOutput_class_data_.base(),
@@ -2727,12 +3226,12 @@ STTOutput::_table_ = {
      {10, 2, 0,
       PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.text_)}},
     // .runanywhere.v1.STTLanguage language = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOutput, _impl_.language_), 4>(),
-     {16, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOutput, _impl_.language_), 5>(),
+     {16, 5, 0,
       PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.language_)}},
     // float confidence = 3;
     {::_pbi::TcParser::FastF32S1,
-     {29, 5, 0,
+     {29, 6, 0,
       PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.confidence_)}},
     // repeated .runanywhere.v1.WordTimestamp words = 4;
     {::_pbi::TcParser::FastMtR1,
@@ -2744,8 +3243,25 @@ STTOutput::_table_ = {
       PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.alternatives_)}},
     // .runanywhere.v1.TranscriptionMetadata metadata = 6;
     {::_pbi::TcParser::FastMtS1,
-     {50, 3, 2,
+     {50, 4, 2,
       PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.metadata_)}},
+    // optional string language_code = 7;
+    {::_pbi::TcParser::FastUS1,
+     {58, 3, 0,
+      PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.language_code_)}},
+    // int64 timestamp_ms = 8;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(STTOutput, _impl_.timestamp_ms_), 7>(),
+     {64, 7, 0,
+      PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.timestamp_ms_)}},
+    // int64 duration_ms = 9;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(STTOutput, _impl_.duration_ms_), 8>(),
+     {72, 8, 0,
+      PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.duration_ms_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
@@ -2753,15 +3269,21 @@ STTOutput::_table_ = {
     // string text = 1;
     {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.text_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // .runanywhere.v1.STTLanguage language = 2;
-    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.language_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.language_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // float confidence = 3;
-    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.confidence_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.confidence_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
     // repeated .runanywhere.v1.WordTimestamp words = 4;
     {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.words_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
     // repeated .runanywhere.v1.TranscriptionAlternative alternatives = 5;
     {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.alternatives_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
     // .runanywhere.v1.TranscriptionMetadata metadata = 6;
-    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.metadata_), _Internal::kHasBitsOffset + 3, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.metadata_), _Internal::kHasBitsOffset + 4, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    // optional string language_code = 7;
+    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.language_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int64 timestamp_ms = 8;
+    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // int64 duration_ms = 9;
+    {PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.duration_ms_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::WordTimestamp>()},
@@ -2769,9 +3291,10 @@ STTOutput::_table_ = {
       {::_pbi::TcParser::GetTable<::runanywhere::v1::TranscriptionMetadata>()},
   }},
   {{
-    "\30\4\0\0\0\0\0\0"
+    "\30\4\0\0\0\0\0\15\0\0\0\0\0\0\0\0"
     "runanywhere.v1.STTOutput"
     "text"
+    "language_code"
   }},
 };
 PROTOBUF_NOINLINE void STTOutput::Clear() {
@@ -2782,7 +3305,7 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _impl_.words_.Clear();
     }
@@ -2793,15 +3316,19 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
       _impl_.text_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.language_code_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       ABSL_DCHECK(_impl_.metadata_ != nullptr);
       _impl_.metadata_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000030U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
     ::memset(&_impl_.language_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.confidence_) -
-        reinterpret_cast<char*>(&_impl_.language_)) + sizeof(_impl_.confidence_));
+        reinterpret_cast<char*>(&_impl_.timestamp_ms_) -
+        reinterpret_cast<char*>(&_impl_.language_)) + sizeof(_impl_.timestamp_ms_));
   }
+  _impl_.duration_ms_ = ::int64_t{0};
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -2836,7 +3363,7 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
   }
 
   // .runanywhere.v1.STTLanguage language = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_language() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2845,7 +3372,7 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
   }
 
   // float confidence = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -2880,10 +3407,36 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
   }
 
   // .runanywhere.v1.TranscriptionMetadata metadata = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         6, *this_._impl_.metadata_, this_._impl_.metadata_->GetCachedSize(), target,
         stream);
+  }
+
+  // optional string language_code = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    const ::std::string& _s = this_._internal_language_code();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.STTOutput.language_code");
+    target = stream->WriteStringMaybeAliased(7, _s, target);
+  }
+
+  // int64 timestamp_ms = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_timestamp_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
+              stream, this_._internal_timestamp_ms(), target);
+    }
+  }
+
+  // int64 duration_ms = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (this_._internal_duration_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<9>(
+              stream, this_._internal_duration_ms(), target);
+    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2911,7 +3464,7 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // repeated .runanywhere.v1.WordTimestamp words = 4;
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_words_size();
@@ -2933,22 +3486,43 @@ PROTOBUF_NOINLINE void STTOutput::Clear() {
                                         this_._internal_text());
       }
     }
-    // .runanywhere.v1.TranscriptionMetadata metadata = 6;
+    // optional string language_code = 7;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_language_code());
+    }
+    // .runanywhere.v1.TranscriptionMetadata metadata = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.metadata_);
     }
     // .runanywhere.v1.STTLanguage language = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_language() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_language());
       }
     }
     // float confidence = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
         total_size += 5;
+      }
+    }
+    // int64 timestamp_ms = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_timestamp_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_timestamp_ms());
+      }
+    }
+  }
+   {
+    // int64 duration_ms = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (this_._internal_duration_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_duration_ms());
       }
     }
   }
@@ -2971,7 +3545,7 @@ void STTOutput::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_words()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
@@ -2992,6 +3566,9 @@ void STTOutput::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _this->_internal_set_language_code(from._internal_language_code());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       ABSL_DCHECK(from._impl_.metadata_ != nullptr);
       if (_this->_impl_.metadata_ == nullptr) {
         _this->_impl_.metadata_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.metadata_);
@@ -2999,15 +3576,25 @@ void STTOutput::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.metadata_->MergeFrom(*from._impl_.metadata_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_language() != 0) {
         _this->_impl_.language_ = from._impl_.language_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_confidence()) != 0) {
         _this->_impl_.confidence_ = from._impl_.confidence_;
       }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_timestamp_ms() != 0) {
+        _this->_impl_.timestamp_ms_ = from._impl_.timestamp_ms_;
+      }
+    }
+  }
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (from._internal_duration_ms() != 0) {
+      _this->_impl_.duration_ms_ = from._impl_.duration_ms_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -3032,9 +3619,10 @@ void STTOutput::InternalSwap(STTOutput* PROTOBUF_RESTRICT PROTOBUF_NONNULL other
   _impl_.words_.InternalSwap(&other->_impl_.words_);
   _impl_.alternatives_.InternalSwap(&other->_impl_.alternatives_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_code_, &other->_impl_.language_code_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.confidence_)
-      + sizeof(STTOutput::_impl_.confidence_)
+      PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.duration_ms_)
+      + sizeof(STTOutput::_impl_.duration_ms_)
       - PROTOBUF_FIELD_OFFSET(STTOutput, _impl_.metadata_)>(
           reinterpret_cast<char*>(&_impl_.metadata_),
           reinterpret_cast<char*>(&other->_impl_.metadata_));
@@ -3068,7 +3656,17 @@ PROTOBUF_NDEBUG_INLINE STTPartialResult::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::STTPartialResult& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        text_(arena, from.text_) {}
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        alternatives_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::STTPartialResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.alternatives_)>()
+        , from.alternatives_}
+        #else
+        alternatives_ { visibility, arena, from.alternatives_ }
+        #endif
+        ,
+        text_(arena, from.text_),
+        language_code_(arena, from.language_code_) {}
 
 STTPartialResult::STTPartialResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -3087,9 +3685,9 @@ STTPartialResult::STTPartialResult(
                offsetof(Impl_, is_final_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_final_),
-           offsetof(Impl_, stability_) -
+           offsetof(Impl_, timestamp_ms_) -
                offsetof(Impl_, is_final_) +
-               sizeof(Impl_::stability_));
+               sizeof(Impl_::timestamp_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.STTPartialResult)
 }
@@ -3097,16 +3695,26 @@ PROTOBUF_NDEBUG_INLINE STTPartialResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        text_(arena) {}
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        alternatives_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::STTPartialResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::STTPartialResult, _impl_.alternatives_)>()
+        }
+        #else
+        alternatives_ { visibility, arena }
+        #endif
+        ,
+        text_(arena),
+        language_code_(arena) {}
 
 inline void STTPartialResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, is_final_),
            0,
-           offsetof(Impl_, stability_) -
+           offsetof(Impl_, timestamp_ms_) -
                offsetof(Impl_, is_final_) +
-               sizeof(Impl_::stability_));
+               sizeof(Impl_::timestamp_ms_));
 }
 STTPartialResult::~STTPartialResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.STTPartialResult)
@@ -3120,6 +3728,7 @@ inline void STTPartialResult::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
+  this_._impl_.language_code_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -3128,10 +3737,29 @@ inline void* PROTOBUF_NONNULL STTPartialResult::PlacementNew_(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
   return ::new (mem) STTPartialResult(arena);
 }
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
 constexpr auto STTPartialResult::InternalNewImpl_() {
   return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(STTPartialResult),
                                             alignof(STTPartialResult));
 }
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto STTPartialResult::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.alternatives_) +
+          decltype(STTPartialResult::_impl_.alternatives_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(STTPartialResult), alignof(STTPartialResult), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&STTPartialResult::PlacementNew_,
+                                 sizeof(STTPartialResult),
+                                 alignof(STTPartialResult));
+  }
+}
+#endif
 constexpr auto STTPartialResult::InternalGenerateClassData_() {
   return ::google::protobuf::internal::ClassDataFull{
       ::google::protobuf::internal::ClassData{
@@ -3165,18 +3793,18 @@ STTPartialResult::GetClassData() const {
   return STTPartialResult_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 3, 0, 44, 2>
+const ::_pbi::TcParseTable<3, 8, 1, 65, 2>
 STTPartialResult::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_._has_bits_),
     0, // no _extensions_
-    3, 24,  // max_field_number, fast_idx_mask
+    8, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967288,  // skipmap
+    4294967040,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    3,  // num_field_entries
-    0,  // num_aux_entries
-    offsetof(decltype(_table_), field_names),  // no aux_entries
+    8,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
     STTPartialResult_class_data_.base(),
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
@@ -3184,34 +3812,66 @@ STTPartialResult::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::STTPartialResult>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // optional string language_code = 8;
+    {::_pbi::TcParser::FastUS1,
+     {66, 2, 0,
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.language_code_)}},
     // string text = 1;
     {::_pbi::TcParser::FastUS1,
-     {10, 0, 0,
+     {10, 1, 0,
       PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.text_)}},
     // bool is_final = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTPartialResult, _impl_.is_final_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTPartialResult, _impl_.is_final_), 3>(),
+     {16, 3, 0,
       PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.is_final_)}},
     // float stability = 3;
     {::_pbi::TcParser::FastF32S1,
-     {29, 2, 0,
+     {29, 4, 0,
       PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.stability_)}},
+    // float confidence = 4;
+    {::_pbi::TcParser::FastF32S1,
+     {37, 5, 0,
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.confidence_)}},
+    // .runanywhere.v1.STTLanguage language = 5;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTPartialResult, _impl_.language_), 6>(),
+     {40, 6, 0,
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.language_)}},
+    // int64 timestamp_ms = 6;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(STTPartialResult, _impl_.timestamp_ms_), 7>(),
+     {48, 7, 0,
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.timestamp_ms_)}},
+    // repeated .runanywhere.v1.TranscriptionAlternative alternatives = 7;
+    {::_pbi::TcParser::FastMtR1,
+     {58, 0, 0,
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.alternatives_)}},
   }}, {{
     65535, 65535
   }}, {{
     // string text = 1;
-    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.text_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // bool is_final = 2;
-    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.is_final_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.is_final_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // float stability = 3;
-    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.stability_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.stability_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // float confidence = 4;
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.confidence_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // .runanywhere.v1.STTLanguage language = 5;
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.language_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // int64 timestamp_ms = 6;
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // repeated .runanywhere.v1.TranscriptionAlternative alternatives = 7;
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.alternatives_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // optional string language_code = 8;
+    {PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.language_code_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
-  // no aux_entries
   {{
-    "\37\4\0\0\0\0\0\0"
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::TranscriptionAlternative>()},
+  }},
+  {{
+    "\37\4\0\0\0\0\0\0\15\0\0\0\0\0\0\0"
     "runanywhere.v1.STTPartialResult"
     "text"
+    "language_code"
   }},
 };
 PROTOBUF_NOINLINE void STTPartialResult::Clear() {
@@ -3222,13 +3882,21 @@ PROTOBUF_NOINLINE void STTPartialResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.text_.ClearNonDefaultToEmpty();
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.alternatives_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.text_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.language_code_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
     ::memset(&_impl_.is_final_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.stability_) -
-        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.stability_));
+        reinterpret_cast<char*>(&_impl_.timestamp_ms_) -
+        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.timestamp_ms_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3254,7 +3922,7 @@ PROTOBUF_NOINLINE void STTPartialResult::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // string text = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (!this_._internal_text().empty()) {
       const ::std::string& _s = this_._internal_text();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -3264,7 +3932,7 @@ PROTOBUF_NOINLINE void STTPartialResult::Clear() {
   }
 
   // bool is_final = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_is_final() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -3273,12 +3941,60 @@ PROTOBUF_NOINLINE void STTPartialResult::Clear() {
   }
 
   // float stability = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_stability()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
           3, this_._internal_stability(), target);
     }
+  }
+
+  // float confidence = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          4, this_._internal_confidence(), target);
+    }
+  }
+
+  // .runanywhere.v1.STTLanguage language = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_language() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          5, this_._internal_language(), target);
+    }
+  }
+
+  // int64 timestamp_ms = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_timestamp_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
+              stream, this_._internal_timestamp_ms(), target);
+    }
+  }
+
+  // repeated .runanywhere.v1.TranscriptionAlternative alternatives = 7;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_alternatives_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_alternatives().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              7, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  // optional string language_code = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_language_code();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.STTPartialResult.language_code");
+    target = stream->WriteStringMaybeAliased(8, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -3306,24 +4022,56 @@ PROTOBUF_NOINLINE void STTPartialResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+    // repeated .runanywhere.v1.TranscriptionAlternative alternatives = 7;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size += 1UL * this_._internal_alternatives_size();
+      for (const auto& msg : this_._internal_alternatives()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
     // string text = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!this_._internal_text().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_text());
       }
     }
+    // optional string language_code = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_language_code());
+    }
     // bool is_final = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_is_final() != 0) {
         total_size += 2;
       }
     }
     // float stability = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_stability()) != 0) {
         total_size += 5;
+      }
+    }
+    // float confidence = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
+        total_size += 5;
+      }
+    }
+    // .runanywhere.v1.STTLanguage language = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_language() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_language());
+      }
+    }
+    // int64 timestamp_ms = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_timestamp_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_timestamp_ms());
       }
     }
   }
@@ -3339,14 +4087,20 @@ void STTPartialResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.STTPartialResult)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_alternatives()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_alternatives());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!from._internal_text().empty()) {
         _this->_internal_set_text(from._internal_text());
       } else {
@@ -3355,14 +4109,32 @@ void STTPartialResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_language_code(from._internal_language_code());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_is_final() != 0) {
         _this->_impl_.is_final_ = from._impl_.is_final_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_stability()) != 0) {
         _this->_impl_.stability_ = from._impl_.stability_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_confidence()) != 0) {
+        _this->_impl_.confidence_ = from._impl_.confidence_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_language() != 0) {
+        _this->_impl_.language_ = from._impl_.language_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_timestamp_ms() != 0) {
+        _this->_impl_.timestamp_ms_ = from._impl_.timestamp_ms_;
       }
     }
   }
@@ -3385,10 +4157,12 @@ void STTPartialResult::InternalSwap(STTPartialResult* PROTOBUF_RESTRICT PROTOBUF
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.alternatives_.InternalSwap(&other->_impl_.alternatives_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_code_, &other->_impl_.language_code_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.stability_)
-      + sizeof(STTPartialResult::_impl_.stability_)
+      PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.timestamp_ms_)
+      + sizeof(STTPartialResult::_impl_.timestamp_ms_)
       - PROTOBUF_FIELD_OFFSET(STTPartialResult, _impl_.is_final_)>(
           reinterpret_cast<char*>(&_impl_.is_final_),
           reinterpret_cast<char*>(&other->_impl_.is_final_));

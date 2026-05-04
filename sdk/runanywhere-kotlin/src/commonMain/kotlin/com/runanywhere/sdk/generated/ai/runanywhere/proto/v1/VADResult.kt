@@ -92,6 +92,36 @@ public class VADResult(
     schemaIndex = 3,
   )
   public val duration_ms: Int = 0,
+  /**
+   * Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timestampMs",
+    schemaIndex = 4,
+  )
+  public val timestamp_ms: Long = 0L,
+  /**
+   * Optional detected segment start/end times, in milliseconds. 0 = unset.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "startTimeMs",
+    schemaIndex = 5,
+  )
+  public val start_time_ms: Long = 0L,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "endTimeMs",
+    schemaIndex = 6,
+  )
+  public val end_time_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -109,6 +139,9 @@ public class VADResult(
     if (confidence != other.confidence) return false
     if (energy != other.energy) return false
     if (duration_ms != other.duration_ms) return false
+    if (timestamp_ms != other.timestamp_ms) return false
+    if (start_time_ms != other.start_time_ms) return false
+    if (end_time_ms != other.end_time_ms) return false
     return true
   }
 
@@ -120,6 +153,9 @@ public class VADResult(
       result = result * 37 + confidence.hashCode()
       result = result * 37 + energy.hashCode()
       result = result * 37 + duration_ms.hashCode()
+      result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + start_time_ms.hashCode()
+      result = result * 37 + end_time_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -131,6 +167,9 @@ public class VADResult(
     result += """confidence=$confidence"""
     result += """energy=$energy"""
     result += """duration_ms=$duration_ms"""
+    result += """timestamp_ms=$timestamp_ms"""
+    result += """start_time_ms=$start_time_ms"""
+    result += """end_time_ms=$end_time_ms"""
     return result.joinToString(prefix = "VADResult{", separator = ", ", postfix = "}")
   }
 
@@ -139,8 +178,12 @@ public class VADResult(
     confidence: Float = this.confidence,
     energy: Float = this.energy,
     duration_ms: Int = this.duration_ms,
+    timestamp_ms: Long = this.timestamp_ms,
+    start_time_ms: Long = this.start_time_ms,
+    end_time_ms: Long = this.end_time_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): VADResult = VADResult(is_speech, confidence, energy, duration_ms, unknownFields)
+  ): VADResult = VADResult(is_speech, confidence, energy, duration_ms, timestamp_ms, start_time_ms,
+      end_time_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -161,6 +204,12 @@ public class VADResult(
         if (!value.energy.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.energy)
         if (value.duration_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
             value.duration_ms)
+        if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(5,
+            value.timestamp_ms)
+        if (value.start_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(6,
+            value.start_time_ms)
+        if (value.end_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.end_time_ms)
         return size
       }
 
@@ -170,11 +219,21 @@ public class VADResult(
             value.confidence)
         if (!value.energy.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.energy)
         if (value.duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.duration_ms)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 5,
+            value.timestamp_ms)
+        if (value.start_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
+            value.start_time_ms)
+        if (value.end_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7, value.end_time_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.end_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7, value.end_time_ms)
+        if (value.start_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
+            value.start_time_ms)
+        if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 5,
+            value.timestamp_ms)
         if (value.duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.duration_ms)
         if (!value.energy.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.energy)
         if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 2,
@@ -187,12 +246,18 @@ public class VADResult(
         var confidence: Float = 0f
         var energy: Float = 0f
         var duration_ms: Int = 0
+        var timestamp_ms: Long = 0L
+        var start_time_ms: Long = 0L
+        var end_time_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_speech = ProtoAdapter.BOOL.decode(reader)
             2 -> confidence = ProtoAdapter.FLOAT.decode(reader)
             3 -> energy = ProtoAdapter.FLOAT.decode(reader)
             4 -> duration_ms = ProtoAdapter.INT32.decode(reader)
+            5 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            6 -> start_time_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> end_time_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -201,6 +266,9 @@ public class VADResult(
           confidence = confidence,
           energy = energy,
           duration_ms = duration_ms,
+          timestamp_ms = timestamp_ms,
+          start_time_ms = start_time_ms,
+          end_time_ms = end_time_ms,
           unknownFields = unknownFields
         )
       }

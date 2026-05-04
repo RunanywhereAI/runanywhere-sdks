@@ -201,6 +201,7 @@ export const RAGScreen: React.FC = () => {
         similarityThreshold: 0.12,
         chunkSize: 180,
         chunkOverlap: 30,
+        maxContextTokens: 2048,
       };
 
       // Create pipeline and ingest document (same as iOS loadDocument)

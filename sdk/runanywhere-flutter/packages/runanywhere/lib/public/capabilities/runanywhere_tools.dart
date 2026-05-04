@@ -16,10 +16,16 @@
 import 'dart:convert';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/llm_options.pb.dart' show LLMGenerationOptions;
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationOptions;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
-    show ToolCall, ToolCallingOptions, ToolCallingResult, ToolDefinition,
-        ToolParameter, ToolResult;
+    show
+        ToolCall,
+        ToolCallingOptions,
+        ToolCallingResult,
+        ToolDefinition,
+        ToolParameter,
+        ToolResult;
 import 'package:runanywhere/generated/tool_calling.pbenum.dart'
     show ToolCallFormatName, ToolParameterType;
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
@@ -209,10 +215,11 @@ class RunAnywhereTools {
     _logger.debug('Tools JSON: $toolsJson');
     _logger.debug('Using tool call format: $formatName');
 
-    final toolsPrompt = DartBridgeToolCalling.shared
-        .formatToolsPromptWithFormat(toolsJson, formatName);
-
-    final formattedPrompt = '$toolsPrompt\n\nUser: $prompt';
+    final formattedPrompt = DartBridgeToolCalling.shared.buildInitialPrompt(
+      prompt,
+      toolsJson,
+      formatName: formatName,
+    );
     _logger.debug(
         'Formatted prompt: ${formattedPrompt.substring(0, formattedPrompt.length.clamp(0, 200))}...');
 
@@ -233,8 +240,8 @@ class RunAnywhereTools {
 
       // v2 close-out Phase G-2: generateStream returns
       // Stream<LLMStreamEvent>; accumulate token text off each event.
-      final eventStream = RunAnywhereLLM.shared
-          .generateStream(currentPrompt, genOptions);
+      final eventStream =
+          RunAnywhereLLM.shared.generateStream(currentPrompt, genOptions);
       final buffer = StringBuffer();
       await for (final event in eventStream) {
         if (event.isFinal) {
@@ -266,15 +273,15 @@ class RunAnywhereTools {
       final toolCall = ToolCall(
         id: parseResult.callId.toString(),
         name: parseResult.toolName!,
-        argumentsJson:
-            parseResult.arguments != null ? jsonEncode(parseResult.arguments) : '',
+        argumentsJson: parseResult.arguments != null
+            ? jsonEncode(parseResult.arguments)
+            : '',
       );
       allToolCalls.add(toolCall);
 
       _logger.info('Tool call detected: ${toolCall.name}');
 
-      final autoExecute =
-          opts.hasAutoExecute() ? opts.autoExecute : true;
+      final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
       if (!autoExecute) {
         return ToolCallingResult(
           text: parseResult.cleanText,

@@ -20,7 +20,7 @@ TTS_VOICE_GENDER_FEMALE: TTSVoiceGender
 TTS_VOICE_GENDER_NEUTRAL: TTSVoiceGender
 
 class TTSConfiguration(_message.Message):
-    __slots__ = ("model_id", "voice", "language_code", "speaking_rate", "pitch", "volume", "audio_format", "sample_rate", "enable_neural_voice", "enable_ssml")
+    __slots__ = ("model_id", "voice", "language_code", "speaking_rate", "pitch", "volume", "audio_format", "sample_rate", "enable_neural_voice", "enable_ssml", "preferred_framework")
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     VOICE_FIELD_NUMBER: _ClassVar[int]
     LANGUAGE_CODE_FIELD_NUMBER: _ClassVar[int]
@@ -31,6 +31,7 @@ class TTSConfiguration(_message.Message):
     SAMPLE_RATE_FIELD_NUMBER: _ClassVar[int]
     ENABLE_NEURAL_VOICE_FIELD_NUMBER: _ClassVar[int]
     ENABLE_SSML_FIELD_NUMBER: _ClassVar[int]
+    PREFERRED_FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
     model_id: str
     voice: str
     language_code: str
@@ -41,10 +42,11 @@ class TTSConfiguration(_message.Message):
     sample_rate: int
     enable_neural_voice: bool
     enable_ssml: bool
-    def __init__(self, model_id: _Optional[str] = ..., voice: _Optional[str] = ..., language_code: _Optional[str] = ..., speaking_rate: _Optional[float] = ..., pitch: _Optional[float] = ..., volume: _Optional[float] = ..., audio_format: _Optional[_Union[_model_types_pb2.AudioFormat, str]] = ..., sample_rate: _Optional[int] = ..., enable_neural_voice: _Optional[bool] = ..., enable_ssml: _Optional[bool] = ...) -> None: ...
+    preferred_framework: _model_types_pb2.InferenceFramework
+    def __init__(self, model_id: _Optional[str] = ..., voice: _Optional[str] = ..., language_code: _Optional[str] = ..., speaking_rate: _Optional[float] = ..., pitch: _Optional[float] = ..., volume: _Optional[float] = ..., audio_format: _Optional[_Union[_model_types_pb2.AudioFormat, str]] = ..., sample_rate: _Optional[int] = ..., enable_neural_voice: _Optional[bool] = ..., enable_ssml: _Optional[bool] = ..., preferred_framework: _Optional[_Union[_model_types_pb2.InferenceFramework, str]] = ...) -> None: ...
 
 class TTSOptions(_message.Message):
-    __slots__ = ("voice", "language_code", "speaking_rate", "pitch", "volume", "enable_ssml", "audio_format")
+    __slots__ = ("voice", "language_code", "speaking_rate", "pitch", "volume", "enable_ssml", "audio_format", "sample_rate")
     VOICE_FIELD_NUMBER: _ClassVar[int]
     LANGUAGE_CODE_FIELD_NUMBER: _ClassVar[int]
     SPEAKING_RATE_FIELD_NUMBER: _ClassVar[int]
@@ -52,6 +54,7 @@ class TTSOptions(_message.Message):
     VOLUME_FIELD_NUMBER: _ClassVar[int]
     ENABLE_SSML_FIELD_NUMBER: _ClassVar[int]
     AUDIO_FORMAT_FIELD_NUMBER: _ClassVar[int]
+    SAMPLE_RATE_FIELD_NUMBER: _ClassVar[int]
     voice: str
     language_code: str
     speaking_rate: float
@@ -59,7 +62,8 @@ class TTSOptions(_message.Message):
     volume: float
     enable_ssml: bool
     audio_format: _model_types_pb2.AudioFormat
-    def __init__(self, voice: _Optional[str] = ..., language_code: _Optional[str] = ..., speaking_rate: _Optional[float] = ..., pitch: _Optional[float] = ..., volume: _Optional[float] = ..., enable_ssml: _Optional[bool] = ..., audio_format: _Optional[_Union[_model_types_pb2.AudioFormat, str]] = ...) -> None: ...
+    sample_rate: int
+    def __init__(self, voice: _Optional[str] = ..., language_code: _Optional[str] = ..., speaking_rate: _Optional[float] = ..., pitch: _Optional[float] = ..., volume: _Optional[float] = ..., enable_ssml: _Optional[bool] = ..., audio_format: _Optional[_Union[_model_types_pb2.AudioFormat, str]] = ..., sample_rate: _Optional[int] = ...) -> None: ...
 
 class TTSPhonemeTimestamp(_message.Message):
     __slots__ = ("phoneme", "start_ms", "end_ms")
@@ -72,18 +76,20 @@ class TTSPhonemeTimestamp(_message.Message):
     def __init__(self, phoneme: _Optional[str] = ..., start_ms: _Optional[int] = ..., end_ms: _Optional[int] = ...) -> None: ...
 
 class TTSSynthesisMetadata(_message.Message):
-    __slots__ = ("voice_id", "language_code", "processing_time_ms", "character_count", "audio_duration_ms")
+    __slots__ = ("voice_id", "language_code", "processing_time_ms", "character_count", "audio_duration_ms", "characters_per_second")
     VOICE_ID_FIELD_NUMBER: _ClassVar[int]
     LANGUAGE_CODE_FIELD_NUMBER: _ClassVar[int]
     PROCESSING_TIME_MS_FIELD_NUMBER: _ClassVar[int]
     CHARACTER_COUNT_FIELD_NUMBER: _ClassVar[int]
     AUDIO_DURATION_MS_FIELD_NUMBER: _ClassVar[int]
+    CHARACTERS_PER_SECOND_FIELD_NUMBER: _ClassVar[int]
     voice_id: str
     language_code: str
     processing_time_ms: int
     character_count: int
     audio_duration_ms: int
-    def __init__(self, voice_id: _Optional[str] = ..., language_code: _Optional[str] = ..., processing_time_ms: _Optional[int] = ..., character_count: _Optional[int] = ..., audio_duration_ms: _Optional[int] = ...) -> None: ...
+    characters_per_second: float
+    def __init__(self, voice_id: _Optional[str] = ..., language_code: _Optional[str] = ..., processing_time_ms: _Optional[int] = ..., character_count: _Optional[int] = ..., audio_duration_ms: _Optional[int] = ..., characters_per_second: _Optional[float] = ...) -> None: ...
 
 class TTSOutput(_message.Message):
     __slots__ = ("audio_data", "audio_format", "sample_rate", "duration_ms", "phoneme_timestamps", "metadata", "timestamp_ms")

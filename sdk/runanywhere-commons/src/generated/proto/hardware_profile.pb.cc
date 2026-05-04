@@ -211,13 +211,15 @@ const char descriptor_table_protodef_hardware_5fprofile_2eproto[] ABSL_ATTRIBUTE
     "rPreference\022\037\n\033ACCELERATOR_PREFERENCE_AU"
     "TO\020\000\022\036\n\032ACCELERATOR_PREFERENCE_ANE\020\001\022\036\n\032"
     "ACCELERATOR_PREFERENCE_GPU\020\002\022\036\n\032ACCELERA"
-    "TOR_PREFERENCE_CPU\020\003b\006proto3"
+    "TOR_PREFERENCE_CPU\020\003B@\n\027ai.runanywhere.p"
+    "roto.v1B\024HardwareProfileProtoP\001\370\001\001\242\002\004RAV"
+    "1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_hardware_5fprofile_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hardware_5fprofile_2eproto = {
     false,
     false,
-    668,
+    734,
     descriptor_table_protodef_hardware_5fprofile_2eproto,
     "hardware_profile.proto",
     &descriptor_table_hardware_5fprofile_2eproto_once,

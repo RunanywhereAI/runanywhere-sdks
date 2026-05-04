@@ -32,6 +32,13 @@ public extension RunAnywhere {
         prompt: String,
         options: DiffusionGenerationOptions? = nil
     ) async throws -> DiffusionResult {
+        let opts = (options ?? DiffusionGenerationOptions(prompt: prompt)).toRADiffusionGenerationOptions()
+        let result = try await generateImage(options: opts)
+        return DiffusionResult(from: result)
+    }
+
+    /// Generate an image through the generated-proto C++ diffusion ABI.
+    static func generateImage(options: RADiffusionGenerationOptions) async throws -> RADiffusionResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
@@ -42,8 +49,7 @@ public extension RunAnywhere {
             throw SDKException.diffusion(.notInitialized, "No diffusion model loaded. Call loadDiffusionModel first.")
         }
 
-        let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-        return try await CppBridge.Diffusion.shared.generate(options: opts)
+        return try await CppBridge.Diffusion.shared.generate(options: options)
     }
 
     /// Generate an image with progress reporting
@@ -147,8 +153,29 @@ public extension RunAnywhere {
             throw SDKException.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
-        let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-        return try await CppBridge.Diffusion.shared.generateWithProgress(options: opts, onProgress: onProgress)
+        let opts = (options ?? DiffusionGenerationOptions(prompt: prompt)).toRADiffusionGenerationOptions()
+        let result = try await generateImage(options: opts) { progress in
+            onProgress(DiffusionProgress(from: progress))
+        }
+        return DiffusionResult(from: result)
+    }
+
+    /// Generate an image with proto progress through the generated C++ diffusion ABI.
+    static func generateImage(
+        options: RADiffusionGenerationOptions,
+        onProgress: @escaping (RADiffusionProgress) -> Bool
+    ) async throws -> RADiffusionResult {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+
+        try await ensureServicesReady()
+
+        guard await CppBridge.Diffusion.shared.isLoaded else {
+            throw SDKException.diffusion(.notInitialized, "No diffusion model loaded")
+        }
+
+        return try await CppBridge.Diffusion.shared.generateWithProgress(options: options, onProgress: onProgress)
     }
 
     /// Cancel ongoing image generation
@@ -157,7 +184,11 @@ public extension RunAnywhere {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        await CppBridge.Diffusion.shared.cancel()
+        do {
+            try await CppBridge.Diffusion.shared.cancelProto()
+        } catch {
+            await CppBridge.Diffusion.shared.cancel()
+        }
     }
 
     /// Load a diffusion model from a `DiffusionConfig` (CANONICAL_API §8).

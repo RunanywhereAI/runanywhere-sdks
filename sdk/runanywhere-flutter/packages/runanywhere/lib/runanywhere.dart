@@ -8,43 +8,177 @@ library runanywhere;
 export 'adapters/model_download_adapter.dart' show ModelDownloadService;
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'core/module/runanywhere_module.dart';
-export 'core/types/component_state.dart';
-export 'core/types/model_types.dart';
+export 'core/types/model_types.dart'
+    hide
+        ArchiveArtifact,
+        ArchiveStructure,
+        ArchiveType,
+        BuiltInArtifact,
+        CustomArtifact,
+        ExpectedModelFiles,
+        InferenceFramework,
+        ModelArtifactType,
+        ModelCategory,
+        ModelFileDescriptor,
+        ModelFormat,
+        ModelInfo,
+        ModelSource,
+        MultiFileArtifact,
+        SingleFileArtifact,
+        ThinkingTagPattern;
 export 'core/types/npu_chip.dart';
-export 'core/types/sdk_component.dart';
-// Network layer
+export 'core/types/sdk_component.dart' hide SDKComponent;
 export 'data/network/network.dart';
 export 'foundation/configuration/sdk_constants.dart';
 export 'foundation/error_types/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';
-// Proto-generated public types (Wave 2: canonical types).
+export 'generated/diffusion_options.pb.dart'
+    show
+        DiffusionCapabilities,
+        DiffusionConfig,
+        DiffusionConfiguration,
+        DiffusionGenerationOptions,
+        DiffusionProgress,
+        DiffusionResult,
+        DiffusionTokenizerSource;
+export 'generated/diffusion_options.pbenum.dart'
+    show
+        DiffusionMode,
+        DiffusionModelVariant,
+        DiffusionScheduler,
+        DiffusionTokenizerSourceKind;
+export 'generated/download_service.pb.dart'
+    show
+        DownloadCancelRequest,
+        DownloadCancelResult,
+        DownloadPlanRequest,
+        DownloadPlanResult,
+        DownloadProgress,
+        DownloadResumeRequest,
+        DownloadResumeResult,
+        DownloadStartRequest,
+        DownloadStartResult,
+        DownloadSubscribeRequest;
+export 'generated/download_service.pbenum.dart'
+    show DownloadStage, DownloadState;
+export 'generated/embeddings_options.pb.dart'
+    show
+        EmbeddingsConfiguration,
+        EmbeddingsOptions,
+        EmbeddingsRequest,
+        EmbeddingsResult;
+export 'generated/embeddings_options.pbenum.dart'
+    show EmbeddingsNormalizeMode, EmbeddingsPoolingStrategy;
 export 'generated/errors.pb.dart' show ErrorContext;
 export 'generated/errors.pbenum.dart' show ErrorCategory, ErrorCode;
+export 'generated/hardware_profile.pb.dart'
+    show AcceleratorInfo, HardwareProfile, HardwareProfileResult;
+export 'generated/hardware_profile.pbenum.dart' show AcceleratorPreference;
 export 'generated/llm_options.pb.dart'
     show LLMConfiguration, LLMGenerationOptions, LLMGenerationResult;
 export 'generated/llm_options.pbenum.dart' show ExecutionTarget;
-export 'generated/llm_service.pb.dart' show LLMStreamEvent;
+export 'generated/llm_service.pb.dart'
+    show LLMGenerateRequest, LLMStreamEvent, LLMStreamFinalResult;
 export 'generated/lora_options.pb.dart'
     show
         LoRAAdapterConfig,
         LoRAAdapterInfo,
         LoraAdapterCatalogEntry,
         LoraCompatibilityResult;
+export 'generated/model_types.pb.dart'
+    show
+        ArchiveArtifact,
+        CurrentModelRequest,
+        CurrentModelResult,
+        ExpectedModelFiles,
+        ModelFileDescriptor,
+        ModelInfo,
+        MultiFileArtifact,
+        ModelInfoList,
+        ModelLoadRequest,
+        ModelLoadResult,
+        ModelListRequest,
+        ModelListResult,
+        ModelQuery,
+        ModelUnloadRequest,
+        ModelUnloadResult,
+        SingleFileArtifact;
+export 'generated/model_types.pbenum.dart'
+    show
+        AccelerationPreference,
+        ArchiveStructure,
+        ArchiveType,
+        AudioFormat,
+        InferenceFramework,
+        ModelArtifactType,
+        ModelCategory,
+        ModelFormat,
+        ModelSource,
+        ModelQuerySortField,
+        ModelQuerySortOrder,
+        RoutingPolicy;
 export 'generated/rag.pb.dart'
     show
         RAGConfiguration,
+        RAGDocument,
         RAGQueryOptions,
-        RAGSearchResult,
         RAGResult,
+        RAGSearchResult,
         RAGStatistics;
+export 'generated/sdk_events.pb.dart'
+    show
+        ComponentLifecycleSnapshot,
+        ComponentInitializationEvent,
+        ConfigurationEvent,
+        DeviceEvent,
+        FrameworkEvent,
+        GenerationEvent,
+        InitializationEvent,
+        ModelEvent,
+        NetworkEvent,
+        PerformanceEvent,
+        SDKEvent,
+        StorageEvent,
+        VoiceLifecycleEvent;
+export 'generated/sdk_events.pbenum.dart'
+    show
+        ComponentLifecycleState,
+        ComponentInitializationEventKind,
+        ConfigurationEventKind,
+        DeviceEventKind,
+        EventDestination,
+        EventSeverity,
+        FrameworkEventKind,
+        GenerationEventKind,
+        InitializationStage,
+        ModelEventKind,
+        NetworkEventKind,
+        PerformanceEventKind,
+        SDKComponent,
+        StorageEventKind,
+        VoiceEventKind;
 export 'generated/storage_types.pb.dart'
     show
-        DeviceStorageInfo,
         AppStorageInfo,
+        DeviceStorageInfo,
         ModelStorageMetrics,
-        StoredModel,
+        StorageAvailability,
+        StorageAvailabilityRequest,
+        StorageAvailabilityResult,
+        StorageDeletePlan,
+        StorageDeletePlanRequest,
+        StorageDeleteRequest,
+        StorageDeleteResult,
         StorageInfo,
-        StorageAvailability;
+        StorageInfoRequest,
+        StorageInfoResult,
+        StoredModel;
+export 'generated/structured_output.pb.dart'
+    show
+        JSONSchema,
+        StructuredOutputOptions,
+        StructuredOutputResult,
+        StructuredOutputValidation;
 export 'generated/stt_options.pb.dart'
     show
         STTConfiguration,
@@ -56,8 +190,16 @@ export 'generated/stt_options.pb.dart'
         WordTimestamp;
 export 'generated/stt_options.pbenum.dart' show STTLanguage;
 export 'generated/stt_options_helpers.dart';
-export 'generated/structured_output.pb.dart'
-    show StructuredOutputOptions, StructuredOutputResult, StructuredOutputValidation;
+export 'generated/tool_calling.pb.dart'
+    show
+        ToolCall,
+        ToolCallingOptions,
+        ToolCallingResult,
+        ToolDefinition,
+        ToolParameter,
+        ToolResult;
+export 'generated/tool_calling.pbenum.dart'
+    show ToolCallFormatName, ToolParameterType;
 export 'generated/tts_options.pb.dart'
     show
         TTSConfiguration,
@@ -70,65 +212,62 @@ export 'generated/tts_options.pb.dart'
 export 'generated/vad_options.pb.dart'
     show VADConfiguration, VADOptions, VADResult, VADStatistics;
 export 'generated/vlm_options.pb.dart'
-    show VLMGenerationOptions, VLMImage, VLMResult;
+    show
+        VLMChatTemplate,
+        VLMConfiguration,
+        VLMGenerationOptions,
+        VLMImage,
+        VLMResult;
+export 'generated/vlm_options.pbenum.dart'
+    show VLMErrorCode, VLMImageFormat, VLMModelFamily;
+export 'generated/voice_agent_service.pb.dart'
+    show
+        VoiceAgentComposeConfig,
+        VoiceAgentRequest,
+        VoiceAgentResult,
+        VoiceSessionConfig;
 export 'generated/voice_events.pb.dart'
-    show VoiceEvent, StateChangeEvent, VADEvent, VoiceEvent_Payload;
+    show
+        StateChangeEvent,
+        VADEvent,
+        VoiceAgentComponentStates,
+        VoiceEvent,
+        VoiceEvent_Payload,
+        VoiceSessionError;
 export 'generated/voice_events.pbenum.dart'
-    show PipelineState, VADEventType;
-// FFI bridges and platform loader are SDK-internal — consumers reach
-// the high-level capability classes via `RunAnywhereSDK.instance.*`.
-// `NativeBackend` / `NativeBackendException` are kept exposed because
-// sub-packages (runanywhere_llamacpp, _onnx, _genie) implement and
-// register backends through them.
+    show ComponentLoadState, PipelineState, VADEventType, VoiceSessionErrorCode;
 export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
-// v4.0: canonical instance API. Use RunAnywhereSDK.instance.{capability}.
 export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'
     show RunAnywhereDownloads;
-export 'public/capabilities/runanywhere_hardware.dart'
-    show RunAnywhereHardware, HardwareProfile;
+export 'public/capabilities/runanywhere_embeddings.dart'
+    show RunAnywhereEmbeddings;
+export 'public/capabilities/runanywhere_hardware.dart' show RunAnywhereHardware;
 export 'public/capabilities/runanywhere_llm.dart' show RunAnywhereLLM;
 export 'public/capabilities/runanywhere_lora.dart'
-    show RunAnywhereLoRACapability, LoRACompatibilityResult;
+    show RunAnywhereLoRACapability;
+export 'public/capabilities/runanywhere_model_lifecycle.dart'
+    show RunAnywhereModelLifecycle;
 export 'public/capabilities/runanywhere_models.dart' show RunAnywhereModels;
 export 'public/capabilities/runanywhere_plugin_loader.dart'
-    show RunAnywherePluginLoaderCapability, PluginInfo;
+    show PluginInfo, RunAnywherePluginLoaderCapability;
 export 'public/capabilities/runanywhere_rag.dart' show RunAnywhereRAG;
 export 'public/capabilities/runanywhere_stt.dart' show RunAnywhereSTT;
-export 'public/capabilities/runanywhere_tools.dart' show RunAnywhereTools;
+export 'public/capabilities/runanywhere_tools.dart'
+    show RunAnywhereTools, ToolCallFormatNames, ToolExecutor;
 export 'public/capabilities/runanywhere_tts.dart' show RunAnywhereTTS;
-export 'public/capabilities/runanywhere_vad.dart'
-    show RunAnywhereVAD, SpeechActivityEvent;
+export 'public/capabilities/runanywhere_vad.dart' show RunAnywhereVAD;
 export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
-// runanywhere_vision_language.dart is the canonical VisionLanguage namespace
-// file; RunAnywhereVLM is already exported above via runanywhere_vlm.dart.
 export 'public/capabilities/runanywhere_vlm_models.dart'
     show RunAnywhereVLMModels;
 export 'public/capabilities/runanywhere_voice.dart'
-    show RunAnywhereVoice, VoiceAgentConfiguration, VoiceAgentResult;
+    show RunAnywhereVoice, VoiceAgentConfiguration;
 export 'public/capabilities/runanywhere_voice_agent.dart'
     show RunAnywhereVoiceAgent;
-// Re-export proto types for canonical typing in consumer code (G-A7).
-export 'generated/download_service.pb.dart' show DownloadProgress;
-export 'generated/download_service.pbenum.dart' show DownloadStage, DownloadState;
-// §15 type-discipline: proto tool_calling types are now the canonical
-// consumer-facing API; the hand-rolled `tool_calling_types.dart` is
-// gone. `RunAnywhereTools.register` takes proto `ToolDefinition`.
-export 'generated/tool_calling.pb.dart'
-    show
-        ToolCall,
-        ToolCallingOptions,
-        ToolCallingResult,
-        ToolDefinition,
-        ToolParameter,
-        ToolResult;
-export 'generated/tool_calling.pbenum.dart'
-    show ToolCallFormatName, ToolParameterType;
 export 'public/configuration/sdk_environment.dart';
-export 'public/events/event_bus.dart';
-export 'public/events/sdk_event.dart';
 export 'public/extensions/rag_module.dart';
+export 'public/extensions/runanywhere_flat_aliases.dart';
 export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_lora.dart';
@@ -137,14 +276,9 @@ export 'public/extensions/runanywhere_model_assignments.dart'
 export 'public/extensions/runanywhere_model_management.dart'
     show RunAnywhereModelManagement;
 export 'public/extensions/runanywhere_storage.dart';
-export 'public/extensions/runanywhere_flat_aliases.dart';
 export 'public/extensions/runanywhere_structured_output.dart'
     show RunAnywhereStructuredOutput;
 export 'public/extensions/runanywhere_thinking_utils.dart'
     show RunAnywhereThinkingUtils, ThinkingExtractionResult;
 export 'public/runanywhere_v4.dart' show RunAnywhereSDK;
 export 'public/types/types.dart';
-// Re-export the few helpers from RunAnywhereTools that consumers use
-// (ToolExecutor typedef, ToolCallFormatNames constants).
-export 'public/capabilities/runanywhere_tools.dart'
-    show ToolCallFormatNames, ToolExecutor;

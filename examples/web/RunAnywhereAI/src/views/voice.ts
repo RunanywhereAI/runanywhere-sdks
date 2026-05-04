@@ -32,8 +32,8 @@ import {
   type VoiceAgentStreamTransport,
   type VoiceEvent,
   VADEventType,
-} from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
+} from '@runanywhere/web';
+import { VAD } from '@runanywhere/web-onnx';
 
 /** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
 const micCapture = new AudioCapture();
@@ -534,7 +534,12 @@ async function startListening(): Promise<void> {
 
 function onVoiceChunk(samples: Float32Array): void {
   if (!vadActive || state !== 'listening') return;
-  VAD.processSamples(samples);
+  try {
+    VAD.processSamples(samples);
+  } catch (err) {
+    setStatus(err instanceof Error ? err.message : String(err));
+    stopVoiceVAD();
+  }
 }
 
 function startVoiceVAD(): void {

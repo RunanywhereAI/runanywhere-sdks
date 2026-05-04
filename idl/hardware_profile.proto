@@ -1,6 +1,13 @@
 syntax = "proto3";
 package runanywhere.v1;
 
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "HardwareProfileProto";
+option objc_class_prefix     = "RAV1";
+option swift_prefix          = "RA";
+
 message HardwareProfile {
   string chip = 1;
   bool has_neural_engine = 2;

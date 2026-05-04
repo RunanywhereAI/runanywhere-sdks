@@ -16,7 +16,8 @@
  * adapted to the Web SDK's no-bridge environment.
  */
 
-import type { SDKEventType } from '../types/enums';
+import type { ModelCategory, SDKEnvironment, SDKEventType } from '../types/enums';
+import type { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 import { SDKLogger } from './SDKLogger';
 
 const logger = new SDKLogger('EventBus');
@@ -38,7 +39,7 @@ export interface SDKEventEnvelope {
 /** Known SDK event types and their payload shapes. */
 export interface SDKEventMap {
   // SDK lifecycle
-  'sdk.initialized': { environment: string };
+  'sdk.initialized': { environment: SDKEnvironment };
   'sdk.accelerationMode': { mode: string };
 
   // Model management
@@ -47,10 +48,10 @@ export interface SDKEventMap {
   'model.downloadProgress': { modelId: string; progress: number; bytesDownloaded: number; totalBytes: number; stage?: string };
   'model.downloadCompleted': { modelId: string; sizeBytes?: number; localPath?: string };
   'model.downloadFailed': { modelId: string; error: string };
-  'model.loadStarted': { modelId: string; component?: string; category?: string };
-  'model.loadCompleted': { modelId: string; component?: string; category?: string; loadTimeMs?: number };
+  'model.loadStarted': { modelId: string; component?: string; category?: ModelCategory };
+  'model.loadCompleted': { modelId: string; component?: string; category?: ModelCategory; loadTimeMs?: number };
   'model.loadFailed': { modelId: string; error: string };
-  'model.unloaded': { modelId: string; category: string };
+  'model.unloaded': { modelId: string; category: ModelCategory };
   'model.quotaExceeded': { modelId: string; availableBytes: number; neededBytes: number };
   'model.evicted': { modelId: string; modelName: string; freedBytes: number };
 
@@ -68,8 +69,8 @@ export interface SDKEventMap {
   'tts.synthesisFailed': { error: string };
 
   // Voice activity detection
-  'vad.speechStarted': { activity: string };
-  'vad.speechEnded': { activity: string; speechDurationMs?: number };
+  'vad.speechStarted': { activity: SpeechActivityKind };
+  'vad.speechEnded': { activity: SpeechActivityKind; speechDurationMs?: number };
 
   // Voice agent
   'voice.turnCompleted': { speechDetected: boolean; transcription: string; response: string };

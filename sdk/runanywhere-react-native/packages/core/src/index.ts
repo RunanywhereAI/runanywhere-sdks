@@ -148,6 +148,11 @@ export {
   SDKEnvironment,
   createNetworkConfig,
   getEnvironmentName,
+  looksLikePlaceholder,
+  isUsableHttpUrl,
+  isUsableCredential,
+  hasUsableBackendConfig,
+  hasUsableSupabaseConfig,
   isDevelopment,
   isProduction,
   DEFAULT_BASE_URL,
@@ -229,6 +234,27 @@ export {
   registerMultiFileModel,
   refreshModelRegistry,
 } from './Public/Extensions/RunAnywhere+Models';
+
+export {
+  checkStorageAvailability,
+  deleteStorage,
+  getStorageInfoProto,
+  planStorageDelete,
+} from './Public/Extensions/RunAnywhere+Storage';
+
+export {
+  pollSDKEvent,
+  publishSDKEvent,
+  publishSDKFailure,
+  subscribeSDKEvents,
+} from './Public/Extensions/RunAnywhere+Events';
+
+export {
+  getComponentLifecycleSnapshot,
+  getCurrentModel,
+  loadModelLifecycle,
+  unloadModelLifecycle,
+} from './Public/Extensions/RunAnywhere+Lifecycle';
 
 // =============================================================================
 // Device / NPU Chip Detection

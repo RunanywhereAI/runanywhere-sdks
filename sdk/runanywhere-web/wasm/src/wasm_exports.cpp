@@ -20,12 +20,17 @@
 #include "rac/core/rac_sdk_state.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_model_lifecycle.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 // Infrastructure
 #include "rac/infrastructure/events/rac_events.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/storage/rac_storage_analyzer.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -68,7 +73,11 @@
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/diffusion/rac_diffusion.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/lora/rac_lora_service.h"
+#include "rac/features/rag/rac_rag_pipeline.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 
@@ -608,6 +617,23 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_resume_from_byt
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_expected_sha256_hex(void) {
     return (int)offsetof(rac_http_download_request_t, expected_sha256_hex);
+}
+
+// ---- rac_proto_buffer_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_proto_buffer(void) {
+    return (int)sizeof(rac_proto_buffer_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_data(void) {
+    return (int)offsetof(rac_proto_buffer_t, data);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_size(void) {
+    return (int)offsetof(rac_proto_buffer_t, size);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_status(void) {
+    return (int)offsetof(rac_proto_buffer_t, status);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_error_message(void) {
+    return (int)offsetof(rac_proto_buffer_t, error_message);
 }
 
 // =============================================================================

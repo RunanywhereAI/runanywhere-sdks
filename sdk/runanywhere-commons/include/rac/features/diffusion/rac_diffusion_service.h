@@ -12,6 +12,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,6 +78,12 @@ typedef struct rac_diffusion_service {
     const char* model_id;
 } rac_diffusion_service_t;
 
+/**
+ * @brief Callback for serialized runanywhere.v1.DiffusionProgress bytes.
+ */
+typedef rac_bool_t (*rac_diffusion_progress_proto_callback_fn)(
+    const uint8_t* progress_proto_bytes, size_t progress_proto_size, void* user_data);
+
 // =============================================================================
 // PUBLIC API - Generic service functions
 // =============================================================================
@@ -133,6 +140,15 @@ RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
                                             rac_diffusion_result_t* out_result);
 
 /**
+ * @brief Generate an image from serialized runanywhere.v1.DiffusionGenerationOptions.
+ *
+ * out_result receives serialized runanywhere.v1.DiffusionResult bytes.
+ */
+RAC_API rac_result_t rac_diffusion_generate_proto(
+    rac_handle_t handle, const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
  * @brief Generate an image with progress reporting
  *
  * @param handle Service handle
@@ -146,6 +162,18 @@ RAC_API rac_result_t
 rac_diffusion_generate_with_progress(rac_handle_t handle, const rac_diffusion_options_t* options,
                                      rac_diffusion_progress_callback_fn progress_callback,
                                      void* user_data, rac_diffusion_result_t* out_result);
+
+/**
+ * @brief Generate an image with serialized progress callbacks.
+ *
+ * options_proto_bytes encodes runanywhere.v1.DiffusionGenerationOptions.
+ * progress_callback receives serialized runanywhere.v1.DiffusionProgress bytes.
+ * out_result receives serialized runanywhere.v1.DiffusionResult bytes.
+ */
+RAC_API rac_result_t rac_diffusion_generate_with_progress_proto(
+    rac_handle_t handle, const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_diffusion_progress_proto_callback_fn progress_callback, void* user_data,
+    rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get service information
@@ -171,6 +199,11 @@ RAC_API uint32_t rac_diffusion_get_capabilities(rac_handle_t handle);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_diffusion_cancel(rac_handle_t handle);
+
+/**
+ * @brief Cancel diffusion generation and emit canonical cancellation events.
+ */
+RAC_API rac_result_t rac_diffusion_cancel_proto(rac_handle_t handle);
 
 /**
  * @brief Cleanup and release model resources

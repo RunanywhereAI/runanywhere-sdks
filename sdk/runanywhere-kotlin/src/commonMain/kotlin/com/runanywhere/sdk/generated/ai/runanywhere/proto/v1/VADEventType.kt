@@ -21,6 +21,8 @@ public enum class VADEventType(
   VAD_EVENT_VOICE_END_OF_UTTERANCE(2),
   VAD_EVENT_BARGE_IN(3),
   VAD_EVENT_SILENCE(4),
+  VAD_EVENT_STATISTICS(5),
+  VAD_EVENT_STATE_CHANGED(6),
   ;
 
   public companion object {
@@ -40,6 +42,8 @@ public enum class VADEventType(
       2 -> VAD_EVENT_VOICE_END_OF_UTTERANCE
       3 -> VAD_EVENT_BARGE_IN
       4 -> VAD_EVENT_SILENCE
+      5 -> VAD_EVENT_STATISTICS
+      6 -> VAD_EVENT_STATE_CHANGED
       else -> null
     }
   }

@@ -64,6 +64,8 @@ enum ErrorCategory : int;
 extern const uint32_t ErrorCategory_internal_data_[];
 enum ErrorCode : int;
 extern const uint32_t ErrorCode_internal_data_[];
+enum ErrorSeverity : int;
+extern const uint32_t ErrorSeverity_internal_data_[];
 class ErrorContext;
 struct ErrorContextDefaultTypeInternal;
 extern ErrorContextDefaultTypeInternal _ErrorContext_default_instance_;
@@ -86,6 +88,9 @@ internal::EnumTraitsT<::runanywhere::v1::ErrorCategory_internal_data_>
 template <>
 internal::EnumTraitsT<::runanywhere::v1::ErrorCode_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ErrorCode>;
+template <>
+internal::EnumTraitsT<::runanywhere::v1::ErrorSeverity_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::ErrorSeverity>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -136,6 +141,50 @@ template <>
 [[nodiscard]] inline bool ErrorCategory_Parse(
     ::absl::string_view name, ErrorCategory* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<ErrorCategory>(ErrorCategory_descriptor(), name,
+                                           value);
+}
+enum ErrorSeverity : int {
+  ERROR_SEVERITY_UNSPECIFIED = 0,
+  ERROR_SEVERITY_DEBUG = 1,
+  ERROR_SEVERITY_INFO = 2,
+  ERROR_SEVERITY_WARNING = 3,
+  ERROR_SEVERITY_ERROR = 4,
+  ERROR_SEVERITY_CRITICAL = 5,
+  ErrorSeverity_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  ErrorSeverity_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t ErrorSeverity_internal_data_[];
+inline constexpr ErrorSeverity ErrorSeverity_MIN =
+    static_cast<ErrorSeverity>(0);
+inline constexpr ErrorSeverity ErrorSeverity_MAX =
+    static_cast<ErrorSeverity>(5);
+[[nodiscard]] inline bool ErrorSeverity_IsValid(int value) {
+  return 0 <= value && value <= 5;
+}
+inline constexpr int ErrorSeverity_ARRAYSIZE = 5 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+ErrorSeverity_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(ErrorSeverity) {
+  return ErrorSeverity_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& ErrorSeverity_Name(T value) {
+  static_assert(::std::is_same<T, ErrorSeverity>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to ErrorSeverity_Name().");
+  return ErrorSeverity_Name(static_cast<ErrorSeverity>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& ErrorSeverity_Name(ErrorSeverity value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<ErrorSeverity_descriptor, 0, 5>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool ErrorSeverity_Parse(
+    ::absl::string_view name, ErrorSeverity* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<ErrorSeverity>(ErrorSeverity_descriptor(), name,
                                            value);
 }
 enum ErrorCode : int {
@@ -744,10 +793,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
   enum : int {
     kMessageFieldNumber = 3,
     kNestedMessageFieldNumber = 6,
+    kComponentFieldNumber = 9,
     kContextFieldNumber = 4,
     kCodeFieldNumber = 1,
     kCategoryFieldNumber = 2,
     kCAbiCodeFieldNumber = 5,
+    kSeverityFieldNumber = 8,
+    kTimestampMsFieldNumber = 7,
   };
   // string message = 3;
   void clear_message() ;
@@ -779,6 +831,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
   const ::std::string& _internal_nested_message() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_nested_message(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_nested_message();
+
+  public:
+  // string component = 9;
+  void clear_component() ;
+  [[nodiscard]] const ::std::string& component() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_component(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_component();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_component();
+  void set_allocated_component(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_component() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_component(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_component();
 
   public:
   // optional .runanywhere.v1.ErrorContext context = 4;
@@ -829,12 +896,32 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
   void _internal_set_c_abi_code(::int32_t value);
 
   public:
+  // .runanywhere.v1.ErrorSeverity severity = 8;
+  void clear_severity() ;
+  [[nodiscard]] ::runanywhere::v1::ErrorSeverity severity() const;
+  void set_severity(::runanywhere::v1::ErrorSeverity value);
+
+  private:
+  ::runanywhere::v1::ErrorSeverity _internal_severity() const;
+  void _internal_set_severity(::runanywhere::v1::ErrorSeverity value);
+
+  public:
+  // int64 timestamp_ms = 7;
+  void clear_timestamp_ms() ;
+  [[nodiscard]] ::int64_t timestamp_ms() const;
+  void set_timestamp_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_timestamp_ms() const;
+  void _internal_set_timestamp_ms(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SDKError)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 6,
-                                   1, 53,
+  static const ::google::protobuf::internal::TcParseTable<4, 9,
+                                   1, 70,
                                    2>
       _table_;
 
@@ -859,10 +946,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr message_;
     ::google::protobuf::internal::ArenaStringPtr nested_message_;
+    ::google::protobuf::internal::ArenaStringPtr component_;
     ::runanywhere::v1::ErrorContext* PROTOBUF_NULLABLE context_;
     int code_;
     int category_;
     ::int32_t c_abi_code_;
+    int severity_;
+    ::int64_t timestamp_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1097,7 +1187,7 @@ inline void SDKError::clear_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000010U);
 }
 inline ::runanywhere::v1::ErrorCode SDKError::code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.code)
@@ -1105,7 +1195,7 @@ inline ::runanywhere::v1::ErrorCode SDKError::code() const {
 }
 inline void SDKError::set_code(::runanywhere::v1::ErrorCode value) {
   _internal_set_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.code)
 }
 inline ::runanywhere::v1::ErrorCode SDKError::_internal_code() const {
@@ -1122,7 +1212,7 @@ inline void SDKError::clear_category() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000020U);
 }
 inline ::runanywhere::v1::ErrorCategory SDKError::category() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.category)
@@ -1130,7 +1220,7 @@ inline ::runanywhere::v1::ErrorCategory SDKError::category() const {
 }
 inline void SDKError::set_category(::runanywhere::v1::ErrorCategory value) {
   _internal_set_category(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.category)
 }
 inline ::runanywhere::v1::ErrorCategory SDKError::_internal_category() const {
@@ -1209,7 +1299,7 @@ inline void SDKError::set_allocated_message(::std::string* PROTOBUF_NULLABLE val
 
 // optional .runanywhere.v1.ErrorContext context = 4;
 inline bool SDKError::has_context() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   PROTOBUF_ASSUME(!value || _impl_.context_ != nullptr);
   return value;
 }
@@ -1217,7 +1307,7 @@ inline void SDKError::clear_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.context_ != nullptr) _impl_.context_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000008U);
 }
 inline const ::runanywhere::v1::ErrorContext& SDKError::_internal_context() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1236,16 +1326,16 @@ inline void SDKError::unsafe_arena_set_allocated_context(
   }
   _impl_.context_ = reinterpret_cast<::runanywhere::v1::ErrorContext*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.SDKError.context)
 }
 inline ::runanywhere::v1::ErrorContext* PROTOBUF_NULLABLE SDKError::release_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::ErrorContext* released = _impl_.context_;
   _impl_.context_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -1265,7 +1355,7 @@ inline ::runanywhere::v1::ErrorContext* PROTOBUF_NULLABLE SDKError::unsafe_arena
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.SDKError.context)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::ErrorContext* temp = _impl_.context_;
   _impl_.context_ = nullptr;
   return temp;
@@ -1280,7 +1370,7 @@ inline ::runanywhere::v1::ErrorContext* PROTOBUF_NONNULL SDKError::_internal_mut
 }
 inline ::runanywhere::v1::ErrorContext* PROTOBUF_NONNULL SDKError::mutable_context()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::ErrorContext* _msg = _internal_mutable_context();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.SDKError.context)
   return _msg;
@@ -1297,9 +1387,9 @@ inline void SDKError::set_allocated_context(::runanywhere::v1::ErrorContext* PRO
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
 
   _impl_.context_ = reinterpret_cast<::runanywhere::v1::ErrorContext*>(value);
@@ -1308,14 +1398,14 @@ inline void SDKError::set_allocated_context(::runanywhere::v1::ErrorContext* PRO
 
 // optional int32 c_abi_code = 5;
 inline bool SDKError::has_c_abi_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   return value;
 }
 inline void SDKError::clear_c_abi_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.c_abi_code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000040U);
 }
 inline ::int32_t SDKError::c_abi_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.c_abi_code)
@@ -1323,7 +1413,7 @@ inline ::int32_t SDKError::c_abi_code() const {
 }
 inline void SDKError::set_c_abi_code(::int32_t value) {
   _internal_set_c_abi_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.c_abi_code)
 }
 inline ::int32_t SDKError::_internal_c_abi_code() const {
@@ -1404,6 +1494,121 @@ inline void SDKError::set_allocated_nested_message(::std::string* PROTOBUF_NULLA
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SDKError.nested_message)
 }
 
+// int64 timestamp_ms = 7;
+inline void SDKError::clear_timestamp_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.timestamp_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline ::int64_t SDKError::timestamp_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.timestamp_ms)
+  return _internal_timestamp_ms();
+}
+inline void SDKError::set_timestamp_ms(::int64_t value) {
+  _internal_set_timestamp_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.timestamp_ms)
+}
+inline ::int64_t SDKError::_internal_timestamp_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.timestamp_ms_;
+}
+inline void SDKError::_internal_set_timestamp_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.timestamp_ms_ = value;
+}
+
+// .runanywhere.v1.ErrorSeverity severity = 8;
+inline void SDKError::clear_severity() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.severity_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline ::runanywhere::v1::ErrorSeverity SDKError::severity() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.severity)
+  return _internal_severity();
+}
+inline void SDKError::set_severity(::runanywhere::v1::ErrorSeverity value) {
+  _internal_set_severity(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.severity)
+}
+inline ::runanywhere::v1::ErrorSeverity SDKError::_internal_severity() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ErrorSeverity>(_impl_.severity_);
+}
+inline void SDKError::_internal_set_severity(::runanywhere::v1::ErrorSeverity value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.severity_ = value;
+}
+
+// string component = 9;
+inline void SDKError::clear_component() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.component_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& SDKError::component() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.component)
+  return _internal_component();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SDKError::set_component(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.component_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.component)
+}
+inline ::std::string* PROTOBUF_NONNULL SDKError::mutable_component()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_component();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SDKError.component)
+  return _s;
+}
+inline const ::std::string& SDKError::_internal_component() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.component_.Get();
+}
+inline void SDKError::_internal_set_component(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.component_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SDKError::_internal_mutable_component() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.component_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SDKError::release_component() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SDKError.component)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.component_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.component_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SDKError::set_allocated_component(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.component_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.component_.IsDefault()) {
+    _impl_.component_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SDKError.component)
+}
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -1421,6 +1626,12 @@ struct is_proto_enum<::runanywhere::v1::ErrorCategory> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ErrorCategory>() {
   return ::runanywhere::v1::ErrorCategory_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::ErrorSeverity> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ErrorSeverity>() {
+  return ::runanywhere::v1::ErrorSeverity_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::ErrorCode> : std::true_type {};

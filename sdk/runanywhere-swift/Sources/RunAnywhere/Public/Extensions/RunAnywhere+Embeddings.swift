@@ -103,8 +103,8 @@ public extension RunAnywhere {
 
     /// Generate an embedding vector for a single text.
     ///
-    /// Delegates to the `rac_embeddings_embed` C ABI and returns the canonical
-    /// `RAEmbeddingVector` proto type. Options default to L2-normalized via
+    /// Delegates to the generated-proto embeddings batch ABI and returns the
+    /// canonical `RAEmbeddingVector` proto type. Options default to L2-normalized via
     /// `RAEmbeddingsOptions.defaults()`.
     ///
     /// A model must be loaded first via `loadEmbeddingsModel(_:)`.
@@ -119,55 +119,27 @@ public extension RunAnywhere {
         text: String,
         options: RAEmbeddingsOptions = .defaults()
     ) async throws -> RAEmbeddingVector {
+        var request = RAEmbeddingsRequest()
+        request.texts = [text]
+        request.options = options
+        let result = try await embedBatch(request)
+        guard let first = result.vectors.first else {
+            throw SDKException.make(
+                code: .generationFailed,
+                message: "Embedding batch returned empty result",
+                category: .component
+            )
+        }
+        return first
+    }
+
+    /// Generate embeddings through the generated-proto C++ embeddings ABI.
+    static func embedBatch(_ request: RAEmbeddingsRequest) async throws -> RAEmbeddingsResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await EmbeddingsHandleStore.shared.requireHandle()
-
-        var cOptions = rac_embeddings_options_t(
-            normalize: options.normalize ? 1 : 0,
-            pooling: -1,
-            n_threads: 0
-        )
-
-        var cResult = rac_embeddings_result_t(
-            embeddings: nil,
-            num_embeddings: 0,
-            dimension: 0,
-            processing_time_ms: 0,
-            total_tokens: 0
-        )
-
-        let rc = text.withCString { textPtr -> rac_result_t in
-            rac_embeddings_embed(handle, textPtr, &cOptions, &cResult)
-        }
-        guard rc == RAC_SUCCESS else {
-            throw SDKException.make(
-                code: .generationFailed,
-                message: "rac_embeddings_embed failed rc=\(rc)",
-                category: .component
-            )
-        }
-        defer { rac_embeddings_result_free(&cResult) }
-
-        guard cResult.num_embeddings > 0, let embeddingsPtr = cResult.embeddings else {
-            throw SDKException.make(
-                code: .generationFailed,
-                message: "rac_embeddings_embed returned empty result",
-                category: .component
-            )
-        }
-
-        let first = embeddingsPtr.pointee
-        var values: [Float] = []
-        if let dataPtr = first.data, first.dimension > 0 {
-            values = Array(UnsafeBufferPointer(start: dataPtr, count: Int(first.dimension)))
-        }
-
-        var vec = RAEmbeddingVector()
-        vec.values = values
-        vec.text = text
-        return vec
+        return try CppBridge.EmbeddingsProto.embedBatch(handle: handle, request: request)
     }
 }

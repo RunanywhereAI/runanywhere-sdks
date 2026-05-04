@@ -146,7 +146,7 @@ async function ingestFile(file: File): Promise<void> {
   setStatus(`Embedding ${pieces.length} chunks from ${file.name}…`);
 
   const { Embeddings } = await import(
-    '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index'
+    '@runanywhere/web-llamacpp'
   );
   if (!Embeddings.isModelLoaded) {
     setStatus('No embedding model loaded. Run Embeddings.loadModel(...) first (e.g. nomic-embed-text-v1.5.Q4_K_M).');
@@ -238,7 +238,7 @@ async function askQuestion(): Promise<void> {
     const prompt = `Use the context below to answer the user's question. If the context doesn't contain the answer, say so.\n\nContext:\n${contextBlock}\n\nQuestion: ${question}\n\nAnswer:`;
 
     const { TextGeneration } = await import(
-      '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index'
+      '@runanywhere/web-llamacpp'
     );
     const result = await TextGeneration.generate(prompt, {
       maxTokens: 512,
@@ -255,7 +255,7 @@ async function askQuestion(): Promise<void> {
 
 async function retrieveTopK(query: string): Promise<DocChunk[]> {
   const { Embeddings } = await import(
-    '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index'
+    '@runanywhere/web-llamacpp'
   );
   if (!Embeddings.isModelLoaded) return [];
   const result = await Embeddings.embed(query);

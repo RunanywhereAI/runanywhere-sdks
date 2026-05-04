@@ -14,6 +14,12 @@ import type {
   DiffusionProgress,
 } from '@runanywhere/proto-ts/diffusion_options';
 export type { DiffusionGenerationOptions, DiffusionResult, DiffusionConfiguration, DiffusionCapabilities, DiffusionProgress };
+export {
+  DiffusionMode,
+  DiffusionScheduler,
+  DiffusionModelVariant,
+  DiffusionTokenizerSourceKind,
+} from '@runanywhere/proto-ts/diffusion_options';
 
 import { ExtensionPoint, ServiceKey } from '../../Infrastructure/ExtensionPoint';
 import { SDKException } from '../../Foundation/SDKException';
@@ -133,6 +139,14 @@ export function getDiffusionCapabilities(): DiffusionCapabilities {
     supportedVariants: [],
     supportedSchedulers: [],
     maxResolutionPx: 0,
+    supportedModes: [],
+    maxWidthPx: 0,
+    maxHeightPx: 0,
+    supportsIntermediateImages: false,
+    supportsSafetyChecker: false,
+    isReady: false,
+    currentModel: undefined,
+    safetyCheckerEnabled: false,
   };
 }
 

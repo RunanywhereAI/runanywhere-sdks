@@ -6,6 +6,7 @@
  */
 
 #include "rac/router/rac_route.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/router/rac_engine_router.h"
 #include "rac/router/rac_hardware_profile.h"
 
@@ -33,9 +34,12 @@ rac_result_t rac_plugin_route(rac_primitive_t              primitive,
     rac::router::EngineRouter router(rac::router::HardwareProfile::cached());
     auto result = router.route(req);
     if (result.vtable == nullptr) {
+        rac::events::publish_route_failed(primitive, RAC_ERROR_NOT_FOUND,
+                                          result.rejection_reason.c_str());
         return RAC_ERROR_NOT_FOUND;
     }
     *out_vtable = result.vtable;
+    rac::events::publish_route_selected(primitive, result.vtable, "engine_router");
     return RAC_SUCCESS;
 }
 

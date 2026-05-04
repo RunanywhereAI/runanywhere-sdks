@@ -4,21 +4,20 @@
 // LLMGenerationResult; streams Stream<LLMStreamEvent>.
 
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
-import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
+import 'package:runanywhere/generated/llm_service.pb.dart'
+    show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_llm_streaming.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -69,7 +68,7 @@ class RunAnywhereLLM {
         throw SDKException.modelNotFound('Model not found: $modelId');
       }
 
-      if (model.localPath == null) {
+      if (model.localPath.isEmpty) {
         throw SDKException.modelNotDownloaded(
           'Model is not downloaded. Call downloadModel() first.',
         );
@@ -95,6 +94,27 @@ class RunAnywhereLLM {
         model.name,
         model.contextLength,
       );
+
+      final framework = model.framework ==
+              model_pb.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+          ? model_pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+          : model.framework;
+      final lifecycleResult = await DartBridge.modelLifecycle.load(
+        model_pb.ModelLoadRequest(
+          modelId: modelId,
+          category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          framework: framework,
+          forceReload: true,
+        ),
+      );
+      if (!lifecycleResult.success) {
+        throw SDKException.modelLoadFailed(
+          modelId,
+          lifecycleResult.errorMessage.isNotEmpty
+              ? lifecycleResult.errorMessage
+              : 'Model lifecycle proto load failed',
+        );
+      }
 
       if (!DartBridge.llm.isLoaded) {
         throw SDKException.modelLoadFailed(
@@ -177,73 +197,36 @@ class RunAnywhereLLM {
 
     final modelId = DartBridge.llm.currentModelId ?? 'unknown';
     final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+        await DartBridgeModelRegistry.instance.getProtoModel(modelId);
     final modelName = modelInfo?.name;
 
-    String? effectiveSystemPrompt =
-        opts.hasSystemPrompt() ? opts.systemPrompt : null;
-    if (opts.hasJsonSchema()) {
-      final jsonSystemPrompt = DartBridgeStructuredOutput.shared
-          .getSystemPrompt(opts.jsonSchema);
-      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
-        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
-      } else {
-        effectiveSystemPrompt = jsonSystemPrompt;
-      }
-    }
-
     try {
-      final result = await DartBridge.llm.generate(
-        prompt,
-        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
-        temperature: opts.hasTemperature() ? opts.temperature : 0.8,
-        systemPrompt: effectiveSystemPrompt,
-      );
+      final request = _toGenerateRequest(prompt, opts);
+      final result = DartBridge.llm.generateProto(request);
 
       final endTime = DateTime.now();
       final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
-      final tokensPerSecond = result.totalTimeMs > 0
-          ? (result.completionTokens / result.totalTimeMs) * 1000
-          : 0.0;
+      if (!result.hasModelUsed() || result.modelUsed.isEmpty) {
+        result.modelUsed = modelId;
+      }
+      if (!result.hasGenerationTimeMs() || result.generationTimeMs <= 0) {
+        result.generationTimeMs = latencyMs;
+      }
 
       TelemetryService.shared.trackGeneration(
         modelId: modelId,
         modelName: modelName,
-        promptTokens: result.promptTokens,
-        completionTokens: result.completionTokens,
+        promptTokens: result.inputTokens,
+        completionTokens: result.tokensGenerated,
         latencyMs: latencyMs.round(),
         temperature: opts.hasTemperature() ? opts.temperature : 0.8,
         maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
         contextLength: modelInfo?.contextLength,
-        tokensPerSecond: tokensPerSecond,
+        tokensPerSecond: result.tokensPerSecond,
         isStreaming: false,
       );
 
-      String? structuredJson;
-      if (opts.hasJsonSchema()) {
-        try {
-          final jsonString =
-              DartBridgeStructuredOutput.shared.extractJson(result.text);
-          if (jsonString != null) {
-            jsonDecode(jsonString); // validate
-            structuredJson = jsonString;
-          }
-        } catch (e) {
-          SDKLogger('StructuredOutputHandler')
-              .info('JSON extraction/parse failed: $e');
-        }
-      }
-
-      return LLMGenerationResult(
-        text: result.text,
-        inputTokens: result.promptTokens,
-        tokensGenerated: result.completionTokens,
-        modelUsed: modelId,
-        generationTimeMs: latencyMs,
-        framework: 'llamacpp',
-        tokensPerSecond: tokensPerSecond,
-        jsonOutput: structuredJson,
-      );
+      return result;
     } catch (e) {
       TelemetryService.shared.trackError(
         errorCode: 'generation_failed',
@@ -273,118 +256,43 @@ class RunAnywhereLLM {
       );
     }
 
-    String? effectiveSystemPrompt =
-        opts.hasSystemPrompt() ? opts.systemPrompt : null;
-    if (opts.hasJsonSchema()) {
-      final jsonSystemPrompt = DartBridgeStructuredOutput.shared
-          .getSystemPrompt(opts.jsonSchema);
-      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
-        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
-      } else {
-        effectiveSystemPrompt = jsonSystemPrompt;
-      }
-    }
-
-    // Probe whether proto streaming is available for the loaded
-    // library. When the native library is built without Protobuf
-    // (e.g. simulator builds), rac_llm_set_stream_proto_callback
-    // returns RAC_ERROR_FEATURE_NOT_AVAILABLE and we fall back to
-    // the struct-based stream path.
-    final protoAvailable = DartBridgeLLMStreaming.protoAvailable();
-
-    if (!protoAvailable) {
-      // Struct-based fallback: forward DartBridge.llm.generateStream tokens
-      // as synthetic LLMStreamEvents so the UI works on simulator builds.
-      return _generateStreamStructFallback(
-        prompt,
-        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
-        temperature: opts.hasTemperature() ? opts.temperature : 0.8,
-        systemPrompt: effectiveSystemPrompt,
-      );
-    }
-
-    // Proto path — canonical production path.
-    final eventStream = DartBridgeLLMStreaming.protoStream();
-
-    final driver = DartBridge.llm.generateStream(
-      prompt,
-      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
-      temperature: opts.hasTemperature() ? opts.temperature : 0.8,
-      systemPrompt: effectiveSystemPrompt,
+    return DartBridge.llm.generateStreamProto(
+      _toGenerateRequest(prompt, opts, streaming: true),
     );
-    DartBridge.llm.setActiveStreamSubscription(
-      driver.listen(
-        (_) {/* struct tokens ignored; proto events are canonical */},
-        onError: (Object _) {/* surfaced via terminal proto event */},
-        onDone: () {
-          DartBridge.llm.setActiveStreamSubscription(null);
-        },
-      ),
-    );
-
-    return eventStream;
   }
 
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /// Struct-based streaming fallback used when Protobuf is not linked.
-  ///
-  /// Wraps [DartBridge.llm.generateStream] (which uses the C struct callback
-  /// path) and converts each token string into a synthetic [LLMStreamEvent]
-  /// so the UI receives the same type it expects from the proto path.
-  Stream<LLMStreamEvent> _generateStreamStructFallback(
-    String prompt, {
-    required int maxTokens,
-    required double temperature,
-    String? systemPrompt,
+  LLMGenerateRequest _toGenerateRequest(
+    String prompt,
+    LLMGenerationOptions? options, {
+    bool streaming = false,
   }) {
-    final controller = StreamController<LLMStreamEvent>();
-
-    final driver = DartBridge.llm.generateStream(
-      prompt,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
+    final opts = options ?? LLMGenerationOptions();
+    return LLMGenerateRequest(
+      prompt: prompt,
+      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
+      temperature: opts.hasTemperature() ? opts.temperature : 0.8,
+      topP: opts.hasTopP() ? opts.topP : null,
+      topK: opts.hasTopK() ? opts.topK : null,
+      repetitionPenalty:
+          opts.hasRepetitionPenalty() ? opts.repetitionPenalty : null,
+      stopSequences: opts.stopSequences,
+      systemPrompt: opts.hasSystemPrompt() ? opts.systemPrompt : null,
+      emitThoughts: opts.hasThinkingPattern(),
+      streamingEnabled: streaming,
+      preferredFramework:
+          opts.hasPreferredFramework() ? opts.preferredFramework.name : null,
+      jsonSchema: opts.hasJsonSchema() ? opts.jsonSchema : null,
+      executionTarget:
+          opts.hasExecutionTarget() ? opts.executionTarget.name : null,
     );
-
-    DartBridge.llm.setActiveStreamSubscription(
-      driver.listen(
-        (token) {
-          if (!controller.isClosed && token.isNotEmpty) {
-            controller.add(LLMStreamEvent(token: token));
-          }
-        },
-        onError: (Object err) {
-          if (!controller.isClosed) {
-            controller.add(LLMStreamEvent(
-              isFinal: true,
-              errorMessage: err.toString(),
-            ));
-            unawaited(controller.close());
-          }
-          DartBridge.llm.setActiveStreamSubscription(null);
-        },
-        onDone: () {
-          if (!controller.isClosed) {
-            controller.add(LLMStreamEvent(isFinal: true));
-            unawaited(controller.close());
-          }
-          DartBridge.llm.setActiveStreamSubscription(null);
-        },
-      ),
-    );
-
-    controller.onCancel = () {
-      DartBridge.llm.cancelGeneration();
-    };
-
-    return controller.stream;
   }
 
   /// Cancel any in-flight LLM generation.
   Future<void> cancel() async {
-    DartBridge.llm.cancelGeneration();
+    DartBridge.llm.cancelProto();
   }
 }

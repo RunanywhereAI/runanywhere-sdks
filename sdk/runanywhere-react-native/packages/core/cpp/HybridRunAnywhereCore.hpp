@@ -99,6 +99,17 @@ public:
   // Model Registry - Delegates to ModelRegistryBridge
   // ============================================================================
 
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(
+    const std::string& modelId) override;
+  std::shared_ptr<Promise<bool>> registerModelProto(
+    const std::shared_ptr<ArrayBuffer>& modelInfoBytes) override;
+  std::shared_ptr<Promise<bool>> updateModelProto(
+    const std::shared_ptr<ArrayBuffer>& modelInfoBytes) override;
+  std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(
+    const std::shared_ptr<ArrayBuffer>& queryBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() override;
   std::shared_ptr<Promise<std::string>> getAvailableModels() override;
   std::shared_ptr<Promise<std::string>> getModelInfo(const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) override;
@@ -122,6 +133,19 @@ public:
     const std::function<void(const std::string&)>& onProgress,
     const std::optional<std::string>& expectedSha256Hex) override;
   std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadPlanProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadStartProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadCancelProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadResumeProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadProgressPollProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onProgressBytes) override;
+  std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() override;
 
   // ============================================================================
   // Storage - Delegates to StorageBridge
@@ -130,6 +154,20 @@ public:
   std::shared_ptr<Promise<std::string>> getStorageInfo() override;
   std::shared_ptr<Promise<bool>> clearCache() override;
   std::shared_ptr<Promise<bool>> deleteModel(const std::string& modelId) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeletePlanProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeleteProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+
+  // ============================================================================
+  // Hardware - Delegates to commons hardware proto ABI
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hardwareProfileProto() override;
 
   // ============================================================================
   // Events - Delegates to EventBridge
@@ -137,6 +175,31 @@ public:
 
   std::shared_ptr<Promise<void>> emitEvent(const std::string& eventJson) override;
   std::shared_ptr<Promise<std::string>> pollEvents() override;
+  std::shared_ptr<Promise<double>> subscribeSDKEventsProto(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+  std::shared_ptr<Promise<void>> unsubscribeSDKEventsProto(double subscriptionId) override;
+  std::shared_ptr<Promise<bool>> publishSDKEventProto(
+    const std::shared_ptr<ArrayBuffer>& eventBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> pollSDKEventProto() override;
+  std::shared_ptr<Promise<bool>> publishSDKFailureProto(
+    double errorCode,
+    const std::string& message,
+    const std::string& component,
+    const std::string& operation,
+    bool recoverable) override;
+
+  // ============================================================================
+  // Model Lifecycle
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> modelLifecycleLoadProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> modelLifecycleUnloadProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> currentModelProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> componentLifecycleSnapshotProto(
+    double component) override;
 
   // ============================================================================
   // HTTP Client - libcurl-backed rac_http_client_* runner. `configureHttp`
@@ -188,6 +251,12 @@ public:
     const std::string& prompt,
     const std::string& schema,
     const std::optional<std::string>& optionsJson) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmGenerateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<void>> llmGenerateStreamProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmCancelProto() override;
 
   // ============================================================================
   // LLM Thinking (rac_llm_thinking.h) — v3 Phase A10 / GAP 08 #6
@@ -219,6 +288,13 @@ public:
   std::shared_ptr<Promise<std::string>> transcribeFile(
     const std::string& filePath,
     const std::optional<std::string>& language) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+  std::shared_ptr<Promise<void>> sttTranscribeStreamProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onPartialBytes) override;
 
   // ============================================================================
   // TTS Capability (Backend-Agnostic)
@@ -238,6 +314,15 @@ public:
     double pitchShift) override;
   std::shared_ptr<Promise<std::string>> getTTSVoices() override;
   std::shared_ptr<Promise<bool>> cancelTTS() override;
+  std::shared_ptr<Promise<bool>> ttsListVoicesProto(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onVoiceBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsSynthesizeProto(
+    const std::string& text,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+  std::shared_ptr<Promise<void>> ttsSynthesizeStreamProto(
+    const std::string& text,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onChunkBytes) override;
 
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
@@ -253,6 +338,14 @@ public:
     const std::string& audioBase64,
     const std::optional<std::string>& optionsJson) override;
   std::shared_ptr<Promise<void>> resetVAD() override;
+  std::shared_ptr<Promise<bool>> vadConfigureProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadProcessProto(
+    const std::shared_ptr<ArrayBuffer>& samplesBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadGetStatisticsProto() override;
+  std::shared_ptr<Promise<bool>> vadSetActivityCallbackProto(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onActivityBytes) override;
 
   // ============================================================================
   // Secure Storage
@@ -300,6 +393,11 @@ public:
   std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(const std::string& prompt) override;
   std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) override;
   std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentComponentStatesProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentProcessTurnProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes) override;
 
   // ============================================================================
   // Tool Calling - Delegates to ToolCallingBridge
@@ -324,6 +422,29 @@ public:
   std::shared_ptr<Promise<bool>> ragClearDocuments() override;
   std::shared_ptr<Promise<double>> ragGetDocumentCount() override;
   std::shared_ptr<Promise<std::string>> ragGetStatistics() override;
+  std::shared_ptr<Promise<bool>> ragCreatePipelineProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<bool>> ragDestroyPipelineProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragIngestProto(
+    const std::shared_ptr<ArrayBuffer>& documentBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragQueryProto(
+    const std::shared_ptr<ArrayBuffer>& queryBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragClearProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragStatsProto() override;
+  std::shared_ptr<Promise<double>> embeddingsCreateProto(
+    const std::string& modelId,
+    const std::optional<std::string>& configJson) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchProto(
+    double handle,
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraLoadProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraClearProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCompatibilityProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
 
   // ============================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8

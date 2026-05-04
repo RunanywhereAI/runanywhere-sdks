@@ -4,6 +4,7 @@
  * Domain implementation for HybridRunAnywhereCore.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
+#include "bridges/ExternalConfigGuard.hpp"
 
 namespace margelo::nitro::runanywhere {
 
@@ -107,9 +108,11 @@ std::string postJsonNative(
     const std::string& endpoint,
     const std::string& bodyJson
 ) {
-    std::string url = baseURL;
-    if (!url.empty() && url.back() == '/') url.pop_back();
-    url += endpoint;
+    if (!config::isUsableHttpUrl(baseURL)) {
+        throw std::runtime_error("No usable external config");
+    }
+
+    std::string url = config::appendEndpointPath(config::trim(baseURL), endpoint);
 
     std::vector<std::pair<std::string, std::string>> headers = {
         {"Content-Type", "application/json"},
@@ -137,6 +140,11 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::authAuthenticate(
     return Promise<std::string>::async([this, apiKey, baseURL, deviceId, platform, sdkVersion]() -> std::string {
         LOGI("authAuthenticate -> %s (device=%s, platform=%s)",
              baseURL.c_str(), deviceId.c_str(), platform.c_str());
+
+        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
+            setLastError("authAuthenticate skipped: no usable external config");
+            throw std::runtime_error("No usable external config");
+        }
 
         std::string requestJson = AuthBridge::shared().buildAuthenticateRequestJSON(
             apiKey, deviceId, platform, sdkVersion);
@@ -172,6 +180,10 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::authRefreshToken(
         std::string refresh = AuthBridge::shared().getRefreshToken();
         if (refresh.empty()) {
             throw std::runtime_error("authRefreshToken: no refresh token stored");
+        }
+        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(refresh)) {
+            setLastError("authRefreshToken skipped: no usable external config");
+            throw std::runtime_error("No usable external config");
         }
 
         std::string deviceId = InitBridge::shared().getPersistentDeviceUUID();
@@ -214,15 +226,38 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
         else if (envStr == "staging") env = RAC_ENV_STAGING;
 
         std::string buildToken = extractStringValue(environmentJson, "buildToken", "");
-        std::string supabaseKey = extractStringValue(environmentJson, "supabaseKey", "");
 
         // For development mode, get build token from C++ dev config if not provided
         // This matches Swift's CppBridge.DevConfig.buildToken behavior
         if (buildToken.empty() && env == RAC_ENV_DEVELOPMENT) {
             const char* devBuildToken = rac_dev_config_get_build_token();
-            if (devBuildToken && strlen(devBuildToken) > 0) {
+            if (devBuildToken && config::isUsableSecret(devBuildToken)) {
                 buildToken = devBuildToken;
                 LOGD("Using build token from dev config");
+            }
+        }
+
+        if (env == RAC_ENV_DEVELOPMENT) {
+            auto supabaseConfig = config::makeEndpointConfig(
+                rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
+                rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
+
+            if (!supabaseConfig.usable || !config::isUsableSecret(buildToken)) {
+                LOGI("Skipping telemetry/device registration: no usable config");
+                return true;
+            }
+        } else {
+            const std::string baseURL = InitBridge::shared().getBaseURL();
+            const std::string accessToken = AuthBridge::shared().getAccessToken();
+            const std::string apiKey = InitBridge::shared().getApiKey();
+            const bool hasUsableAuthToken =
+                config::isUsableSecret(accessToken) || config::isUsableSecret(apiKey);
+
+            if (!config::isUsableHttpUrl(baseURL) ||
+                !hasUsableAuthToken ||
+                !config::isUsableSecret(buildToken)) {
+                LOGI("Skipping telemetry/device registration: no usable config");
+                return true;
             }
         }
 
@@ -328,43 +363,44 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
             if (env == RAC_ENV_DEVELOPMENT) {
                 // Development: Use Supabase from C++ dev config (development_config.cpp)
                 // NO FALLBACK - credentials must come from C++ config only
-                const char* devUrl = rac_dev_config_get_supabase_url();
-                const char* devKey = rac_dev_config_get_supabase_key();
+                auto supabaseConfig = config::makeEndpointConfig(
+                    rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
+                    rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
 
-                baseURL = devUrl ? devUrl : "";
-                apiKey = devKey ? devKey : "";
-
-                if (baseURL.empty()) {
-                    LOGW("Development mode but Supabase URL not configured in C++ dev_config");
-                } else {
-                    LOGD("Using Supabase from dev config: %s", baseURL.c_str());
+                if (!supabaseConfig.usable) {
+                    LOGI("Skipping telemetry/device registration: no usable config");
+                    return {true, 204, "{}", ""};
                 }
+
+                baseURL = supabaseConfig.baseURL;
+                apiKey = supabaseConfig.token;
+                LOGD("Using configured development Supabase endpoint");
             } else {
                 // Production/Staging: Use configured Railway URL
                 // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
-                baseURL = InitBridge::shared().getBaseURL();
+                baseURL = config::trim(InitBridge::shared().getBaseURL());
 
                 // For production mode, prefer JWT access token (from authentication)
                 // over raw API key. This matches Swift/Kotlin behavior.
                 std::string accessToken = AuthBridge::shared().getAccessToken();
-                if (!accessToken.empty()) {
+                if (config::isUsableSecret(accessToken)) {
                     apiKey = accessToken;  // Use JWT for Authorization header
                     LOGD("Using JWT access token for device registration");
                 } else {
                     // Fallback to API key if not authenticated yet
-                    apiKey = InitBridge::shared().getApiKey();
+                    apiKey = config::trim(InitBridge::shared().getApiKey());
                     LOGD("Using API key for device registration (not authenticated)");
                 }
 
-                // Fallback to default if not configured
-                if (baseURL.empty()) {
-                    baseURL = "https://api.runanywhere.ai";
+                if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
+                    LOGI("Skipping telemetry/device registration: no usable config");
+                    return {true, 204, "{}", ""};
                 }
 
-                LOGD("Using production config: %s", baseURL.c_str());
+                LOGD("Using configured production/staging endpoint");
             }
 
-            std::string fullURL = baseURL + endpoint;
+            std::string fullURL = config::appendEndpointPath(baseURL, endpoint);
             LOGI("Device HTTP POST to: %s (env=%d)", fullURL.c_str(), env);
 
             return InitBridge::shared().httpPostSync(fullURL, jsonBody, apiKey);

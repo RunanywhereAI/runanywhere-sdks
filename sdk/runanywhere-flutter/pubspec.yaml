@@ -1,0 +1,39 @@
+name: runanywhere_flutter_workspace
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+workspace:
+  - packages/runanywhere
+  - packages/runanywhere_llamacpp
+  - packages/runanywhere_onnx
+  - packages/runanywhere_genie
+
+dev_dependencies:
+  melos: 7.4.0
+
+melos:
+  command:
+    version:
+      workspaceChangelog: true
+
+    bootstrap:
+      runPubGetInParallel: true
+
+  scripts:
+    analyze:
+      run: melos exec -c 1 -- flutter analyze --no-pub .
+      description: Run flutter analyze in all packages
+
+    format:
+      run: melos exec -- dart format .
+      description: Run dart format in all packages
+
+    test:
+      run: melos exec -- flutter test
+      description: Run tests in all packages
+
+    clean:
+      run: melos exec -- flutter clean
+      description: Run flutter clean in all packages

@@ -11,14 +11,24 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.AppStorageInfo
 import ai.runanywhere.proto.v1.DeviceStorageInfo
+import ai.runanywhere.proto.v1.ModelInfo as ProtoModelInfo
 import ai.runanywhere.proto.v1.ModelStorageMetrics
 import ai.runanywhere.proto.v1.StorageAvailability
+import ai.runanywhere.proto.v1.StorageAvailabilityRequest
+import ai.runanywhere.proto.v1.StorageAvailabilityResult
+import ai.runanywhere.proto.v1.StorageDeletePlan
+import ai.runanywhere.proto.v1.StorageDeletePlanRequest
+import ai.runanywhere.proto.v1.StorageDeleteRequest
+import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfo
+import ai.runanywhere.proto.v1.StorageInfoRequest
+import ai.runanywhere.proto.v1.StorageInfoResult
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorageProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import java.io.File
@@ -33,6 +43,25 @@ actual suspend fun RunAnywhere.storageInfo(): StorageInfo {
         throw SDKException.notInitialized("SDK not initialized")
     }
 
+    return storageInfo(
+        StorageInfoRequest(
+            include_device = true,
+            include_app = true,
+            include_models = true,
+        ),
+    ).info ?: throw SDKException.storage("Storage info result did not include info")
+}
+
+actual suspend fun RunAnywhere.storageInfo(request: StorageInfoRequest): StorageInfoResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeStorageProto.info(request)
+        ?: throw SDKException.storage("Native storage info proto API unavailable")
+}
+
+@Suppress("unused")
+private suspend fun RunAnywhere.storageInfoLegacy(): StorageInfo {
     val baseDir = File(CppBridgeModelPaths.getBaseDirectory())
     val cacheDir = File(baseDir, "cache")
     // Canonical model schema: {base}/RunAnywhere/Models/
@@ -84,18 +113,38 @@ actual suspend fun RunAnywhere.checkStorageAvailability(requiredBytes: Long): St
         throw SDKException.notInitialized("SDK not initialized")
     }
 
-    val json = CppBridgeFileManager.checkStorageJson(requiredBytes)
-    if (json != null) {
-        return parseStorageAvailabilityJson(json, requiredBytes)
-    }
+    return checkStorageAvailability(
+        StorageAvailabilityRequest(
+            required_bytes = requiredBytes,
+            safety_margin = 0.0,
+        ),
+    ).availability ?: throw SDKException.storage("Storage availability result did not include availability")
+}
 
-    val baseDir = File(CppBridgeModelPaths.getBaseDirectory())
-    val availableSpace = baseDir.freeSpace
-    return StorageAvailability(
-        is_available = availableSpace >= requiredBytes,
-        required_bytes = requiredBytes,
-        available_bytes = availableSpace,
-    )
+actual suspend fun RunAnywhere.checkStorageAvailability(
+    request: StorageAvailabilityRequest,
+): StorageAvailabilityResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeStorageProto.availability(request)
+        ?: throw SDKException.storage("Native storage availability proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.storageDeletePlan(request: StorageDeletePlanRequest): StorageDeletePlan {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeStorageProto.deletePlan(request)
+        ?: throw SDKException.storage("Native storage delete plan proto API unavailable")
+}
+
+actual suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDeleteResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    return CppBridgeStorageProto.delete(request)
+        ?: throw SDKException.storage("Native storage delete proto API unavailable")
 }
 
 actual suspend fun RunAnywhere.cacheSize(): Long {
@@ -136,8 +185,12 @@ actual suspend fun RunAnywhere.checkStorageAvailability(
     safetyMargin: Double,
 ): StorageAvailability {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val padded = (requiredBytes.toDouble() * (1.0 + safetyMargin)).toLong()
-    return checkStorageAvailability(padded)
+    return checkStorageAvailability(
+        StorageAvailabilityRequest(
+            required_bytes = requiredBytes,
+            safety_margin = safetyMargin,
+        ),
+    ).availability ?: throw SDKException.storage("Storage availability result did not include availability")
 }
 
 actual suspend fun RunAnywhere.getModelStorageMetrics(
@@ -163,45 +216,15 @@ private fun calculateDirectorySize(directory: File): Long {
 }
 
 /**
- * Parse storage availability JSON from C++ rac_file_manager_check_storage.
- */
-private fun parseStorageAvailabilityJson(json: String, requiredBytes: Long): StorageAvailability {
-    val isAvailable = json.contains("\"isAvailable\":true")
-    val hasWarning = json.contains("\"hasWarning\":true")
-
-    val availableSpace =
-        Regex("\"availableSpace\":(\\d+)")
-            .find(json)
-            ?.groupValues
-            ?.get(1)
-            ?.toLongOrNull() ?: 0L
-
-    val recommendation =
-        Regex("\"recommendation\":\"([^\"]*)\"")
-            .find(json)
-            ?.groupValues
-            ?.get(1)
-            ?.takeIf { it.isNotEmpty() }
-
-    return StorageAvailability(
-        is_available = isAvailable,
-        required_bytes = requiredBytes,
-        available_bytes = availableSpace,
-        warning_message = if (hasWarning) "Low storage" else null,
-        recommendation = recommendation,
-    )
-}
-
-/**
- * Convert a CppBridgeModelRegistry.ModelInfo to proto ModelStorageMetrics.
+ * Convert a registry ModelInfo proto to proto ModelStorageMetrics.
  */
 private fun convertToModelStorageMetrics(
-    registryModel: CppBridgeModelRegistry.ModelInfo,
+    registryModel: ProtoModelInfo,
 ): ModelStorageMetrics? {
-    val localPath = registryModel.localPath ?: return null
+    val localPath = registryModel.local_path.takeIf { it.isNotEmpty() } ?: return null
     val sizeOnDisk = calculateDirectorySize(File(localPath))
     return ModelStorageMetrics(
-        model_id = registryModel.modelId,
+        model_id = registryModel.id,
         size_on_disk_bytes = sizeOnDisk,
     )
 }

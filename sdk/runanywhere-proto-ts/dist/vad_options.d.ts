@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -68,6 +69,25 @@ export interface VADConfiguration {
      * in the C ABI). Defaults to false.
      */
     enableAutoCalibration: boolean;
+    /**
+     * Calibration multiplier (threshold = ambient noise * multiplier).
+     * Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+     */
+    calibrationMultiplier: number;
+    /** Preferred framework for VAD. Absent = auto. */
+    preferredFramework?: InferenceFramework | undefined;
+    /** Optional model path for backend-specific VADs (e.g. Silero ONNX). */
+    modelPath?: string | undefined;
+    /**
+     * Window size in samples for frame-based neural VAD backends. 0 =
+     * backend/default.
+     */
+    windowSizeSamples: number;
+    /**
+     * Maximum continuous speech segment duration in milliseconds. 0 =
+     * backend/default.
+     */
+    maxSpeechDurationMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -107,6 +127,11 @@ export interface VADOptions {
      * Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
      */
     minSilenceDurationMs: number;
+    /**
+     * Maximum continuous speech duration (ms) before forcing a segment split.
+     * 0 = backend/default.
+     */
+    maxSpeechDurationMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -144,6 +169,11 @@ export interface VADResult {
     energy: number;
     /** Length of the analyzed frame in milliseconds. */
     durationMs: number;
+    /** Wall-clock timestamp for this frame/result, in milliseconds since epoch. */
+    timestampMs: number;
+    /** Optional detected segment start/end times, in milliseconds. 0 = unset. */
+    startTimeMs: number;
+    endTimeMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -182,6 +212,14 @@ export interface VADStatistics {
     recentAvg: number;
     /** Recent moving-window peak energy. (Swift/Kotlin: `recentMax`) */
     recentMax: number;
+    /**
+     * Richer service-level counters from rac_vad_statistics_t. Zero = unset
+     * for energy-only implementations.
+     */
+    totalSpeechSegments: number;
+    totalSpeechDurationMs: number;
+    averageEnergy: number;
+    peakEnergy: number;
 }
 /**
  * ---------------------------------------------------------------------------

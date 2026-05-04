@@ -140,9 +140,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       await sdk.RunAnywhereSDK.instance.tts.loadVoice(model.id);
 
       setState(() {
-        _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
+        _selectedFramework = model.preferredFramework;
         _selectedModelName = model.name;
-        _isSystemTTS = model.preferredFramework == LLMFramework.systemTTS;
+        _isSystemTTS = model.preferredFramework ==
+            LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
         _isGenerating = false;
       });
 
@@ -200,7 +201,8 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       );
 
       // Wave 2: TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
-      final samples = Float32List.view(Uint8List.fromList(result.audioData).buffer);
+      final samples =
+          Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
           '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
 

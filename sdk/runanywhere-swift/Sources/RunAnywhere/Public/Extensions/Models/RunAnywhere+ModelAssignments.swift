@@ -102,17 +102,18 @@ public extension RunAnywhere {
     /// - Returns: The same `ModelInfo` (passed through for chaining / storage).
     @discardableResult
     static func registerModel(_ model: ModelInfo) -> ModelInfo {
-        // Re-use the decomposed form which saves to the C++ registry asynchronously.
-        return registerModel(
-            id: model.id,
-            name: model.name,
-            url: model.downloadURL ?? URL(fileURLWithPath: "/dev/null"),
-            framework: model.framework,
-            modality: model.category,
-            artifactType: model.artifactType,
-            memoryRequirement: model.downloadSize,
-            supportsThinking: model.supportsThinking
-        )
+        let logger = SDKLogger(category: "RunAnywhere.Models")
+        let task = Task {
+            do {
+                try await CppBridge.ModelRegistry.shared.save(model)
+                logger.info("Model saved to registry: \(model.id)")
+            } catch {
+                logger.error("Failed to register model: \(error)")
+            }
+        }
+        trackPendingRegistration(task)
+
+        return model
     }
 
     /// Register a model from a URL string
@@ -181,7 +182,9 @@ public extension RunAnywhere {
 
     // MARK: - Multi-File Model Cache
 
-    /// Cache for multi-file model descriptors (C++ registry doesn't preserve file arrays).
+    /// Cache for multi-file model descriptors.
+    /// The proto registry preserves file arrays; this remains for legacy
+    /// binaries and call sites that query descriptors directly.
     /// Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
     private static let multiFileModelCache =
         OSAllocatedUnfairLock<[String: [ModelFileDescriptor]]>(initialState: [:])

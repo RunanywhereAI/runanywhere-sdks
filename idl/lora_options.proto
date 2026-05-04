@@ -134,6 +134,8 @@ message LoraAdapterCatalogEntry {
     repeated string compatible_models = 6;   // explicit base model IDs
     int64           size_bytes        = 7;   // file size, 0 if unknown
     optional string author            = 8;   // optional adapter author
+    float           default_scale     = 9;   // recommended adapter scale
+    optional string checksum_sha256   = 10;  // lowercase hex SHA-256
 }
 
 // ---------------------------------------------------------------------------

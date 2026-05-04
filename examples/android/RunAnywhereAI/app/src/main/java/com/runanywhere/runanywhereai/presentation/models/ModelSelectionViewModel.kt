@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.presentation.models
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import ai.runanywhere.proto.v1.ModelEventKind
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.models.collectDeviceInfo
@@ -28,7 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -58,27 +59,27 @@ class ModelSelectionViewModel(
         viewModelScope.launch {
             Timber.d("📡 Subscribed to download progress events")
             EventBus.events
-                .filterIsInstance<ModelEvent>()
+                .mapNotNull { it.model }
                 .collect { event ->
-                    when (event.eventType) {
-                        ModelEvent.ModelEventType.DOWNLOAD_PROGRESS -> {
-                            val progressPercent = ((event.progress ?: 0f) * 100).toInt()
-                            Timber.d("📊 Download progress: ${event.modelId} - $progressPercent%")
+                    when (event.kind) {
+                        ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PROGRESS -> {
+                            val progressPercent = (event.progress * 100).toInt()
+                            Timber.d("📊 Download progress: ${event.model_id} - $progressPercent%")
                             _uiState.update {
                                 it.copy(loadingProgress = "Downloading... $progressPercent%")
                             }
                         }
-                        ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                            Timber.d("✅ Download completed: ${event.modelId}")
+                        ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED -> {
+                            Timber.d("✅ Download completed: ${event.model_id}")
                             loadModelsAndFrameworks() // Refresh models list
                         }
-                        ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                            Timber.e("❌ Download failed: ${event.modelId} - ${event.error}")
+                        ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED -> {
+                            Timber.e("❌ Download failed: ${event.model_id} - ${event.error}")
                             _uiState.update {
                                 it.copy(
                                     isLoadingModel = false,
                                     loadingProgress = "",
-                                    error = event.error ?: "Download failed",
+                                    error = event.error.ifBlank { "Download failed" },
                                 )
                             }
                         }

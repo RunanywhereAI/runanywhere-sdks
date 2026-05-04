@@ -130,9 +130,44 @@ public struct RAVADConfiguration: Sendable {
   /// in the C ABI). Defaults to false.
   public var enableAutoCalibration: Bool = false
 
+  /// Calibration multiplier (threshold = ambient noise * multiplier).
+  /// Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+  public var calibrationMultiplier: Float = 0
+
+  /// Preferred framework for VAD. Absent = auto.
+  public var preferredFramework: RAInferenceFramework {
+    get {_preferredFramework ?? .unspecified}
+    set {_preferredFramework = newValue}
+  }
+  /// Returns true if `preferredFramework` has been explicitly set.
+  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
+  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
+
+  /// Optional model path for backend-specific VADs (e.g. Silero ONNX).
+  public var modelPath: String {
+    get {_modelPath ?? String()}
+    set {_modelPath = newValue}
+  }
+  /// Returns true if `modelPath` has been explicitly set.
+  public var hasModelPath: Bool {self._modelPath != nil}
+  /// Clears the value of `modelPath`. Subsequent reads from it will return its default value.
+  public mutating func clearModelPath() {self._modelPath = nil}
+
+  /// Window size in samples for frame-based neural VAD backends. 0 =
+  /// backend/default.
+  public var windowSizeSamples: Int32 = 0
+
+  /// Maximum continuous speech segment duration in milliseconds. 0 =
+  /// backend/default.
+  public var maxSpeechDurationMs: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _preferredFramework: RAInferenceFramework? = nil
+  fileprivate var _modelPath: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -171,6 +206,10 @@ public struct RAVADOptions: Sendable {
   /// Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
   /// Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
   public var minSilenceDurationMs: Int32 = 0
+
+  /// Maximum continuous speech duration (ms) before forcing a segment split.
+  /// 0 = backend/default.
+  public var maxSpeechDurationMs: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -214,6 +253,14 @@ public struct RAVADResult: Sendable {
 
   /// Length of the analyzed frame in milliseconds.
   public var durationMs: Int32 = 0
+
+  /// Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+  public var timestampMs: Int64 = 0
+
+  /// Optional detected segment start/end times, in milliseconds. 0 = unset.
+  public var startTimeMs: Int64 = 0
+
+  public var endTimeMs: Int64 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -259,6 +306,16 @@ public struct RAVADStatistics: Sendable {
 
   /// Recent moving-window peak energy. (Swift/Kotlin: `recentMax`)
   public var recentMax: Float = 0
+
+  /// Richer service-level counters from rac_vad_statistics_t. Zero = unset
+  /// for energy-only implementations.
+  public var totalSpeechSegments: Int32 = 0
+
+  public var totalSpeechDurationMs: Int64 = 0
+
+  public var averageEnergy: Float = 0
+
+  public var peakEnergy: Float = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -312,7 +369,7 @@ extension RASpeechActivityKind: SwiftProtobuf._ProtoNameProviding {
 
 extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{1}threshold\0\u{3}enable_auto_calibration\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{1}threshold\0\u{3}enable_auto_calibration\0\u{3}calibration_multiplier\0\u{3}preferred_framework\0\u{3}model_path\0\u{3}window_size_samples\0\u{3}max_speech_duration_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -325,12 +382,21 @@ extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.frameLengthMs) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self.threshold) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.enableAutoCalibration) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self.calibrationMultiplier) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._modelPath) }()
+      case 9: try { try decoder.decodeSingularInt32Field(value: &self.windowSizeSamples) }()
+      case 10: try { try decoder.decodeSingularInt32Field(value: &self.maxSpeechDurationMs) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
@@ -346,6 +412,21 @@ extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if self.enableAutoCalibration != false {
       try visitor.visitSingularBoolField(value: self.enableAutoCalibration, fieldNumber: 5)
     }
+    if self.calibrationMultiplier.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.calibrationMultiplier, fieldNumber: 6)
+    }
+    try { if let v = self._preferredFramework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._modelPath {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    if self.windowSizeSamples != 0 {
+      try visitor.visitSingularInt32Field(value: self.windowSizeSamples, fieldNumber: 9)
+    }
+    if self.maxSpeechDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxSpeechDurationMs, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -355,6 +436,11 @@ extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs.frameLengthMs != rhs.frameLengthMs {return false}
     if lhs.threshold != rhs.threshold {return false}
     if lhs.enableAutoCalibration != rhs.enableAutoCalibration {return false}
+    if lhs.calibrationMultiplier != rhs.calibrationMultiplier {return false}
+    if lhs._preferredFramework != rhs._preferredFramework {return false}
+    if lhs._modelPath != rhs._modelPath {return false}
+    if lhs.windowSizeSamples != rhs.windowSizeSamples {return false}
+    if lhs.maxSpeechDurationMs != rhs.maxSpeechDurationMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -362,7 +448,7 @@ extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}threshold\0\u{3}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}threshold\0\u{3}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -373,6 +459,7 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       case 1: try { try decoder.decodeSingularFloatField(value: &self.threshold) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.minSpeechDurationMs) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.minSilenceDurationMs) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxSpeechDurationMs) }()
       default: break
       }
     }
@@ -388,6 +475,9 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if self.minSilenceDurationMs != 0 {
       try visitor.visitSingularInt32Field(value: self.minSilenceDurationMs, fieldNumber: 3)
     }
+    if self.maxSpeechDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxSpeechDurationMs, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -395,6 +485,7 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.threshold != rhs.threshold {return false}
     if lhs.minSpeechDurationMs != rhs.minSpeechDurationMs {return false}
     if lhs.minSilenceDurationMs != rhs.minSilenceDurationMs {return false}
+    if lhs.maxSpeechDurationMs != rhs.maxSpeechDurationMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -402,7 +493,7 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
 
 extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0\u{3}timestamp_ms\0\u{3}start_time_ms\0\u{3}end_time_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -414,6 +505,9 @@ extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       case 2: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
       case 3: try { try decoder.decodeSingularFloatField(value: &self.energy) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.durationMs) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.startTimeMs) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.endTimeMs) }()
       default: break
       }
     }
@@ -432,6 +526,15 @@ extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     if self.durationMs != 0 {
       try visitor.visitSingularInt32Field(value: self.durationMs, fieldNumber: 4)
     }
+    if self.timestampMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 5)
+    }
+    if self.startTimeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.startTimeMs, fieldNumber: 6)
+    }
+    if self.endTimeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.endTimeMs, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -440,6 +543,9 @@ extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     if lhs.confidence != rhs.confidence {return false}
     if lhs.energy != rhs.energy {return false}
     if lhs.durationMs != rhs.durationMs {return false}
+    if lhs.timestampMs != rhs.timestampMs {return false}
+    if lhs.startTimeMs != rhs.startTimeMs {return false}
+    if lhs.endTimeMs != rhs.endTimeMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -447,7 +553,7 @@ extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
 
 extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADStatistics"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}current_energy\0\u{3}current_threshold\0\u{3}ambient_level\0\u{3}recent_avg\0\u{3}recent_max\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}current_energy\0\u{3}current_threshold\0\u{3}ambient_level\0\u{3}recent_avg\0\u{3}recent_max\0\u{3}total_speech_segments\0\u{3}total_speech_duration_ms\0\u{3}average_energy\0\u{3}peak_energy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -460,6 +566,10 @@ extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
       case 3: try { try decoder.decodeSingularFloatField(value: &self.ambientLevel) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self.recentAvg) }()
       case 5: try { try decoder.decodeSingularFloatField(value: &self.recentMax) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.totalSpeechSegments) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.totalSpeechDurationMs) }()
+      case 8: try { try decoder.decodeSingularFloatField(value: &self.averageEnergy) }()
+      case 9: try { try decoder.decodeSingularFloatField(value: &self.peakEnergy) }()
       default: break
       }
     }
@@ -481,6 +591,18 @@ extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     if self.recentMax.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.recentMax, fieldNumber: 5)
     }
+    if self.totalSpeechSegments != 0 {
+      try visitor.visitSingularInt32Field(value: self.totalSpeechSegments, fieldNumber: 6)
+    }
+    if self.totalSpeechDurationMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.totalSpeechDurationMs, fieldNumber: 7)
+    }
+    if self.averageEnergy.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.averageEnergy, fieldNumber: 8)
+    }
+    if self.peakEnergy.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.peakEnergy, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -490,6 +612,10 @@ extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     if lhs.ambientLevel != rhs.ambientLevel {return false}
     if lhs.recentAvg != rhs.recentAvg {return false}
     if lhs.recentMax != rhs.recentMax {return false}
+    if lhs.totalSpeechSegments != rhs.totalSpeechSegments {return false}
+    if lhs.totalSpeechDurationMs != rhs.totalSpeechDurationMs {return false}
+    if lhs.averageEnergy != rhs.averageEnergy {return false}
+    if lhs.peakEnergy != rhs.peakEnergy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

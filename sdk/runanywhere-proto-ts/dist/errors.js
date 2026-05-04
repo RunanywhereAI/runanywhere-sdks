@@ -4,6 +4,7 @@
 //   protoc               v7.34.1
 // source: errors.proto
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 export const protobufPackage = "runanywhere.v1";
 /**
@@ -112,6 +113,61 @@ export function errorCategoryToJSON(object) {
         case ErrorCategory.ERROR_CATEGORY_CONFIGURATION:
             return "ERROR_CATEGORY_CONFIGURATION";
         case ErrorCategory.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var ErrorSeverity;
+(function (ErrorSeverity) {
+    ErrorSeverity[ErrorSeverity["ERROR_SEVERITY_UNSPECIFIED"] = 0] = "ERROR_SEVERITY_UNSPECIFIED";
+    ErrorSeverity[ErrorSeverity["ERROR_SEVERITY_DEBUG"] = 1] = "ERROR_SEVERITY_DEBUG";
+    ErrorSeverity[ErrorSeverity["ERROR_SEVERITY_INFO"] = 2] = "ERROR_SEVERITY_INFO";
+    ErrorSeverity[ErrorSeverity["ERROR_SEVERITY_WARNING"] = 3] = "ERROR_SEVERITY_WARNING";
+    ErrorSeverity[ErrorSeverity["ERROR_SEVERITY_ERROR"] = 4] = "ERROR_SEVERITY_ERROR";
+    ErrorSeverity[ErrorSeverity["ERROR_SEVERITY_CRITICAL"] = 5] = "ERROR_SEVERITY_CRITICAL";
+    ErrorSeverity[ErrorSeverity["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ErrorSeverity || (ErrorSeverity = {}));
+export function errorSeverityFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "ERROR_SEVERITY_UNSPECIFIED":
+            return ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED;
+        case 1:
+        case "ERROR_SEVERITY_DEBUG":
+            return ErrorSeverity.ERROR_SEVERITY_DEBUG;
+        case 2:
+        case "ERROR_SEVERITY_INFO":
+            return ErrorSeverity.ERROR_SEVERITY_INFO;
+        case 3:
+        case "ERROR_SEVERITY_WARNING":
+            return ErrorSeverity.ERROR_SEVERITY_WARNING;
+        case 4:
+        case "ERROR_SEVERITY_ERROR":
+            return ErrorSeverity.ERROR_SEVERITY_ERROR;
+        case 5:
+        case "ERROR_SEVERITY_CRITICAL":
+            return ErrorSeverity.ERROR_SEVERITY_CRITICAL;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ErrorSeverity.UNRECOGNIZED;
+    }
+}
+export function errorSeverityToJSON(object) {
+    switch (object) {
+        case ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED:
+            return "ERROR_SEVERITY_UNSPECIFIED";
+        case ErrorSeverity.ERROR_SEVERITY_DEBUG:
+            return "ERROR_SEVERITY_DEBUG";
+        case ErrorSeverity.ERROR_SEVERITY_INFO:
+            return "ERROR_SEVERITY_INFO";
+        case ErrorSeverity.ERROR_SEVERITY_WARNING:
+            return "ERROR_SEVERITY_WARNING";
+        case ErrorSeverity.ERROR_SEVERITY_ERROR:
+            return "ERROR_SEVERITY_ERROR";
+        case ErrorSeverity.ERROR_SEVERITY_CRITICAL:
+            return "ERROR_SEVERITY_CRITICAL";
+        case ErrorSeverity.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1231,7 +1287,17 @@ export const ErrorContext_MetadataEntry = {
     },
 };
 function createBaseSDKError() {
-    return { code: 0, category: 0, message: "", context: undefined, cAbiCode: undefined, nestedMessage: undefined };
+    return {
+        code: 0,
+        category: 0,
+        message: "",
+        context: undefined,
+        cAbiCode: undefined,
+        nestedMessage: undefined,
+        timestampMs: 0,
+        severity: 0,
+        component: "",
+    };
 }
 export const SDKError = {
     encode(message, writer = _m0.Writer.create()) {
@@ -1252,6 +1318,15 @@ export const SDKError = {
         }
         if (message.nestedMessage !== undefined) {
             writer.uint32(50).string(message.nestedMessage);
+        }
+        if (message.timestampMs !== 0) {
+            writer.uint32(56).int64(message.timestampMs);
+        }
+        if (message.severity !== 0) {
+            writer.uint32(64).int32(message.severity);
+        }
+        if (message.component !== "") {
+            writer.uint32(74).string(message.component);
         }
         return writer;
     },
@@ -1298,6 +1373,24 @@ export const SDKError = {
                     }
                     message.nestedMessage = reader.string();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.timestampMs = longToNumber(reader.int64());
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.severity = reader.int32();
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.component = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1314,6 +1407,9 @@ export const SDKError = {
             context: isSet(object.context) ? ErrorContext.fromJSON(object.context) : undefined,
             cAbiCode: isSet(object.cAbiCode) ? globalThis.Number(object.cAbiCode) : undefined,
             nestedMessage: isSet(object.nestedMessage) ? globalThis.String(object.nestedMessage) : undefined,
+            timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+            severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
+            component: isSet(object.component) ? globalThis.String(object.component) : "",
         };
     },
     toJSON(message) {
@@ -1336,6 +1432,15 @@ export const SDKError = {
         if (message.nestedMessage !== undefined) {
             obj.nestedMessage = message.nestedMessage;
         }
+        if (message.timestampMs !== 0) {
+            obj.timestampMs = Math.round(message.timestampMs);
+        }
+        if (message.severity !== 0) {
+            obj.severity = errorSeverityToJSON(message.severity);
+        }
+        if (message.component !== "") {
+            obj.component = message.component;
+        }
         return obj;
     },
     create(base) {
@@ -1351,9 +1456,25 @@ export const SDKError = {
             : undefined;
         message.cAbiCode = object.cAbiCode ?? undefined;
         message.nestedMessage = object.nestedMessage ?? undefined;
+        message.timestampMs = object.timestampMs ?? 0;
+        message.severity = object.severity ?? 0;
+        message.component = object.component ?? "";
         return message;
     },
 };
+function longToNumber(long) {
+    if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    }
+    if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+    }
+    return long.toNumber();
+}
+if (_m0.util.Long !== Long) {
+    _m0.util.Long = Long;
+    _m0.configure();
+}
 function isObject(value) {
     return typeof value === "object" && value !== null;
 }

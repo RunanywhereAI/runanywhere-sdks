@@ -20,7 +20,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-public enum Runanywhere_V1_AcceleratorPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
+public enum RAAcceleratorPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case auto // = 0
   case ane // = 1
@@ -53,7 +53,7 @@ public enum Runanywhere_V1_AcceleratorPreference: SwiftProtobuf.Enum, Swift.Case
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [Runanywhere_V1_AcceleratorPreference] = [
+  public static let allCases: [RAAcceleratorPreference] = [
     .auto,
     .ane,
     .gpu,
@@ -62,7 +62,7 @@ public enum Runanywhere_V1_AcceleratorPreference: SwiftProtobuf.Enum, Swift.Case
 
 }
 
-public struct Runanywhere_V1_HardwareProfile: Sendable {
+public struct RAHardwareProfile: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -93,14 +93,14 @@ public struct Runanywhere_V1_HardwareProfile: Sendable {
   public init() {}
 }
 
-public struct Runanywhere_V1_AcceleratorInfo: Sendable {
+public struct RAAcceleratorInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var name: String = String()
 
-  public var type: Runanywhere_V1_AcceleratorPreference = .auto
+  public var type: RAAcceleratorPreference = .auto
 
   public var available: Bool = false
 
@@ -109,13 +109,13 @@ public struct Runanywhere_V1_AcceleratorInfo: Sendable {
   public init() {}
 }
 
-public struct Runanywhere_V1_HardwareProfileResult: Sendable {
+public struct RAHardwareProfileResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var profile: Runanywhere_V1_HardwareProfile {
-    get {_profile ?? Runanywhere_V1_HardwareProfile()}
+  public var profile: RAHardwareProfile {
+    get {_profile ?? RAHardwareProfile()}
     set {_profile = newValue}
   }
   /// Returns true if `profile` has been explicitly set.
@@ -123,24 +123,24 @@ public struct Runanywhere_V1_HardwareProfileResult: Sendable {
   /// Clears the value of `profile`. Subsequent reads from it will return its default value.
   public mutating func clearProfile() {self._profile = nil}
 
-  public var accelerators: [Runanywhere_V1_AcceleratorInfo] = []
+  public var accelerators: [RAAcceleratorInfo] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _profile: Runanywhere_V1_HardwareProfile? = nil
+  fileprivate var _profile: RAHardwareProfile? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
 
-extension Runanywhere_V1_AcceleratorPreference: SwiftProtobuf._ProtoNameProviding {
+extension RAAcceleratorPreference: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATOR_PREFERENCE_AUTO\0\u{1}ACCELERATOR_PREFERENCE_ANE\0\u{1}ACCELERATOR_PREFERENCE_GPU\0\u{1}ACCELERATOR_PREFERENCE_CPU\0")
 }
 
-extension Runanywhere_V1_HardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareProfile"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chip\0\u{3}has_neural_engine\0\u{3}acceleration_mode\0\u{3}total_memory_bytes\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{1}architecture\0\u{1}platform\0")
 
@@ -195,7 +195,7 @@ extension Runanywhere_V1_HardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Runanywhere_V1_HardwareProfile, rhs: Runanywhere_V1_HardwareProfile) -> Bool {
+  public static func ==(lhs: RAHardwareProfile, rhs: RAHardwareProfile) -> Bool {
     if lhs.chip != rhs.chip {return false}
     if lhs.hasNeuralEngine_p != rhs.hasNeuralEngine_p {return false}
     if lhs.accelerationMode != rhs.accelerationMode {return false}
@@ -210,7 +210,7 @@ extension Runanywhere_V1_HardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension Runanywhere_V1_AcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+extension RAAcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AcceleratorInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}type\0\u{1}available\0")
 
@@ -241,7 +241,7 @@ extension Runanywhere_V1_AcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Runanywhere_V1_AcceleratorInfo, rhs: Runanywhere_V1_AcceleratorInfo) -> Bool {
+  public static func ==(lhs: RAAcceleratorInfo, rhs: RAAcceleratorInfo) -> Bool {
     if lhs.name != rhs.name {return false}
     if lhs.type != rhs.type {return false}
     if lhs.available != rhs.available {return false}
@@ -250,7 +250,7 @@ extension Runanywhere_V1_AcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension Runanywhere_V1_HardwareProfileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+extension RAHardwareProfileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareProfileResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}profile\0\u{1}accelerators\0")
 
@@ -281,7 +281,7 @@ extension Runanywhere_V1_HardwareProfileResult: SwiftProtobuf.Message, SwiftProt
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Runanywhere_V1_HardwareProfileResult, rhs: Runanywhere_V1_HardwareProfileResult) -> Bool {
+  public static func ==(lhs: RAHardwareProfileResult, rhs: RAHardwareProfileResult) -> Bool {
     if lhs._profile != rhs._profile {return false}
     if lhs.accelerators != rhs.accelerators {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

@@ -18,6 +18,15 @@ import {
   type VADStatistics,
   SpeechActivityKind,
 } from '@runanywhere/proto-ts/vad_options';
+import {
+  VADOptions as VADOptionsMessage,
+  VADResult as VADResultMessage,
+  VADStatistics as VADStatisticsMessage,
+} from '@runanywhere/proto-ts/vad_options';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.VAD');
 
@@ -35,8 +44,7 @@ export type VADStatisticsCallback = (statistics: VADStatistics) => void;
 
 /** Native module interface extension for VAD statistics. */
 interface VADStatisticsNativeModule {
-  /** rac_vad_component_get_statistics — wired by round1 C++ fix. */
-  vadGetStatistics?: () => Promise<string>;
+  vadGetStatisticsProto?: () => Promise<ArrayBuffer>;
 }
 
 let vadState: VADState = {
@@ -146,15 +154,44 @@ export async function unloadVADModel(): Promise<boolean> {
 // Speech Detection
 // ============================================================================
 
-/** Encode a `Float32Array` audio buffer to a base64 string. */
-function float32ToBase64(samples: Float32Array): string {
-  const bytes = new Uint8Array(samples.buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    const byte = bytes[i];
-    if (byte !== undefined) binary += String.fromCharCode(byte);
+function audioToArrayBuffer(audio: Uint8Array | Float32Array | string | ArrayBuffer): ArrayBuffer {
+  if (typeof audio === 'string') {
+    const binary = atob(audio);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytesToArrayBuffer(bytes);
   }
-  return btoa(binary);
+  if (audio instanceof Uint8Array) {
+    return bytesToArrayBuffer(audio);
+  }
+  if (audio instanceof Float32Array) {
+    return audio.buffer.slice(
+      audio.byteOffset,
+      audio.byteOffset + audio.byteLength
+    ) as ArrayBuffer;
+  }
+  return audio;
+}
+
+function buildVADOptions(options?: Partial<VADOptions>): VADOptions {
+  return VADOptionsMessage.create({
+    threshold: options?.threshold ?? 0,
+    minSpeechDurationMs: options?.minSpeechDurationMs ?? 100,
+    minSilenceDurationMs: options?.minSilenceDurationMs ?? 300,
+    maxSpeechDurationMs: options?.maxSpeechDurationMs ?? 0,
+  });
+}
+
+function defaultVADResult(): VADResult {
+  return VADResultMessage.create({
+    isSpeech: false,
+    confidence: 0,
+    energy: 0,
+    durationMs: 0,
+    timestampMs: Date.now(),
+    startTimeMs: 0,
+    endTimeMs: 0,
+  });
 }
 
 /**
@@ -170,16 +207,9 @@ export async function detectVoiceActivity(
   options?: Partial<VADOptions>
 ): Promise<VADResult> {
   if (!isNativeModuleAvailable()) {
-    return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
+    return defaultVADResult();
   }
-  let audioForProcessing: string | ArrayBuffer;
-  if (audio instanceof Float32Array) {
-    audioForProcessing = audio.buffer as ArrayBuffer;
-  } else if (audio instanceof Uint8Array) {
-    audioForProcessing = audio.buffer as ArrayBuffer;
-  } else {
-    audioForProcessing = audio;
-  }
+  const audioForProcessing = audioToArrayBuffer(audio);
   const result = await processVAD(audioForProcessing, 16000, options);
 
   const wasSpeechActive = vadState.isSpeechActive;
@@ -205,29 +235,10 @@ export async function detectVoiceActivity(
   // Fire statistics callback if set and the bridge exposes vadGetStatistics.
   if (statisticsCallback && isNativeModuleAvailable()) {
     const native = requireNativeModule() as unknown as VADStatisticsNativeModule;
-    if (typeof native.vadGetStatistics === 'function') {
-      native.vadGetStatistics().then((statsJson) => {
+    if (typeof native.vadGetStatisticsProto === 'function') {
+      native.vadGetStatisticsProto().then((statsBytes) => {
         try {
-          const stats = JSON.parse(statsJson) as {
-            currentEnergy?: number;
-            current_energy?: number;
-            currentThreshold?: number;
-            current_threshold?: number;
-            ambientLevel?: number;
-            ambient_level?: number;
-            recentAvg?: number;
-            recent_avg?: number;
-            recentMax?: number;
-            recent_max?: number;
-          };
-          const vadStats: VADStatistics = {
-            currentEnergy: stats.currentEnergy ?? stats.current_energy ?? 0,
-            currentThreshold: stats.currentThreshold ?? stats.current_threshold ?? 0,
-            ambientLevel: stats.ambientLevel ?? stats.ambient_level ?? 0,
-            recentAvg: stats.recentAvg ?? stats.recent_avg ?? 0,
-            recentMax: stats.recentMax ?? stats.recent_max ?? 0,
-          };
-          statisticsCallback?.(vadStats);
+          statisticsCallback?.(VADStatisticsMessage.decode(arrayBufferToBytes(statsBytes)));
         } catch { /* ignore parse errors */ }
       }).catch(() => { /* ignore errors */ });
     }
@@ -255,33 +266,19 @@ export async function processVAD(
   options?: Partial<VADOptions>
 ): Promise<VADResult> {
   if (!isNativeModuleAvailable()) {
-    return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
+    return defaultVADResult();
   }
   const native = requireNativeModule();
-  const audioBase64 =
-    typeof audio === 'string' ? audio : float32ToBase64(new Float32Array(audio));
-  const optionsJson = JSON.stringify({
-    sampleRate,
-    threshold: options?.threshold,
-    minSpeechDurationMs: options?.minSpeechDurationMs,
-    minSilenceDurationMs: options?.minSilenceDurationMs,
-  });
-  const resultJson = await native.processVAD(audioBase64, optionsJson);
-  try {
-    const result = JSON.parse(resultJson);
-    return {
-      isSpeech: result.isSpeech ?? false,
-      confidence:
-        result.speechProbability ??
-        result.probability ??
-        result.confidence ??
-        0,
-      energy: result.energy ?? result.energyLevel ?? 0,
-      durationMs: result.durationMs ?? 0,
-    };
-  } catch {
-    return { isSpeech: false, confidence: 0, energy: 0, durationMs: 0 };
-  }
+  void sampleRate;
+  const optionBytes = bytesToArrayBuffer(
+    VADOptionsMessage.encode(buildVADOptions(options)).finish()
+  );
+  const resultBytes = await native.vadProcessProto(
+    audioToArrayBuffer(audio),
+    optionBytes
+  );
+  const bytes = arrayBufferToBytes(resultBytes);
+  return bytes.byteLength > 0 ? VADResultMessage.decode(bytes) : defaultVADResult();
 }
 
 // ============================================================================

@@ -8,7 +8,11 @@
 import 'dart:typed_data';
 
 import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
+import 'package:runanywhere/generated/voice_agent_service.pb.dart'
+    as voice_agent_proto;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
+import 'package:runanywhere/generated/voice_events.pb.dart'
+    as voice_event_proto;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 
@@ -26,7 +30,7 @@ class RunAnywhereVoiceAgent {
   bool get isReady => RunAnywhereVoice.shared.isReady;
 
   /// Component readiness snapshot.
-  VoiceAgentComponentStates componentStates() =>
+  Future<voice_event_proto.VoiceAgentComponentStates> componentStates() =>
       RunAnywhereVoice.shared.componentStates();
 
   /// Initialize against currently-loaded STT/LLM/TTS models.
@@ -41,7 +45,9 @@ class RunAnywhereVoiceAgent {
   void cleanup() => RunAnywhereVoice.shared.cleanup();
 
   /// Synchronous voice turn (audio in → triple-result out).
-  Future<VoiceAgentResult> processVoiceTurn(Uint8List audioData) =>
+  Future<voice_agent_proto.VoiceAgentResult> processVoiceTurn(
+    Uint8List audioData,
+  ) =>
       RunAnywhereVoice.shared.processVoiceTurn(audioData);
 
   /// Subscribe to canonical VoiceAgent proto events.

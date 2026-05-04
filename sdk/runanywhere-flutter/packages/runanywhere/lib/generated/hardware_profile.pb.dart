@@ -1,9 +1,13 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: hardware_profile.proto
 //
 // @dart = 2.12
-// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
+
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
 import 'dart:core' as $core;
 
@@ -15,20 +19,6 @@ import 'hardware_profile.pbenum.dart';
 export 'hardware_profile.pbenum.dart';
 
 class HardwareProfile extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'HardwareProfile', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'chip')
-    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'hasNeuralEngine')
-    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'accelerationMode')
-    ..a<$fixnum.Int64>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'totalMemoryBytes', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
-    ..a<$core.int>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'coreCount', $pb.PbFieldType.OU3)
-    ..a<$core.int>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'performanceCores', $pb.PbFieldType.OU3)
-    ..a<$core.int>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'efficiencyCores', $pb.PbFieldType.OU3)
-    ..aOS(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'architecture')
-    ..aOS(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'platform')
-    ..hasRequiredFields = false
-  ;
-
-  HardwareProfile._() : super();
   factory HardwareProfile({
     $core.String? chip,
     $core.bool? hasNeuralEngine,
@@ -40,38 +30,53 @@ class HardwareProfile extends $pb.GeneratedMessage {
     $core.String? architecture,
     $core.String? platform,
   }) {
-    final _result = create();
+    final $result = create();
     if (chip != null) {
-      _result.chip = chip;
+      $result.chip = chip;
     }
     if (hasNeuralEngine != null) {
-      _result.hasNeuralEngine = hasNeuralEngine;
+      $result.hasNeuralEngine = hasNeuralEngine;
     }
     if (accelerationMode != null) {
-      _result.accelerationMode = accelerationMode;
+      $result.accelerationMode = accelerationMode;
     }
     if (totalMemoryBytes != null) {
-      _result.totalMemoryBytes = totalMemoryBytes;
+      $result.totalMemoryBytes = totalMemoryBytes;
     }
     if (coreCount != null) {
-      _result.coreCount = coreCount;
+      $result.coreCount = coreCount;
     }
     if (performanceCores != null) {
-      _result.performanceCores = performanceCores;
+      $result.performanceCores = performanceCores;
     }
     if (efficiencyCores != null) {
-      _result.efficiencyCores = efficiencyCores;
+      $result.efficiencyCores = efficiencyCores;
     }
     if (architecture != null) {
-      _result.architecture = architecture;
+      $result.architecture = architecture;
     }
     if (platform != null) {
-      _result.platform = platform;
+      $result.platform = platform;
     }
-    return _result;
+    return $result;
   }
+  HardwareProfile._() : super();
   factory HardwareProfile.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory HardwareProfile.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareProfile', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'chip')
+    ..aOB(2, _omitFieldNames ? '' : 'hasNeuralEngine')
+    ..aOS(3, _omitFieldNames ? '' : 'accelerationMode')
+    ..a<$fixnum.Int64>(4, _omitFieldNames ? '' : 'totalMemoryBytes', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'coreCount', $pb.PbFieldType.OU3)
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'performanceCores', $pb.PbFieldType.OU3)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'efficiencyCores', $pb.PbFieldType.OU3)
+    ..aOS(8, _omitFieldNames ? '' : 'architecture')
+    ..aOS(9, _omitFieldNames ? '' : 'platform')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -81,8 +86,10 @@ class HardwareProfile extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  HardwareProfile copyWith(void Function(HardwareProfile) updates) => super.copyWith((message) => updates(message as HardwareProfile)) as HardwareProfile; // ignore: deprecated_member_use
+  HardwareProfile copyWith(void Function(HardwareProfile) updates) => super.copyWith((message) => updates(message as HardwareProfile)) as HardwareProfile;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static HardwareProfile create() => HardwareProfile._();
   HardwareProfile createEmptyInstance() => create();
@@ -174,33 +181,34 @@ class HardwareProfile extends $pb.GeneratedMessage {
 }
 
 class AcceleratorInfo extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'AcceleratorInfo', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
-    ..e<AcceleratorPreference>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO, valueOf: AcceleratorPreference.valueOf, enumValues: AcceleratorPreference.values)
-    ..aOB(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'available')
-    ..hasRequiredFields = false
-  ;
-
-  AcceleratorInfo._() : super();
   factory AcceleratorInfo({
     $core.String? name,
     AcceleratorPreference? type,
     $core.bool? available,
   }) {
-    final _result = create();
+    final $result = create();
     if (name != null) {
-      _result.name = name;
+      $result.name = name;
     }
     if (type != null) {
-      _result.type = type;
+      $result.type = type;
     }
     if (available != null) {
-      _result.available = available;
+      $result.available = available;
     }
-    return _result;
+    return $result;
   }
+  AcceleratorInfo._() : super();
   factory AcceleratorInfo.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory AcceleratorInfo.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AcceleratorInfo', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..e<AcceleratorPreference>(2, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO, valueOf: AcceleratorPreference.valueOf, enumValues: AcceleratorPreference.values)
+    ..aOB(3, _omitFieldNames ? '' : 'available')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -210,8 +218,10 @@ class AcceleratorInfo extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  AcceleratorInfo copyWith(void Function(AcceleratorInfo) updates) => super.copyWith((message) => updates(message as AcceleratorInfo)) as AcceleratorInfo; // ignore: deprecated_member_use
+  AcceleratorInfo copyWith(void Function(AcceleratorInfo) updates) => super.copyWith((message) => updates(message as AcceleratorInfo)) as AcceleratorInfo;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static AcceleratorInfo create() => AcceleratorInfo._();
   AcceleratorInfo createEmptyInstance() => create();
@@ -249,28 +259,29 @@ class AcceleratorInfo extends $pb.GeneratedMessage {
 }
 
 class HardwareProfileResult extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'HardwareProfileResult', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOM<HardwareProfile>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'profile', subBuilder: HardwareProfile.create)
-    ..pc<AcceleratorInfo>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'accelerators', $pb.PbFieldType.PM, subBuilder: AcceleratorInfo.create)
-    ..hasRequiredFields = false
-  ;
-
-  HardwareProfileResult._() : super();
   factory HardwareProfileResult({
     HardwareProfile? profile,
     $core.Iterable<AcceleratorInfo>? accelerators,
   }) {
-    final _result = create();
+    final $result = create();
     if (profile != null) {
-      _result.profile = profile;
+      $result.profile = profile;
     }
     if (accelerators != null) {
-      _result.accelerators.addAll(accelerators);
+      $result.accelerators.addAll(accelerators);
     }
-    return _result;
+    return $result;
   }
+  HardwareProfileResult._() : super();
   factory HardwareProfileResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory HardwareProfileResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareProfileResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOM<HardwareProfile>(1, _omitFieldNames ? '' : 'profile', subBuilder: HardwareProfile.create)
+    ..pc<AcceleratorInfo>(2, _omitFieldNames ? '' : 'accelerators', $pb.PbFieldType.PM, subBuilder: AcceleratorInfo.create)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -280,8 +291,10 @@ class HardwareProfileResult extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  HardwareProfileResult copyWith(void Function(HardwareProfileResult) updates) => super.copyWith((message) => updates(message as HardwareProfileResult)) as HardwareProfileResult; // ignore: deprecated_member_use
+  HardwareProfileResult copyWith(void Function(HardwareProfileResult) updates) => super.copyWith((message) => updates(message as HardwareProfileResult)) as HardwareProfileResult;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static HardwareProfileResult create() => HardwareProfileResult._();
   HardwareProfileResult createEmptyInstance() => create();
@@ -305,3 +318,6 @@ class HardwareProfileResult extends $pb.GeneratedMessage {
   $core.List<AcceleratorInfo> get accelerators => $_getList(1);
 }
 
+
+const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
+const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');

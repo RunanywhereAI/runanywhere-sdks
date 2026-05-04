@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.lora
 
+import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,7 +48,6 @@ import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 
 /**
  * Full LoRA adapter manager screen — accessible from More hub.
@@ -300,7 +300,7 @@ private fun RegisteredAdapterCard(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
             ) {
-                entry.compatibleModelIds.forEach { modelId ->
+                entry.compatible_models.forEach { modelId ->
                     Text(
                         modelId,
                         style = MaterialTheme.typography.labelSmall,
@@ -318,7 +318,7 @@ private fun RegisteredAdapterCard(
 
             // File size
             Text(
-                "%.1f MB".format(entry.fileSize / (1024.0 * 1024.0)),
+                "%.1f MB".format(entry.size_bytes / (1024.0 * 1024.0)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

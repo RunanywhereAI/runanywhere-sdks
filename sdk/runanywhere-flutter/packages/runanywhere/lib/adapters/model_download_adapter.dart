@@ -19,14 +19,13 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
-import 'package:runanywhere/generated/download_service.pbenum.dart';
+import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
-import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
+import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -63,7 +62,7 @@ class ModelDownloadService {
       return;
     }
 
-    if (model.downloadURL == null) {
+    if (model.downloadUrl.isEmpty) {
       _logger.error('Model has no download URL: $modelId');
       yield _failedProgress(modelId, 'Model has no download URL: $modelId');
       return;
@@ -172,8 +171,8 @@ class ModelDownloadService {
   Stream<DownloadProgress> _orchestrate(ModelInfo model) async* {
     final taskId = DartBridgeDownload.orchestrateDownload(
       modelId: model.id,
-      downloadUrl: model.downloadURL!.toString(),
-      framework: _frameworkToCValue(model.framework),
+      downloadUrl: model.downloadUrl,
+      framework: model.framework.toC(),
       format: model.format.toC(),
       archiveStructure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN → auto-detect
       progressCallback: ffi.Pointer.fromAddress(0),
@@ -225,8 +224,8 @@ class ModelDownloadService {
             stageProgress: 1.0,
           );
         } else {
-          final errMsg = snapshot.errorMessage ??
-              'Download failed (state=$stateVal)';
+          final errMsg =
+              snapshot.errorMessage ?? 'Download failed (state=$stateVal)';
           EventBus.shared.publish(
             SDKModelEvent.downloadFailed(modelId: model.id, error: errMsg),
           );
@@ -242,14 +241,15 @@ class ModelDownloadService {
     try {
       final lib = PlatformLoader.loadCommons();
       final fn = lib.lookupFunction<
-          ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Int32, ffi.Pointer<Utf8>, ffi.Int32),
+          ffi.Int32 Function(
+              ffi.Pointer<Utf8>, ffi.Int32, ffi.Pointer<Utf8>, ffi.Int32),
           int Function(ffi.Pointer<Utf8>, int, ffi.Pointer<Utf8>,
               int)>('rac_model_paths_get_model_folder');
 
       final modelIdPtr = model.id.toNativeUtf8();
       final buf = calloc<ffi.Uint8>(4096).cast<Utf8>();
       try {
-        final rc = fn(modelIdPtr, _frameworkToCValue(model.framework), buf, 4096);
+        final rc = fn(modelIdPtr, model.framework.toC(), buf, 4096);
         if (rc != 0) return null;
         return buf.toDartString();
       } finally {
@@ -324,38 +324,13 @@ class ModelDownloadService {
   }
 
   Future<void> _updateModelLocalPath(ModelInfo model, String path) async {
-    model.localPath = Uri.file(path);
+    model.localPath = path;
     _logger.info('Updated model local path: ${model.id} -> $path');
     try {
       await DartBridgeModelRegistry.instance
           .updateDownloadStatus(model.id, path);
     } catch (e) {
       _logger.debug('Could not update C++ registry: $e');
-    }
-  }
-
-  int _frameworkToCValue(InferenceFramework framework) {
-    switch (framework) {
-      case InferenceFramework.onnx:
-        return 0;
-      case InferenceFramework.llamaCpp:
-        return 1;
-      case InferenceFramework.foundationModels:
-        return 2;
-      case InferenceFramework.systemTTS:
-        return 3;
-      case InferenceFramework.fluidAudio:
-        return 4;
-      case InferenceFramework.builtIn:
-        return 5;
-      case InferenceFramework.none:
-        return 6;
-      case InferenceFramework.genie:
-        return 11;
-      case InferenceFramework.sherpa:
-        return 12;
-      case InferenceFramework.unknown:
-        return 99;
     }
   }
 }

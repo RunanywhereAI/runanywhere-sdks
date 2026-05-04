@@ -60,8 +60,9 @@ export interface ToolValue {
     numberValue?: number | undefined;
     boolValue?: boolean | undefined;
     arrayValue?: ToolValueArray | undefined;
-    /** No "null" arm — proto3 scalar defaults already represent absence. */
     objectValue?: ToolValueObject | undefined;
+    /** true means JSON null */
+    nullValue?: boolean | undefined;
 }
 export interface ToolValueArray {
     values: ToolValue[];
@@ -118,6 +119,20 @@ export interface ToolCall {
      * value at the moment). Empty = unset.
      */
     type: string;
+    /**
+     * Strongly-typed arguments map for SDKs that do not want to parse
+     * arguments_json. Producers should keep arguments_json populated for C++
+     * tokenizer compatibility.
+     */
+    arguments: {
+        [key: string]: ToolValue;
+    };
+    /** Alias for id used by pre-proto SDK surfaces. */
+    callId?: string | undefined;
+}
+export interface ToolCall_ArgumentsEntry {
+    key: string;
+    value?: ToolValue | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -130,6 +145,25 @@ export interface ToolResult {
     name: string;
     resultJson: string;
     error?: string | undefined;
+    /**
+     * Whether execution succeeded. If unset/false and error is empty,
+     * consumers should fall back to legacy result_json/error semantics.
+     */
+    success: boolean;
+    /**
+     * Strongly-typed result map for SDKs that do not want to parse
+     * result_json. Producers should keep result_json populated for C++
+     * tokenizer compatibility.
+     */
+    result: {
+        [key: string]: ToolValue;
+    };
+    /** Alias for tool_call_id used by pre-proto SDK surfaces. */
+    callId?: string | undefined;
+}
+export interface ToolResult_ResultEntry {
+    key: string;
+    value?: ToolValue | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -183,6 +217,11 @@ export interface ToolCallingOptions {
      * `replace_system_prompt` is true.
      */
     customSystemPrompt?: string | undefined;
+    /**
+     * C ABI / SDK field name for max_iterations. 0 = use max_iterations or
+     * SDK default.
+     */
+    maxToolCalls?: number | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -259,6 +298,14 @@ export declare const ToolCall: {
     create<I extends Exact<DeepPartial<ToolCall>, I>>(base?: I): ToolCall;
     fromPartial<I extends Exact<DeepPartial<ToolCall>, I>>(object: I): ToolCall;
 };
+export declare const ToolCall_ArgumentsEntry: {
+    encode(message: ToolCall_ArgumentsEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCall_ArgumentsEntry;
+    fromJSON(object: any): ToolCall_ArgumentsEntry;
+    toJSON(message: ToolCall_ArgumentsEntry): unknown;
+    create<I extends Exact<DeepPartial<ToolCall_ArgumentsEntry>, I>>(base?: I): ToolCall_ArgumentsEntry;
+    fromPartial<I extends Exact<DeepPartial<ToolCall_ArgumentsEntry>, I>>(object: I): ToolCall_ArgumentsEntry;
+};
 export declare const ToolResult: {
     encode(message: ToolResult, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult;
@@ -266,6 +313,14 @@ export declare const ToolResult: {
     toJSON(message: ToolResult): unknown;
     create<I extends Exact<DeepPartial<ToolResult>, I>>(base?: I): ToolResult;
     fromPartial<I extends Exact<DeepPartial<ToolResult>, I>>(object: I): ToolResult;
+};
+export declare const ToolResult_ResultEntry: {
+    encode(message: ToolResult_ResultEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult_ResultEntry;
+    fromJSON(object: any): ToolResult_ResultEntry;
+    toJSON(message: ToolResult_ResultEntry): unknown;
+    create<I extends Exact<DeepPartial<ToolResult_ResultEntry>, I>>(base?: I): ToolResult_ResultEntry;
+    fromPartial<I extends Exact<DeepPartial<ToolResult_ResultEntry>, I>>(object: I): ToolResult_ResultEntry;
 };
 export declare const ToolCallingOptions: {
     encode(message: ToolCallingOptions, writer?: _m0.Writer): _m0.Writer;

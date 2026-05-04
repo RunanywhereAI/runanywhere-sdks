@@ -15,10 +15,12 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.ToolParameterType
+import ai.runanywhere.proto.v1.ToolValueArray
+import ai.runanywhere.proto.v1.ToolValueObject
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.extensions.LLM.ToolCall
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolValue
@@ -73,7 +75,10 @@ object CppBridgeToolCalling {
                 hasToolCall = json["hasToolCall"]?.jsonPrimitive?.boolean ?: false,
                 cleanText = json["cleanText"]?.jsonPrimitive?.content ?: llmOutput,
                 toolName = json["toolName"]?.jsonPrimitive?.contentOrNull,
-                argumentsJson = json["argumentsJson"]?.toString(),
+                argumentsJson =
+                    json["argumentsJson"]?.let { args ->
+                        if (args is JsonPrimitive && args.isString) args.content else args.toString()
+                    },
                 callId = json["callId"]?.jsonPrimitive?.longOrNull ?: 0,
             )
         } catch (e: Exception) {
@@ -106,9 +111,9 @@ object CppBridgeToolCalling {
         return Pair(
             result.cleanText,
             ToolCall(
-                toolName = result.toolName,
-                arguments = arguments,
-                callId = "call_${result.callId}",
+                id = "call_${result.callId}",
+                name = result.toolName,
+                arguments_json = toolValueToJsonString(arguments),
             ),
         )
     }
@@ -121,18 +126,17 @@ object CppBridgeToolCalling {
      * Format tool definitions into a system prompt using C++ implementation.
      *
      * @param tools List of tool definitions
-     * @param format Tool calling format type. See [ToolCallFormat].
+     * @param formatHint Tool calling format hint, e.g. "default" or "lfm2".
      * @return Formatted system prompt string
      */
     fun formatToolsForPrompt(
         tools: List<ToolDefinition>,
-        format: ToolCallFormat = ToolCallFormat.Default,
+        formatHint: String = "",
     ): String {
         if (tools.isEmpty()) return ""
 
         val toolsJson = serializeToolsToJson(tools)
-        // Convert to string at JNI boundary - C++ handles the format logic
-        val formatString = format.toFormatName()
+        val formatString = formatHint.ifBlank { "default" }
         return RunAnywhereBridge.racToolCallFormatPromptJsonWithFormatName(toolsJson, formatString) ?: ""
     }
 
@@ -214,7 +218,7 @@ object CppBridgeToolCalling {
     /**
      * Parse arguments JSON string to Map<String, ToolValue>
      */
-    private fun parseArgumentsJson(json: String): Map<String, ToolValue> {
+    internal fun parseArgumentsJson(json: String): Map<String, ToolValue> {
         return try {
             val element = Json.parseToJsonElement(json)
             if (element is JsonObject) {
@@ -235,14 +239,14 @@ object CppBridgeToolCalling {
         when (element) {
             is JsonPrimitive ->
                 when {
-                    element.isString -> ToolValue.string(element.content)
-                    element.booleanOrNull != null -> ToolValue.bool(element.boolean)
-                    element.doubleOrNull != null -> ToolValue.number(element.double)
-                    else -> ToolValue.string(element.content)
+                    element.isString -> ToolValue(string_value = element.content)
+                    element.booleanOrNull != null -> ToolValue(bool_value = element.boolean)
+                    element.doubleOrNull != null -> ToolValue(number_value = element.double)
+                    else -> ToolValue(string_value = element.content)
                 }
-            is JsonArray -> ToolValue.array(element.map { jsonElementToToolValue(it) })
-            is JsonObject -> ToolValue.obj(element.mapValues { (_, v) -> jsonElementToToolValue(v) })
-            JsonNull -> ToolValue.nullValue()
+            is JsonArray -> ToolValue(array_value = ToolValueArray(element.map { jsonElementToToolValue(it) }))
+            is JsonObject -> ToolValue(object_value = ToolValueObject(element.mapValues { (_, v) -> jsonElementToToolValue(v) }))
+            JsonNull -> ToolValue()
         }
 
     /**
@@ -259,12 +263,12 @@ object CppBridgeToolCalling {
                             tool.parameters.forEach { param ->
                                 addJsonObject {
                                     put("name", param.name)
-                                    put("type", param.type.value)
+                                    put("type", param.type.toJsonSchemaType())
                                     put("description", param.description)
                                     put("required", param.required)
-                                    param.enumValues?.let { values ->
+                                    if (param.enum_values.isNotEmpty()) {
                                         putJsonArray("enumValues") {
-                                            values.forEach { add(it) }
+                                            param.enum_values.forEach { add(it) }
                                         }
                                     }
                                 }
@@ -283,14 +287,14 @@ object CppBridgeToolCalling {
     private fun serializeOptionsToJson(options: ToolCallingOptions): String {
         val jsonObj =
             buildJsonObject {
-                put("maxToolCalls", options.maxToolCalls)
-                put("autoExecute", options.autoExecute)
+                put("maxToolCalls", options.max_iterations)
+                put("autoExecute", options.auto_execute)
                 options.temperature?.let { put("temperature", it) }
-                options.maxTokens?.let { put("maxTokens", it) }
-                options.systemPrompt?.let { put("systemPrompt", it) }
-                put("replaceSystemPrompt", options.replaceSystemPrompt)
-                put("keepToolsAvailable", options.keepToolsAvailable)
-                put("format", options.format.toFormatName()) // Convert to string at serialization boundary
+                options.max_tokens?.let { put("maxTokens", it) }
+                options.system_prompt?.let { put("systemPrompt", it) }
+                put("replaceSystemPrompt", options.replace_system_prompt)
+                put("keepToolsAvailable", options.keep_tools_available)
+                put("format", options.format_hint.ifBlank { "default" })
             }
         return jsonObj.toString()
     }
@@ -309,18 +313,28 @@ object CppBridgeToolCalling {
     }
 
     private fun toolValueToJsonElement(value: ToolValue): JsonElement =
-        when (value) {
-            is ToolValue.StringValue -> JsonPrimitive(value.value)
-            is ToolValue.NumberValue -> JsonPrimitive(value.value)
-            is ToolValue.BoolValue -> JsonPrimitive(value.value)
-            is ToolValue.ArrayValue ->
+        when {
+            value.string_value != null -> JsonPrimitive(value.string_value)
+            value.number_value != null -> JsonPrimitive(value.number_value)
+            value.bool_value != null -> JsonPrimitive(value.bool_value)
+            value.array_value != null ->
                 buildJsonArray {
-                    value.value.forEach { add(toolValueToJsonElement(it)) }
+                    value.array_value.values.forEach { add(toolValueToJsonElement(it)) }
                 }
-            is ToolValue.ObjectValue ->
+            value.object_value != null ->
                 buildJsonObject {
-                    value.value.forEach { (k, v) -> put(k, toolValueToJsonElement(v)) }
+                    value.object_value.fields.forEach { (k, v) -> put(k, toolValueToJsonElement(v)) }
                 }
-            ToolValue.NullValue -> JsonNull
+            else -> JsonNull
+        }
+
+    private fun ToolParameterType.toJsonSchemaType(): String =
+        when (this) {
+            ToolParameterType.TOOL_PARAMETER_TYPE_STRING -> "string"
+            ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER -> "number"
+            ToolParameterType.TOOL_PARAMETER_TYPE_BOOLEAN -> "boolean"
+            ToolParameterType.TOOL_PARAMETER_TYPE_OBJECT -> "object"
+            ToolParameterType.TOOL_PARAMETER_TYPE_ARRAY -> "array"
+            else -> "string"
         }
 }

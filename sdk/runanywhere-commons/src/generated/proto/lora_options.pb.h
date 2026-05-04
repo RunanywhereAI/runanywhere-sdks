@@ -473,7 +473,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterCatalogEntry final : pub
     kUrlFieldNumber = 4,
     kFilenameFieldNumber = 5,
     kAuthorFieldNumber = 8,
+    kChecksumSha256FieldNumber = 10,
     kSizeBytesFieldNumber = 7,
+    kDefaultScaleFieldNumber = 9,
   };
   // repeated string compatible_models = 6;
   [[nodiscard]] int compatible_models_size()
@@ -592,6 +594,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterCatalogEntry final : pub
   ::std::string* PROTOBUF_NONNULL _internal_mutable_author();
 
   public:
+  // optional string checksum_sha256 = 10;
+  [[nodiscard]] bool has_checksum_sha256()
+      const;
+  void clear_checksum_sha256() ;
+  [[nodiscard]] const ::std::string& checksum_sha256() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_checksum_sha256(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_checksum_sha256();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_checksum_sha256();
+  void set_allocated_checksum_sha256(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_checksum_sha256() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_checksum_sha256(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_checksum_sha256();
+
+  public:
   // int64 size_bytes = 7;
   void clear_size_bytes() ;
   [[nodiscard]] ::int64_t size_bytes() const;
@@ -602,12 +621,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterCatalogEntry final : pub
   void _internal_set_size_bytes(::int64_t value);
 
   public:
+  // float default_scale = 9;
+  void clear_default_scale() ;
+  [[nodiscard]] float default_scale() const;
+  void set_default_scale(float value);
+
+  private:
+  float _internal_default_scale() const;
+  void _internal_set_default_scale(float value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.LoraAdapterCatalogEntry)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 8,
-                                   0, 106,
+  static const ::google::protobuf::internal::TcParseTable<4, 10,
+                                   0, 121,
                                    2>
       _table_;
 
@@ -637,7 +666,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterCatalogEntry final : pub
     ::google::protobuf::internal::ArenaStringPtr url_;
     ::google::protobuf::internal::ArenaStringPtr filename_;
     ::google::protobuf::internal::ArenaStringPtr author_;
+    ::google::protobuf::internal::ArenaStringPtr checksum_sha256_;
     ::int64_t size_bytes_;
+    float default_scale_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1973,7 +2004,7 @@ inline void LoraAdapterCatalogEntry::clear_size_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.size_bytes_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000100U);
 }
 inline ::int64_t LoraAdapterCatalogEntry::size_bytes() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterCatalogEntry.size_bytes)
@@ -1981,7 +2012,7 @@ inline ::int64_t LoraAdapterCatalogEntry::size_bytes() const {
 }
 inline void LoraAdapterCatalogEntry::set_size_bytes(::int64_t value) {
   _internal_set_size_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterCatalogEntry.size_bytes)
 }
 inline ::int64_t LoraAdapterCatalogEntry::_internal_size_bytes() const {
@@ -2060,6 +2091,100 @@ inline void LoraAdapterCatalogEntry::set_allocated_author(::std::string* PROTOBU
     _impl_.author_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterCatalogEntry.author)
+}
+
+// float default_scale = 9;
+inline void LoraAdapterCatalogEntry::clear_default_scale() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.default_scale_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000200U);
+}
+inline float LoraAdapterCatalogEntry::default_scale() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterCatalogEntry.default_scale)
+  return _internal_default_scale();
+}
+inline void LoraAdapterCatalogEntry::set_default_scale(float value) {
+  _internal_set_default_scale(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterCatalogEntry.default_scale)
+}
+inline float LoraAdapterCatalogEntry::_internal_default_scale() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.default_scale_;
+}
+inline void LoraAdapterCatalogEntry::_internal_set_default_scale(float value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.default_scale_ = value;
+}
+
+// optional string checksum_sha256 = 10;
+inline bool LoraAdapterCatalogEntry::has_checksum_sha256() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
+inline void LoraAdapterCatalogEntry::clear_checksum_sha256() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.checksum_sha256_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline const ::std::string& LoraAdapterCatalogEntry::checksum_sha256() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterCatalogEntry.checksum_sha256)
+  return _internal_checksum_sha256();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void LoraAdapterCatalogEntry::set_checksum_sha256(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  _impl_.checksum_sha256_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterCatalogEntry.checksum_sha256)
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterCatalogEntry::mutable_checksum_sha256()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::std::string* _s = _internal_mutable_checksum_sha256();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LoraAdapterCatalogEntry.checksum_sha256)
+  return _s;
+}
+inline const ::std::string& LoraAdapterCatalogEntry::_internal_checksum_sha256() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.checksum_sha256_.Get();
+}
+inline void LoraAdapterCatalogEntry::_internal_set_checksum_sha256(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.checksum_sha256_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterCatalogEntry::_internal_mutable_checksum_sha256() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.checksum_sha256_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE LoraAdapterCatalogEntry::release_checksum_sha256() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LoraAdapterCatalogEntry.checksum_sha256)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000080U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  auto* released = _impl_.checksum_sha256_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.checksum_sha256_.Set("", GetArena());
+  }
+  return released;
+}
+inline void LoraAdapterCatalogEntry::set_allocated_checksum_sha256(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+  _impl_.checksum_sha256_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.checksum_sha256_.IsDefault()) {
+    _impl_.checksum_sha256_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterCatalogEntry.checksum_sha256)
 }
 
 // -------------------------------------------------------------------

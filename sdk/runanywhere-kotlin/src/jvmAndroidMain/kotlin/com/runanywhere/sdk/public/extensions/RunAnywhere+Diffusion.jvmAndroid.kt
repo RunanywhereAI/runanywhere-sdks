@@ -14,13 +14,13 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.DiffusionCapabilities
+import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
 import ai.runanywhere.proto.v1.DiffusionResult
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDiffusionProto
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.native.bridge.NativeDiffusionProgressListener
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -29,22 +29,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
-private fun checkRc(rc: Int, op: String) {
-    if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-        throw SDKException.operation("$op failed with rc=$rc")
-    }
-}
-
 actual suspend fun RunAnywhere.generateImage(
     prompt: String,
     options: DiffusionGenerationOptions?,
 ): DiffusionResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-        val bytes =
-            RunAnywhereBridge.racDiffusionGenerate(prompt, options?.encode())
-                ?: throw SDKException.operation("rac_diffusion_generate returned null")
-        DiffusionResult.ADAPTER.decode(bytes)
+        CppBridgeDiffusionProto.generate(prompt, options)
     }
 
 actual suspend fun RunAnywhere.generateImage(
@@ -54,16 +45,7 @@ actual suspend fun RunAnywhere.generateImage(
 ): DiffusionResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-        val listener =
-            NativeDiffusionProgressListener { progressBytes ->
-                val progress = DiffusionProgress.ADAPTER.decode(progressBytes)
-                onProgress(progress)
-            }
-        val bytes =
-            RunAnywhereBridge
-                .racDiffusionGenerateWithProgress(prompt, options?.encode(), listener)
-                ?: throw SDKException.operation("rac_diffusion_generate returned null")
-        DiffusionResult.ADAPTER.decode(bytes)
+        CppBridgeDiffusionProto.generateWithProgress(prompt, options, onProgress)
     }
 
 actual fun RunAnywhere.generateImageStream(
@@ -73,18 +55,15 @@ actual fun RunAnywhere.generateImageStream(
     callbackFlow {
         if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
         var cancelled = false
-        val listener =
-            NativeDiffusionProgressListener { progressBytes ->
-                if (cancelled) return@NativeDiffusionProgressListener false
-                val progress = DiffusionProgress.ADAPTER.decode(progressBytes)
-                trySend(progress)
-                true
-            }
 
         // Drive generation on the calling thread; the JNI thunk blocks until
         // the final progress event has been emitted.
         try {
-            RunAnywhereBridge.racDiffusionGenerateWithProgress(prompt, options?.encode(), listener)
+            CppBridgeDiffusionProto.generateWithProgress(prompt, options) progress@ { progress ->
+                if (cancelled) return@progress false
+                trySend(progress)
+                true
+            }
             close()
         } catch (t: Throwable) {
             close(t)
@@ -96,39 +75,30 @@ actual fun RunAnywhere.generateImageStream(
 actual suspend fun RunAnywhere.cancelImageGeneration() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     withContext(Dispatchers.IO) {
-        val rc = RunAnywhereBridge.racDiffusionCancel()
-        checkRc(rc, "rac_diffusion_cancel")
+        CppBridgeDiffusionProto.cancel()
     }
 }
 
 actual suspend fun RunAnywhere.loadDiffusionModel(config: DiffusionConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     withContext(Dispatchers.IO) {
-        val rc =
-            RunAnywhereBridge.racDiffusionLoadModel(
-                modelPath = config.modelPath,
-                modelId = config.modelId,
-                modelName = config.modelName,
-                configBytes = config.configuration?.encode(),
-            )
-        checkRc(rc, "rac_diffusion_load_model")
+        CppBridgeDiffusionProto.load(config)
     }
 }
 
 actual suspend fun RunAnywhere.unloadDiffusionModel() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     withContext(Dispatchers.IO) {
-        val rc = RunAnywhereBridge.racDiffusionUnloadModel()
-        checkRc(rc, "rac_diffusion_unload_model")
+        CppBridgeDiffusionProto.unload()
     }
 }
 
 actual val RunAnywhere.isDiffusionModelLoaded: Boolean
-    get() = RunAnywhereBridge.racDiffusionIsModelLoaded()
+    get() = CppBridgeDiffusionProto.isLoaded()
 
 actual suspend fun RunAnywhere.currentDiffusionModelId(): String? =
     withContext(Dispatchers.IO) {
-        RunAnywhereBridge.racDiffusionCurrentModelId()
+        CppBridgeDiffusionProto.currentModelId()
     }
 
 actual suspend fun RunAnywhere.currentDiffusionFramework(): InferenceFramework? {
@@ -140,8 +110,5 @@ actual suspend fun RunAnywhere.currentDiffusionFramework(): InferenceFramework? 
 
 actual suspend fun RunAnywhere.getDiffusionCapabilities(): DiffusionCapabilities =
     withContext(Dispatchers.IO) {
-        val bytes =
-            RunAnywhereBridge.racDiffusionGetCapabilities()
-                ?: return@withContext DiffusionCapabilities()
-        DiffusionCapabilities.ADAPTER.decode(bytes)
+        CppBridgeDiffusionProto.capabilities()
     }

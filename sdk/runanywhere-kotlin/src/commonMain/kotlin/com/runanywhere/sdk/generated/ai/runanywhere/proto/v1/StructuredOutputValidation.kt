@@ -78,6 +78,17 @@ public class StructuredOutputValidation(
     schemaIndex = 3,
   )
   public val raw_output: String? = null,
+  /**
+   * JSON substring extracted from raw_output before validation, when the
+   * extractor found one.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "extractedJson",
+    schemaIndex = 4,
+  )
+  public val extracted_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputValidation, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -95,6 +106,7 @@ public class StructuredOutputValidation(
     if (contains_json != other.contains_json) return false
     if (error_message != other.error_message) return false
     if (raw_output != other.raw_output) return false
+    if (extracted_json != other.extracted_json) return false
     return true
   }
 
@@ -106,6 +118,7 @@ public class StructuredOutputValidation(
       result = result * 37 + contains_json.hashCode()
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + (raw_output?.hashCode() ?: 0)
+      result = result * 37 + (extracted_json?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -117,6 +130,7 @@ public class StructuredOutputValidation(
     result += """contains_json=$contains_json"""
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     if (raw_output != null) result += """raw_output=${sanitize(raw_output)}"""
+    if (extracted_json != null) result += """extracted_json=${sanitize(extracted_json)}"""
     return result.joinToString(prefix = "StructuredOutputValidation{", separator = ", ", postfix =
         "}")
   }
@@ -126,9 +140,10 @@ public class StructuredOutputValidation(
     contains_json: Boolean = this.contains_json,
     error_message: String? = this.error_message,
     raw_output: String? = this.raw_output,
+    extracted_json: String? = this.extracted_json,
     unknownFields: ByteString = this.unknownFields,
   ): StructuredOutputValidation = StructuredOutputValidation(is_valid, contains_json, error_message,
-      raw_output, unknownFields)
+      raw_output, extracted_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -148,6 +163,7 @@ public class StructuredOutputValidation(
             value.contains_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.raw_output)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.extracted_json)
         return size
       }
 
@@ -157,11 +173,13 @@ public class StructuredOutputValidation(
             value.contains_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputValidation) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         if (value.contains_json != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2,
@@ -174,12 +192,14 @@ public class StructuredOutputValidation(
         var contains_json: Boolean = false
         var error_message: String? = null
         var raw_output: String? = null
+        var extracted_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_valid = ProtoAdapter.BOOL.decode(reader)
             2 -> contains_json = ProtoAdapter.BOOL.decode(reader)
             3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> raw_output = ProtoAdapter.STRING.decode(reader)
+            5 -> extracted_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -188,6 +208,7 @@ public class StructuredOutputValidation(
           contains_json = contains_json,
           error_message = error_message,
           raw_output = raw_output,
+          extracted_json = extracted_json,
           unknownFields = unknownFields
         )
       }

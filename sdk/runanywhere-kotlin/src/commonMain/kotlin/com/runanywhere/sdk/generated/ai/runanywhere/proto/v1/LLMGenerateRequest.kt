@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -25,6 +26,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 public class LLMGenerateRequest(
@@ -85,8 +87,62 @@ public class LLMGenerateRequest(
     schemaIndex = 6,
   )
   public val emit_thoughts: Boolean = false,
+  /**
+   * Additional LLMGenerationOptions fields kept inline to avoid a codegen
+   * package cycle between service stubs and option messages.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "repetitionPenalty",
+    schemaIndex = 7,
+  )
+  public val repetition_penalty: Float = 0f,
+  stop_sequences: List<String> = emptyList(),
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "streamingEnabled",
+    schemaIndex = 9,
+  )
+  public val streaming_enabled: Boolean = false,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "preferredFramework",
+    schemaIndex = 10,
+  )
+  public val preferred_framework: String = "",
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "jsonSchema",
+    schemaIndex = 11,
+  )
+  public val json_schema: String = "",
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "executionTarget",
+    schemaIndex = 12,
+  )
+  public val execution_target: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerateRequest, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "stopSequences",
+    schemaIndex = 8,
+  )
+  public val stop_sequences: List<String> = immutableCopyOf("stop_sequences", stop_sequences)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -105,6 +161,12 @@ public class LLMGenerateRequest(
     if (top_k != other.top_k) return false
     if (system_prompt != other.system_prompt) return false
     if (emit_thoughts != other.emit_thoughts) return false
+    if (repetition_penalty != other.repetition_penalty) return false
+    if (stop_sequences != other.stop_sequences) return false
+    if (streaming_enabled != other.streaming_enabled) return false
+    if (preferred_framework != other.preferred_framework) return false
+    if (json_schema != other.json_schema) return false
+    if (execution_target != other.execution_target) return false
     return true
   }
 
@@ -119,6 +181,12 @@ public class LLMGenerateRequest(
       result = result * 37 + top_k.hashCode()
       result = result * 37 + system_prompt.hashCode()
       result = result * 37 + emit_thoughts.hashCode()
+      result = result * 37 + repetition_penalty.hashCode()
+      result = result * 37 + stop_sequences.hashCode()
+      result = result * 37 + streaming_enabled.hashCode()
+      result = result * 37 + preferred_framework.hashCode()
+      result = result * 37 + json_schema.hashCode()
+      result = result * 37 + execution_target.hashCode()
       super.hashCode = result
     }
     return result
@@ -133,6 +201,12 @@ public class LLMGenerateRequest(
     result += """top_k=$top_k"""
     result += """system_prompt=${sanitize(system_prompt)}"""
     result += """emit_thoughts=$emit_thoughts"""
+    result += """repetition_penalty=$repetition_penalty"""
+    if (stop_sequences.isNotEmpty()) result += """stop_sequences=${sanitize(stop_sequences)}"""
+    result += """streaming_enabled=$streaming_enabled"""
+    result += """preferred_framework=${sanitize(preferred_framework)}"""
+    result += """json_schema=${sanitize(json_schema)}"""
+    result += """execution_target=${sanitize(execution_target)}"""
     return result.joinToString(prefix = "LLMGenerateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -144,9 +218,16 @@ public class LLMGenerateRequest(
     top_k: Int = this.top_k,
     system_prompt: String = this.system_prompt,
     emit_thoughts: Boolean = this.emit_thoughts,
+    repetition_penalty: Float = this.repetition_penalty,
+    stop_sequences: List<String> = this.stop_sequences,
+    streaming_enabled: Boolean = this.streaming_enabled,
+    preferred_framework: String = this.preferred_framework,
+    json_schema: String = this.json_schema,
+    execution_target: String = this.execution_target,
     unknownFields: ByteString = this.unknownFields,
   ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k,
-      system_prompt, emit_thoughts, unknownFields)
+      system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled,
+      preferred_framework, json_schema, execution_target, unknownFields)
 
   public companion object {
     @JvmField
@@ -172,6 +253,17 @@ public class LLMGenerateRequest(
             value.system_prompt)
         if (value.emit_thoughts != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
             value.emit_thoughts)
+        if (!value.repetition_penalty.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(8,
+            value.repetition_penalty)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(9, value.stop_sequences)
+        if (value.streaming_enabled != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(10,
+            value.streaming_enabled)
+        if (value.preferred_framework != "") size += ProtoAdapter.STRING.encodedSizeWithTag(11,
+            value.preferred_framework)
+        if (value.json_schema != "") size += ProtoAdapter.STRING.encodedSizeWithTag(12,
+            value.json_schema)
+        if (value.execution_target != "") size += ProtoAdapter.STRING.encodedSizeWithTag(13,
+            value.execution_target)
         return size
       }
 
@@ -186,11 +278,33 @@ public class LLMGenerateRequest(
             value.system_prompt)
         if (value.emit_thoughts != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
             value.emit_thoughts)
+        if (!value.repetition_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
+            value.repetition_penalty)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.stop_sequences)
+        if (value.streaming_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
+            value.streaming_enabled)
+        if (value.preferred_framework != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.preferred_framework)
+        if (value.json_schema != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
+            value.json_schema)
+        if (value.execution_target != "") ProtoAdapter.STRING.encodeWithTag(writer, 13,
+            value.execution_target)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerateRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.execution_target != "") ProtoAdapter.STRING.encodeWithTag(writer, 13,
+            value.execution_target)
+        if (value.json_schema != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
+            value.json_schema)
+        if (value.preferred_framework != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.preferred_framework)
+        if (value.streaming_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
+            value.streaming_enabled)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.stop_sequences)
+        if (!value.repetition_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
+            value.repetition_penalty)
         if (value.emit_thoughts != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
             value.emit_thoughts)
         if (value.system_prompt != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
@@ -211,6 +325,12 @@ public class LLMGenerateRequest(
         var top_k: Int = 0
         var system_prompt: String = ""
         var emit_thoughts: Boolean = false
+        var repetition_penalty: Float = 0f
+        val stop_sequences = mutableListOf<String>()
+        var streaming_enabled: Boolean = false
+        var preferred_framework: String = ""
+        var json_schema: String = ""
+        var execution_target: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -220,6 +340,12 @@ public class LLMGenerateRequest(
             5 -> top_k = ProtoAdapter.INT32.decode(reader)
             6 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             7 -> emit_thoughts = ProtoAdapter.BOOL.decode(reader)
+            8 -> repetition_penalty = ProtoAdapter.FLOAT.decode(reader)
+            9 -> stop_sequences.add(ProtoAdapter.STRING.decode(reader))
+            10 -> streaming_enabled = ProtoAdapter.BOOL.decode(reader)
+            11 -> preferred_framework = ProtoAdapter.STRING.decode(reader)
+            12 -> json_schema = ProtoAdapter.STRING.decode(reader)
+            13 -> execution_target = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -231,6 +357,12 @@ public class LLMGenerateRequest(
           top_k = top_k,
           system_prompt = system_prompt,
           emit_thoughts = emit_thoughts,
+          repetition_penalty = repetition_penalty,
+          stop_sequences = stop_sequences,
+          streaming_enabled = streaming_enabled,
+          preferred_framework = preferred_framework,
+          json_schema = json_schema,
+          execution_target = execution_target,
           unknownFields = unknownFields
         )
       }

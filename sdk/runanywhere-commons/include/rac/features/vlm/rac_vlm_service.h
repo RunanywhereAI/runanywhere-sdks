@@ -12,6 +12,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/vlm/rac_vlm_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,6 +117,17 @@ typedef struct rac_vlm_service {
     const char* model_id;
 } rac_vlm_service_t;
 
+/**
+ * @brief Callback for proto-byte VLM streaming events.
+ *
+ * The callback receives serialized runanywhere.v1.SDKEvent bytes. Token deltas
+ * are emitted as GenerationEvent TOKEN_GENERATED events, while operation
+ * lifecycle is also published on the canonical SDKEvent stream.
+ */
+typedef rac_bool_t (*rac_vlm_stream_proto_callback_fn)(const uint8_t* event_proto_bytes,
+                                                       size_t event_proto_size,
+                                                       void* user_data);
+
 // =============================================================================
 // PUBLIC API - Generic service functions
 // =============================================================================
@@ -157,6 +169,20 @@ RAC_API rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t*
                                      rac_vlm_result_t* out_result);
 
 /**
+ * @brief Process an image with serialized generated proto inputs.
+ *
+ * image_proto_bytes must encode runanywhere.v1.VLMImage and
+ * options_proto_bytes must encode runanywhere.v1.VLMGenerationOptions. The
+ * result buffer receives serialized runanywhere.v1.VLMResult bytes.
+ */
+RAC_API rac_result_t rac_vlm_process_proto(rac_handle_t handle,
+                                           const uint8_t* image_proto_bytes,
+                                           size_t image_proto_size,
+                                           const uint8_t* options_proto_bytes,
+                                           size_t options_proto_size,
+                                           rac_proto_buffer_t* out_result);
+
+/**
  * @brief Process an image with streaming response
  *
  * @param handle Service handle
@@ -170,6 +196,19 @@ RAC_API rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t*
 RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_image_t* image,
                                             const char* prompt, const rac_vlm_options_t* options,
                                             rac_vlm_stream_callback_fn callback, void* user_data);
+
+/**
+ * @brief Stream VLM output with serialized generated proto inputs.
+ *
+ * Token events are delivered to callback as serialized runanywhere.v1.SDKEvent
+ * bytes. The optional out_result receives the aggregate runanywhere.v1.VLMResult
+ * when generation completes.
+ */
+RAC_API rac_result_t rac_vlm_process_stream_proto(
+    rac_handle_t handle, const uint8_t* image_proto_bytes, size_t image_proto_size,
+    const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_vlm_stream_proto_callback_fn callback, void* user_data,
+    rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get service information
@@ -187,6 +226,11 @@ RAC_API rac_result_t rac_vlm_get_info(rac_handle_t handle, rac_vlm_info_t* out_i
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_vlm_cancel(rac_handle_t handle);
+
+/**
+ * @brief Cancel VLM generation and emit canonical cancellation events.
+ */
+RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
 
 /**
  * @brief Cleanup and release model resources

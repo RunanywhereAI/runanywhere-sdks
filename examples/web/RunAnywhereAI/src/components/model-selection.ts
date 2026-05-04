@@ -5,6 +5,7 @@
 
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showToast, showEvictionDialog } from './dialogs';
+import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
 
 let modalEl: HTMLElement | null = null;
 
@@ -131,7 +132,7 @@ function renderModelList(models: ModelInfo[]): void {
           <div class="model-info">
             <div class="model-name">${m.name}</div>
             <div class="model-meta">
-              <span class="model-framework-badge">${m.framework}</span>
+              <span class="model-framework-badge">${formatFramework(m.framework)}</span>
               ${m.memoryRequirement ? `<span class="model-size">${formatMB(m.memoryRequirement)}</span>` : ''}
             </div>
             ${progressBar}
@@ -270,8 +271,13 @@ function getModelEmoji(model: ModelInfo): string {
     case ModelCategory.SpeechRecognition: return '&#127908;';
     case ModelCategory.SpeechSynthesis: return '&#128266;';
     case ModelCategory.ImageGeneration: return '&#127912;';
+    case ModelCategory.VoiceActivityDetection: return '&#128483;';
     default: return '&#129302;';
   }
+}
+
+function formatFramework(framework: ModelInfo['framework']): string {
+  return inferenceFrameworkToJSON(framework).replace(/^INFERENCE_FRAMEWORK_/, '').replaceAll('_', ' ');
 }
 
 function formatMB(bytes: number): string {

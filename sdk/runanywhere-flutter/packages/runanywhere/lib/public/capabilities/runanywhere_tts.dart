@@ -6,18 +6,18 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
-import 'package:runanywhere/core/types/model_types.dart';
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/features/tts/system_tts_service.dart' as sys_tts;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb_models;
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_tts.dart' show racAudioFormatPcm;
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -99,7 +99,7 @@ class RunAnywhereTTS {
         throw SDKException.modelNotFound('TTS voice not found: $voiceId');
       }
 
-      if (model.localPath == null) {
+      if (model.localPath.isEmpty) {
         throw SDKException.modelNotDownloaded(
           'TTS voice is not downloaded. Call downloadModel() first.',
         );
@@ -199,7 +199,7 @@ class RunAnywhereTTS {
       );
     }
 
-    final opts = options ?? TTSOptions();
+    final opts = _effectiveOptions(options ?? TTSOptions());
     final logger = SDKLogger('RunAnywhere.Synthesize');
     logger.debug(
         'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
@@ -216,51 +216,27 @@ class RunAnywhereTTS {
     final voiceId = currentVoiceId ?? 'unknown';
 
     final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(voiceId);
+        await DartBridgeModelRegistry.instance.getProtoModel(voiceId);
     final modelName = modelInfo?.name;
 
     try {
-      final result = await DartBridge.tts.synthesize(
-        text,
-        rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
-        pitch: opts.hasPitch() ? opts.pitch : 1.0,
-        volume: opts.hasVolume() ? opts.volume : 1.0,
-        language: opts.hasLanguageCode() ? opts.languageCode : 'en-US',
-        audioFormat: racAudioFormatPcm,
-        sampleRate: 22050,
-        useSsml: opts.enableSsml,
-        voiceId: opts.hasVoice() ? opts.voice : null,
-      );
+      final result = await DartBridge.tts.synthesizeProto(text, opts);
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      final audioBytes = Uint8List.view(result.samples.buffer);
+      final durationMs = result.hasDurationMs() ? result.durationMs.toInt() : 0;
 
       TelemetryService.shared.trackSynthesis(
         voiceId: voiceId,
         modelName: modelName,
         textLength: text.length,
-        audioDurationMs: result.durationMs,
+        audioDurationMs: durationMs,
         latencyMs: latencyMs,
         sampleRate: result.sampleRate,
-        audioSizeBytes: audioBytes.length,
-      );
-
-      final metadata = TTSSynthesisMetadata(
-        voiceId: voiceId,
-        processingTimeMs: Int64(latencyMs),
-        characterCount: text.length,
-        audioDurationMs: Int64(result.durationMs),
+        audioSizeBytes: result.audioData.length,
       );
 
       logger.info(
-          'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz');
-      return TTSOutput(
-        audioData: audioBytes,
-        audioFormat: pb_models.AudioFormat.AUDIO_FORMAT_PCM,
-        sampleRate: result.sampleRate,
-        durationMs: Int64(result.durationMs),
-        metadata: metadata,
-        timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
-      );
+          'Synthesis complete: ${result.audioData.length} bytes, ${result.sampleRate} Hz');
+      return result;
     } catch (e) {
       TelemetryService.shared.trackError(
         errorCode: 'synthesis_failed',
@@ -285,7 +261,7 @@ class RunAnywhereTTS {
     if (!isLoaded) {
       throw SDKException.ttsNotAvailable('No TTS voice loaded.');
     }
-    final opts = options ?? TTSOptions();
+    final opts = _effectiveOptions(options ?? TTSOptions());
 
     // System TTS does not expose per-chunk PCM; plays through the platform
     // engine and returns no samples. Emit a single empty chunk after playback
@@ -298,21 +274,9 @@ class RunAnywhereTTS {
       return;
     }
 
-    await for (final chunk in DartBridge.tts.synthesizeStream(
-      text,
-      rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
-      pitch: opts.hasPitch() ? opts.pitch : 1.0,
-      volume: opts.hasVolume() ? opts.volume : 1.0,
-      language: opts.hasLanguageCode() ? opts.languageCode : 'en-US',
-      audioFormat: racAudioFormatPcm,
-      sampleRate: 22050,
-      useSsml: opts.enableSsml,
-      voiceId: opts.hasVoice() ? opts.voice : null,
-    )) {
-      final bytes = chunk.samples.buffer.asUint8List(
-        chunk.samples.offsetInBytes,
-        chunk.samples.lengthInBytes,
-      );
+    await for (final chunk
+        in DartBridge.tts.synthesizeStreamProto(text, opts)) {
+      final bytes = Uint8List.fromList(chunk.audioData);
       onAudioChunk?.call(bytes);
       yield bytes;
     }
@@ -361,7 +325,9 @@ class RunAnywhereTTS {
   Future<List<String>> availableVoices() async {
     final all = await RunAnywhereModels.shared.available();
     return all
-        .where((m) => m.category == ModelCategory.speechSynthesis)
+        .where((m) =>
+            m.category ==
+            pb_models.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
         .map((m) => m.id)
         .toList(growable: false);
   }
@@ -385,9 +351,8 @@ class RunAnywhereTTS {
 
       await service.synthesize(sys_tts.TTSInput(
         text: text,
-        voiceId: opts.hasVoice() && opts.voice.isNotEmpty
-            ? opts.voice
-            : 'system',
+        voiceId:
+            opts.hasVoice() && opts.voice.isNotEmpty ? opts.voice : 'system',
         rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
         pitch: opts.hasPitch() ? opts.pitch : 1.0,
       ));
@@ -428,5 +393,28 @@ class RunAnywhereTTS {
       logger.error('System TTS synthesis failed: $e');
       rethrow;
     }
+  }
+
+  TTSOptions _effectiveOptions(TTSOptions options) {
+    final opts = options.deepCopy();
+    if (!opts.hasLanguageCode()) {
+      opts.languageCode = 'en-US';
+    }
+    if (!opts.hasSpeakingRate()) {
+      opts.speakingRate = 1.0;
+    }
+    if (!opts.hasPitch()) {
+      opts.pitch = 1.0;
+    }
+    if (!opts.hasVolume()) {
+      opts.volume = 1.0;
+    }
+    if (!opts.hasAudioFormat()) {
+      opts.audioFormat = pb_models.AudioFormat.AUDIO_FORMAT_PCM;
+    }
+    if (!opts.hasSampleRate()) {
+      opts.sampleRate = 22050;
+    }
+    return opts;
   }
 }

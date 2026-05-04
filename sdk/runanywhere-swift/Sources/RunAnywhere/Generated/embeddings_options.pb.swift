@@ -64,6 +64,92 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 }
 
 /// ---------------------------------------------------------------------------
+/// Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
+/// ---------------------------------------------------------------------------
+public enum RAEmbeddingsNormalizeMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case none // = 1
+  case l2 // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .none
+    case 2: self = .l2
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .none: return 1
+    case .l2: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAEmbeddingsNormalizeMode] = [
+    .unspecified,
+    .none,
+    .l2,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
+/// Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
+/// ---------------------------------------------------------------------------
+public enum RAEmbeddingsPoolingStrategy: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case mean // = 1
+  case cls // = 2
+  case last // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .mean
+    case 2: self = .cls
+    case 3: self = .last
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .mean: return 1
+    case .cls: return 2
+    case .last: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAEmbeddingsPoolingStrategy] = [
+    .unspecified,
+    .mean,
+    .cls,
+    .last,
+  ]
+
+}
+
+/// ---------------------------------------------------------------------------
 /// Component-level configuration applied at service creation. Mirrors the
 /// transport-portable subset of rac_embeddings_config_t. Backend selection
 /// (preferred_framework) and pooling strategy live outside the wire schema.
@@ -95,11 +181,43 @@ public struct RAEmbeddingsConfiguration: Sendable {
   /// Clears the value of `normalize`. Subsequent reads from it will return its default value.
   public mutating func clearNormalize() {self._normalize = nil}
 
+  /// Preferred framework for the component. Absent = auto.
+  public var preferredFramework: RAInferenceFramework {
+    get {_preferredFramework ?? .unspecified}
+    set {_preferredFramework = newValue}
+  }
+  /// Returns true if `preferredFramework` has been explicitly set.
+  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
+  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
+
+  /// C ABI name for max_sequence_length. 0 = use max_sequence_length or
+  /// backend default.
+  public var maxTokens: Int32 = 0
+
+  /// Exact C ABI normalization/pooling modes for backends that need more
+  /// than the bool normalize flag.
+  public var normalizeMode: RAEmbeddingsNormalizeMode = .unspecified
+
+  public var pooling: RAEmbeddingsPoolingStrategy = .unspecified
+
+  /// Backend-specific JSON config (e.g. tokenizer/vocab companion paths).
+  public var configJson: String {
+    get {_configJson ?? String()}
+    set {_configJson = newValue}
+  }
+  /// Returns true if `configJson` has been explicitly set.
+  public var hasConfigJson: Bool {self._configJson != nil}
+  /// Clears the value of `configJson`. Subsequent reads from it will return its default value.
+  public mutating func clearConfigJson() {self._configJson = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _normalize: Bool? = nil
+  fileprivate var _preferredFramework: RAInferenceFramework? = nil
+  fileprivate var _configJson: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -138,6 +256,14 @@ public struct RAEmbeddingsOptions: Sendable {
   public var hasBatchSize: Bool {self._batchSize != nil}
   /// Clears the value of `batchSize`. Subsequent reads from it will return its default value.
   public mutating func clearBatchSize() {self._batchSize = nil}
+
+  /// Exact C ABI per-call overrides. UNSPECIFIED = use component config.
+  public var normalizeMode: RAEmbeddingsNormalizeMode = .unspecified
+
+  public var pooling: RAEmbeddingsPoolingStrategy = .unspecified
+
+  /// 0 = auto
+  public var nThreads: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -187,12 +313,43 @@ public struct RAEmbeddingVector: Sendable {
   /// Clears the value of `text`. Subsequent reads from it will return its default value.
   public mutating func clearText() {self._text = nil}
 
+  /// Vector dimension for consumers that need per-vector sizing without
+  /// inspecting EmbeddingsResult.dimension.
+  public var dimension: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _norm: Float? = nil
   fileprivate var _text: String? = nil
+}
+
+/// ---------------------------------------------------------------------------
+/// Request envelope for service-handle APIs. One text = embed, multiple texts =
+/// embed_batch.
+/// ---------------------------------------------------------------------------
+public struct RAEmbeddingsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var texts: [String] = []
+
+  public var options: RAEmbeddingsOptions {
+    get {_options ?? RAEmbeddingsOptions()}
+    set {_options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {self._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {self._options = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _options: RAEmbeddingsOptions? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -228,9 +385,17 @@ public struct RAEmbeddingsResult: Sendable {
 
 fileprivate let _protobuf_package = "runanywhere.v1"
 
+extension RAEmbeddingsNormalizeMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED\0\u{1}EMBEDDINGS_NORMALIZE_MODE_NONE\0\u{1}EMBEDDINGS_NORMALIZE_MODE_L2\0")
+}
+
+extension RAEmbeddingsPoolingStrategy: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED\0\u{1}EMBEDDINGS_POOLING_STRATEGY_MEAN\0\u{1}EMBEDDINGS_POOLING_STRATEGY_CLS\0\u{1}EMBEDDINGS_POOLING_STRATEGY_LAST\0")
+}
+
 extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}embedding_dimension\0\u{3}max_sequence_length\0\u{1}normalize\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}embedding_dimension\0\u{3}max_sequence_length\0\u{1}normalize\0\u{3}preferred_framework\0\u{3}max_tokens\0\u{3}normalize_mode\0\u{1}pooling\0\u{3}config_json\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -242,6 +407,11 @@ extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messa
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.embeddingDimension) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxSequenceLength) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self._normalize) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self.normalizeMode) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.pooling) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self._configJson) }()
       default: break
       }
     }
@@ -264,6 +434,21 @@ extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messa
     try { if let v = self._normalize {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._preferredFramework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    if self.maxTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 6)
+    }
+    if self.normalizeMode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.normalizeMode, fieldNumber: 7)
+    }
+    if self.pooling != .unspecified {
+      try visitor.visitSingularEnumField(value: self.pooling, fieldNumber: 8)
+    }
+    try { if let v = self._configJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -272,6 +457,11 @@ extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs.embeddingDimension != rhs.embeddingDimension {return false}
     if lhs.maxSequenceLength != rhs.maxSequenceLength {return false}
     if lhs._normalize != rhs._normalize {return false}
+    if lhs._preferredFramework != rhs._preferredFramework {return false}
+    if lhs.maxTokens != rhs.maxTokens {return false}
+    if lhs.normalizeMode != rhs.normalizeMode {return false}
+    if lhs.pooling != rhs.pooling {return false}
+    if lhs._configJson != rhs._configJson {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -279,7 +469,7 @@ extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}normalize\0\u{1}truncate\0\u{3}batch_size\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}normalize\0\u{1}truncate\0\u{3}batch_size\0\u{3}normalize_mode\0\u{1}pooling\0\u{3}n_threads\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -290,6 +480,9 @@ extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 1: try { try decoder.decodeSingularBoolField(value: &self.normalize) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self._truncate) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self._batchSize) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.normalizeMode) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.pooling) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.nThreads) }()
       default: break
       }
     }
@@ -309,6 +502,15 @@ extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     try { if let v = self._batchSize {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
     } }()
+    if self.normalizeMode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.normalizeMode, fieldNumber: 4)
+    }
+    if self.pooling != .unspecified {
+      try visitor.visitSingularEnumField(value: self.pooling, fieldNumber: 5)
+    }
+    if self.nThreads != 0 {
+      try visitor.visitSingularInt32Field(value: self.nThreads, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -316,6 +518,9 @@ extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.normalize != rhs.normalize {return false}
     if lhs._truncate != rhs._truncate {return false}
     if lhs._batchSize != rhs._batchSize {return false}
+    if lhs.normalizeMode != rhs.normalizeMode {return false}
+    if lhs.pooling != rhs.pooling {return false}
+    if lhs.nThreads != rhs.nThreads {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -323,7 +528,7 @@ extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingVector"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0\u{1}norm\0\u{1}text\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0\u{1}norm\0\u{1}text\0\u{1}dimension\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -334,6 +539,7 @@ extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 1: try { try decoder.decodeRepeatedFloatField(value: &self.values) }()
       case 2: try { try decoder.decodeSingularFloatField(value: &self._norm) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._text) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.dimension) }()
       default: break
       }
     }
@@ -353,6 +559,9 @@ extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     try { if let v = self._text {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
     } }()
+    if self.dimension != 0 {
+      try visitor.visitSingularInt32Field(value: self.dimension, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -360,6 +569,46 @@ extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.values != rhs.values {return false}
     if lhs._norm != rhs._norm {return false}
     if lhs._text != rhs._text {return false}
+    if lhs.dimension != rhs.dimension {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".EmbeddingsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}texts\0\u{1}options\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.texts) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.texts.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.texts, fieldNumber: 1)
+    }
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAEmbeddingsRequest, rhs: RAEmbeddingsRequest) -> Bool {
+    if lhs.texts != rhs.texts {return false}
+    if lhs._options != rhs._options {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

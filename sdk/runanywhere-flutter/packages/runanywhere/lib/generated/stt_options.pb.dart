@@ -1,58 +1,113 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: stt_options.proto
 //
 // @dart = 2.12
-// ignore_for_file: annotate_overrides,camel_case_types,constant_identifier_names,directives_ordering,library_prefixes,non_constant_identifier_names,prefer_final_fields,return_of_invalid_type,unnecessary_const,unnecessary_import,unnecessary_this,unused_import,unused_shown_name
+
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'model_types.pbenum.dart' as $0;
 import 'stt_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $1;
 
 export 'stt_options.pbenum.dart';
 
+///  ---------------------------------------------------------------------------
+///  STT component configuration (init-time settings).
+///  Sources pre-IDL:
+///    Swift  STTTypes.swift:15           STTConfiguration
+///    Kotlin STTTypes.kt:27              STTConfiguration
+///    Dart   stt_configuration.dart:9    STTConfiguration
+///    C ABI  rac_stt_types.h:76          rac_stt_config_t
+///
+///  Note: max_alternatives, enable_punctuation, enable_diarization, and
+///  enable_timestamps appear in the pre-IDL configs but are runtime knobs
+///  in the canonical model. They live on STTOptions; STTConfiguration
+///  keeps only true init-time fields (model id, language, sample rate,
+///  VAD toggle, audio format). Producers should mirror runtime knobs into
+///  STTOptions when constructing requests.
+///  ---------------------------------------------------------------------------
 class STTConfiguration extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'STTConfiguration', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'modelId')
-    ..e<STTLanguage>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
-    ..a<$core.int>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'sampleRate', $pb.PbFieldType.O3)
-    ..aOB(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'enableVad')
-    ..e<$1.AudioFormat>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $1.AudioFormat.valueOf, enumValues: $1.AudioFormat.values)
-    ..hasRequiredFields = false
-  ;
-
-  STTConfiguration._() : super();
   factory STTConfiguration({
     $core.String? modelId,
     STTLanguage? language,
     $core.int? sampleRate,
     $core.bool? enableVad,
-    $1.AudioFormat? audioFormat,
+    $0.AudioFormat? audioFormat,
+    $core.bool? enablePunctuation,
+    $core.bool? enableDiarization,
+    $core.Iterable<$core.String>? vocabularyList,
+    $core.int? maxAlternatives,
+    $core.bool? enableWordTimestamps,
+    $0.InferenceFramework? preferredFramework,
+    $core.String? languageCode,
   }) {
-    final _result = create();
+    final $result = create();
     if (modelId != null) {
-      _result.modelId = modelId;
+      $result.modelId = modelId;
     }
     if (language != null) {
-      _result.language = language;
+      $result.language = language;
     }
     if (sampleRate != null) {
-      _result.sampleRate = sampleRate;
+      $result.sampleRate = sampleRate;
     }
     if (enableVad != null) {
-      _result.enableVad = enableVad;
+      $result.enableVad = enableVad;
     }
     if (audioFormat != null) {
-      _result.audioFormat = audioFormat;
+      $result.audioFormat = audioFormat;
     }
-    return _result;
+    if (enablePunctuation != null) {
+      $result.enablePunctuation = enablePunctuation;
+    }
+    if (enableDiarization != null) {
+      $result.enableDiarization = enableDiarization;
+    }
+    if (vocabularyList != null) {
+      $result.vocabularyList.addAll(vocabularyList);
+    }
+    if (maxAlternatives != null) {
+      $result.maxAlternatives = maxAlternatives;
+    }
+    if (enableWordTimestamps != null) {
+      $result.enableWordTimestamps = enableWordTimestamps;
+    }
+    if (preferredFramework != null) {
+      $result.preferredFramework = preferredFramework;
+    }
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    return $result;
   }
+  STTConfiguration._() : super();
   factory STTConfiguration.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory STTConfiguration.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTConfiguration', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+    ..e<STTLanguage>(2, _omitFieldNames ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..aOB(4, _omitFieldNames ? '' : 'enableVad')
+    ..e<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..aOB(6, _omitFieldNames ? '' : 'enablePunctuation')
+    ..aOB(7, _omitFieldNames ? '' : 'enableDiarization')
+    ..pPS(8, _omitFieldNames ? '' : 'vocabularyList')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'maxAlternatives', $pb.PbFieldType.O3)
+    ..aOB(10, _omitFieldNames ? '' : 'enableWordTimestamps')
+    ..e<$0.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..aOS(12, _omitFieldNames ? '' : 'languageCode')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -62,8 +117,10 @@ class STTConfiguration extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  STTConfiguration copyWith(void Function(STTConfiguration) updates) => super.copyWith((message) => updates(message as STTConfiguration)) as STTConfiguration; // ignore: deprecated_member_use
+  STTConfiguration copyWith(void Function(STTConfiguration) updates) => super.copyWith((message) => updates(message as STTConfiguration)) as STTConfiguration;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static STTConfiguration create() => STTConfiguration._();
   STTConfiguration createEmptyInstance() => create();
@@ -109,28 +166,94 @@ class STTConfiguration extends $pb.GeneratedMessage {
   void clearEnableVad() => clearField(4);
 
   @$pb.TagNumber(5)
-  $1.AudioFormat get audioFormat => $_getN(4);
+  $0.AudioFormat get audioFormat => $_getN(4);
   @$pb.TagNumber(5)
-  set audioFormat($1.AudioFormat v) { setField(5, v); }
+  set audioFormat($0.AudioFormat v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasAudioFormat() => $_has(4);
   @$pb.TagNumber(5)
   void clearAudioFormat() => clearField(5);
+
+  /// C ABI / legacy SDK config-level transcription defaults. These may be
+  /// mirrored into STTOptions by adapters for per-call overrides.
+  @$pb.TagNumber(6)
+  $core.bool get enablePunctuation => $_getBF(5);
+  @$pb.TagNumber(6)
+  set enablePunctuation($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasEnablePunctuation() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEnablePunctuation() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get enableDiarization => $_getBF(6);
+  @$pb.TagNumber(7)
+  set enableDiarization($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasEnableDiarization() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearEnableDiarization() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.List<$core.String> get vocabularyList => $_getList(7);
+
+  @$pb.TagNumber(9)
+  $core.int get maxAlternatives => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set maxAlternatives($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasMaxAlternatives() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearMaxAlternatives() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get enableWordTimestamps => $_getBF(9);
+  @$pb.TagNumber(10)
+  set enableWordTimestamps($core.bool v) { $_setBool(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasEnableWordTimestamps() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearEnableWordTimestamps() => clearField(10);
+
+  /// Preferred framework for the component. Absent = auto.
+  @$pb.TagNumber(11)
+  $0.InferenceFramework get preferredFramework => $_getN(10);
+  @$pb.TagNumber(11)
+  set preferredFramework($0.InferenceFramework v) { setField(11, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasPreferredFramework() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearPreferredFramework() => clearField(11);
+
+  /// Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
+  /// that cannot be represented by STTLanguage's base-code enum.
+  @$pb.TagNumber(12)
+  $core.String get languageCode => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set languageCode($core.String v) { $_setString(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasLanguageCode() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearLanguageCode() => clearField(12);
 }
 
+///  ---------------------------------------------------------------------------
+///  STT runtime transcription options (per-call overrides).
+///  Sources pre-IDL:
+///    Swift  STTTypes.swift:64           STTOptions  (10 fields)
+///    Kotlin STTTypes.kt:65              STTOptions  (10 fields)
+///    Dart   generation_types.dart:78    STTOptions  (10 fields)
+///    RN     STTTypes.ts:12              STTOptions  (5 fields, narrower)
+///    Web    STTTypes.ts:25              STTTranscribeOptions (2 fields)
+///    C ABI  rac_stt_types.h:130         rac_stt_options_t (8 fields)
+///
+///  Per spec, this canonical message exposes: language, enable_punctuation,
+///  enable_diarization, max_speakers, vocabulary_list, enable_word_timestamps,
+///  beam_size. Other pre-IDL fields (audio_format, sample_rate, detect_language,
+///  preferred_framework) are part of STTConfiguration or implied by
+///  STT_LANGUAGE_AUTO.
+///  ---------------------------------------------------------------------------
 class STTOptions extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'STTOptions', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<STTLanguage>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
-    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'enablePunctuation')
-    ..aOB(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'enableDiarization')
-    ..a<$core.int>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'maxSpeakers', $pb.PbFieldType.O3)
-    ..pPS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'vocabularyList')
-    ..aOB(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'enableWordTimestamps')
-    ..a<$core.int>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'beamSize', $pb.PbFieldType.O3)
-    ..hasRequiredFields = false
-  ;
-
-  STTOptions._() : super();
   factory STTOptions({
     STTLanguage? language,
     $core.bool? enablePunctuation,
@@ -139,33 +262,71 @@ class STTOptions extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? vocabularyList,
     $core.bool? enableWordTimestamps,
     $core.int? beamSize,
+    $core.String? languageCode,
+    $core.bool? detectLanguage,
+    $0.AudioFormat? audioFormat,
+    $core.int? sampleRate,
+    $core.int? maxAlternatives,
   }) {
-    final _result = create();
+    final $result = create();
     if (language != null) {
-      _result.language = language;
+      $result.language = language;
     }
     if (enablePunctuation != null) {
-      _result.enablePunctuation = enablePunctuation;
+      $result.enablePunctuation = enablePunctuation;
     }
     if (enableDiarization != null) {
-      _result.enableDiarization = enableDiarization;
+      $result.enableDiarization = enableDiarization;
     }
     if (maxSpeakers != null) {
-      _result.maxSpeakers = maxSpeakers;
+      $result.maxSpeakers = maxSpeakers;
     }
     if (vocabularyList != null) {
-      _result.vocabularyList.addAll(vocabularyList);
+      $result.vocabularyList.addAll(vocabularyList);
     }
     if (enableWordTimestamps != null) {
-      _result.enableWordTimestamps = enableWordTimestamps;
+      $result.enableWordTimestamps = enableWordTimestamps;
     }
     if (beamSize != null) {
-      _result.beamSize = beamSize;
+      $result.beamSize = beamSize;
     }
-    return _result;
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    if (detectLanguage != null) {
+      $result.detectLanguage = detectLanguage;
+    }
+    if (audioFormat != null) {
+      $result.audioFormat = audioFormat;
+    }
+    if (sampleRate != null) {
+      $result.sampleRate = sampleRate;
+    }
+    if (maxAlternatives != null) {
+      $result.maxAlternatives = maxAlternatives;
+    }
+    return $result;
   }
+  STTOptions._() : super();
   factory STTOptions.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory STTOptions.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTOptions', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<STTLanguage>(1, _omitFieldNames ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
+    ..aOB(2, _omitFieldNames ? '' : 'enablePunctuation')
+    ..aOB(3, _omitFieldNames ? '' : 'enableDiarization')
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'maxSpeakers', $pb.PbFieldType.O3)
+    ..pPS(5, _omitFieldNames ? '' : 'vocabularyList')
+    ..aOB(6, _omitFieldNames ? '' : 'enableWordTimestamps')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'beamSize', $pb.PbFieldType.O3)
+    ..aOS(8, _omitFieldNames ? '' : 'languageCode')
+    ..aOB(9, _omitFieldNames ? '' : 'detectLanguage')
+    ..e<$0.AudioFormat>(10, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'maxAlternatives', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -175,8 +336,10 @@ class STTOptions extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  STTOptions copyWith(void Function(STTOptions) updates) => super.copyWith((message) => updates(message as STTOptions)) as STTOptions; // ignore: deprecated_member_use
+  STTOptions copyWith(void Function(STTOptions) updates) => super.copyWith((message) => updates(message as STTOptions)) as STTOptions;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static STTOptions create() => STTOptions._();
   STTOptions createEmptyInstance() => create();
@@ -241,41 +404,105 @@ class STTOptions extends $pb.GeneratedMessage {
   $core.bool hasBeamSize() => $_has(6);
   @$pb.TagNumber(7)
   void clearBeamSize() => clearField(7);
+
+  /// Free-form BCP-47 language tag. When set, consumers should prefer this
+  /// over the base-language enum above.
+  @$pb.TagNumber(8)
+  $core.String get languageCode => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set languageCode($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasLanguageCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLanguageCode() => clearField(8);
+
+  /// Explicit language auto-detection flag for C ABI parity. Equivalent to
+  /// language == STT_LANGUAGE_AUTO for generated-only consumers.
+  @$pb.TagNumber(9)
+  $core.bool get detectLanguage => $_getBF(8);
+  @$pb.TagNumber(9)
+  set detectLanguage($core.bool v) { $_setBool(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasDetectLanguage() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearDetectLanguage() => clearField(9);
+
+  /// Per-call input audio hints mirrored from rac_stt_options_t.
+  @$pb.TagNumber(10)
+  $0.AudioFormat get audioFormat => $_getN(9);
+  @$pb.TagNumber(10)
+  set audioFormat($0.AudioFormat v) { setField(10, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasAudioFormat() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAudioFormat() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get sampleRate => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set sampleRate($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasSampleRate() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearSampleRate() => clearField(11);
+
+  /// Maximum number of alternatives to return. 0 = backend/default.
+  @$pb.TagNumber(12)
+  $core.int get maxAlternatives => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set maxAlternatives($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasMaxAlternatives() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearMaxAlternatives() => clearField(12);
 }
 
+///  ---------------------------------------------------------------------------
+///  Word-level timestamp.
+///  Sources pre-IDL:
+///    Swift  STTTypes.swift:260          WordTimestamp (TimeInterval seconds)
+///    Kotlin STTTypes.kt:141             WordTimestamp (Double seconds)
+///    Dart   generation_types.dart:124   WordTimestamp (double seconds, conf?)
+///    RN     STTTypes.ts:55              WordTimestamp (number seconds)
+///    Web    STTTypes.ts:18              STTWord       (number ms)
+///    C ABI  rac_stt_types.h:175         rac_stt_word_t (int64 ms)
+///
+///  Canonicalize on int64 *_ms (matches C ABI and Web).
+///  ---------------------------------------------------------------------------
 class WordTimestamp extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'WordTimestamp', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'word')
-    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'startMs')
-    ..aInt64(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'endMs')
-    ..a<$core.double>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'confidence', $pb.PbFieldType.OF)
-    ..hasRequiredFields = false
-  ;
-
-  WordTimestamp._() : super();
   factory WordTimestamp({
     $core.String? word,
     $fixnum.Int64? startMs,
     $fixnum.Int64? endMs,
     $core.double? confidence,
   }) {
-    final _result = create();
+    final $result = create();
     if (word != null) {
-      _result.word = word;
+      $result.word = word;
     }
     if (startMs != null) {
-      _result.startMs = startMs;
+      $result.startMs = startMs;
     }
     if (endMs != null) {
-      _result.endMs = endMs;
+      $result.endMs = endMs;
     }
     if (confidence != null) {
-      _result.confidence = confidence;
+      $result.confidence = confidence;
     }
-    return _result;
+    return $result;
   }
+  WordTimestamp._() : super();
   factory WordTimestamp.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory WordTimestamp.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'WordTimestamp', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'word')
+    ..aInt64(2, _omitFieldNames ? '' : 'startMs')
+    ..aInt64(3, _omitFieldNames ? '' : 'endMs')
+    ..a<$core.double>(4, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -285,8 +512,10 @@ class WordTimestamp extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  WordTimestamp copyWith(void Function(WordTimestamp) updates) => super.copyWith((message) => updates(message as WordTimestamp)) as WordTimestamp; // ignore: deprecated_member_use
+  WordTimestamp copyWith(void Function(WordTimestamp) updates) => super.copyWith((message) => updates(message as WordTimestamp)) as WordTimestamp;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static WordTimestamp create() => WordTimestamp._();
   WordTimestamp createEmptyInstance() => create();
@@ -332,34 +561,48 @@ class WordTimestamp extends $pb.GeneratedMessage {
   void clearConfidence() => clearField(4);
 }
 
+///  ---------------------------------------------------------------------------
+///  Alternative transcription hypothesis (n-best).
+///  Sources pre-IDL:
+///    Swift  STTTypes.swift:275          TranscriptionAlternative (text, confidence)
+///    Kotlin STTTypes.kt:155             TranscriptionAlternative (text, confidence)
+///    Dart   generation_types.dart:146   TranscriptionAlternative (transcript, confidence)
+///    RN     STTTypes.ts:65              STTAlternative (text, confidence)
+///    C ABI  rac_stt_types.h:320         rac_transcription_alternative_t (text, confidence)
+///
+///  Drift: Dart uses `transcript` while everyone else uses `text`. Canonical
+///  field name is `text`. Per-word breakdown is OPTIONAL (only some backends
+///  emit it for alternatives).
+///  ---------------------------------------------------------------------------
 class TranscriptionAlternative extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'TranscriptionAlternative', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'text')
-    ..a<$core.double>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'confidence', $pb.PbFieldType.OF)
-    ..pc<WordTimestamp>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'words', $pb.PbFieldType.PM, subBuilder: WordTimestamp.create)
-    ..hasRequiredFields = false
-  ;
-
-  TranscriptionAlternative._() : super();
   factory TranscriptionAlternative({
     $core.String? text,
     $core.double? confidence,
     $core.Iterable<WordTimestamp>? words,
   }) {
-    final _result = create();
+    final $result = create();
     if (text != null) {
-      _result.text = text;
+      $result.text = text;
     }
     if (confidence != null) {
-      _result.confidence = confidence;
+      $result.confidence = confidence;
     }
     if (words != null) {
-      _result.words.addAll(words);
+      $result.words.addAll(words);
     }
-    return _result;
+    return $result;
   }
+  TranscriptionAlternative._() : super();
   factory TranscriptionAlternative.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory TranscriptionAlternative.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TranscriptionAlternative', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..a<$core.double>(2, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..pc<WordTimestamp>(3, _omitFieldNames ? '' : 'words', $pb.PbFieldType.PM, subBuilder: WordTimestamp.create)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -369,8 +612,10 @@ class TranscriptionAlternative extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  TranscriptionAlternative copyWith(void Function(TranscriptionAlternative) updates) => super.copyWith((message) => updates(message as TranscriptionAlternative)) as TranscriptionAlternative; // ignore: deprecated_member_use
+  TranscriptionAlternative copyWith(void Function(TranscriptionAlternative) updates) => super.copyWith((message) => updates(message as TranscriptionAlternative)) as TranscriptionAlternative;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static TranscriptionAlternative create() => TranscriptionAlternative._();
   TranscriptionAlternative createEmptyInstance() => create();
@@ -401,39 +646,52 @@ class TranscriptionAlternative extends $pb.GeneratedMessage {
   $core.List<WordTimestamp> get words => $_getList(2);
 }
 
+///  ---------------------------------------------------------------------------
+///  Per-pass transcription metadata.
+///  Sources pre-IDL:
+///    Swift  STTTypes.swift:241          TranscriptionMetadata (s + computed RTF)
+///    Kotlin STTTypes.kt:124             TranscriptionMetadata (s + computed RTF)
+///    Dart   generation_types.dart:160   TranscriptionMetadata (s + computed RTF)
+///    RN     STTTypes.ts:73              TranscriptionMetadata (s + optional RTF)
+///    C ABI  rac_stt_types.h:297         rac_transcription_metadata_t (ms + RTF)
+///
+///  Canonicalize on ms (matches C ABI). real_time_factor is producer-set;
+///  consumers may recompute as processing_time_ms / audio_length_ms.
+///  ---------------------------------------------------------------------------
 class TranscriptionMetadata extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'TranscriptionMetadata', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'modelId')
-    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'processingTimeMs')
-    ..aInt64(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'audioLengthMs')
-    ..a<$core.double>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'realTimeFactor', $pb.PbFieldType.OF)
-    ..hasRequiredFields = false
-  ;
-
-  TranscriptionMetadata._() : super();
   factory TranscriptionMetadata({
     $core.String? modelId,
     $fixnum.Int64? processingTimeMs,
     $fixnum.Int64? audioLengthMs,
     $core.double? realTimeFactor,
   }) {
-    final _result = create();
+    final $result = create();
     if (modelId != null) {
-      _result.modelId = modelId;
+      $result.modelId = modelId;
     }
     if (processingTimeMs != null) {
-      _result.processingTimeMs = processingTimeMs;
+      $result.processingTimeMs = processingTimeMs;
     }
     if (audioLengthMs != null) {
-      _result.audioLengthMs = audioLengthMs;
+      $result.audioLengthMs = audioLengthMs;
     }
     if (realTimeFactor != null) {
-      _result.realTimeFactor = realTimeFactor;
+      $result.realTimeFactor = realTimeFactor;
     }
-    return _result;
+    return $result;
   }
+  TranscriptionMetadata._() : super();
   factory TranscriptionMetadata.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory TranscriptionMetadata.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TranscriptionMetadata', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+    ..aInt64(2, _omitFieldNames ? '' : 'processingTimeMs')
+    ..aInt64(3, _omitFieldNames ? '' : 'audioLengthMs')
+    ..a<$core.double>(4, _omitFieldNames ? '' : 'realTimeFactor', $pb.PbFieldType.OF)
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -443,8 +701,10 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  TranscriptionMetadata copyWith(void Function(TranscriptionMetadata) updates) => super.copyWith((message) => updates(message as TranscriptionMetadata)) as TranscriptionMetadata; // ignore: deprecated_member_use
+  TranscriptionMetadata copyWith(void Function(TranscriptionMetadata) updates) => super.copyWith((message) => updates(message as TranscriptionMetadata)) as TranscriptionMetadata;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static TranscriptionMetadata create() => TranscriptionMetadata._();
   TranscriptionMetadata createEmptyInstance() => create();
@@ -490,18 +750,21 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
   void clearRealTimeFactor() => clearField(4);
 }
 
+///  ---------------------------------------------------------------------------
+///  Final STT output.
+///  Sources pre-IDL:
+///    Swift  STTTypes.swift:147          STTOutput (text, conf, words, lang, alts, meta, ts)
+///    Kotlin STTTypes.kt:100             STTOutput (text, conf, words, lang, alts, meta, ts)
+///    Dart   generation_types.dart:218   STTResult / STTOutput (text, conf, durMs, lang, words, alts, meta, ts)
+///    RN     STTTypes.ts:32              STTOutput (text, conf, words, lang, alts, meta)
+///    Web    STTTypes.ts:9               STTTranscriptionResult (text, conf, lang, procMs, words)
+///    C ABI  rac_stt_types.h:338         rac_stt_output_t (text, conf, words, lang, alts, meta, ts_ms)
+///
+///  Drift reconciled:
+///    - language: detected language. Promoted to STTLanguage enum.
+///    - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
+///  ---------------------------------------------------------------------------
 class STTOutput extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'STTOutput', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'text')
-    ..e<STTLanguage>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
-    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'confidence', $pb.PbFieldType.OF)
-    ..pc<WordTimestamp>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'words', $pb.PbFieldType.PM, subBuilder: WordTimestamp.create)
-    ..pc<TranscriptionAlternative>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'alternatives', $pb.PbFieldType.PM, subBuilder: TranscriptionAlternative.create)
-    ..aOM<TranscriptionMetadata>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'metadata', subBuilder: TranscriptionMetadata.create)
-    ..hasRequiredFields = false
-  ;
-
-  STTOutput._() : super();
   factory STTOutput({
     $core.String? text,
     STTLanguage? language,
@@ -509,30 +772,57 @@ class STTOutput extends $pb.GeneratedMessage {
     $core.Iterable<WordTimestamp>? words,
     $core.Iterable<TranscriptionAlternative>? alternatives,
     TranscriptionMetadata? metadata,
+    $core.String? languageCode,
+    $fixnum.Int64? timestampMs,
+    $fixnum.Int64? durationMs,
   }) {
-    final _result = create();
+    final $result = create();
     if (text != null) {
-      _result.text = text;
+      $result.text = text;
     }
     if (language != null) {
-      _result.language = language;
+      $result.language = language;
     }
     if (confidence != null) {
-      _result.confidence = confidence;
+      $result.confidence = confidence;
     }
     if (words != null) {
-      _result.words.addAll(words);
+      $result.words.addAll(words);
     }
     if (alternatives != null) {
-      _result.alternatives.addAll(alternatives);
+      $result.alternatives.addAll(alternatives);
     }
     if (metadata != null) {
-      _result.metadata = metadata;
+      $result.metadata = metadata;
     }
-    return _result;
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    if (timestampMs != null) {
+      $result.timestampMs = timestampMs;
+    }
+    if (durationMs != null) {
+      $result.durationMs = durationMs;
+    }
+    return $result;
   }
+  STTOutput._() : super();
   factory STTOutput.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory STTOutput.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTOutput', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..e<STTLanguage>(2, _omitFieldNames ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..pc<WordTimestamp>(4, _omitFieldNames ? '' : 'words', $pb.PbFieldType.PM, subBuilder: WordTimestamp.create)
+    ..pc<TranscriptionAlternative>(5, _omitFieldNames ? '' : 'alternatives', $pb.PbFieldType.PM, subBuilder: TranscriptionAlternative.create)
+    ..aOM<TranscriptionMetadata>(6, _omitFieldNames ? '' : 'metadata', subBuilder: TranscriptionMetadata.create)
+    ..aOS(7, _omitFieldNames ? '' : 'languageCode')
+    ..aInt64(8, _omitFieldNames ? '' : 'timestampMs')
+    ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -542,8 +832,10 @@ class STTOutput extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  STTOutput copyWith(void Function(STTOutput) updates) => super.copyWith((message) => updates(message as STTOutput)) as STTOutput; // ignore: deprecated_member_use
+  STTOutput copyWith(void Function(STTOutput) updates) => super.copyWith((message) => updates(message as STTOutput)) as STTOutput;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static STTOutput create() => STTOutput._();
   STTOutput createEmptyInstance() => create();
@@ -595,36 +887,106 @@ class STTOutput extends $pb.GeneratedMessage {
   void clearMetadata() => clearField(6);
   @$pb.TagNumber(6)
   TranscriptionMetadata ensureMetadata() => $_ensure(5);
+
+  /// Free-form detected language tag, preserving regional variants.
+  @$pb.TagNumber(7)
+  $core.String get languageCode => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set languageCode($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasLanguageCode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearLanguageCode() => clearField(7);
+
+  /// Wall-clock output timestamp in milliseconds since Unix epoch.
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get timestampMs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set timestampMs($fixnum.Int64 v) { $_setInt64(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasTimestampMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTimestampMs() => clearField(8);
+
+  /// Audio duration in milliseconds for SDKs that expose duration directly.
+  /// Often duplicates metadata.audio_length_ms.
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get durationMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set durationMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasDurationMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearDurationMs() => clearField(9);
 }
 
+///  ---------------------------------------------------------------------------
+///  Streaming partial result emitted during live transcription.
+///  Sources pre-IDL:
+///    Dart   generation_types.dart:184   STTPartialResult (transcript, conf, isFinal, lang, ts, alts)
+///    RN     STTTypes.ts:90              STTPartialResult (transcript, conf, ts, lang, alts, isFinal)
+///    C ABI  rac_stt_types.h:240         rac_stt_stream_callback_t (partial_text, is_final)
+///    Web    STTTypes.ts:31              STTStreamCallback (text, isFinal)
+///
+///  Canonical minimal shape per spec: text, is_final, stability. Full word
+///  timestamps + alternatives flow through STTOutput on the terminal event.
+///  `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
+///  0.0 when backend does not provide one.
+///  ---------------------------------------------------------------------------
 class STTPartialResult extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'STTPartialResult', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'text')
-    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'isFinal')
-    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'stability', $pb.PbFieldType.OF)
-    ..hasRequiredFields = false
-  ;
-
-  STTPartialResult._() : super();
   factory STTPartialResult({
     $core.String? text,
     $core.bool? isFinal,
     $core.double? stability,
+    $core.double? confidence,
+    STTLanguage? language,
+    $fixnum.Int64? timestampMs,
+    $core.Iterable<TranscriptionAlternative>? alternatives,
+    $core.String? languageCode,
   }) {
-    final _result = create();
+    final $result = create();
     if (text != null) {
-      _result.text = text;
+      $result.text = text;
     }
     if (isFinal != null) {
-      _result.isFinal = isFinal;
+      $result.isFinal = isFinal;
     }
     if (stability != null) {
-      _result.stability = stability;
+      $result.stability = stability;
     }
-    return _result;
+    if (confidence != null) {
+      $result.confidence = confidence;
+    }
+    if (language != null) {
+      $result.language = language;
+    }
+    if (timestampMs != null) {
+      $result.timestampMs = timestampMs;
+    }
+    if (alternatives != null) {
+      $result.alternatives.addAll(alternatives);
+    }
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    return $result;
   }
+  STTPartialResult._() : super();
   factory STTPartialResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory STTPartialResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTPartialResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aOB(2, _omitFieldNames ? '' : 'isFinal')
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'stability', $pb.PbFieldType.OF)
+    ..a<$core.double>(4, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..e<STTLanguage>(5, _omitFieldNames ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
+    ..aInt64(6, _omitFieldNames ? '' : 'timestampMs')
+    ..pc<TranscriptionAlternative>(7, _omitFieldNames ? '' : 'alternatives', $pb.PbFieldType.PM, subBuilder: TranscriptionAlternative.create)
+    ..aOS(8, _omitFieldNames ? '' : 'languageCode')
+    ..hasRequiredFields = false
+  ;
+
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
@@ -634,8 +996,10 @@ class STTPartialResult extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  STTPartialResult copyWith(void Function(STTPartialResult) updates) => super.copyWith((message) => updates(message as STTPartialResult)) as STTPartialResult; // ignore: deprecated_member_use
+  STTPartialResult copyWith(void Function(STTPartialResult) updates) => super.copyWith((message) => updates(message as STTPartialResult)) as STTPartialResult;
+
   $pb.BuilderInfo get info_ => _i;
+
   @$core.pragma('dart2js:noInline')
   static STTPartialResult create() => STTPartialResult._();
   STTPartialResult createEmptyInstance() => create();
@@ -670,5 +1034,48 @@ class STTPartialResult extends $pb.GeneratedMessage {
   $core.bool hasStability() => $_has(2);
   @$pb.TagNumber(3)
   void clearStability() => clearField(3);
+
+  /// Additional partial-hypothesis fields carried by Dart/RN live streams.
+  @$pb.TagNumber(4)
+  $core.double get confidence => $_getN(3);
+  @$pb.TagNumber(4)
+  set confidence($core.double v) { $_setFloat(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasConfidence() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearConfidence() => clearField(4);
+
+  @$pb.TagNumber(5)
+  STTLanguage get language => $_getN(4);
+  @$pb.TagNumber(5)
+  set language(STTLanguage v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasLanguage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLanguage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get timestampMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set timestampMs($fixnum.Int64 v) { $_setInt64(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasTimestampMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTimestampMs() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.List<TranscriptionAlternative> get alternatives => $_getList(6);
+
+  @$pb.TagNumber(8)
+  $core.String get languageCode => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set languageCode($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasLanguageCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLanguageCode() => clearField(8);
 }
 
+
+const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
+const _omitMessageNames = $core.bool.fromEnvironment('protobuf.omit_message_names');

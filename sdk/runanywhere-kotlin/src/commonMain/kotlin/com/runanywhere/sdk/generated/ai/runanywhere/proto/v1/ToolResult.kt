@@ -13,6 +13,8 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +26,8 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.Map
+import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -62,8 +66,43 @@ public class ToolResult(
     schemaIndex = 3,
   )
   public val error: String? = null,
+  /**
+   * Whether execution succeeded. If unset/false and error is empty,
+   * consumers should fall back to legacy result_json/error semantics.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val success: Boolean = false,
+  result: Map<String, ToolValue> = emptyMap(),
+  /**
+   * Alias for tool_call_id used by pre-proto SDK surfaces.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "callId",
+    schemaIndex = 6,
+  )
+  public val call_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolResult, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * Strongly-typed result map for SDKs that do not want to parse
+   * result_json. Producers should keep result_json populated for C++
+   * tokenizer compatibility.
+   */
+  @field:WireField(
+    tag = 6,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.ToolValue#ADAPTER",
+    schemaIndex = 5,
+  )
+  public val result: Map<String, ToolValue> = immutableCopyOf("result", result)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -79,29 +118,38 @@ public class ToolResult(
     if (name != other.name) return false
     if (result_json != other.result_json) return false
     if (error != other.error) return false
+    if (success != other.success) return false
+    if (result != other.result) return false
+    if (call_id != other.call_id) return false
     return true
   }
 
   override fun hashCode(): Int {
-    var result = super.hashCode
-    if (result == 0) {
-      result = unknownFields.hashCode()
-      result = result * 37 + tool_call_id.hashCode()
-      result = result * 37 + name.hashCode()
-      result = result * 37 + result_json.hashCode()
-      result = result * 37 + (error?.hashCode() ?: 0)
-      super.hashCode = result
+    var result_ = super.hashCode
+    if (result_ == 0) {
+      result_ = unknownFields.hashCode()
+      result_ = result_ * 37 + tool_call_id.hashCode()
+      result_ = result_ * 37 + name.hashCode()
+      result_ = result_ * 37 + result_json.hashCode()
+      result_ = result_ * 37 + (error?.hashCode() ?: 0)
+      result_ = result_ * 37 + success.hashCode()
+      result_ = result_ * 37 + result.hashCode()
+      result_ = result_ * 37 + (call_id?.hashCode() ?: 0)
+      super.hashCode = result_
     }
-    return result
+    return result_
   }
 
   override fun toString(): String {
-    val result = mutableListOf<String>()
-    result += """tool_call_id=${sanitize(tool_call_id)}"""
-    result += """name=${sanitize(name)}"""
-    result += """result_json=${sanitize(result_json)}"""
-    if (error != null) result += """error=${sanitize(error)}"""
-    return result.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
+    val result_ = mutableListOf<String>()
+    result_ += """tool_call_id=${sanitize(tool_call_id)}"""
+    result_ += """name=${sanitize(name)}"""
+    result_ += """result_json=${sanitize(result_json)}"""
+    if (error != null) result_ += """error=${sanitize(error)}"""
+    result_ += """success=$success"""
+    if (result.isNotEmpty()) result_ += """result=$result"""
+    if (call_id != null) result_ += """call_id=${sanitize(call_id)}"""
+    return result_.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
@@ -109,8 +157,12 @@ public class ToolResult(
     name: String = this.name,
     result_json: String = this.result_json,
     error: String? = this.error,
+    success: Boolean = this.success,
+    result: Map<String, ToolValue> = this.result,
+    call_id: String? = this.call_id,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, unknownFields)
+  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, result, call_id,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -122,6 +174,9 @@ public class ToolResult(
       null, 
       "tool_calling.proto"
     ) {
+      private val resultAdapter: ProtoAdapter<Map<String, ToolValue>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ToolValue.ADAPTER) }
+
       override fun encodedSize(`value`: ToolResult): Int {
         var size = value.unknownFields.size
         if (value.tool_call_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
@@ -130,6 +185,9 @@ public class ToolResult(
         if (value.result_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3,
             value.result_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error)
+        if (value.success != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.success)
+        size += resultAdapter.encodedSizeWithTag(6, value.result)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.call_id)
         return size
       }
 
@@ -139,11 +197,17 @@ public class ToolResult(
         if (value.name != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.name)
         if (value.result_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
+        if (value.success != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
+        resultAdapter.encodeWithTag(writer, 6, value.result)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
+        resultAdapter.encodeWithTag(writer, 6, value.result)
+        if (value.success != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
         if (value.result_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
         if (value.name != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.name)
@@ -156,12 +220,18 @@ public class ToolResult(
         var name: String = ""
         var result_json: String = ""
         var error: String? = null
+        var success: Boolean = false
+        val result = mutableMapOf<String, ToolValue>()
+        var call_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
             2 -> name = ProtoAdapter.STRING.decode(reader)
             3 -> result_json = ProtoAdapter.STRING.decode(reader)
             4 -> error = ProtoAdapter.STRING.decode(reader)
+            5 -> success = ProtoAdapter.BOOL.decode(reader)
+            6 -> result.putAll(resultAdapter.decode(reader))
+            7 -> call_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -170,11 +240,15 @@ public class ToolResult(
           name = name,
           result_json = result_json,
           error = error,
+          success = success,
+          result = result,
+          call_id = call_id,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolResult): ToolResult = value.copy(
+        result = value.result.redactElements(ToolValue.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

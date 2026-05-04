@@ -24,6 +24,31 @@ message LLMGenerateRequest {
     int32  top_k            = 5;
     string system_prompt    = 6;
     bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
+
+    // Additional LLMGenerationOptions fields kept inline to avoid a codegen
+    // package cycle between service stubs and option messages.
+    float  repetition_penalty = 8;
+    repeated string stop_sequences = 9;
+    bool   streaming_enabled = 10;
+    string preferred_framework = 11;
+    string json_schema = 12;
+    string execution_target = 13;
+}
+
+// Aggregate result carried on the terminal LLMStreamEvent. This intentionally
+// duplicates the scalar result fields instead of importing llm_options.proto:
+// Square Wire treats files with/without go_package as different Kotlin
+// packages, and that import creates a package cycle through sdk_events.
+message LLMStreamFinalResult {
+    string text = 1;
+    optional string thinking_content = 2;
+    int32 prompt_tokens = 3;
+    int32 completion_tokens = 4;
+    int32 total_tokens = 5;
+    int64 total_time_ms = 6;
+    int64 time_to_first_token_ms = 7;
+    float tokens_per_second = 8;
+    string finish_reason = 9;
 }
 
 // v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -64,6 +89,14 @@ message LLMStreamEvent {
     // Error message on failure events (kind may be unset, is_final true).
     // Empty on success.
     string error_message   = 9;
+
+    // Final aggregate result. Only populated on terminal events
+    // (is_final=true) when the backend can report result metrics.
+    optional LLMStreamFinalResult result = 10;
+
+    // Numeric backend status code when the terminal event represents a
+    // failure. 0 = unset/success.
+    int32 error_code = 11;
 }
 
 enum LLMTokenKind {

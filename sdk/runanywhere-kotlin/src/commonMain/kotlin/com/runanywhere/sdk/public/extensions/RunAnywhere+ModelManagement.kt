@@ -15,7 +15,26 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ArchiveStructure
 import com.runanywhere.sdk.public.extensions.Models.ArchiveType
+import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.CurrentModelResult
+import ai.runanywhere.proto.v1.DownloadCancelRequest
+import ai.runanywhere.proto.v1.DownloadCancelResult
+import ai.runanywhere.proto.v1.DownloadPlanRequest
+import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.DownloadResumeRequest
+import ai.runanywhere.proto.v1.DownloadResumeResult
+import ai.runanywhere.proto.v1.DownloadStartRequest
+import ai.runanywhere.proto.v1.DownloadStartResult
+import ai.runanywhere.proto.v1.DownloadSubscribeRequest
+import ai.runanywhere.proto.v1.ModelLoadRequest
+import ai.runanywhere.proto.v1.ModelLoadResult
+import ai.runanywhere.proto.v1.ModelUnloadRequest
+import ai.runanywhere.proto.v1.ModelUnloadResult
+import ai.runanywhere.proto.v1.SDKComponent
+import ai.runanywhere.proto.v1.ModelInfoList as ProtoModelInfoList
+import ai.runanywhere.proto.v1.ModelQuery as ProtoModelQuery
 import com.runanywhere.sdk.public.extensions.Models.ModelArtifactType
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
@@ -293,6 +312,39 @@ expect suspend fun RunAnywhere.downloadedModels(): List<ModelInfo>
  */
 expect suspend fun RunAnywhere.model(modelId: String): ModelInfo?
 
+/**
+ * Query the model registry using the generated proto request/result surface.
+ */
+expect suspend fun RunAnywhere.queryModels(query: ProtoModelQuery = ProtoModelQuery()): ProtoModelInfoList
+
+/**
+ * List downloaded models using the generated proto result surface.
+ */
+expect suspend fun RunAnywhere.downloadedModelsProto(): ProtoModelInfoList
+
+/**
+ * Load a model through the stable generated proto lifecycle API.
+ *
+ * Semantic failures are represented by [ModelLoadResult.success] and
+ * [ModelLoadResult.error_message].
+ */
+expect suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult
+
+/**
+ * Unload models through the stable generated proto lifecycle API.
+ */
+expect suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult
+
+/**
+ * Query the currently loaded model through the stable generated proto lifecycle API.
+ */
+expect suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModelRequest()): CurrentModelResult
+
+/**
+ * Snapshot a component lifecycle state through the stable generated proto lifecycle API.
+ */
+expect suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot
+
 // MARK: - Model Downloads
 
 /**
@@ -302,6 +354,36 @@ expect suspend fun RunAnywhere.model(modelId: String): ModelInfo?
  * @return Flow of download progress
  */
 expect fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress>
+
+/**
+ * Plan a download through the stable generated proto API.
+ */
+expect suspend fun RunAnywhere.planDownload(request: DownloadPlanRequest): DownloadPlanResult
+
+/**
+ * Start a download through the stable generated proto API.
+ */
+expect fun RunAnywhere.startDownload(request: DownloadStartRequest): Flow<DownloadProgress>
+
+/**
+ * Start a download and return the generated proto start result.
+ */
+expect suspend fun RunAnywhere.startDownloadProto(request: DownloadStartRequest): DownloadStartResult
+
+/**
+ * Cancel a download through the stable generated proto API.
+ */
+expect suspend fun RunAnywhere.cancelDownload(request: DownloadCancelRequest): DownloadCancelResult
+
+/**
+ * Resume a download through the stable generated proto API.
+ */
+expect suspend fun RunAnywhere.resumeDownload(request: DownloadResumeRequest): DownloadResumeResult
+
+/**
+ * Poll latest download progress through the stable generated proto API.
+ */
+expect suspend fun RunAnywhere.downloadProgress(request: DownloadSubscribeRequest): DownloadProgress?
 
 /**
  * Cancel a model download.

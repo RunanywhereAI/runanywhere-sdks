@@ -233,6 +233,37 @@ public struct STTOutput: ComponentOutput {
             timestamp: Date(timeIntervalSince1970: TimeInterval(cOutput.timestamp_ms) / 1000.0)
         )
     }
+
+    /// Initialize from the generated-proto C++ STT output.
+    public init(from proto: RASTTOutput) {
+        let wordTimestamps: [WordTimestamp]? = proto.words.isEmpty ? nil : proto.words.map {
+            WordTimestamp(
+                word: $0.word,
+                startTime: TimeInterval($0.startMs) / 1000.0,
+                endTime: TimeInterval($0.endMs) / 1000.0,
+                confidence: $0.confidence
+            )
+        }
+        let alternatives: [TranscriptionAlternative]? = proto.alternatives.isEmpty ? nil : proto.alternatives.map {
+            TranscriptionAlternative(text: $0.text, confidence: $0.confidence)
+        }
+        let metadata = TranscriptionMetadata(
+            modelId: proto.hasMetadata ? proto.metadata.modelID : "unknown",
+            processingTime: proto.hasMetadata ? TimeInterval(proto.metadata.processingTimeMs) / 1000.0 : 0,
+            audioLength: proto.hasMetadata ? TimeInterval(proto.metadata.audioLengthMs) / 1000.0 : TimeInterval(proto.durationMs) / 1000.0
+        )
+        self.init(
+            text: proto.text,
+            confidence: proto.confidence,
+            wordTimestamps: wordTimestamps,
+            detectedLanguage: proto.hasLanguageCode ? proto.languageCode : proto.language.shortCode,
+            alternatives: alternatives,
+            metadata: metadata,
+            timestamp: proto.timestampMs > 0
+                ? Date(timeIntervalSince1970: TimeInterval(proto.timestampMs) / 1000.0)
+                : Date()
+        )
+    }
 }
 
 // MARK: - Supporting Types
@@ -443,5 +474,26 @@ extension TranscriptionMetadata {
         proto.audioLengthMs = Int64(audioLength * 1000)
         proto.realTimeFactor = Float(realTimeFactor)
         return proto
+    }
+}
+
+private extension RASTTLanguage {
+    var shortCode: String? {
+        switch self {
+        case .auto: return "auto"
+        case .en: return "en"
+        case .es: return "es"
+        case .fr: return "fr"
+        case .de: return "de"
+        case .zh: return "zh"
+        case .ja: return "ja"
+        case .ko: return "ko"
+        case .it: return "it"
+        case .pt: return "pt"
+        case .ar: return "ar"
+        case .ru: return "ru"
+        case .hi: return "hi"
+        case .unspecified, .UNRECOGNIZED: return nil
+        }
     }
 }

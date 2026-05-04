@@ -102,7 +102,7 @@ struct SolutionsView: View {
                     .padding(8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.secondarySystemBackground))
+                .background(Color.gray.opacity(0.12))
                 .cornerRadius(8)
             }
             .padding()

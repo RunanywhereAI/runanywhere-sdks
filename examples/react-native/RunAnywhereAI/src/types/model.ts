@@ -5,37 +5,23 @@
  */
 
 /**
- * LLM Framework types
- */
-export enum LLMFramework {
-  CoreML = 'CoreML',
-  TensorFlowLite = 'TFLite',
-  MLX = 'MLX',
-  SwiftTransformers = 'SwiftTransformers',
-  ONNX = 'ONNX',
-  ExecuTorch = 'ExecuTorch',
-  LlamaCpp = 'LlamaCpp',
-  FoundationModels = 'FoundationModels',
-  PicoLLM = 'PicoLLM',
-  MLC = 'MLC',
-  MediaPipe = 'MediaPipe',
-  WhisperKit = 'WhisperKit',
-  OpenAIWhisper = 'OpenAIWhisper',
-  SystemTTS = 'SystemTTS',
-  PiperTTS = 'PiperTTS',
-  Genie = 'Genie',
-  Sherpa = 'Sherpa',
-}
-
-/**
  * Model category — re-exported from `@runanywhere/core` (which re-exports the
  * canonical `ModelCategory` proto enum from `@runanywhere/proto-ts`). Keep
  * this re-export so existing example-app imports `from '../types/model'`
  * continue to resolve, but the values are the proto canonical
  * `MODEL_CATEGORY_*` numeric form, not the prior hand-rolled string form.
  */
-import { ModelCategory } from '@runanywhere/core';
-export { ModelCategory };
+import {
+  LLMFramework,
+  LLMFrameworkDisplayNames,
+  ModelCategory,
+  InferenceFramework,
+  type ModelInfo,
+  type ProtoModelInfo,
+} from '@runanywhere/core';
+export { LLMFramework, ModelCategory, InferenceFramework };
+export { LLMFrameworkDisplayNames as FrameworkDisplayNames };
+export type { ModelInfo, ProtoModelInfo };
 
 /**
  * Model modality for filtering
@@ -45,53 +31,6 @@ export enum ModelModality {
   STT = 'stt',
   TTS = 'tts',
   VLM = 'vlm',
-}
-
-/**
- * Model info
- */
-export interface ModelInfo {
-  /** Unique identifier */
-  id: string;
-
-  /** Human-readable name */
-  name: string;
-
-  /** Model category */
-  category: ModelCategory;
-
-  /** Compatible frameworks */
-  compatibleFrameworks: LLMFramework[];
-
-  /** Preferred framework */
-  preferredFramework?: LLMFramework;
-
-  /** Download size in bytes */
-  downloadSize?: number;
-
-  /** Memory required in bytes */
-  memoryRequired?: number;
-
-  /** Context length */
-  contextLength?: number;
-
-  /** Whether model supports thinking/reasoning */
-  supportsThinking: boolean;
-
-  /** Download URL */
-  downloadURL?: string;
-
-  /** Local path if downloaded */
-  localPath?: string;
-
-  /** Whether downloaded */
-  isDownloaded: boolean;
-
-  /** Whether available for use */
-  isAvailable: boolean;
-
-  /** Description */
-  description?: string;
 }
 
 /**
@@ -122,27 +61,3 @@ export interface DeviceInfo {
   /** Number of CPU cores */
   cpuCores?: number;
 }
-
-/**
- * Framework display name mapping
- */
-export const FrameworkDisplayNames: Record<LLMFramework, string> = {
-  [LLMFramework.CoreML]: 'Core ML',
-  [LLMFramework.TensorFlowLite]: 'TensorFlow Lite',
-  [LLMFramework.MLX]: 'MLX',
-  [LLMFramework.SwiftTransformers]: 'Swift Transformers',
-  [LLMFramework.ONNX]: 'ONNX Runtime',
-  [LLMFramework.ExecuTorch]: 'ExecuTorch',
-  [LLMFramework.LlamaCpp]: 'llama.cpp',
-  [LLMFramework.FoundationModels]: 'Foundation Models',
-  [LLMFramework.PicoLLM]: 'Pico LLM',
-  [LLMFramework.MLC]: 'MLC',
-  [LLMFramework.MediaPipe]: 'MediaPipe',
-  [LLMFramework.WhisperKit]: 'WhisperKit',
-  [LLMFramework.OpenAIWhisper]: 'OpenAI Whisper',
-  [LLMFramework.SystemTTS]: 'System TTS',
-  [LLMFramework.PiperTTS]: 'Piper TTS',
-  [LLMFramework.Genie]: 'Genie NPU',
-  [LLMFramework.Sherpa]: 'Sherpa-ONNX',
-};
-

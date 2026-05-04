@@ -36,9 +36,11 @@ library runanywhere_genie;
 import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework, ModelCategory;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/public/runanywhere_v4.dart' show RunAnywhereSDK;
 import 'package:runanywhere_genie/native/genie_bindings.dart';
@@ -79,13 +81,15 @@ class Genie implements RunAnywhereModule {
   String get moduleName => 'Genie';
 
   @override
-  Set<SDKComponent> get capabilities => _isRegistered ? {SDKComponent.llm} : {};
+  Set<SDKComponent> get capabilities =>
+      _isRegistered ? {SDKComponent.SDK_COMPONENT_LLM} : {};
 
   @override
   int get defaultPriority => _isRegistered ? 200 : 0;
 
   @override
-  InferenceFramework get inferenceFramework => InferenceFramework.genie;
+  InferenceFramework get inferenceFramework =>
+      InferenceFramework.INFERENCE_FRAMEWORK_GENIE;
 
   // ============================================================================
   // Registration State
@@ -218,8 +222,8 @@ class Genie implements RunAnywhereModule {
       id: modelId,
       name: name,
       url: uri,
-      framework: InferenceFramework.genie,
-      modality: ModelCategory.language,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
+      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
       memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,
     );

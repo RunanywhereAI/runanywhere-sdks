@@ -1,4 +1,9 @@
 import _m0 from "protobufjs/minimal";
+import { DownloadCancelResult, DownloadPlanResult, DownloadProgress, DownloadResumeResult, DownloadStartResult } from "./download_service";
+import { SDKError } from "./errors";
+import { HardwareProfileResult } from "./hardware_profile";
+import { CurrentModelResult, InferenceFramework, ModelCompatibilityResult, ModelDeleteResult, ModelDiscoveryResult, ModelGetResult, ModelImportResult, ModelListResult, ModelLoadResult, ModelRegistryRefreshResult, ModelUnloadResult } from "./model_types";
+import { StorageAvailabilityResult, StorageDeletePlan, StorageDeleteResult, StorageInfoResult } from "./storage_types";
 import { VoiceEvent } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -70,6 +75,72 @@ export declare enum EventDestination {
 }
 export declare function eventDestinationFromJSON(object: any): EventDestination;
 export declare function eventDestinationToJSON(object: EventDestination): string;
+/**
+ * Canonical event category carried by every SDKEvent envelope. The oneof arm
+ * identifies the concrete payload shape; this field preserves the stable bus /
+ * analytics route used by Swift, Kotlin, Dart/Flutter, React Native, Web, and
+ * C++ commons.
+ */
+export declare enum EventCategory {
+    EVENT_CATEGORY_UNSPECIFIED = 0,
+    EVENT_CATEGORY_SDK = 1,
+    EVENT_CATEGORY_INITIALIZATION = 2,
+    EVENT_CATEGORY_SHUTDOWN = 3,
+    EVENT_CATEGORY_SESSION = 4,
+    EVENT_CATEGORY_AUTH = 5,
+    EVENT_CATEGORY_DEVICE = 6,
+    EVENT_CATEGORY_REGISTRY = 7,
+    EVENT_CATEGORY_ASSIGNMENT = 8,
+    EVENT_CATEGORY_IMPORT = 9,
+    EVENT_CATEGORY_DISCOVERY = 10,
+    EVENT_CATEGORY_DOWNLOAD = 11,
+    EVENT_CATEGORY_STORAGE = 12,
+    EVENT_CATEGORY_HARDWARE = 13,
+    EVENT_CATEGORY_ROUTING = 14,
+    EVENT_CATEGORY_FRAMEWORK = 15,
+    EVENT_CATEGORY_MODEL = 16,
+    EVENT_CATEGORY_COMPONENT = 17,
+    EVENT_CATEGORY_LLM = 18,
+    EVENT_CATEGORY_STT = 19,
+    EVENT_CATEGORY_ASR = 20,
+    EVENT_CATEGORY_TTS = 21,
+    EVENT_CATEGORY_VAD = 22,
+    /** EVENT_CATEGORY_STD - speech-turn detection / diarization */
+    EVENT_CATEGORY_STD = 23,
+    EVENT_CATEGORY_VOICE_AGENT = 24,
+    EVENT_CATEGORY_VLM = 25,
+    EVENT_CATEGORY_DIFFUSION = 26,
+    EVENT_CATEGORY_EMBEDDINGS = 27,
+    EVENT_CATEGORY_RAG = 28,
+    EVENT_CATEGORY_LORA = 29,
+    EVENT_CATEGORY_TELEMETRY = 30,
+    EVENT_CATEGORY_PERFORMANCE = 31,
+    EVENT_CATEGORY_CANCELLATION = 32,
+    EVENT_CATEGORY_FAILURE = 33,
+    EVENT_CATEGORY_NETWORK = 34,
+    EVENT_CATEGORY_ERROR = 35,
+    UNRECOGNIZED = -1
+}
+export declare function eventCategoryFromJSON(object: any): EventCategory;
+export declare function eventCategoryToJSON(object: EventCategory): string;
+/**
+ * Component runtime lifecycle state for model-backed SDK components. This is
+ * distinct from voice_events.proto's ComponentLoadState, which is scoped to
+ * the voice-agent sub-pipeline. Platform adapters own native component handles;
+ * this enum carries the C++ lifecycle state every SDK can expose uniformly.
+ */
+export declare enum ComponentLifecycleState {
+    COMPONENT_LIFECYCLE_STATE_UNSPECIFIED = 0,
+    COMPONENT_LIFECYCLE_STATE_NOT_LOADED = 1,
+    COMPONENT_LIFECYCLE_STATE_LOADING = 2,
+    COMPONENT_LIFECYCLE_STATE_READY = 3,
+    COMPONENT_LIFECYCLE_STATE_UNLOADING = 4,
+    COMPONENT_LIFECYCLE_STATE_ERROR = 5,
+    COMPONENT_LIFECYCLE_STATE_SHUTDOWN = 6,
+    UNRECOGNIZED = -1
+}
+export declare function componentLifecycleStateFromJSON(object: any): ComponentLifecycleState;
+export declare function componentLifecycleStateToJSON(object: ComponentLifecycleState): string;
 export declare enum InitializationStage {
     INITIALIZATION_STAGE_UNSPECIFIED = 0,
     INITIALIZATION_STAGE_STARTED = 1,
@@ -124,6 +195,17 @@ export declare enum GenerationEventKind {
     GENERATION_EVENT_KIND_ROUTING_DECISION = 12,
     /** GENERATION_EVENT_KIND_STREAM_COMPLETED - Kotlin LLMEvent.STREAM_COMPLETED */
     GENERATION_EVENT_KIND_STREAM_COMPLETED = 13,
+    GENERATION_EVENT_KIND_CANCEL_REQUESTED = 14,
+    GENERATION_EVENT_KIND_CANCELLED = 15,
+    GENERATION_EVENT_KIND_TOOL_CALL_STARTED = 16,
+    GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED = 17,
+    GENERATION_EVENT_KIND_TOOL_CALL_FAILED = 18,
+    GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED = 19,
+    GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED = 20,
+    GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED = 21,
+    GENERATION_EVENT_KIND_THINKING_STARTED = 22,
+    GENERATION_EVENT_KIND_THINKING_DELTA = 23,
+    GENERATION_EVENT_KIND_THINKING_COMPLETED = 24,
     UNRECOGNIZED = -1
 }
 export declare function generationEventKindFromJSON(object: any): GenerationEventKind;
@@ -322,6 +404,141 @@ export declare enum ComponentInitializationEventKind {
 }
 export declare function componentInitializationEventKindFromJSON(object: any): ComponentInitializationEventKind;
 export declare function componentInitializationEventKindToJSON(object: ComponentInitializationEventKind): string;
+export declare enum SessionEventKind {
+    SESSION_EVENT_KIND_UNSPECIFIED = 0,
+    SESSION_EVENT_KIND_CREATED = 1,
+    SESSION_EVENT_KIND_STARTED = 2,
+    SESSION_EVENT_KIND_RESUMED = 3,
+    SESSION_EVENT_KIND_PAUSED = 4,
+    SESSION_EVENT_KIND_ENDED = 5,
+    SESSION_EVENT_KIND_EXPIRED = 6,
+    SESSION_EVENT_KIND_FAILED = 7,
+    UNRECOGNIZED = -1
+}
+export declare function sessionEventKindFromJSON(object: any): SessionEventKind;
+export declare function sessionEventKindToJSON(object: SessionEventKind): string;
+export declare enum AuthEventKind {
+    AUTH_EVENT_KIND_UNSPECIFIED = 0,
+    AUTH_EVENT_KIND_REQUESTED = 1,
+    AUTH_EVENT_KIND_SUCCEEDED = 2,
+    AUTH_EVENT_KIND_FAILED = 3,
+    AUTH_EVENT_KIND_TOKEN_REFRESHED = 4,
+    AUTH_EVENT_KIND_TOKEN_EXPIRED = 5,
+    AUTH_EVENT_KIND_DEVICE_REGISTERED = 6,
+    AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED = 7,
+    UNRECOGNIZED = -1
+}
+export declare function authEventKindFromJSON(object: any): AuthEventKind;
+export declare function authEventKindToJSON(object: AuthEventKind): string;
+export declare enum ModelRegistryEventKind {
+    MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED = 0,
+    MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED = 1,
+    MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED = 2,
+    MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED = 3,
+    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED = 4,
+    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED = 5,
+    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED = 6,
+    MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED = 7,
+    MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED = 8,
+    MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED = 9,
+    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED = 10,
+    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED = 11,
+    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED = 12,
+    MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED = 13,
+    UNRECOGNIZED = -1
+}
+export declare function modelRegistryEventKindFromJSON(object: any): ModelRegistryEventKind;
+export declare function modelRegistryEventKindToJSON(object: ModelRegistryEventKind): string;
+export declare enum DownloadEventKind {
+    DOWNLOAD_EVENT_KIND_UNSPECIFIED = 0,
+    DOWNLOAD_EVENT_KIND_PLAN_STARTED = 1,
+    DOWNLOAD_EVENT_KIND_PLAN_COMPLETED = 2,
+    DOWNLOAD_EVENT_KIND_PLAN_FAILED = 3,
+    DOWNLOAD_EVENT_KIND_STARTED = 4,
+    DOWNLOAD_EVENT_KIND_PROGRESS = 5,
+    DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED = 6,
+    DOWNLOAD_EVENT_KIND_CANCELLED = 7,
+    DOWNLOAD_EVENT_KIND_RESUME_REQUESTED = 8,
+    DOWNLOAD_EVENT_KIND_RESUMED = 9,
+    DOWNLOAD_EVENT_KIND_COMPLETED = 10,
+    DOWNLOAD_EVENT_KIND_FAILED = 11,
+    UNRECOGNIZED = -1
+}
+export declare function downloadEventKindFromJSON(object: any): DownloadEventKind;
+export declare function downloadEventKindToJSON(object: DownloadEventKind): string;
+export declare enum StorageLifecycleEventKind {
+    STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
+    STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED = 1,
+    STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED = 2,
+    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED = 3,
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED = 4,
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED = 5,
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED = 6,
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED = 7,
+    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED = 8,
+    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED = 9,
+    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED = 10,
+    UNRECOGNIZED = -1
+}
+export declare function storageLifecycleEventKindFromJSON(object: any): StorageLifecycleEventKind;
+export declare function storageLifecycleEventKindToJSON(object: StorageLifecycleEventKind): string;
+export declare enum HardwareRoutingEventKind {
+    HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED = 0,
+    HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED = 1,
+    HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED = 2,
+    HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED = 3,
+    HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED = 4,
+    HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED = 5,
+    HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED = 6,
+    HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING = 7,
+    UNRECOGNIZED = -1
+}
+export declare function hardwareRoutingEventKindFromJSON(object: any): HardwareRoutingEventKind;
+export declare function hardwareRoutingEventKindToJSON(object: HardwareRoutingEventKind): string;
+export declare enum CapabilityOperationEventKind {
+    CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED = 0,
+    CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED = 1,
+    CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED = 2,
+    CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED = 3,
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED = 4,
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS = 5,
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED = 6,
+    CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED = 7,
+    CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED = 8,
+    CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED = 9,
+    CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED = 10,
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED = 11,
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED = 12,
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED = 13,
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED = 14,
+    CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED = 15,
+    CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED = 16,
+    CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED = 17,
+    CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED = 18,
+    UNRECOGNIZED = -1
+}
+export declare function capabilityOperationEventKindFromJSON(object: any): CapabilityOperationEventKind;
+export declare function capabilityOperationEventKindToJSON(object: CapabilityOperationEventKind): string;
+export declare enum TelemetryEventKind {
+    TELEMETRY_EVENT_KIND_UNSPECIFIED = 0,
+    TELEMETRY_EVENT_KIND_COUNTER = 1,
+    TELEMETRY_EVENT_KIND_GAUGE = 2,
+    TELEMETRY_EVENT_KIND_HISTOGRAM = 3,
+    TELEMETRY_EVENT_KIND_TRACE = 4,
+    UNRECOGNIZED = -1
+}
+export declare function telemetryEventKindFromJSON(object: any): TelemetryEventKind;
+export declare function telemetryEventKindToJSON(object: TelemetryEventKind): string;
+export declare enum CancellationEventKind {
+    CANCELLATION_EVENT_KIND_UNSPECIFIED = 0,
+    CANCELLATION_EVENT_KIND_REQUESTED = 1,
+    CANCELLATION_EVENT_KIND_ACKNOWLEDGED = 2,
+    CANCELLATION_EVENT_KIND_COMPLETED = 3,
+    CANCELLATION_EVENT_KIND_FAILED = 4,
+    UNRECOGNIZED = -1
+}
+export declare function cancellationEventKindFromJSON(object: any): CancellationEventKind;
+export declare function cancellationEventKindToJSON(object: CancellationEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * SDK lifecycle / initialization stage events. Mirrors
@@ -412,6 +629,14 @@ export interface GenerationEvent {
     /** For ROUTING_DECISION — RN events.ts:89. */
     routingTarget: string;
     routingReason: string;
+    /** For cancellation / tool / structured-output / thinking events. */
+    cancelReason: string;
+    toolCallId: string;
+    toolName: string;
+    toolPayloadJson: string;
+    structuredSchemaJson: string;
+    structuredOutputJson: string;
+    thinkingText: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -668,6 +893,141 @@ export interface ComponentInitializationEvent {
     initSuccess: boolean;
     readyCount: number;
     failedCount: number;
+    /**
+     * Typed equivalents of old_state/new_state for SDKs that want generated
+     * enum-backed component lifecycle state instead of parsing strings.
+     */
+    previousLifecycleState: ComponentLifecycleState;
+    currentLifecycleState: ComponentLifecycleState;
+}
+/** Snapshot of a component's current model-backed lifecycle state. */
+export interface ComponentLifecycleSnapshot {
+    component: SDKComponent;
+    state: ComponentLifecycleState;
+    modelId: string;
+    updatedAtMs: number;
+    errorMessage: string;
+}
+/**
+ * Operation-aware lifecycle event. The oneof arms intentionally reference the
+ * operation result/progress protos from this contract slice instead of adding
+ * another broad event taxonomy.
+ */
+export interface ComponentLifecycleEvent {
+    component: SDKComponent;
+    previousState: ComponentLifecycleState;
+    currentState: ComponentLifecycleState;
+    modelId: string;
+    timestampMs: number;
+    modelLoadResult?: ModelLoadResult | undefined;
+    modelUnloadResult?: ModelUnloadResult | undefined;
+    modelDeleteResult?: ModelDeleteResult | undefined;
+    downloadProgress?: DownloadProgress | undefined;
+    storageAvailability?: StorageAvailabilityResult | undefined;
+    storageDeleteResult?: StorageDeleteResult | undefined;
+}
+/** SDK session lifecycle independent of voice-agent turn sessions. */
+export interface SessionEvent {
+    kind: SessionEventKind;
+    sessionId: string;
+    userId: string;
+    reason: string;
+    error: string;
+    startedAtMs: number;
+    endedAtMs: number;
+}
+export interface AuthEvent {
+    kind: AuthEventKind;
+    provider: string;
+    subjectId: string;
+    scope: string;
+    error: string;
+}
+export interface ModelRegistryEvent {
+    kind: ModelRegistryEventKind;
+    modelId: string;
+    assignmentId: string;
+    assignedComponent: SDKComponent;
+    framework: InferenceFramework;
+    sourcePath: string;
+    error: string;
+    refreshResult?: ModelRegistryRefreshResult | undefined;
+    listResult?: ModelListResult | undefined;
+    getResult?: ModelGetResult | undefined;
+    importResult?: ModelImportResult | undefined;
+    discoveryResult?: ModelDiscoveryResult | undefined;
+    compatibilityResult?: ModelCompatibilityResult | undefined;
+    currentModelResult?: CurrentModelResult | undefined;
+}
+export interface DownloadEvent {
+    kind: DownloadEventKind;
+    modelId: string;
+    taskId: string;
+    error: string;
+    planResult?: DownloadPlanResult | undefined;
+    startResult?: DownloadStartResult | undefined;
+    progress?: DownloadProgress | undefined;
+    cancelResult?: DownloadCancelResult | undefined;
+    resumeResult?: DownloadResumeResult | undefined;
+}
+export interface StorageLifecycleEvent {
+    kind: StorageLifecycleEventKind;
+    modelId: string;
+    cacheKey: string;
+    bytes: number;
+    error: string;
+    infoResult?: StorageInfoResult | undefined;
+    availabilityResult?: StorageAvailabilityResult | undefined;
+    deletePlan?: StorageDeletePlan | undefined;
+    deleteResult?: StorageDeleteResult | undefined;
+}
+export interface HardwareRoutingEvent {
+    kind: HardwareRoutingEventKind;
+    component: SDKComponent;
+    framework: InferenceFramework;
+    capability: string;
+    route: string;
+    reason: string;
+    error: string;
+    hardwareProfile?: HardwareProfileResult | undefined;
+}
+export interface CapabilityOperationEvent {
+    kind: CapabilityOperationEventKind;
+    component: SDKComponent;
+    modelId: string;
+    operationId: string;
+    operation: string;
+    progress: number;
+    inputCount: number;
+    outputCount: number;
+    resultJson: string;
+    error: string;
+}
+export interface TelemetryEvent {
+    kind: TelemetryEventKind;
+    name: string;
+    attributes: {
+        [key: string]: string;
+    };
+    value: number;
+    unit: string;
+}
+export interface TelemetryEvent_AttributesEntry {
+    key: string;
+    value: string;
+}
+export interface CancellationEvent {
+    kind: CancellationEventKind;
+    component: SDKComponent;
+    operationId: string;
+    reason: string;
+    userInitiated: boolean;
+}
+export interface FailureEvent {
+    component: SDKComponent;
+    operation: string;
+    error?: SDKError | undefined;
+    recoverable: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -685,6 +1045,13 @@ export interface SDKEvent {
     /** Wall-clock time of event creation, milliseconds since Unix epoch. */
     timestampMs: number;
     severity: EventSeverity;
+    category: EventCategory;
+    component: SDKComponent;
+    /**
+     * Typed failure details for any failed event. When the event itself is
+     * only an error notification, use the failure oneof arm below.
+     */
+    error?: SDKError | undefined;
     /**
      * Event identifier (UUID). Required by Swift SDKEvent.id /
      * Kotlin SDKEvent.id / Dart SDKEvent.id for de-duplication.
@@ -720,6 +1087,17 @@ export interface SDKEvent {
     voice?: VoiceLifecycleEvent | undefined;
     /** from voice_events.proto */
     voicePipeline?: VoiceEvent | undefined;
+    componentLifecycle?: ComponentLifecycleEvent | undefined;
+    session?: SessionEvent | undefined;
+    auth?: AuthEvent | undefined;
+    modelRegistry?: ModelRegistryEvent | undefined;
+    download?: DownloadEvent | undefined;
+    storageLifecycle?: StorageLifecycleEvent | undefined;
+    hardwareRouting?: HardwareRoutingEvent | undefined;
+    capability?: CapabilityOperationEvent | undefined;
+    telemetry?: TelemetryEvent | undefined;
+    cancellation?: CancellationEvent | undefined;
+    failure?: FailureEvent | undefined;
 }
 export interface SDKEvent_PropertiesEntry {
     key: string;
@@ -812,6 +1190,110 @@ export declare const ComponentInitializationEvent: {
     toJSON(message: ComponentInitializationEvent): unknown;
     create<I extends Exact<DeepPartial<ComponentInitializationEvent>, I>>(base?: I): ComponentInitializationEvent;
     fromPartial<I extends Exact<DeepPartial<ComponentInitializationEvent>, I>>(object: I): ComponentInitializationEvent;
+};
+export declare const ComponentLifecycleSnapshot: {
+    encode(message: ComponentLifecycleSnapshot, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentLifecycleSnapshot;
+    fromJSON(object: any): ComponentLifecycleSnapshot;
+    toJSON(message: ComponentLifecycleSnapshot): unknown;
+    create<I extends Exact<DeepPartial<ComponentLifecycleSnapshot>, I>>(base?: I): ComponentLifecycleSnapshot;
+    fromPartial<I extends Exact<DeepPartial<ComponentLifecycleSnapshot>, I>>(object: I): ComponentLifecycleSnapshot;
+};
+export declare const ComponentLifecycleEvent: {
+    encode(message: ComponentLifecycleEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentLifecycleEvent;
+    fromJSON(object: any): ComponentLifecycleEvent;
+    toJSON(message: ComponentLifecycleEvent): unknown;
+    create<I extends Exact<DeepPartial<ComponentLifecycleEvent>, I>>(base?: I): ComponentLifecycleEvent;
+    fromPartial<I extends Exact<DeepPartial<ComponentLifecycleEvent>, I>>(object: I): ComponentLifecycleEvent;
+};
+export declare const SessionEvent: {
+    encode(message: SessionEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): SessionEvent;
+    fromJSON(object: any): SessionEvent;
+    toJSON(message: SessionEvent): unknown;
+    create<I extends Exact<DeepPartial<SessionEvent>, I>>(base?: I): SessionEvent;
+    fromPartial<I extends Exact<DeepPartial<SessionEvent>, I>>(object: I): SessionEvent;
+};
+export declare const AuthEvent: {
+    encode(message: AuthEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): AuthEvent;
+    fromJSON(object: any): AuthEvent;
+    toJSON(message: AuthEvent): unknown;
+    create<I extends Exact<DeepPartial<AuthEvent>, I>>(base?: I): AuthEvent;
+    fromPartial<I extends Exact<DeepPartial<AuthEvent>, I>>(object: I): AuthEvent;
+};
+export declare const ModelRegistryEvent: {
+    encode(message: ModelRegistryEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryEvent;
+    fromJSON(object: any): ModelRegistryEvent;
+    toJSON(message: ModelRegistryEvent): unknown;
+    create<I extends Exact<DeepPartial<ModelRegistryEvent>, I>>(base?: I): ModelRegistryEvent;
+    fromPartial<I extends Exact<DeepPartial<ModelRegistryEvent>, I>>(object: I): ModelRegistryEvent;
+};
+export declare const DownloadEvent: {
+    encode(message: DownloadEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadEvent;
+    fromJSON(object: any): DownloadEvent;
+    toJSON(message: DownloadEvent): unknown;
+    create<I extends Exact<DeepPartial<DownloadEvent>, I>>(base?: I): DownloadEvent;
+    fromPartial<I extends Exact<DeepPartial<DownloadEvent>, I>>(object: I): DownloadEvent;
+};
+export declare const StorageLifecycleEvent: {
+    encode(message: StorageLifecycleEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StorageLifecycleEvent;
+    fromJSON(object: any): StorageLifecycleEvent;
+    toJSON(message: StorageLifecycleEvent): unknown;
+    create<I extends Exact<DeepPartial<StorageLifecycleEvent>, I>>(base?: I): StorageLifecycleEvent;
+    fromPartial<I extends Exact<DeepPartial<StorageLifecycleEvent>, I>>(object: I): StorageLifecycleEvent;
+};
+export declare const HardwareRoutingEvent: {
+    encode(message: HardwareRoutingEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): HardwareRoutingEvent;
+    fromJSON(object: any): HardwareRoutingEvent;
+    toJSON(message: HardwareRoutingEvent): unknown;
+    create<I extends Exact<DeepPartial<HardwareRoutingEvent>, I>>(base?: I): HardwareRoutingEvent;
+    fromPartial<I extends Exact<DeepPartial<HardwareRoutingEvent>, I>>(object: I): HardwareRoutingEvent;
+};
+export declare const CapabilityOperationEvent: {
+    encode(message: CapabilityOperationEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): CapabilityOperationEvent;
+    fromJSON(object: any): CapabilityOperationEvent;
+    toJSON(message: CapabilityOperationEvent): unknown;
+    create<I extends Exact<DeepPartial<CapabilityOperationEvent>, I>>(base?: I): CapabilityOperationEvent;
+    fromPartial<I extends Exact<DeepPartial<CapabilityOperationEvent>, I>>(object: I): CapabilityOperationEvent;
+};
+export declare const TelemetryEvent: {
+    encode(message: TelemetryEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TelemetryEvent;
+    fromJSON(object: any): TelemetryEvent;
+    toJSON(message: TelemetryEvent): unknown;
+    create<I extends Exact<DeepPartial<TelemetryEvent>, I>>(base?: I): TelemetryEvent;
+    fromPartial<I extends Exact<DeepPartial<TelemetryEvent>, I>>(object: I): TelemetryEvent;
+};
+export declare const TelemetryEvent_AttributesEntry: {
+    encode(message: TelemetryEvent_AttributesEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TelemetryEvent_AttributesEntry;
+    fromJSON(object: any): TelemetryEvent_AttributesEntry;
+    toJSON(message: TelemetryEvent_AttributesEntry): unknown;
+    create<I extends Exact<DeepPartial<TelemetryEvent_AttributesEntry>, I>>(base?: I): TelemetryEvent_AttributesEntry;
+    fromPartial<I extends Exact<DeepPartial<TelemetryEvent_AttributesEntry>, I>>(object: I): TelemetryEvent_AttributesEntry;
+};
+export declare const CancellationEvent: {
+    encode(message: CancellationEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): CancellationEvent;
+    fromJSON(object: any): CancellationEvent;
+    toJSON(message: CancellationEvent): unknown;
+    create<I extends Exact<DeepPartial<CancellationEvent>, I>>(base?: I): CancellationEvent;
+    fromPartial<I extends Exact<DeepPartial<CancellationEvent>, I>>(object: I): CancellationEvent;
+};
+export declare const FailureEvent: {
+    encode(message: FailureEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): FailureEvent;
+    fromJSON(object: any): FailureEvent;
+    toJSON(message: FailureEvent): unknown;
+    create<I extends Exact<DeepPartial<FailureEvent>, I>>(base?: I): FailureEvent;
+    fromPartial<I extends Exact<DeepPartial<FailureEvent>, I>>(object: I): FailureEvent;
 };
 export declare const SDKEvent: {
     encode(message: SDKEvent, writer?: _m0.Writer): _m0.Writer;

@@ -97,10 +97,15 @@ inline constexpr SDKError::Impl_::Impl_(
         nested_message_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        component_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         context_{nullptr},
         code_{static_cast< ::runanywhere::v1::ErrorCode >(0)},
         category_{static_cast< ::runanywhere::v1::ErrorCategory >(0)},
-        c_abi_code_{0} {}
+        c_abi_code_{0},
+        severity_{static_cast< ::runanywhere::v1::ErrorSeverity >(0)},
+        timestamp_ms_{::int64_t{0}} {}
 
 template <typename>
 constexpr SDKError::SDKError(::_pbi::ConstantInitialized)
@@ -124,7 +129,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_errors_2eproto[2];
+    file_level_enum_descriptors_errors_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_errors_2eproto = nullptr;
 const ::uint32_t
@@ -150,19 +155,25 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_._has_bits_),
-        9, // hasbit index offset
+        12, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.category_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.context_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.c_abi_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.nested_message_),
-        3,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.timestamp_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.severity_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKError, _impl_.component_),
         4,
-        0,
-        2,
         5,
+        0,
+        3,
+        6,
         1,
+        8,
+        7,
+        2,
 };
 
 static const ::_pbi::MigrationSchema
@@ -185,140 +196,147 @@ const char descriptor_table_protodef_errors_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     "\001\022\026\n\toperation\030\004 \001(\tH\002\210\001\001\032/\n\rMetadataEnt"
     "ry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\016\n\014_s"
     "ource_fileB\016\n\014_source_lineB\014\n\n_operation"
-    "\"\215\002\n\010SDKError\022\'\n\004code\030\001 \001(\0162\031.runanywher"
+    "\"\347\002\n\010SDKError\022\'\n\004code\030\001 \001(\0162\031.runanywher"
     "e.v1.ErrorCode\022/\n\010category\030\002 \001(\0162\035.runan"
     "ywhere.v1.ErrorCategory\022\017\n\007message\030\003 \001(\t"
     "\0222\n\007context\030\004 \001(\0132\034.runanywhere.v1.Error"
     "ContextH\000\210\001\001\022\027\n\nc_abi_code\030\005 \001(\005H\001\210\001\001\022\033\n"
-    "\016nested_message\030\006 \001(\tH\002\210\001\001B\n\n\010_contextB\r"
-    "\n\013_c_abi_codeB\021\n\017_nested_message*\221\002\n\rErr"
-    "orCategory\022\036\n\032ERROR_CATEGORY_UNSPECIFIED"
-    "\020\000\022\032\n\026ERROR_CATEGORY_NETWORK\020\001\022\035\n\031ERROR_"
-    "CATEGORY_VALIDATION\020\002\022\030\n\024ERROR_CATEGORY_"
-    "MODEL\020\003\022\034\n\030ERROR_CATEGORY_COMPONENT\020\004\022\025\n"
-    "\021ERROR_CATEGORY_IO\020\005\022\027\n\023ERROR_CATEGORY_A"
-    "UTH\020\006\022\033\n\027ERROR_CATEGORY_INTERNAL\020\007\022 \n\034ER"
-    "ROR_CATEGORY_CONFIGURATION\020\010*\273\"\n\tErrorCo"
-    "de\022\032\n\026ERROR_CODE_UNSPECIFIED\020\000\022\036\n\032ERROR_"
-    "CODE_NOT_INITIALIZED\020d\022\"\n\036ERROR_CODE_ALR"
-    "EADY_INITIALIZED\020e\022$\n ERROR_CODE_INITIAL"
-    "IZATION_FAILED\020f\022$\n ERROR_CODE_INVALID_C"
-    "ONFIGURATION\020g\022\036\n\032ERROR_CODE_INVALID_API"
-    "_KEY\020h\022#\n\037ERROR_CODE_ENVIRONMENT_MISMATC"
-    "H\020i\022 \n\034ERROR_CODE_INVALID_PARAMETER\020j\022\036\n"
-    "\032ERROR_CODE_MODEL_NOT_FOUND\020n\022 \n\034ERROR_C"
-    "ODE_MODEL_LOAD_FAILED\020o\022&\n\"ERROR_CODE_MO"
-    "DEL_VALIDATION_FAILED\020p\022!\n\035ERROR_CODE_MO"
-    "DEL_INCOMPATIBLE\020q\022#\n\037ERROR_CODE_INVALID"
-    "_MODEL_FORMAT\020r\022&\n\"ERROR_CODE_MODEL_STOR"
-    "AGE_CORRUPTED\020s\022\037\n\033ERROR_CODE_MODEL_NOT_"
-    "LOADED\020t\022!\n\034ERROR_CODE_GENERATION_FAILED"
-    "\020\202\001\022\"\n\035ERROR_CODE_GENERATION_TIMEOUT\020\203\001\022"
-    " \n\033ERROR_CODE_CONTEXT_TOO_LONG\020\204\001\022$\n\037ERR"
-    "OR_CODE_TOKEN_LIMIT_EXCEEDED\020\205\001\022#\n\036ERROR"
-    "_CODE_COST_LIMIT_EXCEEDED\020\206\001\022 \n\033ERROR_CO"
-    "DE_INFERENCE_FAILED\020\207\001\022#\n\036ERROR_CODE_NET"
-    "WORK_UNAVAILABLE\020\226\001\022\035\n\030ERROR_CODE_NETWOR"
-    "K_ERROR\020\227\001\022\036\n\031ERROR_CODE_REQUEST_FAILED\020"
-    "\230\001\022\037\n\032ERROR_CODE_DOWNLOAD_FAILED\020\231\001\022\034\n\027E"
-    "RROR_CODE_SERVER_ERROR\020\232\001\022\027\n\022ERROR_CODE_"
-    "TIMEOUT\020\233\001\022 \n\033ERROR_CODE_INVALID_RESPONS"
-    "E\020\234\001\022\032\n\025ERROR_CODE_HTTP_ERROR\020\235\001\022\037\n\032ERRO"
-    "R_CODE_CONNECTION_LOST\020\236\001\022 \n\033ERROR_CODE_"
-    "PARTIAL_DOWNLOAD\020\237\001\022#\n\036ERROR_CODE_HTTP_R"
-    "EQUEST_FAILED\020\240\001\022\"\n\035ERROR_CODE_HTTP_NOT_"
-    "SUPPORTED\020\241\001\022$\n\037ERROR_CODE_INSUFFICIENT_"
-    "STORAGE\020\264\001\022\034\n\027ERROR_CODE_STORAGE_FULL\020\265\001"
-    "\022\035\n\030ERROR_CODE_STORAGE_ERROR\020\266\001\022\036\n\031ERROR"
-    "_CODE_FILE_NOT_FOUND\020\267\001\022 \n\033ERROR_CODE_FI"
-    "LE_READ_FAILED\020\270\001\022!\n\034ERROR_CODE_FILE_WRI"
-    "TE_FAILED\020\271\001\022!\n\034ERROR_CODE_PERMISSION_DE"
-    "NIED\020\272\001\022\035\n\030ERROR_CODE_DELETE_FAILED\020\273\001\022\033"
-    "\n\026ERROR_CODE_MOVE_FAILED\020\274\001\022)\n$ERROR_COD"
-    "E_DIRECTORY_CREATION_FAILED\020\275\001\022#\n\036ERROR_"
-    "CODE_DIRECTORY_NOT_FOUND\020\276\001\022\034\n\027ERROR_COD"
-    "E_INVALID_PATH\020\277\001\022!\n\034ERROR_CODE_INVALID_"
-    "FILE_NAME\020\300\001\022)\n$ERROR_CODE_TEMP_FILE_CRE"
-    "ATION_FAILED\020\301\001\022$\n\037ERROR_CODE_HARDWARE_U"
-    "NSUPPORTED\020\334\001\022#\n\036ERROR_CODE_INSUFFICIENT"
-    "_MEMORY\020\335\001\022#\n\036ERROR_CODE_COMPONENT_NOT_R"
-    "EADY\020\346\001\022\035\n\030ERROR_CODE_INVALID_STATE\020\347\001\022%"
-    "\n ERROR_CODE_SERVICE_NOT_AVAILABLE\020\350\001\022\034\n"
-    "\027ERROR_CODE_SERVICE_BUSY\020\351\001\022!\n\034ERROR_COD"
-    "E_PROCESSING_FAILED\020\352\001\022\034\n\027ERROR_CODE_STA"
-    "RT_FAILED\020\353\001\022\035\n\030ERROR_CODE_NOT_SUPPORTED"
-    "\020\354\001\022!\n\034ERROR_CODE_VALIDATION_FAILED\020\372\001\022\035"
-    "\n\030ERROR_CODE_INVALID_INPUT\020\373\001\022\036\n\031ERROR_C"
-    "ODE_INVALID_FORMAT\020\374\001\022\033\n\026ERROR_CODE_EMPT"
-    "Y_INPUT\020\375\001\022\035\n\030ERROR_CODE_TEXT_TOO_LONG\020\376"
-    "\001\022\034\n\027ERROR_CODE_INVALID_SSML\020\377\001\022%\n ERROR"
-    "_CODE_INVALID_SPEAKING_RATE\020\200\002\022\035\n\030ERROR_"
-    "CODE_INVALID_PITCH\020\201\002\022\036\n\031ERROR_CODE_INVA"
-    "LID_VOLUME\020\202\002\022 \n\033ERROR_CODE_INVALID_ARGU"
-    "MENT\020\203\002\022\034\n\027ERROR_CODE_NULL_POINTER\020\204\002\022 \n"
-    "\033ERROR_CODE_BUFFER_TOO_SMALL\020\205\002\022*\n%ERROR"
-    "_CODE_AUDIO_FORMAT_NOT_SUPPORTED\020\230\002\022$\n\037E"
-    "RROR_CODE_AUDIO_SESSION_FAILED\020\231\002\022,\n\'ERR"
-    "OR_CODE_MICROPHONE_PERMISSION_DENIED\020\232\002\022"
-    "\'\n\"ERROR_CODE_INSUFFICIENT_AUDIO_DATA\020\233\002"
-    "\022\"\n\035ERROR_CODE_EMPTY_AUDIO_BUFFER\020\234\002\022/\n*"
-    "ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAIL"
-    "ED\020\235\002\022&\n!ERROR_CODE_LANGUAGE_NOT_SUPPORT"
-    "ED\020\254\002\022#\n\036ERROR_CODE_VOICE_NOT_AVAILABLE\020"
-    "\255\002\022\'\n\"ERROR_CODE_STREAMING_NOT_SUPPORTED"
-    "\020\256\002\022 \n\033ERROR_CODE_STREAM_CANCELLED\020\257\002\022%\n"
-    " ERROR_CODE_AUTHENTICATION_FAILED\020\300\002\022\034\n\027"
-    "ERROR_CODE_UNAUTHORIZED\020\301\002\022\031\n\024ERROR_CODE"
-    "_FORBIDDEN\020\302\002\022\036\n\031ERROR_CODE_KEYCHAIN_ERR"
-    "OR\020\312\002\022\036\n\031ERROR_CODE_ENCODING_ERROR\020\313\002\022\036\n"
-    "\031ERROR_CODE_DECODING_ERROR\020\314\002\022%\n ERROR_C"
-    "ODE_SECURE_STORAGE_FAILED\020\315\002\022!\n\034ERROR_CO"
-    "DE_EXTRACTION_FAILED\020\336\002\022!\n\034ERROR_CODE_CH"
-    "ECKSUM_MISMATCH\020\337\002\022#\n\036ERROR_CODE_UNSUPPO"
-    "RTED_ARCHIVE\020\340\002\022\"\n\035ERROR_CODE_CALIBRATIO"
-    "N_FAILED\020\362\002\022#\n\036ERROR_CODE_CALIBRATION_TI"
-    "MEOUT\020\363\002\022\031\n\024ERROR_CODE_CANCELLED\020\374\002\022 \n\033E"
-    "RROR_CODE_MODULE_NOT_FOUND\020\220\003\022)\n$ERROR_C"
-    "ODE_MODULE_ALREADY_REGISTERED\020\221\003\022\"\n\035ERRO"
-    "R_CODE_MODULE_LOAD_FAILED\020\222\003\022!\n\034ERROR_CO"
-    "DE_SERVICE_NOT_FOUND\020\232\003\022*\n%ERROR_CODE_SE"
-    "RVICE_ALREADY_REGISTERED\020\233\003\022%\n ERROR_COD"
-    "E_SERVICE_CREATE_FAILED\020\234\003\022$\n\037ERROR_CODE"
-    "_CAPABILITY_NOT_FOUND\020\244\003\022\"\n\035ERROR_CODE_P"
-    "ROVIDER_NOT_FOUND\020\245\003\022#\n\036ERROR_CODE_NO_CA"
-    "PABLE_PROVIDER\020\246\003\022\031\n\024ERROR_CODE_NOT_FOUN"
-    "D\020\247\003\022\037\n\032ERROR_CODE_ADAPTER_NOT_SET\020\364\003\022!\n"
-    "\034ERROR_CODE_BACKEND_NOT_FOUND\020\330\004\022!\n\034ERRO"
-    "R_CODE_BACKEND_NOT_READY\020\331\004\022#\n\036ERROR_COD"
-    "E_BACKEND_INIT_FAILED\020\332\004\022\034\n\027ERROR_CODE_B"
-    "ACKEND_BUSY\020\333\004\022#\n\036ERROR_CODE_BACKEND_UNA"
-    "VAILABLE\020\334\004\022\036\n\031ERROR_CODE_INVALID_HANDLE"
-    "\020\342\004\022&\n!ERROR_CODE_EVENT_INVALID_CATEGORY"
-    "\020\274\005\022)\n$ERROR_CODE_EVENT_SUBSCRIPTION_FAI"
-    "LED\020\275\005\022$\n\037ERROR_CODE_EVENT_PUBLISH_FAILE"
-    "D\020\276\005\022\037\n\032ERROR_CODE_NOT_IMPLEMENTED\020\240\006\022%\n"
-    " ERROR_CODE_FEATURE_NOT_AVAILABLE\020\241\006\022\'\n\""
-    "ERROR_CODE_FRAMEWORK_NOT_AVAILABLE\020\242\006\022$\n"
-    "\037ERROR_CODE_UNSUPPORTED_MODALITY\020\243\006\022\027\n\022E"
-    "RROR_CODE_UNKNOWN\020\244\006\022\030\n\023ERROR_CODE_INTER"
-    "NAL\020\245\006\022$\n\037ERROR_CODE_ABI_VERSION_MISMATC"
-    "H\020\252\006\022&\n!ERROR_CODE_CAPABILITY_UNSUPPORTE"
-    "D\020\253\006\022 \n\033ERROR_CODE_PLUGIN_DUPLICATE\020\254\006\022\""
-    "\n\035ERROR_CODE_PLUGIN_LOAD_FAILED\020\264\006\022\033\n\026ER"
-    "ROR_CODE_PLUGIN_BUSY\020\265\006\022 \n\033ERROR_CODE_WA"
-    "SM_LOAD_FAILED\020\204\007\022\037\n\032ERROR_CODE_WASM_NOT"
-    "_LOADED\020\205\007\022#\n\036ERROR_CODE_WASM_CALLBACK_E"
-    "RROR\020\206\007\022!\n\034ERROR_CODE_WASM_MEMORY_ERROR\020"
-    "\207\007B\206\001\n\027ai.runanywhere.proto.v1B\013ErrorsPr"
-    "otoP\001Z<github.com/runanywhere/runanywher"
-    "e-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016"
-    "Runanywhere.V1\272\002\002RAb\006proto3"
+    "\016nested_message\030\006 \001(\tH\002\210\001\001\022\024\n\014timestamp_"
+    "ms\030\007 \001(\003\022/\n\010severity\030\010 \001(\0162\035.runanywhere"
+    ".v1.ErrorSeverity\022\021\n\tcomponent\030\t \001(\tB\n\n\010"
+    "_contextB\r\n\013_c_abi_codeB\021\n\017_nested_messa"
+    "ge*\221\002\n\rErrorCategory\022\036\n\032ERROR_CATEGORY_U"
+    "NSPECIFIED\020\000\022\032\n\026ERROR_CATEGORY_NETWORK\020\001"
+    "\022\035\n\031ERROR_CATEGORY_VALIDATION\020\002\022\030\n\024ERROR"
+    "_CATEGORY_MODEL\020\003\022\034\n\030ERROR_CATEGORY_COMP"
+    "ONENT\020\004\022\025\n\021ERROR_CATEGORY_IO\020\005\022\027\n\023ERROR_"
+    "CATEGORY_AUTH\020\006\022\033\n\027ERROR_CATEGORY_INTERN"
+    "AL\020\007\022 \n\034ERROR_CATEGORY_CONFIGURATION\020\010*\265"
+    "\001\n\rErrorSeverity\022\036\n\032ERROR_SEVERITY_UNSPE"
+    "CIFIED\020\000\022\030\n\024ERROR_SEVERITY_DEBUG\020\001\022\027\n\023ER"
+    "ROR_SEVERITY_INFO\020\002\022\032\n\026ERROR_SEVERITY_WA"
+    "RNING\020\003\022\030\n\024ERROR_SEVERITY_ERROR\020\004\022\033\n\027ERR"
+    "OR_SEVERITY_CRITICAL\020\005*\273\"\n\tErrorCode\022\032\n\026"
+    "ERROR_CODE_UNSPECIFIED\020\000\022\036\n\032ERROR_CODE_N"
+    "OT_INITIALIZED\020d\022\"\n\036ERROR_CODE_ALREADY_I"
+    "NITIALIZED\020e\022$\n ERROR_CODE_INITIALIZATIO"
+    "N_FAILED\020f\022$\n ERROR_CODE_INVALID_CONFIGU"
+    "RATION\020g\022\036\n\032ERROR_CODE_INVALID_API_KEY\020h"
+    "\022#\n\037ERROR_CODE_ENVIRONMENT_MISMATCH\020i\022 \n"
+    "\034ERROR_CODE_INVALID_PARAMETER\020j\022\036\n\032ERROR"
+    "_CODE_MODEL_NOT_FOUND\020n\022 \n\034ERROR_CODE_MO"
+    "DEL_LOAD_FAILED\020o\022&\n\"ERROR_CODE_MODEL_VA"
+    "LIDATION_FAILED\020p\022!\n\035ERROR_CODE_MODEL_IN"
+    "COMPATIBLE\020q\022#\n\037ERROR_CODE_INVALID_MODEL"
+    "_FORMAT\020r\022&\n\"ERROR_CODE_MODEL_STORAGE_CO"
+    "RRUPTED\020s\022\037\n\033ERROR_CODE_MODEL_NOT_LOADED"
+    "\020t\022!\n\034ERROR_CODE_GENERATION_FAILED\020\202\001\022\"\n"
+    "\035ERROR_CODE_GENERATION_TIMEOUT\020\203\001\022 \n\033ERR"
+    "OR_CODE_CONTEXT_TOO_LONG\020\204\001\022$\n\037ERROR_COD"
+    "E_TOKEN_LIMIT_EXCEEDED\020\205\001\022#\n\036ERROR_CODE_"
+    "COST_LIMIT_EXCEEDED\020\206\001\022 \n\033ERROR_CODE_INF"
+    "ERENCE_FAILED\020\207\001\022#\n\036ERROR_CODE_NETWORK_U"
+    "NAVAILABLE\020\226\001\022\035\n\030ERROR_CODE_NETWORK_ERRO"
+    "R\020\227\001\022\036\n\031ERROR_CODE_REQUEST_FAILED\020\230\001\022\037\n\032"
+    "ERROR_CODE_DOWNLOAD_FAILED\020\231\001\022\034\n\027ERROR_C"
+    "ODE_SERVER_ERROR\020\232\001\022\027\n\022ERROR_CODE_TIMEOU"
+    "T\020\233\001\022 \n\033ERROR_CODE_INVALID_RESPONSE\020\234\001\022\032"
+    "\n\025ERROR_CODE_HTTP_ERROR\020\235\001\022\037\n\032ERROR_CODE"
+    "_CONNECTION_LOST\020\236\001\022 \n\033ERROR_CODE_PARTIA"
+    "L_DOWNLOAD\020\237\001\022#\n\036ERROR_CODE_HTTP_REQUEST"
+    "_FAILED\020\240\001\022\"\n\035ERROR_CODE_HTTP_NOT_SUPPOR"
+    "TED\020\241\001\022$\n\037ERROR_CODE_INSUFFICIENT_STORAG"
+    "E\020\264\001\022\034\n\027ERROR_CODE_STORAGE_FULL\020\265\001\022\035\n\030ER"
+    "ROR_CODE_STORAGE_ERROR\020\266\001\022\036\n\031ERROR_CODE_"
+    "FILE_NOT_FOUND\020\267\001\022 \n\033ERROR_CODE_FILE_REA"
+    "D_FAILED\020\270\001\022!\n\034ERROR_CODE_FILE_WRITE_FAI"
+    "LED\020\271\001\022!\n\034ERROR_CODE_PERMISSION_DENIED\020\272"
+    "\001\022\035\n\030ERROR_CODE_DELETE_FAILED\020\273\001\022\033\n\026ERRO"
+    "R_CODE_MOVE_FAILED\020\274\001\022)\n$ERROR_CODE_DIRE"
+    "CTORY_CREATION_FAILED\020\275\001\022#\n\036ERROR_CODE_D"
+    "IRECTORY_NOT_FOUND\020\276\001\022\034\n\027ERROR_CODE_INVA"
+    "LID_PATH\020\277\001\022!\n\034ERROR_CODE_INVALID_FILE_N"
+    "AME\020\300\001\022)\n$ERROR_CODE_TEMP_FILE_CREATION_"
+    "FAILED\020\301\001\022$\n\037ERROR_CODE_HARDWARE_UNSUPPO"
+    "RTED\020\334\001\022#\n\036ERROR_CODE_INSUFFICIENT_MEMOR"
+    "Y\020\335\001\022#\n\036ERROR_CODE_COMPONENT_NOT_READY\020\346"
+    "\001\022\035\n\030ERROR_CODE_INVALID_STATE\020\347\001\022%\n ERRO"
+    "R_CODE_SERVICE_NOT_AVAILABLE\020\350\001\022\034\n\027ERROR"
+    "_CODE_SERVICE_BUSY\020\351\001\022!\n\034ERROR_CODE_PROC"
+    "ESSING_FAILED\020\352\001\022\034\n\027ERROR_CODE_START_FAI"
+    "LED\020\353\001\022\035\n\030ERROR_CODE_NOT_SUPPORTED\020\354\001\022!\n"
+    "\034ERROR_CODE_VALIDATION_FAILED\020\372\001\022\035\n\030ERRO"
+    "R_CODE_INVALID_INPUT\020\373\001\022\036\n\031ERROR_CODE_IN"
+    "VALID_FORMAT\020\374\001\022\033\n\026ERROR_CODE_EMPTY_INPU"
+    "T\020\375\001\022\035\n\030ERROR_CODE_TEXT_TOO_LONG\020\376\001\022\034\n\027E"
+    "RROR_CODE_INVALID_SSML\020\377\001\022%\n ERROR_CODE_"
+    "INVALID_SPEAKING_RATE\020\200\002\022\035\n\030ERROR_CODE_I"
+    "NVALID_PITCH\020\201\002\022\036\n\031ERROR_CODE_INVALID_VO"
+    "LUME\020\202\002\022 \n\033ERROR_CODE_INVALID_ARGUMENT\020\203"
+    "\002\022\034\n\027ERROR_CODE_NULL_POINTER\020\204\002\022 \n\033ERROR"
+    "_CODE_BUFFER_TOO_SMALL\020\205\002\022*\n%ERROR_CODE_"
+    "AUDIO_FORMAT_NOT_SUPPORTED\020\230\002\022$\n\037ERROR_C"
+    "ODE_AUDIO_SESSION_FAILED\020\231\002\022,\n\'ERROR_COD"
+    "E_MICROPHONE_PERMISSION_DENIED\020\232\002\022\'\n\"ERR"
+    "OR_CODE_INSUFFICIENT_AUDIO_DATA\020\233\002\022\"\n\035ER"
+    "ROR_CODE_EMPTY_AUDIO_BUFFER\020\234\002\022/\n*ERROR_"
+    "CODE_AUDIO_SESSION_ACTIVATION_FAILED\020\235\002\022"
+    "&\n!ERROR_CODE_LANGUAGE_NOT_SUPPORTED\020\254\002\022"
+    "#\n\036ERROR_CODE_VOICE_NOT_AVAILABLE\020\255\002\022\'\n\""
+    "ERROR_CODE_STREAMING_NOT_SUPPORTED\020\256\002\022 \n"
+    "\033ERROR_CODE_STREAM_CANCELLED\020\257\002\022%\n ERROR"
+    "_CODE_AUTHENTICATION_FAILED\020\300\002\022\034\n\027ERROR_"
+    "CODE_UNAUTHORIZED\020\301\002\022\031\n\024ERROR_CODE_FORBI"
+    "DDEN\020\302\002\022\036\n\031ERROR_CODE_KEYCHAIN_ERROR\020\312\002\022"
+    "\036\n\031ERROR_CODE_ENCODING_ERROR\020\313\002\022\036\n\031ERROR"
+    "_CODE_DECODING_ERROR\020\314\002\022%\n ERROR_CODE_SE"
+    "CURE_STORAGE_FAILED\020\315\002\022!\n\034ERROR_CODE_EXT"
+    "RACTION_FAILED\020\336\002\022!\n\034ERROR_CODE_CHECKSUM"
+    "_MISMATCH\020\337\002\022#\n\036ERROR_CODE_UNSUPPORTED_A"
+    "RCHIVE\020\340\002\022\"\n\035ERROR_CODE_CALIBRATION_FAIL"
+    "ED\020\362\002\022#\n\036ERROR_CODE_CALIBRATION_TIMEOUT\020"
+    "\363\002\022\031\n\024ERROR_CODE_CANCELLED\020\374\002\022 \n\033ERROR_C"
+    "ODE_MODULE_NOT_FOUND\020\220\003\022)\n$ERROR_CODE_MO"
+    "DULE_ALREADY_REGISTERED\020\221\003\022\"\n\035ERROR_CODE"
+    "_MODULE_LOAD_FAILED\020\222\003\022!\n\034ERROR_CODE_SER"
+    "VICE_NOT_FOUND\020\232\003\022*\n%ERROR_CODE_SERVICE_"
+    "ALREADY_REGISTERED\020\233\003\022%\n ERROR_CODE_SERV"
+    "ICE_CREATE_FAILED\020\234\003\022$\n\037ERROR_CODE_CAPAB"
+    "ILITY_NOT_FOUND\020\244\003\022\"\n\035ERROR_CODE_PROVIDE"
+    "R_NOT_FOUND\020\245\003\022#\n\036ERROR_CODE_NO_CAPABLE_"
+    "PROVIDER\020\246\003\022\031\n\024ERROR_CODE_NOT_FOUND\020\247\003\022\037"
+    "\n\032ERROR_CODE_ADAPTER_NOT_SET\020\364\003\022!\n\034ERROR"
+    "_CODE_BACKEND_NOT_FOUND\020\330\004\022!\n\034ERROR_CODE"
+    "_BACKEND_NOT_READY\020\331\004\022#\n\036ERROR_CODE_BACK"
+    "END_INIT_FAILED\020\332\004\022\034\n\027ERROR_CODE_BACKEND"
+    "_BUSY\020\333\004\022#\n\036ERROR_CODE_BACKEND_UNAVAILAB"
+    "LE\020\334\004\022\036\n\031ERROR_CODE_INVALID_HANDLE\020\342\004\022&\n"
+    "!ERROR_CODE_EVENT_INVALID_CATEGORY\020\274\005\022)\n"
+    "$ERROR_CODE_EVENT_SUBSCRIPTION_FAILED\020\275\005"
+    "\022$\n\037ERROR_CODE_EVENT_PUBLISH_FAILED\020\276\005\022\037"
+    "\n\032ERROR_CODE_NOT_IMPLEMENTED\020\240\006\022%\n ERROR"
+    "_CODE_FEATURE_NOT_AVAILABLE\020\241\006\022\'\n\"ERROR_"
+    "CODE_FRAMEWORK_NOT_AVAILABLE\020\242\006\022$\n\037ERROR"
+    "_CODE_UNSUPPORTED_MODALITY\020\243\006\022\027\n\022ERROR_C"
+    "ODE_UNKNOWN\020\244\006\022\030\n\023ERROR_CODE_INTERNAL\020\245\006"
+    "\022$\n\037ERROR_CODE_ABI_VERSION_MISMATCH\020\252\006\022&"
+    "\n!ERROR_CODE_CAPABILITY_UNSUPPORTED\020\253\006\022 "
+    "\n\033ERROR_CODE_PLUGIN_DUPLICATE\020\254\006\022\"\n\035ERRO"
+    "R_CODE_PLUGIN_LOAD_FAILED\020\264\006\022\033\n\026ERROR_CO"
+    "DE_PLUGIN_BUSY\020\265\006\022 \n\033ERROR_CODE_WASM_LOA"
+    "D_FAILED\020\204\007\022\037\n\032ERROR_CODE_WASM_NOT_LOADE"
+    "D\020\205\007\022#\n\036ERROR_CODE_WASM_CALLBACK_ERROR\020\206"
+    "\007\022!\n\034ERROR_CODE_WASM_MEMORY_ERROR\020\207\007B\206\001\n"
+    "\027ai.runanywhere.proto.v1B\013ErrorsProtoP\001Z"
+    "<github.com/runanywhere/runanywhere-sdks"
+    "/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runany"
+    "where.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_errors_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_errors_2eproto = {
     false,
     false,
-    5387,
+    5661,
     descriptor_table_protodef_errors_2eproto,
     "errors.proto",
     &descriptor_table_errors_2eproto_once,
@@ -341,9 +359,16 @@ ErrorCategory_descriptor() {
 PROTOBUF_CONSTINIT const uint32_t ErrorCategory_internal_data_[] = {
     589824u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-ErrorCode_descriptor() {
+ErrorSeverity_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_errors_2eproto);
   return file_level_enum_descriptors_errors_2eproto[1];
+}
+PROTOBUF_CONSTINIT const uint32_t ErrorSeverity_internal_data_[] = {
+    393216u, 0u, };
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+ErrorCode_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_errors_2eproto);
+  return file_level_enum_descriptors_errors_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t ErrorCode_internal_data_[] = {
     65536u, 928u, 0u, 0u, 0u, 1041400u, 4292870270u, 4294443009u, 402653185u, 4261416928u, 528482335u, 2147514368u, 3758104067u, 134610944u, 235110400u, 120u, 0u, 524288u, 0u, 0u, 260046848u, 2u, 0u, 939524096u, 0u, 0u, 2147483648u, 1576479u, 0u, 0u, 120u, };
@@ -892,7 +917,8 @@ PROTOBUF_NDEBUG_INLINE SDKError::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         message_(arena, from.message_),
-        nested_message_(arena, from.nested_message_) {}
+        nested_message_(arena, from.nested_message_),
+        component_(arena, from.component_) {}
 
 SDKError::SDKError(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -908,16 +934,16 @@ SDKError::SDKError(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.context_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.context_ = (CheckHasBit(cached_has_bits, 0x00000008U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.context_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, code_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, code_),
-           offsetof(Impl_, c_abi_code_) -
+           offsetof(Impl_, timestamp_ms_) -
                offsetof(Impl_, code_) +
-               sizeof(Impl_::c_abi_code_));
+               sizeof(Impl_::timestamp_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SDKError)
 }
@@ -926,16 +952,17 @@ PROTOBUF_NDEBUG_INLINE SDKError::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         message_(arena),
-        nested_message_(arena) {}
+        nested_message_(arena),
+        component_(arena) {}
 
 inline void SDKError::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, context_),
            0,
-           offsetof(Impl_, c_abi_code_) -
+           offsetof(Impl_, timestamp_ms_) -
                offsetof(Impl_, context_) +
-               sizeof(Impl_::c_abi_code_));
+               sizeof(Impl_::timestamp_ms_));
 }
 SDKError::~SDKError() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SDKError)
@@ -950,6 +977,7 @@ inline void SDKError::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.message_.Destroy();
   this_._impl_.nested_message_.Destroy();
+  this_._impl_.component_.Destroy();
   delete this_._impl_.context_;
   this_._impl_.~Impl_();
 }
@@ -996,16 +1024,16 @@ SDKError::GetClassData() const {
   return SDKError_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 6, 1, 53, 2>
+const ::_pbi::TcParseTable<4, 9, 1, 70, 2>
 SDKError::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(SDKError, _impl_._has_bits_),
     0, // no _extensions_
-    6, 56,  // max_field_number, fast_idx_mask
+    9, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967232,  // skipmap
+    4294966784,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    6,  // num_field_entries
+    9,  // num_field_entries
     1,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     SDKError_class_data_.base(),
@@ -1017,12 +1045,12 @@ SDKError::_table_ = {
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
     // .runanywhere.v1.ErrorCode code = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.code_), 3>(),
-     {8, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.code_), 4>(),
+     {8, 4, 0,
       PROTOBUF_FIELD_OFFSET(SDKError, _impl_.code_)}},
     // .runanywhere.v1.ErrorCategory category = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.category_), 4>(),
-     {16, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.category_), 5>(),
+     {16, 5, 0,
       PROTOBUF_FIELD_OFFSET(SDKError, _impl_.category_)}},
     // string message = 3;
     {::_pbi::TcParser::FastUS1,
@@ -1030,41 +1058,65 @@ SDKError::_table_ = {
       PROTOBUF_FIELD_OFFSET(SDKError, _impl_.message_)}},
     // optional .runanywhere.v1.ErrorContext context = 4;
     {::_pbi::TcParser::FastMtS1,
-     {34, 2, 0,
+     {34, 3, 0,
       PROTOBUF_FIELD_OFFSET(SDKError, _impl_.context_)}},
     // optional int32 c_abi_code = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.c_abi_code_), 5>(),
-     {40, 5, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.c_abi_code_), 6>(),
+     {40, 6, 0,
       PROTOBUF_FIELD_OFFSET(SDKError, _impl_.c_abi_code_)}},
     // optional string nested_message = 6;
     {::_pbi::TcParser::FastUS1,
      {50, 1, 0,
       PROTOBUF_FIELD_OFFSET(SDKError, _impl_.nested_message_)}},
+    // int64 timestamp_ms = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SDKError, _impl_.timestamp_ms_), 8>(),
+     {56, 8, 0,
+      PROTOBUF_FIELD_OFFSET(SDKError, _impl_.timestamp_ms_)}},
+    // .runanywhere.v1.ErrorSeverity severity = 8;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKError, _impl_.severity_), 7>(),
+     {64, 7, 0,
+      PROTOBUF_FIELD_OFFSET(SDKError, _impl_.severity_)}},
+    // string component = 9;
+    {::_pbi::TcParser::FastUS1,
+     {74, 2, 0,
+      PROTOBUF_FIELD_OFFSET(SDKError, _impl_.component_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // .runanywhere.v1.ErrorCode code = 1;
-    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.code_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.ErrorCategory category = 2;
-    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.category_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.category_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // string message = 3;
     {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // optional .runanywhere.v1.ErrorContext context = 4;
-    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.context_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.context_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     // optional int32 c_abi_code = 5;
-    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.c_abi_code_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.c_abi_code_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // optional string nested_message = 6;
     {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.nested_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int64 timestamp_ms = 7;
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // .runanywhere.v1.ErrorSeverity severity = 8;
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.severity_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // string component = 9;
+    {PROTOBUF_FIELD_OFFSET(SDKError, _impl_.component_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::ErrorContext>()},
   }},
   {{
-    "\27\0\0\7\0\0\16\0"
+    "\27\0\0\7\0\0\16\0\0\11\0\0\0\0\0\0"
     "runanywhere.v1.SDKError"
     "message"
     "nested_message"
+    "component"
   }},
 };
 PROTOBUF_NOINLINE void SDKError::Clear() {
@@ -1075,7 +1127,7 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.message_.ClearNonDefaultToEmpty();
     }
@@ -1083,15 +1135,19 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
       _impl_.nested_message_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.component_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(_impl_.context_ != nullptr);
       _impl_.context_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000038U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
     ::memset(&_impl_.code_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.c_abi_code_) -
-        reinterpret_cast<char*>(&_impl_.code_)) + sizeof(_impl_.c_abi_code_));
+        reinterpret_cast<char*>(&_impl_.severity_) -
+        reinterpret_cast<char*>(&_impl_.code_)) + sizeof(_impl_.severity_));
   }
+  _impl_.timestamp_ms_ = ::int64_t{0};
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -1116,7 +1172,7 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.ErrorCode code = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_code() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1125,7 +1181,7 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
   }
 
   // .runanywhere.v1.ErrorCategory category = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_category() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1144,14 +1200,14 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
   }
 
   // optional .runanywhere.v1.ErrorContext context = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         4, *this_._impl_.context_, this_._impl_.context_->GetCachedSize(), target,
         stream);
   }
 
   // optional int32 c_abi_code = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
             stream, this_._internal_c_abi_code(), target);
@@ -1163,6 +1219,34 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKError.nested_message");
     target = stream->WriteStringMaybeAliased(6, _s, target);
+  }
+
+  // int64 timestamp_ms = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (this_._internal_timestamp_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+              stream, this_._internal_timestamp_ms(), target);
+    }
+  }
+
+  // .runanywhere.v1.ErrorSeverity severity = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_severity() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          8, this_._internal_severity(), target);
+    }
+  }
+
+  // string component = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (!this_._internal_component().empty()) {
+      const ::std::string& _s = this_._internal_component();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKError.component");
+      target = stream->WriteStringMaybeAliased(9, _s, target);
+    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -1190,7 +1274,7 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string message = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_message().empty()) {
@@ -1203,29 +1287,52 @@ PROTOBUF_NOINLINE void SDKError::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_nested_message());
     }
-    // optional .runanywhere.v1.ErrorContext context = 4;
+    // string component = 9;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!this_._internal_component().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_component());
+      }
+    }
+    // optional .runanywhere.v1.ErrorContext context = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.context_);
     }
     // .runanywhere.v1.ErrorCode code = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_code() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_code());
       }
     }
     // .runanywhere.v1.ErrorCategory category = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_category() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_category());
       }
     }
     // optional int32 c_abi_code = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_c_abi_code());
+    }
+    // .runanywhere.v1.ErrorSeverity severity = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_severity() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_severity());
+      }
+    }
+  }
+   {
+    // int64 timestamp_ms = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (this_._internal_timestamp_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_timestamp_ms());
+      }
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -1247,7 +1354,7 @@ void SDKError::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_message().empty()) {
         _this->_internal_set_message(from._internal_message());
@@ -1261,6 +1368,15 @@ void SDKError::MergeImpl(::google::protobuf::MessageLite& to_msg,
       _this->_internal_set_nested_message(from._internal_nested_message());
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!from._internal_component().empty()) {
+        _this->_internal_set_component(from._internal_component());
+      } else {
+        if (_this->_impl_.component_.IsDefault()) {
+          _this->_internal_set_component("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.context_ != nullptr);
       if (_this->_impl_.context_ == nullptr) {
         _this->_impl_.context_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.context_);
@@ -1268,18 +1384,28 @@ void SDKError::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.context_->MergeFrom(*from._impl_.context_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_code() != 0) {
         _this->_impl_.code_ = from._impl_.code_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_category() != 0) {
         _this->_impl_.category_ = from._impl_.category_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       _this->_impl_.c_abi_code_ = from._impl_.c_abi_code_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_severity() != 0) {
+        _this->_impl_.severity_ = from._impl_.severity_;
+      }
+    }
+  }
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (from._internal_timestamp_ms() != 0) {
+      _this->_impl_.timestamp_ms_ = from._impl_.timestamp_ms_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -1303,9 +1429,10 @@ void SDKError::InternalSwap(SDKError* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) 
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.message_, &other->_impl_.message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.nested_message_, &other->_impl_.nested_message_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.component_, &other->_impl_.component_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SDKError, _impl_.c_abi_code_)
-      + sizeof(SDKError::_impl_.c_abi_code_)
+      PROTOBUF_FIELD_OFFSET(SDKError, _impl_.timestamp_ms_)
+      + sizeof(SDKError::_impl_.timestamp_ms_)
       - PROTOBUF_FIELD_OFFSET(SDKError, _impl_.context_)>(
           reinterpret_cast<char*>(&_impl_.context_),
           reinterpret_cast<char*>(&other->_impl_.context_));

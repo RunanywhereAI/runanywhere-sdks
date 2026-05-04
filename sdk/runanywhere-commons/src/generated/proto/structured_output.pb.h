@@ -84,6 +84,10 @@ class JSONSchemaProperty;
 struct JSONSchemaPropertyDefaultTypeInternal;
 extern JSONSchemaPropertyDefaultTypeInternal _JSONSchemaProperty_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull JSONSchemaProperty_class_data_;
+class JSONSchema_DefinitionsEntry_DoNotUse;
+struct JSONSchema_DefinitionsEntry_DoNotUseDefaultTypeInternal;
+extern JSONSchema_DefinitionsEntry_DoNotUseDefaultTypeInternal _JSONSchema_DefinitionsEntry_DoNotUse_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull JSONSchema_DefinitionsEntry_DoNotUse_class_data_;
 class JSONSchema_PropertiesEntry_DoNotUse;
 struct JSONSchema_PropertiesEntry_DoNotUseDefaultTypeInternal;
 extern JSONSchema_PropertiesEntry_DoNotUseDefaultTypeInternal _JSONSchema_PropertiesEntry_DoNotUse_default_instance_;
@@ -278,7 +282,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
     return *reinterpret_cast<const StructuredOutputValidation*>(
         &_StructuredOutputValidation_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(StructuredOutputValidation& a, StructuredOutputValidation& b) { a.Swap(&b); }
   inline void Swap(StructuredOutputValidation* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -370,6 +374,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
   enum : int {
     kErrorMessageFieldNumber = 3,
     kRawOutputFieldNumber = 4,
+    kExtractedJsonFieldNumber = 5,
     kIsValidFieldNumber = 1,
     kContainsJsonFieldNumber = 2,
   };
@@ -407,6 +412,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
   ::std::string* PROTOBUF_NONNULL _internal_mutable_raw_output();
 
   public:
+  // optional string extracted_json = 5;
+  [[nodiscard]] bool has_extracted_json()
+      const;
+  void clear_extracted_json() ;
+  [[nodiscard]] const ::std::string& extracted_json() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_extracted_json(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_extracted_json();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_extracted_json();
+  void set_allocated_extracted_json(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_extracted_json() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_extracted_json(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_extracted_json();
+
+  public:
   // bool is_valid = 1;
   void clear_is_valid() ;
   [[nodiscard]] bool is_valid() const;
@@ -431,8 +453,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<2, 4,
-                                   0, 73,
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   0, 87,
                                    2>
       _table_;
 
@@ -457,6 +479,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::google::protobuf::internal::ArenaStringPtr raw_output_;
+    ::google::protobuf::internal::ArenaStringPtr extracted_json_;
     bool is_valid_;
     bool contains_json_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -524,7 +547,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SentimentResult final : public ::go
     return *reinterpret_cast<const SentimentResult*>(
         &_SentimentResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(SentimentResult& a, SentimentResult& b) { a.Swap(&b); }
   inline void Swap(SentimentResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -774,7 +797,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NamedEntity final : public ::google
     return *reinterpret_cast<const NamedEntity*>(
         &_NamedEntity_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(NamedEntity& a, NamedEntity& b) { a.Swap(&b); }
   inline void Swap(NamedEntity* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1028,7 +1051,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
     return *reinterpret_cast<const JSONSchema*>(
         &_JSONSchema_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 3;
   friend void swap(JSONSchema& a, JSONSchema& b) { a.Swap(&b); }
   inline void Swap(JSONSchema* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1119,10 +1142,20 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
   // accessors -------------------------------------------------------
   enum : int {
     kRequiredFieldNumber = 3,
+    kAllOfFieldNumber = 12,
+    kAnyOfFieldNumber = 13,
+    kOneOfFieldNumber = 14,
+    kSchemaUriFieldNumber = 6,
+    kIdUriFieldNumber = 7,
+    kTitleFieldNumber = 8,
+    kDescriptionFieldNumber = 9,
+    kRefFieldNumber = 11,
     kItemsFieldNumber = 4,
+    kNotSchemaFieldNumber = 15,
     kTypeFieldNumber = 1,
     kAdditionalPropertiesFieldNumber = 5,
     kPropertiesFieldNumber = 2,
+    kDefinitionsFieldNumber = 10,
   };
   // repeated string required = 3;
   [[nodiscard]] int required_size()
@@ -1149,6 +1182,151 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
   ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_required();
 
   public:
+  // repeated .runanywhere.v1.JSONSchema all_of = 12;
+  [[nodiscard]] int all_of_size()
+      const;
+  private:
+  int _internal_all_of_size() const;
+
+  public:
+  void clear_all_of() ;
+  [[nodiscard]] ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL mutable_all_of(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL
+  mutable_all_of();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& _internal_all_of() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL _internal_mutable_all_of();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::JSONSchema& all_of(int index) const;
+  ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL add_all_of();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& all_of()
+      const;
+  // repeated .runanywhere.v1.JSONSchema any_of = 13;
+  [[nodiscard]] int any_of_size()
+      const;
+  private:
+  int _internal_any_of_size() const;
+
+  public:
+  void clear_any_of() ;
+  [[nodiscard]] ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL mutable_any_of(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL
+  mutable_any_of();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& _internal_any_of() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL _internal_mutable_any_of();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::JSONSchema& any_of(int index) const;
+  ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL add_any_of();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& any_of()
+      const;
+  // repeated .runanywhere.v1.JSONSchema one_of = 14;
+  [[nodiscard]] int one_of_size()
+      const;
+  private:
+  int _internal_one_of_size() const;
+
+  public:
+  void clear_one_of() ;
+  [[nodiscard]] ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL mutable_one_of(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL
+  mutable_one_of();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& _internal_one_of() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL _internal_mutable_one_of();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::JSONSchema& one_of(int index) const;
+  ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL add_one_of();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& one_of()
+      const;
+  // optional string schema_uri = 6 [json_name = "$schema"];
+  [[nodiscard]] bool has_schema_uri()
+      const;
+  void clear_schema_uri() ;
+  [[nodiscard]] const ::std::string& schema_uri() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_schema_uri(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_schema_uri();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_schema_uri();
+  void set_allocated_schema_uri(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_schema_uri() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_schema_uri(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_schema_uri();
+
+  public:
+  // optional string id_uri = 7 [json_name = "$id"];
+  [[nodiscard]] bool has_id_uri()
+      const;
+  void clear_id_uri() ;
+  [[nodiscard]] const ::std::string& id_uri() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_id_uri(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_id_uri();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_id_uri();
+  void set_allocated_id_uri(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_id_uri() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_id_uri(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_id_uri();
+
+  public:
+  // optional string title = 8;
+  [[nodiscard]] bool has_title()
+      const;
+  void clear_title() ;
+  [[nodiscard]] const ::std::string& title() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_title(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_title();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_title();
+  void set_allocated_title(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_title() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_title(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_title();
+
+  public:
+  // optional string description = 9;
+  [[nodiscard]] bool has_description()
+      const;
+  void clear_description() ;
+  [[nodiscard]] const ::std::string& description() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_description(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_description();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_description();
+  void set_allocated_description(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_description() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_description(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_description();
+
+  public:
+  // optional string ref = 11 [json_name = "$ref"];
+  [[nodiscard]] bool has_ref()
+      const;
+  void clear_ref() ;
+  [[nodiscard]] const ::std::string& ref() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_ref(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_ref();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_ref();
+  void set_allocated_ref(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_ref() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_ref(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_ref();
+
+  public:
   // optional .runanywhere.v1.JSONSchemaProperty items = 4;
   [[nodiscard]] bool has_items()
       const;
@@ -1163,6 +1341,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
   private:
   const ::runanywhere::v1::JSONSchemaProperty& _internal_items() const;
   ::runanywhere::v1::JSONSchemaProperty* PROTOBUF_NONNULL _internal_mutable_items();
+
+  public:
+  // optional .runanywhere.v1.JSONSchema not_schema = 15;
+  [[nodiscard]] bool has_not_schema()
+      const;
+  void clear_not_schema() ;
+  [[nodiscard]] const ::runanywhere::v1::JSONSchema& not_schema() const;
+  [[nodiscard]] ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE release_not_schema();
+  ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL mutable_not_schema();
+  void set_allocated_not_schema(::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_not_schema(::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE unsafe_arena_release_not_schema();
+
+  private:
+  const ::runanywhere::v1::JSONSchema& _internal_not_schema() const;
+  ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL _internal_mutable_not_schema();
 
   public:
   // .runanywhere.v1.JSONSchemaType type = 1;
@@ -1203,12 +1397,28 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
   ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchemaProperty>* PROTOBUF_NONNULL _internal_mutable_properties();
 
   public:
+  // map<string, .runanywhere.v1.JSONSchema> definitions = 10;
+  [[nodiscard]] int definitions_size()
+      const;
+  private:
+  int _internal_definitions_size() const;
+
+  public:
+  void clear_definitions() ;
+  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>& definitions() const;
+  [[nodiscard]] ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL mutable_definitions();
+
+  private:
+  const ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>& _internal_definitions() const;
+  ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL _internal_mutable_definitions();
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.JSONSchema)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
-                                   3, 52,
+  static const ::google::protobuf::internal::TcParseTable<4, 15,
+                                   9, 106,
                                    2>
       _table_;
 
@@ -1232,10 +1442,20 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::RepeatedPtrField<::std::string> required_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::JSONSchema > all_of_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::JSONSchema > any_of_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::JSONSchema > one_of_;
+    ::google::protobuf::internal::ArenaStringPtr schema_uri_;
+    ::google::protobuf::internal::ArenaStringPtr id_uri_;
+    ::google::protobuf::internal::ArenaStringPtr title_;
+    ::google::protobuf::internal::ArenaStringPtr description_;
+    ::google::protobuf::internal::ArenaStringPtr ref_;
     ::runanywhere::v1::JSONSchemaProperty* PROTOBUF_NULLABLE items_;
+    ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE not_schema_;
     int type_;
     bool additional_properties_;
     ::google::protobuf::internal::MapField<JSONSchema_PropertiesEntry_DoNotUse, ::std::string, ::runanywhere::v1::JSONSchemaProperty> properties_;
+    ::google::protobuf::internal::MapField<JSONSchema_DefinitionsEntry_DoNotUse, ::std::string, ::runanywhere::v1::JSONSchema> definitions_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1243,6 +1463,45 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema final : public ::google:
 };
 
 extern const ::google::protobuf::internal::ClassDataFull JSONSchema_class_data_;
+// -------------------------------------------------------------------
+
+class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema_DefinitionsEntry_DoNotUse final
+    : public ::google::protobuf::internal::MapEntry<::std::string, ::google::protobuf::Message,
+                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
+                             ::google::protobuf::internal::WireFormatLite::TYPE_MESSAGE> {
+ public:
+  using SuperType =
+      ::google::protobuf::internal::MapEntry<::std::string, ::google::protobuf::Message,
+                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
+                      ::google::protobuf::internal::WireFormatLite::TYPE_MESSAGE>;
+  JSONSchema_DefinitionsEntry_DoNotUse();
+  template <typename = void>
+  explicit constexpr JSONSchema_DefinitionsEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized);
+  explicit JSONSchema_DefinitionsEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr const void* PROTOBUF_NONNULL internal_default_instance() {
+    return &_JSONSchema_DefinitionsEntry_DoNotUse_default_instance_;
+  }
+
+
+  static constexpr auto InternalGenerateClassData_();
+
+ private:
+  friend class ::google::protobuf::MessageLite;
+  friend struct ::TableStruct_structured_5foutput_2eproto;
+
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   1, 54,
+                                   2>
+      _table_;
+
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+};
+extern const ::google::protobuf::internal::ClassDataFull JSONSchema_DefinitionsEntry_DoNotUse_class_data_;
 // -------------------------------------------------------------------
 
 class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED JSONSchema_PropertiesEntry_DoNotUse final
@@ -1637,7 +1896,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ClassificationCandidate final : pub
     return *reinterpret_cast<const ClassificationCandidate*>(
         &_ClassificationCandidate_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(ClassificationCandidate& a, ClassificationCandidate& b) { a.Swap(&b); }
   inline void Swap(ClassificationCandidate* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1850,7 +2109,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputResult final : publ
     return *reinterpret_cast<const StructuredOutputResult*>(
         &_StructuredOutputResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(StructuredOutputResult& a, StructuredOutputResult& b) { a.Swap(&b); }
   inline void Swap(StructuredOutputResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2088,7 +2347,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
     return *reinterpret_cast<const StructuredOutputOptions*>(
         &_StructuredOutputOptions_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(StructuredOutputOptions& a, StructuredOutputOptions& b) { a.Swap(&b); }
   inline void Swap(StructuredOutputOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2178,10 +2437,64 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
 
   // accessors -------------------------------------------------------
   enum : int {
+    kJsonSchemaFieldNumber = 4,
+    kTypeNameFieldNumber = 5,
+    kNameFieldNumber = 6,
     kSchemaFieldNumber = 1,
     kIncludeSchemaInPromptFieldNumber = 2,
     kStrictModeFieldNumber = 3,
   };
+  // optional string json_schema = 4;
+  [[nodiscard]] bool has_json_schema()
+      const;
+  void clear_json_schema() ;
+  [[nodiscard]] const ::std::string& json_schema() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_json_schema(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_json_schema();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_json_schema();
+  void set_allocated_json_schema(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_json_schema() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_json_schema(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_json_schema();
+
+  public:
+  // optional string type_name = 5;
+  [[nodiscard]] bool has_type_name()
+      const;
+  void clear_type_name() ;
+  [[nodiscard]] const ::std::string& type_name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_type_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_type_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_type_name();
+  void set_allocated_type_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_type_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_type_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_type_name();
+
+  public:
+  // optional string name = 6;
+  [[nodiscard]] bool has_name()
+      const;
+  void clear_name() ;
+  [[nodiscard]] const ::std::string& name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
+  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
+
+  public:
   // .runanywhere.v1.JSONSchema schema = 1;
   [[nodiscard]] bool has_schema()
       const;
@@ -2224,8 +2537,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<2, 3,
-                                   1, 0,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
+                                   1, 71,
                                    2>
       _table_;
 
@@ -2248,6 +2561,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
         const StructuredOutputOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr json_schema_;
+    ::google::protobuf::internal::ArenaStringPtr type_name_;
+    ::google::protobuf::internal::ArenaStringPtr name_;
     ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE schema_;
     bool include_schema_in_prompt_;
     bool strict_mode_;
@@ -2316,7 +2632,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NERResult final : public ::google::
     return *reinterpret_cast<const NERResult*>(
         &_NERResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 12;
   friend void swap(NERResult& a, NERResult& b) { a.Swap(&b); }
   inline void Swap(NERResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2522,7 +2838,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EntityExtractionResult final : publ
     return *reinterpret_cast<const EntityExtractionResult*>(
         &_EntityExtractionResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 7;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(EntityExtractionResult& a, EntityExtractionResult& b) { a.Swap(&b); }
   inline void Swap(EntityExtractionResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2728,7 +3044,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ClassificationResult final : public
     return *reinterpret_cast<const ClassificationResult*>(
         &_ClassificationResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(ClassificationResult& a, ClassificationResult& b) { a.Swap(&b); }
   inline void Swap(ClassificationResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3359,6 +3675,8 @@ inline void JSONSchemaProperty::set_allocated_object_schema(::runanywhere::v1::J
 
 // -------------------------------------------------------------------
 
+// -------------------------------------------------------------------
+
 // JSONSchema
 
 // .runanywhere.v1.JSONSchemaType type = 1;
@@ -3366,7 +3684,7 @@ inline void JSONSchema::clear_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.type_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000800U);
 }
 inline ::runanywhere::v1::JSONSchemaType JSONSchema::type() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.type)
@@ -3374,7 +3692,7 @@ inline ::runanywhere::v1::JSONSchemaType JSONSchema::type() const {
 }
 inline void JSONSchema::set_type(::runanywhere::v1::JSONSchemaType value) {
   _internal_set_type(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.type)
 }
 inline ::runanywhere::v1::JSONSchemaType JSONSchema::_internal_type() const {
@@ -3397,7 +3715,7 @@ inline void JSONSchema::clear_properties() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.properties_.Clear();
   ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00002000U);
 }
 inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchemaProperty>& JSONSchema::_internal_properties() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3413,7 +3731,7 @@ inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchemaPrope
 }
 inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchemaProperty>* PROTOBUF_NONNULL JSONSchema::mutable_properties()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.JSONSchema.properties)
   return _internal_mutable_properties();
 }
@@ -3492,7 +3810,7 @@ JSONSchema::_internal_mutable_required() {
 
 // optional .runanywhere.v1.JSONSchemaProperty items = 4;
 inline bool JSONSchema::has_items() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
   PROTOBUF_ASSUME(!value || _impl_.items_ != nullptr);
   return value;
 }
@@ -3500,7 +3818,7 @@ inline void JSONSchema::clear_items() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.items_ != nullptr) _impl_.items_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
+                  0x00000200U);
 }
 inline const ::runanywhere::v1::JSONSchemaProperty& JSONSchema::_internal_items() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3519,16 +3837,16 @@ inline void JSONSchema::unsafe_arena_set_allocated_items(
   }
   _impl_.items_ = reinterpret_cast<::runanywhere::v1::JSONSchemaProperty*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.JSONSchema.items)
 }
 inline ::runanywhere::v1::JSONSchemaProperty* PROTOBUF_NULLABLE JSONSchema::release_items() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
   ::runanywhere::v1::JSONSchemaProperty* released = _impl_.items_;
   _impl_.items_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3548,7 +3866,7 @@ inline ::runanywhere::v1::JSONSchemaProperty* PROTOBUF_NULLABLE JSONSchema::unsa
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.items)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
   ::runanywhere::v1::JSONSchemaProperty* temp = _impl_.items_;
   _impl_.items_ = nullptr;
   return temp;
@@ -3563,7 +3881,7 @@ inline ::runanywhere::v1::JSONSchemaProperty* PROTOBUF_NONNULL JSONSchema::_inte
 }
 inline ::runanywhere::v1::JSONSchemaProperty* PROTOBUF_NONNULL JSONSchema::mutable_items()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   ::runanywhere::v1::JSONSchemaProperty* _msg = _internal_mutable_items();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.items)
   return _msg;
@@ -3580,9 +3898,9 @@ inline void JSONSchema::set_allocated_items(::runanywhere::v1::JSONSchemaPropert
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
   }
 
   _impl_.items_ = reinterpret_cast<::runanywhere::v1::JSONSchemaProperty*>(value);
@@ -3591,14 +3909,14 @@ inline void JSONSchema::set_allocated_items(::runanywhere::v1::JSONSchemaPropert
 
 // optional bool additional_properties = 5;
 inline bool JSONSchema::has_additional_properties() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
   return value;
 }
 inline void JSONSchema::clear_additional_properties() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.additional_properties_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00001000U);
 }
 inline bool JSONSchema::additional_properties() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.additional_properties)
@@ -3606,7 +3924,7 @@ inline bool JSONSchema::additional_properties() const {
 }
 inline void JSONSchema::set_additional_properties(bool value) {
   _internal_set_additional_properties(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.additional_properties)
 }
 inline bool JSONSchema::_internal_additional_properties() const {
@@ -3618,13 +3936,657 @@ inline void JSONSchema::_internal_set_additional_properties(bool value) {
   _impl_.additional_properties_ = value;
 }
 
+// optional string schema_uri = 6 [json_name = "$schema"];
+inline bool JSONSchema::has_schema_uri() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  return value;
+}
+inline void JSONSchema::clear_schema_uri() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.schema_uri_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline const ::std::string& JSONSchema::schema_uri() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.schema_uri)
+  return _internal_schema_uri();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void JSONSchema::set_schema_uri(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.schema_uri_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.schema_uri)
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::mutable_schema_uri()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_schema_uri();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.schema_uri)
+  return _s;
+}
+inline const ::std::string& JSONSchema::_internal_schema_uri() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.schema_uri_.Get();
+}
+inline void JSONSchema::_internal_set_schema_uri(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.schema_uri_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::_internal_mutable_schema_uri() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.schema_uri_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE JSONSchema::release_schema_uri() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.schema_uri)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.schema_uri_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.schema_uri_.Set("", GetArena());
+  }
+  return released;
+}
+inline void JSONSchema::set_allocated_schema_uri(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.schema_uri_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.schema_uri_.IsDefault()) {
+    _impl_.schema_uri_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.JSONSchema.schema_uri)
+}
+
+// optional string id_uri = 7 [json_name = "$id"];
+inline bool JSONSchema::has_id_uri() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  return value;
+}
+inline void JSONSchema::clear_id_uri() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.id_uri_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline const ::std::string& JSONSchema::id_uri() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.id_uri)
+  return _internal_id_uri();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void JSONSchema::set_id_uri(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.id_uri_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.id_uri)
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::mutable_id_uri()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::std::string* _s = _internal_mutable_id_uri();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.id_uri)
+  return _s;
+}
+inline const ::std::string& JSONSchema::_internal_id_uri() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.id_uri_.Get();
+}
+inline void JSONSchema::_internal_set_id_uri(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.id_uri_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::_internal_mutable_id_uri() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.id_uri_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE JSONSchema::release_id_uri() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.id_uri)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  auto* released = _impl_.id_uri_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.id_uri_.Set("", GetArena());
+  }
+  return released;
+}
+inline void JSONSchema::set_allocated_id_uri(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+  _impl_.id_uri_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.id_uri_.IsDefault()) {
+    _impl_.id_uri_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.JSONSchema.id_uri)
+}
+
+// optional string title = 8;
+inline bool JSONSchema::has_title() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void JSONSchema::clear_title() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.title_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline const ::std::string& JSONSchema::title() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.title)
+  return _internal_title();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void JSONSchema::set_title(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  _impl_.title_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.title)
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::mutable_title()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::std::string* _s = _internal_mutable_title();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.title)
+  return _s;
+}
+inline const ::std::string& JSONSchema::_internal_title() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.title_.Get();
+}
+inline void JSONSchema::_internal_set_title(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.title_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::_internal_mutable_title() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.title_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE JSONSchema::release_title() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.title)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  auto* released = _impl_.title_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.title_.Set("", GetArena());
+  }
+  return released;
+}
+inline void JSONSchema::set_allocated_title(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+  _impl_.title_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.title_.IsDefault()) {
+    _impl_.title_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.JSONSchema.title)
+}
+
+// optional string description = 9;
+inline bool JSONSchema::has_description() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
+inline void JSONSchema::clear_description() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.description_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline const ::std::string& JSONSchema::description() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.description)
+  return _internal_description();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void JSONSchema::set_description(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  _impl_.description_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.description)
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::mutable_description()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::std::string* _s = _internal_mutable_description();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.description)
+  return _s;
+}
+inline const ::std::string& JSONSchema::_internal_description() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.description_.Get();
+}
+inline void JSONSchema::_internal_set_description(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.description_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::_internal_mutable_description() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.description_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE JSONSchema::release_description() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.description)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000080U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  auto* released = _impl_.description_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.description_.Set("", GetArena());
+  }
+  return released;
+}
+inline void JSONSchema::set_allocated_description(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+  _impl_.description_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.description_.IsDefault()) {
+    _impl_.description_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.JSONSchema.description)
+}
+
+// map<string, .runanywhere.v1.JSONSchema> definitions = 10;
+inline int JSONSchema::_internal_definitions_size() const {
+  return _internal_definitions().size();
+}
+inline int JSONSchema::definitions_size() const {
+  return _internal_definitions_size();
+}
+inline void JSONSchema::clear_definitions() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.definitions_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00004000U);
+}
+inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>& JSONSchema::_internal_definitions() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.definitions_.GetMap();
+}
+inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>& JSONSchema::definitions() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_map:runanywhere.v1.JSONSchema.definitions)
+  return _internal_definitions();
+}
+inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL JSONSchema::_internal_mutable_definitions() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.definitions_.MutableMap();
+}
+inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL JSONSchema::mutable_definitions()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00004000U);
+  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.JSONSchema.definitions)
+  return _internal_mutable_definitions();
+}
+
+// optional string ref = 11 [json_name = "$ref"];
+inline bool JSONSchema::has_ref() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  return value;
+}
+inline void JSONSchema::clear_ref() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.ref_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline const ::std::string& JSONSchema::ref() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.ref)
+  return _internal_ref();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void JSONSchema::set_ref(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  _impl_.ref_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.JSONSchema.ref)
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::mutable_ref()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ::std::string* _s = _internal_mutable_ref();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.ref)
+  return _s;
+}
+inline const ::std::string& JSONSchema::_internal_ref() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.ref_.Get();
+}
+inline void JSONSchema::_internal_set_ref(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.ref_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL JSONSchema::_internal_mutable_ref() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.ref_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE JSONSchema::release_ref() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.ref)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000100U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  auto* released = _impl_.ref_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.ref_.Set("", GetArena());
+  }
+  return released;
+}
+inline void JSONSchema::set_allocated_ref(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  }
+  _impl_.ref_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.ref_.IsDefault()) {
+    _impl_.ref_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.JSONSchema.ref)
+}
+
+// repeated .runanywhere.v1.JSONSchema all_of = 12;
+inline int JSONSchema::_internal_all_of_size() const {
+  return _internal_all_of().size();
+}
+inline int JSONSchema::all_of_size() const {
+  return _internal_all_of_size();
+}
+inline void JSONSchema::clear_all_of() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.all_of_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::mutable_all_of(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.all_of)
+  return _internal_mutable_all_of()->Mutable(index);
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL JSONSchema::mutable_all_of()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.JSONSchema.all_of)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_all_of();
+}
+inline const ::runanywhere::v1::JSONSchema& JSONSchema::all_of(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.all_of)
+  return _internal_all_of().Get(index);
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::add_all_of()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::JSONSchema* _add =
+      _internal_mutable_all_of()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.JSONSchema.all_of)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& JSONSchema::all_of() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.JSONSchema.all_of)
+  return _internal_all_of();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>&
+JSONSchema::_internal_all_of() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.all_of_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL
+JSONSchema::_internal_mutable_all_of() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.all_of_;
+}
+
+// repeated .runanywhere.v1.JSONSchema any_of = 13;
+inline int JSONSchema::_internal_any_of_size() const {
+  return _internal_any_of().size();
+}
+inline int JSONSchema::any_of_size() const {
+  return _internal_any_of_size();
+}
+inline void JSONSchema::clear_any_of() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.any_of_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::mutable_any_of(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.any_of)
+  return _internal_mutable_any_of()->Mutable(index);
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL JSONSchema::mutable_any_of()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.JSONSchema.any_of)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_any_of();
+}
+inline const ::runanywhere::v1::JSONSchema& JSONSchema::any_of(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.any_of)
+  return _internal_any_of().Get(index);
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::add_any_of()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::JSONSchema* _add =
+      _internal_mutable_any_of()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.JSONSchema.any_of)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& JSONSchema::any_of() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.JSONSchema.any_of)
+  return _internal_any_of();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>&
+JSONSchema::_internal_any_of() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.any_of_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL
+JSONSchema::_internal_mutable_any_of() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.any_of_;
+}
+
+// repeated .runanywhere.v1.JSONSchema one_of = 14;
+inline int JSONSchema::_internal_one_of_size() const {
+  return _internal_one_of().size();
+}
+inline int JSONSchema::one_of_size() const {
+  return _internal_one_of_size();
+}
+inline void JSONSchema::clear_one_of() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.one_of_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::mutable_one_of(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.one_of)
+  return _internal_mutable_one_of()->Mutable(index);
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL JSONSchema::mutable_one_of()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.JSONSchema.one_of)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_one_of();
+}
+inline const ::runanywhere::v1::JSONSchema& JSONSchema::one_of(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.one_of)
+  return _internal_one_of().Get(index);
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::add_one_of()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::JSONSchema* _add =
+      _internal_mutable_one_of()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.JSONSchema.one_of)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>& JSONSchema::one_of() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.JSONSchema.one_of)
+  return _internal_one_of();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>&
+JSONSchema::_internal_one_of() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.one_of_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::JSONSchema>* PROTOBUF_NONNULL
+JSONSchema::_internal_mutable_one_of() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.one_of_;
+}
+
+// optional .runanywhere.v1.JSONSchema not_schema = 15;
+inline bool JSONSchema::has_not_schema() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
+  PROTOBUF_ASSUME(!value || _impl_.not_schema_ != nullptr);
+  return value;
+}
+inline void JSONSchema::clear_not_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.not_schema_ != nullptr) _impl_.not_schema_->Clear();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000400U);
+}
+inline const ::runanywhere::v1::JSONSchema& JSONSchema::_internal_not_schema() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::JSONSchema* p = _impl_.not_schema_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::JSONSchema&>(::runanywhere::v1::_JSONSchema_default_instance_);
+}
+inline const ::runanywhere::v1::JSONSchema& JSONSchema::not_schema() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.JSONSchema.not_schema)
+  return _internal_not_schema();
+}
+inline void JSONSchema::unsafe_arena_set_allocated_not_schema(
+    ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.not_schema_);
+  }
+  _impl_.not_schema_ = reinterpret_cast<::runanywhere::v1::JSONSchema*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.JSONSchema.not_schema)
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE JSONSchema::release_not_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ::runanywhere::v1::JSONSchema* released = _impl_.not_schema_;
+  _impl_.not_schema_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE JSONSchema::unsafe_arena_release_not_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.JSONSchema.not_schema)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ::runanywhere::v1::JSONSchema* temp = _impl_.not_schema_;
+  _impl_.not_schema_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::_internal_mutable_not_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.not_schema_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::JSONSchema>(GetArena());
+    _impl_.not_schema_ = reinterpret_cast<::runanywhere::v1::JSONSchema*>(p);
+  }
+  return _impl_.not_schema_;
+}
+inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL JSONSchema::mutable_not_schema()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ::runanywhere::v1::JSONSchema* _msg = _internal_mutable_not_schema();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.JSONSchema.not_schema)
+  return _msg;
+}
+inline void JSONSchema::set_allocated_not_schema(::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.not_schema_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  }
+
+  _impl_.not_schema_ = reinterpret_cast<::runanywhere::v1::JSONSchema*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.JSONSchema.not_schema)
+}
+
 // -------------------------------------------------------------------
 
 // StructuredOutputOptions
 
 // .runanywhere.v1.JSONSchema schema = 1;
 inline bool StructuredOutputOptions::has_schema() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   PROTOBUF_ASSUME(!value || _impl_.schema_ != nullptr);
   return value;
 }
@@ -3632,7 +4594,7 @@ inline void StructuredOutputOptions::clear_schema() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.schema_ != nullptr) _impl_.schema_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000001U);
+                  0x00000008U);
 }
 inline const ::runanywhere::v1::JSONSchema& StructuredOutputOptions::_internal_schema() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3651,16 +4613,16 @@ inline void StructuredOutputOptions::unsafe_arena_set_allocated_schema(
   }
   _impl_.schema_ = reinterpret_cast<::runanywhere::v1::JSONSchema*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.StructuredOutputOptions.schema)
 }
 inline ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE StructuredOutputOptions::release_schema() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::JSONSchema* released = _impl_.schema_;
   _impl_.schema_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3680,7 +4642,7 @@ inline ::runanywhere::v1::JSONSchema* PROTOBUF_NULLABLE StructuredOutputOptions:
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.StructuredOutputOptions.schema)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::JSONSchema* temp = _impl_.schema_;
   _impl_.schema_ = nullptr;
   return temp;
@@ -3695,7 +4657,7 @@ inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL StructuredOutputOptions::
 }
 inline ::runanywhere::v1::JSONSchema* PROTOBUF_NONNULL StructuredOutputOptions::mutable_schema()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::JSONSchema* _msg = _internal_mutable_schema();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.StructuredOutputOptions.schema)
   return _msg;
@@ -3712,9 +4674,9 @@ inline void StructuredOutputOptions::set_allocated_schema(::runanywhere::v1::JSO
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
 
   _impl_.schema_ = reinterpret_cast<::runanywhere::v1::JSONSchema*>(value);
@@ -3726,7 +4688,7 @@ inline void StructuredOutputOptions::clear_include_schema_in_prompt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.include_schema_in_prompt_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
+                  0x00000010U);
 }
 inline bool StructuredOutputOptions::include_schema_in_prompt() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputOptions.include_schema_in_prompt)
@@ -3734,7 +4696,7 @@ inline bool StructuredOutputOptions::include_schema_in_prompt() const {
 }
 inline void StructuredOutputOptions::set_include_schema_in_prompt(bool value) {
   _internal_set_include_schema_in_prompt(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputOptions.include_schema_in_prompt)
 }
 inline bool StructuredOutputOptions::_internal_include_schema_in_prompt() const {
@@ -3748,14 +4710,14 @@ inline void StructuredOutputOptions::_internal_set_include_schema_in_prompt(bool
 
 // optional bool strict_mode = 3;
 inline bool StructuredOutputOptions::has_strict_mode() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void StructuredOutputOptions::clear_strict_mode() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.strict_mode_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000020U);
 }
 inline bool StructuredOutputOptions::strict_mode() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputOptions.strict_mode)
@@ -3763,7 +4725,7 @@ inline bool StructuredOutputOptions::strict_mode() const {
 }
 inline void StructuredOutputOptions::set_strict_mode(bool value) {
   _internal_set_strict_mode(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputOptions.strict_mode)
 }
 inline bool StructuredOutputOptions::_internal_strict_mode() const {
@@ -3775,6 +4737,213 @@ inline void StructuredOutputOptions::_internal_set_strict_mode(bool value) {
   _impl_.strict_mode_ = value;
 }
 
+// optional string json_schema = 4;
+inline bool StructuredOutputOptions::has_json_schema() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  return value;
+}
+inline void StructuredOutputOptions::clear_json_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.json_schema_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& StructuredOutputOptions::json_schema() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputOptions.json_schema)
+  return _internal_json_schema();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void StructuredOutputOptions::set_json_schema(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.json_schema_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputOptions.json_schema)
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputOptions::mutable_json_schema()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_json_schema();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StructuredOutputOptions.json_schema)
+  return _s;
+}
+inline const ::std::string& StructuredOutputOptions::_internal_json_schema() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.json_schema_.Get();
+}
+inline void StructuredOutputOptions::_internal_set_json_schema(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.json_schema_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputOptions::_internal_mutable_json_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.json_schema_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE StructuredOutputOptions::release_json_schema() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.StructuredOutputOptions.json_schema)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.json_schema_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.json_schema_.Set("", GetArena());
+  }
+  return released;
+}
+inline void StructuredOutputOptions::set_allocated_json_schema(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.json_schema_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.json_schema_.IsDefault()) {
+    _impl_.json_schema_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputOptions.json_schema)
+}
+
+// optional string type_name = 5;
+inline bool StructuredOutputOptions::has_type_name() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void StructuredOutputOptions::clear_type_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_name_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& StructuredOutputOptions::type_name() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputOptions.type_name)
+  return _internal_type_name();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void StructuredOutputOptions::set_type_name(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.type_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputOptions.type_name)
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputOptions::mutable_type_name()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_type_name();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StructuredOutputOptions.type_name)
+  return _s;
+}
+inline const ::std::string& StructuredOutputOptions::_internal_type_name() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.type_name_.Get();
+}
+inline void StructuredOutputOptions::_internal_set_type_name(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_name_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputOptions::_internal_mutable_type_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.type_name_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE StructuredOutputOptions::release_type_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.StructuredOutputOptions.type_name)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.type_name_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.type_name_.Set("", GetArena());
+  }
+  return released;
+}
+inline void StructuredOutputOptions::set_allocated_type_name(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.type_name_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.type_name_.IsDefault()) {
+    _impl_.type_name_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputOptions.type_name)
+}
+
+// optional string name = 6;
+inline bool StructuredOutputOptions::has_name() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
+inline void StructuredOutputOptions::clear_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.name_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& StructuredOutputOptions::name() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputOptions.name)
+  return _internal_name();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void StructuredOutputOptions::set_name(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputOptions.name)
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputOptions::mutable_name()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_name();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StructuredOutputOptions.name)
+  return _s;
+}
+inline const ::std::string& StructuredOutputOptions::_internal_name() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.name_.Get();
+}
+inline void StructuredOutputOptions::_internal_set_name(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.name_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputOptions::_internal_mutable_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.name_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE StructuredOutputOptions::release_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.StructuredOutputOptions.name)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.name_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.name_.Set("", GetArena());
+  }
+  return released;
+}
+inline void StructuredOutputOptions::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.name_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
+    _impl_.name_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputOptions.name)
+}
+
 // -------------------------------------------------------------------
 
 // StructuredOutputValidation
@@ -3784,7 +4953,7 @@ inline void StructuredOutputValidation::clear_is_valid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_valid_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000008U);
 }
 inline bool StructuredOutputValidation::is_valid() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.is_valid)
@@ -3792,7 +4961,7 @@ inline bool StructuredOutputValidation::is_valid() const {
 }
 inline void StructuredOutputValidation::set_is_valid(bool value) {
   _internal_set_is_valid(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.is_valid)
 }
 inline bool StructuredOutputValidation::_internal_is_valid() const {
@@ -3809,7 +4978,7 @@ inline void StructuredOutputValidation::clear_contains_json() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.contains_json_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000010U);
 }
 inline bool StructuredOutputValidation::contains_json() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.contains_json)
@@ -3817,7 +4986,7 @@ inline bool StructuredOutputValidation::contains_json() const {
 }
 inline void StructuredOutputValidation::set_contains_json(bool value) {
   _internal_set_contains_json(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.contains_json)
 }
 inline bool StructuredOutputValidation::_internal_contains_json() const {
@@ -3965,6 +5134,75 @@ inline void StructuredOutputValidation::set_allocated_raw_output(::std::string* 
     _impl_.raw_output_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputValidation.raw_output)
+}
+
+// optional string extracted_json = 5;
+inline bool StructuredOutputValidation::has_extracted_json() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
+inline void StructuredOutputValidation::clear_extracted_json() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.extracted_json_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& StructuredOutputValidation::extracted_json() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.extracted_json)
+  return _internal_extracted_json();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void StructuredOutputValidation::set_extracted_json(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.extracted_json_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.extracted_json)
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputValidation::mutable_extracted_json()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_extracted_json();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StructuredOutputValidation.extracted_json)
+  return _s;
+}
+inline const ::std::string& StructuredOutputValidation::_internal_extracted_json() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.extracted_json_.Get();
+}
+inline void StructuredOutputValidation::_internal_set_extracted_json(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.extracted_json_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL StructuredOutputValidation::_internal_mutable_extracted_json() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.extracted_json_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE StructuredOutputValidation::release_extracted_json() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.StructuredOutputValidation.extracted_json)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.extracted_json_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.extracted_json_.Set("", GetArena());
+  }
+  return released;
+}
+inline void StructuredOutputValidation::set_allocated_extracted_json(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.extracted_json_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.extracted_json_.IsDefault()) {
+    _impl_.extracted_json_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputValidation.extracted_json)
 }
 
 // -------------------------------------------------------------------

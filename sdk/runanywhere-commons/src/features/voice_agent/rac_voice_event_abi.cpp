@@ -24,6 +24,8 @@
 
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
 
+#include "rac_voice_event_abi_internal.h"
+
 #include "rac/core/rac_logger.h"
 
 #include <chrono>
@@ -106,8 +108,13 @@ int64_t now_us() {
  * for the GAP 08 voice barge-in path.
  */
 void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& dst) {
+    dst.set_severity(src.type == RAC_VOICE_AGENT_EVENT_ERROR
+                         ? runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR
+                         : runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
     switch (src.type) {
         case RAC_VOICE_AGENT_EVENT_PROCESSED: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_METRICS);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
             auto* m = dst.mutable_metrics();
             /* Per-primitive latencies are not yet captured in the C struct;
              * fill what we have and leave the rest at proto defaults. */
@@ -118,6 +125,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VAD);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
             auto* v = dst.mutable_vad();
             v->set_type(src.data.vad_speech_active == RAC_TRUE
                             ? runanywhere::v1::VAD_EVENT_VOICE_START
@@ -127,6 +136,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_TRANSCRIPTION: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_STT);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_STT);
             auto* u = dst.mutable_user_said();
             if (src.data.transcription) u->set_text(src.data.transcription);
             u->set_is_final(true);
@@ -137,6 +148,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_RESPONSE: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_LLM);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_LLM);
             auto* t = dst.mutable_assistant_token();
             if (src.data.response) t->set_text(src.data.response);
             /* Voice-agent response events are full-utterance, so is_final
@@ -148,6 +161,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_TTS);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_TTS);
             auto* a = dst.mutable_audio();
             if (src.data.audio.audio_data && src.data.audio.audio_size > 0) {
                 a->set_pcm(src.data.audio.audio_data, src.data.audio.audio_size);
@@ -161,6 +176,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_ERROR: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_ERROR);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
             auto* e = dst.mutable_error();
             e->set_code(static_cast<int32_t>(src.data.error_code));
             e->set_message("");           /* C struct has no message string */
@@ -170,6 +187,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED: {
+            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VOICE_AGENT);
+            dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_WAKEWORD);
             /* No proto arm for wakeword today — surface as a state change
              * to LISTENING so frontends can react via the standard state
              * stream without losing the signal. */
@@ -199,10 +218,8 @@ namespace rac::voice_agent {
  *     The arena reuse comes for free from `cc_enable_arenas` in
  *     voice_events.proto.
  */
-void dispatch_proto_event(rac_voice_agent_handle_t       handle,
-                           const rac_voice_agent_event_t* event) {
-    if (event == nullptr) return;
-
+void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
+                                const runanywhere::v1::VoiceEvent& event) {
     CallbackSlot slot;
     uint64_t     seq;
     {
@@ -215,13 +232,15 @@ void dispatch_proto_event(rac_voice_agent_handle_t       handle,
         seq = ++(it->second.seq);
     }
 
-    thread_local runanywhere::v1::VoiceEvent proto_event;
     thread_local std::vector<uint8_t>        scratch;
 
-    proto_event.Clear();
-    proto_event.set_seq(seq);
-    proto_event.set_timestamp_us(now_us());
-    translate(*event, proto_event);
+    runanywhere::v1::VoiceEvent proto_event(event);
+    if (proto_event.seq() == 0) {
+        proto_event.set_seq(seq);
+    }
+    if (proto_event.timestamp_us() == 0) {
+        proto_event.set_timestamp_us(now_us());
+    }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
     if (scratch.size() < needed) scratch.resize(needed);
@@ -229,12 +248,21 @@ void dispatch_proto_event(rac_voice_agent_handle_t       handle,
         /* Serialization should never fail for a valid message; log and
          * drop instead of crashing. */
         RAC_LOG_WARNING("voice_agent",
-                        "dispatch_proto_event: SerializeToArray failed for event type=%d",
-                        static_cast<int>(event->type));
+                        "dispatch_proto_event: SerializeToArray failed for payload case=%d",
+                        static_cast<int>(proto_event.payload_case()));
         return;
     }
 
     slot.fn(scratch.data(), needed, slot.user_data);
+}
+
+void dispatch_proto_event(rac_voice_agent_handle_t       handle,
+                           const rac_voice_agent_event_t* event) {
+    if (event == nullptr) return;
+
+    runanywhere::v1::VoiceEvent proto_event;
+    translate(*event, proto_event);
+    dispatch_proto_voice_event(handle, proto_event);
 }
 
 }  // namespace rac::voice_agent
@@ -460,6 +488,11 @@ void encode_metrics(std::vector<uint8_t>& /*s*/) {
 }  // namespace
 
 namespace rac::voice_agent {
+
+void dispatch_proto_voice_event(rac_voice_agent_handle_t,
+                                const runanywhere::v1::VoiceEvent&) {
+    // Generated VoiceEvent dispatch is only available when libprotobuf is linked.
+}
 
 /**
  * @brief Internal helper called by the voice agent's event dispatcher per

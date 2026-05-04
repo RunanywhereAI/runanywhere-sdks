@@ -61,7 +61,7 @@ export function inferModelFromFilename(filename: string): InferredModelMeta {
       return {
         id: sanitizeId(baseName),
         name: humanizeName(baseName),
-        category: ModelCategory.Audio,
+        category: ModelCategory.VoiceActivityDetection,
         framework: LLMFramework.ONNX,
       };
     }

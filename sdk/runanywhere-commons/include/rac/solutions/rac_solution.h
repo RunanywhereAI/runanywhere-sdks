@@ -11,8 +11,8 @@
  * untouched. Two entry points are provided:
  *
  *   rac_solution_create_from_proto(bytes, len, &handle)
- *     Consumes a serialized SolutionConfig protobuf. Mandatory path —
- *     always available when the build has Protobuf support.
+ *     Consumes a serialized SolutionConfig protobuf. Mandatory path when the
+ *     build includes the Solutions runtime.
  *
  *   rac_solution_create_from_yaml(text, &handle)
  *     Consumes the YAML sugar shipped inside solution packages. The
@@ -48,8 +48,8 @@ typedef void* rac_solution_handle_t;
  * @param out_handle   Receives the new solution handle on success.
  *
  * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT,
- *         RAC_ERROR_FEATURE_NOT_AVAILABLE (when Protobuf is disabled
- *         at build time), RAC_ERROR_DECODING_ERROR, or
+ *         RAC_ERROR_FEATURE_NOT_AVAILABLE (when the Solutions runtime is
+ *         disabled at build time), RAC_ERROR_DECODING_ERROR, or
  *         RAC_ERROR_INVALID_CONFIGURATION.
  */
 RAC_API rac_result_t rac_solution_create_from_proto(const void*            proto_bytes,

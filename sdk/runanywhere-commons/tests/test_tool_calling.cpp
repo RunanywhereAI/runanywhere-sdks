@@ -265,6 +265,45 @@ int test_format_name_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// 10. parse -> tool result JSON -> follow-up prompt loop
+// ---------------------------------------------------------------------------
+int test_tool_result_loop() {
+    const char* input =
+        "checking <tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>";
+    rac_tool_call_t parsed;
+    rac_result_t rc = rac_tool_call_parse(input, &parsed);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(parsed.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(parsed.tool_name, "get_weather");
+    ASSERT_SUBSTR(parsed.arguments_json, "\"Tokyo\"");
+
+    char* result_json = nullptr;
+    rc = rac_tool_call_result_to_json(parsed.tool_name, RAC_TRUE,
+                                      "{\"temperature_c\":22,\"condition\":\"clear\"}",
+                                      nullptr, &result_json);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_TRUE(result_json != nullptr);
+    ASSERT_SUBSTR(result_json, "\"toolName\":\"get_weather\"");
+    ASSERT_SUBSTR(result_json, "\"success\":true");
+    ASSERT_SUBSTR(result_json, "\"temperature_c\":22");
+
+    char* followup = nullptr;
+    rc = rac_tool_call_build_followup_prompt("what is the weather in Tokyo?", nullptr,
+                                             parsed.tool_name, result_json, RAC_FALSE,
+                                             &followup);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_TRUE(followup != nullptr);
+    ASSERT_SUBSTR(followup, "what is the weather in Tokyo?");
+    ASSERT_SUBSTR(followup, "get_weather");
+    ASSERT_SUBSTR(followup, "\"condition\":\"clear\"");
+
+    rac_free(followup);
+    rac_free(result_json);
+    rac_tool_call_free(&parsed);
+    return 0;
+}
+
 struct TestCase {
     const char* name;
     int (*fn)();
@@ -288,6 +327,7 @@ int main(int argc, char** argv) {
         {"normalize_json_unquoted_keys", test_normalize_json_unquoted_keys},
         {"free_functions_idempotent",   test_free_functions_idempotent},
         {"format_name_round_trip",      test_format_name_round_trip},
+        {"tool_result_loop",            test_tool_result_loop},
     };
 
     int num_cases = static_cast<int>(sizeof(cases) / sizeof(cases[0]));

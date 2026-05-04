@@ -17,29 +17,12 @@
  */
 
 import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeConfig';
+import {
+  AcceleratorPreference,
+  type HardwareProfileResult,
+} from '@runanywhere/proto-ts/hardware_profile';
 
-/**
- * Aggregated hardware profile for the current browser/device. Wire shape is
- * loosely inspired by `idl/storage_types.proto::HardwareProfile` but stays
- * Web-side until the proto cross-cuts (G-B1) are added.
- */
-export interface HardwareProfile {
-  chip: string;
-  hasNeuralEngine: boolean;
-  accelerationMode: string;
-  cpuCores: number;
-  deviceMemoryGb: number;
-  webgpuAvailable: boolean;
-  userAgent: string;
-}
-
-/**
- * Canonical alias matching `HardwareProfileResult` from the generated proto
- * type (`runanywhere-proto-ts/src/hardware_profile.ts`). Wave 3 Step 3.2:
- * lets callers spell the type as `HardwareProfileResult` per
- * CANONICAL_API §14, ahead of the Wave 4 type unification.
- */
-export type HardwareProfileResult = HardwareProfile;
+export type { HardwareProfile, HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
 
 type NavigatorWithExtras = Omit<Navigator, 'hardwareConcurrency'> & {
   deviceMemory?: number;
@@ -86,16 +69,31 @@ function detectWebGPU(): boolean {
 
 export const Hardware = {
   /** Snapshot the current hardware profile. */
-  getProfile(): HardwareProfile {
+  getProfile(): HardwareProfileResult {
     const nav = getNavigator();
+    const accelerationMode = detectAccelerationMode();
+    const webgpuAvailable = detectWebGPU();
     return {
-      chip: detectChip(),
-      hasNeuralEngine: detectChip() === 'apple-silicon',
-      accelerationMode: detectAccelerationMode(),
-      cpuCores: nav?.hardwareConcurrency ?? 0,
-      deviceMemoryGb: nav?.deviceMemory ?? 0,
-      webgpuAvailable: detectWebGPU(),
-      userAgent: nav?.userAgent ?? '',
+      profile: {
+        chip: detectChip(),
+        hasNeuralEngine: detectChip() === 'apple-silicon',
+        accelerationMode,
+        totalMemoryBytes: Math.round((nav?.deviceMemory ?? 0) * 1024 * 1024 * 1024),
+        coreCount: nav?.hardwareConcurrency ?? 0,
+        performanceCores: 0,
+        efficiencyCores: 0,
+        architecture: detectChip(),
+        platform: 'web',
+      },
+      accelerators: [
+        {
+          name: webgpuAvailable ? 'webgpu' : accelerationMode,
+          type: webgpuAvailable
+            ? AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU
+            : AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU,
+          available: true,
+        },
+      ],
     };
   },
 

@@ -123,6 +123,7 @@ function parseResult(json: string): DiffusionResult {
       parsed.used_scheduler ??
       parsed.usedScheduler ??
       DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED,
+    errorCode: 0,
   };
 }
 
@@ -155,6 +156,8 @@ function parseProgress(json: string): DiffusionProgress {
     intermediateImageData: intermediateBase64
       ? base64ToBytes(intermediateBase64)
       : undefined,
+    intermediateImageWidth: 0,
+    intermediateImageHeight: 0,
   };
 }
 
@@ -266,6 +269,13 @@ export async function generateImage(
     scheduler:
       options?.scheduler ?? DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS,
     mode: options?.mode ?? DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
+    inputImage: options?.inputImage,
+    maskImage: options?.maskImage,
+    denoiseStrength: options?.denoiseStrength ?? 0,
+    reportIntermediateImages: options?.reportIntermediateImages ?? false,
+    progressStride: options?.progressStride ?? 1,
+    inputImageWidth: options?.inputImageWidth ?? 0,
+    inputImageHeight: options?.inputImageHeight ?? 0,
   };
   const optionsJson = serialiseOptions(opts);
   const json = await native.diffusionGenerate(optionsJson);
@@ -300,6 +310,13 @@ export async function generateImageStream(
     scheduler:
       options?.scheduler ?? DiffusionScheduler.DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS,
     mode: options?.mode ?? DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
+    inputImage: options?.inputImage,
+    maskImage: options?.maskImage,
+    denoiseStrength: options?.denoiseStrength ?? 0,
+    reportIntermediateImages: options?.reportIntermediateImages ?? true,
+    progressStride: options?.progressStride ?? 1,
+    inputImageWidth: options?.inputImageWidth ?? 0,
+    inputImageHeight: options?.inputImageHeight ?? 0,
   };
   const optionsJson = serialiseOptions(opts);
 
@@ -408,6 +425,13 @@ export async function getDiffusionCapabilities(): Promise<DiffusionCapabilities>
       supportedVariants: [],
       supportedSchedulers: [],
       maxResolutionPx: 0,
+      supportedModes: [],
+      maxWidthPx: 0,
+      maxHeightPx: 0,
+      supportsIntermediateImages: false,
+      supportsSafetyChecker: false,
+      isReady: false,
+      safetyCheckerEnabled: false,
     };
   }
   const json = await native.diffusionGetCapabilities();
@@ -423,26 +447,57 @@ export async function getDiffusionCapabilities(): Promise<DiffusionCapabilities>
       maxHeight?: number;
       max_resolution_px?: number;
       maxResolutionPx?: number;
+      supported_modes?: DiffusionMode[];
+      supportedModes?: DiffusionMode[];
+      supports_intermediate_images?: boolean;
+      supportsIntermediateImages?: boolean;
+      supports_safety_checker?: boolean;
+      supportsSafetyChecker?: boolean;
+      is_ready?: boolean;
+      isReady?: boolean;
+      current_model?: string;
+      currentModel?: string;
+      safety_checker_enabled?: boolean;
+      safetyCheckerEnabled?: boolean;
     };
+    const maxWidthPx = parsed.max_width ?? parsed.maxWidth ?? 0;
+    const maxHeightPx = parsed.max_height ?? parsed.maxHeight ?? 0;
     const maxResolutionPx =
       parsed.max_resolution_px ??
       parsed.maxResolutionPx ??
-      Math.max(
-        parsed.max_width ?? parsed.maxWidth ?? 0,
-        parsed.max_height ?? parsed.maxHeight ?? 0
-      );
+      Math.max(maxWidthPx, maxHeightPx);
     return {
       supportedVariants:
         parsed.supported_variants ?? parsed.supportedVariants ?? [],
       supportedSchedulers:
         parsed.supported_schedulers ?? parsed.supportedSchedulers ?? [],
       maxResolutionPx,
+      supportedModes: parsed.supported_modes ?? parsed.supportedModes ?? [],
+      maxWidthPx,
+      maxHeightPx,
+      supportsIntermediateImages:
+        parsed.supports_intermediate_images ??
+        parsed.supportsIntermediateImages ??
+        false,
+      supportsSafetyChecker:
+        parsed.supports_safety_checker ?? parsed.supportsSafetyChecker ?? false,
+      isReady: parsed.is_ready ?? parsed.isReady ?? false,
+      currentModel: parsed.current_model ?? parsed.currentModel,
+      safetyCheckerEnabled:
+        parsed.safety_checker_enabled ?? parsed.safetyCheckerEnabled ?? false,
     };
   } catch {
     return {
       supportedVariants: [],
       supportedSchedulers: [],
       maxResolutionPx: 0,
+      supportedModes: [],
+      maxWidthPx: 0,
+      maxHeightPx: 0,
+      supportsIntermediateImages: false,
+      supportsSafetyChecker: false,
+      isReady: false,
+      safetyCheckerEnabled: false,
     };
   }
 }

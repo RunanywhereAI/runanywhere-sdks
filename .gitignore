@@ -4,7 +4,13 @@
 
 ## Build generated
 build/
+build-*/
 DerivedData/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+a.out.*
 
 ## Various settings
 *.pbxuser
@@ -48,6 +54,8 @@ playground.xcworkspace
 # https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
 #
 # Pods/
+.bundle/
+vendor/bundle/
 
 # Carthage
 #
@@ -408,8 +416,13 @@ __pycache__/
 
 # Node
 node_modules/
+node_modules
 /tools/
 *.trace
+
+# Local detailed validation runs and MCP evidence
+test_workflows/
+gaps/
 
 # External starter-app clones for local reference (release.yml clones them fresh)
 external_examples/
