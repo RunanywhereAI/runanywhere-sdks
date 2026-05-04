@@ -23,6 +23,7 @@ import com.runanywhere.sdk.public.extensions.synthesize
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -116,6 +117,9 @@ data class TTSUiState(
     val audioDuration: Double? = null,
     val audioSize: Int? = null,
     val sampleRate: Int? = null,
+    // Backend-reported PCM encoding. Sherpa-Piper emits AUDIO_FORMAT_PCM
+    // which is float32 by SDK convention; AUDIO_FORMAT_PCM_S16LE is int16.
+    val audioFormat: ai.runanywhere.proto.v1.AudioFormat? = null,
     val playbackProgress: Double = 0.0,
     val currentTime: Double = 0.0,
     val errorMessage: String? = null,
@@ -403,12 +407,13 @@ class TextToSpeechViewModel(
                                 audioDuration = (result.duration_ms / 1000.0),
                                 audioSize = null,
                                 sampleRate = null,
+                                audioFormat = null,
                                 processingTimeMs = processingTime,
                             )
                         }
                     } else {
                         // ONNX/Piper TTS returns audio data for playback
-                        Timber.i("✅ Speech generation complete: ${result.audio_data.toByteArray().size} bytes, duration: ${(result.duration_ms / 1000.0)}s")
+                        Timber.i("✅ Speech generation complete: ${result.audio_data.toByteArray().size} bytes, duration: ${(result.duration_ms / 1000.0)}s, format=${result.audio_format}, sampleRate=${result.sample_rate}")
 
                         generatedAudioData = result.audio_data.toByteArray()
 
@@ -419,7 +424,8 @@ class TextToSpeechViewModel(
                                 hasGeneratedAudio = true,
                                 audioDuration = (result.duration_ms / 1000.0),
                                 audioSize = result.audio_data.toByteArray().size,
-                                sampleRate = null,
+                                sampleRate = result.sample_rate.takeIf { sr -> sr > 0 },
+                                audioFormat = result.audio_format,
                                 processingTimeMs = processingTime,
                             )
                         }
@@ -510,7 +516,20 @@ class TextToSpeechViewModel(
                     }
 
                     val channelConfig = AudioFormat.CHANNEL_OUT_MONO
-                    val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+
+                    // Resolve PCM encoding from the SDK-supplied format.
+                    // Sherpa-Piper emits AUDIO_FORMAT_PCM (= float32 by SDK
+                    // convention; see estimate_pcm_f32_duration_ms in C++
+                    // tts_component.cpp). AUDIO_FORMAT_PCM_S16LE is int16.
+                    // WAV-wrapped output is always int16 by the WAV spec used
+                    // here. Anything else falls back to int16.
+                    val protoFmt = _uiState.value.audioFormat
+                    val isFloat32 = !isWav &&
+                        protoFmt == ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM
+                    val audioFormat =
+                        if (isFloat32) AudioFormat.ENCODING_PCM_FLOAT
+                        else AudioFormat.ENCODING_PCM_16BIT
+                    Timber.i("Playback encoding=${if (isFloat32) "FLOAT32" else "PCM16"} sampleRate=$sampleRate isWav=$isWav protoFmt=$protoFmt")
 
                     val pcmData = audioData.copyOfRange(pcmOffset, audioData.size)
 
@@ -535,11 +554,26 @@ class TextToSpeechViewModel(
                             .setTransferMode(AudioTrack.MODE_STATIC)
                             .build()
 
-                    audioTrack?.write(pcmData, 0, pcmData.size)
+                    if (isFloat32) {
+                        // Decode little-endian float32 stream into a FloatArray
+                        // because AudioTrack.write(byte[]) doesn't accept
+                        // ENCODING_PCM_FLOAT — it requires the float[] overload.
+                        val byteBuffer = java.nio.ByteBuffer.wrap(pcmData)
+                            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                        val floatCount = pcmData.size / 4
+                        val floatBuf = FloatArray(floatCount)
+                        byteBuffer.asFloatBuffer().get(floatBuf)
+                        audioTrack?.write(floatBuf, 0, floatCount, AudioTrack.WRITE_BLOCKING)
+                    } else {
+                        audioTrack?.write(pcmData, 0, pcmData.size)
+                    }
                     audioTrack?.play()
 
                     // Track playback progress (matches iOS timer pattern)
-                    val duration = _uiState.value.audioDuration ?: (pcmData.size.toDouble() / (sampleRate * 2))
+                    // Bytes-per-sample is 4 for float32 PCM, 2 for int16 PCM.
+                    val bytesPerSample = if (isFloat32) 4 else 2
+                    val duration = _uiState.value.audioDuration
+                        ?: (pcmData.size.toDouble() / (sampleRate * bytesPerSample))
                     var currentTime = 0.0
 
                     while (_uiState.value.isPlaying && audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
@@ -561,13 +595,23 @@ class TextToSpeechViewModel(
                         }
                     }
 
-                    // Playback finished - stop and reset state
-                    withContext(Dispatchers.Main) {
+                    // Playback finished - stop and reset state.
+                    // NonCancellable wrapper prevents the natural-completion
+                    // call to stopPlayback() (which cancels playbackJob) from
+                    // throwing CancellationException at us mid-cleanup.
+                    withContext(NonCancellable + Dispatchers.Main) {
                         stopPlayback()
                     }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // Playback was cancelled (either via Stop button or via
+                    // the natural-completion path which calls
+                    // playbackJob?.cancel()). Audio already played to
+                    // completion; don't surface a red error.
+                    Timber.d("Playback coroutine cancelled (normal stop or natural end)")
+                    throw e
                 } catch (e: Exception) {
                     Timber.e(e, "Playback error: ${e.message}")
-                    withContext(Dispatchers.Main) {
+                    withContext(NonCancellable + Dispatchers.Main) {
                         _uiState.update {
                             it.copy(
                                 isPlaying = false,

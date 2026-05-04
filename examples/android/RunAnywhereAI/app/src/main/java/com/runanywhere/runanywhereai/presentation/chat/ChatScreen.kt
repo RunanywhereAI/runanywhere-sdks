@@ -218,6 +218,7 @@ fun ChatScreen(
                     value = uiState.currentInput,
                     onValueChange = viewModel::updateInput,
                     onSend = viewModel::sendMessage,
+                    onStop = viewModel::stopGeneration,
                     isGenerating = uiState.isGenerating,
                     isModelLoaded = true,
                 )
@@ -1283,6 +1284,7 @@ fun ChatInputView(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
+    onStop: () -> Unit,
     isGenerating: Boolean,
     isModelLoaded: Boolean,
 ) {
@@ -1331,17 +1333,18 @@ fun ChatInputView(
             maxLines = 4,
         )
 
-        // Send button -  arrow.up.circle.fill 28pt
+        // Send / Stop button - swaps to a stop icon while generating so the user
+        // can cancel mid-stream (calls RunAnywhere.cancelGeneration via ViewModel).
         IconButton(
-            onClick = onSend,
-            enabled = canSendMessage,
+            onClick = if (isGenerating) onStop else onSend,
+            enabled = if (isGenerating) true else canSendMessage,
             modifier = Modifier.size(Dimensions.buttonHeightRegular),
         ) {
             Icon(
-                imageVector = Icons.Filled.ArrowCircleUp,
-                contentDescription = "Send",
+                imageVector = if (isGenerating) Icons.Filled.StopCircle else Icons.Filled.ArrowCircleUp,
+                contentDescription = if (isGenerating) "Stop" else "Send",
                 tint =
-                    if (canSendMessage) {
+                    if (isGenerating || canSendMessage) {
                         AppColors.primaryAccent
                     } else {
                         AppColors.statusGray

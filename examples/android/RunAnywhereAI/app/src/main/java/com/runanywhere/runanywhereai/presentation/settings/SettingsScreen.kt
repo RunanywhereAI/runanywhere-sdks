@@ -263,7 +263,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         ) {
             StorageOverviewRow(
                 icon = Icons.Filled.Storage,
-                label = "Total Usage",
+                label = "Device Capacity",
                 value = Formatter.formatFileSize(context, uiState.totalStorageSize),
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -375,7 +375,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Version 0.1",
+                        text = "Version ${com.runanywhere.runanywhereai.BuildConfig.VERSION_NAME}",
                         style = AppTypography.caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

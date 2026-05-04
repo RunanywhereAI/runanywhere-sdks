@@ -244,8 +244,20 @@ class ConversationStore private constructor(context: Context) {
                     }
                 }
 
+            // Drop empty conversations — they accumulate from "tap Get Started
+            // → exit before sending" flows and clutter the history sheet with
+            // "0 messages" rows. Delete their on-disk files too so they don't
+            // come back next launch.
+            val (keep, drop) = loaded.partition { it.messages.isNotEmpty() }
+            drop.forEach { conv ->
+                runCatching { conversationFileURL(conv.id).delete() }
+            }
+            if (drop.isNotEmpty()) {
+                Timber.i("Pruned ${drop.size} empty conversation(s)")
+            }
+
             // Sort by update date, newest first
-            _conversations.value = loaded.sortedByDescending { it.updatedAt }
+            _conversations.value = keep.sortedByDescending { it.updatedAt }
 
             // Don't automatically set current conversation - let ChatViewModel create a new one
         } catch (e: Exception) {

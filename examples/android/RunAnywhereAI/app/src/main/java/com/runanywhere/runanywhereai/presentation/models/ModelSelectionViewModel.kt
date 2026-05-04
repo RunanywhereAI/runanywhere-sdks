@@ -325,6 +325,9 @@ class ModelSelectionViewModel(
                     selectedModelId = modelId,
                     isLoadingModel = true,
                     loadingProgress = "Loading model into memory...",
+                    // Clear any stale error from a prior attempt so the success path doesn't
+                    // surface an outdated "Failed to load" dialog.
+                    error = null,
                 )
             }
 
