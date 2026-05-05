@@ -340,54 +340,25 @@ RunAnywhere.events.events  // Combine Publisher<any SDKEvent, Never>
 
 ### App-Local Convenience Shims (`RunAnywhere+ExampleShims.swift`)
 
-The following are **example-app-local convenience helpers**, not canonical SDK
-API. Each composes the canonical proto-backed entry points above.
+All previous shim wrappers (modality-specific load/unload helpers, current-model
+accessors, prompt-form generation overloads, VAD ergonomics, VLM token-stream
+flattening, voice-agent compose helpers, URL-form `registerModel`, etc.) have
+been promoted into the canonical SDK public surface. The example app calls
+those directly via `RunAnywhere.*`.
+
+What remains in this file is strictly example-specific UI plumbing with no
+cross-SDK parity story:
 
 ```swift
-// Modality-shorthand model lifecycle (wrap RAModelLoadRequest with category:)
-RunAnywhere.loadModel(_ modelId: String, category: RAModelCategory)
-RunAnywhere.loadSTTModel(_:) / loadTTSModel(_:) / loadVADModel(_:) / loadVLMModel(_:) / loadDiffusionModel(_:)
-RunAnywhere.unloadModel() / unloadSTTModel() / unloadTTSVoice() / unloadVLMModel() / unloadDiffusionModel()
-
-// Current-model accessors (wrap RACurrentModelRequest)
-RunAnywhere.getCurrentModelId() -> String?
-RunAnywhere.isModelLoaded -> Bool
-RunAnywhere.currentSTTModel / currentTTSVoiceId / currentVADModel / currentDiffusionModelId
-RunAnywhere.isVLMModelLoaded / isDiffusionModelLoaded / supportsLLMStreaming
-
-// Prompt-form generation (wrap RALLMGenerateRequest)
-RunAnywhere.generate(_ prompt: String, options:) -> RALLMGenerationResult
-RunAnywhere.generateStream(_ prompt: String, options:) -> AsyncStream<RALLMStreamEvent>
-RunAnywhere.generateWithTools(_ prompt: String, options:, toolOptions:) -> RAToolCallingResult
-
-// VAD ergonomics
-RunAnywhere.detectSpeech(in samples: [Float]) -> Bool
-RunAnywhere.isVADReady / initializeVAD()  // initializeVAD is a no-op stub
-
-// VLM token-stream flattening
-RunAnywhere.processImageStream(_ image: RAVLMImage, prompt:, options:) -> AsyncStream<String>
-RunAnywhere.processImage(_ image:, prompt:, maxTokens:, temperature:) -> RAVLMResult
-
-// STT positional shim
-RunAnywhere.transcribe(_ audioData: Data) -> String
-
-// Diffusion prompt-form
-RunAnywhere.generateImage(prompt:, options:) / generateImage(prompt:, options:, onProgress:)
-
-// Voice agent (compose-from-currently-loaded)
-RunAnywhere.initializeVoiceAgentWithLoadedModels()
-RunAnywhere.getVoiceAgentComponentStates() -> RAVoiceAgentComponentStates
-
-// Framework discovery via listModels()
+// Framework discovery via listModels() — composes the canonical
+// RunAnywhere.listModels() proto API into the shape the Models tab and
+// Add-from-URL flow want. Sorted by descending model count.
 RunAnywhere.getRegisteredFrameworks() -> [RAInferenceFramework]
-
-// URL-form custom-model registration (wraps RAModelImportRequest)
-RunAnywhere.registerModel(id:name:url:framework:memoryRequirement:supportsThinking:) -> RAModelInfo
 ```
 
-When deciding whether to add a new feature: if it composes existing canonical
-proto APIs into an app-friendly shape, put it in `RunAnywhere+ExampleShims.swift`.
-If it requires net-new C bridge code, it belongs in the SDK.
+When deciding whether to add a new feature: if it requires net-new C bridge
+code, it belongs in the SDK. If it is purely example-app UI plumbing composing
+existing canonical proto APIs, it can live in `RunAnywhere+ExampleShims.swift`.
 
 ---
 

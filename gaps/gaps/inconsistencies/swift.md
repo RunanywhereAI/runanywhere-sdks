@@ -65,14 +65,6 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 - **Validation**: Cross-SDK naming table below shows aligned rows.
 - **Scope**: S.
 
-### SWF-DOC-01: Example CLAUDE.md advertises ~30 shim functions that don't exist (LOW, docs)
-
-- **Symptom**: `examples/ios/RunAnywhereAI/CLAUDE.md:341-386` has an "App-Local Convenience Shims" section documenting ~30 `RunAnywhere.*` convenience shims (`loadSTTModel`, `loadTTSModel`, `loadVADModel`, `loadVLMModel`, `loadDiffusionModel`, `unloadSTTModel`, `unloadTTSVoice`, `unloadVLMModel`, `unloadDiffusionModel`, `getCurrentModelId`, `isModelLoaded`, `currentSTTModel`, `currentTTSVoiceId`, `currentVADModel`, `currentDiffusionModelId`, `isVLMModelLoaded`, `isDiffusionModelLoaded`, `supportsLLMStreaming`, prompt-form `generate/generateStream/generateWithTools`, VAD `detectSpeech/isVADReady/initializeVAD`, VLM `processImageStream(prompt:)`, `transcribe(_:)`, `generateImage(prompt:...)`, `initializeVoiceAgentWithLoadedModels`, `getVoiceAgentComponentStates`, `registerModel(id:name:url:...)`). But `examples/ios/RunAnywhereAI/RunAnywhereAI/Extensions/RunAnywhere+ExampleShims.swift` is 47 lines total and contains only `getRegisteredFrameworks()`. The shim file's own header comment even acknowledges the drift ("All of the previous shim wrappers ... have been promoted into the canonical SDK API"). Grepping the example app for `RunAnywhere.loadSTTModel / detectSpeech / getCurrentModelId / registerModel` returns zero matches.
-- **Why it matters**: Doc drift. Future contributors reading the example CLAUDE will believe those shims exist and may try to edit non-existent code. The "Canonical SDK API" vs "App-Local Convenience Shims" split is now dishonest.
-- **Fix steps**: Trim the "App-Local Convenience Shims" section of `examples/ios/RunAnywhereAI/CLAUDE.md` down to just `getRegisteredFrameworks()`. All previously listed shims should be removed from the docs because they're not part of either the canonical SDK API or the example-app today.
-- **Validation**: `grep -c "loadSTTModel\|detectSpeech\|getCurrentModelId" examples/ios/RunAnywhereAI/CLAUDE.md` returns 0.
-- **Scope**: XS (docs-only).
-
 ## Items to DELETE (hard delete, no deprecation)
 
 - `// MARK: - Legacy alias` + `public typealias HTTPService = HTTPClientAdapter` in `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift:477-482`. The only SDK-internal references are in `CppBridge+HTTP.swift:21-45` (`HTTPService.shared` and `await HTTPService.shared.configure(...)`). Rename the internal usages to `HTTPClientAdapter.shared` and drop the typealias. User rule: DELETE do not deprecate.
@@ -110,9 +102,8 @@ All `RA*` proto typealias names match Kotlin / Flutter / RN / Web conventions. N
 
 ## Example app (iOS) inconsistencies
 
-1. **SWF-DOC-01** (documented above). The example CLAUDE.md advertises ~30 shim functions that do not exist in the actual 47-line shim file. Docs-only fix.
-2. `examples/ios/RunAnywhereAI/.../SettingsViewModel.swift:428,439` and `.../StorageViewModel.swift:64,74` still call `SimplifiedFileManager.shared.clearCache()` / `cleanTempFiles()` directly. Migration to `RunAnywhere.clearCache()` / `cleanTempFiles()` lands with SWF-CROSS-02.
-3. `VoiceAgentViewModel.swift:472,479` contains two comments referring to unexposed symbols: `rac_voice_agent_interrupt(handle)`, `rac_voice_agent_force_commit(handle)`. These are future-work notes and acceptable as-is; flag only if the symbols eventually ship so the example can call the canonical SDK wrapper.
+1. `examples/ios/RunAnywhereAI/.../SettingsViewModel.swift:428,439` and `.../StorageViewModel.swift:64,74` still call `SimplifiedFileManager.shared.clearCache()` / `cleanTempFiles()` directly. Migration to `RunAnywhere.clearCache()` / `cleanTempFiles()` lands with SWF-CROSS-02.
+2. `VoiceAgentViewModel.swift:472,479` contains two comments referring to unexposed symbols: `rac_voice_agent_interrupt(handle)`, `rac_voice_agent_force_commit(handle)`. These are future-work notes and acceptable as-is; flag only if the symbols eventually ship so the example can call the canonical SDK wrapper.
 
 ### SWF-THINKING-MIGRATE: `ThinkingContentParser` still binds 3 now-internal C helpers (MEDIUM)
 
