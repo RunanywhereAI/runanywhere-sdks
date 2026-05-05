@@ -11,14 +11,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.ToolCall
 import ai.runanywhere.proto.v1.ToolCallFormatName
-import ai.runanywhere.proto.v1.ToolCallValidationRequest
-import ai.runanywhere.proto.v1.ToolCallValidationResult
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.ToolDefinition
-import ai.runanywhere.proto.v1.ToolParseRequest
-import ai.runanywhere.proto.v1.ToolParseResult
 import ai.runanywhere.proto.v1.ToolPromptFormatRequest
 import ai.runanywhere.proto.v1.ToolPromptFormatResult
 import ai.runanywhere.proto.v1.ToolResult
@@ -29,67 +24,6 @@ import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
 object CppBridgeToolCalling {
-    fun parseToolCalls(
-        llmOutput: String,
-        options: ToolCallingOptions? = null,
-    ): ToolParseResult =
-        decodeOrThrow(
-            ToolParseResult.ADAPTER,
-            RunAnywhereBridge.racToolCallParseProto(
-                ToolParseRequest.ADAPTER.encode(
-                    ToolParseRequest(
-                        text = llmOutput,
-                        options = options?.bridgeOptions(),
-                    ),
-                ),
-            ),
-            "racToolCallParseProto",
-        )
-
-    fun parseToolCallToObject(
-        llmOutput: String,
-        options: ToolCallingOptions? = null,
-    ): Pair<String, ToolCall?> {
-        val result = parseToolCalls(llmOutput, options)
-        if (result.error_code != 0) {
-            throw SDKException.operation(
-                result.error_message ?: "Tool-call parsing failed: ${result.error_code}",
-            )
-        }
-        return result.remaining_text to result.tool_calls.firstOrNull().takeIf { result.has_tool_call }
-    }
-
-    fun formatToolsForPrompt(
-        tools: List<ToolDefinition>,
-        formatHint: String = "",
-    ): String {
-        if (tools.isEmpty()) return ""
-        val options =
-            ToolCallingOptions(
-                tools = tools,
-                format_hint = formatHint,
-            ).bridgeOptions()
-        return formattedPrompt(
-            ToolPromptFormatRequest(
-                options = options,
-            ),
-        )
-    }
-
-    fun buildInitialPrompt(
-        userPrompt: String,
-        tools: List<ToolDefinition>,
-        options: ToolCallingOptions,
-    ): String {
-        if (tools.isEmpty()) return userPrompt
-        return formattedPrompt(
-            ToolPromptFormatRequest(
-                user_prompt = userPrompt,
-                options = options.bridgeOptions(tools),
-            ),
-        )
-    }
-
     fun buildFollowupPrompt(
         originalPrompt: String,
         tools: List<ToolDefinition>,
@@ -104,33 +38,6 @@ object CppBridgeToolCalling {
             ),
         )
 
-    fun validateToolCall(
-        toolCall: ToolCall,
-        tools: List<ToolDefinition>,
-        options: ToolCallingOptions,
-    ): ToolCallValidationResult =
-        decodeOrThrow(
-            ToolCallValidationResult.ADAPTER,
-            RunAnywhereBridge.racToolCallValidateProto(
-                ToolCallValidationRequest.ADAPTER.encode(
-                    ToolCallValidationRequest(
-                        tool_call = toolCall,
-                        options = options.bridgeOptions(tools),
-                    ),
-                ),
-            ),
-            "racToolCallValidateProto",
-        )
-
-    fun formatPrompt(request: ToolPromptFormatRequest): ToolPromptFormatResult =
-        decodeOrThrow(
-            ToolPromptFormatResult.ADAPTER,
-            RunAnywhereBridge.racToolCallFormatPromptProto(
-                ToolPromptFormatRequest.ADAPTER.encode(request),
-            ),
-            "racToolCallFormatPromptProto",
-        )
-
     private fun formattedPrompt(request: ToolPromptFormatRequest): String {
         val result = formatPrompt(request)
         if (result.error_code != 0) {
@@ -140,6 +47,15 @@ object CppBridgeToolCalling {
         }
         return result.formatted_prompt
     }
+
+    private fun formatPrompt(request: ToolPromptFormatRequest): ToolPromptFormatResult =
+        decodeOrThrow(
+            ToolPromptFormatResult.ADAPTER,
+            RunAnywhereBridge.racToolCallFormatPromptProto(
+                ToolPromptFormatRequest.ADAPTER.encode(request),
+            ),
+            "racToolCallFormatPromptProto",
+        )
 
     private fun ToolCallingOptions.bridgeOptions(
         toolsOverride: List<ToolDefinition>? = null,
