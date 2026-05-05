@@ -46,6 +46,10 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/hardware_profile.proto
     # CPP-02 — model lifecycle service stub mirroring rac_model_lifecycle.h.
     ${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_service.proto
+    # Wave H-2 / IDL-02 — canonical ThinkingTagPattern shared by llm_options and model_types.
+    ${CMAKE_CURRENT_SOURCE_DIR}/thinking_tag_pattern.proto
+    # Wave H-5 (KOT-12) — engine-router capability query types.
+    ${CMAKE_CURRENT_SOURCE_DIR}/router.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

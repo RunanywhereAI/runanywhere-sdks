@@ -196,3 +196,21 @@ message TimeSeriesConfig {
     // Optional explicit solution-kind tag. See `SolutionType`.
     optional SolutionType type_kind = 6;
 }
+
+// Logical solutions service contract. Solution lifecycle verbs (create/start/
+// stop/destroy) mirror the `rac_solution_handle_t` C ABI. Host UI, progress
+// surfacing, and side effects remain adapter-owned; this service describes
+// only the portable ergonomic entry points over generated messages.
+service Solutions {
+    // Instantiate a solution from a SolutionConfig oneof.
+    rpc Create(SolutionConfig) returns (SolutionHandle);
+
+    // Transition the solution to a running state.
+    rpc Start(SolutionHandle) returns (SolutionHandle);
+
+    // Transition the solution to a stopped state (resumable).
+    rpc Stop(SolutionHandle) returns (SolutionHandle);
+
+    // Terminate the solution and release native resources.
+    rpc Destroy(SolutionHandle) returns (SolutionHandle);
+}

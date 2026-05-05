@@ -101,3 +101,58 @@ message PipelineOptions {
     // disconnected edges before running.
     bool   strict_validation = 3;
 }
+
+// ---------------------------------------------------------------------------
+// Pipeline lifecycle status — shared by compile/start/stop results.
+// ---------------------------------------------------------------------------
+enum PipelineStatus {
+    PIPELINE_STATUS_UNSPECIFIED = 0;
+    PIPELINE_STATUS_OK          = 1;
+    PIPELINE_STATUS_FAILED      = 2;
+}
+
+// Result of compiling a PipelineSpec into a runnable graph.
+message PipelineCompileResult {
+    // Opaque compiled-graph identifier. Empty on failure.
+    string          handle_id     = 1;
+    PipelineStatus  status        = 2;
+    optional string error_message = 3;
+    int32           error_code    = 4;
+}
+
+// Request to start a previously compiled pipeline.
+message PipelineStartRequest {
+    // Identifier returned by Compile. Required.
+    string handle_id = 1;
+}
+
+// Live pipeline instance handle.
+message PipelineHandle {
+    // Stable identifier for the started pipeline instance.
+    string          handle_id  = 1;
+    PipelineStatus  status     = 2;
+    // Optional engine-specific state string (e.g. "running", "stopped").
+    optional string state      = 3;
+}
+
+// Result of stopping a pipeline instance.
+message PipelineStopResult {
+    string          handle_id     = 1;
+    PipelineStatus  status        = 2;
+    optional string error_message = 3;
+    int32           error_code    = 4;
+}
+
+// Logical pipeline service contract. Frontends pass a PipelineSpec, receive a
+// compiled-graph handle, then start and stop the live instance. Backend
+// execution, native runtime scheduling, and side effects remain adapter-owned.
+service Pipeline {
+    // Validate + compile a PipelineSpec into a runnable graph.
+    rpc Compile(PipelineSpec) returns (PipelineCompileResult);
+
+    // Start a compiled pipeline; returns a live instance handle.
+    rpc Start(PipelineStartRequest) returns (PipelineHandle);
+
+    // Stop a running pipeline instance.
+    rpc Stop(PipelineHandle) returns (PipelineStopResult);
+}

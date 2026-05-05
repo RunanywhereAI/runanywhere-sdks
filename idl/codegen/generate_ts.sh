@@ -45,6 +45,7 @@ protoc \
     structured_output.proto stt_options.proto tts_options.proto \
     vad_options.proto vlm_options.proto \
     hardware_profile.proto \
-    lifecycle_service.proto
+    lifecycle_service.proto \
+    thinking_tag_pattern.proto
 
 echo "✓ TS proto codegen → ${TS_OUT_DIR}"

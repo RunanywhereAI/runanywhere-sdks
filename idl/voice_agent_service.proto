@@ -18,6 +18,7 @@ package runanywhere.v1;
 
 import "voice_events.proto";
 import "tts_options.proto";
+import "stt_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -45,6 +46,21 @@ service VoiceAgent {
     // Server-streaming: the agent emits VoiceEvents until the client
     // cancels the stream or the agent reaches its terminal state.
     rpc Stream(VoiceAgentRequest) returns (stream VoiceEvent);
+
+    // One-shot voice turn: audio blob in, transcription + assistant response
+    // + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+    rpc ProcessTurn(VoiceAgentTurnRequest) returns (VoiceAgentResult);
+
+    // Helper-level STT transcribe path used by voice-agent sub-components.
+    rpc Transcribe(VoiceAgentTranscribeProtoRequest) returns (STTOutput);
+
+    // Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+    rpc SynthesizeSpeech(VoiceAgentSynthesizeSpeechProtoRequest) returns (TTSOutput);
+
+    // Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+    // wake-word). Returns an initial VoiceAgentResult capturing component
+    // readiness and any initialization errors.
+    rpc Configure(VoiceAgentComposeConfig) returns (VoiceAgentResult);
 }
 
 // ---------------------------------------------------------------------------
