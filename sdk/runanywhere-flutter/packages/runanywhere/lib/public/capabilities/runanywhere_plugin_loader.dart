@@ -9,7 +9,7 @@
 // into that bridge.
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_plugin_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 
@@ -35,7 +35,7 @@ class RunAnywherePluginLoaderCapability {
   /// `rac_plugin_entry_<stem>` it exposes with the in-process plugin
   /// registry.
   Future<PluginInfo> load(String path) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final result = DartBridgePluginLoader.loadPlugin(path);
@@ -47,7 +47,7 @@ class RunAnywherePluginLoaderCapability {
 
   /// Unregister a previously-loaded plugin and `dlclose` its handle.
   Future<void> unload(String name) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final rc = DartBridgePluginLoader.unloadPlugin(name);

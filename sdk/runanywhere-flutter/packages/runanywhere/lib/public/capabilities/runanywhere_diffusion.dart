@@ -18,7 +18,7 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     show ComponentLifecycleState, SDKComponent;
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
@@ -55,7 +55,7 @@ class RunAnywhereDiffusion {
 
   /// Load a diffusion model by registry ID through commons lifecycle routing.
   Future<void> load(String modelId, [DiffusionConfiguration? config]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -79,7 +79,7 @@ class RunAnywhereDiffusion {
 
   /// Unload the currently-loaded diffusion model.
   Future<void> unload() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -110,7 +110,7 @@ class RunAnywhereDiffusion {
     String prompt, [
     DiffusionGenerationOptions? options,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final modelId = await _requireLoadedModelId();
@@ -128,7 +128,7 @@ class RunAnywhereDiffusion {
     String prompt, [
     DiffusionGenerationOptions? options,
   ]) async* {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     await _requireLoadedModelId();
@@ -142,7 +142,7 @@ class RunAnywhereDiffusion {
 
   /// Cancel any in-flight generation.
   Future<void> cancel() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     throw SDKException.featureNotAvailable(
@@ -153,7 +153,7 @@ class RunAnywhereDiffusion {
 
   /// Backend capability discovery.
   DiffusionCapabilities capabilities() {
-    if (!SdkState.shared.isInitialized) return DiffusionCapabilities();
+    if (!DartBridge.isInitialized) return DiffusionCapabilities();
     throw SDKException.featureNotAvailable(
       'Lifecycle-owned diffusion capability discovery is unavailable in '
       'Flutter until commons exposes rac_diffusion_capabilities_proto.',

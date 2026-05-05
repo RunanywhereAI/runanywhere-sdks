@@ -86,12 +86,19 @@ export function applyLLMGenerationDefaults(
 // ---------------------------------------------------------------------------
 // VLM — proto-ts canonical types + Web-only browser shapes
 // ---------------------------------------------------------------------------
-export type {
+// VLMImage, VLMGenerationOptions, and VLMResult are re-exported as runtime
+// values (not `export type`) because backends call `.encode()` / `.decode()`
+// on them for worker IPC (see VLMWorkerBridge). ts-proto generates a dual
+// interface + const for each message, so the runtime export still carries
+// the full type shape as well.
+export {
   VLMImage,
-  VLMConfiguration,
   VLMGenerationOptions,
-  VLMGenerationRequest,
   VLMResult,
+} from '@runanywhere/proto-ts/vlm_options';
+export type {
+  VLMConfiguration,
+  VLMGenerationRequest,
   VLMStreamEvent,
   VLMServiceState,
 } from '@runanywhere/proto-ts/vlm_options';

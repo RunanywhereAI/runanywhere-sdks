@@ -12,7 +12,7 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     show ComponentLifecycleState, SDKComponent;
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
@@ -53,7 +53,7 @@ class RunAnywhereEmbeddings {
     required String modelId,
     EmbeddingsOptions? options,
   }) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return embedBatch(
@@ -66,7 +66,7 @@ class RunAnywhereEmbeddings {
     EmbeddingsRequest request, {
     required String modelId,
   }) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -83,7 +83,7 @@ class RunAnywhereEmbeddings {
   }
 
   Future<void> unload() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 

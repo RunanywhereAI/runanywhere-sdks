@@ -15,7 +15,6 @@ import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/generated/vlm_options.pb.dart';
 import 'package:runanywhere/internal/sdk_event_factories.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -51,7 +50,7 @@ class RunAnywhereVLM {
 
   /// Load a VLM model by ID.
   Future<void> load(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -107,7 +106,7 @@ class RunAnywhereVLM {
 
   /// Unload the currently-loaded VLM model.
   Future<void> unload() async {
-    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
+    if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     var modelId = currentModelId;
     var category = model_pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED;
     if (modelId == null) {
@@ -166,7 +165,7 @@ class RunAnywhereVLM {
     required String prompt,
     VLMGenerationOptions? options,
   }) async {
-    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
+    if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImage');
@@ -212,7 +211,7 @@ class RunAnywhereVLM {
     required String prompt,
     VLMGenerationOptions? options,
   }) async* {
-    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
+    if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImageStream');

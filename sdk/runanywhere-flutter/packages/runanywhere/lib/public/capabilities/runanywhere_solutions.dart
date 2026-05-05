@@ -26,7 +26,7 @@ import 'dart:typed_data';
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/solutions.pb.dart' as proto;
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_solutions.dart';
 import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 
@@ -161,7 +161,7 @@ class RunAnywhereSolutions {
   }
 
   void _ensureReady() {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
   }

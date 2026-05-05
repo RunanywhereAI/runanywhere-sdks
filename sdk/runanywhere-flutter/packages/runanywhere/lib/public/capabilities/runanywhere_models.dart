@@ -31,7 +31,7 @@ class RunAnywhereModels {
   /// generated ModelInfo bytes into commons; this list does not maintain a
   /// parallel Dart registry.
   Future<List<ModelInfo>> available() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -47,7 +47,7 @@ class RunAnywhereModels {
 
   /// Generated-proto registry list surface.
   Future<ModelListResult> list({ModelQuery? query}) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -65,7 +65,7 @@ class RunAnywhereModels {
 
   /// Generated-proto downloaded-model registry surface.
   Future<ModelListResult> listDownloaded() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -82,7 +82,7 @@ class RunAnywhereModels {
   /// `rac_model_registry_refresh`; rescans local filesystem and
   /// fetches the backend catalog in one shot.
   Future<void> refreshModelRegistry() async {
-    if (!SdkState.shared.isInitialized) return;
+    if (!DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Discovery');
 
@@ -187,7 +187,7 @@ class RunAnywhereModels {
   /// the commons model-path resolver so callers do not scan model directories
   /// or infer filenames in Dart.
   Future<String> resolveModelFilePath(ModelInfo model) {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 

@@ -7,7 +7,7 @@
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
 import 'package:runanywhere/internal/sdk_event_factories.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 
@@ -24,7 +24,7 @@ class RunAnywhereRAG {
   /// Create the RAG pipeline. Throws `SDKError.invalidState` if
   /// creation fails. Publishes a generated RAG SDKEvent on success.
   Future<void> createPipeline(RAGConfiguration config) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -39,7 +39,7 @@ class RunAnywhereRAG {
 
   /// Destroy the RAG pipeline and release native resources.
   Future<void> destroyPipeline() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     DartBridgeRAG.shared.destroyPipeline();
@@ -50,7 +50,7 @@ class RunAnywhereRAG {
 
   /// Ingest a single document into the pipeline (chunk → embed → index).
   Future<void> ingest(String text, {String? metadataJSON}) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -82,7 +82,7 @@ class RunAnywhereRAG {
   /// Ingest multiple documents in batch. Each map needs a `text` key
   /// and optionally a `metadataJson` key.
   Future<void> addDocumentsBatch(List<Map<String, String>> documents) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -115,7 +115,7 @@ class RunAnywhereRAG {
 
   /// Clear every document from the pipeline.
   Future<void> clearDocuments() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     try {
@@ -129,7 +129,7 @@ class RunAnywhereRAG {
 
   /// Number of indexed document chunks in the pipeline.
   Future<int> documentCount() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeRAG.shared.documentCount;
@@ -137,7 +137,7 @@ class RunAnywhereRAG {
 
   /// Pipeline statistics (raw JSON from the C pipeline).
   Future<RAGStatistics> getStatistics() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     try {
@@ -155,7 +155,7 @@ class RunAnywhereRAG {
     String question, {
     RAGQueryOptions? options,
   }) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 

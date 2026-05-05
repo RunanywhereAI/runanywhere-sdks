@@ -18,7 +18,7 @@ import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/internal/sdk_event_factories.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
@@ -73,7 +73,7 @@ class RunAnywhereTTS {
 
   /// Load a TTS voice by ID through commons lifecycle routing.
   Future<void> loadVoice(String voiceId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -130,7 +130,7 @@ class RunAnywhereTTS {
 
   /// Unload the currently-loaded TTS voice through commons lifecycle routing.
   Future<void> unloadVoice() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -164,7 +164,7 @@ class RunAnywhereTTS {
     String text, [
     TTSOptions? options,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final voiceId = await _requireLoadedVoiceId();
@@ -183,7 +183,7 @@ class RunAnywhereTTS {
     String text, {
     TTSOptions? options,
   }) async* {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     await _requireLoadedVoiceId();
@@ -197,7 +197,7 @@ class RunAnywhereTTS {
 
   /// Stop in-flight synthesis.
   Future<void> stopSynthesis() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     throw SDKException.featureNotAvailable(

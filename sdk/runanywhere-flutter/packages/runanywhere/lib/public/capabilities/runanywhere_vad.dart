@@ -26,7 +26,7 @@ import 'package:runanywhere/generated/vad_options.pb.dart'
         VADStatistics;
 import 'package:runanywhere/generated/voice_events.pbenum.dart'
     show VADEventType;
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart' hide VADResult;
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
@@ -46,7 +46,7 @@ class RunAnywhereVAD {
 
   /// Initialize VAD with a generated configuration.
   Future<void> initializeVAD([VADConfiguration? config]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     _effectiveConfiguration(config);
@@ -70,7 +70,7 @@ class RunAnywhereVAD {
     Uint8List audio, [
     VADOptions? options,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return _processAudioData(
@@ -85,7 +85,7 @@ class RunAnywhereVAD {
     Float32List audio, [
     VADOptions? options,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final byteData = ByteData(audio.lengthInBytes);
@@ -101,7 +101,7 @@ class RunAnywhereVAD {
 
   /// Start VAD processing.
   Future<void> startVAD() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     throw SDKException.featureNotAvailable(
@@ -112,7 +112,7 @@ class RunAnywhereVAD {
 
   /// Stop VAD processing.
   Future<void> stopVAD() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     throw SDKException.featureNotAvailable(
@@ -196,7 +196,7 @@ class RunAnywhereVAD {
 
   /// Load a VAD model by id through commons lifecycle routing.
   Future<void> loadModel(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -222,7 +222,7 @@ class RunAnywhereVAD {
 
   /// Unload the currently-loaded VAD model through commons lifecycle routing.
   Future<void> unloadModel() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 

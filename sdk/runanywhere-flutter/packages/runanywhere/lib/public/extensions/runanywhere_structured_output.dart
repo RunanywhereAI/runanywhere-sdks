@@ -6,7 +6,6 @@ import 'dart:convert';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 
@@ -21,7 +20,7 @@ class RunAnywhereStructuredOutput {
     int maxTokens = 512,
     double temperature = 0.0,
   }) async {
-    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
+    if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     if (!DartBridge.llm.isLoaded) {
       throw SDKException.componentNotReady('LLM model not loaded.');
     }

@@ -16,7 +16,6 @@ import 'package:runanywhere/generated/model_types.pbenum.dart'
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
-import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 
 /// Canonical generated-proto model/component lifecycle surface.
@@ -31,7 +30,7 @@ class RunAnywhereModelLifecycle {
 
   /// Load a model through commons lifecycle routing.
   Future<ModelLoadResult> load(ModelLoadRequest request) {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       return Future.value(ModelLoadResult(
         success: false,
         modelId: request.modelId,
@@ -45,7 +44,7 @@ class RunAnywhereModelLifecycle {
 
   /// Unload model(s) through commons lifecycle routing.
   Future<ModelUnloadResult> unload(ModelUnloadRequest request) {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       return Future.value(ModelUnloadResult(
         success: false,
         errorMessage: 'SDK not initialized',
@@ -56,7 +55,7 @@ class RunAnywhereModelLifecycle {
 
   /// Query the current loaded model matching the optional category/framework.
   Future<CurrentModelResult> current([CurrentModelRequest? request]) {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       return Future.value(CurrentModelResult());
     }
     return DartBridge.modelLifecycle.current(request ?? CurrentModelRequest());
@@ -64,7 +63,7 @@ class RunAnywhereModelLifecycle {
 
   /// Snapshot the live lifecycle state for a model-backed component.
   ComponentLifecycleSnapshot? componentSnapshot(SDKComponent component) {
-    if (!SdkState.shared.isInitialized) return null;
+    if (!DartBridge.isInitialized) return null;
     return DartBridge.modelLifecycle.componentSnapshot(component);
   }
 

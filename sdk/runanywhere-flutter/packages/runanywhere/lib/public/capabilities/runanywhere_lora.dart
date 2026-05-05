@@ -10,7 +10,7 @@
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
 
 /// LoRA (Low-Rank Adaptation) capability surface.
@@ -27,7 +27,7 @@ class RunAnywhereLoRACapability {
 
   /// Apply one or more LoRA adapters to the current model.
   Future<LoRAApplyResult> apply(LoRAApplyRequest request) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLora.shared.apply(request);
@@ -35,7 +35,7 @@ class RunAnywhereLoRACapability {
 
   /// Remove one or more LoRA adapters, or clear all adapters.
   Future<LoRAState> remove(LoRARemoveRequest request) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLora.shared.remove(request);
@@ -43,7 +43,7 @@ class RunAnywhereLoRACapability {
 
   /// Currently loaded LoRA adapters.
   Future<LoRAState> list() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLora.shared.list();
@@ -51,7 +51,7 @@ class RunAnywhereLoRACapability {
 
   /// LoRA service state reported by commons.
   Future<LoRAState> state() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLora.shared.state();
@@ -61,7 +61,7 @@ class RunAnywhereLoRACapability {
   Future<LoraCompatibilityResult> checkCompatibility(
     LoRAAdapterConfig config,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       return LoraCompatibilityResult(
         isCompatible: false,
         errorMessage: 'SDK not initialized',
@@ -77,7 +77,7 @@ class RunAnywhereLoRACapability {
   Future<LoraAdapterCatalogEntry> register(
     LoraAdapterCatalogEntry entry,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.register(entry);
@@ -87,7 +87,7 @@ class RunAnywhereLoRACapability {
   Future<LoraAdapterCatalogListResult> listCatalog([
     LoraAdapterCatalogListRequest? request,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.listCatalog(
@@ -99,7 +99,7 @@ class RunAnywhereLoRACapability {
   Future<LoraAdapterCatalogListResult> queryCatalog(
     LoraAdapterCatalogQuery query,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.queryCatalog(query);
@@ -109,7 +109,7 @@ class RunAnywhereLoRACapability {
   Future<LoraAdapterCatalogGetResult> getCatalogEntry(
     LoraAdapterCatalogGetRequest request,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.getCatalogEntry(request);
@@ -119,7 +119,7 @@ class RunAnywhereLoRACapability {
   Future<LoraAdapterDownloadCompletedResult> markDownloadCompleted(
     LoraAdapterDownloadCompletedRequest request,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.markDownloadCompleted(request);
@@ -127,7 +127,7 @@ class RunAnywhereLoRACapability {
 
   /// All registered LoRA adapters compatible with [modelId].
   Future<List<LoraAdapterCatalogEntry>> adaptersForModel(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.getForModel(modelId);
@@ -135,7 +135,7 @@ class RunAnywhereLoRACapability {
 
   /// All registered LoRA adapters.
   Future<List<LoraAdapterCatalogEntry>> allRegistered() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.getAll();

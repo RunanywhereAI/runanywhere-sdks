@@ -23,7 +23,7 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
 import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/internal/sdk_event_factories.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
@@ -72,7 +72,7 @@ class RunAnywhereLLM {
 
   /// Load an LLM model by ID through commons lifecycle routing.
   Future<void> load(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -130,7 +130,7 @@ class RunAnywhereLLM {
 
   /// Unload the currently-loaded LLM model.
   Future<void> unload() async {
-    if (!SdkState.shared.isInitialized) return;
+    if (!DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.UnloadModel');
     final modelId = currentModelId;
@@ -167,7 +167,7 @@ class RunAnywhereLLM {
     String prompt, [
     LLMGenerationOptions? options,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -234,7 +234,7 @@ class RunAnywhereLLM {
     String prompt, [
     LLMGenerationOptions? options,
   ]) {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 

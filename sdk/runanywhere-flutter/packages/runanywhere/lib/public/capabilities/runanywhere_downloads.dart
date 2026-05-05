@@ -8,7 +8,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/storage_types.pb.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
@@ -31,7 +31,7 @@ class RunAnywhereDownloads {
 
   /// Build a generated download plan in C++.
   Future<DownloadPlanResult> plan(DownloadPlanRequest request) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeDownload.instance.planProto(request);
@@ -41,7 +41,7 @@ class RunAnywhereDownloads {
   Future<DownloadStartResult> startDownload(
     DownloadStartRequest request,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final result = await DartBridgeDownload.instance.startProto(request);
@@ -59,7 +59,7 @@ class RunAnywhereDownloads {
   /// Progress events are delivered via the commons-owned proto callback
   /// (`rac_download_set_progress_proto_callback`). No Dart-side polling.
   Stream<DownloadProgress> start(String modelId) async* {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -158,7 +158,7 @@ class RunAnywhereDownloads {
 
   /// Cancel an active model download if the adapter still owns it.
   Future<DownloadCancelResult> cancelDownload(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final result = await cancel(DownloadCancelRequest(
@@ -170,14 +170,14 @@ class RunAnywhereDownloads {
   }
 
   Future<DownloadCancelResult> cancel(DownloadCancelRequest request) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeDownload.instance.cancelProto(request);
   }
 
   Future<DownloadResumeResult> resume(DownloadResumeRequest request) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final result = await DartBridgeDownload.instance.resumeProto(request);
@@ -192,7 +192,7 @@ class RunAnywhereDownloads {
   Future<DownloadProgress?> pollProgress(
     DownloadSubscribeRequest request,
   ) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return DartBridgeDownload.instance.pollProgressProto(request);
@@ -200,7 +200,7 @@ class RunAnywhereDownloads {
 
   /// Delete a stored model from the C++ registry + disk.
   Future<StorageDeleteResult> delete(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -214,7 +214,7 @@ class RunAnywhereDownloads {
 
   /// Delete every downloaded model while keeping registry entries available.
   Future<StorageDeleteResult> deleteAllModels() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     final storedModels = await list();
@@ -228,7 +228,7 @@ class RunAnywhereDownloads {
 
   /// Clear cached files managed by the native file manager.
   Future<void> clearCache() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -242,7 +242,7 @@ class RunAnywhereDownloads {
   Future<StorageInfoResult> getStorageInfoResult([
     StorageInfoRequest? request,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       return StorageInfoResult(
           success: false, errorMessage: 'SDK not initialized');
     }
@@ -264,7 +264,7 @@ class RunAnywhereDownloads {
 
   /// List downloaded models with per-model on-disk size.
   Future<List<StoredModel>> list() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       return [];
     }
 

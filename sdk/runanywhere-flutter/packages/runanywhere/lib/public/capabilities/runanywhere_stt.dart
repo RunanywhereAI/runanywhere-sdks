@@ -19,7 +19,7 @@ import 'package:runanywhere/generated/sdk_events.pbenum.dart'
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/stt_options_helpers.dart';
 import 'package:runanywhere/internal/sdk_event_factories.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -81,7 +81,7 @@ class RunAnywhereSTT {
 
   /// Load an STT model by ID through commons lifecycle routing.
   Future<void> load(String modelId) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -138,7 +138,7 @@ class RunAnywhereSTT {
 
   /// Unload the currently-loaded STT model through commons lifecycle routing.
   Future<void> unload() async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
@@ -172,7 +172,7 @@ class RunAnywhereSTT {
     Uint8List audio, [
     STTOptions? options,
   ]) async {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     return _transcribeAudioData(
@@ -186,7 +186,7 @@ class RunAnywhereSTT {
     Uint8List audio, {
     STTOptions? options,
   }) async* {
-    if (!SdkState.shared.isInitialized) {
+    if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
     await _requireLoadedModelId();
