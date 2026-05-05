@@ -387,21 +387,6 @@ void onnxrt_destroy_session(rac_runtime_session_t* session) {
     delete session;
 }
 
-rac_result_t onnxrt_alloc_buffer(size_t bytes, rac_runtime_buffer_t** out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
-    *out = nullptr;
-    auto* buffer = new (std::nothrow) rac_runtime_buffer();
-    if (!buffer) return RAC_ERROR_OUT_OF_MEMORY;
-    buffer->data = std::malloc(bytes);
-    if (!buffer->data) {
-        delete buffer;
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    buffer->bytes = bytes;
-    *out = buffer;
-    return RAC_SUCCESS;
-}
-
 void onnxrt_free_buffer(rac_runtime_buffer_t* buffer) {
     if (!buffer) return;
     std::free(buffer->data);
@@ -411,6 +396,7 @@ void onnxrt_free_buffer(rac_runtime_buffer_t* buffer) {
 rac_result_t onnxrt_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
                                     rac_runtime_buffer_t** out) {
     if (!desc || !out) return RAC_ERROR_NULL_POINTER;
+    *out = nullptr;
     if (desc->device_class != RAC_DEVICE_CLASS_UNSPECIFIED &&
         desc->device_class != RAC_DEVICE_CLASS_CPU) {
         return RAC_ERROR_NOT_SUPPORTED;
@@ -422,7 +408,16 @@ rac_result_t onnxrt_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
     if (desc->alignment > static_cast<uint32_t>(alignof(std::max_align_t))) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
-    return onnxrt_alloc_buffer(desc->bytes, out);
+    auto* buffer = new (std::nothrow) rac_runtime_buffer();
+    if (!buffer) return RAC_ERROR_OUT_OF_MEMORY;
+    buffer->data = std::malloc(desc->bytes);
+    if (!buffer->data) {
+        delete buffer;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    buffer->bytes = desc->bytes;
+    *out = buffer;
+    return RAC_SUCCESS;
 }
 
 rac_result_t onnxrt_buffer_info(rac_runtime_buffer_t* buffer,
@@ -545,8 +540,8 @@ const rac_runtime_vtable_t k_onnxrt_vtable = {
     /* .create_session  = */ onnxrt_create_session,
     /* .run_session     = */ onnxrt_run_session,
     /* .destroy_session = */ onnxrt_destroy_session,
-    /* .alloc_buffer    = */ onnxrt_alloc_buffer,
-    /* .free_buffer     = */ onnxrt_free_buffer,
+    /* .alloc_buffer    = */ nullptr,
+    /* .free_buffer     = */ nullptr,
     /* .device_info     = */ onnxrt_device_info,
     /* .capabilities    = */ onnxrt_capabilities,
     /* .reserved_slot_0 = */ &k_onnxrt_vtable_v2,

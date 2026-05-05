@@ -163,14 +163,9 @@ for independent models. Comparable runtimes load in parallel.
 
 Shared helpers already live in
 `sdk/runanywhere-commons/include/rac/runtime/rac_runtime_helpers.h`.
-DUP-RT-01 (release_tensor) and DUP-RT-02 (copy_buffer) have been migrated;
-remaining duplication below.
-
-1. **Host-malloc allocator dressed up as a device allocator.**
-   `onnxrt_alloc_buffer` at `rac_runtime_onnxrt.cpp:389-408` falls back to
-   `std::malloc`. The CPU runtime already covers this case. Net duplication —
-   either delete the shim and route ONNX callers through the CPU runtime's
-   buffer ops, or have ONNXRT's buffer slot forward to CPU's allocator.
+DUP-RT-01 (release_tensor), DUP-RT-02 (copy_buffer), and DUP-RT-03
+(onnxrt_alloc_buffer shim) have been migrated; no remaining duplication in
+this scope.
 
 ## Cross-SDK alignment expectations
 
