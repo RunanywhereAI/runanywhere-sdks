@@ -443,11 +443,8 @@ _rac_llm_component_load_model
 _rac_llm_component_supports_streaming
 _rac_llm_component_unload
 _rac_llm_create
-_rac_llm_extract_thinking
 _rac_llm_generate
 _rac_llm_generate_stream
-_rac_llm_split_thinking_tokens
-_rac_llm_strip_thinking
 
 # STT component lifecycle + non-proto service ABI.
 _rac_stt_component_cleanup

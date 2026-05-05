@@ -45,6 +45,12 @@ extern "C" {
  * Outputs point into a thread_local buffer owned by the implementation;
  * caller must copy before the next call on the same thread.
  *
+ * @internal Commons-internal helper. SDK-facing thinking/response splits
+ * arrive via `runanywhere.v1.LLMGenerationResult.thinking_content` /
+ * `LLMStreamEvent` proto bytes already populated by
+ * `rac_llm_generate_proto` / `rac_llm_generate_stream_proto`. Do NOT bind
+ * this symbol from any SDK.
+ *
  * @param text             Input text. NULL → RAC_ERROR_NULL_POINTER.
  * @param out_response     Receives a pointer to the response text (NEVER NULL
  *                         on success — empty string at minimum).
@@ -55,30 +61,38 @@ extern "C" {
  *                         is NULL.
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
  */
-RAC_API rac_result_t rac_llm_extract_thinking(const char*  text,
-                                               const char** out_response,
-                                               size_t*      out_response_len,
-                                               const char** out_thinking,
-                                               size_t*      out_thinking_len);
+rac_result_t rac_llm_extract_thinking(const char*  text,
+                                       const char** out_response,
+                                       size_t*      out_response_len,
+                                       const char** out_thinking,
+                                       size_t*      out_thinking_len);
 
 /**
  * Removes ALL `<think>...</think>` blocks (multiple per text + trailing
  * unclosed `<think>`) from @p text. Returns the trimmed remainder via
  * @p out_stripped (thread_local; copy before next call).
  *
+ * @internal Commons-internal helper. See `rac_llm_extract_thinking` above —
+ * SDKs should read the trimmed response from the proto-populated
+ * `LLMGenerationResult.text` / `LLMStreamEvent.token` fields instead.
+ *
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
  */
-RAC_API rac_result_t rac_llm_strip_thinking(const char*  text,
-                                             const char** out_stripped,
-                                             size_t*      out_stripped_len);
+rac_result_t rac_llm_strip_thinking(const char*  text,
+                                     const char** out_stripped,
+                                     size_t*      out_stripped_len);
 
 /**
  * Splits @p total_completion_tokens between thinking and response by the
- * character-length ratio. Mirrors the Swift `ThinkingContentParser.splitTokens`
- * heuristic so cross-SDK token accounting agrees.
+ * character-length ratio. Mirrors the legacy Swift `ThinkingContentParser
+ * .splitTokens` heuristic so cross-SDK token accounting agrees.
  *
  * If @p thinking_text is NULL or empty: thinking = 0, response = total.
  * Else: proportional split, clamped, and `thinking + response == total`.
+ *
+ * @internal Commons-internal helper. The split is already exposed to SDKs
+ * via `LLMGenerationResult.thinking_tokens` / `response_tokens` proto
+ * fields, populated by `rac_llm_generate_proto`. Do NOT bind from SDKs.
  *
  * @param total_completion_tokens >= 0
  * @param response_text           NULL treated as empty.
@@ -87,11 +101,11 @@ RAC_API rac_result_t rac_llm_strip_thinking(const char*  text,
  * @param out_response_tokens     Receives response-segment count.
  * @return RAC_SUCCESS or RAC_ERROR_NULL_POINTER.
  */
-RAC_API rac_result_t rac_llm_split_thinking_tokens(int32_t     total_completion_tokens,
-                                                    const char* response_text,
-                                                    const char* thinking_text,
-                                                    int32_t*    out_thinking_tokens,
-                                                    int32_t*    out_response_tokens);
+rac_result_t rac_llm_split_thinking_tokens(int32_t     total_completion_tokens,
+                                            const char* response_text,
+                                            const char* thinking_text,
+                                            int32_t*    out_thinking_tokens,
+                                            int32_t*    out_response_tokens);
 
 #ifdef __cplusplus
 }  /* extern "C" */
