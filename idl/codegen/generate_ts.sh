@@ -37,29 +37,29 @@ fi
 # does transitively emit component_types.ts via dependent imports, but the
 # positive list is made explicit here so behaviour stays aligned with Kotlin
 # (which requires the explicit entry — Wire does not transitively emit
-# enum-only dependencies). TS excludes:
-#   - router.proto — engine-router capability-query types are consumed only
-#     by C++/Kotlin; RN/Web call commons through NitroModules/WASM bindings
-#     without needing generated router.ts.
+# enum-only dependencies).
+# IDL-19b: router.proto is now included (empty exclusion list) so RN + Web
+# have future-proof parity with Kotlin / C++; no active TS consumer today,
+# but generated router.ts exists for symmetry.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
     RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
 fi
 
-RAC_PROTO_EXCLUDES_TS=(
-    "router.proto"
-)
+RAC_PROTO_EXCLUDES_TS=()
 
 TS_PROTO_BASENAMES=()
 while IFS= read -r proto_path; do
     [ -z "${proto_path}" ] && continue
     proto_base="$(basename "${proto_path}")"
     skip=0
-    for excluded in "${RAC_PROTO_EXCLUDES_TS[@]}"; do
-        if [ "${proto_base}" = "${excluded}" ]; then
-            skip=1
-            break
-        fi
-    done
+    if [ "${#RAC_PROTO_EXCLUDES_TS[@]}" -gt 0 ]; then
+        for excluded in "${RAC_PROTO_EXCLUDES_TS[@]}"; do
+            if [ "${proto_base}" = "${excluded}" ]; then
+                skip=1
+                break
+            fi
+        done
+    fi
     [ "${skip}" -eq 1 ] && continue
     TS_PROTO_BASENAMES+=("${proto_base}")
 done <<< "${RAC_PROTO_FILES}"

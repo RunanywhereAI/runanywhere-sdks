@@ -30,32 +30,32 @@ if ! command -v protoc-gen-swift >/dev/null 2>&1; then
 fi
 
 # IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
-# filesystem discovery when invoked standalone. Swift excludes router.proto
-# (see RAC_PROTO_EXCLUDES_SWIFT below for rationale).
+# filesystem discovery when invoked standalone.
+# IDL-19b: router.proto is now included (empty exclusion list) so Swift has
+# future-proof parity with Kotlin / C++; no active Swift consumer today, but
+# generated RAFrameworksForCapabilityRequest/Response exist for symmetry with
+# Kotlin's positive-list semantic (prior commit 769ceccff).
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
     RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
 fi
 
 # Language-specific exclusions (basenames of .proto files to skip).
-# router.proto — engine-router capability-query types are consumed only by
-#   the C++ core and Kotlin adapters; Swift calls commons directly via the
-#   C ABI and has no need for the generated Swift message types. Keeping
-#   the exclusion means swift codegen doesn't emit dead router.pb.swift.
-RAC_PROTO_EXCLUDES_SWIFT=(
-    "router.proto"
-)
+# Empty today — every schema in idl/ is emitted for Swift.
+RAC_PROTO_EXCLUDES_SWIFT=()
 
 MESSAGE_PROTOS=()
 while IFS= read -r proto_path; do
     [ -z "${proto_path}" ] && continue
     proto_base="$(basename "${proto_path}")"
     skip=0
-    for excluded in "${RAC_PROTO_EXCLUDES_SWIFT[@]}"; do
-        if [ "${proto_base}" = "${excluded}" ]; then
-            skip=1
-            break
-        fi
-    done
+    if [ "${#RAC_PROTO_EXCLUDES_SWIFT[@]}" -gt 0 ]; then
+        for excluded in "${RAC_PROTO_EXCLUDES_SWIFT[@]}"; do
+            if [ "${proto_base}" = "${excluded}" ]; then
+                skip=1
+                break
+            fi
+        done
+    fi
     [ "${skip}" -eq 1 ] && continue
     MESSAGE_PROTOS+=("${proto_path}")
 done <<< "${RAC_PROTO_FILES}"

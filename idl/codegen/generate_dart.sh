@@ -70,9 +70,10 @@ if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
 fi
 
 # IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
-# filesystem discovery when invoked standalone. Dart excludes router.proto —
-# the engine-router capability-query types are consumed only by C++/Kotlin
-# today; Flutter would emit dead .pb.dart files for unused messages.
+# filesystem discovery when invoked standalone.
+# IDL-19b: router.proto is now included (empty exclusion list) so Flutter has
+# future-proof parity with Kotlin / C++; no active Dart consumer today, but
+# generated router.pb.dart exists for symmetry.
 #
 # Using `--dart_out=<dir>` (no `grpc:` prefix) skips the gRPC client stubs
 # for services (voice_agent_service, llm_service, download_service) and
@@ -83,21 +84,21 @@ if [ -z "${RAC_PROTO_FILES:-}" ]; then
     RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
 fi
 
-RAC_PROTO_EXCLUDES_DART=(
-    "router.proto"
-)
+RAC_PROTO_EXCLUDES_DART=()
 
 DART_PROTO_BASENAMES=()
 while IFS= read -r proto_path; do
     [ -z "${proto_path}" ] && continue
     proto_base="$(basename "${proto_path}")"
     skip=0
-    for excluded in "${RAC_PROTO_EXCLUDES_DART[@]}"; do
-        if [ "${proto_base}" = "${excluded}" ]; then
-            skip=1
-            break
-        fi
-    done
+    if [ "${#RAC_PROTO_EXCLUDES_DART[@]}" -gt 0 ]; then
+        for excluded in "${RAC_PROTO_EXCLUDES_DART[@]}"; do
+            if [ "${proto_base}" = "${excluded}" ]; then
+                skip=1
+                break
+            fi
+        done
+    fi
     [ "${skip}" -eq 1 ] && continue
     DART_PROTO_BASENAMES+=("${proto_base}")
 done <<< "${RAC_PROTO_FILES}"
