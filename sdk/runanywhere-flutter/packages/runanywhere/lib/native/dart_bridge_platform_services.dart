@@ -86,40 +86,4 @@ class DartBridgePlatformServices {
         return 0;
     }
   }
-
-  /// Check if Foundation Models are available (iOS 18+)
-  bool isFoundationModelsAvailable() {
-    // Foundation Models require iOS 18+
-    // This would check platform version in a full implementation
-    return false; // Not available on Android or older iOS
-  }
-
-  /// Check if System TTS is available
-  bool isSystemTTSAvailable() {
-    // System TTS is available on all iOS/Android versions
-    return true;
-  }
-
-  /// Check if System STT is available
-  bool isSystemSTTAvailable() {
-    // System STT is available on iOS/Android
-    return true;
-  }
-
-  /// Get available platform services
-  List<String> getAvailableServices() {
-    final services = <String>[];
-
-    if (isFoundationModelsAvailable()) {
-      services.add('foundation_models');
-    }
-    if (isSystemTTSAvailable()) {
-      services.add('system_tts');
-    }
-    if (isSystemSTTAvailable()) {
-      services.add('system_stt');
-    }
-
-    return services;
-  }
 }
