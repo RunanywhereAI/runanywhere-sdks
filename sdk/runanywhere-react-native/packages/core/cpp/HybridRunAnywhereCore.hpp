@@ -246,9 +246,6 @@ public:
 
   std::shared_ptr<Promise<bool>> isSTTModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadSTTModel() override;
-  std::shared_ptr<Promise<std::string>> transcribeFile(
-    const std::string& filePath,
-    const std::optional<std::string>& language) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(
     const std::shared_ptr<ArrayBuffer>& audioBytes,
     const std::shared_ptr<ArrayBuffer>& optionsBytes) override;

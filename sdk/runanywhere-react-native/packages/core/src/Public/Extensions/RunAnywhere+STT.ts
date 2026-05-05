@@ -30,6 +30,7 @@ import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
 } from '../../services/ProtoBytes';
+import { readAudioFileAsBuffer } from '../../Internal/AudioFileReader';
 
 const logger = new SDKLogger('RunAnywhere.STT');
 
@@ -264,6 +265,12 @@ export function transcribeStream(
 /**
  * Transcribe audio from a file path.
  *
+ * Reads the file in JS (via `react-native-fs` or `fetch()`) and routes
+ * through the canonical proto-byte `sttTranscribeProto` surface — the
+ * legacy JSON-returning `native.transcribeFile` path was removed (RN-05,
+ * RN-10). Cross-SDK parity: Swift/Kotlin/Flutter/Web all feed in-memory
+ * audio bytes into the same proto transcribe call.
+ *
  * Matches Swift SDK: `RunAnywhere.transcribeFile(_:options:)`.
  */
 export async function transcribeFile(
@@ -273,73 +280,8 @@ export async function transcribeFile(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
-  const native = requireNativeModule();
-  const language = sttLanguageToCode(options?.language);
-  const startTime = Date.now();
-  const resultJson = await native.transcribeFile(filePath, language);
-  const endTime = Date.now();
-  const processingTimeMs = endTime - startTime;
-
-  try {
-    const parsed = JSON.parse(resultJson);
-    if (parsed.error) throw SDKException.generationFailedWith(parsed.error);
-
-    const audioLengthMs =
-      typeof parsed.duration === 'number' ? parsed.duration * 1000 : 0;
-    return STTOutputMessage.fromPartial({
-      text: parsed.text ?? '',
-      language: options?.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-      confidence: parsed.confidence ?? 1.0,
-      words: parsed.words ?? parsed.timestamps ?? [],
-      alternatives: parsed.alternatives ?? [],
-      metadata: {
-        modelId: parsed.modelId ?? 'unknown',
-        processingTimeMs,
-        audioLengthMs,
-        realTimeFactor:
-          audioLengthMs > 0 ? processingTimeMs / audioLengthMs : 0,
-      },
-      timestampMs: Date.now(),
-      durationMs: audioLengthMs,
-    });
-  } catch (err) {
-    if (err instanceof Error) throw err;
-    throw SDKException.generationFailedWith(`Transcription failed: ${resultJson}`);
-  }
-}
-
-/** Map a proto `STTLanguage` enum value to the BCP-47 string the native bridge expects. */
-function sttLanguageToCode(language?: STTLanguage): string {
-  switch (language) {
-    case STTLanguage.STT_LANGUAGE_AUTO:
-      return 'auto';
-    case STTLanguage.STT_LANGUAGE_EN:
-      return 'en';
-    case STTLanguage.STT_LANGUAGE_ES:
-      return 'es';
-    case STTLanguage.STT_LANGUAGE_FR:
-      return 'fr';
-    case STTLanguage.STT_LANGUAGE_DE:
-      return 'de';
-    case STTLanguage.STT_LANGUAGE_ZH:
-      return 'zh';
-    case STTLanguage.STT_LANGUAGE_JA:
-      return 'ja';
-    case STTLanguage.STT_LANGUAGE_KO:
-      return 'ko';
-    case STTLanguage.STT_LANGUAGE_IT:
-      return 'it';
-    case STTLanguage.STT_LANGUAGE_PT:
-      return 'pt';
-    case STTLanguage.STT_LANGUAGE_AR:
-      return 'ar';
-    case STTLanguage.STT_LANGUAGE_RU:
-      return 'ru';
-    case STTLanguage.STT_LANGUAGE_HI:
-      return 'hi';
-    default:
-      return 'en';
-  }
+  const audioBytes = await readAudioFileAsBuffer(filePath);
+  return transcribe(audioBytes, options);
 }
 
 // ============================================================================

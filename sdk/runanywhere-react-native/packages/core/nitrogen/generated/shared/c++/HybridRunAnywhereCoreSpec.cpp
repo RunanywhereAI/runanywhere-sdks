@@ -77,7 +77,6 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("llmSplitThinkingTokens", &HybridRunAnywhereCoreSpec::llmSplitThinkingTokens);
       prototype.registerHybridMethod("isSTTModelLoaded", &HybridRunAnywhereCoreSpec::isSTTModelLoaded);
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
-      prototype.registerHybridMethod("transcribeFile", &HybridRunAnywhereCoreSpec::transcribeFile);
       prototype.registerHybridMethod("sttTranscribeProto", &HybridRunAnywhereCoreSpec::sttTranscribeProto);
       prototype.registerHybridMethod("sttTranscribeStreamProto", &HybridRunAnywhereCoreSpec::sttTranscribeStreamProto);
       prototype.registerHybridMethod("isTTSModelLoaded", &HybridRunAnywhereCoreSpec::isTTSModelLoaded);

@@ -537,14 +537,6 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   unloadSTTModel(): Promise<boolean>;
 
-  /**
-   * Transcribe an audio file
-   * @param filePath Path to the audio file
-   * @param language Language code (optional)
-   * @returns Transcription result as JSON
-   */
-  transcribeFile(filePath: string, language?: string): Promise<string>;
-
   sttTranscribeProto(
     audioBytes: ArrayBuffer,
     optionsBytes: ArrayBuffer

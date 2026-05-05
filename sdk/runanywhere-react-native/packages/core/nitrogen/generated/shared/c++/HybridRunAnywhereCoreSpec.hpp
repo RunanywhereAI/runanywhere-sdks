@@ -117,7 +117,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(double totalCompletionTokens, const std::string& responseText, const std::string& thinkingText) = 0;
       virtual std::shared_ptr<Promise<bool>> isSTTModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
-      virtual std::shared_ptr<Promise<std::string>> transcribeFile(const std::string& filePath, const std::optional<std::string>& language) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& audioBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;
       virtual std::shared_ptr<Promise<void>> sttTranscribeStreamProto(const std::shared_ptr<ArrayBuffer>& audioBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* partialBytes */)>& onPartialBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;
