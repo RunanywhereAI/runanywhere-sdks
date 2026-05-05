@@ -13,11 +13,11 @@ import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VADConfiguration
-import ai.runanywhere.proto.v1.VADEventType
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
+import ai.runanywhere.proto.v1.VADStreamEventKind
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVADProto
@@ -185,7 +185,7 @@ private fun FloatArray.toPcm16LeBytes(): ByteArray {
 
 @Volatile private var vadAudioBufferCallback: ((FloatArray) -> Unit)? = null
 
-@Volatile private var vadSpeechActivityCallback: ((VADEventType) -> Unit)? = null
+@Volatile private var vadSpeechActivityCallback: ((VADStreamEventKind) -> Unit)? = null
 
 actual suspend fun RunAnywhere.initializeVAD() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
@@ -218,7 +218,7 @@ actual suspend fun RunAnywhere.stopVAD() {
 }
 
 actual suspend fun RunAnywhere.setVADSpeechActivityCallback(
-    callback: (VADEventType) -> Unit,
+    callback: (VADStreamEventKind) -> Unit,
 ) {
     vadSpeechActivityCallback = callback
     // Keep the Swift-parity setter until commons exposes a native

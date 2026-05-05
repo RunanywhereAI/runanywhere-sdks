@@ -70,26 +70,8 @@ actual suspend fun RunAnywhere.ragDestroyPipeline() {
 
 actual suspend fun RunAnywhere.ragIngest(text: String, metadataJson: String?) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // IDL-13: `metadata_json` proto field was deleted. Decode caller-supplied
-    // JSON (if any) into the typed `metadata` map before ingestion.
-    val parsedMetadata: Map<String, String> =
-        metadataJson
-            ?.takeIf { it.isNotBlank() && it.trim().startsWith("{") && it.trim().endsWith("}") }
-            ?.let { json ->
-                runCatching {
-                    json
-                        .trim()
-                        .removeSurrounding("{", "}")
-                        .split(",")
-                        .mapNotNull { pair ->
-                            val parts = pair.split(":", limit = 2)
-                            if (parts.size != 2) return@mapNotNull null
-                            parts[0].trim().trim('"') to parts[1].trim().trim('"')
-                        }.toMap()
-                }.getOrDefault(emptyMap())
-            } ?: emptyMap()
     withContext(Dispatchers.IO) {
-        CppBridgeRAGProto.ingest(RAGDocument(text = text, metadata = parsedMetadata))
+        CppBridgeRAGProto.ingest(RAGDocument(text = text, metadata_json = metadataJson))
     }
 }
 

@@ -360,12 +360,11 @@ function makeRAGQuery(
 }
 
 function makeRAGDocument(text: string, metadataJson?: string): RAGDocument {
-  // IDL-13: `metadata_json` proto field was deleted — decode the caller's
-  // JSON blob into the typed `metadata` map instead.
   const parsed = parseMetadata(metadataJson);
   return {
     id: parsed.docId,
     text,
+    metadataJson,
     metadata: parsed.metadata,
     sourceUri: parsed.sourceUri,
     adapterHandle: undefined,
