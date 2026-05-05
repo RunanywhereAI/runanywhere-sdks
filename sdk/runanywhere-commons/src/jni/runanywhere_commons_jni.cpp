@@ -2842,6 +2842,20 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh
                                         "racModelRegistryRefreshProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelFormatFromUrlProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
+    return callProtoBufferFn(env, requestBytes, rac_model_format_from_url_proto,
+                             "racModelFormatFromUrlProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactInferFromUrlProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
+    return callProtoBufferFn(env, requestBytes, rac_artifact_infer_from_url_proto,
+                             "racArtifactInferFromUrlProto");
+}
+
 // =============================================================================
 // JNI FUNCTIONS - Model Lifecycle Proto ABI (rac_model_lifecycle.h)
 // =============================================================================
