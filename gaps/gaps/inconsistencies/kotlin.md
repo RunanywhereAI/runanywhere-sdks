@@ -135,11 +135,6 @@ and (d) KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
   `timestamp: Long = System.currentTimeMillis()` in `SDKLogger.kt:28`, delete `SimpleInstant.kt`.
 - **Scope**: 1 file / 23 LOC.
 
-### KOT-DEAD-CRYPTOUTILS: `calculateSHA256` unused (priority: LOW)
-- **Symptom**: `jvmAndroidMain/.../utils/CryptoUtils.kt` — `calculateSHA256(ByteArray): String` is
-  the sole function. Zero callers. Legacy auth-token signing path is long gone.
-- **Scope**: 1 file / 12 LOC.
-
 ### KOT-JNI-ORPHAN: 20 `external fun` declarations in `RunAnywhereBridge.kt` have no matching C thunk (priority: HIGH)
 - **Symptom**: Surfaced by Wave 1 CPP-06 JNI audit. 20 `external fun` entries in
   `sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/native/bridge/RunAnywhereBridge.kt`
