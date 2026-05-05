@@ -439,30 +439,6 @@ object Logging {
 }
 
 // =============================================================================
-// PLATFORM LOGGER INTERFACE
-// =============================================================================
-
-/**
- * Platform-specific logger interface.
- * Implementations provided in androidMain and jvmMain.
- */
-expect class PlatformLogger(
-    tag: String,
-) {
-    fun trace(message: String)
-
-    fun debug(message: String)
-
-    fun info(message: String)
-
-    fun warning(message: String)
-
-    fun error(message: String, throwable: Throwable? = null)
-
-    fun fault(message: String, throwable: Throwable? = null)
-}
-
-// =============================================================================
 // SDK LOGGER (CONVENIENCE WRAPPER)
 // =============================================================================
 

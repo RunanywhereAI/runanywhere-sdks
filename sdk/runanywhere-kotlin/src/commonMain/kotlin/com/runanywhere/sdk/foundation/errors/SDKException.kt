@@ -521,5 +521,5 @@ class SDKException(
     }
 }
 
-// See `Int.toSDKException` and `Int.throwIfCAbiErrorAsException` extensions
-// at the bottom of CommonsErrorMapping.kt for proto-canonical equivalents.
+// Prefer `SDKException.fromCAbiCode(rac_result_t, operation)` for proto-canonical
+// conversion from a native result integer.
