@@ -41,6 +41,7 @@
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 #include "rac/router/rac_hardware_profile.h"
+#include "rac/runtime/rac_runtime_helpers.h"
 
 namespace {
 
@@ -471,29 +472,7 @@ rac_result_t cpu_copy_buffer(rac_runtime_buffer_t* dst,
 }
 
 void cpu_release_tensor(rac_runtime_tensor_t* tensor) {
-    if (tensor == nullptr) return;
-    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-        tensor->data != nullptr) {
-        std::free(tensor->data);
-    }
-    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-        tensor->shape != nullptr) {
-        std::free(tensor->shape);
-    }
-    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-        tensor->buffer != nullptr) {
-        cpu_free_buffer(tensor->buffer);
-    }
-    tensor->buffer = nullptr;
-    tensor->data = nullptr;
-    tensor->data_bytes = 0;
-    tensor->data_capacity_bytes = 0;
-    tensor->shape = nullptr;
-    tensor->rank = 0;
-    tensor->shape_capacity = 0;
-    tensor->buffer_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
-    tensor->data_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
-    tensor->shape_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
+    rac::runtime::rac_runtime_release_tensor(tensor, cpu_free_buffer);
 }
 
 /* --------------------------------------------------------------------------
