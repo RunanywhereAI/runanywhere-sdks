@@ -236,7 +236,6 @@ export 'generated/voice_events.pb.dart'
         VoiceSessionError;
 export 'generated/voice_events.pbenum.dart'
     show ComponentLoadState, PipelineState, VADEventType, VoiceSessionErrorCode;
-export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
 export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'
