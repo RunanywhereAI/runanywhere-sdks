@@ -2,7 +2,7 @@ package com.runanywhere.sdk.foundation
 
 import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.LogLevel
-import com.runanywhere.sdk.utils.SimpleInstant
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -25,7 +25,7 @@ import kotlinx.coroutines.sync.withLock
  * Matches Swift SDK LogEntry structure.
  */
 data class LogEntry(
-    val timestamp: SimpleInstant = SimpleInstant.now(),
+    val timestamp: Long = getCurrentTimeMillis(),
     val level: LogLevel,
     val category: String,
     val message: String,

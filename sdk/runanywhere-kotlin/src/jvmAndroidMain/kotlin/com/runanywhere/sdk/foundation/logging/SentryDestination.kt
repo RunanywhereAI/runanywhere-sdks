@@ -90,7 +90,7 @@ class SentryDestination : LogDestination {
      * Add a breadcrumb for context trail.
      */
     private fun addBreadcrumb(entry: LogEntry) {
-        val timestamp = Date(entry.timestamp.toEpochMilliseconds())
+        val timestamp = Date(entry.timestamp)
         val breadcrumb =
             Breadcrumb(timestamp).apply {
                 category = entry.category
@@ -108,7 +108,7 @@ class SentryDestination : LogDestination {
      * Capture an error event in Sentry.
      */
     private fun captureEvent(entry: LogEntry) {
-        val timestamp = Date(entry.timestamp.toEpochMilliseconds())
+        val timestamp = Date(entry.timestamp)
         val event =
             SentryEvent(timestamp).apply {
                 level = convertToSentryLevel(entry.level)
