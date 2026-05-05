@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -23,9 +23,13 @@ CPU is bootstrapped explicitly by the commons registry and intentionally
 omits the macro — comment at `runtimes/cpu/rac_runtime_cpu.cpp:617-627`).
 
 Capability-wise, CPU is the complete runtime: it implements `run_session_v2`
-(with caveats — see RT-CPU-02), all buffer ops, and a provider registration
-surface (`rac_cpu_runtime_register_provider`) that engines can call to plug in
-primitive-specific implementations. ONNXRT has buffer ops + legacy
+with a V2-native fast path (providers that set `run_session_v2` on their
+`rac_cpu_runtime_provider_t` see real V2 tensors and can return runtime-owned
+outputs; V1-only providers still fall back to the legacy shim), all buffer
+ops, and a provider registration surface (`rac_cpu_runtime_register_provider`)
+that engines can call to plug in primitive-specific implementations.
+`RAC_RUNTIME_CAP_OWNED_OUTPUTS` is now advertised only when at least one
+registered provider implements the V2 op. ONNXRT has buffer ops + legacy
 `run_session` but its V2 `run_session_v2` slot is NULL
 (`rac_runtime_onnxrt.cpp:527`). Runtime metadata also drifts from actual
 capabilities in multiple places (see per-runtime gaps below).
@@ -39,20 +43,6 @@ the intended consumers (DEC-01 deferred CoreML/Metal).
 ## Per-runtime gaps
 
 ### runtimes/cpu
-
-#### RT-CPU-02: V2 `run_session_v2` is a shim over the legacy vtable path
-
-`runtimes/cpu/rac_runtime_cpu.cpp:265-329` copies every `rac_runtime_tensor_t`
-into a `rac_runtime_io_t` vector, calls the legacy provider `run_session`,
-then copies the shape/dtype/bytes back onto the V2 tensor. This is an internal
-translation, not a true V2 path. Providers can never receive a real V2
-tensor, which means features that V2 exists to enable (buffer-backed tensors,
-ownership transfer, capacity tracking for output allocation) are all
-flattened back to the V1 `io_t` shape before the provider runs. The
-"owned outputs" capability flag advertised in `cpu_capabilities`
-(`rac_runtime_cpu.cpp:198-206`) is therefore unreachable through V2; outputs
-will never carry ownership back out because the provider only sees the V1
-output array.
 
 #### RT-CPU-03: `rac_cpu_runtime_provider_t` API is effectively a parallel vtable
 

@@ -40,6 +40,31 @@ typedef struct rac_cpu_runtime_provider {
                                 const rac_runtime_io_t* inputs, size_t n_in,
                                 rac_runtime_io_t* outputs, size_t n_out);
     void (*destroy_session)(rac_runtime_session_t* session);
+
+    /**
+     * Optional V2-native execution op.
+     *
+     * When non-NULL the CPU runtime dispatches `run_session_v2` directly to
+     * this callback, passing V2 tensors through untouched. Providers that
+     * implement this slot see real `rac_runtime_tensor_t` values — buffers,
+     * ownership flags, capacity fields, and memory-space tags are preserved
+     * and can be mutated back on owned outputs. The CPU runtime then
+     * advertises `RAC_RUNTIME_CAP_OWNED_OUTPUTS` because outputs can flow
+     * back through a live V2 path.
+     *
+     * When NULL the CPU runtime falls back to the legacy V1 shim: tensors
+     * are flattened into `rac_runtime_io_t` for `run_session`, then dtype /
+     * rank / byte counts are copied back. Ownership transfer and capacity
+     * tracking are only reachable via the V2 op.
+     *
+     * MAY be NULL. Added after the initial ABI so existing providers keep
+     * working — the struct is zero-initialised by callers.
+     */
+    rac_result_t (*run_session_v2)(rac_runtime_session_t* session,
+                                   const rac_runtime_tensor_t* inputs,
+                                   size_t n_in,
+                                   rac_runtime_tensor_t* outputs,
+                                   size_t n_out);
 } rac_cpu_runtime_provider_t;
 
 /**

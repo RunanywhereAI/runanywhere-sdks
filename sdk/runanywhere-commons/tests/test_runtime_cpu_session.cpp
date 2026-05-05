@@ -29,6 +29,7 @@ struct FakeProviderSession {
 
 int g_created = 0;
 int g_destroyed = 0;
+int g_v2_runs = 0;
 
 rac_result_t fake_create_session(const rac_runtime_session_desc_t* desc,
                                  rac_runtime_session_t** out) {
@@ -70,6 +71,34 @@ rac_result_t fake_run_session(rac_runtime_session_t* session,
 void fake_destroy_session(rac_runtime_session_t* session) {
     delete reinterpret_cast<FakeProviderSession*>(session);
     ++g_destroyed;
+}
+
+/* V2-native provider: uses the tensor ABI directly and returns a
+ * runtime-owned output buffer so we can exercise ownership transfer. */
+rac_result_t fake_run_session_v2(rac_runtime_session_t* session,
+                                 const rac_runtime_tensor_t* inputs, size_t n_in,
+                                 rac_runtime_tensor_t* outputs, size_t n_out) {
+    if (session == nullptr || inputs == nullptr || outputs == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (n_in != 1 || n_out != 1) return RAC_ERROR_INVALID_PARAMETER;
+    if (inputs[0].dtype != RAC_RUNTIME_DTYPE_I32 ||
+        inputs[0].data == nullptr ||
+        inputs[0].data_bytes < sizeof(int32_t) ||
+        inputs[0].memory_space != RAC_RUNTIME_MEMORY_SPACE_HOST) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    ++g_v2_runs;
+    const int32_t in_val = *static_cast<const int32_t*>(inputs[0].data);
+    auto* owned_data = static_cast<int32_t*>(std::malloc(sizeof(int32_t)));
+    if (owned_data == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+    *owned_data = in_val * 3;
+    outputs[0].data = owned_data;
+    outputs[0].data_bytes = sizeof(int32_t);
+    outputs[0].dtype = RAC_RUNTIME_DTYPE_I32;
+    outputs[0].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    outputs[0].data_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
+    return RAC_SUCCESS;
 }
 
 }  // namespace
@@ -246,11 +275,86 @@ int main() {
     cpu->destroy_session(session);
     CHECK(g_destroyed == 1, "provider destroy called");
 
+    /* V1-only provider means CAP_OWNED_OUTPUTS must NOT be advertised because
+     * owned outputs cannot round-trip through the shim. */
+    rac_runtime_capabilities_t caps_v1 = {};
+    CHECK(cpu->capabilities(&caps_v1) == RAC_SUCCESS,
+          "capabilities() callback with only V1 provider");
+    CHECK((caps_v1.capability_flags & RAC_RUNTIME_CAP_OWNED_OUTPUTS) == 0,
+          "CAP_OWNED_OUTPUTS hidden when no provider implements V2");
+
     rac_cpu_runtime_unregister_provider("fake_cpu");
     session = nullptr;
     CHECK(cpu->create_session(&desc, &session) == RAC_ERROR_NOT_IMPLEMENTED,
           "unregistered provider is not implemented");
     CHECK(session == nullptr, "failed create leaves session null");
+
+    /* V2-native path: register a provider that implements `run_session_v2`
+     * and confirm the CPU runtime dispatches through it directly, returning
+     * a runtime-owned output tensor that `release_tensor` can free. */
+    rac_cpu_runtime_provider_t v2_provider = {};
+    v2_provider.name = "fake_cpu_v2";
+    v2_provider.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+    v2_provider.formats = formats;
+    v2_provider.formats_count = 1;
+    v2_provider.create_session = fake_create_session;
+    v2_provider.run_session = fake_run_session;  /* fallback still present */
+    v2_provider.destroy_session = fake_destroy_session;
+    v2_provider.run_session_v2 = fake_run_session_v2;
+    CHECK(rac_cpu_runtime_register_provider(&v2_provider) == RAC_SUCCESS,
+          "register V2-capable fake provider");
+
+    /* Owned-outputs capability must now be advertised. */
+    rac_runtime_capabilities_t caps_v2 = {};
+    CHECK(cpu->capabilities(&caps_v2) == RAC_SUCCESS,
+          "capabilities() callback with V2 provider");
+    CHECK((caps_v2.capability_flags & RAC_RUNTIME_CAP_OWNED_OUTPUTS) != 0,
+          "CAP_OWNED_OUTPUTS advertised once a V2 provider registers");
+
+    rac_runtime_session_t* v2_session = nullptr;
+    CHECK(cpu->create_session(&desc, &v2_session) == RAC_SUCCESS,
+          "create V2 CPU provider session");
+    CHECK(v2_session != nullptr, "V2 provider session non-null");
+
+    const int32_t v2_input = 5;
+    int64_t v2_shape[1] = {1};
+    rac_runtime_tensor_t v2_inputs[1] = {};
+    v2_inputs[0].name = "value";
+    v2_inputs[0].data = const_cast<int32_t*>(&v2_input);
+    v2_inputs[0].data_bytes = sizeof(int32_t);
+    v2_inputs[0].dtype = RAC_RUNTIME_DTYPE_I32;
+    v2_inputs[0].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    v2_inputs[0].shape = v2_shape;
+    v2_inputs[0].rank = 1;
+
+    /* Output tensor: no caller-supplied data; provider returns runtime-owned data. */
+    rac_runtime_tensor_t v2_outputs[1] = {};
+    v2_outputs[0].name = "result";
+    v2_outputs[0].dtype = RAC_RUNTIME_DTYPE_I32;
+    v2_outputs[0].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+
+    const int v2_runs_before = g_v2_runs;
+    CHECK(cpu_v2->run_session_v2(v2_session, v2_inputs, 1, v2_outputs, 1) ==
+              RAC_SUCCESS,
+          "run V2 provider through native path");
+    CHECK(g_v2_runs == v2_runs_before + 1,
+          "V2 provider callback invoked (not shimmed to V1)");
+    CHECK(v2_outputs[0].data != nullptr, "V2 output tensor carries data");
+    CHECK(v2_outputs[0].data_bytes == sizeof(int32_t),
+          "V2 output tensor reports bytes");
+    CHECK(v2_outputs[0].data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME,
+          "V2 output preserves runtime ownership through CPU runtime");
+    CHECK(*static_cast<const int32_t*>(v2_outputs[0].data) == v2_input * 3,
+          "V2 provider produced expected result");
+
+    /* `release_tensor` must free the runtime-owned data. */
+    cpu_v2->release_tensor(&v2_outputs[0]);
+    CHECK(v2_outputs[0].data == nullptr &&
+              v2_outputs[0].data_ownership == RAC_RUNTIME_OWNERSHIP_NONE,
+          "release_tensor frees runtime-owned output");
+
+    cpu->destroy_session(v2_session);
+    rac_cpu_runtime_unregister_provider("fake_cpu_v2");
 
     std::cout << "runtime_cpu_session_tests passed" << std::endl;
     return 0;

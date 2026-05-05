@@ -206,22 +206,31 @@ thread_local size_t          tl_primitive_snapshot_count = 0;
 rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
     if (out == nullptr) return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
-    out->capability_flags =
+
+    /* Static, always-on capabilities. The runtime itself (not the providers)
+     * implements buffer mapping/copy/alloc, so those flags are unconditional. */
+    uint64_t flags =
         RAC_RUNTIME_CAP_QUANTIZED_INT8 |
         RAC_RUNTIME_CAP_QUANTIZED_INT4 |
         RAC_RUNTIME_CAP_FP16           |
         RAC_RUNTIME_CAP_DYNAMIC_SHAPES |
         RAC_RUNTIME_CAP_BUFFER_MAPPING |
         RAC_RUNTIME_CAP_BUFFER_COPY    |
-        RAC_RUNTIME_CAP_DEVICE_ALLOC   |
-        RAC_RUNTIME_CAP_OWNED_OUTPUTS;
+        RAC_RUNTIME_CAP_DEVICE_ALLOC;
     out->supported_formats       = nullptr;     /* format-agnostic */
     out->supported_formats_count = 0;
 
     /* Build a deduplicated snapshot of the primitives currently served by
      * registered providers. Order is stable (primitive enum value ascending)
-     * so callers that cache the list see consistent results across calls. */
+     * so callers that cache the list see consistent results across calls.
+     *
+     * While iterating, also detect whether any registered provider implements
+     * the optional V2-native `run_session_v2` callback. `RAC_RUNTIME_CAP_OWNED_OUTPUTS`
+     * is only advertised when at least one provider can return runtime-owned
+     * outputs — the V1-shim fallback flattens tensors and cannot transport
+     * ownership back to the caller. See RT-CPU-02. */
     bool seen[RAC_PRIMITIVE_COUNT] = {false};
+    bool any_v2 = false;
     {
         std::lock_guard<std::mutex> lock(provider_mutex());
         for (const auto& provider : providers()) {
@@ -229,8 +238,16 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
             if (p > RAC_PRIMITIVE_UNSPECIFIED && p < RAC_PRIMITIVE_COUNT) {
                 seen[static_cast<size_t>(p)] = true;
             }
+            if (provider.run_session_v2 != nullptr) {
+                any_v2 = true;
+            }
         }
     }
+    if (any_v2) {
+        flags |= RAC_RUNTIME_CAP_OWNED_OUTPUTS;
+    }
+    out->capability_flags = flags;
+
     size_t count = 0;
     for (size_t i = 1; i < RAC_PRIMITIVE_COUNT; ++i) {
         if (seen[i]) {
@@ -304,6 +321,34 @@ rac_result_t cpu_run_session_v2(rac_runtime_session_t* session,
     if (n_in > 0 && inputs == nullptr) return RAC_ERROR_NULL_POINTER;
     if (n_out > 0 && outputs == nullptr) return RAC_ERROR_NULL_POINTER;
 
+    /* V2-native fast path: provider handles tensors directly, preserving
+     * buffers, ownership flags, capacity fields, memory-space, and dtype.
+     * This is the only path through which `RAC_RUNTIME_CAP_OWNED_OUTPUTS` is
+     * reachable — see RT-CPU-02. */
+    if (cpu_session->provider.run_session_v2 != nullptr) {
+        /* Validate any caller-supplied CPU buffers up front so the provider
+         * only ever sees handles it can safely dereference. Tensors that
+         * don't carry a buffer flow through untouched. */
+        for (size_t i = 0; i < n_in; ++i) {
+            if (inputs[i].buffer != nullptr &&
+                as_cpu_buffer_const(inputs[i].buffer) == nullptr) {
+                return RAC_ERROR_INVALID_HANDLE;
+            }
+        }
+        for (size_t i = 0; i < n_out; ++i) {
+            if (outputs[i].buffer != nullptr &&
+                as_cpu_buffer(outputs[i].buffer) == nullptr) {
+                return RAC_ERROR_INVALID_HANDLE;
+            }
+        }
+        return cpu_session->provider.run_session_v2(
+            cpu_session->provider_session, inputs, n_in, outputs, n_out);
+    }
+
+    /* V1-shim fallback: provider only implements the legacy `run_session`.
+     * Flatten V2 tensors into `rac_runtime_io_t`, run, then copy shape / dtype
+     * / byte count back. Ownership and capacity fields cannot round-trip
+     * through this path; V2-only features remain unreachable here. */
     std::vector<rac_runtime_io_t> legacy_inputs(n_in);
     std::vector<rac_runtime_io_t> legacy_outputs(n_out);
 
