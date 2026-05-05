@@ -149,15 +149,15 @@ public extension RALLMGenerationResult {
 public extension RAThinkingTagPattern {
     static var defaultPattern: RAThinkingTagPattern {
         var p = RAThinkingTagPattern()
-        p.openingTag = "<think>"
-        p.closingTag = "</think>"
+        p.openTag = "<think>"
+        p.closeTag = "</think>"
         return p
     }
 
     init(from cPattern: rac_thinking_tag_pattern_t) {
         var p = RAThinkingTagPattern()
-        if let o = cPattern.opening_tag { p.openingTag = String(cString: o) }
-        if let c = cPattern.closing_tag { p.closingTag = String(cString: c) }
+        if let o = cPattern.opening_tag { p.openTag = String(cString: o) }
+        if let c = cPattern.closing_tag { p.closeTag = String(cString: c) }
         self = p
     }
 }
