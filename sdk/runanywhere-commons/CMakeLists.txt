@@ -941,6 +941,9 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/voice_agent_service.pb.cc
     ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
     ${_RAC_PROTO_GEN_DIR}/router.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
 )
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
