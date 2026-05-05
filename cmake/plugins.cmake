@@ -225,6 +225,33 @@ function(rac_add_engine_plugin name)
 endfunction()
 
 # -----------------------------------------------------------------------------
+# rac_apply_android_page_alignment(<target>)
+#
+# DUP-07 — the three active engines (llamacpp, sherpa, onnx) all need the same
+# linker incantation on Android to stay compliant with Android 15+ (API 35)
+# 16 KiB page-size requirement (mandatory Nov 2025). Bundled with
+# `-Wl,--gc-sections` because every engine historically attaches them to the
+# same `target_link_options` block — there is no scenario where one is wanted
+# without the other.
+#
+# No-op on non-Android platforms so engine CMakeLists can call this
+# unconditionally without an `if(RAC_PLATFORM_ANDROID)` guard. Callers that
+# already sit inside a platform-gated block may still call it — it compounds
+# safely.
+# -----------------------------------------------------------------------------
+function(rac_apply_android_page_alignment target)
+    if(NOT TARGET ${target})
+        message(FATAL_ERROR "rac_apply_android_page_alignment(${target}): target not found")
+    endif()
+    if(RAC_PLATFORM_ANDROID)
+        target_link_options(${target} PRIVATE
+            -Wl,--gc-sections
+            -Wl,-z,max-page-size=16384
+            -Wl,-z,common-page-size=16384)
+    endif()
+endfunction()
+
+# -----------------------------------------------------------------------------
 # rac_force_load(target PLUGINS <name1> <name2> ...)
 #
 # Tells the linker not to drop the static-archive object file even when no

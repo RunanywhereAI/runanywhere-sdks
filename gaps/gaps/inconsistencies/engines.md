@@ -61,9 +61,6 @@ Same `{callback, user_data}` bridge, written twice inside the same engine. Facto
 
 Active backends are consistent; lift the call pattern into the commons service layer so future backends inherit it by default (and Iteration-I backends can't silently drop it).
 
-### DUP-07: Android 16K page-alignment link options block is copy-pasted in every CMakeLists
-`engines/llamacpp/CMakeLists.txt:281-282, 309-310, 374-375`, `engines/sherpa/CMakeLists.txt:358-361`, `engines/onnx/CMakeLists.txt:209-210, 281-282`. Move into a shared `cmake/plugins.cmake` helper.
-
 ## Items to DELETE
 
 (none currently tracked)
@@ -92,6 +89,6 @@ All gaps under the following backends are parked. Do not audit, fix, or referenc
 - `engines/diffusion-coreml/` — ENG-DIFFUSION-01, ENG-DIFFUSION-02, ENG-DIFFUSION-03, ENG-DIFFUSION-04 *(Iteration I — deferred)*
 - `engines/whisperkit_coreml/` — ENG-WKC-01, ENG-WKC-02, ENG-WKC-03 *(Iteration I — deferred)*
 
-Cross-backend items that originally pulled in deferred backends (DUP-03 whispercpp / metalrt slices, DUP-05 metalrt slices, DUP-06 metalrt / diffusion-coreml / whisperkit_coreml slices, DUP-07 whispercpp / genie slices) are stripped to their active-backend portions above. DUP-01 (pcm16→f32) was resolved in Wave 2a: sherpa now routes through the shared commons helper `rac::audio::rac_audio_pcm16_to_float32` in `sdk/runanywhere-commons/include/rac/audio/rac_audio_convert.h`.
+Cross-backend items that originally pulled in deferred backends (DUP-03 whispercpp / metalrt slices, DUP-05 metalrt slices, DUP-06 metalrt / diffusion-coreml / whisperkit_coreml slices) are stripped to their active-backend portions above. DUP-01 (pcm16→f32) was resolved in Wave 2a: sherpa now routes through the shared commons helper `rac::audio::rac_audio_pcm16_to_float32` in `sdk/runanywhere-commons/include/rac/audio/rac_audio_convert.h`. DUP-07 (Android 16 KiB page-alignment link block) was resolved in Wave 2a: extracted to `rac_apply_android_page_alignment()` in `cmake/plugins.cmake`; whispercpp / genie still carry the raw block because they remain deferred.
 
 Previously-tracked llamacpp wins — ENG-LLAMA-01, ENG-LLAMA-02, ENG-LLAMA-04 (DeviceType dedup — shared header at `engines/common/rac_engine_device_type.h`), ENG-LLAMA-05, ENG-LLAMA-06, ENG-LLAMA-07 — were closed and are not re-listed here.

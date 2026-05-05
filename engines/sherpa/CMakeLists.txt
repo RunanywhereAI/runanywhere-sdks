@@ -412,10 +412,7 @@ rac_add_engine_plugin(sherpa
 if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_sherpa PRIVATE log)
     target_compile_options(rac_backend_sherpa PRIVATE -O3 -ffunction-sections -fdata-sections)
-    target_link_options(rac_backend_sherpa PRIVATE
-        -Wl,--gc-sections
-        -Wl,-z,max-page-size=16384
-        -Wl,-z,common-page-size=16384)
+    rac_apply_android_page_alignment(rac_backend_sherpa)
 endif()
 
 # =============================================================================
@@ -447,12 +444,7 @@ else()
         rac_backend_sherpa
         rac_commons
     )
-    if(RAC_PLATFORM_ANDROID)
-        target_link_options(runanywhere_sherpa PRIVATE
-            -Wl,--gc-sections
-            -Wl,-z,max-page-size=16384
-            -Wl,-z,common-page-size=16384)
-    endif()
+    rac_apply_android_page_alignment(runanywhere_sherpa)
     install(TARGETS runanywhere_sherpa LIBRARY DESTINATION lib)
 endif()
 
