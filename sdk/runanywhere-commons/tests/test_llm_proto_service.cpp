@@ -387,14 +387,14 @@ int test_stream_thinking_envelope(rac_model_registry_handle_t registry) {
         runanywhere::v1::LLMStreamEvent event;
         CHECK(event.ParseFromArray(event_bytes.data(), static_cast<int>(event_bytes.size())),
               "thinking stream event parses");
-        if (event.kind() == runanywhere::v1::LLM_TOKEN_KIND_THOUGHT) {
+        if (event.kind() == runanywhere::v1::TOKEN_KIND_THOUGHT) {
             saw_thinking = true;
             CHECK(event.event_kind() == runanywhere::v1::LLM_STREAM_EVENT_KIND_THINKING,
                   "thinking event kind is classified");
             CHECK(event.token() == "plan", "thinking token strips tags");
             CHECK(event.request_id() == "think-req", "thinking event carries request id");
         }
-        if (!event.is_final() && event.kind() == runanywhere::v1::LLM_TOKEN_KIND_ANSWER) {
+        if (!event.is_final() && event.kind() == runanywhere::v1::TOKEN_KIND_ANSWER) {
             saw_answer = true;
             CHECK(event.token() == "done", "answer token strips thinking block");
         }
