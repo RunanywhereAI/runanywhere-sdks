@@ -2,9 +2,9 @@
  * @file rac_rag_pipeline.cpp
  * @brief RAG Pipeline C API Implementation
  *
- * Provides two creation modes:
- *   - rac_rag_pipeline_create: takes pre-created LLM + Embeddings service handles
- *   - rac_rag_pipeline_create_standalone: creates services via the registry
+ * The pipeline is created via `rac_rag_pipeline_create_standalone`, which
+ * creates LLM + Embeddings services through the registry and hands them
+ * to the backend.
  */
 
 #include "rac/features/rag/rac_rag_pipeline.h"
@@ -79,46 +79,10 @@ static RAGBackendConfig build_backend_config(const rac_rag_pipeline_config_t* co
 }
 
 // =============================================================================
-// PUBLIC API — Handle-based creation (Voice Agent pattern)
+// PUBLIC API — Standalone creation (creates services via registry)
 // =============================================================================
 
 extern "C" {
-
-rac_result_t rac_rag_pipeline_create(rac_handle_t llm_service, rac_handle_t embeddings_service,
-                                     const rac_rag_pipeline_config_t* config,
-                                     rac_rag_pipeline_t** out_pipeline) {
-    if (!llm_service || !embeddings_service || !out_pipeline) {
-        LOGE("Null pointer in rac_rag_pipeline_create");
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    *out_pipeline = nullptr;
-
-    try {
-        auto bc = build_backend_config(config);
-
-        auto pipeline = std::make_unique<rac_rag_pipeline>();
-        pipeline->backend =
-            std::make_unique<RAGBackend>(bc, llm_service, embeddings_service, false);
-
-        if (!pipeline->backend->is_initialized()) {
-            LOGE("RAG pipeline failed to initialize");
-            return RAC_ERROR_INITIALIZATION_FAILED;
-        }
-
-        *out_pipeline = pipeline.release();
-        LOGI("RAG pipeline created (handle-based)");
-        return RAC_SUCCESS;
-
-    } catch (const std::exception& e) {
-        LOGE("Exception creating pipeline: %s", e.what());
-        return RAC_ERROR_INITIALIZATION_FAILED;
-    }
-}
-
-// =============================================================================
-// PUBLIC API — Standalone creation (creates services via registry)
-// =============================================================================
 
 rac_result_t rac_rag_pipeline_create_standalone(const rac_rag_config_t* config,
                                                 rac_rag_pipeline_t** out_pipeline) {
@@ -219,36 +183,9 @@ rac_result_t rac_rag_add_document(rac_rag_pipeline_t* pipeline, const char* docu
     }
 }
 
-rac_result_t rac_rag_add_documents_batch(rac_rag_pipeline_t* pipeline, const char** documents,
-                                         const char** metadata_array, size_t count) {
-    if (!pipeline || !documents)
-        return RAC_ERROR_NULL_POINTER;
-
-    size_t failed_count = 0;
-    for (size_t i = 0; i < count; ++i) {
-        const char* metadata = metadata_array ? metadata_array[i] : nullptr;
-        rac_result_t result = rac_rag_add_document(pipeline, documents[i], metadata);
-        if (result != RAC_SUCCESS) {
-            LOGE("Failed to add document %zu of %zu: %d", i, count, result);
-            ++failed_count;
-        }
-    }
-
-    if (failed_count == count && count > 0) {
-        return RAC_ERROR_PROCESSING_FAILED;
-    }
-
-    return RAC_SUCCESS;
-}
-
 // =============================================================================
 // Query — delegates to RAGBackend which runs a GraphScheduler-driven DAG
 // =============================================================================
-//
-// Both rac_rag_query (blocking) and rac_rag_pipeline_query (streaming) share
-// the same underlying graph; the only difference is whether the caller wants
-// per-token notifications. We funnel through `run_query_internal` to keep the
-// option-fill, metadata-extract, and result-population code in one place.
 
 namespace {
 
@@ -304,10 +241,11 @@ void populate_result_from_metadata(rac_rag_result_t* out_result,
     out_result->total_time_ms = total_ms;
 }
 
-rac_result_t run_query_internal(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query,
-                                std::function<bool(const std::string&)> on_token,
-                                rac_rag_result_t* out_result) {
-    if (!pipeline || !query) return RAC_ERROR_NULL_POINTER;
+}  // namespace
+
+rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query,
+                           rac_rag_result_t* out_result) {
+    if (!pipeline || !query || !out_result) return RAC_ERROR_NULL_POINTER;
     if (!query->question) return RAC_ERROR_INVALID_ARGUMENT;
 
     try {
@@ -317,8 +255,8 @@ rac_result_t run_query_internal(rac_rag_pipeline_t* pipeline, const rac_rag_quer
         rac_llm_result_t llm_result = {};
         nlohmann::json metadata;
 
-        rac_result_t status = pipeline->backend->query(query->question, &opts, &llm_result,
-                                                       metadata, std::move(on_token));
+        rac_result_t status =
+            pipeline->backend->query(query->question, &opts, &llm_result, metadata);
 
         auto end = std::chrono::high_resolution_clock::now();
         const double total_ms =
@@ -329,9 +267,7 @@ rac_result_t run_query_internal(rac_rag_pipeline_t* pipeline, const rac_rag_quer
             return status;
         }
 
-        if (out_result) {
-            populate_result_from_metadata(out_result, llm_result, metadata, total_ms);
-        }
+        populate_result_from_metadata(out_result, llm_result, metadata, total_ms);
 
         rac_llm_result_free(&llm_result);
         return RAC_SUCCESS;
@@ -340,26 +276,6 @@ rac_result_t run_query_internal(rac_rag_pipeline_t* pipeline, const rac_rag_quer
         LOGE("Exception in RAG query: %s", e.what());
         return RAC_ERROR_PROCESSING_FAILED;
     }
-}
-
-}  // namespace
-
-rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query,
-                           rac_rag_result_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
-    return run_query_internal(pipeline, query, /*on_token=*/nullptr, out_result);
-}
-
-rac_result_t rac_rag_pipeline_query(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query,
-                                    rac_rag_token_callback_fn callback, void* user_data,
-                                    rac_rag_result_t* out_result) {
-    std::function<bool(const std::string&)> sink;
-    if (callback) {
-        sink = [callback, user_data](const std::string& token) -> bool {
-            return callback(token.c_str(), user_data) == RAC_TRUE;
-        };
-    }
-    return run_query_internal(pipeline, query, std::move(sink), out_result);
 }
 
 // =============================================================================

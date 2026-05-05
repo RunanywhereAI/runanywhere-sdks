@@ -15,9 +15,9 @@
  *     RAGDocument / RAGQueryOptions / RAGResult / RAGStatistics bytes.
  *   - Legacy struct APIs (rac_document_chunk_t, rac_search_result_t,
  *     rac_rag_pipeline_config_t, rac_rag_config_t, rac_rag_query_t,
- *     rac_rag_result_t, rac_rag_pipeline_create_, add_document(s),
- *     query, pipeline_query, clear_documents, get_document_count,
- *     get_statistics, with the rac_rag_token_callback_fn):
+ *     rac_rag_result_t, rac_rag_pipeline_create_standalone,
+ *     rac_rag_add_document, rac_rag_query, rac_rag_clear_documents,
+ *     rac_rag_get_document_count, rac_rag_get_statistics):
  *     `delete after SDK migration`.
  */
 
@@ -179,23 +179,6 @@ typedef struct rac_rag_result {
 // =============================================================================
 
 /**
- * @brief Create a RAG pipeline with existing service handles
- *
- * Follows the Voice Agent pattern: the pipeline orchestrates pre-created
- * LLM and embeddings services rather than loading models itself.
- *
- * @param llm_service Handle to an LLM service (from rac_llm_create)
- * @param embeddings_service Handle to an embeddings service (from rac_embeddings_create)
- * @param config RAG-specific pipeline configuration (can be NULL for defaults)
- * @param out_pipeline Pointer to receive pipeline handle
- * @return RAC_SUCCESS on success, error code otherwise
- */
-RAC_API rac_result_t rac_rag_pipeline_create(rac_handle_t llm_service,
-                                             rac_handle_t embeddings_service,
-                                             const rac_rag_pipeline_config_t* config,
-                                             rac_rag_pipeline_t** out_pipeline);
-
-/**
  * @brief Create a standalone RAG pipeline that creates its own services
  *
  * Convenience function that creates LLM and embeddings services via the
@@ -250,21 +233,6 @@ RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session,
                                           rac_proto_buffer_t* out_stats);
 
 /**
- * @brief Add multiple documents in batch
- *
- * More efficient than calling rac_rag_add_document multiple times.
- *
- * @param pipeline RAG pipeline handle
- * @param documents Array of document texts
- * @param metadata_array Array of metadata JSONs (can be NULL)
- * @param count Number of documents
- * @return RAC_SUCCESS on success, error code otherwise
- */
-RAC_API rac_result_t rac_rag_add_documents_batch(rac_rag_pipeline_t* pipeline,
-                                                 const char** documents,
-                                                 const char** metadata_array, size_t count);
-
-/**
  * @brief Query the RAG pipeline
  *
  * Retrieves relevant chunks and generates answer.
@@ -286,38 +254,6 @@ RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session,
                                          const uint8_t* query_proto_bytes,
                                          size_t query_proto_size,
                                          rac_proto_buffer_t* out_result);
-
-/**
- * @brief Streaming token callback fired by `rac_rag_pipeline_query`.
- *
- * Return RAC_TRUE to keep generating, RAC_FALSE to request cancellation.
- * The pointer is valid only for the duration of the call — copy if needed.
- */
-typedef rac_bool_t (*rac_rag_token_callback_fn)(const char* token, void* user_data);
-
-/**
- * @brief Streaming RAG query — runs the pipeline as a GraphScheduler DAG and
- *        emits LLM tokens to `callback` as soon as each one is generated.
- *
- * Internally constructs a typed `Embed → Retrieve → ContextAssembly → LLM`
- * graph (GAP 05 / T4.6), feeds the question in, and joins the scheduler
- * after the LLM stream terminates. The final assembled answer is also
- * written into `out_result` for callers that want both the streaming hook
- * and the aggregate result. Pass `out_result = NULL` if you only care about
- * the streamed tokens.
- *
- * @param pipeline   RAG pipeline handle
- * @param query      Query parameters
- * @param callback   Token callback (can be NULL)
- * @param user_data  Opaque pointer forwarded to `callback`
- * @param out_result Aggregate result (caller must `rac_rag_result_free`).
- *                   Can be NULL.
- * @return RAC_SUCCESS on success, error code otherwise
- */
-RAC_API rac_result_t rac_rag_pipeline_query(rac_rag_pipeline_t* pipeline,
-                                            const rac_rag_query_t* query,
-                                            rac_rag_token_callback_fn callback, void* user_data,
-                                            rac_rag_result_t* out_result);
 
 /**
  * @brief Clear all documents from the pipeline
