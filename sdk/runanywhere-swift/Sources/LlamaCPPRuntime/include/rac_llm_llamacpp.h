@@ -86,20 +86,6 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_create(const char* model_path,
                                                       rac_handle_t* out_handle);
 
 /**
- * Loads a GGUF model into an existing service.
- *
- * Mirrors Swift's LlamaCPPService.loadModel(path:config:)
- *
- * @param handle Service handle
- * @param model_path Path to the GGUF model file
- * @param config LlamaCPP configuration (can be NULL)
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle,
-                                                          const char* model_path,
-                                                          const rac_llm_llamacpp_config_t* config);
-
-/**
  * Unloads the current model.
  *
  * Mirrors Swift's LlamaCPPService.unloadModel()

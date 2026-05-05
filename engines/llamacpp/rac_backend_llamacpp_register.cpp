@@ -123,9 +123,11 @@ const rac_cpu_runtime_provider_t k_llamacpp_cpu_provider = {
     /* .destroy_session = */ llamacpp_cpu_provider_destroy_session,
 };
 
-// Initialize (model already loaded during create for LlamaCpp)
+// Initialize (model already loaded during create for LlamaCpp, so this is a no-op)
 static rac_result_t llamacpp_vtable_initialize(void* impl, const char* model_path) {
-    return rac_llm_llamacpp_load_model(legacy_handle(impl), model_path, nullptr);
+    (void)impl;
+    (void)model_path;
+    return RAC_SUCCESS;
 }
 
 // Generate (blocking)

@@ -864,7 +864,6 @@ set(RAC_EXPORTED_FUNCTIONS
 if(RAC_WASM_LLAMACPP)
     list(APPEND RAC_EXPORTED_FUNCTIONS
         "_rac_llm_llamacpp_create"
-        "_rac_llm_llamacpp_load_model"
         "_rac_llm_llamacpp_unload_model"
         "_rac_llm_llamacpp_is_model_loaded"
         "_rac_llm_llamacpp_generate"

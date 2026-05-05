@@ -398,12 +398,8 @@ static TestResult test_unload_reload() {
     ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_FALSE,
               "model should not be loaded after unload");
 
-    // Reload
-    rc = rac_llm_llamacpp_load_model(handle, model_path.c_str(), nullptr);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_load_model should succeed");
-    ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_TRUE,
-              "model should be loaded after reload");
-
+    // Reload is not supported via a dedicated load_model API — LlamaCpp loads
+    // the model during create(). To reload, callers destroy and re-create.
     rac_llm_llamacpp_destroy(handle);
     teardown();
     return TEST_PASS();

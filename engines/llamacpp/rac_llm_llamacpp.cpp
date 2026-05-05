@@ -117,16 +117,6 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle, const char* model_path,
-                                         const rac_llm_llamacpp_config_t* config) {
-    // LlamaCPP loads model during rac_llm_llamacpp_create(), so this is a no-op.
-    // This matches the pattern used by ONNX backends (STT/TTS) where initialize is a no-op.
-    (void)handle;
-    (void)model_path;
-    (void)config;
-    return RAC_SUCCESS;
-}
-
 rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle) {
     // ENG-LLAMA-05: teardown is owned by rac_llm_llamacpp_destroy; cleanup()
     // is a no-op so the commons vtable cleanup slot doesn't report a spurious
