@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-06 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-CPU-03 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-06 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -43,22 +43,6 @@ wired to them yet — the helper file's own doc comment flags CPU + ONNXRT as
 the intended consumers (DEC-01 deferred CoreML/Metal).
 
 ## Per-runtime gaps
-
-### runtimes/cpu
-
-#### RT-CPU-03: `rac_cpu_runtime_provider_t` API is effectively a parallel vtable
-
-`rac_cpu_runtime_register_provider` / `rac_cpu_runtime_unregister_provider` /
-`rac_cpu_runtime_get_provider_session` (`rac_runtime_cpu.cpp:564-615`) define
-a separate plugin surface that only the CPU runtime uses. No other runtime
-has an analogous provider registry, and the commons router layer has no
-equivalent concept. This is a reasonable workaround for "engines own
-primitive-specific tensor marshaling" (see `runtimes/CMakeLists.txt:11-12`)
-but it means any cross-runtime provider feature (thermal hints,
-memory-pressure callbacks, accelerator profile queries) would need to be
-duplicated per runtime — or, better, the provider concept needs promoting
-into the shared runtime vtable so onnxrt can benefit from the same escape
-hatch.
 
 ### runtimes/onnxrt
 

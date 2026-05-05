@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <mutex>
 #include <new>
 #include <vector>
 
@@ -15,6 +14,7 @@
 #include "rac/plugin/rac_onnxrt_runtime_provider.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/runtime/rac_runtime_helpers.h"
+#include "rac/runtime/rac_runtime_provider_registry.h"
 
 namespace runanywhere {
 namespace runtime {
@@ -424,45 +424,15 @@ namespace {
  * can plug in per-primitive handlers (embedding, STT, TTS, VAD) rather than
  * rediscovering the onnxrt singleton. Keyed by provider `name`; lookup matches
  * on `(primitive, model_format)`.
+ *
+ * RT-CPU-03: mutex / vector / register / lookup bookkeeping lives in the
+ * shared `rac::runtime::ProviderRegistry<>` template. This TU only owns the
+ * typed registry singleton.
  * -------------------------------------------------------------------------- */
 
-std::mutex& onnxrt_provider_mutex() {
-    static std::mutex mutex;
-    return mutex;
-}
-
-std::vector<rac_onnxrt_runtime_provider_t>& onnxrt_providers() {
-    static std::vector<rac_onnxrt_runtime_provider_t> entries;
-    return entries;
-}
-
-bool onnxrt_primitive_is_in_range(rac_primitive_t primitive) {
-    return primitive > RAC_PRIMITIVE_UNSPECIFIED &&
-           primitive <  RAC_PRIMITIVE_COUNT;
-}
-
-bool onnxrt_provider_supports_format(const rac_onnxrt_runtime_provider_t& provider,
-                                     uint32_t model_format) {
-    if (provider.formats == nullptr || provider.formats_count == 0 || model_format == 0) {
-        return true;
-    }
-    for (size_t i = 0; i < provider.formats_count; ++i) {
-        if (provider.formats[i] == model_format) return true;
-    }
-    return false;
-}
-
-bool onnxrt_find_provider(const rac_runtime_session_desc_t* desc,
-                          rac_onnxrt_runtime_provider_t* out_provider) {
-    std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
-    for (const auto& provider : onnxrt_providers()) {
-        if (provider.primitive == desc->primitive &&
-            onnxrt_provider_supports_format(provider, desc->model_format)) {
-            *out_provider = provider;
-            return true;
-        }
-    }
-    return false;
+rac::runtime::ProviderRegistry<rac_onnxrt_runtime_provider_t>& onnxrt_provider_registry() {
+    static rac::runtime::ProviderRegistry<rac_onnxrt_runtime_provider_t> registry;
+    return registry;
 }
 
 rac_result_t onnxrt_init(void) {
@@ -487,7 +457,8 @@ rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t* desc,
      * handle we wrap in a provider-flavored `rac_runtime_session`. Generic
      * "bare tensor runner" callers fall through to the default path below. */
     rac_onnxrt_runtime_provider_t provider{};
-    if (onnxrt_find_provider(desc, &provider) && provider.create_session != nullptr) {
+    if (onnxrt_provider_registry().find_by_desc(desc, &provider) &&
+        provider.create_session != nullptr) {
         rac_runtime_session_t* provider_session = nullptr;
         rac_result_t rc = provider.create_session(desc, &provider_session);
         if (rc != RAC_SUCCESS) return rc;
@@ -918,18 +889,15 @@ rac_result_t onnxrt_capabilities(rac_runtime_capabilities_t* out) {
      * see consistent results across calls. Mirrors `cpu_capabilities`. */
     bool seen[RAC_PRIMITIVE_COUNT] = {false};
     for (rac_primitive_t p : k_supported_primitives) {
-        if (onnxrt_primitive_is_in_range(p)) {
+        if (rac::runtime::rac_runtime_primitive_in_range(p)) {
             seen[static_cast<size_t>(p)] = true;
         }
     }
-    {
-        std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
-        for (const auto& provider : onnxrt_providers()) {
-            if (onnxrt_primitive_is_in_range(provider.primitive)) {
-                seen[static_cast<size_t>(provider.primitive)] = true;
-            }
+    onnxrt_provider_registry().for_each([&](const rac_onnxrt_runtime_provider_t& provider) {
+        if (rac::runtime::rac_runtime_primitive_in_range(provider.primitive)) {
+            seen[static_cast<size_t>(provider.primitive)] = true;
         }
-    }
+    });
 
     size_t count = 0;
     for (size_t i = 1; i < RAC_PRIMITIVE_COUNT; ++i) {
@@ -1021,39 +989,11 @@ extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_onnxrt(void) {
  * generic tensor runner keep working unchanged. */
 extern "C" RAC_API rac_result_t rac_onnxrt_runtime_register_provider(
     const rac_onnxrt_runtime_provider_t* provider) {
-    if (provider == nullptr || provider->name == nullptr ||
-        provider->create_session == nullptr || provider->run_session == nullptr ||
-        provider->destroy_session == nullptr) {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-    if (!onnxrt_primitive_is_in_range(provider->primitive)) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
-    auto& entries = onnxrt_providers();
-    auto it = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
-        return entry.name != nullptr && std::strcmp(entry.name, provider->name) == 0;
-    });
-    try {
-        if (it != entries.end()) {
-            *it = *provider;
-        } else {
-            entries.push_back(*provider);
-        }
-    } catch (const std::bad_alloc&) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    return RAC_SUCCESS;
+    return onnxrt_provider_registry().register_provider(provider);
 }
 
 extern "C" RAC_API void rac_onnxrt_runtime_unregister_provider(const char* name) {
-    if (name == nullptr) return;
-    std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
-    auto& entries = onnxrt_providers();
-    entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const auto& entry) {
-        return entry.name != nullptr && std::strcmp(entry.name, name) == 0;
-    }), entries.end());
+    onnxrt_provider_registry().unregister_provider(name);
 }
 
 extern "C" RAC_API rac_result_t rac_onnxrt_runtime_get_provider_session(

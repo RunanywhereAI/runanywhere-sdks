@@ -32,12 +32,10 @@
 
 #include "rac_runtime_entry_cpu.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <mutex>
 #include <new>
 #include <vector>
 
@@ -48,6 +46,7 @@
 #include "rac/plugin/rac_runtime_vtable.h"
 #include "rac/router/rac_hardware_profile.h"
 #include "rac/runtime/rac_runtime_helpers.h"
+#include "rac/runtime/rac_runtime_provider_registry.h"
 
 namespace {
 
@@ -85,48 +84,12 @@ struct CpuRuntimeBuffer {
     uint64_t usage_flags = 0;
 };
 
-std::mutex& provider_mutex() {
-    static std::mutex mutex;
-    return mutex;
-}
-
-std::vector<rac_cpu_runtime_provider_t>& providers() {
-    static std::vector<rac_cpu_runtime_provider_t> entries;
-    return entries;
-}
-
-/* Validates a primitive against the declared enum range. Used as a light
- * sanity check at register time and in `create_session` before routing to a
- * specific provider — actual dispatch is still gated by `find_provider`
- * looking up the provider registry, so unsupported primitives fall through
- * to `RAC_ERROR_NOT_IMPLEMENTED` even if they pass this range check. */
-bool primitive_is_in_range(rac_primitive_t primitive) {
-    return primitive > RAC_PRIMITIVE_UNSPECIFIED &&
-           primitive <  RAC_PRIMITIVE_COUNT;
-}
-
-bool provider_supports_format(const rac_cpu_runtime_provider_t& provider,
-                              uint32_t model_format) {
-    if (provider.formats == nullptr || provider.formats_count == 0 || model_format == 0) {
-        return true;
-    }
-    for (size_t i = 0; i < provider.formats_count; ++i) {
-        if (provider.formats[i] == model_format) return true;
-    }
-    return false;
-}
-
-bool find_provider(const rac_runtime_session_desc_t* desc,
-                   rac_cpu_runtime_provider_t* out_provider) {
-    std::lock_guard<std::mutex> lock(provider_mutex());
-    for (const auto& provider : providers()) {
-        if (provider.primitive == desc->primitive &&
-            provider_supports_format(provider, desc->model_format)) {
-            *out_provider = provider;
-            return true;
-        }
-    }
-    return false;
+/* RT-CPU-03: provider bookkeeping (mutex + vector + register/unregister/find)
+ * lives in `rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t>`. This
+ * TU only has to supply the registry singleton. */
+rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t>& provider_registry() {
+    static rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t> registry;
+    return registry;
 }
 
 CpuRuntimeSession* as_cpu_session(rac_runtime_session_t* session) {
@@ -231,18 +194,15 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
      * ownership back to the caller. See RT-CPU-02. */
     bool seen[RAC_PRIMITIVE_COUNT] = {false};
     bool any_v2 = false;
-    {
-        std::lock_guard<std::mutex> lock(provider_mutex());
-        for (const auto& provider : providers()) {
-            const auto p = provider.primitive;
-            if (p > RAC_PRIMITIVE_UNSPECIFIED && p < RAC_PRIMITIVE_COUNT) {
-                seen[static_cast<size_t>(p)] = true;
-            }
-            if (provider.run_session_v2 != nullptr) {
-                any_v2 = true;
-            }
+    provider_registry().for_each([&](const rac_cpu_runtime_provider_t& provider) {
+        const auto p = provider.primitive;
+        if (p > RAC_PRIMITIVE_UNSPECIFIED && p < RAC_PRIMITIVE_COUNT) {
+            seen[static_cast<size_t>(p)] = true;
         }
-    }
+        if (provider.run_session_v2 != nullptr) {
+            any_v2 = true;
+        }
+    });
     if (any_v2) {
         flags |= RAC_RUNTIME_CAP_OWNED_OUTPUTS;
     }
@@ -266,7 +226,7 @@ rac_result_t cpu_create_session(const rac_runtime_session_desc_t* desc,
     if (out == nullptr || desc == nullptr) return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
 
-    if (!primitive_is_in_range(desc->primitive)) {
+    if (!rac::runtime::rac_runtime_primitive_in_range(desc->primitive)) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
@@ -276,7 +236,7 @@ rac_result_t cpu_create_session(const rac_runtime_session_desc_t* desc,
     }
 
     rac_cpu_runtime_provider_t provider{};
-    if (!find_provider(desc, &provider)) {
+    if (!provider_registry().find_by_desc(desc, &provider)) {
         return RAC_ERROR_NOT_IMPLEMENTED;
     }
 
@@ -611,39 +571,11 @@ extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_cpu(void) {
 
 extern "C" RAC_API rac_result_t rac_cpu_runtime_register_provider(
     const rac_cpu_runtime_provider_t* provider) {
-    if (provider == nullptr || provider->name == nullptr ||
-        provider->create_session == nullptr || provider->run_session == nullptr ||
-        provider->destroy_session == nullptr) {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-    if (!primitive_is_in_range(provider->primitive)) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    std::lock_guard<std::mutex> lock(provider_mutex());
-    auto& entries = providers();
-    auto it = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
-        return entry.name != nullptr && std::strcmp(entry.name, provider->name) == 0;
-    });
-    try {
-        if (it != entries.end()) {
-            *it = *provider;
-        } else {
-            entries.push_back(*provider);
-        }
-    } catch (const std::bad_alloc&) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    return RAC_SUCCESS;
+    return provider_registry().register_provider(provider);
 }
 
 extern "C" RAC_API void rac_cpu_runtime_unregister_provider(const char* name) {
-    if (name == nullptr) return;
-    std::lock_guard<std::mutex> lock(provider_mutex());
-    auto& entries = providers();
-    entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const auto& entry) {
-        return entry.name != nullptr && std::strcmp(entry.name, name) == 0;
-    }), entries.end());
+    provider_registry().unregister_provider(name);
 }
 
 extern "C" RAC_API rac_result_t rac_cpu_runtime_get_provider_session(
