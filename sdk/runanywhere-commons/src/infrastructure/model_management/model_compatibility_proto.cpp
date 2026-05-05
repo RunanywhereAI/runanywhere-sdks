@@ -4,7 +4,7 @@
  *
  * Wraps rac_model_check_compatibility() with the canonical
  * runanywhere.v1.ModelCompatibilityRequest /
- * runanywhere.v1.ModelCompatibilityCheckResult message contracts so SDK
+ * runanywhere.v1.ModelCompatibilityResult message contracts so SDK
  * bridges (RN CompatibilityBridge, Web ModelManager, Kotlin compat path)
  * can stop reaching for the struct ABI.
  */
@@ -52,7 +52,7 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
     return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
 }
 
-void populate_result(runanywhere::v1::ModelCompatibilityCheckResult* result,
+void populate_result(runanywhere::v1::ModelCompatibilityResult* result,
                      const rac_model_compatibility_result_t& source,
                      const std::string& model_id) {
     result->set_model_id(model_id);
@@ -109,7 +109,7 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
                                           "failed to parse ModelCompatibilityRequest");
     }
 
-    runanywhere::v1::ModelCompatibilityCheckResult proto_result;
+    runanywhere::v1::ModelCompatibilityResult proto_result;
     proto_result.set_model_id(request.model_id());
 
     if (request.model_id().empty()) {

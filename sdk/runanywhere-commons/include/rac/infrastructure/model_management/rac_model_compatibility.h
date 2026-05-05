@@ -69,13 +69,13 @@ RAC_API rac_result_t rac_model_check_compatibility(rac_model_registry_handle_t r
  * (RN, Web, Kotlin) with a canonical proto-byte ABI. Implementation routes
  * through the same registry lookup + RAM/storage comparison that
  * rac_model_check_compatibility() performs, then encodes the result as
- * runanywhere.v1.ModelCompatibilityCheckResult bytes (canRun / canFit /
+ * runanywhere.v1.ModelCompatibilityResult bytes (canRun / canFit /
  * isCompatible / required vs. available memory & storage / human-readable
  * reasons).
  *
  * @param request_bytes Serialized ModelCompatibilityRequest bytes
  * @param request_size  Byte count
- * @param out_result    Receives serialized ModelCompatibilityCheckResult
+ * @param out_result    Receives serialized ModelCompatibilityResult
  *                      bytes on success or an error envelope on failure.
  * @return RAC_SUCCESS or a negative rac_result_t.
  */

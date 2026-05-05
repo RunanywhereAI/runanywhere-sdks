@@ -1703,32 +1703,6 @@ public struct RAModelQuery: Sendable {
   fileprivate var _registryStatus: RAModelRegistryStatus? = nil
 }
 
-public struct RAModelCompatibilityResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var isCompatible: Bool = false
-
-  public var canRun: Bool = false
-
-  public var canFit: Bool = false
-
-  public var requiredMemoryBytes: Int64 = 0
-
-  public var availableMemoryBytes: Int64 = 0
-
-  public var requiredStorageBytes: Int64 = 0
-
-  public var availableStorageBytes: Int64 = 0
-
-  public var reasons: [String] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 public struct RAModelRegistryRefreshRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2411,7 +2385,7 @@ public struct RAModelCompatibilityRequest: Sendable {
   fileprivate var _preferredFramework: RAInferenceFramework? = nil
 }
 
-public struct RAModelCompatibilityCheckResult: Sendable {
+public struct RAModelCompatibilityResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3497,71 +3471,6 @@ extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs._sortField != rhs._sortField {return false}
     if lhs._sortOrder != rhs._sortOrder {return false}
     if lhs._registryStatus != rhs._registryStatus {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension RAModelCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}can_run\0\u{3}can_fit\0\u{3}required_memory_bytes\0\u{3}available_memory_bytes\0\u{3}required_storage_bytes\0\u{3}available_storage_bytes\0\u{1}reasons\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.isCompatible) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.canRun) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.canFit) }()
-      case 4: try { try decoder.decodeSingularInt64Field(value: &self.requiredMemoryBytes) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self.availableMemoryBytes) }()
-      case 6: try { try decoder.decodeSingularInt64Field(value: &self.requiredStorageBytes) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.availableStorageBytes) }()
-      case 8: try { try decoder.decodeRepeatedStringField(value: &self.reasons) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.isCompatible != false {
-      try visitor.visitSingularBoolField(value: self.isCompatible, fieldNumber: 1)
-    }
-    if self.canRun != false {
-      try visitor.visitSingularBoolField(value: self.canRun, fieldNumber: 2)
-    }
-    if self.canFit != false {
-      try visitor.visitSingularBoolField(value: self.canFit, fieldNumber: 3)
-    }
-    if self.requiredMemoryBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.requiredMemoryBytes, fieldNumber: 4)
-    }
-    if self.availableMemoryBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.availableMemoryBytes, fieldNumber: 5)
-    }
-    if self.requiredStorageBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.requiredStorageBytes, fieldNumber: 6)
-    }
-    if self.availableStorageBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.availableStorageBytes, fieldNumber: 7)
-    }
-    if !self.reasons.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.reasons, fieldNumber: 8)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAModelCompatibilityResult, rhs: RAModelCompatibilityResult) -> Bool {
-    if lhs.isCompatible != rhs.isCompatible {return false}
-    if lhs.canRun != rhs.canRun {return false}
-    if lhs.canFit != rhs.canFit {return false}
-    if lhs.requiredMemoryBytes != rhs.requiredMemoryBytes {return false}
-    if lhs.availableMemoryBytes != rhs.availableMemoryBytes {return false}
-    if lhs.requiredStorageBytes != rhs.requiredStorageBytes {return false}
-    if lhs.availableStorageBytes != rhs.availableStorageBytes {return false}
-    if lhs.reasons != rhs.reasons {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4824,8 +4733,8 @@ extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAModelCompatibilityCheckResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityCheckResult"
+extension RAModelCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}can_run\0\u{3}can_fit\0\u{3}required_memory_bytes\0\u{3}available_memory_bytes\0\u{3}required_storage_bytes\0\u{3}available_storage_bytes\0\u{1}reasons\0\u{3}suggested_alternatives\0\u{3}model_id\0\u{3}error_code\0\u{3}error_message\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4891,7 +4800,7 @@ extension RAModelCompatibilityCheckResult: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RAModelCompatibilityCheckResult, rhs: RAModelCompatibilityCheckResult) -> Bool {
+  public static func ==(lhs: RAModelCompatibilityResult, rhs: RAModelCompatibilityResult) -> Bool {
     if lhs.isCompatible != rhs.isCompatible {return false}
     if lhs.canRun != rhs.canRun {return false}
     if lhs.canFit != rhs.canFit {return false}

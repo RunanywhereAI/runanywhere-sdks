@@ -479,17 +479,6 @@ message ModelQuery {
     optional ModelRegistryStatus registry_status = 11;
 }
 
-message ModelCompatibilityResult {
-    bool  is_compatible          = 1;
-    bool  can_run                = 2;
-    bool  can_fit                = 3;
-    int64 required_memory_bytes  = 4;
-    int64 available_memory_bytes = 5;
-    int64 required_storage_bytes = 6;
-    int64 available_storage_bytes = 7;
-    repeated string reasons      = 8;
-}
-
 // ---------------------------------------------------------------------------
 // Registry and model-lifecycle operation contracts.
 //
@@ -737,7 +726,7 @@ message ModelCompatibilityRequest {
     optional InferenceFramework preferred_framework = 6;
 }
 
-message ModelCompatibilityCheckResult {
+message ModelCompatibilityResult {
     // Mirrors the existing struct fields so SDKs can keep using the same
     // field names; populated from rac_model_compatibility_result_t.
     bool  is_compatible          = 1;

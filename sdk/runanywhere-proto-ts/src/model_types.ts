@@ -1392,17 +1392,6 @@ export interface ModelQuery {
   registryStatus?: ModelRegistryStatus | undefined;
 }
 
-export interface ModelCompatibilityResult {
-  isCompatible: boolean;
-  canRun: boolean;
-  canFit: boolean;
-  requiredMemoryBytes: number;
-  availableMemoryBytes: number;
-  requiredStorageBytes: number;
-  availableStorageBytes: number;
-  reasons: string[];
-}
-
 export interface ModelRegistryRefreshRequest {
   /** Fetch or merge a remote catalog through the platform/network adapter. */
   includeRemoteCatalog: boolean;
@@ -1648,7 +1637,7 @@ export interface ModelCompatibilityRequest {
   preferredFramework?: InferenceFramework | undefined;
 }
 
-export interface ModelCompatibilityCheckResult {
+export interface ModelCompatibilityResult {
   /**
    * Mirrors the existing struct fields so SDKs can keep using the same
    * field names; populated from rac_model_compatibility_result_t.
@@ -3545,179 +3534,6 @@ export const ModelQuery = {
     message.sortField = object.sortField ?? undefined;
     message.sortOrder = object.sortOrder ?? undefined;
     message.registryStatus = object.registryStatus ?? undefined;
-    return message;
-  },
-};
-
-function createBaseModelCompatibilityResult(): ModelCompatibilityResult {
-  return {
-    isCompatible: false,
-    canRun: false,
-    canFit: false,
-    requiredMemoryBytes: 0,
-    availableMemoryBytes: 0,
-    requiredStorageBytes: 0,
-    availableStorageBytes: 0,
-    reasons: [],
-  };
-}
-
-export const ModelCompatibilityResult = {
-  encode(message: ModelCompatibilityResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.isCompatible !== false) {
-      writer.uint32(8).bool(message.isCompatible);
-    }
-    if (message.canRun !== false) {
-      writer.uint32(16).bool(message.canRun);
-    }
-    if (message.canFit !== false) {
-      writer.uint32(24).bool(message.canFit);
-    }
-    if (message.requiredMemoryBytes !== 0) {
-      writer.uint32(32).int64(message.requiredMemoryBytes);
-    }
-    if (message.availableMemoryBytes !== 0) {
-      writer.uint32(40).int64(message.availableMemoryBytes);
-    }
-    if (message.requiredStorageBytes !== 0) {
-      writer.uint32(48).int64(message.requiredStorageBytes);
-    }
-    if (message.availableStorageBytes !== 0) {
-      writer.uint32(56).int64(message.availableStorageBytes);
-    }
-    for (const v of message.reasons) {
-      writer.uint32(66).string(v!);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseModelCompatibilityResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 8) {
-            break;
-          }
-
-          message.isCompatible = reader.bool();
-          continue;
-        case 2:
-          if (tag !== 16) {
-            break;
-          }
-
-          message.canRun = reader.bool();
-          continue;
-        case 3:
-          if (tag !== 24) {
-            break;
-          }
-
-          message.canFit = reader.bool();
-          continue;
-        case 4:
-          if (tag !== 32) {
-            break;
-          }
-
-          message.requiredMemoryBytes = longToNumber(reader.int64() as Long);
-          continue;
-        case 5:
-          if (tag !== 40) {
-            break;
-          }
-
-          message.availableMemoryBytes = longToNumber(reader.int64() as Long);
-          continue;
-        case 6:
-          if (tag !== 48) {
-            break;
-          }
-
-          message.requiredStorageBytes = longToNumber(reader.int64() as Long);
-          continue;
-        case 7:
-          if (tag !== 56) {
-            break;
-          }
-
-          message.availableStorageBytes = longToNumber(reader.int64() as Long);
-          continue;
-        case 8:
-          if (tag !== 66) {
-            break;
-          }
-
-          message.reasons.push(reader.string());
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ModelCompatibilityResult {
-    return {
-      isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
-      canRun: isSet(object.canRun) ? globalThis.Boolean(object.canRun) : false,
-      canFit: isSet(object.canFit) ? globalThis.Boolean(object.canFit) : false,
-      requiredMemoryBytes: isSet(object.requiredMemoryBytes) ? globalThis.Number(object.requiredMemoryBytes) : 0,
-      availableMemoryBytes: isSet(object.availableMemoryBytes) ? globalThis.Number(object.availableMemoryBytes) : 0,
-      requiredStorageBytes: isSet(object.requiredStorageBytes) ? globalThis.Number(object.requiredStorageBytes) : 0,
-      availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
-      reasons: globalThis.Array.isArray(object?.reasons) ? object.reasons.map((e: any) => globalThis.String(e)) : [],
-    };
-  },
-
-  toJSON(message: ModelCompatibilityResult): unknown {
-    const obj: any = {};
-    if (message.isCompatible !== false) {
-      obj.isCompatible = message.isCompatible;
-    }
-    if (message.canRun !== false) {
-      obj.canRun = message.canRun;
-    }
-    if (message.canFit !== false) {
-      obj.canFit = message.canFit;
-    }
-    if (message.requiredMemoryBytes !== 0) {
-      obj.requiredMemoryBytes = Math.round(message.requiredMemoryBytes);
-    }
-    if (message.availableMemoryBytes !== 0) {
-      obj.availableMemoryBytes = Math.round(message.availableMemoryBytes);
-    }
-    if (message.requiredStorageBytes !== 0) {
-      obj.requiredStorageBytes = Math.round(message.requiredStorageBytes);
-    }
-    if (message.availableStorageBytes !== 0) {
-      obj.availableStorageBytes = Math.round(message.availableStorageBytes);
-    }
-    if (message.reasons?.length) {
-      obj.reasons = message.reasons;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult {
-    return ModelCompatibilityResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult {
-    const message = createBaseModelCompatibilityResult();
-    message.isCompatible = object.isCompatible ?? false;
-    message.canRun = object.canRun ?? false;
-    message.canFit = object.canFit ?? false;
-    message.requiredMemoryBytes = object.requiredMemoryBytes ?? 0;
-    message.availableMemoryBytes = object.availableMemoryBytes ?? 0;
-    message.requiredStorageBytes = object.requiredStorageBytes ?? 0;
-    message.availableStorageBytes = object.availableStorageBytes ?? 0;
-    message.reasons = object.reasons?.map((e) => e) || [];
     return message;
   },
 };
@@ -6566,7 +6382,7 @@ export const ModelCompatibilityRequest = {
   },
 };
 
-function createBaseModelCompatibilityCheckResult(): ModelCompatibilityCheckResult {
+function createBaseModelCompatibilityResult(): ModelCompatibilityResult {
   return {
     isCompatible: false,
     canRun: false,
@@ -6583,8 +6399,8 @@ function createBaseModelCompatibilityCheckResult(): ModelCompatibilityCheckResul
   };
 }
 
-export const ModelCompatibilityCheckResult = {
-  encode(message: ModelCompatibilityCheckResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const ModelCompatibilityResult = {
+  encode(message: ModelCompatibilityResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.isCompatible !== false) {
       writer.uint32(8).bool(message.isCompatible);
     }
@@ -6624,10 +6440,10 @@ export const ModelCompatibilityCheckResult = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityCheckResult {
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseModelCompatibilityCheckResult();
+    const message = createBaseModelCompatibilityResult();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -6724,7 +6540,7 @@ export const ModelCompatibilityCheckResult = {
     return message;
   },
 
-  fromJSON(object: any): ModelCompatibilityCheckResult {
+  fromJSON(object: any): ModelCompatibilityResult {
     return {
       isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
       canRun: isSet(object.canRun) ? globalThis.Boolean(object.canRun) : false,
@@ -6743,7 +6559,7 @@ export const ModelCompatibilityCheckResult = {
     };
   },
 
-  toJSON(message: ModelCompatibilityCheckResult): unknown {
+  toJSON(message: ModelCompatibilityResult): unknown {
     const obj: any = {};
     if (message.isCompatible !== false) {
       obj.isCompatible = message.isCompatible;
@@ -6784,13 +6600,11 @@ export const ModelCompatibilityCheckResult = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(base?: I): ModelCompatibilityCheckResult {
-    return ModelCompatibilityCheckResult.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult {
+    return ModelCompatibilityResult.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(
-    object: I,
-  ): ModelCompatibilityCheckResult {
-    const message = createBaseModelCompatibilityCheckResult();
+  fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult {
+    const message = createBaseModelCompatibilityResult();
     message.isCompatible = object.isCompatible ?? false;
     message.canRun = object.canRun ?? false;
     message.canFit = object.canFit ?? false;

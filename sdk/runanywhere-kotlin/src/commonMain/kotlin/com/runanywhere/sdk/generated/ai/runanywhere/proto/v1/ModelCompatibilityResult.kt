@@ -29,6 +29,10 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class ModelCompatibilityResult(
+  /**
+   * Mirrors the existing struct fields so SDKs can keep using the same
+   * field names; populated from rac_model_compatibility_result_t.
+   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -86,8 +90,45 @@ public class ModelCompatibilityResult(
   )
   public val available_storage_bytes: Long = 0L,
   reasons: List<String> = emptyList(),
+  suggested_alternatives: List<String> = emptyList(),
+  /**
+   * Echo of the looked-up model id so callers can correlate batched
+   * checks with their request id.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelId",
+    schemaIndex = 9,
+  )
+  public val model_id: String = "",
+  /**
+   * Negative on failure; mirrors rac_result_t. Empty error_message on
+   * success.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 10,
+  )
+  public val error_code: Int = 0,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorMessage",
+    schemaIndex = 11,
+  )
+  public val error_message: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelCompatibilityResult, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * Human-readable reasons populated when the verdict is negative
+   * (e.g. "insufficient RAM: requires X, available Y").
+   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -95,6 +136,21 @@ public class ModelCompatibilityResult(
     schemaIndex = 7,
   )
   public val reasons: List<String> = immutableCopyOf("reasons", reasons)
+
+  /**
+   * Optional suggested alternative model ids that *would* be compatible.
+   * The current implementation leaves this empty; reserved for future
+   * compatibility-aware suggestions.
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "suggestedAlternatives",
+    schemaIndex = 8,
+  )
+  public val suggested_alternatives: List<String> = immutableCopyOf("suggested_alternatives",
+      suggested_alternatives)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -115,6 +171,10 @@ public class ModelCompatibilityResult(
     if (required_storage_bytes != other.required_storage_bytes) return false
     if (available_storage_bytes != other.available_storage_bytes) return false
     if (reasons != other.reasons) return false
+    if (suggested_alternatives != other.suggested_alternatives) return false
+    if (model_id != other.model_id) return false
+    if (error_code != other.error_code) return false
+    if (error_message != other.error_message) return false
     return true
   }
 
@@ -130,6 +190,10 @@ public class ModelCompatibilityResult(
       result = result * 37 + required_storage_bytes.hashCode()
       result = result * 37 + available_storage_bytes.hashCode()
       result = result * 37 + reasons.hashCode()
+      result = result * 37 + suggested_alternatives.hashCode()
+      result = result * 37 + model_id.hashCode()
+      result = result * 37 + error_code.hashCode()
+      result = result * 37 + error_message.hashCode()
       super.hashCode = result
     }
     return result
@@ -145,6 +209,11 @@ public class ModelCompatibilityResult(
     result += """required_storage_bytes=$required_storage_bytes"""
     result += """available_storage_bytes=$available_storage_bytes"""
     if (reasons.isNotEmpty()) result += """reasons=${sanitize(reasons)}"""
+    if (suggested_alternatives.isNotEmpty()) result +=
+        """suggested_alternatives=${sanitize(suggested_alternatives)}"""
+    result += """model_id=${sanitize(model_id)}"""
+    result += """error_code=$error_code"""
+    result += """error_message=${sanitize(error_message)}"""
     return result.joinToString(prefix = "ModelCompatibilityResult{", separator = ", ", postfix =
         "}")
   }
@@ -158,10 +227,15 @@ public class ModelCompatibilityResult(
     required_storage_bytes: Long = this.required_storage_bytes,
     available_storage_bytes: Long = this.available_storage_bytes,
     reasons: List<String> = this.reasons,
+    suggested_alternatives: List<String> = this.suggested_alternatives,
+    model_id: String = this.model_id,
+    error_code: Int = this.error_code,
+    error_message: String = this.error_message,
     unknownFields: ByteString = this.unknownFields,
   ): ModelCompatibilityResult = ModelCompatibilityResult(is_compatible, can_run, can_fit,
       required_memory_bytes, available_memory_bytes, required_storage_bytes,
-      available_storage_bytes, reasons, unknownFields)
+      available_storage_bytes, reasons, suggested_alternatives, model_id, error_code, error_message,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -189,6 +263,12 @@ public class ModelCompatibilityResult(
         if (value.available_storage_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
             value.available_storage_bytes)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.reasons)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(9, value.suggested_alternatives)
+        if (value.model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.model_id)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(11,
+            value.error_code)
+        if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(12,
+            value.error_message)
         return size
       }
 
@@ -206,11 +286,21 @@ public class ModelCompatibilityResult(
         if (value.available_storage_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
             value.available_storage_bytes)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.reasons)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.suggested_alternatives)
+        if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 10, value.model_id)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
+        if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
+            value.error_message)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelCompatibilityResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
+            value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
+        if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 10, value.model_id)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.suggested_alternatives)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.reasons)
         if (value.available_storage_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
             value.available_storage_bytes)
@@ -235,6 +325,10 @@ public class ModelCompatibilityResult(
         var required_storage_bytes: Long = 0L
         var available_storage_bytes: Long = 0L
         val reasons = mutableListOf<String>()
+        val suggested_alternatives = mutableListOf<String>()
+        var model_id: String = ""
+        var error_code: Int = 0
+        var error_message: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_compatible = ProtoAdapter.BOOL.decode(reader)
@@ -245,6 +339,10 @@ public class ModelCompatibilityResult(
             6 -> required_storage_bytes = ProtoAdapter.INT64.decode(reader)
             7 -> available_storage_bytes = ProtoAdapter.INT64.decode(reader)
             8 -> reasons.add(ProtoAdapter.STRING.decode(reader))
+            9 -> suggested_alternatives.add(ProtoAdapter.STRING.decode(reader))
+            10 -> model_id = ProtoAdapter.STRING.decode(reader)
+            11 -> error_code = ProtoAdapter.INT32.decode(reader)
+            12 -> error_message = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -257,6 +355,10 @@ public class ModelCompatibilityResult(
           required_storage_bytes = required_storage_bytes,
           available_storage_bytes = available_storage_bytes,
           reasons = reasons,
+          suggested_alternatives = suggested_alternatives,
+          model_id = model_id,
+          error_code = error_code,
+          error_message = error_message,
           unknownFields = unknownFields
         )
       }
