@@ -163,6 +163,69 @@ static rac_result_t sherpa_stt_vtable_detect_language(void* impl, const void* au
     return rac_stt_sherpa_detect_language(impl, audio_data, audio_size, options, out_language);
 }
 
+// -----------------------------------------------------------------------------
+// CPP-14 (Wave 1): persistent per-session streaming handles.
+//
+// The Sherpa-ONNX online recognizer expects a stable OnlineStream handle
+// across all chunks of an utterance. Pre-CPP-14, commons handed each
+// chunk to transcribe_stream which synthesized a fresh stream per frame
+// and discarded it — first-token latency regressed badly on Android /
+// Linux voice-agent paths. The three slots below let commons keep the
+// backing SherpaOnnxOnlineStream alive for the whole session: one
+// create, N x feed_audio_chunk with real-time partial emission, one
+// destroy.
+// -----------------------------------------------------------------------------
+
+static rac_result_t sherpa_stt_vtable_stream_create(void* impl,
+                                                    const rac_stt_options_t* /*options*/,
+                                                    rac_handle_t* out_stream_handle) {
+    if (!impl || !out_stream_handle) return RAC_ERROR_INVALID_ARGUMENT;
+    return rac_stt_sherpa_create_stream(static_cast<rac_handle_t>(impl), out_stream_handle);
+}
+
+static rac_result_t sherpa_stt_vtable_stream_feed_audio_chunk(void* impl,
+                                                              rac_handle_t stream_handle,
+                                                              const int16_t* samples, size_t count,
+                                                              rac_stt_stream_callback_t callback,
+                                                              void* user_data) {
+    if (!impl || !stream_handle) return RAC_ERROR_INVALID_ARGUMENT;
+    if (count > 0 && !samples) return RAC_ERROR_INVALID_ARGUMENT;
+
+    std::vector<float> float_samples;
+    float_samples.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        float_samples.push_back(static_cast<float>(samples[i]) / 32768.0f);
+    }
+
+    auto backend_handle = static_cast<rac_handle_t>(impl);
+    rac_result_t feed_rc = rac_stt_sherpa_feed_audio(backend_handle, stream_handle,
+                                                     float_samples.data(), float_samples.size());
+    if (feed_rc != RAC_SUCCESS) return feed_rc;
+
+    // Pull partials out of the recognizer while it has enough buffered
+    // audio. Matches what the legacy transcribe_stream path did, but
+    // without discarding the online recognizer after each chunk.
+    while (rac_stt_sherpa_stream_is_ready(backend_handle, stream_handle) == RAC_TRUE) {
+        char* text = nullptr;
+        rac_result_t dec_rc = rac_stt_sherpa_decode_stream(backend_handle, stream_handle, &text);
+        if (dec_rc != RAC_SUCCESS) return dec_rc;
+
+        const bool endpoint = rac_stt_sherpa_is_endpoint(backend_handle, stream_handle) == RAC_TRUE;
+        if (callback && text) {
+            callback(text, endpoint ? RAC_TRUE : RAC_FALSE, user_data);
+        }
+        if (text) free(text);
+        if (!endpoint) break;  // emitted the final for this utterance, wait for more audio
+    }
+    return RAC_SUCCESS;
+}
+
+static rac_result_t sherpa_stt_vtable_stream_destroy(void* impl, rac_handle_t stream_handle) {
+    if (!impl || !stream_handle) return RAC_SUCCESS;
+    rac_stt_sherpa_destroy_stream(static_cast<rac_handle_t>(impl), stream_handle);
+    return RAC_SUCCESS;
+}
+
 }  // namespace (close anon — ops struct must have external linkage)
 
 // Keep external C linkage so rac_plugin_entry_sherpa.cpp can wire this ops table
@@ -177,6 +240,10 @@ extern "C" const rac_stt_service_ops_t g_sherpa_stt_ops = {
     .create = sherpa_stt_create_impl,
     .get_languages = sherpa_stt_vtable_get_languages,
     .detect_language = sherpa_stt_vtable_detect_language,
+    // CPP-14 (Wave 1): persistent per-session streaming recognizer.
+    .stream_create = sherpa_stt_vtable_stream_create,
+    .stream_feed_audio_chunk = sherpa_stt_vtable_stream_feed_audio_chunk,
+    .stream_destroy = sherpa_stt_vtable_stream_destroy,
 };
 
 namespace {  // reopen for the next batch of static helpers

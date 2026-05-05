@@ -82,6 +82,47 @@ typedef struct rac_stt_service_ops {
      */
     rac_result_t (*detect_language)(void* impl, const void* audio_data, size_t audio_size,
                                     const rac_stt_options_t* options, char** out_language);
+
+    // -------------------------------------------------------------------------
+    // CPP-14 (Wave 1): persistent per-session streaming handles.
+    //
+    // These three slots let the commons streaming dispatcher keep a stable
+    // backend recognizer handle alive across chunks. Sherpa-ONNX in
+    // particular MUST NOT re-initialize its online recognizer every frame —
+    // doing so discards the decoder state and inflates first-token latency.
+    //
+    // Backends that leave these slots NULL continue to receive per-chunk
+    // `transcribe_stream` calls (legacy path). Backends that fill them in
+    // get a stream_create on first chunk, N x stream_feed_audio_chunk, and
+    // a final stream_destroy on stop/cancel.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Allocate a backend-specific streaming session tied to @p impl. The
+     * returned @p out_stream_handle is opaque from commons' perspective and
+     * is plumbed back into stream_feed_audio_chunk / stream_destroy. @p
+     * options carries the resolved language / sample rate / timestamps /
+     * etc. captured at session start and may be NULL for backend defaults.
+     */
+    rac_result_t (*stream_create)(void* impl, const rac_stt_options_t* options,
+                                  rac_handle_t* out_stream_handle);
+
+    /**
+     * Feed one chunk of Int16 mono PCM samples into an active stream. @p
+     * samples is non-null when @p count > 0. Backends decode the chunk
+     * using their online recognizer and push partials / finals back to
+     * commons by invoking @p callback — exactly the same bridge signature
+     * the legacy transcribe_stream uses.
+     */
+    rac_result_t (*stream_feed_audio_chunk)(void* impl, rac_handle_t stream_handle,
+                                            const int16_t* samples, size_t count,
+                                            rac_stt_stream_callback_t callback, void* user_data);
+
+    /**
+     * Tear down a streaming session allocated by stream_create. Must be
+     * idempotent with respect to NULL @p stream_handle.
+     */
+    rac_result_t (*stream_destroy)(void* impl, rac_handle_t stream_handle);
 } rac_stt_service_ops_t;
 
 /**

@@ -67,6 +67,13 @@ struct StreamSession {
     int32_t      max_speakers = 0;
     bool         enable_timestamps = true;
     bool         detect_language = false;
+    // CPP-14: per-session backend recognizer handle. Lazily created on the
+    // first accepted audio chunk via the new stream_create vtable slot.
+    // Backends that don't implement the slot leave this nullptr and
+    // rac_stt_stream_feed_audio_proto falls back to the legacy per-chunk
+    // transcribe_stream path.
+    rac_handle_t backend_stream_handle = nullptr;
+    bool         backend_stream_unsupported = false;
 };
 
 std::mutex& g_mu() { static std::mutex m; return m; }
@@ -241,6 +248,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t       session_id,
     bool         enable_timestamps  = true;
     int32_t      sample_rate        = RAC_STT_DEFAULT_SAMPLE_RATE;
     rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
+    rac_handle_t backend_stream_handle = nullptr;
+    bool         backend_stream_unsupported = false;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
@@ -257,6 +266,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t       session_id,
         enable_timestamps  = it->second.enable_timestamps;
         sample_rate        = it->second.sample_rate;
         audio_format       = it->second.audio_format;
+        backend_stream_handle      = it->second.backend_stream_handle;
+        backend_stream_unsupported = it->second.backend_stream_unsupported;
     }
     if (component_handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
@@ -276,6 +287,105 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t       session_id,
     options.enable_timestamps  = enable_timestamps ? RAC_TRUE : RAC_FALSE;
     options.sample_rate        = sample_rate;
     options.audio_format       = audio_format;
+
+    // CPP-14: try the persistent-handle path first. Backends that advertise
+    // stream_create + stream_feed_audio_chunk keep their recognizer state
+    // alive for the whole session. On first chunk we lazily spin up the
+    // backend stream; subsequent chunks reuse the handle until the session
+    // is stopped or cancelled.
+    if (!backend_stream_unsupported) {
+        if (backend_stream_handle == nullptr) {
+            rac_handle_t new_stream = nullptr;
+            rac_result_t create_rc =
+                rac_stt_component_stream_create(component_handle, &options, &new_stream);
+            if (create_rc == RAC_SUCCESS && new_stream != nullptr) {
+                std::lock_guard<std::mutex> lock(g_mu());
+                auto it = g_sessions().find(session_id);
+                if (it == g_sessions().end() ||
+                    it->second.is_cancelled.load(std::memory_order_relaxed)) {
+                    // Session torn down while we were creating — drop the
+                    // freshly-allocated backend handle so we don't leak.
+                    (void)rac_stt_component_stream_destroy(component_handle, new_stream);
+                    return RAC_ERROR_INVALID_ARGUMENT;
+                }
+                // Another concurrent feed may have raced us; keep the
+                // first-in-wins handle and destroy ours if so.
+                if (it->second.backend_stream_handle != nullptr) {
+                    (void)rac_stt_component_stream_destroy(component_handle, new_stream);
+                    backend_stream_handle = it->second.backend_stream_handle;
+                } else {
+                    it->second.backend_stream_handle = new_stream;
+                    backend_stream_handle = new_stream;
+                }
+            } else if (create_rc == RAC_ERROR_NOT_SUPPORTED) {
+                // Backend didn't wire the new slot — remember so subsequent
+                // chunks skip the create probe and take the legacy path
+                // straight away.
+                std::lock_guard<std::mutex> lock(g_mu());
+                auto it = g_sessions().find(session_id);
+                if (it != g_sessions().end()) {
+                    it->second.backend_stream_unsupported = true;
+                }
+                backend_stream_unsupported = true;
+            } else {
+                rac::stt::dispatch_stt_stream_event(
+                    component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                    /*partial=*/nullptr, /*final_output=*/nullptr,
+                    "STT streaming start failed", create_rc);
+                return create_rc;
+            }
+        }
+
+        if (backend_stream_handle != nullptr) {
+            // audio_size is in bytes; convert to Int16 sample count. We
+            // assume Int16 PCM mono — matches rac_audio_format_enum_t /
+            // RAC_AUDIO_FORMAT_PCM which every current STT backend expects.
+            const int16_t* samples = reinterpret_cast<const int16_t*>(audio_bytes);
+            const size_t   count   = audio_size / sizeof(int16_t);
+
+            struct BridgeCtxStream {
+                rac_handle_t handle;
+                runanywhere::v1::STTLanguage language;
+            } ctx{component_handle, stt_language_from_code(options.language)};
+
+            auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
+                auto* c = static_cast<BridgeCtxStream*>(opaque);
+                runanywhere::v1::STTPartialResult partial;
+                if (partial_text) partial.set_text(partial_text);
+                partial.set_is_final(is_final == RAC_TRUE);
+                partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
+                partial.set_language(c->language);
+                if (is_final == RAC_TRUE) {
+                    runanywhere::v1::STTOutput final_output;
+                    if (partial_text) final_output.set_text(partial_text);
+                    final_output.set_language(c->language);
+                    rac::stt::dispatch_stt_stream_event(
+                        c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial,
+                        &final_output, /*error_message=*/nullptr, /*error_code=*/0);
+                } else {
+                    rac::stt::dispatch_stt_stream_event(
+                        c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
+                        /*final_output=*/nullptr, /*error_message=*/nullptr,
+                        /*error_code=*/0);
+                }
+            };
+
+            rac_result_t feed_rc = rac_stt_component_stream_feed_audio_chunk(
+                component_handle, backend_stream_handle, samples, count, bridge, &ctx);
+            if (feed_rc != RAC_SUCCESS) {
+                rac::stt::dispatch_stt_stream_event(
+                    component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                    /*partial=*/nullptr, /*final_output=*/nullptr,
+                    "STT streaming chunk failed", feed_rc);
+            }
+            return feed_rc;
+        }
+    }
+
+    // Legacy fallback: backend doesn't expose per-session streams. Forward
+    // the chunk through the existing transcribe_stream path; Sherpa will
+    // pay the per-chunk init cost here (CPP-14 pre-fix behavior) for
+    // backends that haven't migrated yet.
 
     // Bridge struct: forwards per-chunk transcribe_stream callbacks to the
     // proto-byte dispatch. We capture the language code by value so the
@@ -334,20 +444,45 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t       session_id,
 
 rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
     if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lock(g_mu());
-    auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
-    g_sessions().erase(it);
+
+    // Detach the session's backend handle under the lock, then destroy it
+    // outside of g_mu() to avoid holding the lock across a backend cleanup
+    // path that may re-enter commons.
+    rac_handle_t component_handle = nullptr;
+    rac_handle_t backend_stream_handle = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
+        component_handle      = it->second.handle;
+        backend_stream_handle = it->second.backend_stream_handle;
+        it->second.backend_stream_handle = nullptr;
+        g_sessions().erase(it);
+    }
+    if (component_handle && backend_stream_handle) {
+        (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
+    }
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {
     if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lock(g_mu());
-    auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
-    it->second.is_cancelled.store(true, std::memory_order_relaxed);
-    g_sessions().erase(it);
+
+    rac_handle_t component_handle = nullptr;
+    rac_handle_t backend_stream_handle = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
+        it->second.is_cancelled.store(true, std::memory_order_relaxed);
+        component_handle      = it->second.handle;
+        backend_stream_handle = it->second.backend_stream_handle;
+        it->second.backend_stream_handle = nullptr;
+        g_sessions().erase(it);
+    }
+    if (component_handle && backend_stream_handle) {
+        (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
+    }
     return RAC_SUCCESS;
 }
 

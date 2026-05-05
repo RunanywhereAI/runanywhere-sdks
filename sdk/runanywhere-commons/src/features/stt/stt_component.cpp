@@ -1080,3 +1080,82 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
     return rc;
 #endif
 }
+
+// =============================================================================
+// CPP-14 (Wave 1): persistent per-session streaming handles.
+//
+// Route straight through the service vtable. When a backend leaves the
+// stream_* slots NULL, these helpers report RAC_ERROR_NOT_SUPPORTED and
+// rac_stt_stream.cpp falls back to the per-chunk transcribe_stream path.
+// =============================================================================
+
+extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
+                                                        const rac_stt_options_t* options,
+                                                        rac_handle_t* out_stream_handle) {
+    if (!handle || !out_stream_handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    *out_stream_handle = nullptr;
+
+    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service_handle = nullptr;
+    rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service_handle);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    auto* service = static_cast<rac_stt_service_t*>(service_handle);
+    if (!service || !service->ops || !service->ops->stream_create) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    const rac_stt_options_t* effective = options ? options : &component->default_options;
+    return service->ops->stream_create(service->impl, effective, out_stream_handle);
+}
+
+extern "C" rac_result_t rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle,
+                                                                   rac_handle_t stream_handle,
+                                                                   const int16_t* samples,
+                                                                   size_t count,
+                                                                   rac_stt_stream_callback_t callback,
+                                                                   void* user_data) {
+    if (!handle) return RAC_ERROR_INVALID_HANDLE;
+    if (count > 0 && !samples) return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service_handle = nullptr;
+    rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service_handle);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    auto* service = static_cast<rac_stt_service_t*>(service_handle);
+    if (!service || !service->ops || !service->ops->stream_feed_audio_chunk) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    return service->ops->stream_feed_audio_chunk(service->impl, stream_handle, samples, count,
+                                                 callback, user_data);
+}
+
+extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
+                                                         rac_handle_t stream_handle) {
+    if (!handle) return RAC_ERROR_INVALID_HANDLE;
+    if (!stream_handle) return RAC_SUCCESS;
+
+    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service_handle = nullptr;
+    rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service_handle);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    auto* service = static_cast<rac_stt_service_t*>(service_handle);
+    if (!service || !service->ops || !service->ops->stream_destroy) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    return service->ops->stream_destroy(service->impl, stream_handle);
+}

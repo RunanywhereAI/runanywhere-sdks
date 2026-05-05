@@ -237,6 +237,65 @@ RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     rac_stt_proto_stream_event_callback_fn callback,
     void* user_data);
 
+// =============================================================================
+// CPP-14 (Wave 1): persistent per-session streaming handles.
+//
+// Commons exposes these thin wrappers so `rac_stt_stream.cpp` can reach the
+// backend vtable without hard-coding knowledge of the service struct layout.
+// Each returns RAC_ERROR_NOT_SUPPORTED if the loaded backend does not
+// implement the matching vtable slot; the commons stream dispatcher then
+// falls back to the per-chunk transcribe_stream path.
+// =============================================================================
+
+/**
+ * @brief Allocate a backend-specific streaming session bound to the loaded STT model.
+ *
+ * @param handle            STT component handle.
+ * @param options           Transcription options (may be NULL for backend defaults).
+ * @param out_stream_handle Output: opaque backend stream handle; NULL on failure.
+ *
+ * @retval RAC_SUCCESS               Session created.
+ * @retval RAC_ERROR_NOT_INITIALIZED No model is loaded.
+ * @retval RAC_ERROR_NOT_SUPPORTED   Backend does not advertise per-session streams.
+ */
+RAC_API rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
+                                                     const rac_stt_options_t* options,
+                                                     rac_handle_t* out_stream_handle);
+
+/**
+ * @brief Feed one chunk of Int16 mono PCM samples into an active backend stream.
+ *
+ * Partials / finals produced by the backend are pushed to @p callback
+ * synchronously during the call. @p callback uses the same
+ * rac_stt_stream_callback_t signature the legacy transcribe_stream path
+ * exposes so commons can route both through the same bridge.
+ *
+ * @param handle        STT component handle.
+ * @param stream_handle Stream handle returned by rac_stt_component_stream_create.
+ * @param samples       Int16 mono PCM samples (non-null when count > 0).
+ * @param count         Number of samples at @p samples.
+ * @param callback      Partial / final emission callback.
+ * @param user_data     Opaque pointer forwarded to @p callback.
+ *
+ * @retval RAC_SUCCESS             Chunk accepted.
+ * @retval RAC_ERROR_NOT_SUPPORTED Backend does not advertise per-session streams.
+ */
+RAC_API rac_result_t rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle,
+                                                               rac_handle_t stream_handle,
+                                                               const int16_t* samples,
+                                                               size_t count,
+                                                               rac_stt_stream_callback_t callback,
+                                                               void* user_data);
+
+/**
+ * @brief Destroy a backend-specific streaming session.
+ *
+ * Safe to call with @p stream_handle == NULL (no-op). Backends that don't
+ * implement the stream_destroy slot return RAC_ERROR_NOT_SUPPORTED.
+ */
+RAC_API rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
+                                                      rac_handle_t stream_handle);
+
 #ifdef __cplusplus
 }
 #endif
