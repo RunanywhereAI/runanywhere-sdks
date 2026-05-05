@@ -34,11 +34,7 @@ Backend health: llamacpp (healthy, 5 gaps already resolved — 01/02/05/06/07), 
 
 (DUP-03 resolved in Wave 2a: `RAC_DEFINE_CREATE_ADAPTER(primitive, name)` landed in `sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h`. Sherpa STT / TTS / VAD `*_create_impl` scaffolds collapsed to a single macro invocation each — net -32 LOC in `engines/sherpa/rac_backend_sherpa_register.cpp`. Llamacpp LLM `create_impl` intentionally NOT migrated: its 45-line body wraps `LlamaCppRuntimeImpl` around the CPU-runtime session path and cannot be expressed as a 7-line forward. Onnx embeddings `create_impl` also NOT migrated: wraps the create in try/catch + std::make_unique + is_ready()-after-init check. Both remain hand-written by design. Follow-up opportunity — DUP-03B — if and when whispercpp / whisperkit_coreml come off Iteration-I hold, their minimal STT `create_impl` scaffolds are direct candidates for the same macro.)
 
-### DUP-05: Stream-callback adapter struct is copy-pasted inside llamacpp
-- `engines/llamacpp/rac_backend_llamacpp_register.cpp:160-172` `StreamAdapter`
-- `engines/llamacpp/rac_backend_llamacpp_vlm_register.cpp:46-58` `VLMStreamAdapter`
-
-Same `{callback, user_data}` bridge, written twice inside the same engine. Factor into a shared `rac/plugin/rac_stream_adapter.h`.
+(DUP-05 resolved in Wave 2a: shared template `rac::plugin::StreamAdapter<CallbackT>` landed at `sdk/runanywhere-commons/include/rac/plugin/rac_stream_adapter.h`. Both llamacpp TUs now `using StreamAdapter = rac::plugin::StreamAdapter<rac_llm_stream_callback_fn>;` / `using VLMStreamAdapter = rac::plugin::StreamAdapter<rac_vlm_stream_callback_fn>;`. Duplicate struct definitions deleted from `engines/llamacpp/rac_backend_llamacpp_register.cpp` and `engines/llamacpp/rac_backend_llamacpp_vlm_register.cpp`. Both TUs recompile clean under `cmake --build build/macos-debug --target rac_backend_llamacpp`; the pre-existing ggml-metal link errors are unrelated. The per-primitive C trampoline (`stream_adapter_callback` / `vlm_stream_adapter_callback`) was intentionally NOT collapsed since each still needs to discard its own `is_final` arg and cast to its specialization — the win is the removed struct body, not the 6-line trampoline.)
 
 ### DUP-06: `rac_event_track("*.backend.created", ...)` sprinkled inconsistently
 - llamacpp: emitted in `rac_llm_llamacpp_create` (`rac_llm_llamacpp.cpp:114`)

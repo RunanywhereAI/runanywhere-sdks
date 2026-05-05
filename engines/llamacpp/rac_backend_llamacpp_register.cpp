@@ -24,6 +24,7 @@
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
+#include "rac/plugin/rac_stream_adapter.h"
 
 static const char* LOG_CAT = "LlamaCPP";
 
@@ -158,11 +159,9 @@ static rac_result_t llamacpp_vtable_generate(void* impl, const char* prompt,
     return runtime_impl->runtime->run_session(runtime_impl->runtime_session, inputs, n_in, &output, 1);
 }
 
-// Streaming callback adapter
-struct StreamAdapter {
-    rac_llm_stream_callback_fn callback;
-    void* user_data;
-};
+// Streaming callback adapter (shared {callback, user_data} bridge; see
+// rac/plugin/rac_stream_adapter.h).
+using StreamAdapter = rac::plugin::StreamAdapter<rac_llm_stream_callback_fn>;
 
 static rac_bool_t stream_adapter_callback(const char* token, rac_bool_t is_final, void* ctx) {
     auto* adapter = static_cast<StreamAdapter*>(ctx);

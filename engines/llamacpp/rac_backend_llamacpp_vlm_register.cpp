@@ -19,6 +19,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_stream_adapter.h"
 
 static const char* LOG_CAT = "VLM.LlamaCPP";
 
@@ -42,11 +43,9 @@ static rac_result_t llamacpp_vlm_vtable_process(void* impl, const rac_vlm_image_
     return rac_vlm_llamacpp_process(impl, image, prompt, options, out_result);
 }
 
-// Streaming callback adapter
-struct VLMStreamAdapter {
-    rac_vlm_stream_callback_fn callback;
-    void* user_data;
-};
+// Streaming callback adapter (shared {callback, user_data} bridge; see
+// rac/plugin/rac_stream_adapter.h).
+using VLMStreamAdapter = rac::plugin::StreamAdapter<rac_vlm_stream_callback_fn>;
 
 static rac_bool_t vlm_stream_adapter_callback(const char* token, rac_bool_t is_final, void* ctx) {
     auto* adapter = static_cast<VLMStreamAdapter*>(ctx);
