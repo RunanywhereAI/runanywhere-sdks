@@ -795,15 +795,15 @@ if(ANDROID)
 endif()
 
 # Apple: wire the curated export list (exports/RACommons.exports) into the
-# linker so the xcframework shipped via SPM only exposes the ~453 curated
-# _rac_* symbols. Matters for App Store symbol analysis; Android keeps the
-# default-visibility workaround above until RAC_API annotations are complete
-# (TODO v0.21 / B19). Note: target_link_options only takes effect when the
-# target is linked as a dynamic library — static-archive builds ignore it,
-# which is fine because symbol visibility only matters at final link time.
-# Wave D-1 (2026-05-04): audit restored ~301 SDK-called RAC_API symbols that
-# had been trimmed out of the list (150 → 453). See exports/RACommons.exports
-# header and gaps/gaps/inconsistencies/cpp-layer.md § CPP-EXPORTS-MISSING-SYMBOLS.
+# linker so the xcframework shipped via SPM only exposes the 465 curated
+# _rac_* symbols currently called by the 5 SDKs (Swift / Kotlin / Flutter /
+# React Native / Web). Matters for App Store symbol analysis; Android keeps
+# the default-visibility workaround above until RAC_API annotations are
+# complete (TODO v0.21 / B19). Note: target_link_options only takes effect
+# when the target is linked as a dynamic library — static-archive builds
+# ignore it, which is fine because symbol visibility only matters at final
+# link time. Use scripts/validation/check_rac_api_exports.sh to verify the
+# list stays in sync; update the count here when it changes materially.
 if(APPLE)
     set_target_properties(rac_commons PROPERTIES
         XCODE_ATTRIBUTE_EXPORTED_SYMBOLS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")

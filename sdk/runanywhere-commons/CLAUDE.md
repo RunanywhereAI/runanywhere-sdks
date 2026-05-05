@@ -255,7 +255,7 @@ All versions centralized in `VERSIONS` file. Consumed three ways:
 
 ## Symbol Visibility
 
-- **Apple**: `exports/RACommons.exports` lists ~484 curated `_rac_*` symbols; applied via `-exported_symbols_list`
+- **Apple**: `exports/RACommons.exports` lists 465 curated `_rac_*` symbols; applied via `-exported_symbols_list`
 - **Android**: Currently `-fvisibility=default` (all symbols exported) as workaround; TODO(v0.21) to annotate all public functions with `RAC_API`
 - **Shared builds**: Global `-fvisibility=hidden` + `RAC_API` attribute (`__attribute__((visibility("default")))` / `__declspec(dllexport)`) on public C functions
 
