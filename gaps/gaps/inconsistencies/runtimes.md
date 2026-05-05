@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-02 + RT-ONNX-03 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -91,14 +91,6 @@ Every engine that wants to use onnxrt has to call into the runtime's public
 `rac_runtime_onnxrt.h:67` or by re-discovering the singleton through
 `rac_runtime_get_by_id(RAC_RUNTIME_ONNXRT)`. This asymmetry means engines can
 plug into CPU primitive-by-primitive but have to treat onnxrt monolithically.
-
-#### RT-ONNX-07: `SharedOrt::mutex` serializes session creation globally
-
-`SharedOrt` (`rac_runtime_onnxrt.cpp:21-54`) guards `CreateSession` with a
-global mutex at `rac_runtime_onnxrt.cpp:150-158`. This is fine for correctness
-but means concurrent model loads — e.g. Whisper + embedding warm-up at the
-same time during engine bring-up — serialize across the whole process, even
-for independent models. Comparable runtimes load in parallel.
 
 ## Cross-runtime duplication (CPU + ONNXRT scope)
 

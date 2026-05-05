@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <mutex>
 #include <new>
 
 #include "core/internal/platform_compat.h"
@@ -19,11 +18,18 @@ namespace runtime {
 namespace onnxrt {
 namespace {
 
+/* RT-ONNX-07: `SharedOrt` no longer carries a mutex. Initialization of the
+ * singleton is already thread-safe via C++11 magic statics (`shared_ort()`
+ * below), and `OrtApi::CreateSession` is documented to be callable concurrently
+ * from multiple threads against the same `OrtEnv` (each call gets its own
+ * `OrtSession*` out-parameter and a locally-constructed `OrtSessionOptions`).
+ * Previously we held a global mutex around `CreateSession`, which forced every
+ * model load in the process to serialize — e.g. Whisper + embedding warm-up at
+ * engine bring-up could not overlap even though the two loads share no state. */
 struct SharedOrt {
     const OrtApiBase* api_base = nullptr;
     const OrtApi* api = nullptr;
     OrtEnv* env = nullptr;
-    std::mutex mutex;
     std::string init_error;
 
     SharedOrt() {
@@ -50,7 +56,7 @@ struct SharedOrt {
 };
 
 SharedOrt& shared_ort() {
-    static SharedOrt ort;
+    static SharedOrt ort;  // Thread-safe one-time init (C++11 magic static).
     return ort;
 }
 
@@ -189,16 +195,19 @@ std::unique_ptr<Session> Session::create(const std::string& model_path,
         }
     }
 
+    /* RT-ONNX-07: `CreateSession` is called without any global lock. ORT's
+     * contract is that `CreateSession` may run concurrently from multiple
+     * threads against a single `OrtEnv` as long as each call supplies a
+     * distinct `OrtSessionOptions` + `OrtSession**`, which is the case here
+     * (both are created on the stack of this call). The `shared_ort()` magic
+     * static takes care of one-time `OrtEnv` creation. */
     OrtSession* raw_session = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(ort.mutex);
 #ifdef _WIN32
-        std::wstring wpath = rac_to_wstring(model_path);
-        status = ort.api->CreateSession(ort.env, wpath.c_str(), session_options, &raw_session);
+    std::wstring wpath = rac_to_wstring(model_path);
+    status = ort.api->CreateSession(ort.env, wpath.c_str(), session_options, &raw_session);
 #else
-        status = ort.api->CreateSession(ort.env, model_path.c_str(), session_options, &raw_session);
+    status = ort.api->CreateSession(ort.env, model_path.c_str(), session_options, &raw_session);
 #endif
-    }
     release_options();
 
     if (status != nullptr) {
