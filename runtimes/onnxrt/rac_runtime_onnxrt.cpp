@@ -5,11 +5,14 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <new>
+#include <vector>
 
 #include "core/internal/platform_compat.h"
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_model_format_ids.h"
+#include "rac/plugin/rac_onnxrt_runtime_provider.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/runtime/rac_runtime_helpers.h"
 
@@ -124,18 +127,15 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_ONNX,
     RAC_MODEL_FORMAT_ID_ORT,
 };
-/* RT-ONNX-05: the onnxrt adapter is a generic ORT tensor runner —
+/* RT-ONNX-05: the onnxrt adapter ships with a generic ORT tensor runner —
  * `onnxrt_run_session` dispatches `OrtSession::Run` without primitive-aware
- * pre/post processing. The only wired consumer today is the onnx embedding
- * provider (engines/onnx, manifest at rac_plugin_entry_onnx.cpp). STT / TTS /
- * VAD primitives advertised here previously were aspirational: a router that
- * picked onnxrt for TRANSCRIBE would still need engine-side feature extraction
- * and token decoding, which this adapter does not provide.
- *
- * RT-ONNX-06 will introduce an `rac_onnxrt_runtime_register_provider` surface
- * parallel to CPU's; once that lands, this list should be rebuilt dynamically
- * from the registered providers (mirroring `cpu_capabilities`). Until then,
- * advertise only the primitive actually serviced end-to-end. */
+ * pre/post processing. The always-on wired consumer is the onnx embedding
+ * provider (engines/onnx, manifest at rac_plugin_entry_onnx.cpp). Engines
+ * that want primitive-aware handling (feature extraction, token decoding,
+ * etc.) can register providers via `rac_onnxrt_runtime_register_provider`
+ * (RT-ONNX-06) — `onnxrt_capabilities` then rebuilds the primitive list
+ * dynamically from the static seed below plus the live provider set,
+ * mirroring `cpu_capabilities`. */
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_EMBED,
 };
@@ -397,8 +397,19 @@ using runanywhere::runtime::onnxrt::k_supported_devices;
 using runanywhere::runtime::onnxrt::k_supported_formats;
 using runanywhere::runtime::onnxrt::k_supported_primitives;
 
+/* RT-ONNX-06: session handle now supports two shapes. Sessions created by the
+ * built-in generic tensor runner own a `runanywhere::runtime::onnxrt::Session`
+ * directly. Sessions created via a registered provider carry a provider-owned
+ * session handle plus a copy of the provider vtable so dispatch / destroy can
+ * round-trip without re-consulting the provider registry. Exactly one of the
+ * two shapes is populated per session. */
 struct rac_runtime_session {
     std::unique_ptr<runanywhere::runtime::onnxrt::Session> session;
+
+    /* Provider path — NULL when this session was created by the generic path. */
+    rac_onnxrt_runtime_provider_t provider{};
+    rac_runtime_session_t* provider_session = nullptr;
+    bool is_provider_session = false;
 };
 
 struct rac_runtime_buffer {
@@ -407,6 +418,52 @@ struct rac_runtime_buffer {
 };
 
 namespace {
+
+/* --------------------------------------------------------------------------
+ * Provider registry (RT-ONNX-06). Mirrors the CPU provider surface so engines
+ * can plug in per-primitive handlers (embedding, STT, TTS, VAD) rather than
+ * rediscovering the onnxrt singleton. Keyed by provider `name`; lookup matches
+ * on `(primitive, model_format)`.
+ * -------------------------------------------------------------------------- */
+
+std::mutex& onnxrt_provider_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+std::vector<rac_onnxrt_runtime_provider_t>& onnxrt_providers() {
+    static std::vector<rac_onnxrt_runtime_provider_t> entries;
+    return entries;
+}
+
+bool onnxrt_primitive_is_in_range(rac_primitive_t primitive) {
+    return primitive > RAC_PRIMITIVE_UNSPECIFIED &&
+           primitive <  RAC_PRIMITIVE_COUNT;
+}
+
+bool onnxrt_provider_supports_format(const rac_onnxrt_runtime_provider_t& provider,
+                                     uint32_t model_format) {
+    if (provider.formats == nullptr || provider.formats_count == 0 || model_format == 0) {
+        return true;
+    }
+    for (size_t i = 0; i < provider.formats_count; ++i) {
+        if (provider.formats[i] == model_format) return true;
+    }
+    return false;
+}
+
+bool onnxrt_find_provider(const rac_runtime_session_desc_t* desc,
+                          rac_onnxrt_runtime_provider_t* out_provider) {
+    std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
+    for (const auto& provider : onnxrt_providers()) {
+        if (provider.primitive == desc->primitive &&
+            onnxrt_provider_supports_format(provider, desc->model_format)) {
+            *out_provider = provider;
+            return true;
+        }
+    }
+    return false;
+}
 
 rac_result_t onnxrt_init(void) {
     const OrtApiBase* base = OrtGetApiBase();
@@ -423,6 +480,33 @@ rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t* desc,
     if (!desc || !out) return RAC_ERROR_NULL_POINTER;
     if (!desc->model_path) return RAC_ERROR_INVALID_PARAMETER;
     *out = nullptr;
+
+    /* RT-ONNX-06: if a provider is registered for this primitive + format,
+     * delegate session construction to it. Providers own their native session
+     * state (e.g. tokenizer + ORT session pair for embeddings) and return a
+     * handle we wrap in a provider-flavored `rac_runtime_session`. Generic
+     * "bare tensor runner" callers fall through to the default path below. */
+    rac_onnxrt_runtime_provider_t provider{};
+    if (onnxrt_find_provider(desc, &provider) && provider.create_session != nullptr) {
+        rac_runtime_session_t* provider_session = nullptr;
+        rac_result_t rc = provider.create_session(desc, &provider_session);
+        if (rc != RAC_SUCCESS) return rc;
+        if (provider_session == nullptr) return RAC_ERROR_INVALID_HANDLE;
+
+        auto* handle = new (std::nothrow) rac_runtime_session();
+        if (!handle) {
+            if (provider.destroy_session != nullptr) {
+                provider.destroy_session(provider_session);
+            }
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        handle->provider = provider;
+        handle->provider_session = provider_session;
+        handle->is_provider_session = true;
+        *out = handle;
+        return RAC_SUCCESS;
+    }
+
     std::string error;
     runanywhere::runtime::onnxrt::SessionOptions options{};
     auto session = runanywhere::runtime::onnxrt::Session::create(desc->model_path, options, &error);
@@ -443,6 +527,16 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session,
                                 rac_runtime_io_t* outputs,
                                 size_t output_count) {
     if (!session || !inputs || !outputs) return RAC_ERROR_NULL_POINTER;
+
+    /* RT-ONNX-06: route through the registered provider when this session was
+     * created by one. Generic-path sessions fall through to the inline tensor
+     * runner below. */
+    if (session->is_provider_session) {
+        if (session->provider.run_session == nullptr) return RAC_ERROR_NOT_IMPLEMENTED;
+        return session->provider.run_session(
+            session->provider_session, inputs, input_count, outputs, output_count);
+    }
+
     std::vector<runanywhere::runtime::onnxrt::TensorInput> runtime_inputs;
     std::vector<const char*> output_names;
     runtime_inputs.reserve(input_count);
@@ -508,6 +602,16 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session,
 }
 
 void onnxrt_destroy_session(rac_runtime_session_t* session) {
+    if (!session) return;
+    /* RT-ONNX-06: forward destroy to the provider for provider-owned sessions.
+     * Generic-path sessions carry a `Session` unique_ptr that cleans up via
+     * the defaulted struct destructor. */
+    if (session->is_provider_session) {
+        if (session->provider.destroy_session != nullptr &&
+            session->provider_session != nullptr) {
+            session->provider.destroy_session(session->provider_session);
+        }
+    }
     delete session;
 }
 
@@ -542,6 +646,20 @@ rac_result_t onnxrt_run_session_v2(rac_runtime_session_t* session,
     if (!session) return RAC_ERROR_INVALID_HANDLE;
     if (n_in > 0 && !inputs) return RAC_ERROR_NULL_POINTER;
     if (n_out > 0 && !outputs) return RAC_ERROR_NULL_POINTER;
+
+    /* RT-ONNX-06: provider-owned sessions forward V2 directly when the
+     * provider implements `run_session_v2`; otherwise return NOT_IMPLEMENTED
+     * so callers can fall back to legacy `run_session`. V2 cannot shim
+     * through V1 for provider sessions because the generic-path marshalling
+     * below only knows how to drive `Session::run` of the built-in
+     * `runanywhere::runtime::onnxrt::Session`. */
+    if (session->is_provider_session) {
+        if (session->provider.run_session_v2 == nullptr) {
+            return RAC_ERROR_NOT_IMPLEMENTED;
+        }
+        return session->provider.run_session_v2(
+            session->provider_session, inputs, n_in, outputs, n_out);
+    }
 
     using runanywhere::runtime::onnxrt::ElementType;
     using runanywhere::runtime::onnxrt::TensorInput;
@@ -772,6 +890,14 @@ rac_result_t onnxrt_device_info(rac_runtime_device_info_t* out) {
     return RAC_SUCCESS;
 }
 
+/* Snapshot storage for the dynamic primitive list published by
+ * `onnxrt_capabilities`. Thread-local so concurrent callers from different
+ * threads each get a stable snapshot whose lifetime extends until the next
+ * `onnxrt_capabilities` call on the same thread. Fixed-size array sized to
+ * the full primitive enum — no allocation on the capability hot path. */
+thread_local rac_primitive_t tl_onnxrt_primitive_snapshot[RAC_PRIMITIVE_COUNT];
+thread_local size_t          tl_onnxrt_primitive_snapshot_count = 0;
+
 rac_result_t onnxrt_capabilities(rac_runtime_capabilities_t* out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
@@ -784,9 +910,37 @@ rac_result_t onnxrt_capabilities(rac_runtime_capabilities_t* out) {
         RAC_RUNTIME_CAP_OWNED_OUTPUTS;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
-    out->supported_primitives = k_supported_primitives;
-    out->supported_primitives_count =
-        sizeof(k_supported_primitives) / sizeof(k_supported_primitives[0]);
+
+    /* RT-ONNX-06: rebuild the primitive list from the static "generic tensor
+     * runner" surface (`k_supported_primitives`, currently just EMBED) plus
+     * whichever primitives have at least one registered provider. Order is
+     * stable (primitive enum value ascending) so callers that cache the list
+     * see consistent results across calls. Mirrors `cpu_capabilities`. */
+    bool seen[RAC_PRIMITIVE_COUNT] = {false};
+    for (rac_primitive_t p : k_supported_primitives) {
+        if (onnxrt_primitive_is_in_range(p)) {
+            seen[static_cast<size_t>(p)] = true;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
+        for (const auto& provider : onnxrt_providers()) {
+            if (onnxrt_primitive_is_in_range(provider.primitive)) {
+                seen[static_cast<size_t>(provider.primitive)] = true;
+            }
+        }
+    }
+
+    size_t count = 0;
+    for (size_t i = 1; i < RAC_PRIMITIVE_COUNT; ++i) {
+        if (seen[i]) {
+            tl_onnxrt_primitive_snapshot[count++] = static_cast<rac_primitive_t>(i);
+        }
+    }
+    tl_onnxrt_primitive_snapshot_count = count;
+    out->supported_primitives =
+        count > 0 ? tl_onnxrt_primitive_snapshot : nullptr;
+    out->supported_primitives_count = count;
     return RAC_SUCCESS;
 }
 
@@ -858,6 +1012,71 @@ const rac_runtime_vtable_t* runtime_vtable() {
 
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_onnxrt(void) {
     return &k_onnxrt_vtable;
+}
+
+/* RT-ONNX-06: provider registration surface, symmetric to CPU's
+ * `rac_cpu_runtime_register_provider`. Providers are stored by value and
+ * looked up by name for replacement / unregistration. Dispatch happens
+ * transparently inside `onnxrt_create_session` so existing consumers of the
+ * generic tensor runner keep working unchanged. */
+extern "C" RAC_API rac_result_t rac_onnxrt_runtime_register_provider(
+    const rac_onnxrt_runtime_provider_t* provider) {
+    if (provider == nullptr || provider->name == nullptr ||
+        provider->create_session == nullptr || provider->run_session == nullptr ||
+        provider->destroy_session == nullptr) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (!onnxrt_primitive_is_in_range(provider->primitive)) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
+    auto& entries = onnxrt_providers();
+    auto it = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.name != nullptr && std::strcmp(entry.name, provider->name) == 0;
+    });
+    try {
+        if (it != entries.end()) {
+            *it = *provider;
+        } else {
+            entries.push_back(*provider);
+        }
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
+}
+
+extern "C" RAC_API void rac_onnxrt_runtime_unregister_provider(const char* name) {
+    if (name == nullptr) return;
+    std::lock_guard<std::mutex> lock(onnxrt_provider_mutex());
+    auto& entries = onnxrt_providers();
+    entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.name != nullptr && std::strcmp(entry.name, name) == 0;
+    }), entries.end());
+}
+
+extern "C" RAC_API rac_result_t rac_onnxrt_runtime_get_provider_session(
+    rac_runtime_session_t* session,
+    const char** out_provider_name,
+    rac_runtime_session_t** out_provider_session) {
+    if (out_provider_session == nullptr) return RAC_ERROR_NULL_POINTER;
+    *out_provider_session = nullptr;
+    if (out_provider_name) *out_provider_name = nullptr;
+
+    if (session == nullptr) return RAC_ERROR_INVALID_HANDLE;
+
+    if (session->is_provider_session) {
+        if (out_provider_name) *out_provider_name = session->provider.name;
+        *out_provider_session = session->provider_session;
+        return RAC_SUCCESS;
+    }
+
+    /* Generic-path session — no provider is involved. Return the same session
+     * handle as the "provider session" so callers can treat the path
+     * uniformly, with NULL provider_name as the signal. */
+    *out_provider_session = session;
+    return RAC_SUCCESS;
 }
 
 RAC_STATIC_RUNTIME_REGISTER(onnxrt);

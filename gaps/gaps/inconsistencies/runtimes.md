@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-06 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -73,15 +73,6 @@ though on Android / macOS / Windows the underlying ORT build could run it
 that way. Also, `SessionOptions` at `rac_runtime_onnxrt.h:35-39` has no knobs
 for selecting an EP — `Session::create` hard-codes CPU-only behavior by never
 calling `SessionOptionsAppendExecutionProvider_*`.
-
-#### RT-ONNX-06: No provider-registration surface
-
-Unlike CPU, onnxrt has no `rac_onnxrt_runtime_register_provider` equivalent.
-Every engine that wants to use onnxrt has to call into the runtime's public
-`Session::create` / `Session::run` via the `runtime_vtable()` accessor at
-`rac_runtime_onnxrt.h:67` or by re-discovering the singleton through
-`rac_runtime_get_by_id(RAC_RUNTIME_ONNXRT)`. This asymmetry means engines can
-plug into CPU primitive-by-primitive but have to treat onnxrt monolithically.
 
 ## Cross-runtime duplication (CPU + ONNXRT scope)
 
