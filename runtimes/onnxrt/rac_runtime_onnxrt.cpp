@@ -517,6 +517,172 @@ void onnxrt_free_buffer(rac_runtime_buffer_t* buffer) {
     delete buffer;
 }
 
+/* RT-ONNX-01: V2-native `run_session_v2` path. Shares the same `Session::run`
+ * tensor execution as V1 but honors V2 buffer-ownership + capacity semantics
+ * on the output side:
+ *   - Inputs borrow from the caller. If a `buffer` handle is supplied the
+ *     runtime reads through it; otherwise `data` + `data_bytes` are used
+ *     directly. Dtype mapping reuses `to_ort_type` via `ElementType`.
+ *   - Outputs: if the caller pre-allocated `data` with a non-zero
+ *     `data_capacity_bytes`, the output is copied in-place and ownership is
+ *     left at `NONE`. If the capacity is smaller than the actual tensor bytes,
+ *     every affected output's `data_bytes` is set to the required size and
+ *     `RAC_ERROR_OUTPUT_TRUNCATED` is returned (no partial copies). If the
+ *     caller did not supply a buffer (`data == NULL` and `data_capacity_bytes
+ *     == 0`), the runtime allocates a new data block via `malloc` and marks
+ *     `data_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME` so the caller can free
+ *     it through `release_tensor`. Shape is handled the same way, using
+ *     `shape_capacity` for caller-supplied storage. Dtype + rank are written
+ *     back unconditionally. */
+rac_result_t onnxrt_run_session_v2(rac_runtime_session_t* session,
+                                   const rac_runtime_tensor_t* inputs,
+                                   size_t n_in,
+                                   rac_runtime_tensor_t* outputs,
+                                   size_t n_out) {
+    if (!session) return RAC_ERROR_INVALID_HANDLE;
+    if (n_in > 0 && !inputs) return RAC_ERROR_NULL_POINTER;
+    if (n_out > 0 && !outputs) return RAC_ERROR_NULL_POINTER;
+
+    using runanywhere::runtime::onnxrt::ElementType;
+    using runanywhere::runtime::onnxrt::TensorInput;
+    using runanywhere::runtime::onnxrt::TensorOutput;
+
+    /* Marshal V2 inputs into the internal `TensorInput` used by `Session::run`.
+     * If a caller supplies a runtime buffer, resolve its host pointer + byte
+     * count; otherwise use the raw `data`/`data_bytes` fields. */
+    std::vector<TensorInput> runtime_inputs;
+    std::vector<const char*> output_names;
+    runtime_inputs.reserve(n_in);
+    output_names.reserve(n_out);
+
+    for (size_t i = 0; i < n_in; ++i) {
+        const void* data = inputs[i].data;
+        size_t data_bytes = inputs[i].data_bytes;
+        if (inputs[i].buffer != nullptr) {
+            data = inputs[i].buffer->data;
+            data_bytes = inputs[i].buffer->bytes;
+        }
+        if (!inputs[i].name || !data || !inputs[i].shape || inputs[i].rank == 0) {
+            return RAC_ERROR_NULL_POINTER;
+        }
+        runtime_inputs.push_back({
+            inputs[i].name,
+            data,
+            data_bytes,
+            inputs[i].shape,
+            inputs[i].rank,
+            static_cast<ElementType>(inputs[i].dtype),
+        });
+    }
+
+    for (size_t i = 0; i < n_out; ++i) {
+        if (!outputs[i].name) return RAC_ERROR_NULL_POINTER;
+        output_names.push_back(outputs[i].name);
+    }
+
+    std::vector<TensorOutput> runtime_outputs;
+    std::string error;
+    rac_result_t rc = session->session->run(runtime_inputs.data(),
+                                            runtime_inputs.size(),
+                                            output_names.data(),
+                                            output_names.size(),
+                                            runtime_outputs,
+                                            &error);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_ERROR("Runtime.ONNXRT", "run_session_v2 failed: %s", error.c_str());
+        return rc;
+    }
+
+    /* First pass: detect capacity shortfalls without copying so the caller can
+     * cleanly reallocate and retry. Mirrors the V1 semantics in
+     * `onnxrt_run_session` — we publish the required byte count on each
+     * truncated output and also flag shape-capacity shortfalls. */
+    bool truncated = false;
+    for (size_t i = 0; i < n_out && i < runtime_outputs.size(); ++i) {
+        const size_t required_bytes = runtime_outputs[i].bytes.size();
+        const size_t required_rank = runtime_outputs[i].shape.size();
+        /* Data capacity check — only applies when the caller supplied storage. */
+        if (outputs[i].data != nullptr && outputs[i].data_capacity_bytes > 0 &&
+            outputs[i].data_capacity_bytes < required_bytes) {
+            outputs[i].data_bytes = required_bytes;
+            truncated = true;
+        }
+        /* Shape capacity check — only applies when the caller supplied storage. */
+        if (outputs[i].shape != nullptr && outputs[i].shape_capacity > 0 &&
+            outputs[i].shape_capacity < required_rank) {
+            outputs[i].rank = required_rank;
+            truncated = true;
+        }
+    }
+    if (truncated) {
+        return RAC_ERROR_OUTPUT_TRUNCATED;
+    }
+
+    /* Second pass: commit outputs. If the caller supplied backing storage,
+     * copy in place and keep `*_ownership == NONE`. Otherwise allocate
+     * runtime-owned storage and mark ownership as RUNTIME so the caller can
+     * release through `onnxrt_release_tensor`. */
+    for (size_t i = 0; i < n_out && i < runtime_outputs.size(); ++i) {
+        const auto& src = runtime_outputs[i];
+        const size_t bytes = src.bytes.size();
+        const size_t rank = src.shape.size();
+
+        /* Data. */
+        if (outputs[i].data != nullptr && outputs[i].data_capacity_bytes > 0) {
+            /* Caller-supplied storage; copy in place. */
+            if (bytes > 0) {
+                std::memcpy(outputs[i].data, src.bytes.data(), bytes);
+            }
+            outputs[i].data_bytes = bytes;
+            /* Leave data_ownership untouched — caller owns their own buffer. */
+        } else if (bytes > 0) {
+            /* No caller storage → allocate runtime-owned data. */
+            void* owned = std::malloc(bytes);
+            if (!owned) return RAC_ERROR_OUT_OF_MEMORY;
+            std::memcpy(owned, src.bytes.data(), bytes);
+            outputs[i].data = owned;
+            outputs[i].data_bytes = bytes;
+            outputs[i].data_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
+        } else {
+            outputs[i].data = nullptr;
+            outputs[i].data_bytes = 0;
+        }
+
+        /* Shape. */
+        if (outputs[i].shape != nullptr && outputs[i].shape_capacity > 0) {
+            if (rank > 0) {
+                std::memcpy(outputs[i].shape, src.shape.data(), rank * sizeof(int64_t));
+            }
+            outputs[i].rank = rank;
+        } else if (rank > 0) {
+            auto* owned_shape = static_cast<int64_t*>(std::malloc(rank * sizeof(int64_t)));
+            if (!owned_shape) {
+                /* Roll back data allocation on this output if we just made one
+                 * so the caller doesn't leak on the error path. */
+                if (outputs[i].data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
+                    outputs[i].data != nullptr) {
+                    std::free(outputs[i].data);
+                    outputs[i].data = nullptr;
+                    outputs[i].data_bytes = 0;
+                    outputs[i].data_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
+                }
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+            std::memcpy(owned_shape, src.shape.data(), rank * sizeof(int64_t));
+            outputs[i].shape = owned_shape;
+            outputs[i].rank = rank;
+            outputs[i].shape_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
+        } else {
+            outputs[i].rank = 0;
+        }
+
+        /* Dtype + memory space are always reported from the runtime. */
+        outputs[i].dtype = static_cast<rac_runtime_dtype_t>(src.dtype);
+        outputs[i].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    }
+    return RAC_SUCCESS;
+}
+
 rac_result_t onnxrt_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
                                     rac_runtime_buffer_t** out) {
     if (!desc || !out) return RAC_ERROR_NULL_POINTER;
@@ -627,7 +793,7 @@ rac_result_t onnxrt_capabilities(rac_runtime_capabilities_t* out) {
 const rac_runtime_vtable_v2_t k_onnxrt_vtable_v2 = {
     /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
     /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
-    /* .run_session_v2 = */ nullptr,
+    /* .run_session_v2 = */ onnxrt_run_session_v2,
     /* .alloc_buffer   = */ onnxrt_alloc_buffer_v2,
     /* .buffer_info    = */ onnxrt_buffer_info,
     /* .map_buffer     = */ onnxrt_map_buffer,

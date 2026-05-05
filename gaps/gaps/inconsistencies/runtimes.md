@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -29,10 +29,12 @@ outputs; V1-only providers still fall back to the legacy shim), all buffer
 ops, and a provider registration surface (`rac_cpu_runtime_register_provider`)
 that engines can call to plug in primitive-specific implementations.
 `RAC_RUNTIME_CAP_OWNED_OUTPUTS` is now advertised only when at least one
-registered provider implements the V2 op. ONNXRT has buffer ops + legacy
-`run_session` but its V2 `run_session_v2` slot is NULL
-(`rac_runtime_onnxrt.cpp:527`). Runtime metadata also drifts from actual
-capabilities in multiple places (see per-runtime gaps below).
+registered provider implements the V2 op. ONNXRT has buffer ops, legacy
+`run_session`, and (RT-ONNX-01 resolved) a V2-native `run_session_v2` that
+honors caller capacity, returns runtime-owned tensor data/shape when no
+caller storage is supplied, and returns `RAC_ERROR_OUTPUT_TRUNCATED` with
+required byte counts published on truncation. Runtime metadata also drifts
+from actual capabilities in multiple places (see per-runtime gaps below).
 
 Shared runtime helpers exist in commons
 (`sdk/runanywhere-commons/include/rac/runtime/rac_runtime_helpers.h`) for
@@ -59,17 +61,6 @@ into the shared runtime vtable so onnxrt can benefit from the same escape
 hatch.
 
 ### runtimes/onnxrt
-
-#### RT-ONNX-01: V2 `run_session_v2` slot is NULL
-
-`runtimes/onnxrt/rac_runtime_onnxrt.cpp:527` leaves `run_session_v2 = nullptr`
-even though buffer V2 ops (`alloc_buffer`, `buffer_info`, `map_buffer`,
-`unmap_buffer`, `copy_buffer`, `release_tensor`) are all filled in at
-`rac_runtime_onnxrt.cpp:528-533`. Any caller that picked this runtime via the
-V2 entry point will get a NULL-deref if the commons router calls
-`run_session_v2` — the router has to fall back to the V1 `run_session` slot,
-which means no V2-only feature (tensor-backed buffers, capacity-aware outputs)
-is reachable through onnxrt.
 
 #### RT-ONNX-04: Advertises CPU-only `RAC_DEVICE_CLASS_CPU` while ORT supports EPs
 
