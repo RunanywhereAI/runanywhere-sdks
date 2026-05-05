@@ -61,14 +61,66 @@ object CppBridgePlatformAdapter {
     private const val TAG = "CppBridge"
 
     /**
-     * Fetch the configured [PlatformSecureStorage] or fail fast if the host app
-     * forgot to configure one. There is no in-memory fallback by design — secure
-     * storage MUST be backed by a real persistent, encrypted implementation.
+     * FQCN of the JVM-only AES-GCM secure storage fallback. Loaded reflectively
+     * so the shared jvmAndroidMain source set does not accumulate a hard
+     * reference to a jvmMain-only class.
      */
-    private fun requirePlatformStorage(): PlatformSecureStorage =
-        platformStorage ?: throw IllegalStateException(
+    private const val JVM_SECURE_STORAGE_CLASS =
+        "com.runanywhere.sdk.foundation.bridge.extensions.JvmSecureStorage"
+
+    /**
+     * Android runtime marker class; used to detect whether the SDK is running
+     * on Android and should skip the JVM-file-based secure storage fallback.
+     */
+    private const val ANDROID_BUILD_CLASS = "android.os.Build"
+
+    /**
+     * Fetch the configured [PlatformSecureStorage], auto-installing the JVM
+     * file-based AES-GCM implementation if nothing is configured AND we're
+     * running on a non-Android JVM. Android consumers MUST call
+     * [setContext] (or [setPlatformStorage] directly) explicitly — there is no
+     * sane auto-fallback on Android since we need a real [android.content.Context].
+     */
+    private fun requirePlatformStorage(): PlatformSecureStorage {
+        platformStorage?.let { return it }
+        synchronized(lock) {
+            platformStorage?.let { return it }
+            val fallback = tryInstallJvmFallback()
+            if (fallback != null) {
+                platformStorage = fallback
+                return fallback
+            }
+        }
+        throw IllegalStateException(
             "Platform secure storage not configured — call RunAnywhere.setPlatformStorage() before use",
         )
+    }
+
+    /**
+     * Attempt to load the JVM AES-GCM secure storage via reflection. Returns
+     * null if we're on Android or the JVM-only class is not present on the
+     * classpath. Keeps the jvmAndroidMain source set free of direct jvmMain
+     * class references (those classes only exist in the JVM jar, not the AAR).
+     */
+    private fun tryInstallJvmFallback(): PlatformSecureStorage? {
+        return try {
+            // Short-circuit when we're clearly running on Android: the Build class
+            // is always present in the Android runtime.
+            try {
+                Class.forName(ANDROID_BUILD_CLASS)
+                return null
+            } catch (_: ClassNotFoundException) {
+                // Not Android — proceed to load the JVM implementation.
+            }
+            val cls = Class.forName(JVM_SECURE_STORAGE_CLASS)
+            val ctor = cls.getDeclaredConstructor()
+            val instance = ctor.newInstance()
+            instance as? PlatformSecureStorage
+        } catch (e: Throwable) {
+            logCallback(LogLevel.DEBUG, TAG, "JvmSecureStorage auto-install skipped: ${e.message}")
+            null
+        }
+    }
 
     /**
      * Interface for platform-specific secure storage.
