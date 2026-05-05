@@ -20,10 +20,12 @@ and the dead bridges (`RAGBridge`, `LLMStreamAdapter`, `CppBridgeHTTP`,
 directory, `AudioUtils`, `CppBridgeEnvironment`, `CommonsErrorMapping`, and
 `PlatformLogger` are all deleted. KOT-09 (structured output), KOT-10
 (ModelFormat URL heuristics), KOT-12 (router frameworks-for-capability),
-and KOT-STREAM-VAD are all wired to native commons APIs. What remains is
-(a) KOT-05 legacy VLM trio (still calls `racVlmCreate`/`racVlmInitialize`/
-`racVlmDestroy` instead of a proto-backed `load`), and (b) KOT-14
-`currentDiffusionFramework` returning a `null` stub.
+and KOT-STREAM-VAD are all wired to native commons APIs. KOT-14 resolved in
+Wave 3a by deleting the `currentDiffusionFramework()` + `getDiffusionCapabilities()`
+Kotlin `expect`/`actual` pair (no Kotlin-usable diffusion backend exists today;
+iteration I will reintroduce when a non-Apple-only diffusion engine ships — see
+`KOT-DIFFUSION-REWIRE`). What remains is (a) KOT-05 legacy VLM trio (still calls
+`racVlmCreate`/`racVlmInitialize`/`racVlmDestroy` instead of a proto-backed `load`).
 
 ## Confirmed gaps
 
@@ -40,20 +42,31 @@ and KOT-STREAM-VAD are all wired to native commons APIs. What remains is
      `racVlmCreate`/`racVlmInitialize`/`racVlmDestroy` from `RunAnywhereBridge.kt:299/302/323`.
 - **Scope**: 1 `.proto` message + ~40 LOC Kotlin + C++ work.
 
-### KOT-14: `currentDiffusionFramework` returns null stub (priority: LOW)
-- **Symptom**:
-  `jvmAndroidMain/.../RunAnywhere+Diffusion.jvmAndroid.kt:104-107`:
-  ```kotlin
-  actual suspend fun RunAnywhere.currentDiffusionFramework(): InferenceFramework? {
-      // TODO: wire rac_diffusion_current_framework_proto once commons exposes it.
-      return null
-  }
-  ```
-  `CppBridgeDiffusionProto.capabilities()` in `CppBridgeModalityProto.kt` also returns an empty
-  `DiffusionCapabilities()` on every call.
-- **Concrete steps**: Commons: expose `rac_diffusion_current_framework_proto` + populate capabilities
-  proto. Kotlin: replace the `return null` + hollow capabilities() with the native calls.
-- **Scope**: ~10 LOC Kotlin + C++ work.
+### KOT-DIFFUSION-REWIRE: Reintroduce `currentDiffusionFramework` + `getDiffusionCapabilities` when a Kotlin-usable diffusion backend ships (priority: LOW, deferred to iteration I)
+- **Context**: Wave 3a (KOT-14) deleted the `currentDiffusionFramework()` and
+  `getDiffusionCapabilities()` `expect`/`actual` pair plus the hollow
+  `CppBridgeDiffusionProto.capabilities()` wrapper. Rationale: the only existing
+  diffusion backend is `diffusion-coreml` (Apple-only), which is wired only through
+  Swift. On Android/JVM today, those Kotlin APIs unconditionally returned `null` /
+  empty — there was no reachable native implementation to report a framework
+  or enumerate capabilities. Deleting the dead surface area prevents misleading
+  API shape (consumers never got a meaningful value).
+- **Reintroduction trigger**: When either (a) `diffusion-coreml` is wired to
+  Kotlin/Apple via the KMP iOS/macOS source set, or (b) a non-Apple diffusion
+  backend lands (e.g. ONNX-runtime SD variant, WGPU SD, NNAPI SD).
+- **Concrete reintroduction steps**:
+  1. Commons: add `rac_diffusion_current_framework_proto` (returns
+     `InferenceFrameworkResponse`) and `rac_diffusion_capabilities_proto` (returns
+     `DiffusionCapabilities`) to the C ABI, routed through the diffusion component.
+  2. JNI: expose matching thunks in `runanywhere_commons_jni.cpp` +
+     `RunAnywhereBridge.kt`.
+  3. Kotlin: restore the `expect suspend fun RunAnywhere.currentDiffusionFramework()`
+     and `expect suspend fun RunAnywhere.getDiffusionCapabilities()` declarations in
+     `commonMain/.../RunAnywhere+Diffusion.kt`, and wire the proto-backed actuals
+     in `jvmAndroidMain/.../RunAnywhere+Diffusion.jvmAndroid.kt` through a new
+     `CppBridgeDiffusionProto.currentFramework()` + `capabilities()` helper.
+  4. Cross-SDK: mirror to Flutter, React Native, Web.
+- **Scope**: 2 new proto APIs + 2 JNI thunks + ~30 LOC Kotlin + C++ work.
 
 ### KOT-JNI-ORPHAN: 20 `external fun` declarations in `RunAnywhereBridge.kt` have no matching C thunk (priority: HIGH)
 - **Symptom**: Surfaced by Wave 1 CPP-06 JNI audit. 20 `external fun` entries in

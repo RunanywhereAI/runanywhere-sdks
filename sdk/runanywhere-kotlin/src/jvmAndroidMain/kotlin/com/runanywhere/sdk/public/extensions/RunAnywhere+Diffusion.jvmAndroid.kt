@@ -13,12 +13,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.DiffusionCapabilities
 import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
 import ai.runanywhere.proto.v1.DiffusionResult
-import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDiffusionProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -99,14 +97,4 @@ actual val RunAnywhere.isDiffusionModelLoaded: Boolean
 actual suspend fun RunAnywhere.currentDiffusionModelId(): String? =
     withContext(Dispatchers.IO) {
         CppBridgeDiffusionProto.currentModelId()
-    }
-
-actual suspend fun RunAnywhere.currentDiffusionFramework(): InferenceFramework? {
-    // TODO: wire rac_diffusion_current_framework_proto once commons exposes it.
-    return null
-}
-
-actual suspend fun RunAnywhere.getDiffusionCapabilities(): DiffusionCapabilities =
-    withContext(Dispatchers.IO) {
-        CppBridgeDiffusionProto.capabilities()
     }

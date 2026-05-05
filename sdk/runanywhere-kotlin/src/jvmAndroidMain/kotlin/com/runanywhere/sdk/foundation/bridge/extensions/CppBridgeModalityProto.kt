@@ -5,7 +5,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.DiffusionCapabilities
 import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
@@ -690,11 +689,6 @@ object CppBridgeDiffusionProto {
     fun isLoaded(): Boolean = handle != 0L
 
     fun currentModelId(): String? = modelId
-
-    fun capabilities(): DiffusionCapabilities {
-        if (handle == 0L) return DiffusionCapabilities()
-        return DiffusionCapabilities()
-    }
 
     private fun requireHandle(): Long =
         handle.takeIf { it != 0L } ?: throw SDKException.notInitialized("Diffusion service not loaded")

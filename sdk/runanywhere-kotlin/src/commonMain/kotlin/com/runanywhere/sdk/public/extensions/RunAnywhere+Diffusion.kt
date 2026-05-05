@@ -17,12 +17,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.DiffusionCapabilities
 import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
 import ai.runanywhere.proto.v1.DiffusionResult
-import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
@@ -92,9 +90,3 @@ expect val RunAnywhere.isDiffusionModelLoaded: Boolean
 
 /** The currently loaded diffusion model ID, if any. */
 expect suspend fun RunAnywhere.currentDiffusionModelId(): String?
-
-/** The currently loaded diffusion framework, if any. */
-expect suspend fun RunAnywhere.currentDiffusionFramework(): InferenceFramework?
-
-/** Get diffusion service capabilities (text-to-image, inpainting, etc.). */
-expect suspend fun RunAnywhere.getDiffusionCapabilities(): DiffusionCapabilities
