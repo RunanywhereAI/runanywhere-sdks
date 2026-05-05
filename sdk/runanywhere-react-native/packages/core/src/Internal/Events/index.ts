@@ -5,5 +5,5 @@
  * Public streaming surfaces moved to native proto streams.
  */
 
-export { EventBus, NativeEventNames } from './EventBus';
+export { EventBus } from './EventBus';
 export type { EventBusImpl } from './EventBus';

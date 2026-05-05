@@ -10,7 +10,7 @@ import 'package:runanywhere/native/dart_bridge_diffusion.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
-import 'package:runanywhere/native/dart_bridge_vad.dart' hide VADResult;
+import 'package:runanywhere/native/dart_bridge_vad.dart';
 
 void main() {
   tearDown(() {

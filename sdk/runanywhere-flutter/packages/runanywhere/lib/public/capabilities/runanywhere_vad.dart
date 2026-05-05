@@ -27,7 +27,7 @@ import 'package:runanywhere/generated/vad_options.pb.dart'
 import 'package:runanywhere/generated/voice_events.pbenum.dart'
     show VADEventType;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_vad.dart' hide VADResult;
+import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
 /// Voice Activity Detection (VAD) capability surface.
