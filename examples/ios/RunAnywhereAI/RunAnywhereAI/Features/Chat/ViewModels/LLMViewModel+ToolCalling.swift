@@ -43,7 +43,7 @@ extension LLMViewModel {
 
         // Generate with tools — pass generation options (temperature, maxTokens).
         // Tool calling format is managed via ToolCallingOptions registered separately.
-        let result = try await RunAnywhere.generateWithTools(prompt, options: options)
+        let result = try await RunAnywhere.generateWithTools(prompt: prompt, options: options)
 
         // Tool call metadata is embedded in the result text (the SDK orchestrates
         // tool call → execute → respond internally). No separate toolCalls/toolResults

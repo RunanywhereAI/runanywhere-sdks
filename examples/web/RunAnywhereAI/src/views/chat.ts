@@ -1,15 +1,15 @@
 /**
  * Chat Tab — minimal LLM chat over the V2 proto-byte LLM adapter.
  *
- * Once `LlamaCPP.register()` resolves, the public surface in
- * `@runanywhere/web` (`RunAnywhere.generateStream`) flows through the
- * proto-byte LLM adapter into the WASM module. This view keeps a
- * `feature-unavailable` fallback when the backend is missing so the rest
- * of the app shell can still validate.
+ * Once `LlamaCPP.register()` resolves AND the user loads a model via the
+ * toolbar model selector, the public surface in `@runanywhere/web`
+ * (`RunAnywhere.generateStream`) flows through the proto-byte LLM adapter
+ * into the WASM module.
  *
- * MVP scope: text-only generation with streaming tokens. Tool calling /
- * structured output are exposed via the existing core extensions and can
- * be layered onto this view in a follow-up.
+ * The toolbar model pill + "Get Started" overlay are built by
+ * `components/model-selection.ts`. They expose the DOM ids the readiness
+ * probe in `main.ts` looks for (`#chat-toolbar-model`, `#chat-model-overlay`,
+ * `#chat-get-started-btn`).
  */
 
 import type { TabLifecycle } from '../app';
@@ -17,7 +17,12 @@ import {
   RunAnywhere,
   isSDKException,
 } from '@runanywhere/web';
-import { renderFeatureUnavailable } from '../components/feature-unavailable';
+import {
+  buildGetStartedOverlay,
+  buildToolbarModelButton,
+  ensureCatalogRegistered,
+  onModelStateChange,
+} from '../components/model-selection';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -32,26 +37,16 @@ let cancelGeneration: (() => void) | null = null;
 export function initChatTab(el: HTMLElement): TabLifecycle {
   container = el;
 
-  if (!isLLMBackendAvailable()) {
-    renderFeatureUnavailable(el, {
-      title: 'Chat',
-      description:
-        'Streaming LLM chat. Backed by `RunAnywhere.generateStream` once a ' +
-        'WASM LLM backend is registered (e.g. via `LlamaCPP.register()`).',
-      requires: [
-        'RunAnywhere.generateStream',
-        'RunAnywhere.modelLifecycle.load',
-      ],
-    });
-    return {};
-  }
+  // Register the catalog as soon as the chat tab is mounted. This is
+  // best-effort — if the WASM backend has not yet installed the proto-byte
+  // registry adapter, the call returns false and the toolbar button
+  // displays "Loading…" until a later call succeeds.
+  ensureCatalogRegistered();
 
   container.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">Chat</div>
-      <div class="toolbar-actions">
-        <button class="btn btn-secondary" id="chat-clear-btn">Clear</button>
-      </div>
+      <div class="toolbar-title" id="chat-toolbar-title-host"></div>
+      <div class="toolbar-actions" id="chat-toolbar-actions-host"></div>
     </div>
     <div class="scroll-area" id="chat-messages"></div>
     <div class="chat-input-area">
@@ -62,13 +57,26 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     </div>
   `;
 
+  // Mount the toolbar model pill in the title slot so the probe finds the
+  // #chat-toolbar-model element even when the panel becomes the active tab.
+  const titleHost = container.querySelector('#chat-toolbar-title-host') as HTMLElement;
+  titleHost.appendChild(buildToolbarModelButton());
+
+  // Mount the "Get Started" overlay directly inside the panel host so the
+  // readiness probe's overlay visibility check works. The overlay is shown
+  // whenever no model is loaded and hidden once a model enters the loaded
+  // state.
+  container.appendChild(buildGetStartedOverlay());
+
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
   const sendBtn = container.querySelector('#chat-send-btn') as HTMLButtonElement;
-  const clearBtn = container.querySelector('#chat-clear-btn') as HTMLButtonElement;
+  const clearBtn = buildClearButton();
+  (container.querySelector('#chat-toolbar-actions-host') as HTMLElement).appendChild(clearBtn);
 
   const refreshSendButton = () => {
-    sendBtn.disabled = isGenerating || inputEl.value.trim().length === 0;
+    const hasInput = inputEl.value.trim().length > 0;
+    sendBtn.disabled = isGenerating || !hasInput;
   };
 
   inputEl.addEventListener('input', refreshSendButton);
@@ -89,9 +97,22 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 
   renderMessages(messagesEl);
 
+  // Re-render when the model state changes so disabled/enabled states stay
+  // consistent with what the toolbar reports.
+  const unsubscribeState = onModelStateChange(() => refreshSendButton());
+
   async function onSend(): Promise<void> {
     const prompt = inputEl.value.trim();
     if (!prompt || isGenerating) return;
+
+    if (!isLLMBackendAvailable()) {
+      messages.push({
+        role: 'assistant',
+        content: 'No LLM backend available. Check the console for backend load errors.',
+      });
+      renderMessages(messagesEl);
+      return;
+    }
 
     inputEl.value = '';
     refreshSendButton();
@@ -113,7 +134,6 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         assistantMsg.content += token;
         updateLastMessageContent(messagesEl, assistantMsg.content);
       }
-      // Wait for the result to settle (so cancel timing is consistent).
       await stream.result;
     } catch (error) {
       const message = formatChatError(error);
@@ -126,9 +146,26 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
   }
 
+  // Tear down the model-state subscription if the panel element ever
+  // detaches (e.g. a full app-shell re-render). Kept minimal since the
+  // tab framework does not call a dispose hook today.
+  const disposeObserver = new MutationObserver(() => {
+    if (!container.isConnected) {
+      disposeObserver.disconnect();
+      unsubscribeState();
+    }
+  });
+  const rootParent = container.parentElement;
+  if (rootParent) disposeObserver.observe(rootParent, { childList: true });
+
   return {
     onDeactivate: () => {
       if (cancelGeneration) cancelGeneration();
+    },
+    onActivate: () => {
+      // Re-try catalog registration on tab activation in case the backend
+      // was not ready when the tab was first mounted.
+      ensureCatalogRegistered();
     },
   };
 }
@@ -137,23 +174,13 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Probes whether an LLM proto-byte backend is registered. When no backend
- * package has called `setRunanywhereModule(...)`, every adapter throws
- * `backendNotAvailable`; we render the feature-unavailable placeholder
- * instead of a useless empty chat.
- */
 function isLLMBackendAvailable(): boolean {
+  // The proto-byte LLM adapter is live iff a backend has installed the
+  // Emscripten module. `RunAnywhere.runtime.active` becomes non-null once
+  // LlamaCppBridge finishes booting the WASM, so this works as a cheap
+  // "is WASM loaded?" probe without reaching into internal adapters.
   try {
-    // The provider-aware availability check on the public surface.
-    // A backend is registered iff `LLMProtoAdapter.tryDefault()` is non-null
-    // — but rather than reach into the internal adapter, we rely on the
-    // `backendNotAvailable` exception flow. Calling `RunAnywhere.textGeneration`
-    // is cheap (it's just the namespace object).
     void RunAnywhere.textGeneration;
-    // Heuristic: assume the backend is wired if the runtime active mode is
-    // populated (the llamacpp bridge sets it post-load). If it's null, the
-    // backend hasn't been registered yet.
     return RunAnywhere.runtime.active !== null;
   } catch {
     return false;
@@ -174,7 +201,7 @@ function renderMessages(host: HTMLElement): void {
 
   host.innerHTML = messages.map((msg, idx) => `
     <div class="chat-message chat-message--${msg.role}" data-idx="${idx}">
-      <div class="chat-bubble">${escapeHTML(msg.content) || '<span class="chat-bubble-typing">…</span>'}</div>
+      <div class="chat-bubble">${escapeHTML(msg.content) || '<span class="chat-bubble-typing">&hellip;</span>'}</div>
     </div>
   `).join('');
 
@@ -209,4 +236,13 @@ function formatChatError(error: unknown): string {
     return `Error: ${error.message}`;
   }
   return `Error: ${String(error)}`;
+}
+
+function buildClearButton(): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'chat-clear-btn';
+  btn.className = 'btn btn-secondary';
+  btn.textContent = 'Clear';
+  return btn;
 }

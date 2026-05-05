@@ -67,7 +67,9 @@ final class VLMViewModel: NSObject {
     // MARK: - Model
 
     func checkModelStatus() async {
-        isModelLoaded = await RunAnywhere.isVLMModelLoaded
+        var req = RACurrentModelRequest()
+        req.category = .multimodal
+        isModelLoaded = RunAnywhere.currentModel(req).found
     }
 
     @objc
@@ -148,10 +150,12 @@ final class VLMViewModel: NSObject {
             let prompt = "Describe what you see briefly."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
             options.maxTokens = 200
-            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
+            let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await token in stream {
-                currentDescription += token
+            for await event in stream {
+                if !event.generation.token.isEmpty {
+                    currentDescription += event.generation.token
+                }
             }
         } catch {
             self.error = error
@@ -174,10 +178,12 @@ final class VLMViewModel: NSObject {
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
             options.maxTokens = 300
-            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
+            let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await token in stream {
-                currentDescription += token
+            for await event in stream {
+                if !event.generation.token.isEmpty {
+                    currentDescription += event.generation.token
+                }
             }
         } catch {
             self.error = error
@@ -212,10 +218,12 @@ final class VLMViewModel: NSObject {
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
             options.maxTokens = 300
-            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
+            let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await token in stream {
-                currentDescription += token
+            for await event in stream {
+                if !event.generation.token.isEmpty {
+                    currentDescription += event.generation.token
+                }
             }
         } catch {
             self.error = error
@@ -313,11 +321,13 @@ final class VLMViewModel: NSObject {
             let prompt = "Describe what you see in one sentence."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
             options.maxTokens = 100
-            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
+            let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await token in stream {
-                newDescription += token
-                currentDescription = newDescription
+            for await event in stream {
+                if !event.generation.token.isEmpty {
+                    newDescription += event.generation.token
+                    currentDescription = newDescription
+                }
             }
         } catch {
             // Don't show errors during auto-stream, just log

@@ -307,25 +307,37 @@ extension ModelSelectionSheet {
     }
 
     private func loadModelForContext(_ model: RAModelInfo) async throws {
+        let category: RAModelCategory
         switch context {
-        case .llm: try await RunAnywhere.loadModel(model.id)
-        case .stt: try await RunAnywhere.loadSTTModel(model.id)
-        case .tts: try await RunAnywhere.loadTTSModel(model.id)
-        case .vad: try await RunAnywhere.loadVADModel(model.id)
-        case .voice: try await loadModelForVoiceContext(model)
-        case .vlm: try await RunAnywhere.loadVLMModel(model)
+        case .llm: category = .language
+        case .stt: category = .speechRecognition
+        case .tts: category = .speechSynthesis
+        case .vad: category = .voiceActivityDetection
+        case .voice: category = voiceContextCategory(for: model)
+        case .vlm: category = .multimodal
         case .ragEmbedding, .ragLLM:
             // RAG models are referenced by local file path at pipeline creation time,
             // not pre-loaded into memory via the SDK model loader.
-            break
+            return
+        }
+        try await loadViaCanonicalAPI(modelID: model.id, category: category)
+    }
+
+    private func voiceContextCategory(for model: RAModelInfo) -> RAModelCategory {
+        switch model.category {
+        case .speechRecognition: return .speechRecognition
+        case .speechSynthesis: return .speechSynthesis
+        default: return .language
         }
     }
 
-    private func loadModelForVoiceContext(_ model: RAModelInfo) async throws {
-        switch model.category {
-        case .speechRecognition: try await RunAnywhere.loadSTTModel(model.id)
-        case .speechSynthesis: try await RunAnywhere.loadTTSModel(model.id)
-        default: try await RunAnywhere.loadModel(model.id)
+    private func loadViaCanonicalAPI(modelID: String, category: RAModelCategory) async throws {
+        var request = RAModelLoadRequest()
+        request.modelID = modelID
+        request.category = category
+        let result = await RunAnywhere.loadModel(request)
+        if !result.success {
+            throw SDKException.general(.unknown, result.errorMessage)
         }
     }
 

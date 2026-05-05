@@ -14,8 +14,9 @@
  * Architecture:
  * - Uses ConversationStore for state management (matches iOS)
  * - Separates UI from business logic (View + ViewModel pattern)
- * - Model loading via RunAnywhere.loadModel()
- * - Text generation via RunAnywhere.generate()
+ * - Model loading via RunAnywhere.loadModel(id, category?)
+ * - Text generation via RunAnywhere.generate(prompt, options?)
+ *   and RunAnywhere.generateStream(prompt, options?) (proto-canonical signatures)
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */

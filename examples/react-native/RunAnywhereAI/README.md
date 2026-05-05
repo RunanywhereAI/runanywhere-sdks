@@ -380,13 +380,17 @@ await RunAnywhere.registerModel({
 ### Download & Load a Model
 
 ```typescript
-// Download with progress tracking
-await RunAnywhere.downloadModel(modelId, (progress) => {
+// Download with progress tracking (AsyncIterable — Hermes-safe iterator loop)
+const downloadIter = RunAnywhere.downloadModel(modelId)[Symbol.asyncIterator]();
+let downloadResult = await downloadIter.next();
+while (!downloadResult.done) {
+  const progress = downloadResult.value;
   console.log(`Download: ${(progress.progress * 100).toFixed(1)}%`);
-});
+  downloadResult = await downloadIter.next();
+}
 
-// Load LLM model into memory
-const success = await RunAnywhere.loadModel(modelPath);
+// Load LLM model into memory (model-id-driven, matches iOS/Kotlin/Flutter/Web)
+const success = await RunAnywhere.loadModel(modelId, ModelCategory.MODEL_CATEGORY_TEXT_GENERATION);
 
 // Check if model is loaded
 const isLoaded = await RunAnywhere.isModelLoaded();
@@ -395,32 +399,42 @@ const isLoaded = await RunAnywhere.isModelLoaded();
 ### Stream Text Generation
 
 ```typescript
-// Generate with streaming
-const streamResult = await RunAnywhere.generateStream(prompt, {
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+
+// Generate with streaming (proto-canonical: AsyncIterable<LLMStreamEvent>)
+const options = LLMGenerationOptions.fromPartial({
   maxTokens: 1000,
   temperature: 0.7,
+  streamingEnabled: true,
 });
+const stream = RunAnywhere.generateStream(prompt, options);
 
+// Hermes constraint: `for await...of` does not work with NitroModules
+// custom async iterables — use manual iterator.next() loops.
 let fullResponse = '';
-for await (const token of streamResult.stream) {
-  fullResponse += token;
-  // Update UI in real-time
-  updateMessage(fullResponse);
+const iterator = stream[Symbol.asyncIterator]();
+let result = await iterator.next();
+while (!result.done) {
+  const event = result.value;
+  if (event.token) {
+    fullResponse += event.token;
+    updateMessage(fullResponse);
+  }
+  if (event.isFinal) break;
+  result = await iterator.next();
 }
-
-// Get final metrics
-const result = await streamResult.result;
-console.log(`Speed: ${result.tokensPerSecond} tok/s`);
-console.log(`Latency: ${result.latencyMs}ms`);
 ```
 
 ### Non-Streaming Generation
 
 ```typescript
-const result = await RunAnywhere.generate(prompt, {
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+
+const options = LLMGenerationOptions.fromPartial({
   maxTokens: 256,
   temperature: 0.7,
 });
+const result = await RunAnywhere.generate(prompt, options);
 
 console.log('Response:', result.text);
 console.log('Tokens:', result.tokensUsed);
@@ -430,8 +444,11 @@ console.log('Model:', result.modelUsed);
 ### Speech-to-Text
 
 ```typescript
-// Load STT model
-await RunAnywhere.loadSTTModel(modelPath, 'whisper');
+// Load STT model by id (model-id-driven lifecycle, matches iOS/Kotlin/Flutter/Web)
+await RunAnywhere.loadModel(
+  modelId,
+  ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+);
 
 // Check if loaded
 const isLoaded = await RunAnywhere.isSTTModelLoaded();
@@ -448,19 +465,27 @@ console.log('Confidence:', result.confidence);
 ### Text-to-Speech
 
 ```typescript
-// Load TTS voice model
-await RunAnywhere.loadTTSModel(modelPath, 'piper');
+import { AudioFormat } from '@runanywhere/proto-ts';
 
-// Synthesize speech
+// Load TTS voice model by id
+await RunAnywhere.loadModel(
+  modelId,
+  ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+);
+
+// Synthesize speech (proto-canonical TTSOptions)
 const result = await RunAnywhere.synthesize(text, {
   voice: 'default',
-  rate: 1.0,
+  languageCode: '',
+  speakingRate: 1.0,
   pitch: 1.0,
   volume: 1.0,
+  enableSsml: false,
+  audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
 });
 
-// result.audio contains base64-encoded float32 PCM
-// result.sampleRate, result.numSamples, result.duration
+// result.audioData (Uint8Array of float32 PCM bytes)
+// result.sampleRate, result.durationMs
 ```
 
 ### Voice Pipeline (STT → LLM → TTS)
@@ -521,8 +546,8 @@ await RunAnywhere.cleanTempFiles();
 - Model status banner showing loaded model
 
 **Key SDK APIs:**
-- `RunAnywhere.generateStream()` — Streaming generation
-- `RunAnywhere.loadModel()` — Load LLM model
+- `RunAnywhere.generateStream(prompt, LLMGenerationOptions)` — Streaming generation
+- `RunAnywhere.loadModel(id, ModelCategory)` — Load LLM model
 - `RunAnywhere.isModelLoaded()` — Check model status
 - `RunAnywhere.getAvailableModels()` — List models
 
@@ -536,7 +561,7 @@ await RunAnywhere.cleanTempFiles();
 - Microphone permission handling
 
 **Key SDK APIs:**
-- `RunAnywhere.loadSTTModel()` — Load Whisper model
+- `RunAnywhere.loadModel(id, ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)` — Load Whisper model
 - `RunAnywhere.isSTTModelLoaded()` — Check STT model status
 - `RunAnywhere.transcribeFile()` — Transcribe audio file
 - Native audio recording via `AudioService`
@@ -551,7 +576,7 @@ await RunAnywhere.cleanTempFiles();
 - WAV file generation from float32 PCM
 
 **Key SDK APIs:**
-- `RunAnywhere.loadTTSModel()` — Load TTS model
+- `RunAnywhere.loadModel(id, ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)` — Load TTS model
 - `RunAnywhere.isTTSModelLoaded()` — Check TTS model status
 - `RunAnywhere.synthesize()` — Generate speech audio
 - Native audio playback via `NativeAudioModule` (iOS)

@@ -119,10 +119,11 @@ class ModelListViewModel: ObservableObject {
 
     /// Sync current model state with SDK
     private func syncCurrentModelWithSDK() async {
-        if let currentModelId = await RunAnywhere.getCurrentModelId(),
-           let matchingModel = availableModels.first(where: { $0.id == currentModelId }) {
+        let snapshot = RunAnywhere.currentModel()
+        if snapshot.found,
+           let matchingModel = availableModels.first(where: { $0.id == snapshot.modelID }) {
             currentModel = matchingModel
-            print("✅ ModelListViewModel: Restored currentModel from SDK: \(matchingModel.name)")
+            print("ModelListViewModel: Restored currentModel from SDK: \(matchingModel.name)")
         }
     }
 
@@ -194,20 +195,39 @@ class ModelListViewModel: ObservableObject {
     }
 
     func loadModel(_ model: RAModelInfo) async throws {
-        try await RunAnywhere.loadModel(model.id)
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        if model.category != .unspecified {
+            request.category = model.category
+        }
+        let result = await RunAnywhere.loadModel(request)
+        guard result.success else {
+            throw SDKException.general(.unknown, result.errorMessage)
+        }
         currentModel = model
     }
 
     /// Add a custom model from URL
     func addModelFromURL(name: String, url: URL, framework: InferenceFramework, estimatedSize: Int64?) async {
-        // Persist via the canonical importModel proto path. The example shim
-        // composes RAModelInfo + RAModelImportRequest so call sites stay terse.
-        _ = await RunAnywhere.registerModel(
-            name: name,
-            url: url,
-            framework: framework,
-            memoryRequirement: estimatedSize
-        )
+        // Compose a canonical RAModelImportRequest directly. The shim version
+        // composed this behind a convenience; the example now issues the proto
+        // request inline to stay on the canonical path.
+        var modelInfo = RAModelInfo()
+        modelInfo.id = UUID().uuidString
+        modelInfo.name = name
+        modelInfo.framework = framework
+        modelInfo.memoryRequiredBytes = estimatedSize ?? 0
+        modelInfo.downloadURL = url.absoluteString
+
+        var request = RAModelImportRequest()
+        request.model = modelInfo
+        request.sourcePath = url.absoluteString
+
+        do {
+            _ = try await RunAnywhere.importModel(request)
+        } catch {
+            print("Failed to import model: \(error.localizedDescription)")
+        }
 
         // Reload models to include the new one
         await loadModelsFromRegistry()

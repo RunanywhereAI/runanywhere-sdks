@@ -60,10 +60,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.R
+import com.runanywhere.runanywhereai.models.AppDeviceInfo
+import com.runanywhere.runanywhereai.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.models.DeviceInfo
-import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
 import kotlinx.coroutines.delay
@@ -280,7 +280,7 @@ fun ModelSelectionBottomSheet(
     }
 }
 
-private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
+private fun toDeviceStatus(info: AppDeviceInfo): DeviceStatus =
     DeviceStatus(
         model = info.modelName,
         chip = info.architecture,

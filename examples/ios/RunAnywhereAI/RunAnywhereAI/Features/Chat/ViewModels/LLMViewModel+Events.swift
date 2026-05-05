@@ -29,8 +29,12 @@ extension LLMViewModel {
     }
 
     func checkModelStatusFromSDK() async {
-        let isLoaded = await RunAnywhere.isModelLoaded
-        let modelId = await RunAnywhere.getCurrentModelId()
+        // Resolve currently-loaded LLM via canonical proto snapshot API.
+        var request = RACurrentModelRequest()
+        request.category = .language
+        let snapshot = RunAnywhere.currentModel(request)
+        let isLoaded = snapshot.found
+        let modelId = snapshot.found ? snapshot.modelID : nil
 
         await MainActor.run {
             self.updateModelLoadedState(isLoaded: isLoaded)

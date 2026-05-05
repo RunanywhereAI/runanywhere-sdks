@@ -76,7 +76,13 @@ class VADViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            try await RunAnywhere.loadVADModel(model.id)
+            var loadRequest = RAModelLoadRequest()
+            loadRequest.modelID = model.id
+            loadRequest.category = .voiceActivityDetection
+            let loadResult = await RunAnywhere.loadModel(loadRequest)
+            guard loadResult.success else {
+                throw SDKException.general(.unknown, loadResult.errorMessage)
+            }
             selectedFramework = model.framework
             selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
@@ -173,7 +179,11 @@ class VADViewModel: ObservableObject {
     }
 
     private func checkInitialModelState() async {
-        if let model = await RunAnywhere.currentVADModel {
+        var req = RACurrentModelRequest()
+        req.category = .voiceActivityDetection
+        let snapshot = RunAnywhere.currentModel(req)
+        if snapshot.found {
+            let model = snapshot.model
             selectedModelId = model.id
             selectedModelName = model.name.modelNameFromID()
             selectedFramework = model.framework
@@ -194,17 +204,8 @@ class VADViewModel: ObservableObject {
             return
         }
 
-        // Initialize VAD if needed
-        do {
-            if await !RunAnywhere.isVADReady {
-                try await RunAnywhere.initializeVAD()
-            }
-        } catch {
-            logger.error("Failed to initialize VAD: \(error.localizedDescription)")
-            errorMessage = "VAD initialization failed: \(error.localizedDescription)"
-            return
-        }
-
+        // VAD is initialized implicitly by loading the VAD model.
+        // The canonical SDK API does not expose an explicit readiness check.
         do {
             try await audioCapture.startRecording { [weak self] audioData in
                 Task { @MainActor in
@@ -251,7 +252,11 @@ class VADViewModel: ObservableObject {
                     let samples = self.convertInt16ToFloat(bufferData)
 
                     do {
-                        let speechDetected = try await RunAnywhere.detectSpeech(in: samples)
+                        let audioBytes = samples.withUnsafeBufferPointer {
+                            Data(buffer: $0)
+                        }
+                        let vadResult = try await RunAnywhere.detectVoiceActivity(audioBytes)
+                        let speechDetected = vadResult.isSpeech
 
                         self.isSpeechDetected = speechDetected
 

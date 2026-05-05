@@ -8,6 +8,7 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.models.AppDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
@@ -18,7 +19,6 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.services.BenchmarkR
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.BenchmarkExportFormat
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.BenchmarkReportFormatter
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
-import com.runanywhere.sdk.models.DeviceInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -232,7 +232,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun makeDeviceInfo(): BenchmarkDeviceInfo {
         return try {
-            val info = DeviceInfo.current
+            val info = AppDeviceInfo.current()
             BenchmarkDeviceInfo(
                 modelName = info.modelName,
                 chipName = info.architecture,

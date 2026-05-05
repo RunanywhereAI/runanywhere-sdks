@@ -28,18 +28,28 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
         var metrics = BenchmarkMetrics()
 
         // Ensure clean state: unload any VLM model left over from Camera or a previous run
-        await RunAnywhere.unloadVLMModel()
+        var vlmUnloadRequest = RAModelUnloadRequest()
+        vlmUnloadRequest.category = .multimodal
+        _ = await RunAnywhere.unloadModel(vlmUnloadRequest)
         // Also unload any lingering LLM model to free memory headroom
-        try? await RunAnywhere.unloadModel()
+        var llmUnloadRequest = RAModelUnloadRequest()
+        llmUnloadRequest.category = .language
+        _ = await RunAnywhere.unloadModel(llmUnloadRequest)
         // Brief pause to let iOS reclaim GPU/Metal memory from the previous model
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5s
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
         do {
-            // Load
+            // Load (canonical proto-request form)
             let loadStart = Date()
-            try await RunAnywhere.loadVLMModel(model)
+            var loadRequest = RAModelLoadRequest()
+            loadRequest.modelID = model.id
+            loadRequest.category = .multimodal
+            let loadResult = await RunAnywhere.loadModel(loadRequest)
+            guard loadResult.success else {
+                throw SDKException.general(.unknown, loadResult.errorMessage)
+            }
             metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
             // Generate a small synthetic image inside an autoreleasepool so CoreGraphics
@@ -58,19 +68,22 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
 
             // Warmup: single token to prime the pipeline without large KV allocation
             let warmupStart = Date()
-            _ = try await RunAnywhere.processImage(vlmImage, prompt: "Hi", maxTokens: 1, temperature: 0.0)
+            var warmupOptions = RAVLMGenerationOptions()
+            warmupOptions.prompt = "Hi"
+            warmupOptions.maxTokens = 1
+            warmupOptions.temperature = 0.0
+            _ = try await RunAnywhere.processImage(vlmImage, options: warmupOptions)
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
 
             // Cancel to flush any lingering generation state / KV cache before the real run
             await RunAnywhere.cancelVLMGeneration()
 
             // Benchmark
-            let result = try await RunAnywhere.processImage(
-                vlmImage,
-                prompt: "Describe this image in detail.",
-                maxTokens: 128,
-                temperature: 0.0
-            )
+            var benchOptions = RAVLMGenerationOptions()
+            benchOptions.prompt = "Describe this image in detail."
+            benchOptions.maxTokens = 128
+            benchOptions.temperature = 0.0
+            let result = try await RunAnywhere.processImage(vlmImage, options: benchOptions)
             metrics.endToEndLatencyMs = Double(result.processingTimeMs)
             metrics.tokensPerSecond = Double(result.tokensPerSecond)
             metrics.promptTokens = Int(result.promptTokens)
@@ -79,12 +92,12 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            await RunAnywhere.unloadVLMModel()
+            _ = await RunAnywhere.unloadModel(vlmUnloadRequest)
             // Give iOS time to release GPU/Metal buffers before the next model loads
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
             return metrics
         } catch {
-            await RunAnywhere.unloadVLMModel()
+            _ = await RunAnywhere.unloadModel(vlmUnloadRequest)
             try? await Task.sleep(nanoseconds: 300_000_000)
             throw error
         }

@@ -7,11 +7,10 @@ import ai.runanywhere.proto.v1.ModelInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.sdk.models.DeviceInfo
-import com.runanywhere.sdk.models.collectDeviceInfo
+import com.runanywhere.runanywhereai.models.AppDeviceInfo
+import com.runanywhere.runanywhereai.models.ModelSelectionContext
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.currentLLMModel
@@ -90,7 +89,12 @@ class ModelSelectionViewModel(
 
     private fun loadDeviceInfo() {
         viewModelScope.launch {
-            val deviceInfo = collectDeviceInfo()
+            val deviceInfo =
+                try {
+                    AppDeviceInfo.current()
+                } catch (_: Exception) {
+                    null
+                }
             _uiState.update { it.copy(deviceInfo = deviceInfo) }
         }
     }
@@ -421,7 +425,7 @@ class ModelSelectionViewModel(
  */
 data class ModelSelectionUiState(
     val context: ModelSelectionContext = ModelSelectionContext.LLM,
-    val deviceInfo: DeviceInfo? = null,
+    val deviceInfo: AppDeviceInfo? = null,
     val models: List<ModelInfo> = emptyList(),
     val frameworks: List<InferenceFramework> = emptyList(),
     val expandedFramework: InferenceFramework? = null,

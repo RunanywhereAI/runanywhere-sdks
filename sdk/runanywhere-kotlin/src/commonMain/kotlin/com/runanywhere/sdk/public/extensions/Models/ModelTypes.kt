@@ -14,68 +14,9 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 
-/**
- * Context for model selection UI. This is not an IDL schema; it is a
- * Kotlin-side filter helper over generated model category/framework enums.
- */
-enum class ModelSelectionContext(
-    val key: String,
-) {
-    LLM("llm"),
-    STT("stt"),
-    TTS("tts"),
-    VOICE("voice"),
-    RAG_EMBEDDING("ragEmbedding"),
-    RAG_LLM("ragLLM"),
-    VLM("vlm"),
-    ;
-
-    val title: String
-        get() =
-            when (this) {
-                LLM -> "Select LLM Model"
-                STT -> "Select STT Model"
-                TTS -> "Select TTS Voice"
-                VOICE -> "Select Voice Models"
-                RAG_EMBEDDING -> "Select Embedding Model"
-                RAG_LLM -> "Select LLM Model"
-                VLM -> "Select Vision Model"
-            }
-
-    fun isCategoryRelevant(category: ModelCategory): Boolean =
-        when (this) {
-            LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
-            STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-            TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-            VOICE ->
-                category == ModelCategory.MODEL_CATEGORY_LANGUAGE ||
-                    category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ||
-                    category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS ||
-                    category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-            RAG_EMBEDDING -> category == ModelCategory.MODEL_CATEGORY_EMBEDDING
-            RAG_LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
-            VLM ->
-                category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
-                    category == ModelCategory.MODEL_CATEGORY_VISION
-        }
-
-    fun isFrameworkRelevant(framework: InferenceFramework): Boolean =
-        when (this) {
-            LLM ->
-                framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
-            STT -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            TTS ->
-                framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
-            VOICE -> LLM.isFrameworkRelevant(framework) || STT.isFrameworkRelevant(framework) || TTS.isFrameworkRelevant(framework)
-            RAG_EMBEDDING -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            RAG_LLM -> framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-            VLM -> framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-        }
-}
+// KOT-15: `ModelSelectionContext` lived here as a UI filter helper but had
+// zero consumers inside the SDK. It was moved to the Android example app at
+// `examples/android/RunAnywhereAI/.../models/ModelSelectionContext.kt`.
 
 val ModelCategory.requiresContextLength: Boolean
     get() =

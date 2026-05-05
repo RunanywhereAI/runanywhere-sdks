@@ -45,8 +45,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.theme.AppColors
-import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 
 /**
  * ModelRequiredOverlay - Displays when a model needs to be selected

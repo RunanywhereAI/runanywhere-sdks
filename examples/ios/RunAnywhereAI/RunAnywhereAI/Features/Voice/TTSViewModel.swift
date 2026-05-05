@@ -52,7 +52,11 @@ class TTSViewModel: ObservableObject {
         subscribeToSDKEvents()
 
         // Check initial TTS voice state
-        if let voiceId = await RunAnywhere.currentTTSVoiceId {
+        var req = RACurrentModelRequest()
+        req.category = .speechSynthesis
+        let snapshot = RunAnywhere.currentModel(req)
+        if snapshot.found {
+            let voiceId = snapshot.modelID
             selectedModelId = voiceId
             selectedModelName = voiceId
             logger.info("TTS voice already loaded: \(voiceId)")
@@ -67,15 +71,18 @@ class TTSViewModel: ObservableObject {
         isSpeaking = true
         errorMessage = nil
 
-        do {
-            try await RunAnywhere.loadTTSModel(model.id)
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = .speechSynthesis
+        let result = await RunAnywhere.loadModel(request)
+        if result.success {
             selectedFramework = model.framework
             selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
             logger.info("TTS model loaded successfully: \(model.name)")
-        } catch {
-            logger.error("Failed to load TTS model: \(error.localizedDescription)")
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
+        } else {
+            logger.error("Failed to load TTS model: \(result.errorMessage)")
+            errorMessage = "Failed to load model: \(result.errorMessage)"
         }
 
         isSpeaking = false

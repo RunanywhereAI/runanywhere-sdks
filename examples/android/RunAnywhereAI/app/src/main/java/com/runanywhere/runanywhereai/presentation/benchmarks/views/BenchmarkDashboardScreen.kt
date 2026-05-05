@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.models.AppDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRunStatus
@@ -57,7 +58,6 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.viewmodel.Benchmark
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppSpacing
-import com.runanywhere.sdk.models.DeviceInfo
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -206,7 +206,7 @@ private fun DeviceInfoSection() {
     val context = LocalContext.current
     val deviceInfo =
         try {
-            DeviceInfo.current
+            AppDeviceInfo.current()
         } catch (_: Exception) {
             null
         }

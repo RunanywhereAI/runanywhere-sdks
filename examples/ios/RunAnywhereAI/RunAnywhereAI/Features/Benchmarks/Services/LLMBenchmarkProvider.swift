@@ -27,25 +27,37 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         let maxTokens = Int(scenario.parameters?["maxTokens"] ?? "") ?? 512
         var metrics = BenchmarkMetrics()
 
-        // Ensure clean state: unload any model left over from Chat or a previous run
-        try? await RunAnywhere.unloadModel()
+        // Ensure clean state: unload any LLM left over from Chat or a previous run
+        var preUnloadRequest = RAModelUnloadRequest()
+        preUnloadRequest.category = .language
+        _ = await RunAnywhere.unloadModel(preUnloadRequest)
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load
+        // Load (canonical proto-request form)
         let loadStart = Date()
-        try await RunAnywhere.loadModel(model.id)
+        var loadRequest = RAModelLoadRequest()
+        loadRequest.modelID = model.id
+        loadRequest.category = .language
+        let loadResult = await RunAnywhere.loadModel(loadRequest)
+        guard loadResult.success else {
+            throw SDKException.general(.unknown, loadResult.errorMessage)
+        }
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
+
+        var unloadRequest = RAModelUnloadRequest()
+        unloadRequest.category = .language
 
         do {
             // v2 close-out Phase G-2: generateStream returns
             // AsyncStream<RALLMStreamEvent>; benchmark derives TTFT +
             // tokens/sec from the event sequence directly.
             let warmupStart = Date()
-            var warmupOptions = RALLMGenerationOptions.defaults()
-            warmupOptions.maxTokens = 5
-            warmupOptions.temperature = 0.0
-            let warmupEvents = try await RunAnywhere.generateStream("Hello", options: warmupOptions)
+            var warmupRequest = RALLMGenerateRequest()
+            warmupRequest.prompt = "Hello"
+            warmupRequest.maxTokens = 5
+            warmupRequest.temperature = 0.0
+            let warmupEvents = try await RunAnywhere.generateStream(warmupRequest)
             for await event in warmupEvents where event.isFinal { break }
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
 
@@ -54,15 +66,16 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             let systemPrompt = "You are a helpful assistant. Always give extremely detailed, "
                 + "thorough responses. Never stop early. Use the full response length available "
                 + "to you. Elaborate on every point with examples and explanations."
-            var options = RALLMGenerationOptions.defaults()
-            options.maxTokens = Int32(maxTokens)
-            options.temperature = 0.0
-            options.systemPrompt = systemPrompt
             let prompt = "Write a very long and detailed explanation of how neural networks work, "
                 + "covering perceptrons, activation functions, backpropagation, gradient descent, "
                 + "loss functions, convolutional layers, recurrent layers, transformers, attention "
                 + "mechanisms, and training procedures. Be as thorough as possible."
-            let benchEvents = try await RunAnywhere.generateStream(prompt, options: options)
+            var benchRequest = RALLMGenerateRequest()
+            benchRequest.prompt = prompt
+            benchRequest.maxTokens = Int32(maxTokens)
+            benchRequest.temperature = 0.0
+            benchRequest.systemPrompt = systemPrompt
+            let benchEvents = try await RunAnywhere.generateStream(benchRequest)
 
             var tokenCount = 0
             var firstTokenTime: Date?
@@ -96,10 +109,10 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            try? await RunAnywhere.unloadModel()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             return metrics
         } catch {
-            try? await RunAnywhere.unloadModel()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             throw error
         }
     }

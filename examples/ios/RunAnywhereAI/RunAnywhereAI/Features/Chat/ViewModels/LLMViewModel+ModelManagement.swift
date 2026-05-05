@@ -13,18 +13,20 @@ extension LLMViewModel {
     // MARK: - Model Loading
 
     func loadModel(_ modelInfo: RAModelInfo) async {
-        do {
-            try await RunAnywhere.loadModel(modelInfo.id)
-
+        var request = RAModelLoadRequest()
+        request.modelID = modelInfo.id
+        request.category = .language
+        let result = await RunAnywhere.loadModel(request)
+        if result.success {
             await MainActor.run {
                 self.updateModelLoadedState(isLoaded: true)
                 self.updateLoadedModelInfo(name: modelInfo.name, framework: modelInfo.framework)
                 self.setLoadedModelSupportsThinking(modelInfo.supportsThinking)
                 self.updateSystemMessageAfterModelLoad()
             }
-        } catch {
+        } else {
             await MainActor.run {
-                self.setError(error)
+                self.setError(SDKException.general(.unknown, result.errorMessage))
                 self.updateModelLoadedState(isLoaded: false)
                 self.clearLoadedModelInfo()
             }
@@ -53,13 +55,17 @@ extension LLMViewModel {
 
     private func verifyModelLoaded(_ currentModel: RAModelInfo) {
         Task {
-            do {
-                try await RunAnywhere.loadModel(currentModel.id)
-                let supportsStreaming = await RunAnywhere.supportsLLMStreaming
+            var request = RAModelLoadRequest()
+            request.modelID = currentModel.id
+            request.category = .language
+            let result = await RunAnywhere.loadModel(request)
+            if result.success {
+                // All LLM inference goes through the canonical generate/generateStream
+                // entry points which negotiate streaming per-request.
                 await MainActor.run {
-                    self.updateStreamingSupport(supportsStreaming)
+                    self.updateStreamingSupport(true)
                 }
-            } catch {
+            } else {
                 await MainActor.run {
                     self.updateModelLoadedState(isLoaded: false)
                     self.clearLoadedModelInfo()

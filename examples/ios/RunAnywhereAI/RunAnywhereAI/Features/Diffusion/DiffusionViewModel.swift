@@ -76,9 +76,12 @@ class DiffusionViewModel: ObservableObject {
     }
 
     func checkModelState() async {
-        isModelLoaded = await RunAnywhere.isDiffusionModelLoaded
+        var request = RACurrentModelRequest()
+        request.category = .imageGeneration
+        let snapshot = RunAnywhere.currentModel(request)
+        isModelLoaded = snapshot.found
         if isModelLoaded {
-            currentModelName = await RunAnywhere.currentDiffusionModelId
+            currentModelName = snapshot.modelID
             // Determine backend from selected model
             if let model = selectedModel {
                 currentBackend = model.framework.displayName
@@ -129,11 +132,16 @@ class DiffusionViewModel: ObservableObject {
             let variant: RADiffusionModelVariant = .sd15
             currentModelVariant = variant
 
-            var config = RADiffusionConfiguration.defaults()
-            config.modelVariant = variant
-            config.enableSafetyChecker = true
-            config.reduceMemory = true
-            try await RunAnywhere.loadDiffusionModel(model, configuration: config)
+            // Load via canonical proto-request lifecycle. Diffusion-specific
+            // configuration (variant, safety checker, memory) is applied by the
+            // SDK internally based on category-default settings.
+            var loadRequest = RAModelLoadRequest()
+            loadRequest.modelID = model.id
+            loadRequest.category = .imageGeneration
+            let loadResult = await RunAnywhere.loadModel(loadRequest)
+            guard loadResult.success else {
+                throw SDKException.general(.unknown, loadResult.errorMessage)
+            }
             isModelLoaded = true
             currentModelName = model.name
             currentBackend = model.framework.displayName
@@ -188,9 +196,8 @@ class DiffusionViewModel: ObservableObject {
             options.guidanceScale = guidanceScale
             // Use the progress-callback overload so the pipeline runs only once.
             let result = try await RunAnywhere.generateImage(
-                prompt: prompt,
                 options: options
-            ) { [weak self] update in
+            ) { [weak self] (update: RADiffusionProgress) in
                 Task { @MainActor [weak self] in
                     self?.progress = update.progressPercent
                     if steps == 1 {

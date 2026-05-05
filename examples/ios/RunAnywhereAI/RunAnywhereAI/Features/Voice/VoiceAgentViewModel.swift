@@ -209,15 +209,34 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    /// Sync model states from SDK
+    /// Sync model states from SDK via canonical component lifecycle snapshot API.
     private func syncModelStates() async {
-        let states = await RunAnywhere.getVoiceAgentComponentStates()
+        let sttState = componentStateFromSnapshot(.stt)
+        let llmState = componentStateFromSnapshot(.llm)
+        let ttsState = componentStateFromSnapshot(.tts)
+        let vadState = componentStateFromSnapshot(.vad)
 
-        sttModelState = mapState(states.stt)
-        llmModelState = mapState(states.llm)
-        ttsModelState = mapState(states.tts)
+        sttModelState = mapState(sttState)
+        llmModelState = mapState(llmState)
+        ttsModelState = mapState(ttsState)
 
-        logger.info("Model states synced - VAD: \(states.vad.isLoaded), STT: \(states.stt.isLoaded), LLM: \(states.llm.isLoaded), TTS: \(states.tts.isLoaded)")
+        logger.info("Model states synced - VAD: \(vadState.isLoaded), STT: \(sttState.isLoaded), LLM: \(llmState.isLoaded), TTS: \(ttsState.isLoaded)")
+    }
+
+    private func componentStateFromSnapshot(_ component: RASDKComponent) -> RAComponentLoadState {
+        guard let snapshot = RunAnywhere.componentLifecycleSnapshot(component) else {
+            return .notLoaded
+        }
+        switch snapshot.state {
+        case .ready:
+            return .loaded
+        case .loading, .downloading, .updating:
+            return .loading
+        case .error:
+            return .error
+        default:
+            return .notLoaded
+        }
     }
 
     private func mapState(_ state: ComponentLoadState) -> ModelLoadState {
@@ -397,9 +416,24 @@ final class VoiceAgentViewModel: ObservableObject {
 
         do {
             // Initialize voice agent against the currently-loaded models.
-            // SettingsViewModel's continuousMode/thinking/maxTokens land at the C
-            // layer via a future config surface; v3.1 keeps the init minimal.
-            try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+            // Compose from the canonical currentModel(_:) snapshots per category.
+            var composeConfig = RAVoiceAgentComposeConfig()
+            var sttRequest = RACurrentModelRequest()
+            sttRequest.category = .speechRecognition
+            let sttSnap = RunAnywhere.currentModel(sttRequest)
+            if sttSnap.found { composeConfig.sttModelID = sttSnap.modelID }
+
+            var llmRequest = RACurrentModelRequest()
+            llmRequest.category = .language
+            let llmSnap = RunAnywhere.currentModel(llmRequest)
+            if llmSnap.found { composeConfig.llmModelID = llmSnap.modelID }
+
+            var ttsRequest = RACurrentModelRequest()
+            ttsRequest.category = .speechSynthesis
+            let ttsSnap = RunAnywhere.currentModel(ttsRequest)
+            if ttsSnap.found { composeConfig.ttsVoiceID = ttsSnap.modelID }
+
+            try await RunAnywhere.initializeVoiceAgent(composeConfig)
 
             sessionState = .listening
             currentStatus = "Listening..."

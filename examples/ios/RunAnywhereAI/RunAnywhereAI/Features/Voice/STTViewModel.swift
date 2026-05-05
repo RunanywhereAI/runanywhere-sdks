@@ -110,15 +110,18 @@ class STTViewModel: ObservableObject {
         isProcessing = true
         errorMessage = nil
 
-        do {
-            try await RunAnywhere.loadSTTModel(model.id)
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = .speechRecognition
+        let result = await RunAnywhere.loadModel(request)
+        if result.success {
             selectedFramework = model.framework
             selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
             logger.info("STT model loaded successfully: \(model.name)")
-        } catch {
-            logger.error("Failed to load STT model: \(error.localizedDescription)")
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
+        } else {
+            logger.error("Failed to load STT model: \(result.errorMessage)")
+            errorMessage = "Failed to load model: \(result.errorMessage)"
         }
 
         isProcessing = false
@@ -204,7 +207,11 @@ class STTViewModel: ObservableObject {
     }
 
     private func checkInitialModelState() async {
-        if let model = await RunAnywhere.currentSTTModel {
+        var req = RACurrentModelRequest()
+        req.category = .speechRecognition
+        let snapshot = RunAnywhere.currentModel(req)
+        if snapshot.found {
+            let model = snapshot.model
             selectedModelId = model.id
             selectedModelName = model.name.modelNameFromID()
             selectedFramework = model.framework
@@ -284,9 +291,9 @@ class STTViewModel: ObservableObject {
         transcription = ""
 
         do {
-            let result = try await RunAnywhere.transcribe(audioBuffer)
-            transcription = result
-            logger.info("Batch transcription complete: \(result)")
+            let output = try await RunAnywhere.transcribe(audio: audioBuffer)
+            transcription = output.text
+            logger.info("Batch transcription complete: \(output.text)")
         } catch {
             logger.error("Batch transcription failed: \(error.localizedDescription)")
             errorMessage = "Transcription failed: \(error.localizedDescription)"
@@ -351,13 +358,13 @@ class STTViewModel: ObservableObject {
         isTranscribing = true
 
         do {
-            let result = try await RunAnywhere.transcribe(audio)
+            let output = try await RunAnywhere.transcribe(audio: audio)
             // Append to existing transcription with newline
             if !transcription.isEmpty {
                 transcription += "\n"
             }
-            transcription += result
-            logger.info("Live transcription result: \(result)")
+            transcription += output.text
+            logger.info("Live transcription result: \(output.text)")
         } catch {
             logger.error("Live transcription failed: \(error.localizedDescription)")
             errorMessage = "Transcription failed: \(error.localizedDescription)"

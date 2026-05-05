@@ -23,12 +23,16 @@ class ModelManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        do {
-            // Use SDK's model loading with new API
-            try await RunAnywhere.loadModel(modelInfo.id)
-        } catch {
-            self.error = error
-            throw error
+        var request = RAModelLoadRequest()
+        request.modelID = modelInfo.id
+        if modelInfo.category != .unspecified {
+            request.category = modelInfo.category
+        }
+        let result = await RunAnywhere.loadModel(request)
+        guard result.success else {
+            let err = SDKException.general(.unknown, result.errorMessage)
+            self.error = err
+            throw err
         }
     }
 
@@ -36,13 +40,9 @@ class ModelManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Use SDK's model unloading with new API
-        do {
-            try await RunAnywhere.unloadModel()
-        } catch {
-            self.error = error
-            print("Failed to unload model: \(error)")
-        }
+        var request = RAModelUnloadRequest()
+        request.unloadAll = true
+        _ = await RunAnywhere.unloadModel(request)
     }
 
     func getAvailableModels() async -> [RAModelInfo] {
@@ -55,11 +55,13 @@ class ModelManager: ObservableObject {
     }
 
     func getCurrentModel() async -> RAModelInfo? {
-        // Get current model ID from SDK and look up the model info
-        guard let modelId = await RunAnywhere.getCurrentModelId() else {
-            return nil
+        // Resolve any currently-loaded model via canonical proto snapshot API.
+        let snapshot = RunAnywhere.currentModel()
+        guard snapshot.found else { return nil }
+        if snapshot.hasModel {
+            return snapshot.model
         }
         let models = await getAvailableModels()
-        return models.first { $0.id == modelId }
+        return models.first { $0.id == snapshot.modelID }
     }
 }

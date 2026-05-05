@@ -13,8 +13,8 @@
  *
  * Architecture:
  * - Uses native audio recording (AudioService)
- * - Model loading via RunAnywhere.loadSTTModel()
- * - Transcription via RunAnywhere.transcribe()
+ * - Model loading via RunAnywhere.loadModel(id, ModelCategory.SPEECH_TO_TEXT)
+ * - Transcription via RunAnywhere.transcribeFile() (file-based) or streaming primitives
  * - Supports ONNX-based Whisper models
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift

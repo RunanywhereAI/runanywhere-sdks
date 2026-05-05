@@ -12,8 +12,8 @@
  * - System TTS fallback
  *
  * Architecture:
- * - Model loading via RunAnywhere.loadTTSModel()
- * - Speech synthesis via RunAnywhere.synthesizeSpeech()
+ * - Model loading via RunAnywhere.loadModel(id, ModelCategory.SPEECH_SYNTHESIS)
+ * - Speech synthesis via RunAnywhere.synthesize()
  * - Audio playback via native audio player
  * - Supports ONNX-based Piper TTS models
  *
@@ -375,7 +375,7 @@ export const TTSScreen: React.FC = () => {
         } else {
           const error = await RunAnywhere.getLastError();
           console.error(
-            '[TTSScreen] loadTTSModel returned false, error:',
+            '[TTSScreen] loadModelById returned false, error:',
             error
           );
           Alert.alert(

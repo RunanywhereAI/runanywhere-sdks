@@ -26,10 +26,19 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load
+        // Load (canonical proto-request form)
         let loadStart = Date()
-        try await RunAnywhere.loadSTTModel(model.id)
+        var loadRequest = RAModelLoadRequest()
+        loadRequest.modelID = model.id
+        loadRequest.category = .speechRecognition
+        let loadResult = await RunAnywhere.loadModel(loadRequest)
+        guard loadResult.success else {
+            throw SDKException.general(.unknown, loadResult.errorMessage)
+        }
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
+
+        var unloadRequest = RAModelUnloadRequest()
+        unloadRequest.category = .speechRecognition
 
         do {
             // Generate audio
@@ -57,10 +66,10 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            try? await RunAnywhere.unloadSTTModel()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             return metrics
         } catch {
-            try? await RunAnywhere.unloadSTTModel()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             throw error
         }
     }

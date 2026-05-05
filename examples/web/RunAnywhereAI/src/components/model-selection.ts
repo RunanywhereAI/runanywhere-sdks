@@ -1,0 +1,535 @@
+/**
+ * Model Selection — minimal in-toolbar model picker + bottom-sheet list.
+ *
+ * This component satisfies two probe targets read by `main.ts:probeAppShell`:
+ *
+ *   1. `#chat-toolbar-model` — a pill-button shown on top of the chat panel
+ *      listing the currently loaded model (or "Select Model"). It is
+ *      actionable whenever at least one catalog entry has been registered.
+ *   2. `#chat-model-overlay` + `#chat-get-started-btn` — a "Get Started"
+ *      overlay shown before any model is chosen. The readiness probe accepts
+ *      either one so the chat tab is considered interactive as soon as the
+ *      user has a clear path to a model.
+ *
+ * Model actions flow through the proto-byte bridges:
+ *
+ *   - `RunAnywhere.modelRegistry.*`    — catalog list / get
+ *   - `RunAnywhere.downloads.*`        — download start/cancel/poll
+ *   - `RunAnywhere.modelLifecycle.*`   — load / unload / current / snapshot
+ *
+ * No legacy `ModelManager`, `ModelRegistry` (JS), or `ExtensionPoint` usage.
+ */
+
+import type { ModelInfo } from '@runanywhere/web';
+import {
+  RunAnywhere,
+  ModelCategory,
+  InferenceFramework,
+} from '@runanywhere/web';
+import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
+import {
+  DownloadState,
+} from '@runanywhere/proto-ts/download_service';
+import { getCatalog, registerModelCatalog } from '../services/model-catalog';
+import { showToast } from './dialogs';
+
+// ---------------------------------------------------------------------------
+// State (module-scope, one selection sheet per app)
+// ---------------------------------------------------------------------------
+
+type RowStatus =
+  | 'registered'       // not downloaded yet
+  | 'downloading'
+  | 'downloaded'       // on disk but not loaded
+  | 'loading'
+  | 'loaded'
+  | 'error';
+
+interface RowState {
+  status: RowStatus;
+  progress?: number;   // 0..1
+  taskId?: string;
+  error?: string;
+}
+
+const rowStates = new Map<string, RowState>();
+
+let modalEl: HTMLElement | null = null;
+let toolbarBtn: HTMLElement | null = null;
+let toolbarText: HTMLElement | null = null;
+let getStartedOverlay: HTMLElement | null = null;
+let getStartedBtn: HTMLButtonElement | null = null;
+let pollInterval: number | null = null;
+let catalogRegistered = false;
+const listeners: Array<() => void> = [];
+
+// ---------------------------------------------------------------------------
+// Public API — wiring into the chat view
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensures the catalog is registered with the proto-byte model registry.
+ * Safe to call repeatedly; only the first successful call registers entries.
+ */
+export function ensureCatalogRegistered(): boolean {
+  if (catalogRegistered) return true;
+  const count = registerModelCatalog();
+  catalogRegistered = count > 0;
+  if (catalogRegistered) {
+    hydrateRowStatesFromRegistry();
+  }
+  return catalogRegistered;
+}
+
+/**
+ * Mount the `#chat-toolbar-model` pill into the chat toolbar. Returns the
+ * element so the caller can place it wherever the toolbar layout expects.
+ */
+export function buildToolbarModelButton(): HTMLElement {
+  const btn = document.createElement('button');
+  btn.id = 'chat-toolbar-model';
+  btn.className = 'toolbar-model-btn';
+  btn.type = 'button';
+  btn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="model-icon">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 3c2.5 3 2.5 15 0 18M3 12h18"/>
+    </svg>
+    <span id="chat-toolbar-model-text">Select Model</span>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  `;
+  btn.addEventListener('click', () => openSheet());
+
+  toolbarBtn = btn;
+  toolbarText = btn.querySelector('#chat-toolbar-model-text') as HTMLElement;
+  refreshToolbarLabel();
+  return btn;
+}
+
+/**
+ * Mount the `#chat-model-overlay` "Get Started" overlay into the panel host.
+ * The overlay is hidden automatically as soon as a model is loaded.
+ */
+export function buildGetStartedOverlay(): HTMLElement {
+  const overlay = document.createElement('div');
+  overlay.id = 'chat-model-overlay';
+  overlay.className = 'chat-model-overlay';
+  overlay.innerHTML = `
+    <div class="chat-model-overlay-card">
+      <h3 class="chat-model-overlay-title">Get started</h3>
+      <p class="chat-model-overlay-description">
+        Pick a model to download and load. Models run fully on-device via
+        WebAssembly &mdash; no server round-trips.
+      </p>
+      <button type="button" id="chat-get-started-btn" class="btn btn-primary btn-lg">
+        Choose a Model
+      </button>
+    </div>
+  `;
+
+  getStartedOverlay = overlay;
+  getStartedBtn = overlay.querySelector('#chat-get-started-btn') as HTMLButtonElement;
+  getStartedBtn.addEventListener('click', () => openSheet());
+
+  refreshOverlayVisibility();
+  return overlay;
+}
+
+/**
+ * Subscribe to state changes for re-rendering consumers (chat toolbar, etc.).
+ * Returns an unsubscribe function.
+ */
+export function onModelStateChange(listener: () => void): () => void {
+  listeners.push(listener);
+  return () => {
+    const idx = listeners.indexOf(listener);
+    if (idx >= 0) listeners.splice(idx, 1);
+  };
+}
+
+/** Open the model selection bottom sheet programmatically. */
+export function openSheet(): void {
+  if (modalEl) return;
+  ensureCatalogRegistered();
+  renderSheet();
+}
+
+// ---------------------------------------------------------------------------
+// Rendering — bottom sheet
+// ---------------------------------------------------------------------------
+
+function renderSheet(): void {
+  modalEl = document.createElement('div');
+  modalEl.className = 'modal-backdrop';
+  modalEl.innerHTML = `
+    <div class="modal-sheet" role="dialog" aria-modal="true">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 class="text-md font-semibold">Select Model</h3>
+        <button type="button" class="btn-ghost" id="model-sheet-close" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="model-sheet-list"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalEl);
+
+  modalEl.querySelector('#model-sheet-close')!.addEventListener('click', closeSheet);
+  modalEl.addEventListener('click', (event) => {
+    if (event.target === modalEl) closeSheet();
+  });
+
+  renderRows();
+}
+
+function closeSheet(): void {
+  if (!modalEl) return;
+  modalEl.remove();
+  modalEl = null;
+}
+
+function renderRows(): void {
+  const host = document.getElementById('model-sheet-list');
+  if (!host) return;
+
+  const entries = getCatalog();
+  if (!entries.length) {
+    host.innerHTML = '<p class="text-secondary">No models registered.</p>';
+    return;
+  }
+
+  host.innerHTML = entries.map((entry) => {
+    const state = rowStates.get(entry.id) ?? { status: 'registered' as RowStatus };
+    const progressBar = state.status === 'downloading'
+      ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+      : '';
+    const errorBar = state.error
+      ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
+      : '';
+    return `
+      <div class="model-row" data-model-id="${entry.id}">
+        <div class="model-logo">${modalityEmoji(entry.category)}</div>
+        <div class="model-info">
+          <div class="model-name">${escapeHtml(entry.name)}</div>
+          <div class="model-meta">
+            <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
+            <span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>
+          </div>
+          ${progressBar}
+          ${errorBar}
+        </div>
+        ${actionButton(entry.id, state)}
+      </div>
+    `;
+  }).join('');
+
+  host.querySelectorAll('[data-action]').forEach((el) => {
+    const btn = el as HTMLButtonElement;
+    const action = btn.dataset.action as 'download' | 'load' | 'unload';
+    const modelId = btn.dataset.modelId!;
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      void handleAction(action, modelId);
+    });
+  });
+}
+
+function actionButton(modelId: string, state: RowState): string {
+  switch (state.status) {
+    case 'registered':
+      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${modelId}">Download</button>`;
+    case 'downloading':
+      return `<button type="button" class="model-action-btn" disabled>${Math.round((state.progress ?? 0) * 100)}%</button>`;
+    case 'downloaded':
+      return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${modelId}">Load</button>`;
+    case 'loading':
+      return `<button type="button" class="model-action-btn" disabled>Loading...</button>`;
+    case 'loaded':
+      return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${modelId}">Loaded</button>`;
+    case 'error':
+      return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${modelId}">Retry</button>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Actions — download / load / unload
+// ---------------------------------------------------------------------------
+
+async function handleAction(action: 'download' | 'load' | 'unload', modelId: string): Promise<void> {
+  if (action === 'download') await startDownload(modelId);
+  else if (action === 'load') await loadModel(modelId);
+  else if (action === 'unload') await unloadModel(modelId);
+}
+
+async function startDownload(modelId: string): Promise<void> {
+  setRow(modelId, { status: 'downloading', progress: 0 });
+
+  try {
+    const plan = RunAnywhere.downloads.plan({
+      modelId,
+      resumeExisting: false,
+      availableStorageBytes: 0,
+      allowMeteredNetwork: true,
+      storageNamespace: '',
+      validateExistingBytes: false,
+      verifyChecksums: false,
+      requiredFreeBytesAfterDownload: 0,
+    });
+
+    if (!plan || !plan.canStart) {
+      throw new Error(plan?.errorMessage || 'Download plan unavailable');
+    }
+
+    const start = RunAnywhere.downloads.start({
+      modelId,
+      plan,
+      resume: false,
+      resumeToken: '',
+      updateRegistryOnCompletion: true,
+    });
+
+    if (!start || !start.accepted) {
+      throw new Error(start?.errorMessage || 'Download start rejected');
+    }
+
+    setRow(modelId, {
+      status: 'downloading',
+      progress: 0,
+      taskId: start.taskId,
+    });
+    startDownloadPolling();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    setRow(modelId, { status: 'error', error: message });
+    showToast(`Download failed: ${message}`, 'warning');
+  }
+}
+
+async function loadModel(modelId: string): Promise<void> {
+  setRow(modelId, { status: 'loading' });
+  try {
+    const result = RunAnywhere.modelLifecycle.load({
+      modelId,
+      forceReload: false,
+      validateAvailability: true,
+    });
+    if (!result || !result.success) {
+      throw new Error(result?.errorMessage || 'Model load failed');
+    }
+    setRow(modelId, { status: 'loaded' });
+    showToast(`Loaded ${modelId}`, 'success');
+    closeSheet();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    setRow(modelId, { status: 'error', error: message });
+    showToast(`Load failed: ${message}`, 'warning');
+  }
+}
+
+async function unloadModel(modelId: string): Promise<void> {
+  try {
+    const result = RunAnywhere.modelLifecycle.unload({
+      modelId,
+      unloadAll: false,
+    });
+    if (!result || !result.success) {
+      throw new Error(result?.errorMessage || 'Unload failed');
+    }
+    setRow(modelId, { status: 'downloaded' });
+    showToast(`Unloaded ${modelId}`, 'info');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    showToast(`Unload failed: ${message}`, 'warning');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Download progress polling — cheap polling keeps dependencies minimal
+// ---------------------------------------------------------------------------
+
+function startDownloadPolling(): void {
+  if (pollInterval !== null) return;
+  pollInterval = window.setInterval(() => pollAll(), 500);
+}
+
+function stopDownloadPolling(): void {
+  if (pollInterval !== null) {
+    window.clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
+function pollAll(): void {
+  let active = false;
+  for (const [modelId, state] of rowStates.entries()) {
+    if (state.status !== 'downloading') continue;
+    active = true;
+    try {
+      const progress = RunAnywhere.downloads.poll({
+        modelId,
+        taskId: state.taskId ?? '',
+      });
+      if (progress) applyProgress(modelId, progress);
+    } catch {
+      // tolerate transient poll failures; keep polling
+    }
+  }
+  if (!active) stopDownloadPolling();
+}
+
+function applyProgress(modelId: string, progress: DownloadProgress): void {
+  const fraction = Math.max(0, Math.min(1, progress.overallProgress));
+  if (progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED) {
+    setRow(modelId, { status: 'downloaded', progress: 1 });
+    return;
+  }
+  if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
+    setRow(modelId, { status: 'error', error: progress.errorMessage || 'Download failed' });
+    return;
+  }
+  if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
+    setRow(modelId, { status: 'registered' });
+    return;
+  }
+  setRow(modelId, {
+    status: 'downloading',
+    progress: fraction,
+    taskId: progress.taskId,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// State + toolbar updates
+// ---------------------------------------------------------------------------
+
+function setRow(modelId: string, patch: Partial<RowState>): void {
+  const previous = rowStates.get(modelId) ?? { status: 'registered' as RowStatus };
+  rowStates.set(modelId, { ...previous, ...patch });
+  if (modalEl) renderRows();
+  refreshToolbarLabel();
+  refreshOverlayVisibility();
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.warn('[model-selection] listener threw', err);
+    }
+  }
+}
+
+function refreshToolbarLabel(): void {
+  if (!toolbarBtn || !toolbarText) return;
+
+  const loaded = findLoadedModelId();
+  if (loaded) {
+    const info = lookupModelInfo(loaded);
+    toolbarText.textContent = info?.name ?? loaded;
+  } else {
+    toolbarText.textContent = catalogRegistered ? 'Select Model' : 'Loading...';
+  }
+}
+
+function refreshOverlayVisibility(): void {
+  if (!getStartedOverlay) return;
+  const shouldShow = !findLoadedModelId();
+  getStartedOverlay.classList.toggle('hidden', !shouldShow);
+  if (getStartedBtn) {
+    getStartedBtn.disabled = !catalogRegistered;
+    if (!getStartedBtn.textContent?.trim()) {
+      getStartedBtn.textContent = 'Choose a Model';
+    }
+  }
+}
+
+function findLoadedModelId(): string | null {
+  for (const [id, state] of rowStates.entries()) {
+    if (state.status === 'loaded') return id;
+  }
+  return null;
+}
+
+function lookupModelInfo(modelId: string): ModelInfo | null {
+  try {
+    return RunAnywhere.modelRegistry.get(modelId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * On first catalog registration, query the registry for already-downloaded
+ * and currently-loaded models so the UI reflects their real state.
+ */
+function hydrateRowStatesFromRegistry(): void {
+  try {
+    const downloaded = RunAnywhere.modelRegistry.listDownloaded();
+    for (const model of downloaded?.models ?? []) {
+      rowStates.set(model.id, { status: 'downloaded' });
+    }
+  } catch {
+    // ignore — listDownloaded may be unavailable in some WASM builds
+  }
+
+  try {
+    const current = RunAnywhere.modelLifecycle.currentModel();
+    if (current?.modelId) {
+      rowStates.set(current.modelId, { status: 'loaded' });
+    }
+  } catch {
+    // ignore — lifecycle may be unavailable
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Small formatting helpers
+// ---------------------------------------------------------------------------
+
+function modalityEmoji(category: ModelCategory): string {
+  switch (category) {
+    case ModelCategory.MODEL_CATEGORY_LANGUAGE: return '&#129302;';
+    case ModelCategory.MODEL_CATEGORY_MULTIMODAL: return '&#128065;';
+    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION: return '&#127908;';
+    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS: return '&#128266;';
+    case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION: return '&#128483;';
+    case ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION: return '&#127912;';
+    case ModelCategory.MODEL_CATEGORY_EMBEDDING: return '&#128279;';
+    default: return '&#9881;&#65039;';
+  }
+}
+
+function formatFramework(framework: InferenceFramework): string {
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP: return 'llama.cpp';
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX: return 'ONNX';
+    case InferenceFramework.INFERENCE_FRAMEWORK_COREML: return 'CoreML';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLX: return 'MLX';
+    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS: return 'Apple FM';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS: return 'System TTS';
+    case InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO: return 'FluidAudio';
+    default: return 'Unknown';
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+  if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;
+  return `${Math.round(bytes / 1_000)} KB`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}

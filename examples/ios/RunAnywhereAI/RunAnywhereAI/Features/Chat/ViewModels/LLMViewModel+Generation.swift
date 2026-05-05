@@ -27,7 +27,8 @@ extension LLMViewModel {
         var finishReason = ""
         var terminalError = ""
 
-        let eventStream = try await RunAnywhere.generateStream(prompt, options: options)
+        let request = Self.makeRequest(prompt: prompt, options: options)
+        let eventStream = try await RunAnywhere.generateStream(request)
         for await event in eventStream {
             if !event.token.isEmpty {
                 if firstTokenTime == nil { firstTokenTime = Date() }
@@ -87,7 +88,8 @@ extension LLMViewModel {
         options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        let result = try await RunAnywhere.generate(prompt, options: options)
+        let request = Self.makeRequest(prompt: prompt, options: options)
+        let result = try await RunAnywhere.generate(request)
         await updateMessageWithResult(
             at: messageIndex,
             result: result,
@@ -95,6 +97,22 @@ extension LLMViewModel {
             options: options,
             wasInterrupted: false
         )
+    }
+
+    /// Compose a canonical `RALLMGenerateRequest` from a prompt and options.
+    /// Example-local convenience for bridging the app's options-based API into
+    /// the SDK's canonical request-based entry points.
+    static func makeRequest(prompt: String, options: RALLMGenerationOptions) -> RALLMGenerateRequest {
+        var request = RALLMGenerateRequest()
+        request.prompt = prompt
+        request.maxTokens = options.maxTokens
+        request.temperature = options.temperature
+        request.topP = options.topP
+        request.topK = options.topK
+        request.systemPrompt = options.systemPrompt
+        request.stopSequences = options.stopSequences
+        request.streamingEnabled = options.streamingEnabled
+        return request
     }
 
     // MARK: - Message Updates

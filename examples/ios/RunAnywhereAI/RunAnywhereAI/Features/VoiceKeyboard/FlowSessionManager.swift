@@ -166,7 +166,9 @@ final class FlowSessionManager: ObservableObject {
     /// Ensure an STT model is loaded; returns true on success. On failure the
     /// session is transitioned back to `.idle` and `lastError` is populated.
     private func ensureSTTModelLoaded() async -> Bool {
-        if await RunAnywhere.currentSTTModel != nil { return true }
+        var req = RACurrentModelRequest()
+        req.category = .speechRecognition
+        if RunAnywhere.currentModel(req).found { return true }
 
         guard let preferredId = SharedDataBridge.shared.preferredSTTModelId else {
             lastError = "No STT model selected. Open Voice Keyboard settings to download one."
@@ -177,12 +179,15 @@ final class FlowSessionManager: ObservableObject {
         }
 
         logger.info("Auto-loading preferred STT model: \(preferredId)")
-        do {
-            try await RunAnywhere.loadSTTModel(preferredId)
+        var request = RAModelLoadRequest()
+        request.modelID = preferredId
+        request.category = .speechRecognition
+        let result = await RunAnywhere.loadModel(request)
+        if result.success {
             return true
-        } catch {
+        } else {
             lastError = "Could not load model. Please check Voice Keyboard settings."
-            logger.error("Auto-load failed: \(error.localizedDescription)")
+            logger.error("Auto-load failed: \(result.errorMessage)")
             SharedDataBridge.shared.clearSession()
             transition(to: .idle)
             return false
@@ -292,7 +297,8 @@ final class FlowSessionManager: ObservableObject {
         logger.info("Transcribing \(audio.count) bytes")
 
         do {
-            let text = try await RunAnywhere.transcribe(audio)
+            let output = try await RunAnywhere.transcribe(audio: audio)
+            let text = output.text
             logger.info("Transcription complete: \"\(text)\"")
             wordCount += text.split(separator: " ").count
 

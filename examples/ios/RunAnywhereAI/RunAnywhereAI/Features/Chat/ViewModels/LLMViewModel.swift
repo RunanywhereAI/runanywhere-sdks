@@ -322,14 +322,9 @@ final class LLMViewModel {
             return
         }
 
-        let modelSupportsStreaming = await RunAnywhere.supportsLLMStreaming
-        let effectiveUseStreaming = useStreaming && modelSupportsStreaming
-
-        if !modelSupportsStreaming && useStreaming {
-            logger.info("Model doesn't support streaming, using non-streaming mode")
-        }
-
-        if effectiveUseStreaming {
+        // All LLM backends now handle streaming via the canonical generateStream
+        // entry point; the SDK no longer exposes a per-model capability flag.
+        if useStreaming {
             try await generateStreamingResponse(prompt: prompt, options: options, messageIndex: messageIndex)
         } else {
             try await generateNonStreamingResponse(prompt: prompt, options: options, messageIndex: messageIndex)
@@ -713,14 +708,15 @@ final class LLMViewModel {
     private func modelLoaded(_ notification: Notification) {
         Task {
             if let model = notification.object as? RAModelInfo {
-                let supportsStreaming = await RunAnywhere.supportsLLMStreaming
-
+                // All LLM backends expose streaming via the canonical
+                // generateStream entry; the SDK no longer publishes a
+                // per-model capability flag.
                 await MainActor.run {
                     self.isModelLoaded = true
                     self.loadedModelName = model.name
                     self.loadedModelSupportsThinking = model.supportsThinking
                     self.selectedFramework = model.framework
-                    self.modelSupportsStreaming = supportsStreaming
+                    self.modelSupportsStreaming = true
 
                     if self.messages.first?.role == .system {
                         self.messages.removeFirst()

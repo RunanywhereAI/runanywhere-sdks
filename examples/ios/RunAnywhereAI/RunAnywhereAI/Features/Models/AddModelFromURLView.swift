@@ -179,18 +179,33 @@ struct AddModelFromURLView: View {
         isAdding = true
         errorMessage = nil
 
-        // Use the new registerModel API
-        let modelInfo = await RunAnywhere.registerModel(
-            name: modelName,
-            url: url,
-            framework: selectedFramework,
-            memoryRequirement: Int64(estimatedSize),
-            supportsThinking: supportsThinking
-        )
+        // Compose a canonical RAModelImportRequest from the user input.
+        var modelInfo = RAModelInfo()
+        modelInfo.id = UUID().uuidString
+        modelInfo.name = modelName
+        modelInfo.framework = selectedFramework
+        modelInfo.memoryRequiredBytes = Int64(estimatedSize) ?? 0
+        modelInfo.supportsThinking = supportsThinking
+        modelInfo.downloadURL = url.absoluteString
 
-        await MainActor.run {
-            onModelAdded(modelInfo)
-            dismiss()
+        var request = RAModelImportRequest()
+        request.model = modelInfo
+        request.sourcePath = url.absoluteString
+
+        do {
+            let result = try await RunAnywhere.importModel(request)
+            guard result.success, result.hasModel else {
+                throw SDKException.general(.unknown, result.warnings.joined(separator: "; "))
+            }
+            await MainActor.run {
+                onModelAdded(result.model)
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isAdding = false
+            }
         }
     }
 }
