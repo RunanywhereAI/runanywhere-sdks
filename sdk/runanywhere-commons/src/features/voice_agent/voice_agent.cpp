@@ -38,6 +38,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "errors.pb.h"
 #include "sdk_events.pb.h"
 #include "voice_agent_service.pb.h"
 #include "voice_events.pb.h"
@@ -211,7 +212,8 @@ void emit_component_failure(rac_voice_agent_handle_t handle,
     event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     auto* session_error = event.mutable_session_error();
-    session_error->set_code(runanywhere::v1::VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE);
+    // IDL-08: VoiceSessionError.code now uses canonical ErrorCode from errors.proto.
+    session_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
     session_error->set_message(message ? message : rac_error_message(code));
     if (component) {
         session_error->set_failed_component(component);
@@ -1528,7 +1530,8 @@ void d7_emit_state(rac_voice_agent_handle_t handle,
 }
 
 void d7_emit_vad(rac_voice_agent_handle_t handle,
-                 runanywhere::v1::VADEventType type,
+                 runanywhere::v1::VADStreamEventKind kind,
+                 bool is_speech,
                  const std::string& session_id,
                  const std::string& turn_id,
                  const std::string& request_id,
@@ -1539,8 +1542,8 @@ void d7_emit_vad(rac_voice_agent_handle_t handle,
     event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
     auto* v = event.mutable_vad();
-    v->set_type(type);
-    v->set_is_speech(type == runanywhere::v1::VAD_EVENT_VOICE_START);
+    v->set_type(kind);
+    v->set_is_speech(is_speech);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
@@ -1698,7 +1701,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_IDLE,
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
-    d7_emit_vad(handle, runanywhere::v1::VAD_EVENT_VOICE_START, session_id, turn_id, request_id,
+    d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+                /*is_speech=*/true, session_id, turn_id, request_id,
                 event_callback, user_data);
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_LISTENING,
@@ -1722,7 +1726,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                                "STT transcription was empty");
         return RAC_ERROR_INVALID_STATE;
     }
-    d7_emit_vad(handle, runanywhere::v1::VAD_EVENT_VOICE_END_OF_UTTERANCE, session_id, turn_id,
+    d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+                /*is_speech=*/false, session_id, turn_id,
                 request_id, event_callback, user_data);
     d7_emit_user_said(handle, stt.text,
                       request.session_config().has_language_code()

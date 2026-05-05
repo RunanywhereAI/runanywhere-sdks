@@ -116,7 +116,7 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
     <View style={styles.metricsRow}>
       <MetricView
         label="Time"
-        value={`${(analytics.totalGenerationTime / 1000).toFixed(1)}s`}
+        value={`${(analytics.performance.latencyMs / 1000).toFixed(1)}s`}
         color={Colors.statusGreen}
       />
       {analytics.timeToFirstToken && (
@@ -126,14 +126,13 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
           color={Colors.statusBlue}
         />
       )}
-      {analytics.averageTokensPerSecond != null &&
-        analytics.averageTokensPerSecond > 0 && (
-          <MetricView
-            label="Speed"
-            value={`${Math.round(analytics.averageTokensPerSecond)} tok/s`}
-            color={Colors.primaryPurple}
-          />
-        )}
+      {analytics.performance.throughputTokensPerSec > 0 && (
+        <MetricView
+          label="Speed"
+          value={`${Math.round(analytics.performance.throughputTokensPerSec)} tok/s`}
+          color={Colors.primaryPurple}
+        />
+      )}
       {analytics.wasThinkingMode && (
         <Icon name="bulb-outline" size={14} color={Colors.statusOrange} />
       )}
@@ -180,16 +179,18 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
     }
 
     const totalResponseTime = analyticsMessages.reduce(
-      (sum, { analytics }) => sum + analytics.totalGenerationTime,
+      (sum, { analytics }) => sum + analytics.performance.latencyMs,
       0
     );
     const totalTPS = analyticsMessages.reduce(
-      (sum, { analytics }) => sum + (analytics.averageTokensPerSecond || 0),
+      (sum, { analytics }) => sum + analytics.performance.throughputTokensPerSec,
       0
     );
     const totalTokens = analyticsMessages.reduce(
       (sum, { analytics }) =>
-        sum + analytics.inputTokens + analytics.outputTokens,
+        sum +
+        analytics.performance.promptTokens +
+        analytics.performance.completionTokens,
       0
     );
     const completedCount = analyticsMessages.filter(
@@ -211,8 +212,8 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       }
       const group = modelGroups.get(modelName);
       if (group) {
-        group.times.push(analytics.totalGenerationTime);
-        group.speeds.push(analytics.averageTokensPerSecond || 0);
+        group.times.push(analytics.performance.latencyMs);
+        group.speeds.push(analytics.performance.throughputTokensPerSec);
       }
     });
 

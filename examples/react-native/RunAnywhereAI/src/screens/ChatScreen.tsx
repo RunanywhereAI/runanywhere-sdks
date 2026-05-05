@@ -588,10 +588,13 @@ export const ChatScreen: React.FC = () => {
           frameworkDisplayName: frameworkName,
         },
         analytics: {
-          totalGenerationTime: 0,
-          inputTokens: Math.ceil(prompt.length / 4),
-          outputTokens: Math.ceil(finalContent.length / 4),
-          averageTokensPerSecond: 0,
+          performance: {
+            latencyMs: 0,
+            memoryBytes: 0,
+            throughputTokensPerSec: 0,
+            promptTokens: Math.ceil(prompt.length / 4),
+            completionTokens: Math.ceil(finalContent.length / 4),
+          },
           completionStatus: 'completed',
           wasThinkingMode: false,
           wasInterrupted: false,
