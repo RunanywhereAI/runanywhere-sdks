@@ -195,6 +195,44 @@ rac_add_engine_plugin(onnx
 )
 
 # =============================================================================
+# Self-registration carrier (ENG-SHERPA-03)
+# =============================================================================
+# Matches the llamacpp / sherpa pattern: thin shim that wraps
+# RAC_STATIC_PLUGIN_REGISTER(onnx). On RAC_STATIC_PLUGINS=ON hosts
+# (iOS / WASM) the ctor lands inside rac_commons and fires before main().
+# On dynamic hosts the shim becomes a SHARED library whose only export is
+# the entry symbol; the actual op functions live in rac_backend_onnx.
+if(RAC_STATIC_PLUGINS)
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_onnx.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RAC_COMMONS_ROOT_DIR}/include
+    )
+else()
+    add_library(runanywhere_onnx SHARED
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_onnx.cpp
+    )
+    set_target_properties(runanywhere_onnx PROPERTIES
+        OUTPUT_NAME           runanywhere_onnx
+        C_VISIBILITY_PRESET   hidden
+        CXX_VISIBILITY_PRESET hidden
+    )
+    target_link_libraries(runanywhere_onnx PUBLIC
+        rac_backend_onnx
+        rac_commons
+    )
+    if(RAC_PLATFORM_ANDROID)
+        target_link_options(runanywhere_onnx PRIVATE
+            -Wl,--gc-sections
+            -Wl,-z,max-page-size=16384
+            -Wl,-z,common-page-size=16384)
+    endif()
+    install(TARGETS runanywhere_onnx LIBRARY DESTINATION lib)
+endif()
+
+# =============================================================================
 # Platform-specific configuration
 # =============================================================================
 

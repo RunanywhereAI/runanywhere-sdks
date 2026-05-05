@@ -418,6 +418,44 @@ if(RAC_PLATFORM_ANDROID)
         -Wl,-z,common-page-size=16384)
 endif()
 
+# =============================================================================
+# Self-registration carrier (ENG-SHERPA-03)
+# =============================================================================
+# Matches the llamacpp pattern: thin shim that wraps
+# RAC_STATIC_PLUGIN_REGISTER(sherpa). On RAC_STATIC_PLUGINS=ON hosts
+# (iOS / WASM) the ctor lands inside rac_commons and fires before main().
+# On dynamic hosts the shim becomes a SHARED library whose only export is
+# the entry symbol; the actual op functions live in rac_backend_sherpa.
+if(RAC_STATIC_PLUGINS)
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_sherpa.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RAC_COMMONS_ROOT_DIR}/include
+    )
+else()
+    add_library(runanywhere_sherpa SHARED
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_sherpa.cpp
+    )
+    set_target_properties(runanywhere_sherpa PROPERTIES
+        OUTPUT_NAME           runanywhere_sherpa
+        C_VISIBILITY_PRESET   hidden
+        CXX_VISIBILITY_PRESET hidden
+    )
+    target_link_libraries(runanywhere_sherpa PUBLIC
+        rac_backend_sherpa
+        rac_commons
+    )
+    if(RAC_PLATFORM_ANDROID)
+        target_link_options(runanywhere_sherpa PRIVATE
+            -Wl,--gc-sections
+            -Wl,-z,max-page-size=16384
+            -Wl,-z,common-page-size=16384)
+    endif()
+    install(TARGETS runanywhere_sherpa LIBRARY DESTINATION lib)
+endif()
+
 message(STATUS "Sherpa Backend Configuration:")
 message(STATUS "  Sherpa-ONNX:  ${SHERPA_ONNX_AVAILABLE}")
 message(STATUS "  Platform:     ${RAC_PLATFORM_NAME}")

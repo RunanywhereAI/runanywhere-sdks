@@ -11,6 +11,7 @@
 #include <jni.h>
 
 #include <cstring>
+#include <dlfcn.h>
 #include <string>
 
 #include "rac/core/rac_core.h"
@@ -58,6 +59,28 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegis
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
         LOGe("Failed to register ONNX backend: %d", result);
         return static_cast<jint>(result);
+    }
+
+    // ENG-SHERPA-03: opportunistically call rac_backend_sherpa_register() when
+    // librac_backend_sherpa.so is present in-process (ONNXBridge.kt /
+    // equivalent platform loaders dlopen it before this JNI entry runs). The
+    // former ELF `__attribute__((constructor))` block in
+    // rac_plugin_entry_sherpa.cpp has been deleted, so the registration now
+    // flows through this explicit call on dynamic hosts. Static hosts
+    // (RAC_STATIC_PLUGINS=ON) still go through RAC_STATIC_PLUGIN_REGISTER
+    // from rac_static_register_sherpa.cpp.
+    using rac_backend_sherpa_register_fn = rac_result_t (*)(void);
+    auto* sherpa_register = reinterpret_cast<rac_backend_sherpa_register_fn>(
+        dlsym(RTLD_DEFAULT, "rac_backend_sherpa_register"));
+    if (sherpa_register != nullptr) {
+        rac_result_t sherpa_rc = sherpa_register();
+        if (sherpa_rc != RAC_SUCCESS && sherpa_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            LOGw("rac_backend_sherpa_register returned %d", sherpa_rc);
+        } else {
+            LOGi("Sherpa backend registered via explicit dlsym call");
+        }
+    } else {
+        LOGi("rac_backend_sherpa_register symbol not present; Sherpa backend unavailable");
     }
 
     // v3 Phase B9: list EMBED plugins for debug visibility.

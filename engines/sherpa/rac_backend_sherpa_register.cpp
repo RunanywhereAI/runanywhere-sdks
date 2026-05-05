@@ -24,6 +24,8 @@
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -416,3 +418,71 @@ extern "C" const rac_vad_service_ops_t g_sherpa_vad_ops = {
     .create = sherpa_vad_create_impl,
 };
 
+// =============================================================================
+// REGISTRATION API
+// =============================================================================
+//
+// ENG-SHERPA-03: standardized registration. Mirrors the llamacpp + onnx
+// pattern — one explicit `rac_backend_<name>_register()` entry point that
+// registers both the module record and the unified plugin vtable with the
+// registry. Replaces the deleted ELF `__attribute__((constructor))` auto-
+// register block that previously lived at the bottom of
+// rac_plugin_entry_sherpa.cpp. iOS / WASM hosts still exercise the static
+// path via RAC_STATIC_PLUGIN_REGISTER(sherpa) (see
+// rac_static_register_sherpa.cpp); dynamic hosts (Android, Linux, macOS
+// dev) call this function explicitly from the SDK bridge.
+
+namespace {
+
+bool g_sherpa_registered = false;
+
+}  // namespace
+
+extern "C" {
+
+rac_result_t rac_backend_sherpa_register(void) {
+    if (g_sherpa_registered) {
+        return RAC_ERROR_MODULE_ALREADY_REGISTERED;
+    }
+
+    rac_module_info_t module_info = {};
+    module_info.id = "sherpa";
+    module_info.name = "Sherpa-ONNX";
+    module_info.version = "1.0.0";
+    module_info.description = "Sherpa-ONNX backend (STT / TTS / VAD)";
+    module_info.capabilities = nullptr;
+    module_info.num_capabilities = 0;
+
+    rac_result_t result = rac_module_register(&module_info);
+    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        return result;
+    }
+
+    const rac_engine_vtable_t* vt = rac_plugin_entry_sherpa();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'sherpa'");
+        }
+    }
+
+    g_sherpa_registered = true;
+    RAC_LOG_INFO(LOG_CAT, "Sherpa backend registered (module + plugin)");
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_backend_sherpa_unregister(void) {
+    if (!g_sherpa_registered) {
+        return RAC_ERROR_MODULE_NOT_FOUND;
+    }
+
+    rac_plugin_unregister("sherpa");
+    rac_module_unregister("sherpa");
+
+    g_sherpa_registered = false;
+    return RAC_SUCCESS;
+}
+
+}  // extern "C"
