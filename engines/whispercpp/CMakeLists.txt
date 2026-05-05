@@ -3,8 +3,7 @@
 # =============================================================================
 
 # T5.4: per-engine build toggle owned locally.
-# WhisperCPP defaults OFF — Sherpa-ONNX (NeMo CTC / Parakeet) is the primary
-# STT backend; WhisperCPP is an opt-in alternative.
+# Opt-in fallback for Whisper-family models; use sherpa for all other STT.
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 if(NOT RAC_BACKEND_WHISPERCPP)
     return()

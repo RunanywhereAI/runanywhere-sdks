@@ -15,8 +15,10 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'component_types.pbenum.dart' as $11;
 import 'download_service.pb.dart' as $7;
 import 'errors.pb.dart' as $9;
+import 'errors.pbenum.dart' as $9;
 import 'hardware_profile.pb.dart' as $8;
 import 'model_types.pb.dart' as $0;
 import 'model_types.pbenum.dart' as $0;
@@ -2011,8 +2013,8 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
     $core.bool? initSuccess,
     $core.int? readyCount,
     $core.int? failedCount,
-    ComponentLifecycleState? previousLifecycleState,
-    ComponentLifecycleState? currentLifecycleState,
+    $11.ComponentLifecycleState? previousLifecycleState,
+    $11.ComponentLifecycleState? currentLifecycleState,
   }) {
     final $result = create();
     if (kind != null) {
@@ -2084,8 +2086,8 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
     ..aOB(12, _omitFieldNames ? '' : 'initSuccess')
     ..a<$core.int>(13, _omitFieldNames ? '' : 'readyCount', $pb.PbFieldType.O3)
     ..a<$core.int>(14, _omitFieldNames ? '' : 'failedCount', $pb.PbFieldType.O3)
-    ..e<ComponentLifecycleState>(15, _omitFieldNames ? '' : 'previousLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
-    ..e<ComponentLifecycleState>(16, _omitFieldNames ? '' : 'currentLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
+    ..e<$11.ComponentLifecycleState>(15, _omitFieldNames ? '' : 'previousLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
+    ..e<$11.ComponentLifecycleState>(16, _omitFieldNames ? '' : 'currentLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
     ..hasRequiredFields = false
   ;
 
@@ -2232,18 +2234,18 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
   /// Typed equivalents of old_state/new_state for SDKs that want generated
   /// enum-backed component lifecycle state instead of parsing strings.
   @$pb.TagNumber(15)
-  ComponentLifecycleState get previousLifecycleState => $_getN(14);
+  $11.ComponentLifecycleState get previousLifecycleState => $_getN(14);
   @$pb.TagNumber(15)
-  set previousLifecycleState(ComponentLifecycleState v) { setField(15, v); }
+  set previousLifecycleState($11.ComponentLifecycleState v) { setField(15, v); }
   @$pb.TagNumber(15)
   $core.bool hasPreviousLifecycleState() => $_has(14);
   @$pb.TagNumber(15)
   void clearPreviousLifecycleState() => clearField(15);
 
   @$pb.TagNumber(16)
-  ComponentLifecycleState get currentLifecycleState => $_getN(15);
+  $11.ComponentLifecycleState get currentLifecycleState => $_getN(15);
   @$pb.TagNumber(16)
-  set currentLifecycleState(ComponentLifecycleState v) { setField(16, v); }
+  set currentLifecycleState($11.ComponentLifecycleState v) { setField(16, v); }
   @$pb.TagNumber(16)
   $core.bool hasCurrentLifecycleState() => $_has(15);
   @$pb.TagNumber(16)
@@ -2254,7 +2256,7 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
 class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   factory ComponentLifecycleSnapshot({
     SDKComponent? component,
-    ComponentLifecycleState? state,
+    $11.ComponentLifecycleState? state,
     $core.String? modelId,
     $fixnum.Int64? updatedAtMs,
     $core.String? errorMessage,
@@ -2303,7 +2305,7 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleSnapshot', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..e<ComponentLifecycleState>(2, _omitFieldNames ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
+    ..e<$11.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aInt64(4, _omitFieldNames ? '' : 'updatedAtMs')
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
@@ -2346,9 +2348,9 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   void clearComponent() => clearField(1);
 
   @$pb.TagNumber(2)
-  ComponentLifecycleState get state => $_getN(1);
+  $11.ComponentLifecycleState get state => $_getN(1);
   @$pb.TagNumber(2)
-  set state(ComponentLifecycleState v) { setField(2, v); }
+  set state($11.ComponentLifecycleState v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasState() => $_has(1);
   @$pb.TagNumber(2)
@@ -2584,8 +2586,8 @@ enum ComponentLifecycleEvent_Payload {
 class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   factory ComponentLifecycleEvent({
     SDKComponent? component,
-    ComponentLifecycleState? previousState,
-    ComponentLifecycleState? currentState,
+    $11.ComponentLifecycleState? previousState,
+    $11.ComponentLifecycleState? currentState,
     $core.String? modelId,
     $fixnum.Int64? timestampMs,
     $0.ModelLoadResult? modelLoadResult,
@@ -2662,8 +2664,8 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..e<ComponentLifecycleState>(2, _omitFieldNames ? '' : 'previousState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
-    ..e<ComponentLifecycleState>(3, _omitFieldNames ? '' : 'currentState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
+    ..e<$11.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'previousState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
+    ..e<$11.ComponentLifecycleState>(3, _omitFieldNames ? '' : 'currentState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
     ..aOS(4, _omitFieldNames ? '' : 'modelId')
     ..aInt64(5, _omitFieldNames ? '' : 'timestampMs')
     ..aOM<$0.ModelLoadResult>(10, _omitFieldNames ? '' : 'modelLoadResult', subBuilder: $0.ModelLoadResult.create)
@@ -2712,18 +2714,18 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   void clearComponent() => clearField(1);
 
   @$pb.TagNumber(2)
-  ComponentLifecycleState get previousState => $_getN(1);
+  $11.ComponentLifecycleState get previousState => $_getN(1);
   @$pb.TagNumber(2)
-  set previousState(ComponentLifecycleState v) { setField(2, v); }
+  set previousState($11.ComponentLifecycleState v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasPreviousState() => $_has(1);
   @$pb.TagNumber(2)
   void clearPreviousState() => clearField(2);
 
   @$pb.TagNumber(3)
-  ComponentLifecycleState get currentState => $_getN(2);
+  $11.ComponentLifecycleState get currentState => $_getN(2);
   @$pb.TagNumber(3)
-  set currentState(ComponentLifecycleState v) { setField(3, v); }
+  set currentState($11.ComponentLifecycleState v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasCurrentState() => $_has(2);
   @$pb.TagNumber(3)
@@ -4407,7 +4409,7 @@ enum SDKEvent_Event {
 class SDKEvent extends $pb.GeneratedMessage {
   factory SDKEvent({
     $fixnum.Int64? timestampMs,
-    EventSeverity? severity,
+    $9.ErrorSeverity? severity,
     InitializationEvent? initialization,
     ConfigurationEvent? configuration,
     GenerationEvent? generation,
@@ -4425,7 +4427,7 @@ class SDKEvent extends $pb.GeneratedMessage {
     VoiceLifecycleEvent? voice,
     $10.VoiceEvent? voicePipeline,
     ComponentLifecycleEvent? componentLifecycle,
-    EventCategory? category,
+    $11.EventCategory? category,
     SDKComponent? component,
     $9.SDKError? error,
     SessionEvent? session,
@@ -4587,7 +4589,7 @@ class SDKEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..oo(0, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32])
     ..aInt64(1, _omitFieldNames ? '' : 'timestampMs')
-    ..e<EventSeverity>(2, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: EventSeverity.EVENT_SEVERITY_DEBUG, valueOf: EventSeverity.valueOf, enumValues: EventSeverity.values)
+    ..e<$9.ErrorSeverity>(2, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: $9.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $9.ErrorSeverity.valueOf, enumValues: $9.ErrorSeverity.values)
     ..aOM<InitializationEvent>(3, _omitFieldNames ? '' : 'initialization', subBuilder: InitializationEvent.create)
     ..aOM<ConfigurationEvent>(4, _omitFieldNames ? '' : 'configuration', subBuilder: ConfigurationEvent.create)
     ..aOM<GenerationEvent>(5, _omitFieldNames ? '' : 'generation', subBuilder: GenerationEvent.create)
@@ -4605,7 +4607,7 @@ class SDKEvent extends $pb.GeneratedMessage {
     ..aOM<VoiceLifecycleEvent>(17, _omitFieldNames ? '' : 'voice', subBuilder: VoiceLifecycleEvent.create)
     ..aOM<$10.VoiceEvent>(18, _omitFieldNames ? '' : 'voicePipeline', subBuilder: $10.VoiceEvent.create)
     ..aOM<ComponentLifecycleEvent>(19, _omitFieldNames ? '' : 'componentLifecycle', subBuilder: ComponentLifecycleEvent.create)
-    ..e<EventCategory>(20, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: EventCategory.valueOf, enumValues: EventCategory.values)
+    ..e<$11.EventCategory>(20, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $11.EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: $11.EventCategory.valueOf, enumValues: $11.EventCategory.values)
     ..e<SDKComponent>(21, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
     ..aOM<$9.SDKError>(22, _omitFieldNames ? '' : 'error', subBuilder: $9.SDKError.create)
     ..aOM<SessionEvent>(23, _omitFieldNames ? '' : 'session', subBuilder: SessionEvent.create)
@@ -4660,9 +4662,9 @@ class SDKEvent extends $pb.GeneratedMessage {
   void clearTimestampMs() => clearField(1);
 
   @$pb.TagNumber(2)
-  EventSeverity get severity => $_getN(1);
+  $9.ErrorSeverity get severity => $_getN(1);
   @$pb.TagNumber(2)
-  set severity(EventSeverity v) { setField(2, v); }
+  set severity($9.ErrorSeverity v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasSeverity() => $_has(1);
   @$pb.TagNumber(2)
@@ -4850,9 +4852,9 @@ class SDKEvent extends $pb.GeneratedMessage {
   ComponentLifecycleEvent ensureComponentLifecycle() => $_ensure(18);
 
   @$pb.TagNumber(20)
-  EventCategory get category => $_getN(19);
+  $11.EventCategory get category => $_getN(19);
   @$pb.TagNumber(20)
-  set category(EventCategory v) { setField(20, v); }
+  set category($11.EventCategory v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasCategory() => $_has(19);
   @$pb.TagNumber(20)
@@ -5043,10 +5045,10 @@ class SDKEvent extends $pb.GeneratedMessage {
 /// above without interpreting payload-specific data.
 class SDKEventFilter extends $pb.GeneratedMessage {
   factory SDKEventFilter({
-    $core.Iterable<EventCategory>? categories,
+    $core.Iterable<$11.EventCategory>? categories,
     $core.Iterable<SDKComponent>? components,
     $core.Iterable<EventDestination>? destinations,
-    EventSeverity? minimumSeverity,
+    $9.ErrorSeverity? minimumSeverity,
     $core.String? sessionId,
     $core.String? operationId,
     $core.String? correlationId,
@@ -5088,10 +5090,10 @@ class SDKEventFilter extends $pb.GeneratedMessage {
   factory SDKEventFilter.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEventFilter', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..pc<EventCategory>(1, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: EventCategory.valueOf, enumValues: EventCategory.values, defaultEnumValue: EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..pc<$11.EventCategory>(1, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $11.EventCategory.valueOf, enumValues: $11.EventCategory.values, defaultEnumValue: $11.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
     ..pc<SDKComponent>(2, _omitFieldNames ? '' : 'components', $pb.PbFieldType.KE, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values, defaultEnumValue: SDKComponent.SDK_COMPONENT_UNSPECIFIED)
     ..pc<EventDestination>(3, _omitFieldNames ? '' : 'destinations', $pb.PbFieldType.KE, valueOf: EventDestination.valueOf, enumValues: EventDestination.values, defaultEnumValue: EventDestination.EVENT_DESTINATION_UNSPECIFIED)
-    ..e<EventSeverity>(4, _omitFieldNames ? '' : 'minimumSeverity', $pb.PbFieldType.OE, defaultOrMaker: EventSeverity.EVENT_SEVERITY_DEBUG, valueOf: EventSeverity.valueOf, enumValues: EventSeverity.values)
+    ..e<$9.ErrorSeverity>(4, _omitFieldNames ? '' : 'minimumSeverity', $pb.PbFieldType.OE, defaultOrMaker: $9.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $9.ErrorSeverity.valueOf, enumValues: $9.ErrorSeverity.values)
     ..aOS(5, _omitFieldNames ? '' : 'sessionId')
     ..aOS(6, _omitFieldNames ? '' : 'operationId')
     ..aOS(7, _omitFieldNames ? '' : 'correlationId')
@@ -5122,7 +5124,7 @@ class SDKEventFilter extends $pb.GeneratedMessage {
   static SDKEventFilter? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.List<EventCategory> get categories => $_getList(0);
+  $core.List<$11.EventCategory> get categories => $_getList(0);
 
   @$pb.TagNumber(2)
   $core.List<SDKComponent> get components => $_getList(1);
@@ -5131,9 +5133,9 @@ class SDKEventFilter extends $pb.GeneratedMessage {
   $core.List<EventDestination> get destinations => $_getList(2);
 
   @$pb.TagNumber(4)
-  EventSeverity get minimumSeverity => $_getN(3);
+  $9.ErrorSeverity get minimumSeverity => $_getN(3);
   @$pb.TagNumber(4)
-  set minimumSeverity(EventSeverity v) { setField(4, v); }
+  set minimumSeverity($9.ErrorSeverity v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasMinimumSeverity() => $_has(3);
   @$pb.TagNumber(4)

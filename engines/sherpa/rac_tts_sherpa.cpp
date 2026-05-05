@@ -19,26 +19,6 @@
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_events.h"
 
-namespace {
-// Build a minimal JSON array of string codes. Returns a malloc'd NUL-terminated
-// buffer; caller must free() it. We skip escaping because language codes are
-// ASCII alphabet / digits / hyphen.
-char* build_json_string_array(const std::vector<std::string>& items) {
-    std::string json;
-    json.reserve(items.size() * 8 + 2);
-    json.push_back('[');
-    for (size_t i = 0; i < items.size(); ++i) {
-        if (i > 0)
-            json.push_back(',');
-        json.push_back('"');
-        json.append(items[i]);
-        json.push_back('"');
-    }
-    json.push_back(']');
-    return strdup(json.c_str());
-}
-}  // namespace
-
 struct rac_sherpa_tts_handle_impl {
     std::unique_ptr<runanywhere::SherpaBackend> backend;
     runanywhere::SherpaTTS* tts;  // Owned by backend
@@ -205,7 +185,7 @@ rac_result_t rac_tts_sherpa_get_languages(rac_handle_t handle, char** out_json) 
         languages.push_back(voice.language);
     }
 
-    *out_json = build_json_string_array(languages);
+    *out_json = rac::backends::sherpa::build_json_string_array(languages);
     if (!*out_json) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }

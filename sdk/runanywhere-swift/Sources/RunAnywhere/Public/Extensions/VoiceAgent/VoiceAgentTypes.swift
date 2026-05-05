@@ -12,7 +12,10 @@ import Foundation
 // MARK: - Canonical Proto Typealiases
 
 public typealias VoiceAgentResult = RAVoiceAgentResult
-public typealias ComponentLoadState = RAComponentLoadState
+// IDL-04: VoiceAgentComponentStates now uses the canonical
+// RAComponentLifecycleState (richer taxonomy shared with SDKEvent), replacing
+// the private RAComponentLoadState. The old `.loaded` case maps to `.ready`.
+public typealias ComponentLoadState = RAComponentLifecycleState
 public typealias VoiceAgentComponentStates = RAVoiceAgentComponentStates
 public typealias ComponentStates = RAVoiceAgentComponentStates
 public typealias VoiceAgentConfiguration = RAVoiceAgentComposeConfig
@@ -62,28 +65,29 @@ public extension RAVoiceAgentResult {
     }
 }
 
-public extension RAComponentLoadState {
-    var isLoaded: Bool { self == .loaded }
+public extension RAComponentLifecycleState {
+    // IDL-04: former RAComponentLoadState.loaded → RAComponentLifecycleState.ready.
+    var isLoaded: Bool { self == .ready }
     var isLoading: Bool { self == .loading }
 }
 
 public extension RAVoiceAgentComponentStates {
-    var stt: RAComponentLoadState {
+    var stt: RAComponentLifecycleState {
         get { sttState }
         set { sttState = newValue }
     }
 
-    var llm: RAComponentLoadState {
+    var llm: RAComponentLifecycleState {
         get { llmState }
         set { llmState = newValue }
     }
 
-    var tts: RAComponentLoadState {
+    var tts: RAComponentLifecycleState {
         get { ttsState }
         set { ttsState = newValue }
     }
 
-    var vad: RAComponentLoadState {
+    var vad: RAComponentLifecycleState {
         get { vadState }
         set { vadState = newValue }
     }
@@ -101,10 +105,10 @@ public extension RAVoiceAgentComponentStates {
     }
 
     init(
-        stt: RAComponentLoadState = .notLoaded,
-        llm: RAComponentLoadState = .notLoaded,
-        tts: RAComponentLoadState = .notLoaded,
-        vad: RAComponentLoadState = .notLoaded
+        stt: RAComponentLifecycleState = .notLoaded,
+        llm: RAComponentLifecycleState = .notLoaded,
+        tts: RAComponentLifecycleState = .notLoaded,
+        vad: RAComponentLifecycleState = .notLoaded
     ) {
         self.init()
         self.sttState = stt

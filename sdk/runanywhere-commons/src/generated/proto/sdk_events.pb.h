@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "component_types.pb.h"
 #include "download_service.pb.h"
 #include "errors.pb.h"
 #include "hardware_profile.pb.h"
@@ -74,20 +75,14 @@ enum CapabilityOperationEventKind : int;
 extern const uint32_t CapabilityOperationEventKind_internal_data_[];
 enum ComponentInitializationEventKind : int;
 extern const uint32_t ComponentInitializationEventKind_internal_data_[];
-enum ComponentLifecycleState : int;
-extern const uint32_t ComponentLifecycleState_internal_data_[];
 enum ConfigurationEventKind : int;
 extern const uint32_t ConfigurationEventKind_internal_data_[];
 enum DeviceEventKind : int;
 extern const uint32_t DeviceEventKind_internal_data_[];
 enum DownloadEventKind : int;
 extern const uint32_t DownloadEventKind_internal_data_[];
-enum EventCategory : int;
-extern const uint32_t EventCategory_internal_data_[];
 enum EventDestination : int;
 extern const uint32_t EventDestination_internal_data_[];
-enum EventSeverity : int;
-extern const uint32_t EventSeverity_internal_data_[];
 enum FrameworkEventKind : int;
 extern const uint32_t FrameworkEventKind_internal_data_[];
 enum GenerationEventKind : int;
@@ -261,9 +256,6 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::ComponentInitializationEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ComponentInitializationEventKind>;
 template <>
-internal::EnumTraitsT<::runanywhere::v1::ComponentLifecycleState_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::ComponentLifecycleState>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::ConfigurationEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ConfigurationEventKind>;
 template <>
@@ -273,14 +265,8 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::DownloadEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::DownloadEventKind>;
 template <>
-internal::EnumTraitsT<::runanywhere::v1::EventCategory_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::EventCategory>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::EventDestination_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::EventDestination>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::EventSeverity_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::EventSeverity>;
 template <>
 internal::EnumTraitsT<::runanywhere::v1::FrameworkEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::FrameworkEventKind>;
@@ -378,49 +364,6 @@ template <>
   return ::google::protobuf::internal::ParseNamedEnum<SDKComponent>(SDKComponent_descriptor(), name,
                                            value);
 }
-enum EventSeverity : int {
-  EVENT_SEVERITY_DEBUG = 0,
-  EVENT_SEVERITY_INFO = 1,
-  EVENT_SEVERITY_WARNING = 2,
-  EVENT_SEVERITY_ERROR = 3,
-  EVENT_SEVERITY_CRITICAL = 4,
-  EventSeverity_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  EventSeverity_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t EventSeverity_internal_data_[];
-inline constexpr EventSeverity EventSeverity_MIN =
-    static_cast<EventSeverity>(0);
-inline constexpr EventSeverity EventSeverity_MAX =
-    static_cast<EventSeverity>(4);
-[[nodiscard]] inline bool EventSeverity_IsValid(int value) {
-  return 0 <= value && value <= 4;
-}
-inline constexpr int EventSeverity_ARRAYSIZE = 4 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-EventSeverity_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(EventSeverity) {
-  return EventSeverity_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& EventSeverity_Name(T value) {
-  static_assert(::std::is_same<T, EventSeverity>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to EventSeverity_Name().");
-  return EventSeverity_Name(static_cast<EventSeverity>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& EventSeverity_Name(EventSeverity value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<EventSeverity_descriptor, 0, 4>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool EventSeverity_Parse(
-    ::absl::string_view name, EventSeverity* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<EventSeverity>(EventSeverity_descriptor(), name,
-                                           value);
-}
 enum EventDestination : int {
   EVENT_DESTINATION_UNSPECIFIED = 0,
   EVENT_DESTINATION_ALL = 1,
@@ -461,129 +404,6 @@ template <>
 [[nodiscard]] inline bool EventDestination_Parse(
     ::absl::string_view name, EventDestination* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<EventDestination>(EventDestination_descriptor(), name,
-                                           value);
-}
-enum EventCategory : int {
-  EVENT_CATEGORY_UNSPECIFIED = 0,
-  EVENT_CATEGORY_SDK = 1,
-  EVENT_CATEGORY_INITIALIZATION = 2,
-  EVENT_CATEGORY_SHUTDOWN = 3,
-  EVENT_CATEGORY_SESSION = 4,
-  EVENT_CATEGORY_AUTH = 5,
-  EVENT_CATEGORY_DEVICE = 6,
-  EVENT_CATEGORY_REGISTRY = 7,
-  EVENT_CATEGORY_ASSIGNMENT = 8,
-  EVENT_CATEGORY_IMPORT = 9,
-  EVENT_CATEGORY_DISCOVERY = 10,
-  EVENT_CATEGORY_DOWNLOAD = 11,
-  EVENT_CATEGORY_STORAGE = 12,
-  EVENT_CATEGORY_HARDWARE = 13,
-  EVENT_CATEGORY_ROUTING = 14,
-  EVENT_CATEGORY_FRAMEWORK = 15,
-  EVENT_CATEGORY_MODEL = 16,
-  EVENT_CATEGORY_COMPONENT = 17,
-  EVENT_CATEGORY_LLM = 18,
-  EVENT_CATEGORY_STT = 19,
-  EVENT_CATEGORY_ASR = 20,
-  EVENT_CATEGORY_TTS = 21,
-  EVENT_CATEGORY_VAD = 22,
-  EVENT_CATEGORY_STD = 23,
-  EVENT_CATEGORY_VOICE_AGENT = 24,
-  EVENT_CATEGORY_VLM = 25,
-  EVENT_CATEGORY_DIFFUSION = 26,
-  EVENT_CATEGORY_EMBEDDINGS = 27,
-  EVENT_CATEGORY_RAG = 28,
-  EVENT_CATEGORY_LORA = 29,
-  EVENT_CATEGORY_TELEMETRY = 30,
-  EVENT_CATEGORY_PERFORMANCE = 31,
-  EVENT_CATEGORY_CANCELLATION = 32,
-  EVENT_CATEGORY_FAILURE = 33,
-  EVENT_CATEGORY_NETWORK = 34,
-  EVENT_CATEGORY_ERROR = 35,
-  EventCategory_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  EventCategory_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t EventCategory_internal_data_[];
-inline constexpr EventCategory EventCategory_MIN =
-    static_cast<EventCategory>(0);
-inline constexpr EventCategory EventCategory_MAX =
-    static_cast<EventCategory>(35);
-[[nodiscard]] inline bool EventCategory_IsValid(int value) {
-  return 0 <= value && value <= 35;
-}
-inline constexpr int EventCategory_ARRAYSIZE = 35 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-EventCategory_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(EventCategory) {
-  return EventCategory_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& EventCategory_Name(T value) {
-  static_assert(::std::is_same<T, EventCategory>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to EventCategory_Name().");
-  return EventCategory_Name(static_cast<EventCategory>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& EventCategory_Name(EventCategory value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<EventCategory_descriptor, 0, 35>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool EventCategory_Parse(
-    ::absl::string_view name, EventCategory* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<EventCategory>(EventCategory_descriptor(), name,
-                                           value);
-}
-enum ComponentLifecycleState : int {
-  COMPONENT_LIFECYCLE_STATE_UNSPECIFIED = 0,
-  COMPONENT_LIFECYCLE_STATE_NOT_LOADED = 1,
-  COMPONENT_LIFECYCLE_STATE_LOADING = 2,
-  COMPONENT_LIFECYCLE_STATE_READY = 3,
-  COMPONENT_LIFECYCLE_STATE_UNLOADING = 4,
-  COMPONENT_LIFECYCLE_STATE_ERROR = 5,
-  COMPONENT_LIFECYCLE_STATE_SHUTDOWN = 6,
-  COMPONENT_LIFECYCLE_STATE_DOWNLOADING = 7,
-  COMPONENT_LIFECYCLE_STATE_DELETING = 8,
-  COMPONENT_LIFECYCLE_STATE_PAUSED = 9,
-  COMPONENT_LIFECYCLE_STATE_UPDATING = 10,
-  ComponentLifecycleState_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  ComponentLifecycleState_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t ComponentLifecycleState_internal_data_[];
-inline constexpr ComponentLifecycleState ComponentLifecycleState_MIN =
-    static_cast<ComponentLifecycleState>(0);
-inline constexpr ComponentLifecycleState ComponentLifecycleState_MAX =
-    static_cast<ComponentLifecycleState>(10);
-[[nodiscard]] inline bool ComponentLifecycleState_IsValid(int value) {
-  return 0 <= value && value <= 10;
-}
-inline constexpr int ComponentLifecycleState_ARRAYSIZE = 10 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-ComponentLifecycleState_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(ComponentLifecycleState) {
-  return ComponentLifecycleState_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& ComponentLifecycleState_Name(T value) {
-  static_assert(::std::is_same<T, ComponentLifecycleState>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to ComponentLifecycleState_Name().");
-  return ComponentLifecycleState_Name(static_cast<ComponentLifecycleState>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& ComponentLifecycleState_Name(ComponentLifecycleState value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<ComponentLifecycleState_descriptor, 0, 10>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool ComponentLifecycleState_Parse(
-    ::absl::string_view name, ComponentLifecycleState* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<ComponentLifecycleState>(ComponentLifecycleState_descriptor(), name,
                                            value);
 }
 enum InitializationStage : int {
@@ -2939,14 +2759,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKEventFilter final : public ::goo
   ::std::string* PROTOBUF_NONNULL _internal_mutable_trace_id();
 
   public:
-  // .runanywhere.v1.EventSeverity minimum_severity = 4;
+  // .runanywhere.v1.ErrorSeverity minimum_severity = 4;
   void clear_minimum_severity() ;
-  [[nodiscard]] ::runanywhere::v1::EventSeverity minimum_severity() const;
-  void set_minimum_severity(::runanywhere::v1::EventSeverity value);
+  [[nodiscard]] ::runanywhere::v1::ErrorSeverity minimum_severity() const;
+  void set_minimum_severity(::runanywhere::v1::ErrorSeverity value);
 
   private:
-  ::runanywhere::v1::EventSeverity _internal_minimum_severity() const;
-  void _internal_set_minimum_severity(::runanywhere::v1::EventSeverity value);
+  ::runanywhere::v1::ErrorSeverity _internal_minimum_severity() const;
+  void _internal_set_minimum_severity(::runanywhere::v1::ErrorSeverity value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SDKEventFilter)
@@ -10865,14 +10685,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKEvent final : public ::google::p
   void _internal_set_timestamp_ms(::int64_t value);
 
   public:
-  // .runanywhere.v1.EventSeverity severity = 2;
+  // .runanywhere.v1.ErrorSeverity severity = 2;
   void clear_severity() ;
-  [[nodiscard]] ::runanywhere::v1::EventSeverity severity() const;
-  void set_severity(::runanywhere::v1::EventSeverity value);
+  [[nodiscard]] ::runanywhere::v1::ErrorSeverity severity() const;
+  void set_severity(::runanywhere::v1::ErrorSeverity value);
 
   private:
-  ::runanywhere::v1::EventSeverity _internal_severity() const;
-  void _internal_set_severity(::runanywhere::v1::EventSeverity value);
+  ::runanywhere::v1::ErrorSeverity _internal_severity() const;
+  void _internal_set_severity(::runanywhere::v1::ErrorSeverity value);
 
   public:
   // .runanywhere.v1.EventDestination destination = 15;
@@ -23415,27 +23235,27 @@ inline void SDKEvent::_internal_set_timestamp_ms(::int64_t value) {
   _impl_.timestamp_ms_ = value;
 }
 
-// .runanywhere.v1.EventSeverity severity = 2;
+// .runanywhere.v1.ErrorSeverity severity = 2;
 inline void SDKEvent::clear_severity() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.severity_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000100U);
 }
-inline ::runanywhere::v1::EventSeverity SDKEvent::severity() const {
+inline ::runanywhere::v1::ErrorSeverity SDKEvent::severity() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKEvent.severity)
   return _internal_severity();
 }
-inline void SDKEvent::set_severity(::runanywhere::v1::EventSeverity value) {
+inline void SDKEvent::set_severity(::runanywhere::v1::ErrorSeverity value) {
   _internal_set_severity(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKEvent.severity)
 }
-inline ::runanywhere::v1::EventSeverity SDKEvent::_internal_severity() const {
+inline ::runanywhere::v1::ErrorSeverity SDKEvent::_internal_severity() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::EventSeverity>(_impl_.severity_);
+  return static_cast<::runanywhere::v1::ErrorSeverity>(_impl_.severity_);
 }
-inline void SDKEvent::_internal_set_severity(::runanywhere::v1::EventSeverity value) {
+inline void SDKEvent::_internal_set_severity(::runanywhere::v1::ErrorSeverity value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.severity_ = value;
 }
@@ -26071,27 +25891,27 @@ SDKEventFilter::_internal_mutable_destinations() {
   return &_impl_.destinations_;
 }
 
-// .runanywhere.v1.EventSeverity minimum_severity = 4;
+// .runanywhere.v1.ErrorSeverity minimum_severity = 4;
 inline void SDKEventFilter::clear_minimum_severity() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.minimum_severity_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000100U);
 }
-inline ::runanywhere::v1::EventSeverity SDKEventFilter::minimum_severity() const {
+inline ::runanywhere::v1::ErrorSeverity SDKEventFilter::minimum_severity() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKEventFilter.minimum_severity)
   return _internal_minimum_severity();
 }
-inline void SDKEventFilter::set_minimum_severity(::runanywhere::v1::EventSeverity value) {
+inline void SDKEventFilter::set_minimum_severity(::runanywhere::v1::ErrorSeverity value) {
   _internal_set_minimum_severity(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKEventFilter.minimum_severity)
 }
-inline ::runanywhere::v1::EventSeverity SDKEventFilter::_internal_minimum_severity() const {
+inline ::runanywhere::v1::ErrorSeverity SDKEventFilter::_internal_minimum_severity() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::EventSeverity>(_impl_.minimum_severity_);
+  return static_cast<::runanywhere::v1::ErrorSeverity>(_impl_.minimum_severity_);
 }
-inline void SDKEventFilter::_internal_set_minimum_severity(::runanywhere::v1::EventSeverity value) {
+inline void SDKEventFilter::_internal_set_minimum_severity(::runanywhere::v1::ErrorSeverity value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.minimum_severity_ = value;
 }
@@ -27047,28 +26867,10 @@ inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v
   return ::runanywhere::v1::SDKComponent_descriptor();
 }
 template <>
-struct is_proto_enum<::runanywhere::v1::EventSeverity> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EventSeverity>() {
-  return ::runanywhere::v1::EventSeverity_descriptor();
-}
-template <>
 struct is_proto_enum<::runanywhere::v1::EventDestination> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EventDestination>() {
   return ::runanywhere::v1::EventDestination_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::EventCategory> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EventCategory>() {
-  return ::runanywhere::v1::EventCategory_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::ComponentLifecycleState> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ComponentLifecycleState>() {
-  return ::runanywhere::v1::ComponentLifecycleState_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::InitializationStage> : std::true_type {};

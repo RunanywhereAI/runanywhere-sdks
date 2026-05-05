@@ -119,6 +119,12 @@ protoc \
     --dart_out="${OUT_DIR}" \
     thinking_tag_pattern.proto
 
+# Wave H-2 / IDL-04 — shared ComponentLifecycleState + EventCategory (import-cycle break).
+protoc \
+    --proto_path="${PROTO_DIR}" \
+    --dart_out="${OUT_DIR}" \
+    component_types.proto
+
 # Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
 # (some older protoc_plugin versions emit them even without the grpc: prefix).
 rm -f "${OUT_DIR}"/*.pbgrpc.dart

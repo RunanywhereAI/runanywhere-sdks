@@ -233,7 +233,8 @@ export type {
   VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 export type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
-export { ComponentLoadState } from '@runanywhere/proto-ts/voice_events';
+// IDL-04: former ComponentLoadState re-exported as the canonical
+// ComponentLifecycleState (from component_types.proto).
 
 // ---------------------------------------------------------------------------
 // Model lifecycle — generated proto source of truth
@@ -278,10 +279,12 @@ export {
 export {
   ComponentLifecycleState,
   EventCategory,
+} from '@runanywhere/proto-ts/component_types';
+export {
   EventDestination,
-  EventSeverity,
   SDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
+export { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
 export { AcceleratorPreference } from '@runanywhere/proto-ts/hardware_profile';
 

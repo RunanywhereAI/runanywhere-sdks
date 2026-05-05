@@ -27,47 +27,66 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ---------------------------------------------------------------------------
+ * v3.2: VoiceAgent component-load lifecycle.
+ *
+ * Describes whether each sub-component (STT, LLM, TTS, VAD, wake-word) of the
+ * voice agent has been loaded yet. Emitted on the
+ * `VoiceEvent.component_state_changed` oneof arm whenever any component
+ * transitions. Uses the canonical `ComponentLifecycleState` enum from
+ * component_types.proto (IDL-04).
+ * ---------------------------------------------------------------------------
  * Aggregate load state across all four voice-agent components. Mirrors Swift
  * `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
  * `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
  * `VoiceAgentComponentStates`.
+ *
+ * IDL-04: The former `ComponentLoadState` enum was consolidated into the
+ * canonical richer `ComponentLifecycleState` (component_types.proto). Where
+ * the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
+ * component is ready to use", callers now use
+ * `COMPONENT_LIFECYCLE_STATE_READY`.
  */
 public class VoiceAgentComponentStates(
   @field:WireField(
     tag = 1,
-    adapter = "ai.runanywhere.proto.v1.ComponentLoadState#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sttState",
     schemaIndex = 0,
   )
-  public val stt_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
+  public val stt_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.ComponentLoadState#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "llmState",
     schemaIndex = 1,
   )
-  public val llm_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
+  public val llm_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.ComponentLoadState#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "ttsState",
     schemaIndex = 2,
   )
-  public val tts_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
+  public val tts_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   @field:WireField(
     tag = 4,
-    adapter = "ai.runanywhere.proto.v1.ComponentLoadState#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "vadState",
     schemaIndex = 3,
   )
-  public val vad_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
+  public val vad_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   /**
    * Computed: true when stt_state, llm_state, tts_state, vad_state are all
-   * COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+   * COMPONENT_LIFECYCLE_STATE_READY. Producer sets this; consumers must NOT
    * recompute.
    */
   @field:WireField(
@@ -78,7 +97,8 @@ public class VoiceAgentComponentStates(
   )
   public val ready: Boolean = false,
   /**
-   * Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING.
+   * Computed: true when any of the four states is
+   * COMPONENT_LIFECYCLE_STATE_LOADING.
    */
   @field:WireField(
     tag = 6,
@@ -90,13 +110,13 @@ public class VoiceAgentComponentStates(
   public val any_loading: Boolean = false,
   @field:WireField(
     tag = 7,
-    adapter = "ai.runanywhere.proto.v1.ComponentLoadState#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "wakewordState",
     schemaIndex = 6,
   )
-  public val wakeword_state: ComponentLoadState =
-      ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
+  public val wakeword_state: ComponentLifecycleState =
+      ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -160,13 +180,13 @@ public class VoiceAgentComponentStates(
   }
 
   public fun copy(
-    stt_state: ComponentLoadState = this.stt_state,
-    llm_state: ComponentLoadState = this.llm_state,
-    tts_state: ComponentLoadState = this.tts_state,
-    vad_state: ComponentLoadState = this.vad_state,
+    stt_state: ComponentLifecycleState = this.stt_state,
+    llm_state: ComponentLifecycleState = this.llm_state,
+    tts_state: ComponentLifecycleState = this.tts_state,
+    vad_state: ComponentLifecycleState = this.vad_state,
     ready: Boolean = this.ready,
     any_loading: Boolean = this.any_loading,
-    wakeword_state: ComponentLoadState = this.wakeword_state,
+    wakeword_state: ComponentLifecycleState = this.wakeword_state,
     error_message: String? = this.error_message,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceAgentComponentStates = VoiceAgentComponentStates(stt_state, llm_state, tts_state,
@@ -185,37 +205,37 @@ public class VoiceAgentComponentStates(
     ) {
       override fun encodedSize(`value`: VoiceAgentComponentStates): Int {
         var size = value.unknownFields.size
-        if (value.stt_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED) size +=
-            ComponentLoadState.ADAPTER.encodedSizeWithTag(1, value.stt_state)
-        if (value.llm_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED) size +=
-            ComponentLoadState.ADAPTER.encodedSizeWithTag(2, value.llm_state)
-        if (value.tts_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED) size +=
-            ComponentLoadState.ADAPTER.encodedSizeWithTag(3, value.tts_state)
-        if (value.vad_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED) size +=
-            ComponentLoadState.ADAPTER.encodedSizeWithTag(4, value.vad_state)
+        if (value.stt_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            size += ComponentLifecycleState.ADAPTER.encodedSizeWithTag(1, value.stt_state)
+        if (value.llm_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            size += ComponentLifecycleState.ADAPTER.encodedSizeWithTag(2, value.llm_state)
+        if (value.tts_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            size += ComponentLifecycleState.ADAPTER.encodedSizeWithTag(3, value.tts_state)
+        if (value.vad_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            size += ComponentLifecycleState.ADAPTER.encodedSizeWithTag(4, value.vad_state)
         if (value.ready != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.ready)
         if (value.any_loading != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
             value.any_loading)
-        if (value.wakeword_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED) size +=
-            ComponentLoadState.ADAPTER.encodedSizeWithTag(7, value.wakeword_state)
+        if (value.wakeword_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            size += ComponentLifecycleState.ADAPTER.encodedSizeWithTag(7, value.wakeword_state)
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VoiceAgentComponentStates) {
-        if (value.stt_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 1, value.stt_state)
-        if (value.llm_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 2, value.llm_state)
-        if (value.tts_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 3, value.tts_state)
-        if (value.vad_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 4, value.vad_state)
+        if (value.stt_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 1, value.stt_state)
+        if (value.llm_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 2, value.llm_state)
+        if (value.tts_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 3, value.tts_state)
+        if (value.vad_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 4, value.vad_state)
         if (value.ready != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.ready)
         if (value.any_loading != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
             value.any_loading)
-        if (value.wakeword_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 7, value.wakeword_state)
+        if (value.wakeword_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 7, value.wakeword_state)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
         writer.writeBytes(value.unknownFields)
       }
@@ -223,56 +243,61 @@ public class VoiceAgentComponentStates(
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentComponentStates) {
         writer.writeBytes(value.unknownFields)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
-        if (value.wakeword_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 7, value.wakeword_state)
+        if (value.wakeword_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 7, value.wakeword_state)
         if (value.any_loading != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
             value.any_loading)
         if (value.ready != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.ready)
-        if (value.vad_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 4, value.vad_state)
-        if (value.tts_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 3, value.tts_state)
-        if (value.llm_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 2, value.llm_state)
-        if (value.stt_state != ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED)
-            ComponentLoadState.ADAPTER.encodeWithTag(writer, 1, value.stt_state)
+        if (value.vad_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 4, value.vad_state)
+        if (value.tts_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 3, value.tts_state)
+        if (value.llm_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 2, value.llm_state)
+        if (value.stt_state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED)
+            ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 1, value.stt_state)
       }
 
       override fun decode(reader: ProtoReader): VoiceAgentComponentStates {
-        var stt_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED
-        var llm_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED
-        var tts_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED
-        var vad_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED
+        var stt_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
+        var llm_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
+        var tts_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
+        var vad_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
         var ready: Boolean = false
         var any_loading: Boolean = false
-        var wakeword_state: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED
+        var wakeword_state: ComponentLifecycleState =
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
         var error_message: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
-              stt_state = ComponentLoadState.ADAPTER.decode(reader)
+              stt_state = ComponentLifecycleState.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             2 -> try {
-              llm_state = ComponentLoadState.ADAPTER.decode(reader)
+              llm_state = ComponentLifecycleState.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             3 -> try {
-              tts_state = ComponentLoadState.ADAPTER.decode(reader)
+              tts_state = ComponentLifecycleState.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             4 -> try {
-              vad_state = ComponentLoadState.ADAPTER.decode(reader)
+              vad_state = ComponentLifecycleState.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             5 -> ready = ProtoAdapter.BOOL.decode(reader)
             6 -> any_loading = ProtoAdapter.BOOL.decode(reader)
             7 -> try {
-              wakeword_state = ComponentLoadState.ADAPTER.decode(reader)
+              wakeword_state = ComponentLifecycleState.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

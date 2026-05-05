@@ -7,19 +7,10 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { EventCategory, eventCategoryFromJSON, eventCategoryToJSON } from "./component_types";
+import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON } from "./errors";
 import { TTSOptions } from "./tts_options";
-import {
-  AudioEncoding,
-  audioEncodingFromJSON,
-  audioEncodingToJSON,
-  VoiceAgentComponentStates,
-  VoiceEventCategory,
-  voiceEventCategoryFromJSON,
-  voiceEventCategoryToJSON,
-  VoiceEventSeverity,
-  voiceEventSeverityFromJSON,
-  voiceEventSeverityToJSON,
-} from "./voice_events";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates } from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -35,8 +26,8 @@ export interface VoiceAgentRequest {
    */
   eventFilter: string;
   sessionId: string;
-  categories: VoiceEventCategory[];
-  minSeverity: VoiceEventSeverity;
+  categories: EventCategory[];
+  minSeverity: ErrorSeverity;
   replayFromSeq: number;
   includeAudio: boolean;
 }
@@ -390,9 +381,9 @@ export const VoiceAgentRequest = {
       eventFilter: isSet(object.eventFilter) ? globalThis.String(object.eventFilter) : "",
       sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
       categories: globalThis.Array.isArray(object?.categories)
-        ? object.categories.map((e: any) => voiceEventCategoryFromJSON(e))
+        ? object.categories.map((e: any) => eventCategoryFromJSON(e))
         : [],
-      minSeverity: isSet(object.minSeverity) ? voiceEventSeverityFromJSON(object.minSeverity) : 0,
+      minSeverity: isSet(object.minSeverity) ? errorSeverityFromJSON(object.minSeverity) : 0,
       replayFromSeq: isSet(object.replayFromSeq) ? globalThis.Number(object.replayFromSeq) : 0,
       includeAudio: isSet(object.includeAudio) ? globalThis.Boolean(object.includeAudio) : false,
     };
@@ -407,10 +398,10 @@ export const VoiceAgentRequest = {
       obj.sessionId = message.sessionId;
     }
     if (message.categories?.length) {
-      obj.categories = message.categories.map((e) => voiceEventCategoryToJSON(e));
+      obj.categories = message.categories.map((e) => eventCategoryToJSON(e));
     }
     if (message.minSeverity !== 0) {
-      obj.minSeverity = voiceEventSeverityToJSON(message.minSeverity);
+      obj.minSeverity = errorSeverityToJSON(message.minSeverity);
     }
     if (message.replayFromSeq !== 0) {
       obj.replayFromSeq = Math.round(message.replayFromSeq);

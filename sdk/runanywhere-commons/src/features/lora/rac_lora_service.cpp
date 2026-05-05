@@ -223,8 +223,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_LORA);
-    event.set_severity(error && error[0] ? runanywhere::v1::EVENT_SEVERITY_ERROR
-                                         : runanywhere::v1::EVENT_SEVERITY_INFO);
+    event.set_severity(error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                         : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_LLM);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     event.set_source("cpp");

@@ -16,6 +16,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "component_types.proto";
+import "errors.proto";
 import "voice_events.proto";
 import "tts_options.proto";
 import "stt_options.proto";
@@ -36,8 +38,8 @@ message VoiceAgentRequest {
     // (e.g. "user_said,assistant_token"). Empty = all events.
     string event_filter = 1;
     string session_id = 2;
-    repeated VoiceEventCategory categories = 3;
-    VoiceEventSeverity min_severity = 4;
+    repeated EventCategory categories = 3;
+    ErrorSeverity min_severity = 4;
     uint64 replay_from_seq = 5;
     bool include_audio = 6;
 }

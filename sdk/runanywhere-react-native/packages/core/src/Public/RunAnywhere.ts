@@ -37,7 +37,7 @@ import type { SDKInitOptions } from '../types';
 import {
   EventCategory,
   EventDestination,
-  EventSeverity,
+  ErrorSeverity,
   InitializationStage,
   SDKComponent,
   SDKEvent as SDKEventCodec,
@@ -91,8 +91,8 @@ function publishInitializationEvent(
     SDKEventCodec.fromPartial({
       timestampMs: Date.now(),
       severity: error
-        ? EventSeverity.EVENT_SEVERITY_ERROR
-        : EventSeverity.EVENT_SEVERITY_INFO,
+        ? ErrorSeverity.ERROR_SEVERITY_ERROR
+        : ErrorSeverity.ERROR_SEVERITY_INFO,
       category: EventCategory.EVENT_CATEGORY_INITIALIZATION,
       component: SDKComponent.SDK_COMPONENT_UNSPECIFIED,
       id: `rn-init-${Date.now()}-${Math.random().toString(36).slice(2)}`,

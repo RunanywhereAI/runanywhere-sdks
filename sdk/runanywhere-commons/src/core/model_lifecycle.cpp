@@ -54,7 +54,7 @@ using runanywhere::v1::CurrentModelRequest;
 using runanywhere::v1::CurrentModelResult;
 using runanywhere::v1::EventCategory;
 using runanywhere::v1::EventDestination;
-using runanywhere::v1::EventSeverity;
+using runanywhere::v1::ErrorSeverity;
 using runanywhere::v1::InferenceFramework;
 using runanywhere::v1::ModelCategory;
 using runanywhere::v1::ModelFileDescriptor;
@@ -170,7 +170,7 @@ rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
 
 void populate_event_envelope(SDKEvent* event,
                              EventCategory category,
-                             EventSeverity severity,
+                             ErrorSeverity severity,
                              SDKComponent component) {
     event->set_id(generate_event_id());
     event->set_timestamp_ms(now_ms());
@@ -201,8 +201,8 @@ void publish_component_event(SDKComponent component,
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_COMPONENT,
                             error_message && error_message[0]
-                                ? runanywhere::v1::EVENT_SEVERITY_ERROR
-                                : runanywhere::v1::EVENT_SEVERITY_INFO,
+                                ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                : runanywhere::v1::ERROR_SEVERITY_INFO,
                             component);
     auto* lifecycle = event.mutable_component_lifecycle();
     lifecycle->set_component(component);
@@ -230,7 +230,7 @@ void publish_component_event(SDKComponent component,
 void publish_current_model_event(const CurrentModelResult& result, SDKComponent component) {
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_MODEL,
-                            runanywhere::v1::EVENT_SEVERITY_INFO, component);
+                            runanywhere::v1::ERROR_SEVERITY_INFO, component);
     auto* registry = event.mutable_model_registry();
     registry->set_kind(
         runanywhere::v1::MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED);

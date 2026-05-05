@@ -7,154 +7,25 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
-import { ErrorCode, errorCodeFromJSON, errorCodeToJSON } from "./errors";
+import {
+  ComponentLifecycleState,
+  componentLifecycleStateFromJSON,
+  componentLifecycleStateToJSON,
+  EventCategory,
+  eventCategoryFromJSON,
+  eventCategoryToJSON,
+} from "./component_types";
+import {
+  ErrorCode,
+  errorCodeFromJSON,
+  errorCodeToJSON,
+  ErrorSeverity,
+  errorSeverityFromJSON,
+  errorSeverityToJSON,
+} from "./errors";
 import { VADStreamEventKind, vADStreamEventKindFromJSON, vADStreamEventKindToJSON } from "./vad_options";
 
 export const protobufPackage = "runanywhere.v1";
-
-export enum VoiceEventCategory {
-  VOICE_EVENT_CATEGORY_UNSPECIFIED = 0,
-  VOICE_EVENT_CATEGORY_VOICE_AGENT = 1,
-  VOICE_EVENT_CATEGORY_STT = 2,
-  VOICE_EVENT_CATEGORY_ASR = 3,
-  VOICE_EVENT_CATEGORY_TTS = 4,
-  VOICE_EVENT_CATEGORY_VAD = 5,
-  VOICE_EVENT_CATEGORY_STD = 6,
-  VOICE_EVENT_CATEGORY_LLM = 7,
-  VOICE_EVENT_CATEGORY_AUDIO = 8,
-  VOICE_EVENT_CATEGORY_METRICS = 9,
-  VOICE_EVENT_CATEGORY_ERROR = 10,
-  VOICE_EVENT_CATEGORY_WAKEWORD = 11,
-  UNRECOGNIZED = -1,
-}
-
-export function voiceEventCategoryFromJSON(object: any): VoiceEventCategory {
-  switch (object) {
-    case 0:
-    case "VOICE_EVENT_CATEGORY_UNSPECIFIED":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED;
-    case 1:
-    case "VOICE_EVENT_CATEGORY_VOICE_AGENT":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_VOICE_AGENT;
-    case 2:
-    case "VOICE_EVENT_CATEGORY_STT":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_STT;
-    case 3:
-    case "VOICE_EVENT_CATEGORY_ASR":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_ASR;
-    case 4:
-    case "VOICE_EVENT_CATEGORY_TTS":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_TTS;
-    case 5:
-    case "VOICE_EVENT_CATEGORY_VAD":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_VAD;
-    case 6:
-    case "VOICE_EVENT_CATEGORY_STD":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_STD;
-    case 7:
-    case "VOICE_EVENT_CATEGORY_LLM":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_LLM;
-    case 8:
-    case "VOICE_EVENT_CATEGORY_AUDIO":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_AUDIO;
-    case 9:
-    case "VOICE_EVENT_CATEGORY_METRICS":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_METRICS;
-    case 10:
-    case "VOICE_EVENT_CATEGORY_ERROR":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_ERROR;
-    case 11:
-    case "VOICE_EVENT_CATEGORY_WAKEWORD":
-      return VoiceEventCategory.VOICE_EVENT_CATEGORY_WAKEWORD;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return VoiceEventCategory.UNRECOGNIZED;
-  }
-}
-
-export function voiceEventCategoryToJSON(object: VoiceEventCategory): string {
-  switch (object) {
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED:
-      return "VOICE_EVENT_CATEGORY_UNSPECIFIED";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_VOICE_AGENT:
-      return "VOICE_EVENT_CATEGORY_VOICE_AGENT";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_STT:
-      return "VOICE_EVENT_CATEGORY_STT";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_ASR:
-      return "VOICE_EVENT_CATEGORY_ASR";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_TTS:
-      return "VOICE_EVENT_CATEGORY_TTS";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_VAD:
-      return "VOICE_EVENT_CATEGORY_VAD";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_STD:
-      return "VOICE_EVENT_CATEGORY_STD";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_LLM:
-      return "VOICE_EVENT_CATEGORY_LLM";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_AUDIO:
-      return "VOICE_EVENT_CATEGORY_AUDIO";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_METRICS:
-      return "VOICE_EVENT_CATEGORY_METRICS";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_ERROR:
-      return "VOICE_EVENT_CATEGORY_ERROR";
-    case VoiceEventCategory.VOICE_EVENT_CATEGORY_WAKEWORD:
-      return "VOICE_EVENT_CATEGORY_WAKEWORD";
-    case VoiceEventCategory.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum VoiceEventSeverity {
-  VOICE_EVENT_SEVERITY_DEBUG = 0,
-  VOICE_EVENT_SEVERITY_INFO = 1,
-  VOICE_EVENT_SEVERITY_WARNING = 2,
-  VOICE_EVENT_SEVERITY_ERROR = 3,
-  VOICE_EVENT_SEVERITY_CRITICAL = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function voiceEventSeverityFromJSON(object: any): VoiceEventSeverity {
-  switch (object) {
-    case 0:
-    case "VOICE_EVENT_SEVERITY_DEBUG":
-      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG;
-    case 1:
-    case "VOICE_EVENT_SEVERITY_INFO":
-      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_INFO;
-    case 2:
-    case "VOICE_EVENT_SEVERITY_WARNING":
-      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_WARNING;
-    case 3:
-    case "VOICE_EVENT_SEVERITY_ERROR":
-      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_ERROR;
-    case 4:
-    case "VOICE_EVENT_SEVERITY_CRITICAL":
-      return VoiceEventSeverity.VOICE_EVENT_SEVERITY_CRITICAL;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return VoiceEventSeverity.UNRECOGNIZED;
-  }
-}
-
-export function voiceEventSeverityToJSON(object: VoiceEventSeverity): string {
-  switch (object) {
-    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG:
-      return "VOICE_EVENT_SEVERITY_DEBUG";
-    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_INFO:
-      return "VOICE_EVENT_SEVERITY_INFO";
-    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_WARNING:
-      return "VOICE_EVENT_SEVERITY_WARNING";
-    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_ERROR:
-      return "VOICE_EVENT_SEVERITY_ERROR";
-    case VoiceEventSeverity.VOICE_EVENT_SEVERITY_CRITICAL:
-      return "VOICE_EVENT_SEVERITY_CRITICAL";
-    case VoiceEventSeverity.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
 
 export enum VoicePipelineComponent {
   VOICE_PIPELINE_COMPONENT_UNSPECIFIED = 0,
@@ -468,62 +339,6 @@ export function pipelineStateToJSON(object: PipelineState): string {
   }
 }
 
-/**
- * Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
- * UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
- * the same as NOT_LOADED for forward-compatibility.
- */
-export enum ComponentLoadState {
-  COMPONENT_LOAD_STATE_UNSPECIFIED = 0,
-  COMPONENT_LOAD_STATE_NOT_LOADED = 1,
-  COMPONENT_LOAD_STATE_LOADING = 2,
-  COMPONENT_LOAD_STATE_LOADED = 3,
-  COMPONENT_LOAD_STATE_ERROR = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function componentLoadStateFromJSON(object: any): ComponentLoadState {
-  switch (object) {
-    case 0:
-    case "COMPONENT_LOAD_STATE_UNSPECIFIED":
-      return ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED;
-    case 1:
-    case "COMPONENT_LOAD_STATE_NOT_LOADED":
-      return ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED;
-    case 2:
-    case "COMPONENT_LOAD_STATE_LOADING":
-      return ComponentLoadState.COMPONENT_LOAD_STATE_LOADING;
-    case 3:
-    case "COMPONENT_LOAD_STATE_LOADED":
-      return ComponentLoadState.COMPONENT_LOAD_STATE_LOADED;
-    case 4:
-    case "COMPONENT_LOAD_STATE_ERROR":
-      return ComponentLoadState.COMPONENT_LOAD_STATE_ERROR;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return ComponentLoadState.UNRECOGNIZED;
-  }
-}
-
-export function componentLoadStateToJSON(object: ComponentLoadState): string {
-  switch (object) {
-    case ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED:
-      return "COMPONENT_LOAD_STATE_UNSPECIFIED";
-    case ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED:
-      return "COMPONENT_LOAD_STATE_NOT_LOADED";
-    case ComponentLoadState.COMPONENT_LOAD_STATE_LOADING:
-      return "COMPONENT_LOAD_STATE_LOADING";
-    case ComponentLoadState.COMPONENT_LOAD_STATE_LOADED:
-      return "COMPONENT_LOAD_STATE_LOADED";
-    case ComponentLoadState.COMPONENT_LOAD_STATE_ERROR:
-      return "COMPONENT_LOAD_STATE_ERROR";
-    case ComponentLoadState.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 export enum SpeechTurnDetectionEventKind {
   SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
   SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
@@ -672,8 +487,8 @@ export interface VoiceEvent {
    * Unix epoch. Frontends may re-timestamp for UI display.
    */
   timestampUs: number;
-  category: VoiceEventCategory;
-  severity: VoiceEventSeverity;
+  category: EventCategory;
+  severity: ErrorSeverity;
   component: VoicePipelineComponent;
   userSaid?: UserSaidEvent | undefined;
   assistantToken?: AssistantTokenEvent | undefined;
@@ -855,21 +670,30 @@ export interface ComponentProgressEvent {
  * `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
  * `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
  * `VoiceAgentComponentStates`.
+ *
+ * IDL-04: The former `ComponentLoadState` enum was consolidated into the
+ * canonical richer `ComponentLifecycleState` (component_types.proto). Where
+ * the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
+ * component is ready to use", callers now use
+ * `COMPONENT_LIFECYCLE_STATE_READY`.
  */
 export interface VoiceAgentComponentStates {
-  sttState: ComponentLoadState;
-  llmState: ComponentLoadState;
-  ttsState: ComponentLoadState;
-  vadState: ComponentLoadState;
+  sttState: ComponentLifecycleState;
+  llmState: ComponentLifecycleState;
+  ttsState: ComponentLifecycleState;
+  vadState: ComponentLifecycleState;
   /**
    * Computed: true when stt_state, llm_state, tts_state, vad_state are all
-   * COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+   * COMPONENT_LIFECYCLE_STATE_READY. Producer sets this; consumers must NOT
    * recompute.
    */
   ready: boolean;
-  /** Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING. */
+  /**
+   * Computed: true when any of the four states is
+   * COMPONENT_LIFECYCLE_STATE_LOADING.
+   */
   anyLoading: boolean;
-  wakewordState: ComponentLoadState;
+  wakewordState: ComponentLifecycleState;
   errorMessage?: string | undefined;
 }
 
@@ -1270,8 +1094,8 @@ export const VoiceEvent = {
     return {
       seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
-      category: isSet(object.category) ? voiceEventCategoryFromJSON(object.category) : 0,
-      severity: isSet(object.severity) ? voiceEventSeverityFromJSON(object.severity) : 0,
+      category: isSet(object.category) ? eventCategoryFromJSON(object.category) : 0,
+      severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
       component: isSet(object.component) ? voicePipelineComponentFromJSON(object.component) : 0,
       userSaid: isSet(object.userSaid) ? UserSaidEvent.fromJSON(object.userSaid) : undefined,
       assistantToken: isSet(object.assistantToken) ? AssistantTokenEvent.fromJSON(object.assistantToken) : undefined,
@@ -1325,10 +1149,10 @@ export const VoiceEvent = {
       obj.timestampUs = Math.round(message.timestampUs);
     }
     if (message.category !== 0) {
-      obj.category = voiceEventCategoryToJSON(message.category);
+      obj.category = eventCategoryToJSON(message.category);
     }
     if (message.severity !== 0) {
-      obj.severity = voiceEventSeverityToJSON(message.severity);
+      obj.severity = errorSeverityToJSON(message.severity);
     }
     if (message.component !== 0) {
       obj.component = voicePipelineComponentToJSON(message.component);
@@ -3005,13 +2829,13 @@ export const VoiceAgentComponentStates = {
 
   fromJSON(object: any): VoiceAgentComponentStates {
     return {
-      sttState: isSet(object.sttState) ? componentLoadStateFromJSON(object.sttState) : 0,
-      llmState: isSet(object.llmState) ? componentLoadStateFromJSON(object.llmState) : 0,
-      ttsState: isSet(object.ttsState) ? componentLoadStateFromJSON(object.ttsState) : 0,
-      vadState: isSet(object.vadState) ? componentLoadStateFromJSON(object.vadState) : 0,
+      sttState: isSet(object.sttState) ? componentLifecycleStateFromJSON(object.sttState) : 0,
+      llmState: isSet(object.llmState) ? componentLifecycleStateFromJSON(object.llmState) : 0,
+      ttsState: isSet(object.ttsState) ? componentLifecycleStateFromJSON(object.ttsState) : 0,
+      vadState: isSet(object.vadState) ? componentLifecycleStateFromJSON(object.vadState) : 0,
       ready: isSet(object.ready) ? globalThis.Boolean(object.ready) : false,
       anyLoading: isSet(object.anyLoading) ? globalThis.Boolean(object.anyLoading) : false,
-      wakewordState: isSet(object.wakewordState) ? componentLoadStateFromJSON(object.wakewordState) : 0,
+      wakewordState: isSet(object.wakewordState) ? componentLifecycleStateFromJSON(object.wakewordState) : 0,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
     };
   },
@@ -3019,16 +2843,16 @@ export const VoiceAgentComponentStates = {
   toJSON(message: VoiceAgentComponentStates): unknown {
     const obj: any = {};
     if (message.sttState !== 0) {
-      obj.sttState = componentLoadStateToJSON(message.sttState);
+      obj.sttState = componentLifecycleStateToJSON(message.sttState);
     }
     if (message.llmState !== 0) {
-      obj.llmState = componentLoadStateToJSON(message.llmState);
+      obj.llmState = componentLifecycleStateToJSON(message.llmState);
     }
     if (message.ttsState !== 0) {
-      obj.ttsState = componentLoadStateToJSON(message.ttsState);
+      obj.ttsState = componentLifecycleStateToJSON(message.ttsState);
     }
     if (message.vadState !== 0) {
-      obj.vadState = componentLoadStateToJSON(message.vadState);
+      obj.vadState = componentLifecycleStateToJSON(message.vadState);
     }
     if (message.ready !== false) {
       obj.ready = message.ready;
@@ -3037,7 +2861,7 @@ export const VoiceAgentComponentStates = {
       obj.anyLoading = message.anyLoading;
     }
     if (message.wakewordState !== 0) {
-      obj.wakewordState = componentLoadStateToJSON(message.wakewordState);
+      obj.wakewordState = componentLifecycleStateToJSON(message.wakewordState);
     }
     if (message.errorMessage !== undefined) {
       obj.errorMessage = message.errorMessage;

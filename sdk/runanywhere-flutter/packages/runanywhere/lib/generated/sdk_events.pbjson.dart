@@ -18,7 +18,7 @@ import 'errors.pbjson.dart' as $9;
 import 'hardware_profile.pbjson.dart' as $8;
 import 'model_types.pbjson.dart' as $0;
 import 'storage_types.pbjson.dart' as $5;
-import 'thinking_tag_pattern.pbjson.dart' as $11;
+import 'thinking_tag_pattern.pbjson.dart' as $12;
 import 'voice_events.pbjson.dart' as $10;
 
 @$core.Deprecated('Use sDKComponentDescriptor instead')
@@ -50,24 +50,6 @@ final $typed_data.Uint8List sDKComponentDescriptor = $convert.base64Decode(
     'NES19DT01QT05FTlRfV0FLRVdPUkQQChIlCiFTREtfQ09NUE9ORU5UX1NQRUFLRVJfRElBUkla'
     'QVRJT04QCw==');
 
-@$core.Deprecated('Use eventSeverityDescriptor instead')
-const EventSeverity$json = {
-  '1': 'EventSeverity',
-  '2': [
-    {'1': 'EVENT_SEVERITY_DEBUG', '2': 0},
-    {'1': 'EVENT_SEVERITY_INFO', '2': 1},
-    {'1': 'EVENT_SEVERITY_WARNING', '2': 2},
-    {'1': 'EVENT_SEVERITY_ERROR', '2': 3},
-    {'1': 'EVENT_SEVERITY_CRITICAL', '2': 4},
-  ],
-};
-
-/// Descriptor for `EventSeverity`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List eventSeverityDescriptor = $convert.base64Decode(
-    'Cg1FdmVudFNldmVyaXR5EhgKFEVWRU5UX1NFVkVSSVRZX0RFQlVHEAASFwoTRVZFTlRfU0VWRV'
-    'JJVFlfSU5GTxABEhoKFkVWRU5UX1NFVkVSSVRZX1dBUk5JTkcQAhIYChRFVkVOVF9TRVZFUklU'
-    'WV9FUlJPUhADEhsKF0VWRU5UX1NFVkVSSVRZX0NSSVRJQ0FMEAQ=');
-
 @$core.Deprecated('Use eventDestinationDescriptor instead')
 const EventDestination$json = {
   '1': 'EventDestination',
@@ -84,101 +66,6 @@ final $typed_data.Uint8List eventDestinationDescriptor = $convert.base64Decode(
     'ChBFdmVudERlc3RpbmF0aW9uEiEKHUVWRU5UX0RFU1RJTkFUSU9OX1VOU1BFQ0lGSUVEEAASGQ'
     'oVRVZFTlRfREVTVElOQVRJT05fQUxMEAESIQodRVZFTlRfREVTVElOQVRJT05fUFVCTElDX09O'
     'TFkQAhIkCiBFVkVOVF9ERVNUSU5BVElPTl9BTkFMWVRJQ1NfT05MWRAD');
-
-@$core.Deprecated('Use eventCategoryDescriptor instead')
-const EventCategory$json = {
-  '1': 'EventCategory',
-  '2': [
-    {'1': 'EVENT_CATEGORY_UNSPECIFIED', '2': 0},
-    {'1': 'EVENT_CATEGORY_SDK', '2': 1},
-    {'1': 'EVENT_CATEGORY_INITIALIZATION', '2': 2},
-    {'1': 'EVENT_CATEGORY_SHUTDOWN', '2': 3},
-    {'1': 'EVENT_CATEGORY_SESSION', '2': 4},
-    {'1': 'EVENT_CATEGORY_AUTH', '2': 5},
-    {'1': 'EVENT_CATEGORY_DEVICE', '2': 6},
-    {'1': 'EVENT_CATEGORY_REGISTRY', '2': 7},
-    {'1': 'EVENT_CATEGORY_ASSIGNMENT', '2': 8},
-    {'1': 'EVENT_CATEGORY_IMPORT', '2': 9},
-    {'1': 'EVENT_CATEGORY_DISCOVERY', '2': 10},
-    {'1': 'EVENT_CATEGORY_DOWNLOAD', '2': 11},
-    {'1': 'EVENT_CATEGORY_STORAGE', '2': 12},
-    {'1': 'EVENT_CATEGORY_HARDWARE', '2': 13},
-    {'1': 'EVENT_CATEGORY_ROUTING', '2': 14},
-    {'1': 'EVENT_CATEGORY_FRAMEWORK', '2': 15},
-    {'1': 'EVENT_CATEGORY_MODEL', '2': 16},
-    {'1': 'EVENT_CATEGORY_COMPONENT', '2': 17},
-    {'1': 'EVENT_CATEGORY_LLM', '2': 18},
-    {'1': 'EVENT_CATEGORY_STT', '2': 19},
-    {'1': 'EVENT_CATEGORY_ASR', '2': 20},
-    {'1': 'EVENT_CATEGORY_TTS', '2': 21},
-    {'1': 'EVENT_CATEGORY_VAD', '2': 22},
-    {'1': 'EVENT_CATEGORY_STD', '2': 23},
-    {'1': 'EVENT_CATEGORY_VOICE_AGENT', '2': 24},
-    {'1': 'EVENT_CATEGORY_VLM', '2': 25},
-    {'1': 'EVENT_CATEGORY_DIFFUSION', '2': 26},
-    {'1': 'EVENT_CATEGORY_EMBEDDINGS', '2': 27},
-    {'1': 'EVENT_CATEGORY_RAG', '2': 28},
-    {'1': 'EVENT_CATEGORY_LORA', '2': 29},
-    {'1': 'EVENT_CATEGORY_TELEMETRY', '2': 30},
-    {'1': 'EVENT_CATEGORY_PERFORMANCE', '2': 31},
-    {'1': 'EVENT_CATEGORY_CANCELLATION', '2': 32},
-    {'1': 'EVENT_CATEGORY_FAILURE', '2': 33},
-    {'1': 'EVENT_CATEGORY_NETWORK', '2': 34},
-    {'1': 'EVENT_CATEGORY_ERROR', '2': 35},
-  ],
-};
-
-/// Descriptor for `EventCategory`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List eventCategoryDescriptor = $convert.base64Decode(
-    'Cg1FdmVudENhdGVnb3J5Eh4KGkVWRU5UX0NBVEVHT1JZX1VOU1BFQ0lGSUVEEAASFgoSRVZFTl'
-    'RfQ0FURUdPUllfU0RLEAESIQodRVZFTlRfQ0FURUdPUllfSU5JVElBTElaQVRJT04QAhIbChdF'
-    'VkVOVF9DQVRFR09SWV9TSFVURE9XThADEhoKFkVWRU5UX0NBVEVHT1JZX1NFU1NJT04QBBIXCh'
-    'NFVkVOVF9DQVRFR09SWV9BVVRIEAUSGQoVRVZFTlRfQ0FURUdPUllfREVWSUNFEAYSGwoXRVZF'
-    'TlRfQ0FURUdPUllfUkVHSVNUUlkQBxIdChlFVkVOVF9DQVRFR09SWV9BU1NJR05NRU5UEAgSGQ'
-    'oVRVZFTlRfQ0FURUdPUllfSU1QT1JUEAkSHAoYRVZFTlRfQ0FURUdPUllfRElTQ09WRVJZEAoS'
-    'GwoXRVZFTlRfQ0FURUdPUllfRE9XTkxPQUQQCxIaChZFVkVOVF9DQVRFR09SWV9TVE9SQUdFEA'
-    'wSGwoXRVZFTlRfQ0FURUdPUllfSEFSRFdBUkUQDRIaChZFVkVOVF9DQVRFR09SWV9ST1VUSU5H'
-    'EA4SHAoYRVZFTlRfQ0FURUdPUllfRlJBTUVXT1JLEA8SGAoURVZFTlRfQ0FURUdPUllfTU9ERU'
-    'wQEBIcChhFVkVOVF9DQVRFR09SWV9DT01QT05FTlQQERIWChJFVkVOVF9DQVRFR09SWV9MTE0Q'
-    'EhIWChJFVkVOVF9DQVRFR09SWV9TVFQQExIWChJFVkVOVF9DQVRFR09SWV9BU1IQFBIWChJFVk'
-    'VOVF9DQVRFR09SWV9UVFMQFRIWChJFVkVOVF9DQVRFR09SWV9WQUQQFhIWChJFVkVOVF9DQVRF'
-    'R09SWV9TVEQQFxIeChpFVkVOVF9DQVRFR09SWV9WT0lDRV9BR0VOVBAYEhYKEkVWRU5UX0NBVE'
-    'VHT1JZX1ZMTRAZEhwKGEVWRU5UX0NBVEVHT1JZX0RJRkZVU0lPThAaEh0KGUVWRU5UX0NBVEVH'
-    'T1JZX0VNQkVERElOR1MQGxIWChJFVkVOVF9DQVRFR09SWV9SQUcQHBIXChNFVkVOVF9DQVRFR0'
-    '9SWV9MT1JBEB0SHAoYRVZFTlRfQ0FURUdPUllfVEVMRU1FVFJZEB4SHgoaRVZFTlRfQ0FURUdP'
-    'UllfUEVSRk9STUFOQ0UQHxIfChtFVkVOVF9DQVRFR09SWV9DQU5DRUxMQVRJT04QIBIaChZFVk'
-    'VOVF9DQVRFR09SWV9GQUlMVVJFECESGgoWRVZFTlRfQ0FURUdPUllfTkVUV09SSxAiEhgKFEVW'
-    'RU5UX0NBVEVHT1JZX0VSUk9SECM=');
-
-@$core.Deprecated('Use componentLifecycleStateDescriptor instead')
-const ComponentLifecycleState$json = {
-  '1': 'ComponentLifecycleState',
-  '2': [
-    {'1': 'COMPONENT_LIFECYCLE_STATE_UNSPECIFIED', '2': 0},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_NOT_LOADED', '2': 1},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_LOADING', '2': 2},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_READY', '2': 3},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_UNLOADING', '2': 4},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_ERROR', '2': 5},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_SHUTDOWN', '2': 6},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_DOWNLOADING', '2': 7},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_DELETING', '2': 8},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_PAUSED', '2': 9},
-    {'1': 'COMPONENT_LIFECYCLE_STATE_UPDATING', '2': 10},
-  ],
-};
-
-/// Descriptor for `ComponentLifecycleState`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List componentLifecycleStateDescriptor = $convert.base64Decode(
-    'ChdDb21wb25lbnRMaWZlY3ljbGVTdGF0ZRIpCiVDT01QT05FTlRfTElGRUNZQ0xFX1NUQVRFX1'
-    'VOU1BFQ0lGSUVEEAASKAokQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9OT1RfTE9BREVEEAES'
-    'JQohQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9MT0FESU5HEAISIwofQ09NUE9ORU5UX0xJRk'
-    'VDWUNMRV9TVEFURV9SRUFEWRADEicKI0NPTVBPTkVOVF9MSUZFQ1lDTEVfU1RBVEVfVU5MT0FE'
-    'SU5HEAQSIwofQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9FUlJPUhAFEiYKIkNPTVBPTkVOVF'
-    '9MSUZFQ1lDTEVfU1RBVEVfU0hVVERPV04QBhIpCiVDT01QT05FTlRfTElGRUNZQ0xFX1NUQVRF'
-    'X0RPV05MT0FESU5HEAcSJgoiQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9ERUxFVElORxAIEi'
-    'QKIENPTVBPTkVOVF9MSUZFQ1lDTEVfU1RBVEVfUEFVU0VEEAkSJgoiQ09NUE9ORU5UX0xJRkVD'
-    'WUNMRV9TVEFURV9VUERBVElORxAK');
 
 @$core.Deprecated('Use initializationStageDescriptor instead')
 const InitializationStage$json = {
@@ -1630,7 +1517,7 @@ const SDKEvent$json = {
   '1': 'SDKEvent',
   '2': [
     {'1': 'timestamp_ms', '3': 1, '4': 1, '5': 3, '10': 'timestampMs'},
-    {'1': 'severity', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.EventSeverity', '10': 'severity'},
+    {'1': 'severity', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.ErrorSeverity', '10': 'severity'},
     {'1': 'category', '3': 20, '4': 1, '5': 14, '6': '.runanywhere.v1.EventCategory', '10': 'category'},
     {'1': 'component', '3': 21, '4': 1, '5': 14, '6': '.runanywhere.v1.SDKComponent', '10': 'component'},
     {'1': 'error', '3': 22, '4': 1, '5': 11, '6': '.runanywhere.v1.SDKError', '9': 1, '10': 'error', '17': true},
@@ -1686,7 +1573,7 @@ const SDKEvent_PropertiesEntry$json = {
 /// Descriptor for `SDKEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sDKEventDescriptor = $convert.base64Decode(
     'CghTREtFdmVudBIhCgx0aW1lc3RhbXBfbXMYASABKANSC3RpbWVzdGFtcE1zEjkKCHNldmVyaX'
-    'R5GAIgASgOMh0ucnVuYW55d2hlcmUudjEuRXZlbnRTZXZlcml0eVIIc2V2ZXJpdHkSOQoIY2F0'
+    'R5GAIgASgOMh0ucnVuYW55d2hlcmUudjEuRXJyb3JTZXZlcml0eVIIc2V2ZXJpdHkSOQoIY2F0'
     'ZWdvcnkYFCABKA4yHS5ydW5hbnl3aGVyZS52MS5FdmVudENhdGVnb3J5UghjYXRlZ29yeRI6Cg'
     'ljb21wb25lbnQYFSABKA4yHC5ydW5hbnl3aGVyZS52MS5TREtDb21wb25lbnRSCWNvbXBvbmVu'
     'dBIzCgVlcnJvchgWIAEoCzIYLnJ1bmFueXdoZXJlLnYxLlNES0Vycm9ySAFSBWVycm9yiAEBEg'
@@ -1734,7 +1621,7 @@ const SDKEventFilter$json = {
     {'1': 'categories', '3': 1, '4': 3, '5': 14, '6': '.runanywhere.v1.EventCategory', '10': 'categories'},
     {'1': 'components', '3': 2, '4': 3, '5': 14, '6': '.runanywhere.v1.SDKComponent', '10': 'components'},
     {'1': 'destinations', '3': 3, '4': 3, '5': 14, '6': '.runanywhere.v1.EventDestination', '10': 'destinations'},
-    {'1': 'minimum_severity', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.EventSeverity', '10': 'minimumSeverity'},
+    {'1': 'minimum_severity', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.ErrorSeverity', '10': 'minimumSeverity'},
     {'1': 'session_id', '3': 5, '4': 1, '5': 9, '10': 'sessionId'},
     {'1': 'operation_id', '3': 6, '4': 1, '5': 9, '10': 'operationId'},
     {'1': 'correlation_id', '3': 7, '4': 1, '5': 9, '10': 'correlationId'},
@@ -1749,7 +1636,7 @@ final $typed_data.Uint8List sDKEventFilterDescriptor = $convert.base64Decode(
     'ZlbnRDYXRlZ29yeVIKY2F0ZWdvcmllcxI8Cgpjb21wb25lbnRzGAIgAygOMhwucnVuYW55d2hl'
     'cmUudjEuU0RLQ29tcG9uZW50Ugpjb21wb25lbnRzEkQKDGRlc3RpbmF0aW9ucxgDIAMoDjIgLn'
     'J1bmFueXdoZXJlLnYxLkV2ZW50RGVzdGluYXRpb25SDGRlc3RpbmF0aW9ucxJIChBtaW5pbXVt'
-    'X3NldmVyaXR5GAQgASgOMh0ucnVuYW55d2hlcmUudjEuRXZlbnRTZXZlcml0eVIPbWluaW11bV'
+    'X3NldmVyaXR5GAQgASgOMh0ucnVuYW55d2hlcmUudjEuRXJyb3JTZXZlcml0eVIPbWluaW11bV'
     'NldmVyaXR5Eh0KCnNlc3Npb25faWQYBSABKAlSCXNlc3Npb25JZBIhCgxvcGVyYXRpb25faWQY'
     'BiABKAlSC29wZXJhdGlvbklkEiUKDmNvcnJlbGF0aW9uX2lkGAcgASgJUg1jb3JyZWxhdGlvbk'
     'lkEhYKBnNvdXJjZRgIIAEoCVIGc291cmNlEhkKCHRyYWNlX2lkGAkgASgJUgd0cmFjZUlk');
@@ -1866,7 +1753,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsS
   '.runanywhere.v1.StorageDeleteResult': $5.StorageDeleteResult$json,
   '.runanywhere.v1.ComponentLifecycleSnapshot': ComponentLifecycleSnapshot$json,
   '.runanywhere.v1.ModelInfo': $0.ModelInfo$json,
-  '.runanywhere.v1.ThinkingTagPattern': $11.ThinkingTagPattern$json,
+  '.runanywhere.v1.ThinkingTagPattern': $12.ThinkingTagPattern$json,
   '.runanywhere.v1.ModelInfoMetadata': $0.ModelInfoMetadata$json,
   '.runanywhere.v1.SingleFileArtifact': $0.SingleFileArtifact$json,
   '.runanywhere.v1.ExpectedModelFiles': $0.ExpectedModelFiles$json,

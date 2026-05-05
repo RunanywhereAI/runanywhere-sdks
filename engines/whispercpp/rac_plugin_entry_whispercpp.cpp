@@ -17,6 +17,15 @@ extern "C" {
 
 extern const rac_stt_service_ops_t g_whispercpp_stt_ops;
 
+/**
+ * whispercpp has no runtime gate beyond build-time presence — if the engine
+ * binary is loaded the whisper.cpp library was linked in, so the primitives
+ * are always dispatchable. Return RAC_SUCCESS to signal "available".
+ */
+static rac_result_t whispercpp_capability_check(void) {
+    return RAC_SUCCESS;
+}
+
 static const rac_runtime_id_t k_whispercpp_runtimes[] = {
     RAC_RUNTIME_CPU,
 #if defined(__APPLE__)
@@ -40,7 +49,7 @@ static const rac_engine_manifest_t k_whispercpp_manifest = {
     .package_owner    = "runanywhere",
     .package_name     = "runanywhere_whispercpp",
     .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority         = 90,
+    .priority         = 80,
     .capability_flags = 0,
     .primitives       = k_whispercpp_primitives,
     .primitives_count = sizeof(k_whispercpp_primitives) / sizeof(k_whispercpp_primitives[0]),
@@ -54,7 +63,7 @@ static const rac_engine_manifest_t k_whispercpp_manifest = {
 
 static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_whispercpp_manifest),
-    /* capability_check */ nullptr,
+    /* capability_check */ whispercpp_capability_check,
     /* on_unload        */ nullptr,
 
     /* llm_ops          */ nullptr,

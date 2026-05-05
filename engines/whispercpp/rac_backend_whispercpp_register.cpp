@@ -15,6 +15,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_service.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -149,6 +150,10 @@ bool g_registered = false;
 
 extern "C" {
 
+// Forward-declare the plugin entry function defined in
+// rac_plugin_entry_whispercpp.cpp (via RAC_PLUGIN_ENTRY_DEF(whispercpp)).
+const rac_engine_vtable_t* rac_plugin_entry_whispercpp(void);
+
 rac_result_t rac_backend_whispercpp_register(void) {
     if (g_registered) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
@@ -169,10 +174,21 @@ rac_result_t rac_backend_whispercpp_register(void) {
         return result;
     }
 
-    // v3 Phase B4: plugin registration via rac_plugin_entry_whispercpp().
+    // Register the unified plugin vtable so rac_plugin_route(RAC_PRIMITIVE_
+    // TRANSCRIBE) can find whispercpp's STT ops. Phase B4 dropped this call
+    // but no replacement constructor landed — without it the plugin is
+    // invisible to the router even when librac_backend_whispercpp.so is
+    // loaded and rac_backend_whispercpp_register() is called.
+    const rac_engine_vtable_t* vt = rac_plugin_entry_whispercpp();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        }
+    }
+
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "WhisperCPP backend registered (module_register only; "
-                          "plugin registration via rac_plugin_entry_whispercpp)");
+    RAC_LOG_INFO(LOG_CAT, "WhisperCPP backend registered (module + plugin)");
     return RAC_SUCCESS;
 }
 

@@ -322,12 +322,11 @@ set(SHERPA_BACKEND_SOURCES
     rac_tts_sherpa.cpp
     rac_vad_sherpa.cpp
     rac_backend_sherpa_register.cpp
-    wakeword_sherpa.cpp
     rac_plugin_entry_sherpa.cpp
 )
 
 set(SHERPA_LINK_LIBS onnxruntime nlohmann_json::nlohmann_json)
-set(SHERPA_COMPILE_DEFS RAC_SHERPA_BUILDING RAC_ONNX_BUILDING RAC_HAS_ONNX RAC_SHERPA_SPEECH_OPS_AVAILABLE=1)
+set(SHERPA_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX RAC_SHERPA_SPEECH_OPS_AVAILABLE=1)
 if(SHERPA_ONNX_AVAILABLE)
     list(APPEND SHERPA_LINK_LIBS sherpa_onnx)
     list(APPEND SHERPA_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=1)

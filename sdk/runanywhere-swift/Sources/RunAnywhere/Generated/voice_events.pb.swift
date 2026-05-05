@@ -31,126 +31,6 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-public enum RAVoiceEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case voiceAgent // = 1
-  case stt // = 2
-  case asr // = 3
-  case tts // = 4
-  case vad // = 5
-  case std // = 6
-  case llm // = 7
-  case audio // = 8
-  case metrics // = 9
-  case error // = 10
-  case wakeword // = 11
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .voiceAgent
-    case 2: self = .stt
-    case 3: self = .asr
-    case 4: self = .tts
-    case 5: self = .vad
-    case 6: self = .std
-    case 7: self = .llm
-    case 8: self = .audio
-    case 9: self = .metrics
-    case 10: self = .error
-    case 11: self = .wakeword
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .voiceAgent: return 1
-    case .stt: return 2
-    case .asr: return 3
-    case .tts: return 4
-    case .vad: return 5
-    case .std: return 6
-    case .llm: return 7
-    case .audio: return 8
-    case .metrics: return 9
-    case .error: return 10
-    case .wakeword: return 11
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVoiceEventCategory] = [
-    .unspecified,
-    .voiceAgent,
-    .stt,
-    .asr,
-    .tts,
-    .vad,
-    .std,
-    .llm,
-    .audio,
-    .metrics,
-    .error,
-    .wakeword,
-  ]
-
-}
-
-public enum RAVoiceEventSeverity: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case debug // = 0
-  case info // = 1
-  case warning // = 2
-  case error // = 3
-  case critical // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .debug
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .debug
-    case 1: self = .info
-    case 2: self = .warning
-    case 3: self = .error
-    case 4: self = .critical
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .debug: return 0
-    case .info: return 1
-    case .warning: return 2
-    case .error: return 3
-    case .critical: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVoiceEventSeverity] = [
-    .debug,
-    .info,
-    .warning,
-    .error,
-    .critical,
-  ]
-
-}
-
 public enum RAVoicePipelineComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -423,55 +303,6 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
-/// UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
-/// the same as NOT_LOADED for forward-compatibility.
-public enum RAComponentLoadState: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case notLoaded // = 1
-  case loading // = 2
-  case loaded // = 3
-  case error // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .notLoaded
-    case 2: self = .loading
-    case 3: self = .loaded
-    case 4: self = .error
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .notLoaded: return 1
-    case .loading: return 2
-    case .loaded: return 3
-    case .error: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAComponentLoadState] = [
-    .unspecified,
-    .notLoaded,
-    .loading,
-    .loaded,
-    .error,
-  ]
-
-}
-
 public enum RASpeechTurnDetectionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -606,12 +437,12 @@ public struct RAVoiceEvent: @unchecked Sendable {
     set {_uniqueStorage()._timestampUs = newValue}
   }
 
-  public var category: RAVoiceEventCategory {
+  public var category: RAEventCategory {
     get {_storage._category}
     set {_uniqueStorage()._category = newValue}
   }
 
-  public var severity: RAVoiceEventSeverity {
+  public var severity: RAErrorSeverity {
     get {_storage._severity}
     set {_uniqueStorage()._severity = newValue}
   }
@@ -1092,28 +923,35 @@ public struct RAComponentProgressEvent: Sendable {
 /// `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
 /// `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
 /// `VoiceAgentComponentStates`.
+///
+/// IDL-04: The former `ComponentLoadState` enum was consolidated into the
+/// canonical richer `ComponentLifecycleState` (component_types.proto). Where
+/// the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
+/// component is ready to use", callers now use
+/// `COMPONENT_LIFECYCLE_STATE_READY`.
 public struct RAVoiceAgentComponentStates: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var sttState: RAComponentLoadState = .unspecified
+  public var sttState: RAComponentLifecycleState = .unspecified
 
-  public var llmState: RAComponentLoadState = .unspecified
+  public var llmState: RAComponentLifecycleState = .unspecified
 
-  public var ttsState: RAComponentLoadState = .unspecified
+  public var ttsState: RAComponentLifecycleState = .unspecified
 
-  public var vadState: RAComponentLoadState = .unspecified
+  public var vadState: RAComponentLifecycleState = .unspecified
 
   /// Computed: true when stt_state, llm_state, tts_state, vad_state are all
-  /// COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+  /// COMPONENT_LIFECYCLE_STATE_READY. Producer sets this; consumers must NOT
   /// recompute.
   public var ready: Bool = false
 
-  /// Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING.
+  /// Computed: true when any of the four states is
+  /// COMPONENT_LIFECYCLE_STATE_LOADING.
   public var anyLoading: Bool = false
 
-  public var wakewordState: RAComponentLoadState = .unspecified
+  public var wakewordState: RAComponentLifecycleState = .unspecified
 
   public var errorMessage: String {
     get {_errorMessage ?? String()}
@@ -1288,14 +1126,6 @@ public struct RAWakeWordDetectedEvent: Sendable {
 
 fileprivate let _protobuf_package = "runanywhere.v1"
 
-extension RAVoiceEventCategory: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_EVENT_CATEGORY_UNSPECIFIED\0\u{1}VOICE_EVENT_CATEGORY_VOICE_AGENT\0\u{1}VOICE_EVENT_CATEGORY_STT\0\u{1}VOICE_EVENT_CATEGORY_ASR\0\u{1}VOICE_EVENT_CATEGORY_TTS\0\u{1}VOICE_EVENT_CATEGORY_VAD\0\u{1}VOICE_EVENT_CATEGORY_STD\0\u{1}VOICE_EVENT_CATEGORY_LLM\0\u{1}VOICE_EVENT_CATEGORY_AUDIO\0\u{1}VOICE_EVENT_CATEGORY_METRICS\0\u{1}VOICE_EVENT_CATEGORY_ERROR\0\u{1}VOICE_EVENT_CATEGORY_WAKEWORD\0")
-}
-
-extension RAVoiceEventSeverity: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_EVENT_SEVERITY_DEBUG\0\u{1}VOICE_EVENT_SEVERITY_INFO\0\u{1}VOICE_EVENT_SEVERITY_WARNING\0\u{1}VOICE_EVENT_SEVERITY_ERROR\0\u{1}VOICE_EVENT_SEVERITY_CRITICAL\0")
-}
-
 extension RAVoicePipelineComponent: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_PIPELINE_COMPONENT_UNSPECIFIED\0\u{1}VOICE_PIPELINE_COMPONENT_AGENT\0\u{1}VOICE_PIPELINE_COMPONENT_STT\0\u{1}VOICE_PIPELINE_COMPONENT_ASR\0\u{1}VOICE_PIPELINE_COMPONENT_TTS\0\u{1}VOICE_PIPELINE_COMPONENT_VAD\0\u{1}VOICE_PIPELINE_COMPONENT_STD\0\u{1}VOICE_PIPELINE_COMPONENT_LLM\0\u{1}VOICE_PIPELINE_COMPONENT_AUDIO\0\u{1}VOICE_PIPELINE_COMPONENT_WAKEWORD\0")
 }
@@ -1316,10 +1146,6 @@ extension RAPipelineState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATE_UNSPECIFIED\0\u{1}PIPELINE_STATE_IDLE\0\u{1}PIPELINE_STATE_LISTENING\0\u{1}PIPELINE_STATE_THINKING\0\u{1}PIPELINE_STATE_SPEAKING\0\u{1}PIPELINE_STATE_STOPPED\0\u{1}PIPELINE_STATE_WAITING_WAKEWORD\0\u{1}PIPELINE_STATE_PROCESSING_SPEECH\0\u{1}PIPELINE_STATE_GENERATING_RESPONSE\0\u{1}PIPELINE_STATE_PLAYING_TTS\0\u{1}PIPELINE_STATE_COOLDOWN\0\u{1}PIPELINE_STATE_ERROR\0")
 }
 
-extension RAComponentLoadState: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_LOAD_STATE_UNSPECIFIED\0\u{1}COMPONENT_LOAD_STATE_NOT_LOADED\0\u{1}COMPONENT_LOAD_STATE_LOADING\0\u{1}COMPONENT_LOAD_STATE_LOADED\0\u{1}COMPONENT_LOAD_STATE_ERROR\0")
-}
-
 extension RASpeechTurnDetectionEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS\0")
 }
@@ -1335,8 +1161,8 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   fileprivate class _StorageClass {
     var _seq: UInt64 = 0
     var _timestampUs: Int64 = 0
-    var _category: RAVoiceEventCategory = .unspecified
-    var _severity: RAVoiceEventSeverity = .debug
+    var _category: RAEventCategory = .unspecified
+    var _severity: RAErrorSeverity = .unspecified
     var _component: RAVoicePipelineComponent = .unspecified
     var _payload: RAVoiceEvent.OneOf_Payload?
     var _sessionID: String = String()
@@ -1658,7 +1484,7 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       if _storage._category != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._category, fieldNumber: 3)
       }
-      if _storage._severity != .debug {
+      if _storage._severity != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._severity, fieldNumber: 4)
       }
       if _storage._component != .unspecified {

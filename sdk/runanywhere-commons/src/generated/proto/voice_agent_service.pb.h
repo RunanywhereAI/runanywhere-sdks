@@ -34,8 +34,11 @@
 #include "google/protobuf/map_entry.h"
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "component_types.pb.h"
+#include "errors.pb.h"
 #include "voice_events.pb.h"
 #include "tts_options.pb.h"
+#include "stt_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -881,7 +884,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::
     kMinSeverityFieldNumber = 4,
     kIncludeAudioFieldNumber = 6,
   };
-  // repeated .runanywhere.v1.VoiceEventCategory categories = 3;
+  // repeated .runanywhere.v1.EventCategory categories = 3;
   [[nodiscard]] int categories_size()
       const;
   private:
@@ -890,9 +893,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::
   public:
   void clear_categories() ;
   public:
-  [[nodiscard]] ::runanywhere::v1::VoiceEventCategory categories(int index) const;
-  void set_categories(int index, ::runanywhere::v1::VoiceEventCategory value);
-  void add_categories(::runanywhere::v1::VoiceEventCategory value);
+  [[nodiscard]] ::runanywhere::v1::EventCategory categories(int index) const;
+  void set_categories(int index, ::runanywhere::v1::EventCategory value);
+  void add_categories(::runanywhere::v1::EventCategory value);
   [[nodiscard]] const ::google::protobuf::RepeatedField<int>& categories() const;
   [[nodiscard]] ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL mutable_categories();
 
@@ -941,14 +944,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::
   void _internal_set_replay_from_seq(::uint64_t value);
 
   public:
-  // .runanywhere.v1.VoiceEventSeverity min_severity = 4;
+  // .runanywhere.v1.ErrorSeverity min_severity = 4;
   void clear_min_severity() ;
-  [[nodiscard]] ::runanywhere::v1::VoiceEventSeverity min_severity() const;
-  void set_min_severity(::runanywhere::v1::VoiceEventSeverity value);
+  [[nodiscard]] ::runanywhere::v1::ErrorSeverity min_severity() const;
+  void set_min_severity(::runanywhere::v1::ErrorSeverity value);
 
   private:
-  ::runanywhere::v1::VoiceEventSeverity _internal_min_severity() const;
-  void _internal_set_min_severity(::runanywhere::v1::VoiceEventSeverity value);
+  ::runanywhere::v1::ErrorSeverity _internal_min_severity() const;
+  void _internal_set_min_severity(::runanywhere::v1::ErrorSeverity value);
 
   public:
   // bool include_audio = 6;
@@ -2936,7 +2939,7 @@ inline void VoiceAgentRequest::set_allocated_session_id(::std::string* PROTOBUF_
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentRequest.session_id)
 }
 
-// repeated .runanywhere.v1.VoiceEventCategory categories = 3;
+// repeated .runanywhere.v1.EventCategory categories = 3;
 inline int VoiceAgentRequest::_internal_categories_size() const {
   return _internal_categories().size();
 }
@@ -2949,15 +2952,15 @@ inline void VoiceAgentRequest::clear_categories() {
   ClearHasBitForRepeated(_impl_._has_bits_[0],
                   0x00000001U);
 }
-inline ::runanywhere::v1::VoiceEventCategory VoiceAgentRequest::categories(int index) const {
+inline ::runanywhere::v1::EventCategory VoiceAgentRequest::categories(int index) const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.categories)
-  return static_cast<::runanywhere::v1::VoiceEventCategory>(_internal_categories().Get(index));
+  return static_cast<::runanywhere::v1::EventCategory>(_internal_categories().Get(index));
 }
-inline void VoiceAgentRequest::set_categories(int index, ::runanywhere::v1::VoiceEventCategory value) {
+inline void VoiceAgentRequest::set_categories(int index, ::runanywhere::v1::EventCategory value) {
   _internal_mutable_categories()->Set(index, value);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.categories)
 }
-inline void VoiceAgentRequest::add_categories(::runanywhere::v1::VoiceEventCategory value) {
+inline void VoiceAgentRequest::add_categories(::runanywhere::v1::EventCategory value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _internal_mutable_categories()->InternalAddWithArena(
       internal_visibility(), GetArena(), value);
@@ -2987,27 +2990,27 @@ VoiceAgentRequest::_internal_mutable_categories() {
   return &_impl_.categories_;
 }
 
-// .runanywhere.v1.VoiceEventSeverity min_severity = 4;
+// .runanywhere.v1.ErrorSeverity min_severity = 4;
 inline void VoiceAgentRequest::clear_min_severity() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_severity_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000010U);
 }
-inline ::runanywhere::v1::VoiceEventSeverity VoiceAgentRequest::min_severity() const {
+inline ::runanywhere::v1::ErrorSeverity VoiceAgentRequest::min_severity() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.min_severity)
   return _internal_min_severity();
 }
-inline void VoiceAgentRequest::set_min_severity(::runanywhere::v1::VoiceEventSeverity value) {
+inline void VoiceAgentRequest::set_min_severity(::runanywhere::v1::ErrorSeverity value) {
   _internal_set_min_severity(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.min_severity)
 }
-inline ::runanywhere::v1::VoiceEventSeverity VoiceAgentRequest::_internal_min_severity() const {
+inline ::runanywhere::v1::ErrorSeverity VoiceAgentRequest::_internal_min_severity() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::VoiceEventSeverity>(_impl_.min_severity_);
+  return static_cast<::runanywhere::v1::ErrorSeverity>(_impl_.min_severity_);
 }
-inline void VoiceAgentRequest::_internal_set_min_severity(::runanywhere::v1::VoiceEventSeverity value) {
+inline void VoiceAgentRequest::_internal_set_min_severity(::runanywhere::v1::ErrorSeverity value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_severity_ = value;
 }

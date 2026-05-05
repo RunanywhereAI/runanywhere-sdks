@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
 import ai.runanywhere.proto.v1.AudioEncoding
-import ai.runanywhere.proto.v1.ComponentLoadState
+import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_LLM
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
@@ -50,11 +50,11 @@ data class SelectedModel(
     val modelId: String,
 )
 
-val ComponentLoadState.isLoaded: Boolean
-    get() = this == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED
+val ComponentLifecycleState.isLoaded: Boolean
+    get() = this == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY
 
-val ComponentLoadState.isLoading: Boolean
-    get() = this == ComponentLoadState.COMPONENT_LOAD_STATE_LOADING
+val ComponentLifecycleState.isLoading: Boolean
+    get() = this == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_LOADING
 
 /**
  * Voice Assistant UI State matching iOS VoiceAgentViewModel
@@ -70,9 +70,9 @@ data class VoiceUiState(
     val llmModel: SelectedModel? = null,
     val ttsModel: SelectedModel? = null,
     // Model Loading States matching iOS
-    val sttLoadState: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
-    val llmLoadState: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
-    val ttsLoadState: ComponentLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED,
+    val sttLoadState: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
+    val llmLoadState: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
+    val ttsLoadState: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
 ) {
     /**
      * Check if all models are actually loaded in memory
@@ -349,7 +349,7 @@ class VoiceAssistantViewModel(
                     EVENT_CATEGORY_LLM -> {
                         _uiState.update {
                             it.copy(
-                                llmLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_LOADED,
+                                llmLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY,
                                 llmModel = SelectedModel("llamacpp", modelEvent.model_id, modelEvent.model_id),
                             )
                         }
@@ -358,7 +358,7 @@ class VoiceAssistantViewModel(
                     EVENT_CATEGORY_STT -> {
                         _uiState.update {
                             it.copy(
-                                sttLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_LOADED,
+                                sttLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY,
                                 sttModel = SelectedModel("whisper", modelEvent.model_id, modelEvent.model_id),
                             )
                         }
@@ -367,7 +367,7 @@ class VoiceAssistantViewModel(
                     EVENT_CATEGORY_TTS -> {
                         _uiState.update {
                             it.copy(
-                                ttsLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_LOADED,
+                                ttsLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY,
                                 ttsModel = SelectedModel("tts", modelEvent.model_id, modelEvent.model_id),
                             )
                         }
@@ -381,7 +381,7 @@ class VoiceAssistantViewModel(
                     EVENT_CATEGORY_LLM -> {
                         _uiState.update {
                             it.copy(
-                                llmLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
+                                llmLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                 llmModel = null,
                             )
                         }
@@ -389,7 +389,7 @@ class VoiceAssistantViewModel(
                     EVENT_CATEGORY_STT -> {
                         _uiState.update {
                             it.copy(
-                                sttLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
+                                sttLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                 sttModel = null,
                             )
                         }
@@ -397,7 +397,7 @@ class VoiceAssistantViewModel(
                     EVENT_CATEGORY_TTS -> {
                         _uiState.update {
                             it.copy(
-                                ttsLoadState = ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
+                                ttsLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                 ttsModel = null,
                             )
                         }
@@ -426,9 +426,9 @@ class VoiceAssistantViewModel(
             val llmState = protoStates.llm_state
             val ttsState = protoStates.tts_state
 
-            val sttModelId = "stt".takeIf { sttState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED }
-            val llmModelId = "llm".takeIf { llmState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED }
-            val ttsModelId = "tts".takeIf { ttsState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED }
+            val sttModelId = "stt".takeIf { sttState == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY }
+            val llmModelId = "llm".takeIf { llmState == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY }
+            val ttsModelId = "tts".takeIf { ttsState == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY }
 
             _uiState.update { currentState ->
                 currentState.copy(
@@ -451,9 +451,9 @@ class VoiceAssistantViewModel(
             }
 
             Timber.i(
-                "Model states synced - STT: ${sttState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED}, " +
-                    "LLM: ${llmState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED}, " +
-                    "TTS: ${ttsState == ComponentLoadState.COMPONENT_LOAD_STATE_LOADED}",
+                "Model states synced - STT: ${sttState == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY}, " +
+                    "LLM: ${llmState == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY}, " +
+                    "TTS: ${ttsState == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY}",
             )
         } catch (e: Exception) {
             Timber.w("Could not sync model states: ${e.message}")

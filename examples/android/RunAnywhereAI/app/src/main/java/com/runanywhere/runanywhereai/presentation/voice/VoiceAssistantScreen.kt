@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
-import ai.runanywhere.proto.v1.ComponentLoadState
+import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.PipelineState
 import android.Manifest
 import androidx.compose.animation.*
@@ -239,9 +239,9 @@ private fun VoicePipelineSetupView(
     sttModel: SelectedModel?,
     llmModel: SelectedModel?,
     ttsModel: SelectedModel?,
-    sttLoadState: ComponentLoadState,
-    llmLoadState: ComponentLoadState,
-    ttsLoadState: ComponentLoadState,
+    sttLoadState: ComponentLifecycleState,
+    llmLoadState: ComponentLifecycleState,
+    ttsLoadState: ComponentLifecycleState,
     onSelectSTT: () -> Unit,
     onSelectLLM: () -> Unit,
     onSelectTTS: () -> Unit,
@@ -377,7 +377,7 @@ private fun ModelSetupCard(
     color: Color,
     selectedFramework: String?,
     selectedModel: String?,
-    loadState: ComponentLoadState,
+    loadState: ComponentLifecycleState,
     onSelect: () -> Unit,
 ) {
     val isConfigured = selectedFramework != null && selectedModel != null

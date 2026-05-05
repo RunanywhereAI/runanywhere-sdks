@@ -8,13 +8,21 @@
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import {
+  ComponentLifecycleState,
+  componentLifecycleStateFromJSON,
+  componentLifecycleStateToJSON,
+  EventCategory,
+  eventCategoryFromJSON,
+  eventCategoryToJSON,
+} from "./component_types";
+import {
   DownloadCancelResult,
   DownloadPlanResult,
   DownloadProgress,
   DownloadResumeResult,
   DownloadStartResult,
 } from "./download_service";
-import { SDKError } from "./errors";
+import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON, SDKError } from "./errors";
 import { HardwareProfileResult } from "./hardware_profile";
 import {
   CurrentModelResult,
@@ -148,64 +156,6 @@ export function sDKComponentToJSON(object: SDKComponent): string {
 
 /**
  * ---------------------------------------------------------------------------
- * Event severity. New unification — pre-IDL each SDK either implied severity
- * from event type ("failed" → ERROR) or had no notion. Canonicalizing now
- * enables analytics to filter without parsing event names.
- * ---------------------------------------------------------------------------
- */
-export enum EventSeverity {
-  EVENT_SEVERITY_DEBUG = 0,
-  EVENT_SEVERITY_INFO = 1,
-  EVENT_SEVERITY_WARNING = 2,
-  EVENT_SEVERITY_ERROR = 3,
-  EVENT_SEVERITY_CRITICAL = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function eventSeverityFromJSON(object: any): EventSeverity {
-  switch (object) {
-    case 0:
-    case "EVENT_SEVERITY_DEBUG":
-      return EventSeverity.EVENT_SEVERITY_DEBUG;
-    case 1:
-    case "EVENT_SEVERITY_INFO":
-      return EventSeverity.EVENT_SEVERITY_INFO;
-    case 2:
-    case "EVENT_SEVERITY_WARNING":
-      return EventSeverity.EVENT_SEVERITY_WARNING;
-    case 3:
-    case "EVENT_SEVERITY_ERROR":
-      return EventSeverity.EVENT_SEVERITY_ERROR;
-    case 4:
-    case "EVENT_SEVERITY_CRITICAL":
-      return EventSeverity.EVENT_SEVERITY_CRITICAL;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return EventSeverity.UNRECOGNIZED;
-  }
-}
-
-export function eventSeverityToJSON(object: EventSeverity): string {
-  switch (object) {
-    case EventSeverity.EVENT_SEVERITY_DEBUG:
-      return "EVENT_SEVERITY_DEBUG";
-    case EventSeverity.EVENT_SEVERITY_INFO:
-      return "EVENT_SEVERITY_INFO";
-    case EventSeverity.EVENT_SEVERITY_WARNING:
-      return "EVENT_SEVERITY_WARNING";
-    case EventSeverity.EVENT_SEVERITY_ERROR:
-      return "EVENT_SEVERITY_ERROR";
-    case EventSeverity.EVENT_SEVERITY_CRITICAL:
-      return "EVENT_SEVERITY_CRITICAL";
-    case EventSeverity.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
  * Where an event should be routed. Mirrors Swift `EventDestination` /
  * Kotlin `EventDestination` / Dart `EventDestination`.
  * Sources pre-IDL:
@@ -257,343 +207,6 @@ export function eventDestinationToJSON(object: EventDestination): string {
     case EventDestination.EVENT_DESTINATION_ANALYTICS_ONLY:
       return "EVENT_DESTINATION_ANALYTICS_ONLY";
     case EventDestination.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * Canonical event category carried by every SDKEvent envelope. The oneof arm
- * identifies the concrete payload shape; this field preserves the stable bus /
- * analytics route used by Swift, Kotlin, Dart/Flutter, React Native, Web, and
- * C++ commons.
- */
-export enum EventCategory {
-  EVENT_CATEGORY_UNSPECIFIED = 0,
-  EVENT_CATEGORY_SDK = 1,
-  EVENT_CATEGORY_INITIALIZATION = 2,
-  EVENT_CATEGORY_SHUTDOWN = 3,
-  EVENT_CATEGORY_SESSION = 4,
-  EVENT_CATEGORY_AUTH = 5,
-  EVENT_CATEGORY_DEVICE = 6,
-  EVENT_CATEGORY_REGISTRY = 7,
-  EVENT_CATEGORY_ASSIGNMENT = 8,
-  EVENT_CATEGORY_IMPORT = 9,
-  EVENT_CATEGORY_DISCOVERY = 10,
-  EVENT_CATEGORY_DOWNLOAD = 11,
-  EVENT_CATEGORY_STORAGE = 12,
-  EVENT_CATEGORY_HARDWARE = 13,
-  EVENT_CATEGORY_ROUTING = 14,
-  EVENT_CATEGORY_FRAMEWORK = 15,
-  EVENT_CATEGORY_MODEL = 16,
-  EVENT_CATEGORY_COMPONENT = 17,
-  EVENT_CATEGORY_LLM = 18,
-  EVENT_CATEGORY_STT = 19,
-  EVENT_CATEGORY_ASR = 20,
-  EVENT_CATEGORY_TTS = 21,
-  EVENT_CATEGORY_VAD = 22,
-  /** EVENT_CATEGORY_STD - speech-turn detection / diarization */
-  EVENT_CATEGORY_STD = 23,
-  EVENT_CATEGORY_VOICE_AGENT = 24,
-  EVENT_CATEGORY_VLM = 25,
-  EVENT_CATEGORY_DIFFUSION = 26,
-  EVENT_CATEGORY_EMBEDDINGS = 27,
-  EVENT_CATEGORY_RAG = 28,
-  EVENT_CATEGORY_LORA = 29,
-  EVENT_CATEGORY_TELEMETRY = 30,
-  EVENT_CATEGORY_PERFORMANCE = 31,
-  EVENT_CATEGORY_CANCELLATION = 32,
-  EVENT_CATEGORY_FAILURE = 33,
-  EVENT_CATEGORY_NETWORK = 34,
-  EVENT_CATEGORY_ERROR = 35,
-  UNRECOGNIZED = -1,
-}
-
-export function eventCategoryFromJSON(object: any): EventCategory {
-  switch (object) {
-    case 0:
-    case "EVENT_CATEGORY_UNSPECIFIED":
-      return EventCategory.EVENT_CATEGORY_UNSPECIFIED;
-    case 1:
-    case "EVENT_CATEGORY_SDK":
-      return EventCategory.EVENT_CATEGORY_SDK;
-    case 2:
-    case "EVENT_CATEGORY_INITIALIZATION":
-      return EventCategory.EVENT_CATEGORY_INITIALIZATION;
-    case 3:
-    case "EVENT_CATEGORY_SHUTDOWN":
-      return EventCategory.EVENT_CATEGORY_SHUTDOWN;
-    case 4:
-    case "EVENT_CATEGORY_SESSION":
-      return EventCategory.EVENT_CATEGORY_SESSION;
-    case 5:
-    case "EVENT_CATEGORY_AUTH":
-      return EventCategory.EVENT_CATEGORY_AUTH;
-    case 6:
-    case "EVENT_CATEGORY_DEVICE":
-      return EventCategory.EVENT_CATEGORY_DEVICE;
-    case 7:
-    case "EVENT_CATEGORY_REGISTRY":
-      return EventCategory.EVENT_CATEGORY_REGISTRY;
-    case 8:
-    case "EVENT_CATEGORY_ASSIGNMENT":
-      return EventCategory.EVENT_CATEGORY_ASSIGNMENT;
-    case 9:
-    case "EVENT_CATEGORY_IMPORT":
-      return EventCategory.EVENT_CATEGORY_IMPORT;
-    case 10:
-    case "EVENT_CATEGORY_DISCOVERY":
-      return EventCategory.EVENT_CATEGORY_DISCOVERY;
-    case 11:
-    case "EVENT_CATEGORY_DOWNLOAD":
-      return EventCategory.EVENT_CATEGORY_DOWNLOAD;
-    case 12:
-    case "EVENT_CATEGORY_STORAGE":
-      return EventCategory.EVENT_CATEGORY_STORAGE;
-    case 13:
-    case "EVENT_CATEGORY_HARDWARE":
-      return EventCategory.EVENT_CATEGORY_HARDWARE;
-    case 14:
-    case "EVENT_CATEGORY_ROUTING":
-      return EventCategory.EVENT_CATEGORY_ROUTING;
-    case 15:
-    case "EVENT_CATEGORY_FRAMEWORK":
-      return EventCategory.EVENT_CATEGORY_FRAMEWORK;
-    case 16:
-    case "EVENT_CATEGORY_MODEL":
-      return EventCategory.EVENT_CATEGORY_MODEL;
-    case 17:
-    case "EVENT_CATEGORY_COMPONENT":
-      return EventCategory.EVENT_CATEGORY_COMPONENT;
-    case 18:
-    case "EVENT_CATEGORY_LLM":
-      return EventCategory.EVENT_CATEGORY_LLM;
-    case 19:
-    case "EVENT_CATEGORY_STT":
-      return EventCategory.EVENT_CATEGORY_STT;
-    case 20:
-    case "EVENT_CATEGORY_ASR":
-      return EventCategory.EVENT_CATEGORY_ASR;
-    case 21:
-    case "EVENT_CATEGORY_TTS":
-      return EventCategory.EVENT_CATEGORY_TTS;
-    case 22:
-    case "EVENT_CATEGORY_VAD":
-      return EventCategory.EVENT_CATEGORY_VAD;
-    case 23:
-    case "EVENT_CATEGORY_STD":
-      return EventCategory.EVENT_CATEGORY_STD;
-    case 24:
-    case "EVENT_CATEGORY_VOICE_AGENT":
-      return EventCategory.EVENT_CATEGORY_VOICE_AGENT;
-    case 25:
-    case "EVENT_CATEGORY_VLM":
-      return EventCategory.EVENT_CATEGORY_VLM;
-    case 26:
-    case "EVENT_CATEGORY_DIFFUSION":
-      return EventCategory.EVENT_CATEGORY_DIFFUSION;
-    case 27:
-    case "EVENT_CATEGORY_EMBEDDINGS":
-      return EventCategory.EVENT_CATEGORY_EMBEDDINGS;
-    case 28:
-    case "EVENT_CATEGORY_RAG":
-      return EventCategory.EVENT_CATEGORY_RAG;
-    case 29:
-    case "EVENT_CATEGORY_LORA":
-      return EventCategory.EVENT_CATEGORY_LORA;
-    case 30:
-    case "EVENT_CATEGORY_TELEMETRY":
-      return EventCategory.EVENT_CATEGORY_TELEMETRY;
-    case 31:
-    case "EVENT_CATEGORY_PERFORMANCE":
-      return EventCategory.EVENT_CATEGORY_PERFORMANCE;
-    case 32:
-    case "EVENT_CATEGORY_CANCELLATION":
-      return EventCategory.EVENT_CATEGORY_CANCELLATION;
-    case 33:
-    case "EVENT_CATEGORY_FAILURE":
-      return EventCategory.EVENT_CATEGORY_FAILURE;
-    case 34:
-    case "EVENT_CATEGORY_NETWORK":
-      return EventCategory.EVENT_CATEGORY_NETWORK;
-    case 35:
-    case "EVENT_CATEGORY_ERROR":
-      return EventCategory.EVENT_CATEGORY_ERROR;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return EventCategory.UNRECOGNIZED;
-  }
-}
-
-export function eventCategoryToJSON(object: EventCategory): string {
-  switch (object) {
-    case EventCategory.EVENT_CATEGORY_UNSPECIFIED:
-      return "EVENT_CATEGORY_UNSPECIFIED";
-    case EventCategory.EVENT_CATEGORY_SDK:
-      return "EVENT_CATEGORY_SDK";
-    case EventCategory.EVENT_CATEGORY_INITIALIZATION:
-      return "EVENT_CATEGORY_INITIALIZATION";
-    case EventCategory.EVENT_CATEGORY_SHUTDOWN:
-      return "EVENT_CATEGORY_SHUTDOWN";
-    case EventCategory.EVENT_CATEGORY_SESSION:
-      return "EVENT_CATEGORY_SESSION";
-    case EventCategory.EVENT_CATEGORY_AUTH:
-      return "EVENT_CATEGORY_AUTH";
-    case EventCategory.EVENT_CATEGORY_DEVICE:
-      return "EVENT_CATEGORY_DEVICE";
-    case EventCategory.EVENT_CATEGORY_REGISTRY:
-      return "EVENT_CATEGORY_REGISTRY";
-    case EventCategory.EVENT_CATEGORY_ASSIGNMENT:
-      return "EVENT_CATEGORY_ASSIGNMENT";
-    case EventCategory.EVENT_CATEGORY_IMPORT:
-      return "EVENT_CATEGORY_IMPORT";
-    case EventCategory.EVENT_CATEGORY_DISCOVERY:
-      return "EVENT_CATEGORY_DISCOVERY";
-    case EventCategory.EVENT_CATEGORY_DOWNLOAD:
-      return "EVENT_CATEGORY_DOWNLOAD";
-    case EventCategory.EVENT_CATEGORY_STORAGE:
-      return "EVENT_CATEGORY_STORAGE";
-    case EventCategory.EVENT_CATEGORY_HARDWARE:
-      return "EVENT_CATEGORY_HARDWARE";
-    case EventCategory.EVENT_CATEGORY_ROUTING:
-      return "EVENT_CATEGORY_ROUTING";
-    case EventCategory.EVENT_CATEGORY_FRAMEWORK:
-      return "EVENT_CATEGORY_FRAMEWORK";
-    case EventCategory.EVENT_CATEGORY_MODEL:
-      return "EVENT_CATEGORY_MODEL";
-    case EventCategory.EVENT_CATEGORY_COMPONENT:
-      return "EVENT_CATEGORY_COMPONENT";
-    case EventCategory.EVENT_CATEGORY_LLM:
-      return "EVENT_CATEGORY_LLM";
-    case EventCategory.EVENT_CATEGORY_STT:
-      return "EVENT_CATEGORY_STT";
-    case EventCategory.EVENT_CATEGORY_ASR:
-      return "EVENT_CATEGORY_ASR";
-    case EventCategory.EVENT_CATEGORY_TTS:
-      return "EVENT_CATEGORY_TTS";
-    case EventCategory.EVENT_CATEGORY_VAD:
-      return "EVENT_CATEGORY_VAD";
-    case EventCategory.EVENT_CATEGORY_STD:
-      return "EVENT_CATEGORY_STD";
-    case EventCategory.EVENT_CATEGORY_VOICE_AGENT:
-      return "EVENT_CATEGORY_VOICE_AGENT";
-    case EventCategory.EVENT_CATEGORY_VLM:
-      return "EVENT_CATEGORY_VLM";
-    case EventCategory.EVENT_CATEGORY_DIFFUSION:
-      return "EVENT_CATEGORY_DIFFUSION";
-    case EventCategory.EVENT_CATEGORY_EMBEDDINGS:
-      return "EVENT_CATEGORY_EMBEDDINGS";
-    case EventCategory.EVENT_CATEGORY_RAG:
-      return "EVENT_CATEGORY_RAG";
-    case EventCategory.EVENT_CATEGORY_LORA:
-      return "EVENT_CATEGORY_LORA";
-    case EventCategory.EVENT_CATEGORY_TELEMETRY:
-      return "EVENT_CATEGORY_TELEMETRY";
-    case EventCategory.EVENT_CATEGORY_PERFORMANCE:
-      return "EVENT_CATEGORY_PERFORMANCE";
-    case EventCategory.EVENT_CATEGORY_CANCELLATION:
-      return "EVENT_CATEGORY_CANCELLATION";
-    case EventCategory.EVENT_CATEGORY_FAILURE:
-      return "EVENT_CATEGORY_FAILURE";
-    case EventCategory.EVENT_CATEGORY_NETWORK:
-      return "EVENT_CATEGORY_NETWORK";
-    case EventCategory.EVENT_CATEGORY_ERROR:
-      return "EVENT_CATEGORY_ERROR";
-    case EventCategory.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * Component runtime lifecycle state for model-backed SDK components. This is
- * distinct from voice_events.proto's ComponentLoadState, which is scoped to
- * the voice-agent sub-pipeline. Platform adapters own native component handles;
- * this enum carries the C++ lifecycle state every SDK can expose uniformly.
- */
-export enum ComponentLifecycleState {
-  COMPONENT_LIFECYCLE_STATE_UNSPECIFIED = 0,
-  COMPONENT_LIFECYCLE_STATE_NOT_LOADED = 1,
-  COMPONENT_LIFECYCLE_STATE_LOADING = 2,
-  COMPONENT_LIFECYCLE_STATE_READY = 3,
-  COMPONENT_LIFECYCLE_STATE_UNLOADING = 4,
-  COMPONENT_LIFECYCLE_STATE_ERROR = 5,
-  COMPONENT_LIFECYCLE_STATE_SHUTDOWN = 6,
-  COMPONENT_LIFECYCLE_STATE_DOWNLOADING = 7,
-  COMPONENT_LIFECYCLE_STATE_DELETING = 8,
-  COMPONENT_LIFECYCLE_STATE_PAUSED = 9,
-  COMPONENT_LIFECYCLE_STATE_UPDATING = 10,
-  UNRECOGNIZED = -1,
-}
-
-export function componentLifecycleStateFromJSON(object: any): ComponentLifecycleState {
-  switch (object) {
-    case 0:
-    case "COMPONENT_LIFECYCLE_STATE_UNSPECIFIED":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED;
-    case 1:
-    case "COMPONENT_LIFECYCLE_STATE_NOT_LOADED":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
-    case 2:
-    case "COMPONENT_LIFECYCLE_STATE_LOADING":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_LOADING;
-    case 3:
-    case "COMPONENT_LIFECYCLE_STATE_READY":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
-    case 4:
-    case "COMPONENT_LIFECYCLE_STATE_UNLOADING":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNLOADING;
-    case 5:
-    case "COMPONENT_LIFECYCLE_STATE_ERROR":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR;
-    case 6:
-    case "COMPONENT_LIFECYCLE_STATE_SHUTDOWN":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN;
-    case 7:
-    case "COMPONENT_LIFECYCLE_STATE_DOWNLOADING":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DOWNLOADING;
-    case 8:
-    case "COMPONENT_LIFECYCLE_STATE_DELETING":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DELETING;
-    case 9:
-    case "COMPONENT_LIFECYCLE_STATE_PAUSED":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_PAUSED;
-    case 10:
-    case "COMPONENT_LIFECYCLE_STATE_UPDATING":
-      return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UPDATING;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return ComponentLifecycleState.UNRECOGNIZED;
-  }
-}
-
-export function componentLifecycleStateToJSON(object: ComponentLifecycleState): string {
-  switch (object) {
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED:
-      return "COMPONENT_LIFECYCLE_STATE_UNSPECIFIED";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED:
-      return "COMPONENT_LIFECYCLE_STATE_NOT_LOADED";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_LOADING:
-      return "COMPONENT_LIFECYCLE_STATE_LOADING";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY:
-      return "COMPONENT_LIFECYCLE_STATE_READY";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNLOADING:
-      return "COMPONENT_LIFECYCLE_STATE_UNLOADING";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR:
-      return "COMPONENT_LIFECYCLE_STATE_ERROR";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN:
-      return "COMPONENT_LIFECYCLE_STATE_SHUTDOWN";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DOWNLOADING:
-      return "COMPONENT_LIFECYCLE_STATE_DOWNLOADING";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DELETING:
-      return "COMPONENT_LIFECYCLE_STATE_DELETING";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_PAUSED:
-      return "COMPONENT_LIFECYCLE_STATE_PAUSED";
-    case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UPDATING:
-      return "COMPONENT_LIFECYCLE_STATE_UPDATING";
-    case ComponentLifecycleState.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -3350,7 +2963,7 @@ export interface FailureEvent {
 export interface SDKEvent {
   /** Wall-clock time of event creation, milliseconds since Unix epoch. */
   timestampMs: number;
-  severity: EventSeverity;
+  severity: ErrorSeverity;
   category: EventCategory;
   component: SDKComponent;
   /**
@@ -3445,7 +3058,7 @@ export interface SDKEventFilter {
   categories: EventCategory[];
   components: SDKComponent[];
   destinations: EventDestination[];
-  minimumSeverity: EventSeverity;
+  minimumSeverity: ErrorSeverity;
   sessionId: string;
   operationId: string;
   correlationId: string;
@@ -8838,7 +8451,7 @@ export const SDKEvent = {
   fromJSON(object: any): SDKEvent {
     return {
       timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
-      severity: isSet(object.severity) ? eventSeverityFromJSON(object.severity) : 0,
+      severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
       category: isSet(object.category) ? eventCategoryFromJSON(object.category) : 0,
       component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
@@ -8895,7 +8508,7 @@ export const SDKEvent = {
       obj.timestampMs = Math.round(message.timestampMs);
     }
     if (message.severity !== 0) {
-      obj.severity = eventSeverityToJSON(message.severity);
+      obj.severity = errorSeverityToJSON(message.severity);
     }
     if (message.category !== 0) {
       obj.category = eventCategoryToJSON(message.category);
@@ -9353,7 +8966,7 @@ export const SDKEventFilter = {
       destinations: globalThis.Array.isArray(object?.destinations)
         ? object.destinations.map((e: any) => eventDestinationFromJSON(e))
         : [],
-      minimumSeverity: isSet(object.minimumSeverity) ? eventSeverityFromJSON(object.minimumSeverity) : 0,
+      minimumSeverity: isSet(object.minimumSeverity) ? errorSeverityFromJSON(object.minimumSeverity) : 0,
       sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
       operationId: isSet(object.operationId) ? globalThis.String(object.operationId) : "",
       correlationId: isSet(object.correlationId) ? globalThis.String(object.correlationId) : "",
@@ -9374,7 +8987,7 @@ export const SDKEventFilter = {
       obj.destinations = message.destinations.map((e) => eventDestinationToJSON(e));
     }
     if (message.minimumSeverity !== 0) {
-      obj.minimumSeverity = eventSeverityToJSON(message.minimumSeverity);
+      obj.minimumSeverity = errorSeverityToJSON(message.minimumSeverity);
     }
     if (message.sessionId !== "") {
       obj.sessionId = message.sessionId;

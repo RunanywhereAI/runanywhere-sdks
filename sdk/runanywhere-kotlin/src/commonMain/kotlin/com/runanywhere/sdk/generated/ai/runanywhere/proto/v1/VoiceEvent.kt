@@ -61,18 +61,18 @@ public class VoiceEvent(
   public val timestamp_us: Long = 0L,
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.VoiceEventCategory#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.EventCategory#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val category: VoiceEventCategory = VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED,
+  public val category: EventCategory = EventCategory.EVENT_CATEGORY_UNSPECIFIED,
   @field:WireField(
     tag = 4,
-    adapter = "ai.runanywhere.proto.v1.VoiceEventSeverity#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ErrorSeverity#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 3,
   )
-  public val severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG,
+  public val severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.VoicePipelineComponent#ADAPTER",
@@ -400,8 +400,8 @@ public class VoiceEvent(
   public fun copy(
     seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
-    category: VoiceEventCategory = this.category,
-    severity: VoiceEventSeverity = this.severity,
+    category: EventCategory = this.category,
+    severity: ErrorSeverity = this.severity,
     component: VoicePipelineComponent = this.component,
     user_said: UserSaidEvent? = this.user_said,
     assistant_token: AssistantTokenEvent? = this.assistant_token,
@@ -451,10 +451,10 @@ public class VoiceEvent(
         if (value.seq != 0L) size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
         if (value.timestamp_us != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(2,
             value.timestamp_us)
-        if (value.category != VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED) size +=
-            VoiceEventCategory.ADAPTER.encodedSizeWithTag(3, value.category)
-        if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG) size +=
-            VoiceEventSeverity.ADAPTER.encodedSizeWithTag(4, value.severity)
+        if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED) size +=
+            EventCategory.ADAPTER.encodedSizeWithTag(3, value.category)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) size +=
+            ErrorSeverity.ADAPTER.encodedSizeWithTag(4, value.severity)
         if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED) size +=
             VoicePipelineComponent.ADAPTER.encodedSizeWithTag(5, value.component)
         size += UserSaidEvent.ADAPTER.encodedSizeWithTag(10, value.user_said)
@@ -492,10 +492,10 @@ public class VoiceEvent(
         if (value.seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.timestamp_us)
-        if (value.category != VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED)
-            VoiceEventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
-        if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
-            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
+        if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+            EventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
         if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED)
             VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 30, value.session_id)
@@ -553,10 +553,10 @@ public class VoiceEvent(
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 30, value.session_id)
         if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED)
             VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
-        if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
-            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
-        if (value.category != VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED)
-            VoiceEventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
+        if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+            EventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.timestamp_us)
         if (value.seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
@@ -565,8 +565,8 @@ public class VoiceEvent(
       override fun decode(reader: ProtoReader): VoiceEvent {
         var seq: Long = 0L
         var timestamp_us: Long = 0L
-        var category: VoiceEventCategory = VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED
-        var severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG
+        var category: EventCategory = EventCategory.EVENT_CATEGORY_UNSPECIFIED
+        var severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var component: VoicePipelineComponent =
             VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED
         var user_said: UserSaidEvent? = null
@@ -597,12 +597,12 @@ public class VoiceEvent(
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> try {
-              category = VoiceEventCategory.ADAPTER.decode(reader)
+              category = EventCategory.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             4 -> try {
-              severity = VoiceEventSeverity.ADAPTER.decode(reader)
+              severity = ErrorSeverity.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

@@ -42,6 +42,7 @@ protoc \
     hardware_profile.proto \
     lifecycle_service.proto \
     thinking_tag_pattern.proto \
+    component_types.proto \
     router.proto
 
 echo "✓ C++ proto codegen → ${OUT_DIR}"

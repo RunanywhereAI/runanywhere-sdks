@@ -39,12 +39,12 @@ public class SDKEventFilter(
   destinations: List<EventDestination> = emptyList(),
   @field:WireField(
     tag = 4,
-    adapter = "ai.runanywhere.proto.v1.EventSeverity#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ErrorSeverity#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "minimumSeverity",
     schemaIndex = 3,
   )
-  public val minimum_severity: EventSeverity = EventSeverity.EVENT_SEVERITY_DEBUG,
+  public val minimum_severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -169,7 +169,7 @@ public class SDKEventFilter(
     categories: List<EventCategory> = this.categories,
     components: List<SDKComponent> = this.components,
     destinations: List<EventDestination> = this.destinations,
-    minimum_severity: EventSeverity = this.minimum_severity,
+    minimum_severity: ErrorSeverity = this.minimum_severity,
     session_id: String = this.session_id,
     operation_id: String = this.operation_id,
     correlation_id: String = this.correlation_id,
@@ -194,8 +194,8 @@ public class SDKEventFilter(
         size += EventCategory.ADAPTER.asRepeated().encodedSizeWithTag(1, value.categories)
         size += SDKComponent.ADAPTER.asRepeated().encodedSizeWithTag(2, value.components)
         size += EventDestination.ADAPTER.asRepeated().encodedSizeWithTag(3, value.destinations)
-        if (value.minimum_severity != EventSeverity.EVENT_SEVERITY_DEBUG) size +=
-            EventSeverity.ADAPTER.encodedSizeWithTag(4, value.minimum_severity)
+        if (value.minimum_severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) size +=
+            ErrorSeverity.ADAPTER.encodedSizeWithTag(4, value.minimum_severity)
         if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5,
             value.session_id)
         if (value.operation_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
@@ -211,8 +211,8 @@ public class SDKEventFilter(
         EventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.categories)
         SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.components)
         EventDestination.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.destinations)
-        if (value.minimum_severity != EventSeverity.EVENT_SEVERITY_DEBUG)
-            EventSeverity.ADAPTER.encodeWithTag(writer, 4, value.minimum_severity)
+        if (value.minimum_severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 4, value.minimum_severity)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.session_id)
         if (value.operation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.operation_id)
@@ -232,8 +232,8 @@ public class SDKEventFilter(
         if (value.operation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.operation_id)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.session_id)
-        if (value.minimum_severity != EventSeverity.EVENT_SEVERITY_DEBUG)
-            EventSeverity.ADAPTER.encodeWithTag(writer, 4, value.minimum_severity)
+        if (value.minimum_severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 4, value.minimum_severity)
         EventDestination.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.destinations)
         SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.components)
         EventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.categories)
@@ -243,7 +243,7 @@ public class SDKEventFilter(
         val categories = mutableListOf<EventCategory>()
         val components = mutableListOf<SDKComponent>()
         val destinations = mutableListOf<EventDestination>()
-        var minimum_severity: EventSeverity = EventSeverity.EVENT_SEVERITY_DEBUG
+        var minimum_severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var session_id: String = ""
         var operation_id: String = ""
         var correlation_id: String = ""
@@ -267,7 +267,7 @@ public class SDKEventFilter(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             4 -> try {
-              minimum_severity = EventSeverity.ADAPTER.decode(reader)
+              minimum_severity = ErrorSeverity.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

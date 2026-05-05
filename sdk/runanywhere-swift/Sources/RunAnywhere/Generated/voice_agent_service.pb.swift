@@ -53,9 +53,9 @@ public struct RAVoiceAgentRequest: Sendable {
 
   public var sessionID: String = String()
 
-  public var categories: [RAVoiceEventCategory] = []
+  public var categories: [RAEventCategory] = []
 
-  public var minSeverity: RAVoiceEventSeverity = .debug
+  public var minSeverity: RAErrorSeverity = .unspecified
 
   public var replayFromSeq: UInt64 = 0
 
@@ -654,7 +654,7 @@ extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if !self.categories.isEmpty {
       try visitor.visitPackedEnumField(value: self.categories, fieldNumber: 3)
     }
-    if self.minSeverity != .debug {
+    if self.minSeverity != .unspecified {
       try visitor.visitSingularEnumField(value: self.minSeverity, fieldNumber: 4)
     }
     if self.replayFromSeq != 0 {

@@ -76,7 +76,7 @@ rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
 }
 
 void populate_envelope(runanywhere::v1::SDKEvent* event,
-                       runanywhere::v1::EventSeverity severity) {
+                       runanywhere::v1::ErrorSeverity severity) {
     event->set_id(event_id());
     event->set_timestamp_ms(now_ms());
     event->set_category(runanywhere::v1::EVENT_CATEGORY_VLM);
@@ -99,8 +99,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
                         const char* operation, float progress, int64_t input_count,
                         int64_t output_count, const char* error) {
     runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, error && error[0] ? runanywhere::v1::EVENT_SEVERITY_ERROR
-                                                : runanywhere::v1::EVENT_SEVERITY_INFO);
+    populate_envelope(&event, error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                                : runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
@@ -253,7 +253,7 @@ rac_bool_t stream_token_trampoline(const char* token, void* user_data) {
     ++ctx->token_count;
 
     runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, runanywhere::v1::EVENT_SEVERITY_INFO);
+    populate_envelope(&event, runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* generation = event.mutable_generation();
     generation->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
     generation->set_token(token);
@@ -354,7 +354,7 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
     }
 
     runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, runanywhere::v1::EVENT_SEVERITY_INFO);
+    populate_envelope(&event, runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* generation = event.mutable_generation();
     generation->set_kind(ctx->token_count == 1
                              ? runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED
@@ -535,7 +535,7 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
         return RAC_ERROR_COMPONENT_NOT_READY;
     }
     runanywhere::v1::SDKEvent requested;
-    populate_envelope(&requested, runanywhere::v1::EVENT_SEVERITY_INFO);
+    populate_envelope(&requested, runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* cancel = requested.mutable_cancellation();
     cancel->set_kind(runanywhere::v1::CANCELLATION_EVENT_KIND_REQUESTED);
     cancel->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
@@ -546,8 +546,8 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
 
     rac_result_t rc = rac_vlm_cancel(handle);
     runanywhere::v1::SDKEvent completed;
-    populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
-                                                    : runanywhere::v1::EVENT_SEVERITY_ERROR);
+    populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                                    : runanywhere::v1::ERROR_SEVERITY_ERROR);
     auto* completed_cancel = completed.mutable_cancellation();
     completed_cancel->set_kind(rc == RAC_SUCCESS
                                    ? runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED
@@ -739,7 +739,7 @@ rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event) {
 
     rac::vlm::request_lifecycle_vlm_cancel(&ref);
     runanywhere::v1::SDKEvent requested;
-    populate_envelope(&requested, runanywhere::v1::EVENT_SEVERITY_INFO);
+    populate_envelope(&requested, runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* cancel = requested.mutable_cancellation();
     cancel->set_kind(runanywhere::v1::CANCELLATION_EVENT_KIND_REQUESTED);
     cancel->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
@@ -755,8 +755,8 @@ rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event) {
     }
 
     runanywhere::v1::SDKEvent completed;
-    populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
-                                                    : runanywhere::v1::EVENT_SEVERITY_ERROR);
+    populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                                    : runanywhere::v1::ERROR_SEVERITY_ERROR);
     auto* completed_cancel = completed.mutable_cancellation();
     completed_cancel->set_kind(rc == RAC_SUCCESS
                                    ? runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED

@@ -10,6 +10,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -23,6 +25,34 @@
 #include <sherpa-onnx/c-api/c-api.h>
 #endif
 
+namespace rac::backends::sherpa {
+
+// =============================================================================
+// SHARED HELPERS
+// =============================================================================
+
+/**
+ * Build a minimal JSON array of string codes. Returns a malloc'd NUL-terminated
+ * buffer; caller must free() it. We skip escaping because language codes are
+ * ASCII alphabet / digits / hyphen.
+ */
+inline char* build_json_string_array(const std::vector<std::string>& items) {
+    std::string json;
+    json.reserve(items.size() * 8 + 2);
+    json.push_back('[');
+    for (size_t i = 0; i < items.size(); ++i) {
+        if (i > 0)
+            json.push_back(',');
+        json.push_back('"');
+        json.append(items[i]);
+        json.push_back('"');
+    }
+    json.push_back(']');
+    return strdup(json.c_str());
+}
+
+}  // namespace rac::backends::sherpa
+
 namespace runanywhere {
 
 // =============================================================================
@@ -33,7 +63,6 @@ enum class DeviceType {
     CPU = 0,
     GPU = 1,
     NEURAL_ENGINE = 2,
-    COREML = 6,
 };
 
 struct DeviceInfo {

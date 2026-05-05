@@ -56,11 +56,11 @@ public class SDKEvent(
   public val timestamp_ms: Long = 0L,
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.EventSeverity#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ErrorSeverity#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 1,
   )
-  public val severity: EventSeverity = EventSeverity.EVENT_SEVERITY_DEBUG,
+  public val severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
   @field:WireField(
     tag = 20,
     adapter = "ai.runanywhere.proto.v1.EventCategory#ADAPTER",
@@ -501,7 +501,7 @@ public class SDKEvent(
 
   public fun copy(
     timestamp_ms: Long = this.timestamp_ms,
-    severity: EventSeverity = this.severity,
+    severity: ErrorSeverity = this.severity,
     category: EventCategory = this.category,
     component: SDKComponent = this.component,
     error: SDKError? = this.error,
@@ -561,8 +561,8 @@ public class SDKEvent(
         var size = value.unknownFields.size
         if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(1,
             value.timestamp_ms)
-        if (value.severity != EventSeverity.EVENT_SEVERITY_DEBUG) size +=
-            EventSeverity.ADAPTER.encodedSizeWithTag(2, value.severity)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) size +=
+            ErrorSeverity.ADAPTER.encodedSizeWithTag(2, value.severity)
         if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED) size +=
             EventCategory.ADAPTER.encodedSizeWithTag(20, value.category)
         if (value.component != SDKComponent.SDK_COMPONENT_UNSPECIFIED) size +=
@@ -609,8 +609,8 @@ public class SDKEvent(
       override fun encode(writer: ProtoWriter, `value`: SDKEvent) {
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 1,
             value.timestamp_ms)
-        if (value.severity != EventSeverity.EVENT_SEVERITY_DEBUG)
-            EventSeverity.ADAPTER.encodeWithTag(writer, 2, value.severity)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 2, value.severity)
         if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED)
             EventCategory.ADAPTER.encodeWithTag(writer, 20, value.category)
         if (value.component != SDKComponent.SDK_COMPONENT_UNSPECIFIED)
@@ -694,15 +694,15 @@ public class SDKEvent(
             SDKComponent.ADAPTER.encodeWithTag(writer, 21, value.component)
         if (value.category != EventCategory.EVENT_CATEGORY_UNSPECIFIED)
             EventCategory.ADAPTER.encodeWithTag(writer, 20, value.category)
-        if (value.severity != EventSeverity.EVENT_SEVERITY_DEBUG)
-            EventSeverity.ADAPTER.encodeWithTag(writer, 2, value.severity)
+        if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 2, value.severity)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 1,
             value.timestamp_ms)
       }
 
       override fun decode(reader: ProtoReader): SDKEvent {
         var timestamp_ms: Long = 0L
-        var severity: EventSeverity = EventSeverity.EVENT_SEVERITY_DEBUG
+        var severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var category: EventCategory = EventCategory.EVENT_CATEGORY_UNSPECIFIED
         var component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED
         var error: SDKError? = null
@@ -741,7 +741,7 @@ public class SDKEvent(
           when (tag) {
             1 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             2 -> try {
-              severity = EventSeverity.ADAPTER.decode(reader)
+              severity = ErrorSeverity.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

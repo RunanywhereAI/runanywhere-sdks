@@ -91,7 +91,7 @@ int main() {
     CHECK(poll_event(&auth_event), "authenticate response publishes SDKEvent");
     expect_auth_envelope(auth_event, runanywhere::v1::AUTH_EVENT_KIND_SUCCEEDED,
                          "auth.authenticate");
-    CHECK(auth_event.severity() == runanywhere::v1::EVENT_SEVERITY_INFO,
+    CHECK(auth_event.severity() == runanywhere::v1::ERROR_SEVERITY_INFO,
           "authenticate success severity is info");
     CHECK(auth_event.auth().subject_id() == "user-1", "authenticate event carries subject");
     const auto device_property = auth_event.properties().find("device_id");
@@ -109,7 +109,7 @@ int main() {
     CHECK(poll_event(&refresh_event), "refresh response publishes SDKEvent");
     expect_auth_envelope(refresh_event, runanywhere::v1::AUTH_EVENT_KIND_TOKEN_REFRESHED,
                          "auth.refresh");
-    CHECK(refresh_event.severity() == runanywhere::v1::EVENT_SEVERITY_INFO,
+    CHECK(refresh_event.severity() == runanywhere::v1::ERROR_SEVERITY_INFO,
           "refresh severity is info");
 
     rac_sdk_event_clear_queue();
@@ -120,7 +120,7 @@ int main() {
     CHECK(poll_event(&failed_event), "invalid authenticate response publishes SDKEvent");
     expect_auth_envelope(failed_event, runanywhere::v1::AUTH_EVENT_KIND_FAILED,
                          "auth.authenticate");
-    CHECK(failed_event.severity() == runanywhere::v1::EVENT_SEVERITY_ERROR,
+    CHECK(failed_event.severity() == runanywhere::v1::ERROR_SEVERITY_ERROR,
           "auth failure severity is error");
     CHECK(failed_event.has_error(), "auth failure carries SDKError");
     CHECK(failed_event.error().c_abi_code() == RAC_ERROR_AUTHENTICATION_FAILED,

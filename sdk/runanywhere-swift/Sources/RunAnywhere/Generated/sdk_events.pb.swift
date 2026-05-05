@@ -141,57 +141,6 @@ public enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Event severity. New unification — pre-IDL each SDK either implied severity
-/// from event type ("failed" → ERROR) or had no notion. Canonicalizing now
-/// enables analytics to filter without parsing event names.
-/// ---------------------------------------------------------------------------
-public enum RAEventSeverity: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case debug // = 0
-  case info // = 1
-  case warning // = 2
-  case error // = 3
-  case critical // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .debug
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .debug
-    case 1: self = .info
-    case 2: self = .warning
-    case 3: self = .error
-    case 4: self = .critical
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .debug: return 0
-    case .info: return 1
-    case .warning: return 2
-    case .error: return 3
-    case .critical: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAEventSeverity] = [
-    .debug,
-    .info,
-    .warning,
-    .error,
-    .critical,
-  ]
-
-}
-
-/// ---------------------------------------------------------------------------
 /// Where an event should be routed. Mirrors Swift `EventDestination` /
 /// Kotlin `EventDestination` / Dart `EventDestination`.
 /// Sources pre-IDL:
@@ -243,256 +192,6 @@ public enum RAEventDestination: SwiftProtobuf.Enum, Swift.CaseIterable {
     .all,
     .publicOnly,
     .analyticsOnly,
-  ]
-
-}
-
-/// Canonical event category carried by every SDKEvent envelope. The oneof arm
-/// identifies the concrete payload shape; this field preserves the stable bus /
-/// analytics route used by Swift, Kotlin, Dart/Flutter, React Native, Web, and
-/// C++ commons.
-public enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case sdk // = 1
-  case initialization // = 2
-  case shutdown // = 3
-  case session // = 4
-  case auth // = 5
-  case device // = 6
-  case registry // = 7
-  case assignment // = 8
-  case `import` // = 9
-  case discovery // = 10
-  case download // = 11
-  case storage // = 12
-  case hardware // = 13
-  case routing // = 14
-  case framework // = 15
-  case model // = 16
-  case component // = 17
-  case llm // = 18
-  case stt // = 19
-  case asr // = 20
-  case tts // = 21
-  case vad // = 22
-
-  /// speech-turn detection / diarization
-  case std // = 23
-  case voiceAgent // = 24
-  case vlm // = 25
-  case diffusion // = 26
-  case embeddings // = 27
-  case rag // = 28
-  case lora // = 29
-  case telemetry // = 30
-  case performance // = 31
-  case cancellation // = 32
-  case failure // = 33
-  case network // = 34
-  case error // = 35
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .sdk
-    case 2: self = .initialization
-    case 3: self = .shutdown
-    case 4: self = .session
-    case 5: self = .auth
-    case 6: self = .device
-    case 7: self = .registry
-    case 8: self = .assignment
-    case 9: self = .import
-    case 10: self = .discovery
-    case 11: self = .download
-    case 12: self = .storage
-    case 13: self = .hardware
-    case 14: self = .routing
-    case 15: self = .framework
-    case 16: self = .model
-    case 17: self = .component
-    case 18: self = .llm
-    case 19: self = .stt
-    case 20: self = .asr
-    case 21: self = .tts
-    case 22: self = .vad
-    case 23: self = .std
-    case 24: self = .voiceAgent
-    case 25: self = .vlm
-    case 26: self = .diffusion
-    case 27: self = .embeddings
-    case 28: self = .rag
-    case 29: self = .lora
-    case 30: self = .telemetry
-    case 31: self = .performance
-    case 32: self = .cancellation
-    case 33: self = .failure
-    case 34: self = .network
-    case 35: self = .error
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .sdk: return 1
-    case .initialization: return 2
-    case .shutdown: return 3
-    case .session: return 4
-    case .auth: return 5
-    case .device: return 6
-    case .registry: return 7
-    case .assignment: return 8
-    case .import: return 9
-    case .discovery: return 10
-    case .download: return 11
-    case .storage: return 12
-    case .hardware: return 13
-    case .routing: return 14
-    case .framework: return 15
-    case .model: return 16
-    case .component: return 17
-    case .llm: return 18
-    case .stt: return 19
-    case .asr: return 20
-    case .tts: return 21
-    case .vad: return 22
-    case .std: return 23
-    case .voiceAgent: return 24
-    case .vlm: return 25
-    case .diffusion: return 26
-    case .embeddings: return 27
-    case .rag: return 28
-    case .lora: return 29
-    case .telemetry: return 30
-    case .performance: return 31
-    case .cancellation: return 32
-    case .failure: return 33
-    case .network: return 34
-    case .error: return 35
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAEventCategory] = [
-    .unspecified,
-    .sdk,
-    .initialization,
-    .shutdown,
-    .session,
-    .auth,
-    .device,
-    .registry,
-    .assignment,
-    .import,
-    .discovery,
-    .download,
-    .storage,
-    .hardware,
-    .routing,
-    .framework,
-    .model,
-    .component,
-    .llm,
-    .stt,
-    .asr,
-    .tts,
-    .vad,
-    .std,
-    .voiceAgent,
-    .vlm,
-    .diffusion,
-    .embeddings,
-    .rag,
-    .lora,
-    .telemetry,
-    .performance,
-    .cancellation,
-    .failure,
-    .network,
-    .error,
-  ]
-
-}
-
-/// Component runtime lifecycle state for model-backed SDK components. This is
-/// distinct from voice_events.proto's ComponentLoadState, which is scoped to
-/// the voice-agent sub-pipeline. Platform adapters own native component handles;
-/// this enum carries the C++ lifecycle state every SDK can expose uniformly.
-public enum RAComponentLifecycleState: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case notLoaded // = 1
-  case loading // = 2
-  case ready // = 3
-  case unloading // = 4
-  case error // = 5
-  case shutdown // = 6
-  case downloading // = 7
-  case deleting // = 8
-  case paused // = 9
-  case updating // = 10
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .notLoaded
-    case 2: self = .loading
-    case 3: self = .ready
-    case 4: self = .unloading
-    case 5: self = .error
-    case 6: self = .shutdown
-    case 7: self = .downloading
-    case 8: self = .deleting
-    case 9: self = .paused
-    case 10: self = .updating
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .notLoaded: return 1
-    case .loading: return 2
-    case .ready: return 3
-    case .unloading: return 4
-    case .error: return 5
-    case .shutdown: return 6
-    case .downloading: return 7
-    case .deleting: return 8
-    case .paused: return 9
-    case .updating: return 10
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAComponentLifecycleState] = [
-    .unspecified,
-    .notLoaded,
-    .loading,
-    .ready,
-    .unloading,
-    .error,
-    .shutdown,
-    .downloading,
-    .deleting,
-    .paused,
-    .updating,
   ]
 
 }
@@ -3491,7 +3190,7 @@ public struct RASDKEvent: @unchecked Sendable {
     set {_uniqueStorage()._timestampMs = newValue}
   }
 
-  public var severity: RAEventSeverity {
+  public var severity: RAErrorSeverity {
     get {_storage._severity}
     set {_uniqueStorage()._severity = newValue}
   }
@@ -3815,7 +3514,7 @@ public struct RASDKEventFilter: Sendable {
 
   public var destinations: [RAEventDestination] = []
 
-  public var minimumSeverity: RAEventSeverity = .debug
+  public var minimumSeverity: RAErrorSeverity = .unspecified
 
   public var sessionID: String = String()
 
@@ -3940,20 +3639,8 @@ extension RASDKComponent: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_COMPONENT_UNSPECIFIED\0\u{1}SDK_COMPONENT_STT\0\u{1}SDK_COMPONENT_TTS\0\u{1}SDK_COMPONENT_VAD\0\u{1}SDK_COMPONENT_LLM\0\u{1}SDK_COMPONENT_VLM\0\u{1}SDK_COMPONENT_DIFFUSION\0\u{1}SDK_COMPONENT_RAG\0\u{1}SDK_COMPONENT_EMBEDDINGS\0\u{1}SDK_COMPONENT_VOICE_AGENT\0\u{1}SDK_COMPONENT_WAKEWORD\0\u{1}SDK_COMPONENT_SPEAKER_DIARIZATION\0")
 }
 
-extension RAEventSeverity: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_SEVERITY_DEBUG\0\u{1}EVENT_SEVERITY_INFO\0\u{1}EVENT_SEVERITY_WARNING\0\u{1}EVENT_SEVERITY_ERROR\0\u{1}EVENT_SEVERITY_CRITICAL\0")
-}
-
 extension RAEventDestination: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_DESTINATION_UNSPECIFIED\0\u{1}EVENT_DESTINATION_ALL\0\u{1}EVENT_DESTINATION_PUBLIC_ONLY\0\u{1}EVENT_DESTINATION_ANALYTICS_ONLY\0")
-}
-
-extension RAEventCategory: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_CATEGORY_UNSPECIFIED\0\u{1}EVENT_CATEGORY_SDK\0\u{1}EVENT_CATEGORY_INITIALIZATION\0\u{1}EVENT_CATEGORY_SHUTDOWN\0\u{1}EVENT_CATEGORY_SESSION\0\u{1}EVENT_CATEGORY_AUTH\0\u{1}EVENT_CATEGORY_DEVICE\0\u{1}EVENT_CATEGORY_REGISTRY\0\u{1}EVENT_CATEGORY_ASSIGNMENT\0\u{1}EVENT_CATEGORY_IMPORT\0\u{1}EVENT_CATEGORY_DISCOVERY\0\u{1}EVENT_CATEGORY_DOWNLOAD\0\u{1}EVENT_CATEGORY_STORAGE\0\u{1}EVENT_CATEGORY_HARDWARE\0\u{1}EVENT_CATEGORY_ROUTING\0\u{1}EVENT_CATEGORY_FRAMEWORK\0\u{1}EVENT_CATEGORY_MODEL\0\u{1}EVENT_CATEGORY_COMPONENT\0\u{1}EVENT_CATEGORY_LLM\0\u{1}EVENT_CATEGORY_STT\0\u{1}EVENT_CATEGORY_ASR\0\u{1}EVENT_CATEGORY_TTS\0\u{1}EVENT_CATEGORY_VAD\0\u{1}EVENT_CATEGORY_STD\0\u{1}EVENT_CATEGORY_VOICE_AGENT\0\u{1}EVENT_CATEGORY_VLM\0\u{1}EVENT_CATEGORY_DIFFUSION\0\u{1}EVENT_CATEGORY_EMBEDDINGS\0\u{1}EVENT_CATEGORY_RAG\0\u{1}EVENT_CATEGORY_LORA\0\u{1}EVENT_CATEGORY_TELEMETRY\0\u{1}EVENT_CATEGORY_PERFORMANCE\0\u{1}EVENT_CATEGORY_CANCELLATION\0\u{1}EVENT_CATEGORY_FAILURE\0\u{1}EVENT_CATEGORY_NETWORK\0\u{1}EVENT_CATEGORY_ERROR\0")
-}
-
-extension RAComponentLifecycleState: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_LIFECYCLE_STATE_UNSPECIFIED\0\u{1}COMPONENT_LIFECYCLE_STATE_NOT_LOADED\0\u{1}COMPONENT_LIFECYCLE_STATE_LOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_READY\0\u{1}COMPONENT_LIFECYCLE_STATE_UNLOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_ERROR\0\u{1}COMPONENT_LIFECYCLE_STATE_SHUTDOWN\0\u{1}COMPONENT_LIFECYCLE_STATE_DOWNLOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_DELETING\0\u{1}COMPONENT_LIFECYCLE_STATE_PAUSED\0\u{1}COMPONENT_LIFECYCLE_STATE_UPDATING\0")
 }
 
 extension RAInitializationStage: SwiftProtobuf._ProtoNameProviding {
@@ -6411,7 +6098,7 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
 
   fileprivate class _StorageClass {
     var _timestampMs: Int64 = 0
-    var _severity: RAEventSeverity = .debug
+    var _severity: RAErrorSeverity = .unspecified
     var _category: RAEventCategory = .unspecified
     var _component: RASDKComponent = .unspecified
     var _error: RASDKError? = nil
@@ -6793,7 +6480,7 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       if _storage._timestampMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampMs, fieldNumber: 1)
       }
-      if _storage._severity != .debug {
+      if _storage._severity != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._severity, fieldNumber: 2)
       }
       switch _storage._event {
@@ -6996,7 +6683,7 @@ extension RASDKEventFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     if !self.destinations.isEmpty {
       try visitor.visitPackedEnumField(value: self.destinations, fieldNumber: 3)
     }
-    if self.minimumSeverity != .debug {
+    if self.minimumSeverity != .unspecified {
       try visitor.visitSingularEnumField(value: self.minimumSeverity, fieldNumber: 4)
     }
     if !self.sessionID.isEmpty {

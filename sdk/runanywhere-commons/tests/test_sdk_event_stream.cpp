@@ -109,7 +109,7 @@ int main() {
     CHECK(callback_event.timestamp_ms() > 0, "SDKEvent envelope has timestamp");
     CHECK(callback_event.category() == runanywhere::v1::EVENT_CATEGORY_FAILURE,
           "failure event category is canonical");
-    CHECK(callback_event.severity() == runanywhere::v1::EVENT_SEVERITY_ERROR,
+    CHECK(callback_event.severity() == runanywhere::v1::ERROR_SEVERITY_ERROR,
           "failure event severity is error");
     CHECK(callback_event.has_error(), "failure event includes envelope error");
     CHECK(callback_event.has_failure(), "failure event uses typed payload");

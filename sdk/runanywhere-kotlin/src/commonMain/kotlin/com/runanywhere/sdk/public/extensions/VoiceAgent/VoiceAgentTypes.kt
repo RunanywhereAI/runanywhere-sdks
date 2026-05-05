@@ -11,7 +11,11 @@
 
 package com.runanywhere.sdk.public.extensions.VoiceAgent
 
-typealias ComponentLoadState = ai.runanywhere.proto.v1.ComponentLoadState
+// IDL-04: VoiceAgentComponentStates now uses the richer canonical
+// `ComponentLifecycleState` (shared with SDKEvent). The former
+// `ComponentLoadState.LOADED` case maps to
+// `ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY`.
+typealias ComponentLoadState = ai.runanywhere.proto.v1.ComponentLifecycleState
 typealias VoiceAgentComponentStates = ai.runanywhere.proto.v1.VoiceAgentComponentStates
 typealias VoiceAgentConfiguration = ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 typealias VoiceAgentResult = ai.runanywhere.proto.v1.VoiceAgentResult

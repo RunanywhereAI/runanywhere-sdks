@@ -123,12 +123,14 @@ set(ONNX_BACKEND_SOURCES
 # that touched the ONNX plugin entry. Path now points at the real location.
 set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons/src/features/rag")
 set(ONNX_EXTRA_INCLUDES "")
+set(ONNX_RAG_PRESENT OFF)
 if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
     list(APPEND ONNX_BACKEND_SOURCES
         ${RAG_DIR}/onnx_embedding_provider.cpp
         ${RAG_DIR}/rac_onnx_embeddings_register.cpp
     )
     list(APPEND ONNX_EXTRA_INCLUDES ${RAG_DIR})
+    set(ONNX_RAG_PRESENT ON)
     message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
 endif()
 
@@ -136,6 +138,12 @@ endif()
 # runtimes/onnxrt; this engine uses only its thin session wrapper.
 set(ONNX_LINK_LIBS rac_runtime_onnxrt nlohmann_json::nlohmann_json)
 set(ONNX_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX)
+# Propagate RAG state so rac_plugin_entry_onnx.cpp can NULL the embeddings
+# slot when onnx_embedding_provider.cpp is not compiled in (otherwise the
+# extern symbol g_onnx_embeddings_ops is unresolved at link time).
+if(ONNX_RAG_PRESENT)
+    list(APPEND ONNX_COMPILE_DEFS RAC_BACKEND_RAG=1)
+endif()
 if(NOT TARGET rac_runtime_onnxrt)
     message(FATAL_ERROR "RAC_BACKEND_ONNX requires rac_runtime_onnxrt. Enable RAC_RUNTIME_ONNXRT or disable RAC_BACKEND_ONNX.")
 endif()
@@ -257,6 +265,14 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
         rac_backend_onnx
         log
     )
+
+    # Propagate the linked ONNX Runtime version so nativeGetVersion() no longer
+    # returns a stale hard-coded literal. Android ships ONNX_VERSION_ANDROID from
+    # the central VERSIONS file.
+    if(DEFINED ONNX_VERSION_ANDROID AND NOT "${ONNX_VERSION_ANDROID}" STREQUAL "")
+        target_compile_definitions(rac_backend_onnx_jni PRIVATE
+            RAC_ONNXRUNTIME_VERSION="${ONNX_VERSION_ANDROID}")
+    endif()
 
     target_compile_options(rac_backend_onnx_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025

@@ -81,8 +81,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_DIFFUSION);
-    event.set_severity(error && error[0] ? runanywhere::v1::EVENT_SEVERITY_ERROR
-                                         : runanywhere::v1::EVENT_SEVERITY_INFO);
+    event.set_severity(error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                         : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     event.set_source("cpp");
@@ -300,7 +300,7 @@ rac_result_t rac_diffusion_cancel_proto(rac_handle_t handle) {
     requested.set_id(event_id());
     requested.set_timestamp_ms(now_ms());
     requested.set_category(runanywhere::v1::EVENT_CATEGORY_CANCELLATION);
-    requested.set_severity(runanywhere::v1::EVENT_SEVERITY_INFO);
+    requested.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     requested.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     requested.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     requested.set_source("cpp");
@@ -318,8 +318,8 @@ rac_result_t rac_diffusion_cancel_proto(rac_handle_t handle) {
     completed.set_id(event_id());
     completed.set_timestamp_ms(now_ms());
     completed.set_category(runanywhere::v1::EVENT_CATEGORY_CANCELLATION);
-    completed.set_severity(rc == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
-                                             : runanywhere::v1::EVENT_SEVERITY_ERROR);
+    completed.set_severity(rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                             : runanywhere::v1::ERROR_SEVERITY_ERROR);
     completed.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     completed.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     completed.set_source("cpp");

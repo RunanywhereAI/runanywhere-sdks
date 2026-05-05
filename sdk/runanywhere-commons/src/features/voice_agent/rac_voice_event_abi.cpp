@@ -109,11 +109,11 @@ int64_t now_us() {
  */
 void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& dst) {
     dst.set_severity(src.type == RAC_VOICE_AGENT_EVENT_ERROR
-                         ? runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR
-                         : runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+                         ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                         : runanywhere::v1::ERROR_SEVERITY_INFO);
     switch (src.type) {
         case RAC_VOICE_AGENT_EVENT_PROCESSED: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_METRICS);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_METRICS);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
             auto* m = dst.mutable_metrics();
             /* Per-primitive latencies are not yet captured in the C struct;
@@ -125,7 +125,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VAD);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_VAD);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
             auto* v = dst.mutable_vad();
             // IDL-18: VADEvent.type now uses VADStreamEventKind. Speech-
@@ -138,7 +138,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_TRANSCRIPTION: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_STT);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_STT);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_STT);
             auto* u = dst.mutable_user_said();
             if (src.data.transcription) u->set_text(src.data.transcription);
@@ -150,7 +150,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_RESPONSE: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_LLM);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_LLM);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_LLM);
             auto* t = dst.mutable_assistant_token();
             if (src.data.response) t->set_text(src.data.response);
@@ -163,7 +163,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_TTS);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_TTS);
             auto* a = dst.mutable_audio();
             if (src.data.audio.audio_data && src.data.audio.audio_size > 0) {
@@ -178,7 +178,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_ERROR: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_ERROR);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
             auto* e = dst.mutable_error();
             e->set_code(static_cast<int32_t>(src.data.error_code));
@@ -189,7 +189,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED: {
-            dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VOICE_AGENT);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_WAKEWORD);
             /* No proto arm for wakeword today — surface as a state change
              * to LISTENING so frontends can react via the standard state

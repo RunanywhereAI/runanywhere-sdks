@@ -17,7 +17,7 @@ export {
   ComponentLifecycleState,
   EventCategory,
   EventDestination,
-  EventSeverity,
+  ErrorSeverity,
   ExecutionTarget,
   FrameworkModality,
   InferenceFramework,
@@ -377,11 +377,6 @@ export type {
   VoiceAgentComponentStates,
   VoiceEvent,
   VoiceSessionError,
-} from '@runanywhere/proto-ts/voice_events';
-export {
-  ComponentLoadState,
-  VoiceEventCategory,
-  VoiceEventSeverity,
 } from '@runanywhere/proto-ts/voice_events';
 export type {
   VoiceAgentComposeConfig,

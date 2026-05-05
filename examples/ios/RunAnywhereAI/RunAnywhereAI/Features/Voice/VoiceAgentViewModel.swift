@@ -223,28 +223,23 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Model states synced - VAD: \(vadState.isLoaded), STT: \(sttState.isLoaded), LLM: \(llmState.isLoaded), TTS: \(ttsState.isLoaded)")
     }
 
-    private func componentStateFromSnapshot(_ component: RASDKComponent) -> RAComponentLoadState {
+    // IDL-04: RAComponentLoadState consolidated into the richer
+    // RAComponentLifecycleState (shared with SDKEvent). ComponentLoadState is
+    // kept as a public typealias for continuity.
+    private func componentStateFromSnapshot(_ component: RASDKComponent) -> RAComponentLifecycleState {
         guard let snapshot = RunAnywhere.componentLifecycleSnapshot(component) else {
             return .notLoaded
         }
-        switch snapshot.state {
-        case .ready:
-            return .loaded
-        case .loading, .downloading, .updating:
-            return .loading
-        case .error:
-            return .error
-        default:
-            return .notLoaded
-        }
+        return snapshot.state
     }
 
     private func mapState(_ state: ComponentLoadState) -> ModelLoadState {
         switch state {
         case .unspecified, .notLoaded: return .notLoaded
-        case .loading: return .loading
-        case .loaded: return .loaded
+        case .loading, .downloading, .updating: return .loading
+        case .ready: return .loaded
         case .error: return .error("Component failed")
+        case .unloading, .shutdown, .deleting, .paused: return .notLoaded
         case .UNRECOGNIZED(_): return .error("Unknown component state")
         }
     }

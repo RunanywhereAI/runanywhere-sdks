@@ -37,7 +37,7 @@ namespace {
 
 using runanywhere::v1::CancellationEventKind;
 using runanywhere::v1::EventCategory;
-using runanywhere::v1::EventSeverity;
+using runanywhere::v1::ErrorSeverity;
 using runanywhere::v1::GenerationEventKind;
 using runanywhere::v1::LLMGenerateRequest;
 using runanywhere::v1::LLMGenerationResult;
@@ -99,7 +99,7 @@ rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
 
 void populate_event_envelope(SDKEvent* event,
                              EventCategory category,
-                             EventSeverity severity) {
+                             ErrorSeverity severity) {
     event->set_id(make_event_id());
     event->set_timestamp_ms(now_ms());
     event->set_category(category);
@@ -131,8 +131,8 @@ void publish_generation_event(GenerationEventKind kind,
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
-                            failed ? runanywhere::v1::EVENT_SEVERITY_ERROR
-                                   : runanywhere::v1::EVENT_SEVERITY_INFO);
+                            failed ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                   : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_operation_id("llm.generate");
     auto* generation = event.mutable_generation();
     generation->set_kind(kind);
@@ -167,7 +167,7 @@ void publish_generation_event(GenerationEventKind kind,
 SDKEvent make_cancellation_event(CancellationEventKind kind,
                                  const char* reason,
                                  rac_bool_t user_initiated,
-                                 EventSeverity severity) {
+                                 ErrorSeverity severity) {
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_CANCELLATION, severity);
     event.set_operation_id("llm.generate");
@@ -697,7 +697,7 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
         SDKEvent failed = make_cancellation_event(
             runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED,
             "no lifecycle LLM model loaded", RAC_TRUE,
-            runanywhere::v1::EVENT_SEVERITY_ERROR);
+            runanywhere::v1::ERROR_SEVERITY_ERROR);
         (void)publish_sdk_event(failed);
         return rac_proto_buffer_set_error(out_event, rc, "no lifecycle LLM model loaded");
     }
@@ -716,8 +716,8 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
                           : runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED,
         rc == RAC_SUCCESS ? "user_requested" : rac_error_message(rc),
         RAC_TRUE,
-        rc == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
-                          : runanywhere::v1::EVENT_SEVERITY_ERROR);
+        rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                          : runanywhere::v1::ERROR_SEVERITY_ERROR);
     (void)publish_sdk_event(event);
     rac_result_t copy_rc = copy_proto(event, out_event);
     rac::llm::release_lifecycle_llm(&ref);

@@ -198,7 +198,7 @@ std::string make_sdk_event_bytes() {
     event.set_id("evt-03e");
     event.set_timestamp_ms(1);
     event.set_category(runanywhere::v1::EVENT_CATEGORY_INITIALIZATION);
-    event.set_severity(runanywhere::v1::EVENT_SEVERITY_INFO);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.mutable_initialization()->set_stage(
         runanywhere::v1::INITIALIZATION_STAGE_STARTED);
     std::string bytes;
@@ -210,8 +210,8 @@ std::string make_voice_event_bytes() {
     runanywhere::v1::VoiceEvent event;
     event.set_seq(1);
     event.set_timestamp_us(1);
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VOICE_AGENT);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     event.mutable_state()->set_previous(runanywhere::v1::PIPELINE_STATE_IDLE);
     event.mutable_state()->set_current(runanywhere::v1::PIPELINE_STATE_STOPPED);

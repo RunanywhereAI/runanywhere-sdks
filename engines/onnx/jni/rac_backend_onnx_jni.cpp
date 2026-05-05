@@ -115,7 +115,11 @@ Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeIsRegistered(JNIEnv* env, jc
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeGetVersion(JNIEnv* env, jclass clazz) {
     (void)clazz;
-    return env->NewStringUTF("1.0.0");
+#ifdef RAC_ONNXRUNTIME_VERSION
+    return env->NewStringUTF(RAC_ONNXRUNTIME_VERSION);
+#else
+    return env->NewStringUTF("unknown");
+#endif
 }
 
 }  // extern "C"

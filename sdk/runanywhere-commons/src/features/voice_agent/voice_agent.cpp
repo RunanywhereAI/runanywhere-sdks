@@ -95,17 +95,17 @@ std::string event_id(const char* prefix) {
     return std::string(prefix) + "-" + std::to_string(rac_get_current_time_ms());
 }
 
-runanywhere::v1::ComponentLoadState component_load_state_from_lifecycle(
+runanywhere::v1::ComponentLifecycleState component_load_state_from_lifecycle(
     rac_lifecycle_state_t state) {
     switch (state) {
         case RAC_LIFECYCLE_STATE_LOADING:
-            return runanywhere::v1::COMPONENT_LOAD_STATE_LOADING;
+            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING;
         case RAC_LIFECYCLE_STATE_LOADED:
-            return runanywhere::v1::COMPONENT_LOAD_STATE_LOADED;
+            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
         case RAC_LIFECYCLE_STATE_FAILED:
-            return runanywhere::v1::COMPONENT_LOAD_STATE_ERROR;
+            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
         default:
-            return runanywhere::v1::COMPONENT_LOAD_STATE_NOT_LOADED;
+            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     }
 }
 
@@ -114,35 +114,35 @@ void fill_component_states(rac_voice_agent_handle_t handle,
     const auto stt = handle && handle->stt_handle
                          ? component_load_state_from_lifecycle(
                                rac_stt_component_get_state(handle->stt_handle))
-                         : runanywhere::v1::COMPONENT_LOAD_STATE_NOT_LOADED;
+                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     const auto llm = handle && handle->llm_handle
                          ? component_load_state_from_lifecycle(
                                rac_llm_component_get_state(handle->llm_handle))
-                         : runanywhere::v1::COMPONENT_LOAD_STATE_NOT_LOADED;
+                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     const auto tts = handle && handle->tts_handle
                          ? component_load_state_from_lifecycle(
                                rac_tts_component_get_state(handle->tts_handle))
-                         : runanywhere::v1::COMPONENT_LOAD_STATE_NOT_LOADED;
+                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     const auto vad = handle && handle->vad_handle
                          ? component_load_state_from_lifecycle(
                                rac_vad_component_get_state(handle->vad_handle))
-                         : runanywhere::v1::COMPONENT_LOAD_STATE_NOT_LOADED;
+                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     out->set_stt_state(stt);
     out->set_llm_state(llm);
     out->set_tts_state(tts);
     out->set_vad_state(vad);
-    out->set_ready(stt == runanywhere::v1::COMPONENT_LOAD_STATE_LOADED &&
-                   llm == runanywhere::v1::COMPONENT_LOAD_STATE_LOADED &&
-                   tts == runanywhere::v1::COMPONENT_LOAD_STATE_LOADED &&
-                   vad == runanywhere::v1::COMPONENT_LOAD_STATE_LOADED);
-    out->set_any_loading(stt == runanywhere::v1::COMPONENT_LOAD_STATE_LOADING ||
-                         llm == runanywhere::v1::COMPONENT_LOAD_STATE_LOADING ||
-                         tts == runanywhere::v1::COMPONENT_LOAD_STATE_LOADING ||
-                         vad == runanywhere::v1::COMPONENT_LOAD_STATE_LOADING);
+    out->set_ready(stt == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY &&
+                   llm == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY &&
+                   tts == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY &&
+                   vad == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY);
+    out->set_any_loading(stt == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING ||
+                         llm == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING ||
+                         tts == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING ||
+                         vad == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING);
 }
 
 void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_event,
-                                      runanywhere::v1::EventSeverity severity) {
+                                      runanywhere::v1::ErrorSeverity severity) {
     runanywhere::v1::SDKEvent sdk_event;
     sdk_event.set_timestamp_ms(rac_get_current_time_ms());
     sdk_event.set_id(event_id("voice"));
@@ -163,8 +163,8 @@ void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_e
 
 void emit_generated_voice_event(rac_voice_agent_handle_t handle,
                                 const runanywhere::v1::VoiceEvent& event,
-                                runanywhere::v1::EventSeverity sdk_severity =
-                                    runanywhere::v1::EVENT_SEVERITY_INFO) {
+                                runanywhere::v1::ErrorSeverity sdk_severity =
+                                    runanywhere::v1::ERROR_SEVERITY_INFO) {
     rac::voice_agent::dispatch_proto_voice_event(handle, event);
     publish_voice_pipeline_sdk_event(event, sdk_severity);
 }
@@ -172,8 +172,8 @@ void emit_generated_voice_event(rac_voice_agent_handle_t handle,
 void emit_component_states(rac_voice_agent_handle_t handle) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_us(rac_get_current_time_ms() * 1000);
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VOICE_AGENT);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     fill_component_states(handle, event.mutable_component_state_changed());
     emit_generated_voice_event(handle, event);
@@ -186,10 +186,10 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          const char* error = nullptr) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_us(rac_get_current_time_ms() * 1000);
-    event.set_category(error ? runanywhere::v1::VOICE_EVENT_CATEGORY_ERROR
-                             : runanywhere::v1::VOICE_EVENT_CATEGORY_VOICE_AGENT);
-    event.set_severity(error ? runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR
-                             : runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(error ? runanywhere::v1::EVENT_CATEGORY_ERROR
+                             : runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+    event.set_severity(error ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                             : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     auto* turn = event.mutable_turn_lifecycle();
     turn->set_kind(kind);
@@ -198,8 +198,8 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
     if (response) turn->set_response(response);
     if (error) turn->set_error(error);
     emit_generated_voice_event(handle, event,
-                               error ? runanywhere::v1::EVENT_SEVERITY_ERROR
-                                     : runanywhere::v1::EVENT_SEVERITY_INFO);
+                               error ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                     : runanywhere::v1::ERROR_SEVERITY_INFO);
 }
 
 void emit_component_failure(rac_voice_agent_handle_t handle,
@@ -208,8 +208,8 @@ void emit_component_failure(rac_voice_agent_handle_t handle,
                             const char* message) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_us(rac_get_current_time_ms() * 1000);
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_ERROR);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     auto* session_error = event.mutable_session_error();
     // IDL-08: VoiceSessionError.code now uses canonical ErrorCode from errors.proto.
@@ -218,7 +218,7 @@ void emit_component_failure(rac_voice_agent_handle_t handle,
     if (component) {
         session_error->set_failed_component(component);
     }
-    emit_generated_voice_event(handle, event, runanywhere::v1::EVENT_SEVERITY_ERROR);
+    emit_generated_voice_event(handle, event, runanywhere::v1::ERROR_SEVERITY_ERROR);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_FAILED, nullptr,
                         nullptr, message ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, component ? component : "voice_agent",
@@ -1192,25 +1192,25 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
 
     runanywhere::v1::VoiceAgentComponentStates states;
     fill_component_states(handle, &states);
-    if (states.stt_state() != runanywhere::v1::COMPONENT_LOAD_STATE_LOADED) {
+    if (states.stt_state() != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
         emit_component_failure(handle, "stt", RAC_ERROR_NOT_INITIALIZED,
                                "STT component is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
                                           "STT component is not loaded");
     }
-    if (states.llm_state() != runanywhere::v1::COMPONENT_LOAD_STATE_LOADED) {
+    if (states.llm_state() != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
         emit_component_failure(handle, "llm", RAC_ERROR_NOT_INITIALIZED,
                                "LLM component is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
                                           "LLM component is not loaded");
     }
-    if (states.tts_state() != runanywhere::v1::COMPONENT_LOAD_STATE_LOADED) {
+    if (states.tts_state() != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
         emit_component_failure(handle, "tts", RAC_ERROR_NOT_INITIALIZED,
                                "TTS component is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
                                           "TTS component is not loaded");
     }
-    if (states.vad_state() != runanywhere::v1::COMPONENT_LOAD_STATE_LOADED) {
+    if (states.vad_state() != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
         emit_component_failure(handle, "vad", RAC_ERROR_NOT_INITIALIZED,
                                "VAD component is not initialized");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
@@ -1506,9 +1506,9 @@ void d7_emit_voice_event(rac_voice_agent_handle_t handle,
     rac::voice_agent::dispatch_proto_voice_event(handle, *event);
     publish_voice_pipeline_sdk_event(
         *event,
-        event->severity() == runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR
-            ? runanywhere::v1::EVENT_SEVERITY_ERROR
-            : runanywhere::v1::EVENT_SEVERITY_INFO);
+        event->severity() == runanywhere::v1::ERROR_SEVERITY_ERROR
+            ? runanywhere::v1::ERROR_SEVERITY_ERROR
+            : runanywhere::v1::ERROR_SEVERITY_INFO);
 }
 
 void d7_emit_state(rac_voice_agent_handle_t handle,
@@ -1520,8 +1520,8 @@ void d7_emit_state(rac_voice_agent_handle_t handle,
                    rac_voice_agent_turn_event_callback_fn cb,
                    void* user_data) {
     runanywhere::v1::VoiceEvent event;
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VOICE_AGENT);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     auto* s = event.mutable_state();
     s->set_previous(previous);
@@ -1538,8 +1538,8 @@ void d7_emit_vad(rac_voice_agent_handle_t handle,
                  rac_voice_agent_turn_event_callback_fn cb,
                  void* user_data) {
     runanywhere::v1::VoiceEvent event;
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VAD);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_VAD);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
     auto* v = event.mutable_vad();
     v->set_type(kind);
@@ -1556,8 +1556,8 @@ void d7_emit_user_said(rac_voice_agent_handle_t handle,
                        rac_voice_agent_turn_event_callback_fn cb,
                        void* user_data) {
     runanywhere::v1::VoiceEvent event;
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_STT);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_STT);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_STT);
     auto* u = event.mutable_user_said();
     if (text) u->set_text(text);
@@ -1574,8 +1574,8 @@ void d7_emit_assistant_token(rac_voice_agent_handle_t handle,
                              rac_voice_agent_turn_event_callback_fn cb,
                              void* user_data) {
     runanywhere::v1::VoiceEvent event;
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_LLM);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_LLM);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_LLM);
     auto* t = event.mutable_assistant_token();
     if (text) t->set_text(text);
@@ -1593,8 +1593,8 @@ void d7_emit_audio(rac_voice_agent_handle_t handle,
                    rac_voice_agent_turn_event_callback_fn cb,
                    void* user_data) {
     runanywhere::v1::VoiceEvent event;
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_TTS);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_INFO);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_TTS);
     auto* a = event.mutable_audio();
     if (data && size > 0) a->set_pcm(data, size);
@@ -1615,8 +1615,8 @@ void d7_emit_error(rac_voice_agent_handle_t handle,
                    rac_voice_agent_turn_event_callback_fn cb,
                    void* user_data) {
     runanywhere::v1::VoiceEvent event;
-    event.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_ERROR);
-    event.set_severity(runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR);
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     auto* e = event.mutable_error();
     e->set_code(static_cast<int32_t>(code));
@@ -1668,7 +1668,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     runanywhere::v1::VoiceAgentComponentStates component_states;
     fill_component_states(handle, &component_states);
     const struct {
-        runanywhere::v1::ComponentLoadState state;
+        runanywhere::v1::ComponentLifecycleState state;
         const char* name;
         const char* message;
     } required[] = {
@@ -1678,7 +1678,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         {component_states.vad_state(), "vad", "VAD component is not initialized"},
     };
     for (const auto& entry : required) {
-        if (entry.state != runanywhere::v1::COMPONENT_LOAD_STATE_LOADED) {
+        if (entry.state != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
             d7_emit_error(handle, RAC_ERROR_NOT_INITIALIZED, entry.name, entry.message,
                           session_id, turn_id, request_id, event_callback, user_data);
             emit_component_failure(handle, entry.name, RAC_ERROR_NOT_INITIALIZED, entry.message);

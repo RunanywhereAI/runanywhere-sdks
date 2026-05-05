@@ -505,7 +505,7 @@ runanywhere::v1::ErrorCategory storage_error_category(rac_result_t code) {
 }
 
 void populate_storage_event_envelope(runanywhere::v1::SDKEvent* event,
-                                     runanywhere::v1::EventSeverity severity) {
+                                     runanywhere::v1::ErrorSeverity severity) {
     if (!event) {
         return;
     }
@@ -536,15 +536,15 @@ void populate_storage_error(runanywhere::v1::SDKError* error,
     error->set_retryable(false);
 }
 
-runanywhere::v1::EventSeverity storage_event_severity(rac_result_t error_code,
+runanywhere::v1::ErrorSeverity storage_event_severity(rac_result_t error_code,
                                                       int warning_count) {
     if (error_code != RAC_SUCCESS) {
-        return runanywhere::v1::EVENT_SEVERITY_ERROR;
+        return runanywhere::v1::ERROR_SEVERITY_ERROR;
     }
     if (warning_count > 0) {
-        return runanywhere::v1::EVENT_SEVERITY_WARNING;
+        return runanywhere::v1::ERROR_SEVERITY_WARNING;
     }
-    return runanywhere::v1::EVENT_SEVERITY_INFO;
+    return runanywhere::v1::ERROR_SEVERITY_INFO;
 }
 
 void publish_storage_sdk_event(const runanywhere::v1::SDKEvent& event) {

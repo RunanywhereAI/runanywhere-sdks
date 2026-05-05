@@ -220,11 +220,11 @@ void publish_vad_pipeline_event(bool is_speech,
     runanywhere::v1::VoiceEvent voice_event;
     voice_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
     voice_event.set_category(error_code == RAC_SUCCESS
-                                 ? runanywhere::v1::VOICE_EVENT_CATEGORY_VAD
-                                 : runanywhere::v1::VOICE_EVENT_CATEGORY_ERROR);
+                                 ? runanywhere::v1::EVENT_CATEGORY_VAD
+                                 : runanywhere::v1::EVENT_CATEGORY_ERROR);
     voice_event.set_severity(error_code == RAC_SUCCESS
-                                 ? runanywhere::v1::VOICE_EVENT_SEVERITY_INFO
-                                 : runanywhere::v1::VOICE_EVENT_SEVERITY_ERROR);
+                                 ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                 : runanywhere::v1::ERROR_SEVERITY_ERROR);
     voice_event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
     if (error_code == RAC_SUCCESS) {
         auto* vad = voice_event.mutable_vad();
@@ -250,8 +250,8 @@ void publish_vad_pipeline_event(bool is_speech,
     sdk_event.set_category(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_CATEGORY_VAD
                                                      : runanywhere::v1::EVENT_CATEGORY_FAILURE);
     sdk_event.set_component(runanywhere::v1::SDK_COMPONENT_VAD);
-    sdk_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
-                                                     : runanywhere::v1::EVENT_SEVERITY_ERROR);
+    sdk_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                                     : runanywhere::v1::ERROR_SEVERITY_ERROR);
     sdk_event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     sdk_event.set_source("cpp");
     sdk_event.set_operation_id("vad.process");

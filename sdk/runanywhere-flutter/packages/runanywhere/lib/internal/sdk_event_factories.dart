@@ -1,5 +1,7 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/generated/component_types.pbenum.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart';
 
 class SdkEventFactory {
@@ -27,7 +29,7 @@ class SdkEventFactory {
 
   static SDKEvent initializationFailed(Object error) => _event(
         category: EventCategory.EVENT_CATEGORY_INITIALIZATION,
-        severity: EventSeverity.EVENT_SEVERITY_ERROR,
+        severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
         initialization: InitializationEvent(
           stage: InitializationStage.INITIALIZATION_STAGE_FAILED,
           source: 'flutter',
@@ -54,7 +56,7 @@ class SdkEventFactory {
         modelId: modelId,
         error: '$error',
         type: 'model.load.failed',
-        severity: EventSeverity.EVENT_SEVERITY_ERROR,
+        severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
       );
 
   static SDKEvent modelUnloadStarted(String modelId) => _model(
@@ -86,7 +88,7 @@ class SdkEventFactory {
         modelId: modelId,
         error: '$error',
         type: 'model.download.failed',
-        severity: EventSeverity.EVENT_SEVERITY_ERROR,
+        severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
       );
 
   static SDKEvent ragPipelineCreated() => _rag(
@@ -155,7 +157,7 @@ class SdkEventFactory {
         operation: 'rag',
         error: '$error',
         type: 'rag.error',
-        severity: EventSeverity.EVENT_SEVERITY_ERROR,
+        severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
       );
 
   static SDKEvent _model(
@@ -163,7 +165,7 @@ class SdkEventFactory {
     required String modelId,
     required String type,
     Object? error,
-    EventSeverity severity = EventSeverity.EVENT_SEVERITY_INFO,
+    ErrorSeverity severity = ErrorSeverity.ERROR_SEVERITY_INFO,
   }) =>
       _event(
         category: EventCategory.EVENT_CATEGORY_MODEL,
@@ -189,7 +191,7 @@ class SdkEventFactory {
     int? outputCount,
     String? resultJson,
     Object? error,
-    EventSeverity severity = EventSeverity.EVENT_SEVERITY_INFO,
+    ErrorSeverity severity = ErrorSeverity.ERROR_SEVERITY_INFO,
   }) =>
       _event(
         category: EventCategory.EVENT_CATEGORY_RAG,
@@ -213,7 +215,7 @@ class SdkEventFactory {
 
   static SDKEvent _event({
     required EventCategory category,
-    EventSeverity severity = EventSeverity.EVENT_SEVERITY_INFO,
+    ErrorSeverity severity = ErrorSeverity.ERROR_SEVERITY_INFO,
     SDKComponent component = SDKComponent.SDK_COMPONENT_UNSPECIFIED,
     InitializationEvent? initialization,
     ModelEvent? model,

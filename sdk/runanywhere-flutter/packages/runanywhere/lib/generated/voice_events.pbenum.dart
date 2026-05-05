@@ -13,62 +13,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class VoiceEventCategory extends $pb.ProtobufEnum {
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_UNSPECIFIED = VoiceEventCategory._(0, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_UNSPECIFIED');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_VOICE_AGENT = VoiceEventCategory._(1, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_VOICE_AGENT');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_STT = VoiceEventCategory._(2, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_STT');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_ASR = VoiceEventCategory._(3, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_ASR');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_TTS = VoiceEventCategory._(4, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_TTS');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_VAD = VoiceEventCategory._(5, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_VAD');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_STD = VoiceEventCategory._(6, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_STD');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_LLM = VoiceEventCategory._(7, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_LLM');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_AUDIO = VoiceEventCategory._(8, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_AUDIO');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_METRICS = VoiceEventCategory._(9, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_METRICS');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_ERROR = VoiceEventCategory._(10, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_ERROR');
-  static const VoiceEventCategory VOICE_EVENT_CATEGORY_WAKEWORD = VoiceEventCategory._(11, _omitEnumNames ? '' : 'VOICE_EVENT_CATEGORY_WAKEWORD');
-
-  static const $core.List<VoiceEventCategory> values = <VoiceEventCategory> [
-    VOICE_EVENT_CATEGORY_UNSPECIFIED,
-    VOICE_EVENT_CATEGORY_VOICE_AGENT,
-    VOICE_EVENT_CATEGORY_STT,
-    VOICE_EVENT_CATEGORY_ASR,
-    VOICE_EVENT_CATEGORY_TTS,
-    VOICE_EVENT_CATEGORY_VAD,
-    VOICE_EVENT_CATEGORY_STD,
-    VOICE_EVENT_CATEGORY_LLM,
-    VOICE_EVENT_CATEGORY_AUDIO,
-    VOICE_EVENT_CATEGORY_METRICS,
-    VOICE_EVENT_CATEGORY_ERROR,
-    VOICE_EVENT_CATEGORY_WAKEWORD,
-  ];
-
-  static final $core.Map<$core.int, VoiceEventCategory> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static VoiceEventCategory? valueOf($core.int value) => _byValue[value];
-
-  const VoiceEventCategory._($core.int v, $core.String n) : super(v, n);
-}
-
-class VoiceEventSeverity extends $pb.ProtobufEnum {
-  static const VoiceEventSeverity VOICE_EVENT_SEVERITY_DEBUG = VoiceEventSeverity._(0, _omitEnumNames ? '' : 'VOICE_EVENT_SEVERITY_DEBUG');
-  static const VoiceEventSeverity VOICE_EVENT_SEVERITY_INFO = VoiceEventSeverity._(1, _omitEnumNames ? '' : 'VOICE_EVENT_SEVERITY_INFO');
-  static const VoiceEventSeverity VOICE_EVENT_SEVERITY_WARNING = VoiceEventSeverity._(2, _omitEnumNames ? '' : 'VOICE_EVENT_SEVERITY_WARNING');
-  static const VoiceEventSeverity VOICE_EVENT_SEVERITY_ERROR = VoiceEventSeverity._(3, _omitEnumNames ? '' : 'VOICE_EVENT_SEVERITY_ERROR');
-  static const VoiceEventSeverity VOICE_EVENT_SEVERITY_CRITICAL = VoiceEventSeverity._(4, _omitEnumNames ? '' : 'VOICE_EVENT_SEVERITY_CRITICAL');
-
-  static const $core.List<VoiceEventSeverity> values = <VoiceEventSeverity> [
-    VOICE_EVENT_SEVERITY_DEBUG,
-    VOICE_EVENT_SEVERITY_INFO,
-    VOICE_EVENT_SEVERITY_WARNING,
-    VOICE_EVENT_SEVERITY_ERROR,
-    VOICE_EVENT_SEVERITY_CRITICAL,
-  ];
-
-  static final $core.Map<$core.int, VoiceEventSeverity> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static VoiceEventSeverity? valueOf($core.int value) => _byValue[value];
-
-  const VoiceEventSeverity._($core.int v, $core.String n) : super(v, n);
-}
-
 class VoicePipelineComponent extends $pb.ProtobufEnum {
   static const VoicePipelineComponent VOICE_PIPELINE_COMPONENT_UNSPECIFIED = VoicePipelineComponent._(0, _omitEnumNames ? '' : 'VOICE_PIPELINE_COMPONENT_UNSPECIFIED');
   static const VoicePipelineComponent VOICE_PIPELINE_COMPONENT_AGENT = VoicePipelineComponent._(1, _omitEnumNames ? '' : 'VOICE_PIPELINE_COMPONENT_AGENT');
@@ -190,30 +134,6 @@ class PipelineState extends $pb.ProtobufEnum {
   static PipelineState? valueOf($core.int value) => _byValue[value];
 
   const PipelineState._($core.int v, $core.String n) : super(v, n);
-}
-
-/// Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
-/// UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
-/// the same as NOT_LOADED for forward-compatibility.
-class ComponentLoadState extends $pb.ProtobufEnum {
-  static const ComponentLoadState COMPONENT_LOAD_STATE_UNSPECIFIED = ComponentLoadState._(0, _omitEnumNames ? '' : 'COMPONENT_LOAD_STATE_UNSPECIFIED');
-  static const ComponentLoadState COMPONENT_LOAD_STATE_NOT_LOADED = ComponentLoadState._(1, _omitEnumNames ? '' : 'COMPONENT_LOAD_STATE_NOT_LOADED');
-  static const ComponentLoadState COMPONENT_LOAD_STATE_LOADING = ComponentLoadState._(2, _omitEnumNames ? '' : 'COMPONENT_LOAD_STATE_LOADING');
-  static const ComponentLoadState COMPONENT_LOAD_STATE_LOADED = ComponentLoadState._(3, _omitEnumNames ? '' : 'COMPONENT_LOAD_STATE_LOADED');
-  static const ComponentLoadState COMPONENT_LOAD_STATE_ERROR = ComponentLoadState._(4, _omitEnumNames ? '' : 'COMPONENT_LOAD_STATE_ERROR');
-
-  static const $core.List<ComponentLoadState> values = <ComponentLoadState> [
-    COMPONENT_LOAD_STATE_UNSPECIFIED,
-    COMPONENT_LOAD_STATE_NOT_LOADED,
-    COMPONENT_LOAD_STATE_LOADING,
-    COMPONENT_LOAD_STATE_LOADED,
-    COMPONENT_LOAD_STATE_ERROR,
-  ];
-
-  static final $core.Map<$core.int, ComponentLoadState> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static ComponentLoadState? valueOf($core.int value) => _byValue[value];
-
-  const ComponentLoadState._($core.int v, $core.String n) : super(v, n);
 }
 
 class SpeechTurnDetectionEventKind extends $pb.ProtobufEnum {

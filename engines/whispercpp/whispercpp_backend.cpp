@@ -9,8 +9,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <iomanip>
-#include <sstream>
 
 #include "rac/core/rac_logger.h"
 
@@ -114,14 +112,6 @@ WhisperCppSTT::WhisperCppSTT(WhisperCppBackend* backend) : backend_(backend) {
 
 WhisperCppSTT::~WhisperCppSTT() {
     unload_model();
-
-    for (auto& [id, state] : streams_) {
-        if (state && state->state) {
-            whisper_free_state(state->state);
-        }
-    }
-    streams_.clear();
-
     RAC_LOG_INFO("STT.WhisperCpp", "WhisperCppSTT destroyed");
 }
 
@@ -182,13 +172,6 @@ bool WhisperCppSTT::unload_model() {
     if (!model_loaded_ || !ctx_) {
         return true;
     }
-
-    for (auto& [id, state] : streams_) {
-        if (state && state->state) {
-            whisper_free_state(state->state);
-        }
-    }
-    streams_.clear();
 
     whisper_free(ctx_);
     ctx_ = nullptr;
@@ -333,199 +316,6 @@ STTResult WhisperCppSTT::transcribe_internal(const std::vector<float>& audio,
                  result.detected_language.empty() ? "unknown" : result.detected_language.c_str());
 
     return result;
-}
-
-bool WhisperCppSTT::supports_streaming() const {
-    return true;
-}
-
-std::string WhisperCppSTT::generate_stream_id() {
-    std::stringstream ss;
-    ss << "whisper_stream_" << ++stream_counter_;
-    return ss.str();
-}
-
-std::string WhisperCppSTT::create_stream(const nlohmann::json& config) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (!model_loaded_ || !ctx_) {
-        RAC_LOG_ERROR("STT.WhisperCpp", "Cannot create stream: model not loaded");
-        return "";
-    }
-
-    std::string stream_id = generate_stream_id();
-
-    auto state = std::make_unique<WhisperStreamState>();
-    state->state = whisper_init_state(ctx_);
-
-    if (!state->state) {
-        RAC_LOG_ERROR("STT.WhisperCpp", "Failed to create whisper state for stream");
-        return "";
-    }
-
-    if (config.contains("language")) {
-        state->language = config["language"].get<std::string>();
-    }
-
-    if (config.contains("sample_rate")) {
-        state->sample_rate = config["sample_rate"].get<int>();
-    }
-
-    streams_[stream_id] = std::move(state);
-
-    RAC_LOG_INFO("STT.WhisperCpp", "Created stream: %s", stream_id.c_str());
-    return stream_id;
-}
-
-bool WhisperCppSTT::feed_audio(const std::string& stream_id, const std::vector<float>& samples,
-                               int sample_rate) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = streams_.find(stream_id);
-    if (it == streams_.end()) {
-        RAC_LOG_ERROR("STT.WhisperCpp", "Stream not found: %s", stream_id.c_str());
-        return false;
-    }
-
-    auto& state = it->second;
-
-    std::vector<float> resampled = samples;
-    if (sample_rate != WHISPER_SAMPLE_RATE) {
-        resampled = resample_to_16khz(samples, sample_rate);
-    }
-
-    state->audio_buffer.insert(state->audio_buffer.end(), resampled.begin(), resampled.end());
-
-    return true;
-}
-
-bool WhisperCppSTT::is_stream_ready(const std::string& stream_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = streams_.find(stream_id);
-    if (it == streams_.end()) {
-        return false;
-    }
-
-    const size_t min_samples = WHISPER_SAMPLE_RATE;
-    return it->second->audio_buffer.size() >= min_samples || it->second->input_finished;
-}
-
-STTResult WhisperCppSTT::decode(const std::string& stream_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    STTResult result;
-
-    auto it = streams_.find(stream_id);
-    if (it == streams_.end()) {
-        RAC_LOG_ERROR("STT.WhisperCpp", "Stream not found: %s", stream_id.c_str());
-        return result;
-    }
-
-    auto& stream_state = it->second;
-
-    if (stream_state->audio_buffer.empty()) {
-        result.is_final = stream_state->input_finished;
-        return result;
-    }
-
-    whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-    wparams.n_threads = backend_->get_num_threads();
-    wparams.single_segment = !stream_state->input_finished;
-    wparams.no_context = false;
-    wparams.print_progress = false;
-    wparams.print_realtime = false;
-    wparams.print_timestamps = false;
-
-    if (!stream_state->language.empty()) {
-        wparams.language = stream_state->language.c_str();
-    }
-
-    int ret = whisper_full_with_state(ctx_, stream_state->state, wparams,
-                                      stream_state->audio_buffer.data(),
-                                      static_cast<int>(stream_state->audio_buffer.size()));
-
-    if (ret != 0) {
-        RAC_LOG_ERROR("STT.WhisperCpp", "whisper_full_with_state failed: %d", ret);
-        return result;
-    }
-
-    const int n_segments = whisper_full_n_segments_from_state(stream_state->state);
-    std::string full_text;
-
-    for (int i = 0; i < n_segments; ++i) {
-        const char* text = whisper_full_get_segment_text_from_state(stream_state->state, i);
-        if (text) {
-            full_text += text;
-
-            AudioSegment segment;
-            segment.text = text;
-            segment.start_time_ms =
-                whisper_full_get_segment_t0_from_state(stream_state->state, i) * 10.0;
-            segment.end_time_ms =
-                whisper_full_get_segment_t1_from_state(stream_state->state, i) * 10.0;
-            result.segments.push_back(segment);
-        }
-    }
-
-    result.text = full_text;
-    result.is_final = stream_state->input_finished;
-    result.audio_duration_ms =
-        (stream_state->audio_buffer.size() / static_cast<double>(WHISPER_SAMPLE_RATE)) * 1000.0;
-
-    int lang_id = whisper_full_lang_id_from_state(stream_state->state);
-    if (lang_id >= 0) {
-        result.detected_language = whisper_lang_str(lang_id);
-    }
-
-    stream_state->audio_buffer.clear();
-
-    return result;
-}
-
-bool WhisperCppSTT::is_endpoint(const std::string& stream_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = streams_.find(stream_id);
-    if (it == streams_.end()) {
-        return false;
-    }
-
-    return it->second->input_finished;
-}
-
-void WhisperCppSTT::input_finished(const std::string& stream_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = streams_.find(stream_id);
-    if (it != streams_.end()) {
-        it->second->input_finished = true;
-        RAC_LOG_INFO("STT.WhisperCpp", "Input finished for stream: %s", stream_id.c_str());
-    }
-}
-
-void WhisperCppSTT::reset_stream(const std::string& stream_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = streams_.find(stream_id);
-    if (it != streams_.end()) {
-        it->second->audio_buffer.clear();
-        it->second->input_finished = false;
-        RAC_LOG_INFO("STT.WhisperCpp", "Reset stream: %s", stream_id.c_str());
-    }
-}
-
-void WhisperCppSTT::destroy_stream(const std::string& stream_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = streams_.find(stream_id);
-    if (it != streams_.end()) {
-        if (it->second && it->second->state) {
-            whisper_free_state(it->second->state);
-        }
-        streams_.erase(it);
-        RAC_LOG_INFO("STT.WhisperCpp", "Destroyed stream: %s", stream_id.c_str());
-    }
 }
 
 void WhisperCppSTT::cancel() {

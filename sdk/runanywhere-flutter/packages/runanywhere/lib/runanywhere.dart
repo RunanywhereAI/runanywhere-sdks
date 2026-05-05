@@ -12,6 +12,8 @@ export 'data/network/network.dart';
 export 'foundation/configuration/sdk_constants.dart';
 export 'foundation/error_types/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';
+export 'generated/component_types.pbenum.dart'
+    show ComponentLifecycleState, EventCategory;
 export 'generated/diffusion_options.pb.dart'
     show
         DiffusionCapabilities,
@@ -50,17 +52,16 @@ export 'generated/embeddings_options.pb.dart'
 export 'generated/embeddings_options.pbenum.dart'
     show EmbeddingsNormalizeMode, EmbeddingsPoolingStrategy;
 export 'generated/errors.pb.dart' show ErrorContext;
-export 'generated/errors.pbenum.dart' show ErrorCategory, ErrorCode;
+export 'generated/errors.pbenum.dart' show ErrorCategory, ErrorCode, ErrorSeverity;
 export 'generated/hardware_profile.pb.dart'
     show AcceleratorInfo, HardwareProfile, HardwareProfileResult;
-export 'generated/hardware_profile.pbenum.dart' show AcceleratorPreference;
+export 'generated/hardware_profile.pbenum.dart' show AccelerationPreference;
 export 'generated/llm_options.pb.dart'
     show
         LLMConfiguration,
         LLMGenerationOptions,
         LLMGenerationResult;
 export 'generated/llm_options.pbenum.dart' show ExecutionTarget;
-export 'generated/thinking_tag_pattern.pb.dart' show ThinkingTagPattern;
 export 'generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent, LLMStreamFinalResult;
 export 'generated/lora_options.pb.dart'
@@ -102,7 +103,6 @@ export 'generated/model_types.pb.dart'
         SingleFileArtifact;
 export 'generated/model_types.pbenum.dart'
     show
-        AccelerationPreference,
         ArchiveStructure,
         ArchiveType,
         AudioFormat,
@@ -139,13 +139,10 @@ export 'generated/sdk_events.pb.dart'
         VoiceLifecycleEvent;
 export 'generated/sdk_events.pbenum.dart'
     show
-        ComponentLifecycleState,
         ComponentInitializationEventKind,
         ConfigurationEventKind,
         DeviceEventKind,
-        EventCategory,
         EventDestination,
-        EventSeverity,
         FrameworkEventKind,
         GenerationEventKind,
         InitializationStage,
@@ -225,6 +222,7 @@ export 'generated/voice_agent_service.pb.dart'
         VoiceAgentRequest,
         VoiceAgentResult,
         VoiceSessionConfig;
+export 'generated/vad_options.pbenum.dart' show VADStreamEventKind;
 export 'generated/voice_events.pb.dart'
     show
         StateChangeEvent,
@@ -233,9 +231,7 @@ export 'generated/voice_events.pb.dart'
         VoiceEvent,
         VoiceEvent_Payload,
         VoiceSessionError;
-export 'generated/vad_options.pbenum.dart' show VADStreamEventKind;
-export 'generated/voice_events.pbenum.dart'
-    show ComponentLoadState, PipelineState;
+export 'generated/voice_events.pbenum.dart' show PipelineState;
 export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'

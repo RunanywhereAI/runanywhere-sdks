@@ -62,6 +62,8 @@ MESSAGE_PROTOS=(
     "${PROTO_DIR}/lifecycle_service.proto"
     # Wave H-2 / IDL-02 — canonical ThinkingTagPattern shared by llm_options and model_types.
     "${PROTO_DIR}/thinking_tag_pattern.proto"
+    # Wave H-2 / IDL-04 — shared ComponentLifecycleState + EventCategory (import-cycle break).
+    "${PROTO_DIR}/component_types.proto"
 )
 
 protoc \

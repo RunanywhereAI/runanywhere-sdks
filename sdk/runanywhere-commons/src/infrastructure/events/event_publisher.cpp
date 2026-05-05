@@ -175,7 +175,7 @@ runanywhere::v1::InferenceFramework framework_for_engine(const rac_engine_vtable
 
 void populate_envelope(runanywhere::v1::SDKEvent* event,
                        runanywhere::v1::EventCategory category,
-                       runanywhere::v1::EventSeverity severity,
+                       runanywhere::v1::ErrorSeverity severity,
                        runanywhere::v1::SDKComponent component =
                            runanywhere::v1::SDK_COMPONENT_UNSPECIFIED) {
     event->set_timestamp_ms(static_cast<int64_t>(current_time_ms()));
@@ -488,7 +488,7 @@ rac_result_t rac_sdk_event_publish_failure(rac_result_t error_code,
     const auto sdk_component = component_from_string(component);
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_FAILURE,
-                      runanywhere::v1::EVENT_SEVERITY_ERROR, sdk_component);
+                      runanywhere::v1::ERROR_SEVERITY_ERROR, sdk_component);
     if (operation && operation[0]) {
         event.set_operation_id(operation);
     }
@@ -526,7 +526,7 @@ rac_result_t publish_initialization_started(void) {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_INITIALIZATION,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     event.mutable_initialization()->set_stage(
         runanywhere::v1::INITIALIZATION_STAGE_STARTED);
     return publish_message(event);
@@ -539,7 +539,7 @@ rac_result_t publish_initialization_completed(void) {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_INITIALIZATION,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     event.mutable_initialization()->set_stage(
         runanywhere::v1::INITIALIZATION_STAGE_COMPLETED);
     return publish_message(event);
@@ -552,7 +552,7 @@ rac_result_t publish_initialization_failed(rac_result_t error_code, const char* 
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_INITIALIZATION,
-                      runanywhere::v1::EVENT_SEVERITY_ERROR);
+                      runanywhere::v1::ERROR_SEVERITY_ERROR);
     auto* init = event.mutable_initialization();
     init->set_stage(runanywhere::v1::INITIALIZATION_STAGE_FAILED);
     if (message) init->set_error(message);
@@ -570,7 +570,7 @@ rac_result_t publish_shutdown(void) {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_SHUTDOWN,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     event.mutable_initialization()->set_stage(
         runanywhere::v1::INITIALIZATION_STAGE_SHUTDOWN);
     return publish_message(event);
@@ -583,7 +583,7 @@ rac_result_t publish_device_registered(const char* device_id) {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_DEVICE,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* device = event.mutable_device();
     device->set_kind(runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED);
     if (device_id) device->set_device_id(device_id);
@@ -598,7 +598,7 @@ rac_result_t publish_device_registration_failed(rac_result_t error_code, const c
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_DEVICE,
-                      runanywhere::v1::EVENT_SEVERITY_ERROR);
+                      runanywhere::v1::ERROR_SEVERITY_ERROR);
     auto* device = event.mutable_device();
     device->set_kind(runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED);
     if (message) device->set_error(message);
@@ -616,7 +616,7 @@ rac_result_t publish_device_registration_state_changed(bool registered) {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_DEVICE,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* device = event.mutable_device();
     device->set_kind(registered ? runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED
                                 : runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED);
@@ -637,7 +637,7 @@ rac_result_t publish_auth_succeeded(const char* subject_id,
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     if (operation && operation[0]) {
         event.set_operation_id(operation);
     }
@@ -668,7 +668,7 @@ rac_result_t publish_auth_token_refreshed(const char* subject_id,
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     if (operation && operation[0]) {
         event.set_operation_id(operation);
     }
@@ -699,7 +699,7 @@ rac_result_t publish_auth_failed(rac_result_t error_code,
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
-                      runanywhere::v1::EVENT_SEVERITY_ERROR);
+                      runanywhere::v1::ERROR_SEVERITY_ERROR);
     if (operation && operation[0]) {
         event.set_operation_id(operation);
     }
@@ -726,7 +726,7 @@ rac_result_t publish_hardware_profile_completed(const uint8_t* profile_bytes,
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_HARDWARE,
-                      runanywhere::v1::EVENT_SEVERITY_INFO);
+                      runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* hardware = event.mutable_hardware_routing();
     hardware->set_kind(runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED);
     hardware->set_capability("hardware_profile");
@@ -737,7 +737,7 @@ rac_result_t publish_hardware_profile_completed(const uint8_t* profile_bytes,
             populate_error(event.mutable_error(), RAC_ERROR_DECODING_ERROR,
                            "failed to decode HardwareProfileResult",
                            runanywhere::v1::SDK_COMPONENT_UNSPECIFIED);
-            event.set_severity(runanywhere::v1::EVENT_SEVERITY_ERROR);
+            event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
         }
     }
     return publish_message(event);
@@ -755,7 +755,7 @@ rac_result_t publish_route_selected(rac_primitive_t primitive,
     const auto component = component_for_primitive(primitive);
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_ROUTING,
-                      runanywhere::v1::EVENT_SEVERITY_INFO, component);
+                      runanywhere::v1::ERROR_SEVERITY_INFO, component);
     auto* routing = event.mutable_hardware_routing();
     routing->set_kind(runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED);
     routing->set_component(component);
@@ -779,7 +779,7 @@ rac_result_t publish_route_failed(rac_primitive_t primitive,
     const auto component = component_for_primitive(primitive);
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, category_for_error(error_code),
-                      runanywhere::v1::EVENT_SEVERITY_ERROR, component);
+                      runanywhere::v1::ERROR_SEVERITY_ERROR, component);
     auto* routing = event.mutable_hardware_routing();
     routing->set_kind(runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING);
     routing->set_component(component);

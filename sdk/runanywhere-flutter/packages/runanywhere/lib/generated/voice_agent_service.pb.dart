@@ -15,6 +15,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'component_types.pbenum.dart' as $3;
+import 'errors.pbenum.dart' as $4;
 import 'stt_options.pb.dart' as $2;
 import 'tts_options.pb.dart' as $1;
 import 'voice_events.pb.dart' as $0;
@@ -27,8 +29,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   factory VoiceAgentRequest({
     $core.String? eventFilter,
     $core.String? sessionId,
-    $core.Iterable<$0.VoiceEventCategory>? categories,
-    $0.VoiceEventSeverity? minSeverity,
+    $core.Iterable<$3.EventCategory>? categories,
+    $4.ErrorSeverity? minSeverity,
     $fixnum.Int64? replayFromSeq,
     $core.bool? includeAudio,
   }) {
@@ -60,8 +62,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'eventFilter')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..pc<$0.VoiceEventCategory>(3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $0.VoiceEventCategory.valueOf, enumValues: $0.VoiceEventCategory.values, defaultEnumValue: $0.VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED)
-    ..e<$0.VoiceEventSeverity>(4, _omitFieldNames ? '' : 'minSeverity', $pb.PbFieldType.OE, defaultOrMaker: $0.VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG, valueOf: $0.VoiceEventSeverity.valueOf, enumValues: $0.VoiceEventSeverity.values)
+    ..pc<$3.EventCategory>(3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $3.EventCategory.valueOf, enumValues: $3.EventCategory.values, defaultEnumValue: $3.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..e<$4.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity', $pb.PbFieldType.OE, defaultOrMaker: $4.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $4.ErrorSeverity.valueOf, enumValues: $4.ErrorSeverity.values)
     ..a<$fixnum.Int64>(5, _omitFieldNames ? '' : 'replayFromSeq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOB(6, _omitFieldNames ? '' : 'includeAudio')
     ..hasRequiredFields = false
@@ -109,12 +111,12 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   void clearSessionId() => clearField(2);
 
   @$pb.TagNumber(3)
-  $core.List<$0.VoiceEventCategory> get categories => $_getList(2);
+  $core.List<$3.EventCategory> get categories => $_getList(2);
 
   @$pb.TagNumber(4)
-  $0.VoiceEventSeverity get minSeverity => $_getN(3);
+  $4.ErrorSeverity get minSeverity => $_getN(3);
   @$pb.TagNumber(4)
-  set minSeverity($0.VoiceEventSeverity v) { setField(4, v); }
+  set minSeverity($4.ErrorSeverity v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasMinSeverity() => $_has(3);
   @$pb.TagNumber(4)

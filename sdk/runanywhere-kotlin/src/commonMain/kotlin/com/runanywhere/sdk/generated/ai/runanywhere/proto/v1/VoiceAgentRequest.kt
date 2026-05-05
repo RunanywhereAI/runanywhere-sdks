@@ -54,15 +54,15 @@ public class VoiceAgentRequest(
     schemaIndex = 1,
   )
   public val session_id: String = "",
-  categories: List<VoiceEventCategory> = emptyList(),
+  categories: List<EventCategory> = emptyList(),
   @field:WireField(
     tag = 4,
-    adapter = "ai.runanywhere.proto.v1.VoiceEventSeverity#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ErrorSeverity#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "minSeverity",
     schemaIndex = 3,
   )
-  public val min_severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG,
+  public val min_severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#UINT64",
@@ -83,11 +83,11 @@ public class VoiceAgentRequest(
 ) : Message<VoiceAgentRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.VoiceEventCategory#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.EventCategory#ADAPTER",
     label = WireField.Label.REPEATED,
     schemaIndex = 2,
   )
-  public val categories: List<VoiceEventCategory> = immutableCopyOf("categories", categories)
+  public val categories: List<EventCategory> = immutableCopyOf("categories", categories)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -138,8 +138,8 @@ public class VoiceAgentRequest(
   public fun copy(
     event_filter: String = this.event_filter,
     session_id: String = this.session_id,
-    categories: List<VoiceEventCategory> = this.categories,
-    min_severity: VoiceEventSeverity = this.min_severity,
+    categories: List<EventCategory> = this.categories,
+    min_severity: ErrorSeverity = this.min_severity,
     replay_from_seq: Long = this.replay_from_seq,
     include_audio: Boolean = this.include_audio,
     unknownFields: ByteString = this.unknownFields,
@@ -162,9 +162,9 @@ public class VoiceAgentRequest(
             value.event_filter)
         if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2,
             value.session_id)
-        size += VoiceEventCategory.ADAPTER.asRepeated().encodedSizeWithTag(3, value.categories)
-        if (value.min_severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG) size +=
-            VoiceEventSeverity.ADAPTER.encodedSizeWithTag(4, value.min_severity)
+        size += EventCategory.ADAPTER.asRepeated().encodedSizeWithTag(3, value.categories)
+        if (value.min_severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) size +=
+            ErrorSeverity.ADAPTER.encodedSizeWithTag(4, value.min_severity)
         if (value.replay_from_seq != 0L) size += ProtoAdapter.UINT64.encodedSizeWithTag(5,
             value.replay_from_seq)
         if (value.include_audio != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
@@ -176,9 +176,9 @@ public class VoiceAgentRequest(
         if (value.event_filter != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
             value.event_filter)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.session_id)
-        VoiceEventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.categories)
-        if (value.min_severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
-            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.min_severity)
+        EventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.categories)
+        if (value.min_severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 4, value.min_severity)
         if (value.replay_from_seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 5,
             value.replay_from_seq)
         if (value.include_audio != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
@@ -192,9 +192,9 @@ public class VoiceAgentRequest(
             value.include_audio)
         if (value.replay_from_seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 5,
             value.replay_from_seq)
-        if (value.min_severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
-            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.min_severity)
-        VoiceEventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.categories)
+        if (value.min_severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
+            ErrorSeverity.ADAPTER.encodeWithTag(writer, 4, value.min_severity)
+        EventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.categories)
         if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.session_id)
         if (value.event_filter != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
             value.event_filter)
@@ -203,8 +203,8 @@ public class VoiceAgentRequest(
       override fun decode(reader: ProtoReader): VoiceAgentRequest {
         var event_filter: String = ""
         var session_id: String = ""
-        val categories = mutableListOf<VoiceEventCategory>()
-        var min_severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG
+        val categories = mutableListOf<EventCategory>()
+        var min_severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var replay_from_seq: Long = 0L
         var include_audio: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
@@ -212,12 +212,12 @@ public class VoiceAgentRequest(
             1 -> event_filter = ProtoAdapter.STRING.decode(reader)
             2 -> session_id = ProtoAdapter.STRING.decode(reader)
             3 -> try {
-              VoiceEventCategory.ADAPTER.tryDecode(reader, categories)
+              EventCategory.ADAPTER.tryDecode(reader, categories)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             4 -> try {
-              min_severity = VoiceEventSeverity.ADAPTER.decode(reader)
+              min_severity = ErrorSeverity.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

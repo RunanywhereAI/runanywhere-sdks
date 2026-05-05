@@ -117,8 +117,8 @@ int test_sdk_events_generated_service_contract() {
         filter_desc->FindFieldByName("minimum_severity");
     CHECK(minimum_severity != nullptr, "SDKEventFilter carries minimum severity");
     if (minimum_severity) {
-        CHECK(minimum_severity->enum_type()->full_name() == "runanywhere.v1.EventSeverity",
-              "SDKEventFilter minimum_severity uses EventSeverity");
+        CHECK(minimum_severity->enum_type()->full_name() == "runanywhere.v1.ErrorSeverity",
+              "SDKEventFilter minimum_severity uses ErrorSeverity");
     }
 
     return 0;

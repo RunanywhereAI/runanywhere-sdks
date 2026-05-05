@@ -21,13 +21,14 @@ import type {
 } from '@runanywhere/proto-ts/voice_agent_service';
 import {
   AudioEncoding,
-  ComponentLoadState,
-  VoiceEventCategory,
-  VoiceEventSeverity,
   VoicePipelineComponent,
   type VoiceAgentComponentStates,
   type VoiceEvent,
 } from '@runanywhere/proto-ts/voice_events';
+// IDL-03/04/07: VoiceEventCategory/VoiceEventSeverity/ComponentLoadState were
+// consolidated into EventCategory/ErrorSeverity/ComponentLifecycleState.
+import { EventCategory, ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
+import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule';
 
 const logger = new SDKLogger('VoiceAgent');
@@ -253,13 +254,13 @@ function assertNativeHandle(handle: number, feature: string): number {
 
 function unavailableComponentStates(reason: string): VoiceAgentComponentStates {
   return {
-    sttState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
-    llmState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
-    ttsState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
-    vadState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
+    sttState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
+    llmState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
+    ttsState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
+    vadState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
     ready: false,
     anyLoading: false,
-    wakewordState: ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
+    wakewordState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
     errorMessage: reason,
   };
 }
@@ -292,8 +293,8 @@ function unavailableVoiceEvent(reason?: string): VoiceEvent {
   return {
     seq: 0,
     timestampUs: nowUs(),
-    category: VoiceEventCategory.VOICE_EVENT_CATEGORY_ERROR,
-    severity: VoiceEventSeverity.VOICE_EVENT_SEVERITY_ERROR,
+    category: EventCategory.EVENT_CATEGORY_ERROR,
+    severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
     component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT,
     error: {
       code: SDKErrorCode.BackendNotAvailable,

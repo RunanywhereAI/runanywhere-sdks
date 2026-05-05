@@ -23,8 +23,8 @@ const VoiceAgentRequest$json = {
   '2': [
     {'1': 'event_filter', '3': 1, '4': 1, '5': 9, '10': 'eventFilter'},
     {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
-    {'1': 'categories', '3': 3, '4': 3, '5': 14, '6': '.runanywhere.v1.VoiceEventCategory', '10': 'categories'},
-    {'1': 'min_severity', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.VoiceEventSeverity', '10': 'minSeverity'},
+    {'1': 'categories', '3': 3, '4': 3, '5': 14, '6': '.runanywhere.v1.EventCategory', '10': 'categories'},
+    {'1': 'min_severity', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.ErrorSeverity', '10': 'minSeverity'},
     {'1': 'replay_from_seq', '3': 5, '4': 1, '5': 4, '10': 'replayFromSeq'},
     {'1': 'include_audio', '3': 6, '4': 1, '5': 8, '10': 'includeAudio'},
   ],
@@ -33,11 +33,11 @@ const VoiceAgentRequest$json = {
 /// Descriptor for `VoiceAgentRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List voiceAgentRequestDescriptor = $convert.base64Decode(
     'ChFWb2ljZUFnZW50UmVxdWVzdBIhCgxldmVudF9maWx0ZXIYASABKAlSC2V2ZW50RmlsdGVyEh'
-    '0KCnNlc3Npb25faWQYAiABKAlSCXNlc3Npb25JZBJCCgpjYXRlZ29yaWVzGAMgAygOMiIucnVu'
-    'YW55d2hlcmUudjEuVm9pY2VFdmVudENhdGVnb3J5UgpjYXRlZ29yaWVzEkUKDG1pbl9zZXZlcm'
-    'l0eRgEIAEoDjIiLnJ1bmFueXdoZXJlLnYxLlZvaWNlRXZlbnRTZXZlcml0eVILbWluU2V2ZXJp'
-    'dHkSJgoPcmVwbGF5X2Zyb21fc2VxGAUgASgEUg1yZXBsYXlGcm9tU2VxEiMKDWluY2x1ZGVfYX'
-    'VkaW8YBiABKAhSDGluY2x1ZGVBdWRpbw==');
+    '0KCnNlc3Npb25faWQYAiABKAlSCXNlc3Npb25JZBI9CgpjYXRlZ29yaWVzGAMgAygOMh0ucnVu'
+    'YW55d2hlcmUudjEuRXZlbnRDYXRlZ29yeVIKY2F0ZWdvcmllcxJACgxtaW5fc2V2ZXJpdHkYBC'
+    'ABKA4yHS5ydW5hbnl3aGVyZS52MS5FcnJvclNldmVyaXR5UgttaW5TZXZlcml0eRImCg9yZXBs'
+    'YXlfZnJvbV9zZXEYBSABKARSDXJlcGxheUZyb21TZXESIwoNaW5jbHVkZV9hdWRpbxgGIAEoCF'
+    'IMaW5jbHVkZUF1ZGlv');
 
 @$core.Deprecated('Use voiceAgentResultDescriptor instead')
 const VoiceAgentResult$json = {

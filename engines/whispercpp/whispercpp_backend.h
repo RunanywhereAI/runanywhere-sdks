@@ -16,7 +16,6 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace runanywhere {
@@ -112,18 +111,6 @@ class WhisperCppBackend {
 };
 
 // =============================================================================
-// STREAMING STATE
-// =============================================================================
-
-struct WhisperStreamState {
-    whisper_state* state = nullptr;
-    std::vector<float> audio_buffer;
-    std::string language;
-    bool input_finished = false;
-    int sample_rate = 16000;
-};
-
-// =============================================================================
 // STT IMPLEMENTATION
 // =============================================================================
 
@@ -141,17 +128,6 @@ class WhisperCppSTT {
 
     STTResult transcribe(const STTRequest& request);
 
-    bool supports_streaming() const;
-    std::string create_stream(const nlohmann::json& config = {});
-    bool feed_audio(const std::string& stream_id, const std::vector<float>& samples,
-                    int sample_rate);
-    bool is_stream_ready(const std::string& stream_id);
-    STTResult decode(const std::string& stream_id);
-    bool is_endpoint(const std::string& stream_id);
-    void input_finished(const std::string& stream_id);
-    void reset_stream(const std::string& stream_id);
-    void destroy_stream(const std::string& stream_id);
-
     void cancel();
     std::vector<std::string> get_supported_languages() const;
 
@@ -159,7 +135,6 @@ class WhisperCppSTT {
     STTResult transcribe_internal(const std::vector<float>& audio, const std::string& language,
                                   bool detect_language, bool translate, bool word_timestamps);
     std::vector<float> resample_to_16khz(const std::vector<float>& samples, int source_rate);
-    std::string generate_stream_id();
 
     WhisperCppBackend* backend_;
     whisper_context* ctx_ = nullptr;
@@ -169,9 +144,6 @@ class WhisperCppSTT {
 
     std::string model_path_;
     nlohmann::json model_config_;
-
-    std::unordered_map<std::string, std::unique_ptr<WhisperStreamState>> streams_;
-    int stream_counter_ = 0;
 
     mutable std::mutex mutex_;
 };

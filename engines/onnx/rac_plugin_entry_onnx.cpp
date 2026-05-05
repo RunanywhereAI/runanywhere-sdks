@@ -18,8 +18,12 @@ extern "C" {
 
 /* v3 Phase B7: embeddings ops live in sdk/runanywhere-commons/src/features/rag/
  * rac_onnx_embeddings_register.cpp but are plugged into this engine's
- * vtable since onnx naturally owns the embedding primitive. */
+ * vtable since onnx naturally owns the embedding primitive. When RAG is off,
+ * onnx_embedding_provider.cpp is not compiled and the symbol is unresolved —
+ * the vtable slot stays nullptr below to match. */
+#if defined(RAC_BACKEND_RAG)
 extern const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
+#endif
 
 static const rac_runtime_id_t k_onnx_runtimes[] = {
     RAC_RUNTIME_ONNXRT,
@@ -30,9 +34,11 @@ static const uint32_t k_onnx_formats[] = {
     RAC_MODEL_FORMAT_ID_ORT,
 };
 
+#if defined(RAC_BACKEND_RAG)
 static const rac_primitive_t k_onnx_primitives[] = {
     RAC_PRIMITIVE_EMBED,
 };
+#endif
 
 // P0 regression fix (post FIX-AK17 autoregister): the onnx engine plugin
 // only owns the embeddings primitive on this build (stt/tts/vad ops are
@@ -46,8 +52,13 @@ static const rac_engine_manifest_t k_onnx_manifest = {
     .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
     .priority         = 50,
     .capability_flags = 0,
+#if defined(RAC_BACKEND_RAG)
     .primitives       = k_onnx_primitives,
     .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
+#else
+    .primitives       = nullptr,
+    .primitives_count = 0,
+#endif
     .runtimes         = k_onnx_runtimes,
     .runtimes_count   = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
     .formats          = k_onnx_formats,
@@ -65,7 +76,11 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
     /* stt_ops          */ nullptr,
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
+#if defined(RAC_BACKEND_RAG)
     /* embedding_ops    */ &g_onnx_embeddings_ops,
+#else
+    /* embedding_ops    */ nullptr,
+#endif
     /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
@@ -81,26 +96,3 @@ RAC_PLUGIN_ENTRY_DEF(onnx) {
 }
 
 }  // extern "C"
-
-// B-AK-17-002 fix: librac_backend_onnx.so is loaded via System.loadLibrary by
-// the SDK example apps (Kotlin/Flutter/RN). Without an explicit caller that
-// runs `rac_backend_onnx_register()` BEFORE RAG flow starts, the unified
-// plugin registry never sees the ONNX engine vtable (and its embedding_ops
-// slot), so `rac_plugin_route(RAC_PRIMITIVE_EMBED)` returns NOT_FOUND. This
-// breaks RAG pipeline creation even when the .so ships in the APK.
-//
-// Mirror the Sherpa fix (engines/sherpa/rac_plugin_entry_sherpa.cpp): use the
-// standard ELF constructor attribute so the engine plugin auto-registers when
-// the dynamic linker loads this .so. The plugin registry deduplicates by name,
-// so the explicit `rac_backend_onnx_register()` path remains safe.
-#if defined(__GNUC__) || defined(__clang__)
-extern "C" {
-__attribute__((constructor))
-static void rac_onnx_autoregister_on_load(void) {
-    const rac_engine_vtable_t* vt = rac_plugin_entry_onnx();
-    if (vt != nullptr) {
-        (void)rac_plugin_register(vt);
-    }
-}
-}  // extern "C"
-#endif

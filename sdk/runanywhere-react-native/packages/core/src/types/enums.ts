@@ -14,7 +14,7 @@
 export {
   // sdk_events.proto
   SDKComponent,
-  EventSeverity,
+  ErrorSeverity,
   EventDestination,
   EventCategory,
   ComponentLifecycleState,
