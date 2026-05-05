@@ -3754,28 +3754,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStreamCancelProto
     return static_cast<jint>(rac_vad_stream_cancel_proto(static_cast<uint64_t>(sessionId)));
 }
 
-JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCreate(
-    JNIEnv* env, jclass clazz, jstring modelIdOrPath) {
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentLoadResolvedArtifactsProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     (void)clazz;
-    if (modelIdOrPath == nullptr) return 0L;
-    std::string model = getCString(env, modelIdOrPath);
-    rac_handle_t handle = nullptr;
-    rac_result_t rc = rac_vlm_create(model.c_str(), &handle);
-    if (RAC_FAILED(rc)) return 0L;
-    return reinterpret_cast<jlong>(handle);
-}
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmInitialize(
-    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring mmprojPath) {
-    (void)clazz;
-    if (handle == 0L || modelPath == nullptr) return RAC_ERROR_NULL_POINTER;
-    std::string modelPathStorage = getCString(env, modelPath);
-    std::string mmprojStorage;
-    const char* mmproj = getNullableCString(env, mmprojPath, mmprojStorage);
-    return static_cast<jint>(
-        rac_vlm_initialize(handleFromJLong(handle), modelPathStorage.c_str(), mmproj));
+    JByteArrayView request(env, requestProto);
+    if (!request.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vlm_component_load_resolved_artifacts_proto(
+        request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result,
+                               "racVlmComponentLoadResolvedArtifactsProto");
 }
 
 JNIEXPORT jbyteArray JNICALL

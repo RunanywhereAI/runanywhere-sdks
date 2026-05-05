@@ -296,10 +296,7 @@ object RunAnywhereBridge {
     // ========================================================================
 
     @JvmStatic
-    external fun racVlmCreate(modelIdOrPath: String): Long
-
-    @JvmStatic
-    external fun racVlmInitialize(handle: Long, modelPath: String, visionProjectorPath: String): Int
+    external fun racVlmComponentLoadResolvedArtifactsProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic
     external fun racVlmProcessProto(

@@ -47,6 +47,8 @@ import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
+import ai.runanywhere.proto.v1.VLMLoadResolvedArtifactsRequest
+import ai.runanywhere.proto.v1.VLMLoadResolvedArtifactsResponse
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
@@ -480,20 +482,29 @@ object CppBridgeVLMProto {
         visionProjectorPath: String,
     ): Int {
         destroy()
-        val serviceHandle = RunAnywhereBridge.racVlmCreate(modelId.ifBlank { primaryModelPath })
-        if (serviceHandle == 0L) return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
-        val rc =
-            RunAnywhereBridge.racVlmInitialize(
-                serviceHandle,
-                primaryModelPath,
-                visionProjectorPath,
+        val request =
+            VLMLoadResolvedArtifactsRequest(
+                model_id = modelId,
+                primary_model_path = primaryModelPath,
+                mmproj_path = visionProjectorPath.takeIf { it.isNotBlank() },
             )
-        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-            RunAnywhereBridge.racVlmDestroy(serviceHandle)
-            return rc
+        val response =
+            decodeOrThrow(
+                VLMLoadResolvedArtifactsResponse.ADAPTER,
+                RunAnywhereBridge.racVlmComponentLoadResolvedArtifactsProto(
+                    VLMLoadResolvedArtifactsRequest.ADAPTER.encode(request),
+                ),
+                "racVlmComponentLoadResolvedArtifactsProto",
+            )
+        if (response.result_code != RunAnywhereBridge.RAC_SUCCESS || response.handle == 0L) {
+            return if (response.result_code != RunAnywhereBridge.RAC_SUCCESS) {
+                response.result_code
+            } else {
+                RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+            }
         }
-        handle = serviceHandle
-        return rc
+        handle = response.handle
+        return RunAnywhereBridge.RAC_SUCCESS
     }
 
     @Synchronized

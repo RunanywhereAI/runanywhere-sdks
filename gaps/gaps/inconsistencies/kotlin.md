@@ -24,23 +24,15 @@ and KOT-STREAM-VAD are all wired to native commons APIs. KOT-14 resolved in
 Wave 3a by deleting the `currentDiffusionFramework()` + `getDiffusionCapabilities()`
 Kotlin `expect`/`actual` pair (no Kotlin-usable diffusion backend exists today;
 iteration I will reintroduce when a non-Apple-only diffusion engine ships — see
-`KOT-DIFFUSION-REWIRE`). What remains is (a) KOT-05 legacy VLM trio (still calls
-`racVlmCreate`/`racVlmInitialize`/`racVlmDestroy` instead of a proto-backed `load`).
+`KOT-DIFFUSION-REWIRE`). KOT-05 resolved in Wave 3a: the VLM
+`loadResolvedArtifacts` path is now proto-backed via the new
+`rac_vlm_component_load_resolved_artifacts_proto` commons API, the legacy
+`racVlmCreate`/`racVlmInitialize` JNI thunks and `external fun` decls are
+deleted, and `racVlmDestroy` remains only as the handle-release path used
+by `CppBridgeVLMProto.destroy()`. No open inconsistencies remain on this
+SDK.
 
 ## Confirmed gaps
-
-### KOT-05: `CppBridgeVLMProto.loadResolvedArtifacts` still uses legacy non-proto trio (priority: MED)
-- **Symptom**:
-  `sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeModalityProto.kt:478-498`
-  calls `racVlmCreate(modelIdOrPath)`, `racVlmInitialize(handle, modelPath, visionProjectorPath)`,
-  `racVlmDestroy(handle)` directly. `RunAnywhereBridge.kt:299/302/323` still declare those legacy thunks.
-  Swift/Flutter have migrated to generated-proto VLM lifecycle; Kotlin hasn't.
-- **Concrete steps**:
-  1. Commons: add `rac_vlm_component_load_resolved_artifacts_proto` taking a `VLMLoadResolvedArtifactsRequest`
-     proto (fields: `model_id`, `primary_model_path`, `vision_projector_path`).
-  2. Kotlin: replace `CppBridgeModalityProto.kt:478-498` with a proto-backed `load()`, delete
-     `racVlmCreate`/`racVlmInitialize`/`racVlmDestroy` from `RunAnywhereBridge.kt:299/302/323`.
-- **Scope**: 1 `.proto` message + ~40 LOC Kotlin + C++ work.
 
 ### KOT-DIFFUSION-REWIRE: Reintroduce `currentDiffusionFramework` + `getDiffusionCapabilities` when a Kotlin-usable diffusion backend ships (priority: LOW, deferred to iteration I)
 - **Context**: Wave 3a (KOT-14) deleted the `currentDiffusionFramework()` and
