@@ -27,6 +27,7 @@ option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
 option java_outer_classname  = "VoiceAgentServiceProto";
 option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 

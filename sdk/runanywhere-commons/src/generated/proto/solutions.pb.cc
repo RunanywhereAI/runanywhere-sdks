@@ -571,15 +571,17 @@ const char descriptor_table_protodef_solutions_2eproto[] ABSL_ATTRIBUTE_SECTION_
     "nanywhere.v1.SolutionHandle\032\036.runanywher"
     "e.v1.SolutionHandle\022I\n\007Destroy\022\036.runanyw"
     "here.v1.SolutionHandle\032\036.runanywhere.v1."
-    "SolutionHandleB:\n\027ai.runanywhere.proto.v"
-    "1B\016SolutionsProtoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006prot"
+    "SolutionHandleB\211\001\n\027ai.runanywhere.proto."
+    "v1B\016SolutionsProtoP\001Z<github.com/runanyw"
+    "here/runanywhere-sdks/idl/v1;runanywhere"
+    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
     "o3"
 };
 static ::absl::once_flag descriptor_table_solutions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_solutions_2eproto = {
     false,
     false,
-    2722,
+    2802,
     descriptor_table_protodef_solutions_2eproto,
     "solutions.proto",
     &descriptor_table_solutions_2eproto_once,

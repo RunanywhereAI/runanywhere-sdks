@@ -494,15 +494,17 @@ const char descriptor_table_protodef_pipeline_2eproto[] ABSL_ATTRIBUTE_SECTION_V
     "where.v1.PipelineStartRequest\032\036.runanywh"
     "ere.v1.PipelineHandle\022J\n\004Stop\022\036.runanywh"
     "ere.v1.PipelineHandle\032\".runanywhere.v1.P"
-    "ipelineStopResultB9\n\027ai.runanywhere.prot"
-    "o.v1B\rPipelineProtoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006pr"
+    "ipelineStopResultB\210\001\n\027ai.runanywhere.pro"
+    "to.v1B\rPipelineProtoP\001Z<github.com/runan"
+    "ywhere/runanywhere-sdks/idl/v1;runanywhe"
+    "rev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pr"
     "oto3"
 };
 static ::absl::once_flag descriptor_table_pipeline_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_pipeline_2eproto = {
     false,
     false,
-    1804,
+    1884,
     descriptor_table_protodef_pipeline_2eproto,
     "pipeline.proto",
     &descriptor_table_pipeline_2eproto_once,

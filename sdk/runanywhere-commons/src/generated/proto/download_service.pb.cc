@@ -800,10 +800,10 @@ const char descriptor_table_protodef_download_5fservice_2eproto[] ABSL_ATTRIBUTE
     "$.runanywhere.v1.DownloadCancelResult\022U\n"
     "\006Resume\022%.runanywhere.v1.DownloadResumeR"
     "equest\032$.runanywhere.v1.DownloadResumeRe"
-    "sultB~\n\027ai.runanywhere.proto.v1B\024Downloa"
-    "dServiceProtoP\001Z<github.com/runanywhere/"
-    "runanywhere-sdks/idl/v1;runanywherev1\370\001\001"
-    "\242\002\004RAV1\272\002\002RAb\006proto3"
+    "sultB\217\001\n\027ai.runanywhere.proto.v1B\024Downlo"
+    "adServiceProtoP\001Z<github.com/runanywhere"
+    "/runanywhere-sdks/idl/v1;runanywherev1\370\001"
+    "\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_download_5fservice_2eproto_deps[1] = {
@@ -813,7 +813,7 @@ static ::absl::once_flag descriptor_table_download_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_download_5fservice_2eproto = {
     false,
     false,
-    3580,
+    3598,
     descriptor_table_protodef_download_5fservice_2eproto,
     "download_service.proto",
     &descriptor_table_download_5fservice_2eproto_once,

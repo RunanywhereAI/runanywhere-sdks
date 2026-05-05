@@ -718,10 +718,11 @@ const char descriptor_table_protodef_voice_5fagent_5fservice_2eproto[] ABSL_ATTR
     "SpeechProtoRequest\032\031.runanywhere.v1.TTSO"
     "utput\022V\n\tConfigure\022\'.runanywhere.v1.Voic"
     "eAgentComposeConfig\032 .runanywhere.v1.Voi"
-    "ceAgentResultB\200\001\n\027ai.runanywhere.proto.v"
+    "ceAgentResultB\221\001\n\027ai.runanywhere.proto.v"
     "1B\026VoiceAgentServiceProtoP\001Z<github.com/"
     "runanywhere/runanywhere-sdks/idl/v1;runa"
-    "nywherev1\370\001\001\242\002\004RAV1\272\002\002RAb\006proto3"
+    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
+    "Ab\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_voice_5fagent_5fservice_2eproto_deps[5] = {
@@ -735,7 +736,7 @@ static ::absl::once_flag descriptor_table_voice_5fagent_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_voice_5fagent_5fservice_2eproto = {
     false,
     false,
-    3912,
+    3929,
     descriptor_table_protodef_voice_5fagent_5fservice_2eproto,
     "voice_agent_service.proto",
     &descriptor_table_voice_5fagent_5fservice_2eproto_once,

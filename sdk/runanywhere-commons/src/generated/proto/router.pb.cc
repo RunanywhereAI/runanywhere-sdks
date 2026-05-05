@@ -126,8 +126,10 @@ const char descriptor_table_protodef_router_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     "2\034.runanywhere.v1.SDKComponent\"Y\n\037Framew"
     "orksForCapabilityResponse\0226\n\nframeworks\030"
     "\001 \003(\0162\".runanywhere.v1.InferenceFramewor"
-    "kB7\n\027ai.runanywhere.proto.v1B\013RouterProt"
-    "oP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006proto3"
+    "kB\206\001\n\027ai.runanywhere.proto.v1B\013RouterPro"
+    "toP\001Z<github.com/runanywhere/runanywhere"
+    "-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016R"
+    "unanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_router_2eproto_deps[2] = {
@@ -138,7 +140,7 @@ static ::absl::once_flag descriptor_table_router_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_router_2eproto = {
     false,
     false,
-    306,
+    386,
     descriptor_table_protodef_router_2eproto,
     "router.proto",
     &descriptor_table_router_2eproto_once,

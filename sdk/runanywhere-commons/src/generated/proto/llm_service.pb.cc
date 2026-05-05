@@ -433,14 +433,16 @@ const char descriptor_table_protodef_llm_5fservice_2eproto[] ABSL_ATTRIBUTE_SECT
     "\022\034\n\030LLM_TOKEN_KIND_TOOL_CALL\020\0032W\n\003LLM\022P\n"
     "\010Generate\022\".runanywhere.v1.LLMGenerateRe"
     "quest\032\036.runanywhere.v1.LLMStreamEvent0\001B"
-    ";\n\027ai.runanywhere.proto.v1B\017LLMServicePr"
-    "otoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006proto3"
+    "\212\001\n\027ai.runanywhere.proto.v1B\017LLMServiceP"
+    "rotoP\001Z<github.com/runanywhere/runanywhe"
+    "re-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002"
+    "\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_llm_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5fservice_2eproto = {
     false,
     false,
-    2148,
+    2228,
     descriptor_table_protodef_llm_5fservice_2eproto,
     "llm_service.proto",
     &descriptor_table_llm_5fservice_2eproto_once,

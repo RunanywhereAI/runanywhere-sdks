@@ -50,10 +50,10 @@ const char descriptor_table_protodef_lifecycle_5fservice_2eproto[] ABSL_ATTRIBUT
     "tModelResult\022o\n\010Snapshot\0221.runanywhere.v"
     "1.ComponentLifecycleSnapshotRequest\0320.ru"
     "nanywhere.v1.ComponentLifecycleSnapshotR"
-    "esultB\177\n\027ai.runanywhere.proto.v1B\025Lifecy"
-    "cleServiceProtoP\001Z<github.com/runanywher"
-    "e/runanywhere-sdks/idl/v1;runanywherev1\370"
-    "\001\001\242\002\004RAV1\272\002\002RAb\006proto3"
+    "esultB\220\001\n\027ai.runanywhere.proto.v1B\025Lifec"
+    "ycleServiceProtoP\001Z<github.com/runanywhe"
+    "re/runanywhere-sdks/idl/v1;runanywherev1"
+    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_lifecycle_5fservice_2eproto_deps[2] = {
@@ -64,7 +64,7 @@ static ::absl::once_flag descriptor_table_lifecycle_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_lifecycle_5fservice_2eproto = {
     false,
     false,
-    582,
+    600,
     descriptor_table_protodef_lifecycle_5fservice_2eproto,
     "lifecycle_service.proto",
     &descriptor_table_lifecycle_5fservice_2eproto_once,
