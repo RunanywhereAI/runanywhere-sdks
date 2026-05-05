@@ -25,6 +25,10 @@ object CppBridgeFileManager {
     private var isRegistered: Boolean = false
     private val lock = Any()
 
+    // ========================================================================
+    // REGISTRATION
+    // ========================================================================
+
     /**
      * Register the file I/O callbacks with C++ core.
      * Must be called during SDK initialization after native library is loaded.
@@ -36,6 +40,69 @@ object CppBridgeFileManager {
             isRegistered = true
         }
     }
+
+    // ========================================================================
+    // PUBLIC API
+    // ========================================================================
+
+    /** Create directory structure (Models, Cache, Temp, Downloads). */
+    fun createDirectoryStructure(): Boolean {
+        return RunAnywhereBridge.nativeFileManagerCreateDirectoryStructure() == RunAnywhereBridge.RAC_SUCCESS
+    }
+
+    /** Calculate directory size recursively (C++ logic, Kotlin I/O). */
+    fun calculateDirectorySize(path: String): Long {
+        return RunAnywhereBridge.nativeFileManagerCalculateDirSize(path)
+    }
+
+    /** Get total models storage used. */
+    fun modelsStorageUsed(): Long {
+        return RunAnywhereBridge.nativeFileManagerModelsStorageUsed()
+    }
+
+    /** Clear cache directory. */
+    fun clearCache(): Boolean {
+        return RunAnywhereBridge.nativeFileManagerClearCache() == RunAnywhereBridge.RAC_SUCCESS
+    }
+
+    /** Clear temp directory. */
+    fun clearTemp(): Boolean {
+        return RunAnywhereBridge.nativeFileManagerClearTemp() == RunAnywhereBridge.RAC_SUCCESS
+    }
+
+    /** Get cache size. */
+    fun cacheSize(): Long {
+        return RunAnywhereBridge.nativeFileManagerCacheSize()
+    }
+
+    /** Delete a model folder. */
+    fun deleteModel(modelId: String, framework: Int): Boolean {
+        return RunAnywhereBridge.nativeFileManagerDeleteModel(modelId, framework) == RunAnywhereBridge.RAC_SUCCESS
+    }
+
+    /** Create model folder and return path. */
+    fun createModelFolder(modelId: String, framework: Int): String? {
+        return RunAnywhereBridge.nativeFileManagerCreateModelFolder(modelId, framework)
+    }
+
+    /** Check if model folder exists. */
+    fun modelFolderExists(modelId: String, framework: Int): Boolean {
+        return RunAnywhereBridge.nativeFileManagerModelFolderExists(modelId, framework)
+    }
+
+    /** Get storage info as JSON. */
+    fun getStorageInfoJson(): String? {
+        return RunAnywhereBridge.nativeFileManagerGetStorageInfo()
+    }
+
+    /** Check storage availability as JSON. */
+    fun checkStorageJson(requiredBytes: Long): String? {
+        return RunAnywhereBridge.nativeFileManagerCheckStorage(requiredBytes)
+    }
+
+    // ========================================================================
+    // PLATFORM I/O CALLBACK PROVIDER
+    // ========================================================================
 
     /**
      * Provides platform file I/O methods called by C++ via JNI.

@@ -21,7 +21,7 @@ import 'package:runanywhere/native/platform_loader.dart';
 ///
 /// This Dart code just:
 /// 1. Calls `rac_backend_genie_register()` to register the backend
-/// 2. The core SDK's `NativeBackend` handles all LLM operations via `rac_llm_component_*`
+/// 2. The core SDK handles all LLM operations via `rac_llm_component_*` FFI calls
 ///
 /// ## Platform Support
 ///
