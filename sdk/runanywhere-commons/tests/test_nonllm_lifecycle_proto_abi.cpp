@@ -119,6 +119,15 @@ rac_result_t mock_stt_transcribe(void*, const void* audio_data, size_t audio_siz
                                                                : RAC_ERROR_OUT_OF_MEMORY;
 }
 
+rac_result_t mock_stt_transcribe_stream(void*, const void* audio_data, size_t audio_size,
+                                         const rac_stt_options_t*,
+                                         rac_stt_stream_callback_t callback, void* user_data) {
+    if (!audio_data || audio_size == 0 || !callback) return RAC_ERROR_INVALID_ARGUMENT;
+    callback("stream-draft", RAC_FALSE, user_data);
+    callback("stream-final", RAC_TRUE, user_data);
+    return RAC_SUCCESS;
+}
+
 rac_result_t mock_tts_synthesize(void*, const char* text, const rac_tts_options_t* options,
                                  rac_tts_result_t* out_result) {
     if (!text || !out_result) return RAC_ERROR_NULL_POINTER;
@@ -267,6 +276,7 @@ bool install_mock_plugin() {
     rac_stt_service_ops_t stt_ops{};
     stt_ops.initialize = mock_initialize_with_path;
     stt_ops.transcribe = mock_stt_transcribe;
+    stt_ops.transcribe_stream = mock_stt_transcribe_stream;
     stt_ops.cleanup = mock_cleanup;
     stt_ops.destroy = mock_destroy;
     stt_ops.create = mock_create;
@@ -372,6 +382,53 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     CHECK(stt_output.metadata().model_id() == "lifecycle.stt",
           "STT lifecycle output carries loaded model id");
     rac_proto_buffer_free(&out);
+
+    // Lifecycle-owned STT streaming should emit the canonical STTStreamEvent
+    // envelope (STARTED → PARTIAL → FINAL) off the mock backend's
+    // transcribe_stream callbacks.
+    {
+        std::vector<runanywhere::v1::STTStreamEvent> stream_events;
+        auto stream_cb = [](const uint8_t* data, size_t size, void* user_data) {
+            auto* out = static_cast<std::vector<runanywhere::v1::STTStreamEvent>*>(user_data);
+            runanywhere::v1::STTStreamEvent event;
+            if (event.ParseFromArray(data, static_cast<int>(size))) {
+                out->push_back(event);
+            }
+        };
+        std::vector<uint8_t> stream_bytes;
+        CHECK(serialize(stt_request, &stream_bytes), "STT lifecycle stream request serializes");
+        rc = rac_stt_transcribe_stream_lifecycle_proto(stream_bytes.data(), stream_bytes.size(),
+                                                        stream_cb, &stream_events);
+        CHECK(rc == RAC_SUCCESS, "STT lifecycle stream ABI returns success");
+        CHECK(stream_events.size() == 3,
+              "STT lifecycle stream ABI emits started, partial and final events");
+        if (stream_events.size() == 3) {
+            CHECK(stream_events[0].kind() ==
+                      runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED &&
+                      stream_events[0].seq() == 1,
+                  "STT lifecycle stream first event is STARTED with seq=1");
+            CHECK(stream_events[1].kind() ==
+                          runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL &&
+                      stream_events[1].has_partial() &&
+                      stream_events[1].partial().text() == "stream-draft" &&
+                      !stream_events[1].partial().is_final(),
+                  "STT lifecycle stream second event is PARTIAL with draft text");
+            CHECK(stream_events[2].kind() ==
+                          runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL &&
+                      stream_events[2].has_partial() &&
+                      stream_events[2].partial().is_final() &&
+                      stream_events[2].has_final_output() &&
+                      stream_events[2].final_output().text() == "stream-final",
+                  "STT lifecycle stream third event is FINAL with final text");
+            CHECK(stream_events[0].seq() == 1 && stream_events[1].seq() == 2 &&
+                      stream_events[2].seq() == 3,
+                  "STT lifecycle stream sequence is monotonic");
+            const std::string request_id = stream_events[0].request_id();
+            CHECK(!request_id.empty() && stream_events[1].request_id() == request_id &&
+                      stream_events[2].request_id() == request_id,
+                  "STT lifecycle stream request_id is stable across events");
+        }
+    }
 
     runanywhere::v1::TTSSynthesisRequest tts_request;
     tts_request.set_request_id("tts-1");

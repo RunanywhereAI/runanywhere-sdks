@@ -789,12 +789,15 @@ if(ANDROID)
 endif()
 
 # Apple: wire the curated export list (exports/RACommons.exports) into the
-# linker so the xcframework shipped via SPM only exposes the 484 curated
-# rac_* symbols. Matters for App Store symbol analysis; Android keeps the
+# linker so the xcframework shipped via SPM only exposes the ~453 curated
+# _rac_* symbols. Matters for App Store symbol analysis; Android keeps the
 # default-visibility workaround above until RAC_API annotations are complete
 # (TODO v0.21 / B19). Note: target_link_options only takes effect when the
 # target is linked as a dynamic library — static-archive builds ignore it,
 # which is fine because symbol visibility only matters at final link time.
+# Wave D-1 (2026-05-04): audit restored ~301 SDK-called RAC_API symbols that
+# had been trimmed out of the list (150 → 453). See exports/RACommons.exports
+# header and gaps/gaps/inconsistencies/cpp-layer.md § CPP-EXPORTS-MISSING-SYMBOLS.
 if(APPLE)
     set_target_properties(rac_commons PROPERTIES
         XCODE_ATTRIBUTE_EXPORTED_SYMBOLS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")
@@ -943,6 +946,14 @@ if(RAC_ENABLE_PROTOBUF)
         find_package(Protobuf 34.1 EXACT CONFIG QUIET)
     else()
         find_package(Protobuf 34.1 EXACT QUIET)
+    endif()
+    # Fallback for homebrew/system protobuf 34.x: the upstream config file
+    # reports PACKAGE_VERSION_MAJOR==7 (runtime ABI major) and rejects
+    # `Protobuf 34.1 EXACT`. Module mode finds the same install with a
+    # synthesized version string. Accept either so local dev on macOS works
+    # without requiring a vendored FetchContent build.
+    if(NOT Protobuf_FOUND)
+        find_package(Protobuf QUIET)
     endif()
 
     if(NOT Protobuf_FOUND AND RAC_VENDOR_PROTOBUF)

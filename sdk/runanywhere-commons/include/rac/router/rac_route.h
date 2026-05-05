@@ -24,6 +24,7 @@
 #include <stdint.h>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/router/rac_routing_hints.h"
@@ -52,10 +53,10 @@ extern "C" {
  * Thread-safe. The first call also triggers HardwareProfile::detect();
  * subsequent calls reuse the memoized profile.
  */
-rac_result_t rac_plugin_route(rac_primitive_t              primitive,
-                              uint32_t                     format,
-                              const rac_routing_hints_t*   hints,
-                              const rac_engine_vtable_t**  out_vtable);
+RAC_API rac_result_t rac_plugin_route(rac_primitive_t              primitive,
+                                      uint32_t                     format,
+                                      const rac_routing_hints_t*   hints,
+                                      const rac_engine_vtable_t**  out_vtable);
 
 #ifdef __cplusplus
 }

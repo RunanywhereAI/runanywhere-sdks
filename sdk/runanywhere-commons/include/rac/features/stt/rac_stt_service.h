@@ -225,6 +225,38 @@ RAC_API rac_result_t rac_stt_transcribe_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 
+/**
+ * @brief Callback fired once per serialized runanywhere.v1.STTStreamEvent.
+ *
+ * The buffer is valid only for the duration of the callback. Callers that
+ * need to retain the bytes MUST copy them out.
+ */
+typedef void (*rac_stt_lifecycle_stream_event_callback_fn)(const uint8_t* event_bytes,
+                                                            size_t event_size,
+                                                            void* user_data);
+
+/**
+ * @brief Stream transcription using the lifecycle-loaded STT model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.STTTranscriptionRequest. Commons
+ * resolves the current STT lifecycle component, dispatches the audio to the
+ * backend, and fires @p callback once per canonical
+ * runanywhere.v1.STTStreamEvent envelope (kind = STARTED / PARTIAL / FINAL /
+ * ERROR, each with monotonically-increasing `seq` and `timestamp_us`).
+ *
+ * Designed to let SDKs collapse "load then stream" flows into a single
+ * native call without having to first acquire an STT component handle.
+ *
+ * @retval RAC_SUCCESS                      Streaming completed successfully.
+ * @retval RAC_ERROR_INVALID_ARGUMENT       Request bytes/audio/callback invalid.
+ * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
+ * @retval RAC_ERROR_NOT_INITIALIZED        No STT lifecycle model is loaded.
+ * @retval RAC_ERROR_NOT_SUPPORTED          Backend does not advertise streaming.
+ */
+RAC_API rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data);
+
 #ifdef __cplusplus
 }
 #endif

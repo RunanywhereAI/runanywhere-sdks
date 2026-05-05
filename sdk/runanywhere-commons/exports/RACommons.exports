@@ -1,5 +1,33 @@
 # RunAnywhere Commons - Exported Symbols
-# Auto-generated from librac_commons.a
+#
+# Curated Apple `-exported_symbols_list` for `librac_commons.{a,dylib}`.
+# Consumed by `sdk/runanywhere-commons/CMakeLists.txt` and applied at link time
+# when commons is built as a shared library (static archives ignore the option).
+# Each entry must include the leading underscore (Apple linker convention).
+#
+# To audit drift vs. RAC_API-decorated declarations in the commons headers:
+#   scripts/validation/check_rac_api_exports.sh            # advisory report
+#   scripts/validation/check_rac_api_exports.sh --strict   # CI gate (exit 1)
+#
+# TODO(v0.21): The include tree still contains ~493 RAC_API-decorated decls
+# that are NOT called by any SDK today. Those are internalization candidates —
+# either strip RAC_API from the header or relocate to `src/.../internal.h`.
+# Once that cleanup lands, wire `check_rac_api_exports.sh --strict` into
+# `scripts/validation/run_commons_proto_checks.sh` as a CI gate.
+#
+# Note: backend-conditional symbols (rac_rag_*, rac_backend_rag_*,
+# rac_backend_whisperkit_coreml_*, rac_whisperkit_coreml_stt_set_callbacks)
+# are deliberately NOT listed here even though SDKs call them — the shared
+# linker would reject the list when those backends are not compiled. When
+# commons is built as a dynamic lib, backend-specific symbols come from
+# per-backend shared libraries (librac_backend_rag.so, RABackendLLAMACPP,
+# etc.) which already export them with default visibility.
+#
+# Symbols declared RAC_API but without a commons-side implementation
+# (`rac_vad_start`, `rac_vad_stop`, `rac_vad_reset` in
+# include/rac/features/vad/rac_vad_service.h) are also intentionally absent
+# — those are stale declarations that should be removed from the headers
+# as a follow-up.
 
 # Audio Utilities — internal helpers (PCM/WAV plumbing for backends and
 # tests). Audio bytes leaving the SDK travel inside generated proto results.
@@ -224,6 +252,7 @@ _rac_llm_generate_proto
 _rac_llm_generate_stream_proto
 _rac_llm_cancel_proto
 _rac_stt_transcribe_lifecycle_proto
+_rac_stt_transcribe_stream_lifecycle_proto
 _rac_stt_component_transcribe_proto
 _rac_stt_component_transcribe_stream_proto
 _rac_tts_synthesize_lifecycle_proto
@@ -249,12 +278,6 @@ _rac_vlm_cancel_lifecycle_proto
 _rac_embeddings_embed_batch_proto
 _rac_embeddings_embed_batch_lifecycle_proto
 _rac_embeddings_create_proto
-_rac_rag_session_create_proto
-_rac_rag_session_destroy_proto
-_rac_rag_ingest_proto
-_rac_rag_query_proto
-_rac_rag_clear_proto
-_rac_rag_stats_proto
 _rac_lora_register_proto
 _rac_lora_catalog_list_proto
 _rac_lora_catalog_query_proto
@@ -269,3 +292,416 @@ _rac_diffusion_generate_proto
 _rac_diffusion_generate_lifecycle_proto
 _rac_diffusion_generate_with_progress_proto
 _rac_diffusion_cancel_proto
+
+# ============================================================================
+# WAVE D-1 additions (2026-05-04): RAC_API symbols actively called by SDK
+# bridges that were missing from the curated list. These would link-fail the
+# moment commons ships as a dynamic library on Apple. See gaps/gaps/
+# inconsistencies/cpp-layer.md § CPP-EXPORTS-MISSING-SYMBOLS.
+# ============================================================================
+
+# Plugin loader / registry — ABI v3 plugin discovery and lifecycle.
+# Exposed as RAC_API and actively called by Swift (Public/Extensions/RunAnywhere+PluginLoader.swift)
+# and other SDKs. (CPP-EXPORTS-MISSING-SYMBOLS / Wave D-1.)
+_rac_plugin_api_version
+_rac_plugin_list
+_rac_registry_free_plugin_list
+_rac_registry_list_plugins
+_rac_registry_load_plugin
+_rac_registry_plugin_count
+_rac_registry_unload_plugin
+
+# Plugin router — primitive → vtable resolution. NOTE: declared in
+# include/rac/router/rac_route.h WITHOUT RAC_API today; see TODO in Wave D followup
+# to add the annotation. Keeping exported so commons built as dynamic lib works.
+_rac_plugin_route
+
+# HTTP transport contract — platform SDK registers a URLSession/OkHttp vtable
+# here and the C ABI download executor dispatches through it.
+_rac_http_client_create
+_rac_http_client_destroy
+_rac_http_download_execute
+_rac_http_request_send
+_rac_http_request_stream
+_rac_http_response_free
+_rac_http_transport_is_registered
+_rac_http_transport_register
+
+# Auth manager — device auth, refresh tokens, persisted-state bridge.
+# Swift CppBridge+Auth.swift / Kotlin CppBridgeAuth.kt / Dart dart_bridge_auth.dart call these.
+_rac_auth_build_authenticate_request
+_rac_auth_build_refresh_request
+_rac_auth_clear
+_rac_auth_get_access_token
+_rac_auth_get_device_id
+_rac_auth_get_organization_id
+_rac_auth_get_refresh_token
+_rac_auth_get_token_expires_at
+_rac_auth_get_user_id
+_rac_auth_get_valid_token
+_rac_auth_handle_authenticate_response
+_rac_auth_handle_refresh_response
+_rac_auth_init
+_rac_auth_is_authenticated
+_rac_auth_load_stored_tokens
+_rac_auth_needs_refresh
+_rac_auth_reset
+_rac_auth_save_tokens
+
+# SDK state (api key, base URL, device id, environment) — read/written
+# via CppBridge+State.swift and equivalents.
+_rac_state_get_api_key
+_rac_state_get_base_url
+_rac_state_get_device_id
+_rac_state_get_environment
+_rac_state_initialize
+_rac_state_is_device_registered
+_rac_state_is_initialized
+_rac_state_reset
+_rac_state_set_device_registered
+_rac_state_shutdown
+
+# SDK init + logging configuration.
+_rac_configure_logging
+_rac_sdk_get_config
+_rac_sdk_init
+
+# SDKEnvironment helpers + URL / API key validators called from
+# Public/Configuration/SDKEnvironment.swift and CppBridge+Environment.swift.
+_rac_env_default_log_level
+_rac_env_description
+_rac_env_is_production
+_rac_env_is_testing
+_rac_env_requires_auth
+_rac_env_requires_backend_url
+_rac_env_should_send_telemetry
+_rac_env_should_sync_with_backend
+_rac_validate_api_key
+_rac_validate_base_url
+_rac_validate_config
+_rac_validation_error_message
+
+# Dev-only config (Sentry DSN, Supabase URL/key, build token) — reached
+# through CppBridge+Environment.swift.
+_rac_dev_config_get_build_token
+_rac_dev_config_get_sentry_dsn
+_rac_dev_config_get_supabase_key
+_rac_dev_config_get_supabase_url
+_rac_dev_config_has_build_token
+_rac_dev_config_is_available
+
+# Device registration manager — the commons-side device id cache and
+# deferred registration trigger called by CppBridge+Device.swift.
+_rac_device_manager_clear_registration
+_rac_device_manager_get_device_id
+_rac_device_manager_is_registered
+_rac_device_manager_register_if_needed
+_rac_device_manager_set_callbacks
+
+# Backend registration entry points — every backend (platform FM, RAG,
+# WhisperKit CoreML, etc.) publishes a rac_backend_*_register()/_unregister()
+# pair that the platform SDK calls at module load.
+_rac_backend_platform_register
+_rac_backend_platform_unregister
+
+# Apple platform (Foundation Models / System TTS / WhisperKit CoreML) callback
+# contracts. Swift registers C callbacks via rac_platform_*_set_callbacks.
+_rac_platform_llm_set_callbacks
+_rac_platform_tts_set_callbacks
+
+# LLM component lifecycle + non-proto service ABI — still called by Swift /
+# Kotlin bridges during the proto-byte migration (CPP_PROTO_OWNERSHIP.md §2.1).
+_rac_llm_cancel
+_rac_llm_component_cancel
+_rac_llm_component_cleanup
+_rac_llm_component_create
+_rac_llm_component_destroy
+_rac_llm_component_generate
+_rac_llm_component_generate_stream
+_rac_llm_component_get_model_id
+_rac_llm_component_is_loaded
+_rac_llm_component_load_model
+_rac_llm_component_supports_streaming
+_rac_llm_component_unload
+_rac_llm_create
+_rac_llm_extract_thinking
+_rac_llm_generate
+_rac_llm_generate_stream
+_rac_llm_split_thinking_tokens
+_rac_llm_strip_thinking
+
+# STT component lifecycle + non-proto service ABI.
+_rac_stt_component_cleanup
+_rac_stt_component_configure
+_rac_stt_component_create
+_rac_stt_component_destroy
+_rac_stt_component_is_loaded
+_rac_stt_component_load_model
+_rac_stt_component_supports_streaming
+_rac_stt_component_transcribe
+_rac_stt_component_transcribe_stream
+_rac_stt_component_unload
+_rac_stt_result_free
+_rac_stt_transcribe
+_rac_stt_transcribe_stream
+
+# TTS component lifecycle + non-proto service ABI.
+_rac_tts_component_cleanup
+_rac_tts_component_create
+_rac_tts_component_destroy
+_rac_tts_component_is_loaded
+_rac_tts_component_load_voice
+_rac_tts_component_stop
+_rac_tts_component_synthesize
+_rac_tts_component_synthesize_stream
+_rac_tts_component_unload
+_rac_tts_result_free
+_rac_tts_stop
+_rac_tts_synthesize
+_rac_tts_synthesize_stream
+
+# VAD component lifecycle + non-proto service ABI.
+_rac_vad_component_cleanup
+_rac_vad_component_configure
+_rac_vad_component_create
+_rac_vad_component_destroy
+_rac_vad_component_get_energy_threshold
+_rac_vad_component_get_statistics
+_rac_vad_component_initialize
+_rac_vad_component_is_initialized
+_rac_vad_component_is_loaded
+_rac_vad_component_is_speech_active
+_rac_vad_component_load_model
+_rac_vad_component_process
+_rac_vad_component_reset
+_rac_vad_component_set_energy_threshold
+_rac_vad_component_start
+_rac_vad_component_stop
+_rac_vad_component_unload
+
+# VLM component lifecycle + non-proto service ABI.
+_rac_vlm_cancel
+_rac_vlm_cleanup
+_rac_vlm_component_cancel
+_rac_vlm_component_cleanup
+_rac_vlm_component_create
+_rac_vlm_component_destroy
+_rac_vlm_component_get_state
+_rac_vlm_component_is_loaded
+_rac_vlm_component_load_model
+_rac_vlm_component_supports_streaming
+_rac_vlm_component_unload
+_rac_vlm_create
+_rac_vlm_destroy
+_rac_vlm_initialize
+_rac_vlm_process
+_rac_vlm_process_stream
+
+# Diffusion component lifecycle + non-proto service ABI (Apple CoreML).
+_rac_diffusion_cancel
+_rac_diffusion_component_cancel
+_rac_diffusion_component_cleanup
+_rac_diffusion_component_configure
+_rac_diffusion_component_create
+_rac_diffusion_component_destroy
+_rac_diffusion_component_get_capabilities
+_rac_diffusion_component_is_loaded
+_rac_diffusion_component_load_model
+_rac_diffusion_create
+_rac_diffusion_create_with_config
+_rac_diffusion_destroy
+_rac_diffusion_generate
+_rac_diffusion_generate_with_progress
+_rac_diffusion_get_capabilities
+_rac_diffusion_initialize
+
+# Embeddings component lifecycle + non-proto service ABI.
+_rac_embeddings_create
+_rac_embeddings_create_with_config
+_rac_embeddings_destroy
+_rac_embeddings_embed
+_rac_embeddings_embed_batch
+_rac_embeddings_initialize
+
+# RAG pipeline non-proto ABI — still called by RN RAGBridge.cpp until Wave B-5
+# lands (CPP-RAG-PIPELINE-LEGACY blocker).
+
+# Voice agent orchestrator — legacy non-proto ABI kept live while platform
+# bridges migrate to the rac_voice_agent_*_proto surface.
+_rac_voice_agent_cleanup
+_rac_voice_agent_create
+_rac_voice_agent_create_standalone
+_rac_voice_agent_destroy
+_rac_voice_agent_generate_response
+_rac_voice_agent_initialize
+_rac_voice_agent_initialize_with_loaded_models
+_rac_voice_agent_is_llm_loaded
+_rac_voice_agent_is_ready
+_rac_voice_agent_is_stt_loaded
+_rac_voice_agent_is_tts_loaded
+_rac_voice_agent_load_llm_model
+_rac_voice_agent_load_stt_model
+_rac_voice_agent_load_tts_voice
+_rac_voice_agent_process_voice_turn
+_rac_voice_agent_result_free
+_rac_voice_agent_synthesize_speech
+_rac_voice_agent_transcribe
+
+# Tool calling — struct-based helpers still called from Swift CppBridge+ToolCalling.swift.
+_rac_tool_call_format_prompt
+_rac_tool_call_free
+_rac_tool_call_parse
+_rac_tool_call_validate
+
+# Structured output — struct-based helpers still called from Swift
+# CppBridge+StructuredOutput.swift.
+_rac_structured_output_parse
+_rac_structured_output_prepare_prompt
+_rac_structured_output_validate
+
+# Solutions API — L5 solution lifecycle called from Swift
+# Public/Extensions/Solutions/RunAnywhere+Solutions.swift.
+_rac_solution_cancel
+_rac_solution_close_input
+_rac_solution_create_from_proto
+_rac_solution_create_from_yaml
+_rac_solution_destroy
+_rac_solution_feed
+_rac_solution_start
+_rac_solution_stop
+
+# Telemetry manager — flush + HTTP callback bridge for Sentry/analytics.
+_rac_telemetry_manager_create
+_rac_telemetry_manager_destroy
+_rac_telemetry_manager_flush
+_rac_telemetry_manager_http_complete
+_rac_telemetry_manager_set_device_info
+_rac_telemetry_manager_set_http_callback
+_rac_telemetry_manager_track
+_rac_telemetry_manager_track_analytics
+
+# File manager — model folder bookkeeping called from CppBridge+FileManager.swift.
+_rac_file_manager_cache_size
+_rac_file_manager_calculate_dir_size
+_rac_file_manager_check_storage
+_rac_file_manager_clear_cache
+_rac_file_manager_clear_temp
+_rac_file_manager_create_directory_structure
+_rac_file_manager_create_model_folder
+_rac_file_manager_delete_model
+_rac_file_manager_get_storage_info
+_rac_file_manager_model_folder_exists
+_rac_file_manager_models_storage_used
+
+# Storage analyzer non-proto entry points (used by CppBridge+Storage.swift).
+_rac_storage_analyzer_analyze
+_rac_storage_analyzer_calculate_size
+_rac_storage_analyzer_get_model_metrics
+_rac_storage_info_free
+
+# Model registry non-proto ABI — still used by Swift CppBridge+ModelRegistry.swift
+# and Flutter dart_bridge_models.dart during the proto-byte migration.
+_rac_get_model
+_rac_get_model_registry
+_rac_model_info_alloc
+_rac_model_info_array_free
+_rac_model_info_free
+_rac_model_info_is_downloaded
+_rac_model_registry_create
+_rac_model_registry_discover_downloaded
+_rac_model_registry_get
+_rac_model_registry_get_all
+_rac_model_registry_get_downloaded
+_rac_model_registry_refresh
+_rac_model_registry_remove
+_rac_model_registry_save
+_rac_model_registry_update_download_status
+_rac_model_registry_update_last_used
+
+# Model paths helpers — {base_dir}/RunAnywhere/Models/{framework}/{modelId}/
+# resolution (called from CppBridge+ModelPaths.swift / DartBridgeModelPaths).
+_rac_model_paths_extract_framework
+_rac_model_paths_extract_model_id
+_rac_model_paths_get_base_dir
+_rac_model_paths_get_cache_directory
+_rac_model_paths_get_downloads_directory
+_rac_model_paths_get_expected_model_path
+_rac_model_paths_get_framework_directory
+_rac_model_paths_get_model_folder
+_rac_model_paths_get_models_directory
+_rac_model_paths_get_temp_directory
+_rac_model_paths_is_model_path
+_rac_model_paths_resolve_artifact
+_rac_model_paths_set_base_dir
+
+# Model assignment (device-targeted model catalog) non-proto ABI.
+_rac_model_assignment_clear_cache
+_rac_model_assignment_fetch
+_rac_model_assignment_get_by_category
+_rac_model_assignment_get_by_framework
+_rac_model_assignment_set_callbacks
+
+# Model category / framework helpers (capability probes).
+_rac_framework_raw_value
+_rac_model_category_requires_context_length
+_rac_model_category_supports_thinking
+_rac_model_check_compatibility
+_rac_model_matches_filter
+
+# Model registry supporting result/freeing helpers.
+_rac_discovery_result_free
+_rac_find_model_path_after_extraction
+_rac_model_path_resolution_free
+
+# LoRA registry non-proto ABI.
+_rac_get_lora_for_model
+_rac_get_lora_registry
+_rac_lora_entry_array_free
+_rac_lora_registry_get
+_rac_lora_registry_get_all
+
+# Download manager + orchestrator non-proto ABI — still called by RN
+# DownloadBridge.cpp and other SDK adapters during migration.
+_rac_download_compute_destination
+_rac_download_manager_cancel
+_rac_download_manager_create
+_rac_download_manager_destroy
+_rac_download_manager_get_active_tasks
+_rac_download_manager_get_progress
+_rac_download_manager_is_healthy
+_rac_download_manager_mark_complete
+_rac_download_manager_mark_failed
+_rac_download_manager_pause_all
+_rac_download_manager_resume_all
+_rac_download_manager_start
+_rac_download_manager_update_progress
+_rac_download_orchestrate
+_rac_download_requires_extraction
+_rac_download_task_ids_free
+
+# Archive extraction helpers (ONNX .tar.bz2, diffusion bundles, etc.).
+_rac_extract_archive
+_rac_extract_archive_native
+
+# Module registry — capability probing called from CppBridge+Services.swift.
+_rac_module_get_info
+_rac_module_list
+_rac_module_register
+_rac_module_unregister
+
+# Lower-level event bus (analytics/track). Public event stream remains rac_sdk_event_*.
+_rac_event_subscribe
+_rac_event_track
+
+# Structured error API — rac_error_message and related helpers called from
+# Swift runtime shims (ONNX.swift, MetalRT.swift) and JNI error bridges.
+_rac_error_clear_details
+_rac_error_get_details
+_rac_error_is_commons_error
+_rac_error_is_core_error
+_rac_error_is_expected
+_rac_error_message
+_rac_error_set_details
+
+# Audio utilities — WAV header helpers used by Swift TTS shim.
+_rac_audio_float32_to_wav

@@ -18,6 +18,79 @@
 # engines/onnx keeps only generic ONNX Runtime services and embeddings.
 # =============================================================================
 
+# =============================================================================
+# TODO(WAVE D-2 follow-up): WASM Sherpa unblock — exact remaining work
+# =============================================================================
+# See: thoughts/shared/plans/wasm_onnx_unblock.md  (step-by-step plan)
+# See: gaps/gaps/inconsistencies/cpp-layer.md § CPP-WASM-ONNX-UNBLOCK
+#
+# Sherpa-ONNX does NOT publish a prebuilt static archive for WASM.
+# sdk/runanywhere-web/wasm/scripts/build-sherpa-onnx.sh currently builds a
+# STANDALONE Emscripten module (sherpa-onnx-wasm-nodejs.wasm, 12 MB) which is
+# shipped separately at packages/onnx/wasm/sherpa/sherpa-onnx.wasm. That
+# standalone module CANNOT be linked into racommons-llamacpp.wasm — it is a
+# complete Emscripten executable, not a static library.
+#
+# To flip this engine on for EMSCRIPTEN the following vendored artifacts are
+# required:
+#
+#   sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/
+#     ├── lib/
+#     │   ├── libsherpa-onnx-c-api.a       (sherpa public C API)
+#     │   ├── libsherpa-onnx-core.a        (core kernels)
+#     │   ├── libkaldi-native-fbank-core.a
+#     │   ├── libkaldi-decoder-core.a
+#     │   ├── libsherpa-onnx-fst.a
+#     │   ├── libsherpa-onnx-fstfar.a
+#     │   ├── libsherpa-onnx-kaldifst-core.a
+#     │   ├── libpiper_phonemize.a         (TTS only)
+#     │   ├── libespeak-ng.a               (TTS only)
+#     │   ├── libucd.a                     (TTS only)
+#     │   └── libkissfft-float.a
+#     └── include/
+#         └── sherpa-onnx/c-api/c-api.h    (published by sherpa upstream)
+#
+# Build recipe:
+#   cd sdk/runanywhere-web/wasm/third_party/sherpa-onnx
+#   # Modify CMakeLists to build static archive targets instead of the
+#   # standalone sherpa-onnx-wasm-nodejs executable. Currently the WASM build
+#   # recipes in build-wasm-simd-{asr,tts,vad,nodejs}.sh all produce a final
+#   # linked module.
+#   cmake -B build-wasm-static -DBUILD_SHARED_LIBS=OFF \
+#         -DSHERPA_ONNX_ENABLE_WASM=ON \
+#         -DSHERPA_ONNX_ENABLE_BINARY=OFF \
+#         -DSHERPA_ONNX_ENABLE_C_API=ON \
+#         -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN/cmake/Modules/Platform/Emscripten.cmake
+#   cmake --build build-wasm-static --target sherpa-onnx-c-api
+#   # Collect every produced libsherpa-onnx-*.a into third_party/sherpa-onnx-wasm/lib/
+#
+# Sherpa-ONNX transitively depends on onnxruntime (also as a static archive).
+# Its own CMake pulls onnxruntime via SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME
+# OR builds its own. For WASM the pre-installed path is required — point it at
+# the onnxruntime-wasm static lib vendored for engines/onnx (see sibling TODO).
+#
+# Emscripten-specific considerations:
+#   - Static plugin registration: WASM forces RAC_STATIC_PLUGINS=ON, so
+#     rac_plugin_entry_sherpa.cpp → RAC_STATIC_PLUGIN_REGISTER(sherpa) is
+#     the only registration path. No dlopen. Export symbol
+#     _rac_backend_sherpa_register must be kept live — add to
+#     RAC_EXPORTED_FUNCTIONS in sdk/runanywhere-web/wasm/CMakeLists.txt.
+#   - Piper TTS uses espeak-ng which has static initialization side-effects.
+#     Verify the C++ static constructors survive --whole-archive equivalent
+#     (Emscripten lacks -Wl,--whole-archive; use -sEXPORT_ALL=0 +
+#     EXPORTED_FUNCTIONS+= the relevant symbols).
+#
+# Gate recipe (replace the current force-OFF):
+#   set(RAC_SHERPA_WASM_RUNTIME_DIR
+#       "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm")
+#   if(EMSCRIPTEN AND NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
+#       set(RAC_BACKEND_SHERPA OFF CACHE BOOL "" FORCE)
+#   endif()
+#
+# Prebuilt discovery section (lines 68-219 below) needs a new
+# `elseif(RAC_PLATFORM_WASM)` branch that creates the IMPORTED targets from
+# the vendored static archives above (mirroring the LINUX/MACOS branches).
+# =============================================================================
 option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONNX)" ON)
 if(EMSCRIPTEN)
     # WASM has no Sherpa-ONNX prebuilt. Force off.

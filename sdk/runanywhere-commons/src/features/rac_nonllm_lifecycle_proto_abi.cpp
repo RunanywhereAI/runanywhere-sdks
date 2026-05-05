@@ -337,6 +337,172 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(
 #endif
 }
 
+rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data) {
+    if (!callback) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    runanywhere::v1::STTTranscriptionRequest request;
+    if (!request.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.has_audio() &&
+        (!request.audio().file_uri().empty() ||
+         !request.audio().adapter_handle().empty())) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (!request.has_audio() || request.audio().audio_data().empty()) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    rac::lifecycle::LifecycleSttRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_stt(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    if (!ref.ops || !ref.ops->transcribe_stream) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+    if (request.has_options() &&
+        !rac::foundation::rac_stt_options_from_proto(request.options(), &options)) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.has_options() && request.options().has_language_code() &&
+        !request.options().language_code().empty()) {
+        options.language = request.options().language_code().c_str();
+        options.detect_language = RAC_FALSE;
+    }
+    if (request.audio().sample_rate() > 0) {
+        options.sample_rate = request.audio().sample_rate();
+    }
+    if (request.audio().audio_format() != runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED) {
+        options.audio_format = c_audio_format(request.audio().audio_format());
+    }
+
+    // Bridge context: forwards backend partial/final callbacks into
+    // serialized STTStreamEvent envelopes via the caller's proto callback.
+    struct StreamCtx {
+        rac_stt_lifecycle_stream_event_callback_fn fn;
+        void* user_data;
+        std::string request_id;
+        uint64_t next_seq;
+        runanywhere::v1::STTLanguage language;
+        size_t audio_size;
+        int32_t sample_rate;
+        size_t sample_width;
+    };
+
+    const std::string request_id =
+        request.request_id().empty()
+            ? std::string("stt-lifecycle-") + std::to_string(rac_get_current_time_ms())
+            : request.request_id();
+
+    const size_t sample_width =
+        request.audio().encoding() == runanywhere::v1::STT_AUDIO_ENCODING_PCM_F32_LE
+            ? sizeof(float)
+            : RAC_STT_BYTES_PER_SAMPLE;
+
+    const int32_t effective_sample_rate =
+        options.sample_rate > 0 ? options.sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
+
+    runanywhere::v1::STTLanguage language_enum = runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
+    if (request.has_options()) {
+        language_enum = request.options().language();
+    }
+
+    StreamCtx ctx{callback, user_data, request_id, 1, language_enum,
+                  request.audio().audio_data().size(), effective_sample_rate, sample_width};
+
+    auto emit_event = [](const runanywhere::v1::STTStreamEvent& event,
+                         rac_stt_lifecycle_stream_event_callback_fn fn,
+                         void* user_ctx) {
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_ctx);
+    };
+
+    // Emit STARTED envelope before the backend call so SDK consumers can wire
+    // their state machine (kind = STARTED, seq = 1).
+    {
+        runanywhere::v1::STTStreamEvent started;
+        started.set_seq(ctx.next_seq++);
+        started.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        started.set_request_id(ctx.request_id);
+        started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
+        emit_event(started, ctx.fn, ctx.user_data);
+    }
+
+    auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
+        auto* c = static_cast<StreamCtx*>(opaque);
+        runanywhere::v1::STTStreamEvent event;
+        event.set_seq(c->next_seq++);
+        event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        event.set_request_id(c->request_id);
+        event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
+                                            : runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL);
+        auto* partial = event.mutable_partial();
+        if (partial_text) {
+            partial->set_text(partial_text);
+        }
+        partial->set_is_final(is_final == RAC_TRUE);
+        partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
+        partial->set_request_id(c->request_id);
+        partial->set_language(c->language);
+        if (is_final == RAC_TRUE) {
+            auto* final_output = event.mutable_final_output();
+            if (partial_text) {
+                final_output->set_text(partial_text);
+            }
+            final_output->set_language(c->language);
+            const int64_t audio_length_ms =
+                estimate_audio_length_ms(c->audio_size, c->sample_rate, c->sample_width);
+            final_output->set_duration_ms(audio_length_ms);
+            final_output->mutable_metadata()->set_audio_length_ms(audio_length_ms);
+        }
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        c->fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), c->user_data);
+    };
+
+    const std::string& audio = request.audio().audio_data();
+    rc = ref.ops->transcribe_stream(ref.impl, audio.data(), audio.size(), &options, bridge, &ctx);
+    if (rc != RAC_SUCCESS) {
+        runanywhere::v1::STTStreamEvent error_event;
+        error_event.set_seq(ctx.next_seq++);
+        error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        error_event.set_request_id(ctx.request_id);
+        error_event.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
+        error_event.set_error_code(rc);
+        error_event.set_error_message(rac_error_message(rc));
+        emit_event(error_event, ctx.fn, ctx.user_data);
+    }
+    rac::lifecycle::release_lifecycle_stt(&ref);
+    return rc;
+#endif
+}
+
 rac_result_t rac_tts_synthesize_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_proto_buffer_t* out_result) {

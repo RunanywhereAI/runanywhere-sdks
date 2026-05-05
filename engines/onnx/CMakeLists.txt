@@ -5,7 +5,53 @@
 # T5.4: per-engine build toggle owned locally. Emscripten has no in-tree
 # ONNX Runtime WASM binary (FetchONNXRuntime expects third_party/onnxruntime-wasm);
 # WASM ONNX ships via onnxruntime-web from the frontend. Force off there.
-# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip back to default ON.
+#
+# =============================================================================
+# TODO(WAVE D-2 follow-up): WASM ONNX unblock — exact remaining work
+# =============================================================================
+# See: thoughts/shared/plans/wasm_onnx_unblock.md  (step-by-step plan)
+# See: gaps/gaps/inconsistencies/cpp-layer.md § CPP-WASM-ONNX-UNBLOCK
+#
+# To flip this engine on for EMSCRIPTEN the following vendored artifact is
+# required:
+#
+#   sdk/runanywhere-commons/third_party/onnxruntime-wasm/
+#     ├── lib/libonnxruntime.a          (static archive, SIMD build recommended)
+#     └── include/                      (C + C++ headers)
+#         ├── onnxruntime_c_api.h       (required)
+#         ├── onnxruntime_cxx_api.h     (required — used by rac_runtime_onnxrt)
+#         ├── onnxruntime_cxx_inline.h
+#         ├── onnxruntime_float16.h
+#         ├── onnxruntime_session_options_config_keys.h
+#         └── onnxruntime_run_options_config_keys.h
+#
+# Build recipe (upstream Microsoft does NOT publish prebuilt WASM ORT):
+#   git clone --depth 1 --branch v1.18.0 https://github.com/microsoft/onnxruntime
+#   cd onnxruntime
+#   ./build.sh --config Release --build_wasm_static_lib --enable_wasm_simd \
+#              --skip_tests --minimal_build --disable_wasm_exception_catching \
+#              --disable_rtti --target onnxruntime_webassembly
+#
+# Emscripten link flags needed (add to engines/onnx/CMakeLists.txt under
+# RAC_PLATFORM_WASM branch):
+#   -sALLOW_MEMORY_GROWTH=1  (already set at root)
+#   -sMAXIMUM_MEMORY=4294967296  (already set)
+#
+# No Emscripten-specific symbol mappings required — ORT C API is pure C.
+# Register symbol: _rac_backend_onnx_register (published via
+# rac_plugin_entry_onnx.cpp → RAC_STATIC_PLUGIN_REGISTER(onnx)).
+#
+# Gate recipe (replace the current force-OFF):
+#   set(RAC_ONNX_WASM_RUNTIME_DIR
+#       "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+#   if(EMSCRIPTEN AND NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
+#       set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
+#   endif()
+#
+# Also FetchONNXRuntime.cmake already has a scaffold for the EMSCRIPTEN
+# branch (INTERFACE target + optional headers); it needs to be extended to
+# attach the static lib as IMPORTED when the archive is present.
+# =============================================================================
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 if(EMSCRIPTEN)
     set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
