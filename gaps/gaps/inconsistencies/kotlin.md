@@ -22,10 +22,8 @@ directory, `AudioUtils`, `CppBridgeEnvironment`, `CommonsErrorMapping`, and
 (ModelFormat URL heuristics), KOT-12 (router frameworks-for-capability),
 and KOT-STREAM-VAD are all wired to native commons APIs. What remains is
 (a) KOT-05 legacy VLM trio (still calls `racVlmCreate`/`racVlmInitialize`/
-`racVlmDestroy` instead of a proto-backed `load`), (b) KOT-14
-`currentDiffusionFramework` returning a `null` stub, and (c)
-KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
-`Runtime.exec` when `racHardwareProfileGet` is unavailable.
+`racVlmDestroy` instead of a proto-backed `load`), and (b) KOT-14
+`currentDiffusionFramework` returning a `null` stub.
 
 ## Confirmed gaps
 
@@ -56,15 +54,6 @@ KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
 - **Concrete steps**: Commons: expose `rac_diffusion_current_framework_proto` + populate capabilities
   proto. Kotlin: replace the `return null` + hollow capabilities() with the native calls.
 - **Scope**: ~10 LOC Kotlin + C++ work.
-
-### KOT-HARDWARE-FALLBACK: `buildPlatformProfile()` Kotlin-side SoC heuristic (priority: LOW)
-- **Symptom**: `jvmAndroidMain/.../RunAnywhere+Hardware.jvmAndroid.kt:42-76` — when
-  `racHardwareProfileGet()` is unavailable, builds a `HardwareProfileResult` locally by invoking
-  `getprop ro.board.platform` via `Runtime.exec(...)` on Android. Chip name detection should be in
-  C++ `rac_hardware_profile_get` exclusively.
-- **Concrete steps**: Ensure `racHardwareProfileGet()` always returns a populated proto on Android;
-  delete the `buildPlatformProfile()` fallback.
-- **Scope**: ~40 LOC Kotlin deletion.
 
 ### KOT-JNI-ORPHAN: 20 `external fun` declarations in `RunAnywhereBridge.kt` have no matching C thunk (priority: HIGH)
 - **Symptom**: Surfaced by Wave 1 CPP-06 JNI audit. 20 `external fun` entries in
