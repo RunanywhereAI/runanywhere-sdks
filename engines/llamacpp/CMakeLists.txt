@@ -23,6 +23,10 @@ if(NOT DEFINED LLAMACPP_VERSION)
 endif()
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
+# ENG-LLAMA-01: propagate llama.cpp upstream tag through to the JNI bridge so
+# nativeGetVersion() doesn't drift from the actual linked llama.cpp build.
+add_compile_definitions(RAC_LLAMACPP_VERSION="${LLAMACPP_VERSION}")
+
 FetchContent_Declare(
     llamacpp
     GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git

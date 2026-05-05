@@ -111,7 +111,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeIsRegistered(JNIEnv* 
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGetVersion(JNIEnv* env, jclass clazz) {
     (void)clazz;
-    return env->NewStringUTF("b7199");
+    return env->NewStringUTF(RAC_LLAMACPP_VERSION);
 }
 
 // =============================================================================

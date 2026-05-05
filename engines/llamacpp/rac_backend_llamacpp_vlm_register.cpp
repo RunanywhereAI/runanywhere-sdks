@@ -80,16 +80,18 @@ static rac_result_t llamacpp_vlm_vtable_get_info(void* impl, rac_vlm_info_t* out
     out_info->context_length = 0;
     out_info->vision_encoder_type = "clip";  // Default for llama.cpp VLM
 
-    // Get actual info from model
+    // Get actual info from model.
+    // ENG-LLAMA-06: use nlohmann::json (already linked) instead of strstr —
+    // mirrors the LLM-side parser at rac_backend_llamacpp_register.cpp.
     if (out_info->is_ready) {
         char* json_str = nullptr;
         if (rac_vlm_llamacpp_get_model_info(impl, &json_str) == RAC_SUCCESS && json_str) {
-            // Simple parse for context_size
-            // In production, use proper JSON parsing
-            const char* ctx_key = "\"context_size\":";
-            const char* ctx_pos = strstr(json_str, ctx_key);
-            if (ctx_pos) {
-                out_info->context_length = atoi(ctx_pos + strlen(ctx_key));
+            try {
+                auto json = nlohmann::json::parse(json_str);
+                out_info->context_length =
+                    static_cast<int32_t>(json.at("context_size").get<int64_t>());
+            } catch (...) {
+                // JSON parse / key-missing / type mismatch → leave context_length = 0.
             }
             free(json_str);
         }
@@ -229,22 +231,12 @@ rac_result_t rac_backend_llamacpp_vlm_register(void) {
         return result;
     }
 
-    // Android-fix (same as LlamaCpp LLM register): also wire the unified
-    // plugin registry so `rac_plugin_route` finds VLM ops. Apple/iOS uses
-    // RAC_STATIC_PLUGIN_REGISTER; Android does neither path on its own.
-    extern const rac_engine_vtable_t* rac_plugin_entry_llamacpp_vlm(void);
-    const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp_vlm();
-    if (vt != nullptr) {
-        rac_result_t plugin_rc = rac_plugin_register(vt);
-        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
-        } else {
-            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp-vlm'");
-        }
-    }
+    // ENG-LLAMA-02: plugin-registry wiring for llamacpp-vlm rides the same
+    // static-register shim as the LLM side. The explicit
+    // rac_plugin_register() call previously here duplicated that work.
 
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module + plugin)");
+    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module)");
     return RAC_SUCCESS;
 }
 

@@ -177,6 +177,7 @@ Both follow the same pattern: thin KMP wrappers that register a C++ backend with
 - **Proto types over hand-rolled types.** Use Wire-generated types from `generated/` as the canonical representation. Add extension properties in `foundation/protoext/` for ergonomics.
 - **Structured types, never raw strings.** Use enums, sealed classes, and data classes for all configuration and return values.
 - **`expect`/`actual` for platform divergence only.** The `jvmAndroidMain` shared source set handles 90% of platform code; `androidMain` and `jvmMain` only differ where Android/JVM APIs genuinely diverge.
+- **VLM on Android routes through core JNI, not llamacpp-JNI.** The dedicated `librac_backend_llamacpp_jni.so` bridge only exposes LLM primitives (`nativeCreate`, `nativeGenerate`, `nativeCancel`) plus the two registration shims. Kotlin VLM callers invoke the commons `rac_vlm_component_*` proto APIs via `librunanywhere_jni.so` (same path iOS uses via `CppBridgeVLM`). Do not add `nativeCreateVLM` / `nativeProcessVLM` entry points to the llamacpp JNI — the VLM plugin registers its vtable, and `rac_plugin_route` dispatches from core.
 
 ## Build System Details
 

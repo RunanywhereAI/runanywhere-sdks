@@ -431,29 +431,16 @@ rac_result_t rac_backend_llamacpp_register(void) {
         return result;
     }
 
-    // v3 Phase B1 + Android-fix: register with the unified plugin registry
-    // here as well. Originally this was supposed to happen via either:
-    //   - RAC_STATIC_PLUGIN_REGISTER (only active when RAC_PLUGIN_MODE_STATIC)
-    //   - dlopen + dlsym path in plugin_loader.cpp (only when host calls it)
-    // Neither runs on Android: the Kotlin/Flutter/RN SDKs load this .so
-    // directly via System.loadLibrary and call this function via JNI, never
-    // dlopen'ing through the plugin loader. As a result `rac_plugin_route`
-    // returns NOT_FOUND when the LLM service tries to route to "llamacpp",
-    // breaking model load on every Android app. Calling the registration
-    // here is idempotent (the registry deduplicates).
-    extern const rac_engine_vtable_t* rac_plugin_entry_llamacpp(void);
-    const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp();
-    if (vt != nullptr) {
-        rac_result_t plugin_rc = rac_plugin_register(vt);
-        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
-        } else {
-            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp'");
-        }
-    }
+    // ENG-LLAMA-02: plugin-registry wiring is owned exclusively by the
+    // static-register shim (rac_static_register_llamacpp.cpp) which calls
+    // RAC_STATIC_PLUGIN_REGISTER(llamacpp). On RAC_STATIC_PLUGINS=ON hosts
+    // (iOS, WASM) the ctor fires before main(); on dynamic hosts (Android,
+    // Linux, macOS dev) the ctor fires on .so load. The explicit
+    // rac_plugin_register() that used to live here duplicated that work and
+    // muddied the single-registration-path invariant.
 
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module + plugin)");
+    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module)");
     return RAC_SUCCESS;
 }
 

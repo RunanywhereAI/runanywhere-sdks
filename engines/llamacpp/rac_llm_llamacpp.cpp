@@ -128,10 +128,11 @@ rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle, const char* model_
 }
 
 rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle) {
-    // LlamaCPP doesn't support unloading without destroying
-    // Caller should call destroy instead
+    // ENG-LLAMA-05: teardown is owned by rac_llm_llamacpp_destroy; cleanup()
+    // is a no-op so the commons vtable cleanup slot doesn't report a spurious
+    // NOT_SUPPORTED for every LLM teardown.
     (void)handle;
-    return RAC_ERROR_NOT_SUPPORTED;
+    return RAC_SUCCESS;
 }
 
 rac_bool_t rac_llm_llamacpp_is_model_loaded(rac_handle_t handle) {

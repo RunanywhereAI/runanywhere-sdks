@@ -12,7 +12,7 @@ package com.runanywhere.sdk.public.extensions.VoiceAgent
 import ai.runanywhere.proto.v1.PipelineState
 import ai.runanywhere.proto.v1.SpeechTurnDetectionEventKind
 import ai.runanywhere.proto.v1.TurnLifecycleEventKind
-import ai.runanywhere.proto.v1.VADEventType
+import ai.runanywhere.proto.v1.VADStreamEventKind
 import ai.runanywhere.proto.v1.VoiceEvent
 
 fun VoiceEvent.pipelineStateOrNull(): PipelineState? {
@@ -34,8 +34,9 @@ fun VoiceEvent.pipelineStateOrNull(): PipelineState? {
 fun VoiceEvent.speechDetectedOrNull(): Boolean? =
     when {
         audio_level != null -> audio_level!!.is_speech
-        vad?.type == VADEventType.VAD_EVENT_VOICE_START -> true
-        vad?.type == VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE -> false
+        // IDL-18: VADEvent.type uses VADStreamEventKind; speech start/end
+        // both ride SPEECH_ACTIVITY with direction on the is_speech bool.
+        vad?.type == VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY -> vad!!.is_speech
         speech_turn_detection?.kind == SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED -> true
         speech_turn_detection?.kind == SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED -> false
         turn_lifecycle?.kind == TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED -> true
