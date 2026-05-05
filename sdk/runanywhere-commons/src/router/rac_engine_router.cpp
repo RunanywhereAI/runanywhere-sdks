@@ -36,6 +36,8 @@
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_runtime_registry.h"
 
+#include "accelerator_preference_internal.h"
+
 namespace rac {
 namespace router {
 
@@ -52,6 +54,62 @@ constexpr int kPinnedEngineBonus = 10000;
 constexpr int kRuntimeCompatibilityWeight = 40;
 constexpr int kHardwareProfileWeight = 20;
 constexpr int kModelFormatWeight = 10;
+
+/* Bonus granted when the engine declares a runtime whose accelerator class
+ * matches the process-wide accelerator preference set through
+ * `rac_hardware_set_accelerator_preference`. Sized to exceed a base-priority
+ * gap of ~30 so a GPU engine with priority 50 beats a CPU engine with
+ * priority 50 + runtime_compat (40) when GPU preference is active. */
+constexpr int kAcceleratorPreferenceWeight = 50;
+
+/* `runanywhere.v1.AccelerationPreference` values that this router recognises
+ * as scoring hints.  Mirrors hardware_profile.proto. */
+enum class AcceleratorClass {
+    None,   // UNSPECIFIED / AUTO — no scoring effect
+    Cpu,
+    Gpu,
+    Npu,
+};
+
+AcceleratorClass preference_to_class(int preference_enum) {
+    switch (preference_enum) {
+        case 2: return AcceleratorClass::Cpu;  // ACCELERATION_PREFERENCE_CPU
+        case 3: return AcceleratorClass::Gpu;  // ACCELERATION_PREFERENCE_GPU
+        case 4: return AcceleratorClass::Npu;  // ACCELERATION_PREFERENCE_NPU
+        default: return AcceleratorClass::None;
+    }
+}
+
+/* True when the given runtime belongs to the accelerator class. Grouping
+ * follows the `rac_runtime_id_t` semantics: Metal / CUDA / Vulkan / WebGPU
+ * are GPU-class; ANE / QNN / NNAPI / CoreML are NPU-class (CoreML routes
+ * across ANE+GPU+CPU but is most commonly chosen for NPU-leaning workloads);
+ * CPU is its own class. */
+bool runtime_matches_class(rac_runtime_id_t r, AcceleratorClass c) {
+    switch (c) {
+        case AcceleratorClass::Cpu:
+            return r == RAC_RUNTIME_CPU;
+        case AcceleratorClass::Gpu:
+            return r == RAC_RUNTIME_METAL || r == RAC_RUNTIME_CUDA ||
+                   r == RAC_RUNTIME_VULKAN || r == RAC_RUNTIME_WEBGPU ||
+                   r == RAC_RUNTIME_HIPBLAS || r == RAC_RUNTIME_OPENCL;
+        case AcceleratorClass::Npu:
+            return r == RAC_RUNTIME_ANE || r == RAC_RUNTIME_QNN ||
+                   r == RAC_RUNTIME_NNAPI || r == RAC_RUNTIME_COREML;
+        case AcceleratorClass::None:
+        default:
+            return false;
+    }
+}
+
+bool engine_declares_class(const rac_engine_vtable_t& vt, AcceleratorClass c) {
+    if (c == AcceleratorClass::None) return false;
+    if (vt.metadata.runtimes == nullptr) return false;
+    for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
+        if (runtime_matches_class(vt.metadata.runtimes[i], c)) return true;
+    }
+    return false;
+}
 
 /** Snapshot the global registry's vtables for `primitive`, descending priority.
  *  Uses the C ABI `rac_plugin_list` so we don't reach into registry internals. */
@@ -144,6 +202,18 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
      * declared formats. 0 = no format hint; skip the check. */
     if (matches_model_format(vt, req.format)) {
         s += kModelFormatWeight;
+    }
+
+    /* +kAcceleratorPreferenceWeight when the process-wide accelerator
+     * preference (set via `rac_hardware_set_accelerator_preference`)
+     * matches an accelerator class declared by the engine. Lets callers
+     * steer routing without a per-request `preferred_runtime` hint — e.g.
+     * "GPU preferred, any GPU-class runtime is fine." */
+    const AcceleratorClass pref_class =
+        preference_to_class(internal::get_accelerator_preference());
+    if (pref_class != AcceleratorClass::None &&
+        engine_declares_class(vt, pref_class)) {
+        s += kAcceleratorPreferenceWeight;
     }
 
     return s;

@@ -38,6 +38,10 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/router/rac_hardware_profile.h"
 
+#include "accelerator_preference_internal.h"
+
+#include <atomic>
+
 // ============================================================================
 // Minimal hand-encoded protobuf helpers
 // ============================================================================
@@ -292,10 +296,27 @@ static std::vector<uint8_t> build_hardware_profile_result_bytes(bool include_pro
     return result_buf;
 }
 
-// Global accelerator preference (default: AUTO = 0)
-static int g_accelerator_preference = 0;
+// Global accelerator preference (default: AUTO = 0). Atomic so the engine
+// router can read it from any thread without a lock.  Values follow
+// `runanywhere.v1.AccelerationPreference` (see hardware_profile.proto).
+std::atomic<int> g_accelerator_preference{0};
 
 }  // namespace
+
+// Internal accessor used by the engine router to turn the preference into a
+// scoring bonus.  Kept in the `rac::router::internal` namespace so it isn't
+// part of the public C ABI.
+namespace rac {
+namespace router {
+namespace internal {
+
+int get_accelerator_preference() {
+    return g_accelerator_preference.load(std::memory_order_relaxed);
+}
+
+}  // namespace internal
+}  // namespace router
+}  // namespace rac
 
 // ============================================================================
 // Public C ABI
@@ -348,11 +369,13 @@ rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out, size_t* pr
 }
 
 rac_result_t rac_hardware_set_accelerator_preference(int preference_enum) {
-    // Validate: 0=AUTO, 1=ANE, 2=GPU, 3=CPU
+    // Validate against `runanywhere.v1.AccelerationPreference` value range.
+    // Historic mapping documented in the header remains in range (0..3); the
+    // proto values used by tests and SDKs are CPU=2, GPU=3.
     if (preference_enum < 0 || preference_enum > 3) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    g_accelerator_preference = preference_enum;
+    g_accelerator_preference.store(preference_enum, std::memory_order_relaxed);
     RAC_LOG_INFO("HardwareABI", "Accelerator preference set to %d", preference_enum);
     return RAC_SUCCESS;
 }

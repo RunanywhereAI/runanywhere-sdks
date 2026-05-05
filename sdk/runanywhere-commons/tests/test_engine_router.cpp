@@ -23,6 +23,7 @@
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 #include "rac/router/rac_engine_router.h"
+#include "rac/router/rac_hardware_abi.h"
 #include "rac/router/rac_hardware_profile.h"
 #include "rac/router/rac_route.h"
 
@@ -607,6 +608,75 @@ int main() {
 
         rac_plugin_unregister("fallback_llm");
         rac_plugin_unregister("genie");
+    }
+
+    /* --- (CPP-15) Accelerator preference steers GPU vs CPU winner --------- *
+     * Two engines serve the same primitive with identical priority but
+     * distinct declared runtimes (one Metal-only, one CPU-only). When the
+     * process-wide accelerator preference is set to GPU via the public C
+     * ABI, the router must surface the Metal engine; when switched to CPU,
+     * the CPU engine wins. Covers `rac_hardware_set_accelerator_preference`
+     * end-to-end through the scoring path. */
+    {
+        rac::router::HardwareProfile prof{};
+        prof.has_metal = true;
+        rac::router::EngineRouter router(prof);
+
+        const rac_runtime_id_t metal_rts[] = {RAC_RUNTIME_METAL};
+        const rac_runtime_id_t cpu_rts[]   = {RAC_RUNTIME_CPU};
+        auto rt_metal = make_runtime_vt(RAC_RUNTIME_METAL, "metal-pref-test");
+        rac_runtime_register(&rt_metal);
+
+        auto v_gpu = make_vt("gpu_engine", 50, metal_rts, 1, nullptr, 0);
+        auto v_cpu = make_vt("cpu_engine", 50, cpu_rts,   1, nullptr, 0);
+        rac_plugin_register(&v_gpu);
+        rac_plugin_register(&v_cpu);
+
+        rac::router::RouteRequest req;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        /* No per-request preferred_runtime — steering comes solely from the
+         * process-wide accelerator preference. */
+
+        /* ACCELERATION_PREFERENCE_GPU (proto value 3) — GPU engine wins. */
+        CHECK(rac_hardware_set_accelerator_preference(3) == RAC_SUCCESS,
+              "(CPP-15) setter accepts ACCELERATION_PREFERENCE_GPU");
+        auto gpu_result = router.route(req);
+        CHECK(gpu_result.vtable == &v_gpu,
+              "(CPP-15) GPU preference selects Metal-declaring engine");
+        CHECK(gpu_result.score > v_cpu.metadata.priority + 40,
+              "(CPP-15) GPU-preferred score exceeds CPU engine's base + runtime weight");
+
+        /* ACCELERATION_PREFERENCE_CPU (proto value 2) — CPU engine wins. */
+        CHECK(rac_hardware_set_accelerator_preference(2) == RAC_SUCCESS,
+              "(CPP-15) setter accepts ACCELERATION_PREFERENCE_CPU");
+        auto cpu_result = router.route(req);
+        CHECK(cpu_result.vtable == &v_cpu,
+              "(CPP-15) CPU preference selects CPU-declaring engine");
+        CHECK(cpu_result.score > v_gpu.metadata.priority + 40,
+              "(CPP-15) CPU-preferred score exceeds GPU engine's base + runtime weight");
+
+        /* Reset to AUTO (proto value 1) so later tests in the process run
+         * with no preference steering. Tied scores fall back to the
+         * deterministic tiebreak (priority desc → name asc → "cpu_engine"). */
+        CHECK(rac_hardware_set_accelerator_preference(1) == RAC_SUCCESS,
+              "(CPP-15) setter accepts ACCELERATION_PREFERENCE_AUTO (reset)");
+        auto tie_result = router.route(req);
+        CHECK(tie_result.vtable == &v_cpu,
+              "(CPP-15) AUTO preference leaves scoring to priority+tiebreak");
+
+        /* Out-of-range preference rejected (validator clamps to 0..3). */
+        CHECK(rac_hardware_set_accelerator_preference(-1) == RAC_ERROR_INVALID_ARGUMENT,
+              "(CPP-15) setter rejects negative preference");
+        CHECK(rac_hardware_set_accelerator_preference(99) == RAC_ERROR_INVALID_ARGUMENT,
+              "(CPP-15) setter rejects out-of-range preference");
+
+        /* Leave the global preference at UNSPECIFIED=0 so we don't leak
+         * state into any future router-test binary invocation. */
+        rac_hardware_set_accelerator_preference(0);
+
+        rac_plugin_unregister("gpu_engine");
+        rac_plugin_unregister("cpu_engine");
+        rac_runtime_unregister(RAC_RUNTIME_METAL);
     }
 
     std::fprintf(stdout, "\n%d checks, %d failed\n", test_count, fail_count);
