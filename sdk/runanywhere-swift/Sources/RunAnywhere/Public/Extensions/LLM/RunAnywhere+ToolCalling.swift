@@ -279,10 +279,12 @@ public extension RunAnywhere {
         error: String? = nil,
         toolCallID: String? = nil
     ) -> RAToolResult {
+        // IDL-13: the typed `result` map was removed — `resultJson` is the
+        // canonical wire shape (the C++ tool-prompt formatter reads it
+        // directly when building follow-up LLM prompts).
         var toolResult = RAToolResult()
         toolResult.name = name
         toolResult.success = success
-        toolResult.result = result
         toolResult.resultJson = RAToolValue.jsonString(from: result)
         if let error {
             toolResult.error = error
@@ -302,9 +304,10 @@ public extension RunAnywhere {
             return toolCall
         }
 
+        // IDL-13: typed `arguments` map removed — only `argumentsJson`
+        // survives as the canonical wire shape.
         var normalized = toolCall
         normalized.argumentsJson = validation.normalizedArgumentsJson
-        normalized.arguments = RAToolValue.parseObjectJSON(validation.normalizedArgumentsJson)
         return normalized
     }
 

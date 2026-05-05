@@ -1,0 +1,5 @@
+# TypeScript build output (regenerate via `yarn build` from the repo root)
+lib/
+
+# TypeScript incremental build state
+*.tsbuildinfo

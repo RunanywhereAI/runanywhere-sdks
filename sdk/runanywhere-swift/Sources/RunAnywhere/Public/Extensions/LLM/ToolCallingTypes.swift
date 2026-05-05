@@ -195,9 +195,9 @@ public extension RAToolDefinition {
 
 extension RAToolCall {
     init(toolName: String, arguments: [String: RAToolValue], callId: String? = nil) {
+        // IDL-13: typed `arguments` map removed — only `argumentsJson` survives.
         self.init()
         self.name = toolName
-        self.arguments = arguments
         self.argumentsJson = RAToolValue.jsonString(from: arguments)
         if let callId {
             self.id = callId

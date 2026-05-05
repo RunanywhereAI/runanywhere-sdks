@@ -64,10 +64,16 @@ extension RARAGConfiguration {
 
 extension RARAGDocument {
     public init(text: String, metadataJSON: String? = nil) {
+        // IDL-13: `metadata_json` proto field was removed; decode the caller's
+        // JSON blob (if any) into the typed `metadata` map.
         self.init()
         self.text = text
-        if let metadataJSON {
-            self.metadataJson = metadataJSON
+        if let metadataJSON, !metadataJSON.isEmpty,
+           let data = metadataJSON.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for (key, value) in parsed {
+                self.metadata[key] = String(describing: value)
+            }
         }
     }
 }

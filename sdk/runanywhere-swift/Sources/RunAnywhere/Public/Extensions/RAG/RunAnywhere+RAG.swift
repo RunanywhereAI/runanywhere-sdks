@@ -82,9 +82,17 @@ public extension RunAnywhere {
     ///   - metadataJSON: Optional JSON string attached to all chunks from this document
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails
     static func ragIngest(text: String, metadataJSON: String? = nil) async throws {
+        // IDL-13: `metadata_json` proto field was removed; decode the caller's
+        // JSON blob (if any) into the typed `metadata` map.
         var document = RARAGDocument()
         document.text = text
-        if let metadataJSON { document.metadataJson = metadataJSON }
+        if let metadataJSON, !metadataJSON.isEmpty,
+           let data = metadataJSON.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for (key, value) in parsed {
+                document.metadata[key] = String(describing: value)
+            }
+        }
         try await ragIngest(document)
     }
 
