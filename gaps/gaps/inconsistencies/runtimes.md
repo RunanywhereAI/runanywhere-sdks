@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-CPU-03 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-06 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-CPU-03 + RT-ONNX-01 + RT-ONNX-02 + RT-ONNX-03 + RT-ONNX-04 + RT-ONNX-06 + RT-ONNX-07 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -46,17 +46,33 @@ the intended consumers (DEC-01 deferred CoreML/Metal).
 
 ### runtimes/onnxrt
 
-#### RT-ONNX-04: Advertises CPU-only `RAC_DEVICE_CLASS_CPU` while ORT supports EPs
+#### RT-ONNX-04-EP-CUDA: CUDA execution provider linkage not wired
 
-`rac_runtime_onnxrt.cpp:82` pins `k_supported_devices = {CPU}` and
-`onnxrt_device_info` returns `device_id = "onnxrt-cpu"`
-(`rac_runtime_onnxrt.cpp:501`). ORT's execution-provider model (CoreML EP,
-CUDA EP, DirectML EP, NNAPI EP, QNN EP…) is entirely hidden — there is no
-way for the router to pick onnxrt for an NPU-class or GPU-class model even
-though on Android / macOS / Windows the underlying ORT build could run it
-that way. Also, `SessionOptions` at `rac_runtime_onnxrt.h:35-39` has no knobs
-for selecting an EP — `Session::create` hard-codes CPU-only behavior by never
-calling `SessionOptionsAppendExecutionProvider_*`.
+`rac_onnxrt_runtime_enable_execution_provider(RAC_ONNXRT_EP_CUDA)` currently
+returns `RAC_ERROR_CAPABILITY_UNSUPPORTED` because the vendored ORT build is
+compiled without `RAC_ONNXRT_EP_CUDA_ENABLED`. Follow-up: decide link-time
+feature flag, declare the CUDA EP append path inside `apply_active_ep`, and
+add a CI matrix entry that exercises `onnxrt-cuda` device id reporting.
+
+#### RT-ONNX-04-EP-DIRECTML: DirectML execution provider linkage not wired
+
+As above, for Windows DirectML. Needs `RAC_ONNXRT_EP_DIRECTML_ENABLED` guard
+and a `dml_provider_factory.h`-powered `apply_active_ep` branch.
+
+#### RT-ONNX-04-EP-NNAPI: NNAPI execution provider linkage not wired
+
+Android NNAPI path. Needs `nnapi_provider_factory.h` wiring inside
+`apply_active_ep`, plus `RAC_ONNXRT_EP_NNAPI_ENABLED` guarded on `ANDROID`.
+
+#### RT-ONNX-04-EP-QNN: QNN execution provider linkage not wired
+
+Qualcomm HTP / DSP / HMX path. Blocked on QNN SDK redistribution policy —
+decide between vendoring the libs and documenting a consumer-provided path.
+
+#### RT-ONNX-04-EP-WEBGPU: WebGPU execution provider linkage not wired
+
+Emscripten WebGPU EP. Needs `webgpu_provider_factory.h` wiring inside
+`apply_active_ep` when building with `-sUSE_WEBGPU=1`.
 
 ## Cross-runtime duplication (CPU + ONNXRT scope)
 
@@ -77,7 +93,9 @@ code that should need `RAC_RUNTIME_CPU` or `RAC_RUNTIME_ONNXRT` as a string
 or enum value — engines declare the runtime they were built against, and
 commons picks among registered runtimes.
 
-Today's ONNXRT manifest is inconsistent enough (RT-ONNX-04, RT-ONNX-05) that
+Today's ONNXRT manifest is inconsistent enough (RT-ONNX-05 open; RT-ONNX-04
+resolved with CoreML EP fully wired and CUDA/DirectML/NNAPI/QNN/WebGPU
+activation accepted but routed to CPU until linkage lands) that
 any SDK that *did* try to infer a runtime from capabilities would get
 ambiguous answers. This must be cleaned up in commons before we can enforce
 "no SDK-side runtime pinning" as a rule. Concretely: the primitive / format /

@@ -2,15 +2,23 @@
 
 #include <onnxruntime_c_api.h>
 
+#if defined(RAC_ONNXRT_EP_COREML_ENABLED)
+#include <coreml_provider_factory.h>
+#endif
+
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <new>
+#include <string>
 #include <vector>
 
 #include "core/internal/platform_compat.h"
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_model_format_ids.h"
+#include "rac/plugin/rac_onnxrt_runtime_ep.h"
 #include "rac/plugin/rac_onnxrt_runtime_provider.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/runtime/rac_runtime_helpers.h"
@@ -61,6 +69,132 @@ struct SharedOrt {
 SharedOrt& shared_ort() {
     static SharedOrt ort;  // Thread-safe one-time init (C++11 magic static).
     return ort;
+}
+
+/* --------------------------------------------------------------------------
+ * RT-ONNX-04: Execution-provider (EP) state.
+ *
+ * A single "active EP" is tracked process-wide. The initial skeleton only
+ * wires CoreML end-to-end (the vendored ORT build ships `coreml_provider_
+ * factory.h` + `OrtSessionOptionsAppendExecutionProvider_CoreML`); CUDA,
+ * DirectML, NNAPI, QNN, and WebGPU accept activation only when their
+ * corresponding `RAC_ONNXRT_EP_*` compile-time flag is set, otherwise we
+ * return `RAC_ERROR_CAPABILITY_UNSUPPORTED` up front.
+ *
+ * Lock strategy: a plain mutex guards the active-EP snapshot. `Session::
+ * create` takes a short copy under the lock, then appends the EP outside.
+ * -------------------------------------------------------------------------- */
+
+struct EpState {
+    std::mutex             mu;
+    rac_onnxrt_ep_type_t   active = RAC_ONNXRT_EP_CPU;
+    std::string            config_json;  // Copy of caller's config, if any.
+
+    rac_onnxrt_ep_type_t snapshot(std::string* out_config) {
+        std::lock_guard<std::mutex> lock(mu);
+        if (out_config) *out_config = config_json;
+        return active;
+    }
+
+    void set(rac_onnxrt_ep_type_t type, const char* config) {
+        std::lock_guard<std::mutex> lock(mu);
+        active = type;
+        config_json = config ? config : std::string();
+    }
+};
+
+EpState& ep_state() {
+    static EpState state;
+    return state;
+}
+
+bool ep_is_compiled_in(rac_onnxrt_ep_type_t type) {
+    switch (type) {
+        case RAC_ONNXRT_EP_CPU:
+            return true;
+#if defined(RAC_ONNXRT_EP_COREML_ENABLED)
+        case RAC_ONNXRT_EP_COREML:
+            return true;
+#endif
+#if defined(RAC_ONNXRT_EP_CUDA)
+        case RAC_ONNXRT_EP_CUDA:
+            return true;
+#endif
+#if defined(RAC_ONNXRT_EP_DIRECTML)
+        case RAC_ONNXRT_EP_DIRECTML:
+            return true;
+#endif
+#if defined(RAC_ONNXRT_EP_NNAPI)
+        case RAC_ONNXRT_EP_NNAPI:
+            return true;
+#endif
+#if defined(RAC_ONNXRT_EP_QNN)
+        case RAC_ONNXRT_EP_QNN:
+            return true;
+#endif
+#if defined(RAC_ONNXRT_EP_WEBGPU)
+        case RAC_ONNXRT_EP_WEBGPU:
+            return true;
+#endif
+        default:
+            return false;
+    }
+}
+
+const char* ep_short_name(rac_onnxrt_ep_type_t type) {
+    switch (type) {
+        case RAC_ONNXRT_EP_CPU:      return "cpu";
+        case RAC_ONNXRT_EP_COREML:   return "coreml";
+        case RAC_ONNXRT_EP_CUDA:     return "cuda";
+        case RAC_ONNXRT_EP_DIRECTML: return "directml";
+        case RAC_ONNXRT_EP_NNAPI:    return "nnapi";
+        case RAC_ONNXRT_EP_QNN:      return "qnn";
+        case RAC_ONNXRT_EP_WEBGPU:   return "webgpu";
+    }
+    return "cpu";
+}
+
+/* Apply the active EP to the supplied session options. Returns RAC_SUCCESS
+ * on success or when no non-CPU EP is active. On append failure the caller
+ * logs and falls back to CPU-only execution — EPs are advisory. */
+rac_result_t apply_active_ep(const OrtApi* api, OrtSessionOptions* session_options) {
+    if (!api || !session_options) return RAC_ERROR_NULL_POINTER;
+
+    std::string config;
+    rac_onnxrt_ep_type_t active = ep_state().snapshot(&config);
+    if (active == RAC_ONNXRT_EP_CPU) return RAC_SUCCESS;
+
+    (void)config;  // Reserved for MVP — structured EP options parsed per-EP below.
+    switch (active) {
+#if defined(RAC_ONNXRT_EP_COREML_ENABLED)
+        case RAC_ONNXRT_EP_COREML: {
+            /* MVP wiring: the default-behavior call. Real config parsing
+             * (COREML_FLAG_* + MLComputeUnits) is a follow-up row. Passing
+             * 0 asks CoreML EP to use its own defaults (ANE+GPU+CPU). */
+            OrtStatus* status = OrtSessionOptionsAppendExecutionProvider_CoreML(
+                session_options, /*coreml_flags=*/0);
+            if (status != nullptr) {
+                std::string msg = api->GetErrorMessage(status);
+                api->ReleaseStatus(status);
+                RAC_LOG_WARNING("Runtime.ONNXRT",
+                                "CoreML EP append failed: %s — falling back to CPU",
+                                msg.c_str());
+                return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+            }
+            return RAC_SUCCESS;
+        }
+#endif
+        /* CUDA / DirectML / NNAPI / QNN / WebGPU are SKELETON stubs for now.
+         * Activation is accepted (see `rac_onnxrt_runtime_enable_execution_
+         * provider` below which gates on `ep_is_compiled_in`), but the ORT
+         * append path isn't wired yet — fall through to CPU and warn. A
+         * follow-up gap row per EP will bring real linkage. */
+        default:
+            RAC_LOG_WARNING("Runtime.ONNXRT",
+                            "EP '%s' stub — running on CPU until linkage lands",
+                            ep_short_name(active));
+            return RAC_SUCCESS;
+    }
 }
 
 std::string status_message(const OrtApi* api, OrtStatus* status) {
@@ -122,7 +256,31 @@ size_t element_count(const std::vector<int64_t>& shape) {
     return count;
 }
 
-const rac_device_class_t k_supported_devices[] = {RAC_DEVICE_CLASS_CPU};
+/* RT-ONNX-04: the device-class manifest is widened at compile time to reflect
+ * which Execution Providers are linked into this build. CPU is always present;
+ * CoreML / CUDA / DirectML / NNAPI add NPU or GPU capability. The router uses
+ * this array to decide whether onnxrt can be scored for a given device-class
+ * request, so it has to be a superset of everything the adapter can route to
+ * at runtime. Activation at runtime is what actually selects one. */
+const rac_device_class_t k_supported_devices[] = {
+    RAC_DEVICE_CLASS_CPU,
+#if defined(RAC_ONNXRT_EP_COREML_ENABLED)
+    /* CoreML fuses ANE + GPU + CPU; we advertise both to let the router pick
+     * onnxrt for either class. The active EP is still a process-wide
+     * single-slot — activation decides what the session actually runs on. */
+    RAC_DEVICE_CLASS_NPU,
+    RAC_DEVICE_CLASS_GPU,
+#endif
+#if defined(RAC_ONNXRT_EP_CUDA) || defined(RAC_ONNXRT_EP_DIRECTML)
+    RAC_DEVICE_CLASS_GPU,
+#endif
+#if defined(RAC_ONNXRT_EP_NNAPI) || defined(RAC_ONNXRT_EP_QNN)
+    RAC_DEVICE_CLASS_NPU,
+#endif
+#if defined(RAC_ONNXRT_EP_WEBGPU)
+    RAC_DEVICE_CLASS_WEB_GPU,
+#endif
+};
 const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_ONNX,
     RAC_MODEL_FORMAT_ID_ORT,
@@ -194,6 +352,12 @@ std::unique_ptr<Session> Session::create(const std::string& model_path,
             return nullptr;
         }
     }
+
+    /* RT-ONNX-04: append the currently-active execution provider, if any.
+     * `apply_active_ep` is advisory — CoreML is the only real wiring today;
+     * CUDA / DirectML / NNAPI / QNN / WebGPU accept activation but degrade
+     * gracefully to CPU-only execution until their linker paths land. */
+    (void)apply_active_ep(ort.api, session_options);
 
     /* RT-ONNX-07: `CreateSession` is called without any global lock. ORT's
      * contract is that `CreateSession` may run concurrently from multiple
@@ -852,11 +1016,40 @@ void onnxrt_release_tensor(rac_runtime_tensor_t* tensor) {
     rac::runtime::rac_runtime_release_tensor(tensor, onnxrt_free_buffer);
 }
 
+/* RT-ONNX-04: stable per-EP `device_id` strings backed by static storage so
+ * callers can safely hold the pointer across calls. We return pointers to
+ * these rather than building a heap string per `onnxrt_device_info` call. */
+constexpr const char* k_onnxrt_device_id_cpu      = "onnxrt-cpu";
+constexpr const char* k_onnxrt_device_id_coreml   = "onnxrt-coreml";
+constexpr const char* k_onnxrt_device_id_cuda     = "onnxrt-cuda";
+constexpr const char* k_onnxrt_device_id_directml = "onnxrt-directml";
+constexpr const char* k_onnxrt_device_id_nnapi    = "onnxrt-nnapi";
+constexpr const char* k_onnxrt_device_id_qnn      = "onnxrt-qnn";
+constexpr const char* k_onnxrt_device_id_webgpu   = "onnxrt-webgpu";
+
+const char* active_ep_device_id(rac_onnxrt_ep_type_t type) {
+    switch (type) {
+        case RAC_ONNXRT_EP_COREML:   return k_onnxrt_device_id_coreml;
+        case RAC_ONNXRT_EP_CUDA:     return k_onnxrt_device_id_cuda;
+        case RAC_ONNXRT_EP_DIRECTML: return k_onnxrt_device_id_directml;
+        case RAC_ONNXRT_EP_NNAPI:    return k_onnxrt_device_id_nnapi;
+        case RAC_ONNXRT_EP_QNN:      return k_onnxrt_device_id_qnn;
+        case RAC_ONNXRT_EP_WEBGPU:   return k_onnxrt_device_id_webgpu;
+        case RAC_ONNXRT_EP_CPU:
+        default:                     return k_onnxrt_device_id_cpu;
+    }
+}
+
 rac_result_t onnxrt_device_info(rac_runtime_device_info_t* out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_device_info_t{};
-    out->device_class = RAC_DEVICE_CLASS_CPU;
-    out->device_id = "onnxrt-cpu";
+    /* RT-ONNX-04: the active EP determines both the class and the id so the
+     * router can pick onnxrt for NPU/GPU-class primitives when an appropriate
+     * EP has been activated. Falls back to CPU when no EP is active. */
+    rac_onnxrt_ep_type_t active =
+        runanywhere::runtime::onnxrt::ep_state().snapshot(/*out_config=*/nullptr);
+    out->device_class = rac_onnxrt_runtime_ep_device_class(active);
+    out->device_id    = active_ep_device_id(active);
     out->display_name = "ONNX Runtime";
     return RAC_SUCCESS;
 }
@@ -994,6 +1187,45 @@ extern "C" RAC_API rac_result_t rac_onnxrt_runtime_register_provider(
 
 extern "C" RAC_API void rac_onnxrt_runtime_unregister_provider(const char* name) {
     onnxrt_provider_registry().unregister_provider(name);
+}
+
+/* RT-ONNX-04: Execution-provider configuration surface. Real linkage is only
+ * wired for CoreML today; other EPs accept activation but run on CPU until
+ * their follow-up rows bring the ORT append paths online. */
+extern "C" RAC_API rac_result_t rac_onnxrt_runtime_enable_execution_provider(
+    const rac_onnxrt_ep_config_t* config) {
+    if (config == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (!runanywhere::runtime::onnxrt::ep_is_compiled_in(config->type)) {
+        return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    }
+    runanywhere::runtime::onnxrt::ep_state().set(config->type, config->config_json);
+    return RAC_SUCCESS;
+}
+
+extern "C" RAC_API rac_result_t rac_onnxrt_runtime_get_active_ep(
+    rac_onnxrt_ep_type_t* out) {
+    if (out == nullptr) return RAC_ERROR_NULL_POINTER;
+    *out = runanywhere::runtime::onnxrt::ep_state().snapshot(nullptr);
+    return RAC_SUCCESS;
+}
+
+extern "C" RAC_API int rac_onnxrt_runtime_ep_is_available(
+    rac_onnxrt_ep_type_t type) {
+    return runanywhere::runtime::onnxrt::ep_is_compiled_in(type) ? 1 : 0;
+}
+
+extern "C" RAC_API rac_device_class_t rac_onnxrt_runtime_ep_device_class(
+    rac_onnxrt_ep_type_t type) {
+    switch (type) {
+        case RAC_ONNXRT_EP_COREML:   return RAC_DEVICE_CLASS_NPU;   /* ANE. */
+        case RAC_ONNXRT_EP_CUDA:     return RAC_DEVICE_CLASS_GPU;
+        case RAC_ONNXRT_EP_DIRECTML: return RAC_DEVICE_CLASS_GPU;
+        case RAC_ONNXRT_EP_NNAPI:    return RAC_DEVICE_CLASS_NPU;
+        case RAC_ONNXRT_EP_QNN:      return RAC_DEVICE_CLASS_NPU;
+        case RAC_ONNXRT_EP_WEBGPU:   return RAC_DEVICE_CLASS_WEB_GPU;
+        case RAC_ONNXRT_EP_CPU:
+        default:                     return RAC_DEVICE_CLASS_CPU;
+    }
 }
 
 extern "C" RAC_API rac_result_t rac_onnxrt_runtime_get_provider_session(
