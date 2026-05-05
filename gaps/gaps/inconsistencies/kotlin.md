@@ -104,17 +104,6 @@ and (d) KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
   `sync-versions.sh` rewrite it, or read via Gradle resource).
 - **Scope**: 1 file, ~135 LOC.
 
-### KOT-DEAD-PLATFORMUTILS: `PlatformUtils` expect/actuals unused (priority: LOW)
-- **Symptom**: `getDeviceId/getPlatformName/getDeviceInfo/getOSVersion/getDeviceModel/getAppVersion`
-  (`commonMain/.../utils/PlatformUtils.kt` + android/jvm actuals). Only `getPlatformName()` is called
-  from the dead `SDKConstants.platform` accessor. On Android the actual also has a standalone
-  `init(context)` that's never called.
-- **Files to delete** (3):
-  - `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/utils/PlatformUtils.kt`
-  - `sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/utils/PlatformUtils.kt`
-  - `sdk/runanywhere-kotlin/src/jvmMain/kotlin/com/runanywhere/sdk/utils/PlatformUtils.kt`
-- **Scope**: 3 files / ~220 LOC.
-
 ### KOT-JNI-ORPHAN: 20 `external fun` declarations in `RunAnywhereBridge.kt` have no matching C thunk (priority: HIGH)
 - **Symptom**: Surfaced by Wave 1 CPP-06 JNI audit. 20 `external fun` entries in
   `sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/native/bridge/RunAnywhereBridge.kt`
