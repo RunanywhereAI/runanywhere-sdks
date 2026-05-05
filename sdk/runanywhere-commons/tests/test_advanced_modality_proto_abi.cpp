@@ -17,7 +17,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/lora/rac_lora_service.h"
-#include "rac/features/rag/rac_rag_pipeline.h"
+#include "rac/features/rag/rac_rag.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"

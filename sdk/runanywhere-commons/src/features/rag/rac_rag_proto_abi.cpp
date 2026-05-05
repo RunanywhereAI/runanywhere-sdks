@@ -1,15 +1,24 @@
 /**
  * @file rac_rag_proto_abi.cpp
  * @brief Proto-byte C ABI for RAG sessions.
+ *
+ * Constructs RAGBackend (internal C++ class) directly from
+ * runanywhere.v1.RAGConfiguration bytes, without going through the
+ * deleted legacy struct API (`rac_rag_pipeline_*` / `rac_rag_config_t`).
+ * Model ids are resolved to filesystem paths via the global model
+ * registry, then passed through rac_embeddings_create_with_config() /
+ * rac_llm_create() before handing the service handles to RAGBackend
+ * (which owns them and destroys on session destroy).
  */
 
-#include "rac/features/rag/rac_rag_pipeline.h"
+#include "rac/features/rag/rac_rag.h"
 
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,15 +26,25 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
-#include "rac/foundation/rac_proto_adapters.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rag_backend.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "rag.pb.h"
 #include "sdk_events.pb.h"
 #endif
+
+#define LOG_TAG "RAG.ProtoABI"
+#define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
+#define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+
+using runanywhere::rag::RAGBackend;
+using runanywhere::rag::RAGBackendConfig;
 
 namespace {
 
@@ -109,37 +128,20 @@ void publish_failure(rac_result_t code, const char* operation, const char* messa
     (void)rac_sdk_event_publish_failure(code, message, "rag", operation, RAC_TRUE);
 }
 
-void free_rag_config(rac_rag_config_t* config) {
-    if (!config) return;
-    rac_free(const_cast<char*>(config->embedding_model_path));
-    rac_free(const_cast<char*>(config->llm_model_path));
-    rac_free(const_cast<char*>(config->prompt_template));
-    rac_free(const_cast<char*>(config->embedding_config_json));
-    rac_free(const_cast<char*>(config->llm_config_json));
-    *config = rac_rag_config_default();
-}
-
-// Helper: copy a std::string into a freshly allocated C string using
-// rac_strdup so downstream free_rag_config can release it with rac_free.
-char* rag_copy_string(const std::string& s) {
-    if (s.empty()) return nullptr;
-    return rac_strdup(s.c_str());
-}
-
 // ---------------------------------------------------------------------------
 // D-6: model-id -> filesystem-path resolution for the RAG proto ABI.
 //
 // Given a registered model id, looks up the model in the global registry and
 // returns the canonical on-disk path (rac_model_info_t.local_path) as a
-// heap-allocated copy the caller must rac_free. If the model isn't registered
-// or has no local_path set (never downloaded), *out_err_message is populated
-// and the function returns nullptr.
+// std::string. If the model isn't registered or has no local_path set (never
+// downloaded), *out_err_message is populated and the function returns an
+// empty string.
 // ---------------------------------------------------------------------------
-char* resolve_rag_model_id_to_path(const std::string& model_id,
-                                   std::string* out_err_message) {
+std::string resolve_rag_model_id_to_path(const std::string& model_id,
+                                         std::string* out_err_message) {
     if (model_id.empty()) {
         if (out_err_message) *out_err_message = "model id is required";
-        return nullptr;
+        return {};
     }
     rac_model_info_t* info = nullptr;
     rac_result_t rc = rac_get_model(model_id.c_str(), &info);
@@ -148,7 +150,7 @@ char* resolve_rag_model_id_to_path(const std::string& model_id,
             *out_err_message = "RAG model id '" + model_id + "' is not registered";
         }
         if (info) rac_model_info_free(info);
-        return nullptr;
+        return {};
     }
     if (!info->local_path || info->local_path[0] == '\0') {
         if (out_err_message) {
@@ -156,47 +158,71 @@ char* resolve_rag_model_id_to_path(const std::string& model_id,
                                "' is registered but has no local_path (not downloaded)";
         }
         rac_model_info_free(info);
-        return nullptr;
+        return {};
     }
-    char* path = rac_strdup(info->local_path);
+    std::string path(info->local_path);
     rac_model_info_free(info);
     return path;
 }
 
-void free_rag_query(rac_rag_query_t* query) {
-    if (!query) return;
-    rac_free(const_cast<char*>(query->question));
-    rac_free(const_cast<char*>(query->system_prompt));
-    std::memset(query, 0, sizeof(*query));
+// ---------------------------------------------------------------------------
+// Session handle
+//
+// The RAG proto ABI hands out rac_handle_t values that are in fact pointers
+// to a Session struct which owns the underlying RAGBackend (which owns the
+// LLM + Embeddings service handles). The Session is created by
+// rac_rag_session_create_proto and freed by rac_rag_session_destroy_proto.
+// ---------------------------------------------------------------------------
+struct Session {
+    std::unique_ptr<RAGBackend> backend;
+};
+
+Session* as_session(rac_handle_t handle) {
+    return reinterpret_cast<Session*>(handle);
 }
 
-runanywhere::v1::RAGStatistics make_stats(rac_rag_pipeline_t* pipeline) {
+RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& proto) {
+    RAGBackendConfig bc;
+    if (proto.embedding_dimension() > 0)
+        bc.embedding_dimension = static_cast<size_t>(proto.embedding_dimension());
+    if (proto.top_k() > 0)
+        bc.top_k = static_cast<size_t>(proto.top_k());
+    if (proto.similarity_threshold() > 0.0f)
+        bc.similarity_threshold = proto.similarity_threshold();
+    if (proto.max_context_tokens() > 0)
+        bc.max_context_tokens = static_cast<size_t>(proto.max_context_tokens());
+    if (proto.chunk_size() > 0)
+        bc.chunk_size = static_cast<size_t>(proto.chunk_size());
+    if (proto.chunk_overlap() >= 0)
+        bc.chunk_overlap = static_cast<size_t>(proto.chunk_overlap());
+    if (proto.has_prompt_template() && !proto.prompt_template().empty())
+        bc.prompt_template = proto.prompt_template();
+    return bc;
+}
+
+runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
     runanywhere::v1::RAGStatistics out;
-    const int64_t chunks = static_cast<int64_t>(rac_rag_get_document_count(pipeline));
+    const int64_t chunks = static_cast<int64_t>(backend.document_count());
     out.set_indexed_documents(chunks);
     out.set_indexed_chunks(chunks);
     out.set_last_updated_ms(now_ms());
 
-    char* stats_json = nullptr;
-    if (rac_rag_get_statistics(pipeline, &stats_json) == RAC_SUCCESS && stats_json) {
-        try {
-            auto stats = nlohmann::json::parse(stats_json);
-            if (stats.contains("num_chunks") && stats["num_chunks"].is_number_integer()) {
-                out.set_indexed_chunks(stats["num_chunks"].get<int64_t>());
-                out.set_indexed_documents(stats["num_chunks"].get<int64_t>());
-            }
-            if (stats.contains("total_tokens_indexed") &&
-                stats["total_tokens_indexed"].is_number_integer()) {
-                out.set_total_tokens_indexed(stats["total_tokens_indexed"].get<int64_t>());
-            }
-            if (stats.contains("index_path") && stats["index_path"].is_string()) {
-                out.set_index_path(stats["index_path"].get<std::string>());
-            }
-        } catch (...) {
-            // Keep the structural counters gathered above.
+    try {
+        const auto stats = backend.get_statistics();
+        if (stats.contains("num_chunks") && stats["num_chunks"].is_number_integer()) {
+            out.set_indexed_chunks(stats["num_chunks"].get<int64_t>());
+            out.set_indexed_documents(stats["num_chunks"].get<int64_t>());
         }
+        if (stats.contains("total_tokens_indexed") &&
+            stats["total_tokens_indexed"].is_number_integer()) {
+            out.set_total_tokens_indexed(stats["total_tokens_indexed"].get<int64_t>());
+        }
+        if (stats.contains("index_path") && stats["index_path"].is_string()) {
+            out.set_index_path(stats["index_path"].get<std::string>());
+        }
+    } catch (...) {
+        // Keep the structural counters gathered above.
     }
-    rac_free(stats_json);
     return out;
 }
 
@@ -242,7 +268,7 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // D-6: RAGConfiguration carries model ids. embedding_model_id is required;
     // llm_model_id is optional (embed-only pipelines are legal). Commons
     // resolves each id to a filesystem path via rac_get_model() before
-    // forwarding to rac_rag_pipeline_create_standalone.
+    // handing them to rac_embeddings_create_with_config / rac_llm_create.
     const std::string embedding_model_id = proto.embedding_model_id();
     const std::string llm_model_id = proto.llm_model_id();
     const std::string reranker_model_id =
@@ -255,18 +281,17 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     }
 
     std::string err_message;
-    char* embedding_path = resolve_rag_model_id_to_path(embedding_model_id, &err_message);
-    if (!embedding_path) {
+    std::string embedding_path = resolve_rag_model_id_to_path(embedding_model_id, &err_message);
+    if (embedding_path.empty()) {
         publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
                         err_message.c_str());
         return RAC_ERROR_MODEL_NOT_FOUND;
     }
 
-    char* llm_path = nullptr;
+    std::string llm_path;
     if (!llm_model_id.empty()) {
         llm_path = resolve_rag_model_id_to_path(llm_model_id, &err_message);
-        if (!llm_path) {
-            rac_free(embedding_path);
+        if (llm_path.empty()) {
             publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
                             err_message.c_str());
             return RAC_ERROR_MODEL_NOT_FOUND;
@@ -274,60 +299,81 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     }
 
     // Reranker is optional. When set but not resolvable, we fail the same way
-    // as missing LLM/embedding ids. The internal rac_rag_config_t doesn't
-    // carry reranker yet, so we release the resolved path after validation
-    // (reranker wiring through to the pipeline is tracked separately).
+    // as missing LLM/embedding ids. RAGBackend does not consume the reranker
+    // path yet (see the separate reranker-wiring task), so we validate and
+    // discard.
     if (!reranker_model_id.empty()) {
-        char* reranker_path = resolve_rag_model_id_to_path(reranker_model_id, &err_message);
-        if (!reranker_path) {
-            rac_free(embedding_path);
-            rac_free(llm_path);
+        std::string reranker_path =
+            resolve_rag_model_id_to_path(reranker_model_id, &err_message);
+        if (reranker_path.empty()) {
             publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
                             err_message.c_str());
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
-        rac_free(reranker_path);
     }
 
-    // Populate the remaining (non-model-id) config fields directly from the
-    // proto. We deliberately don't use rac::foundation::rac_rag_config_from_proto
-    // here because that adapter copies the ids into the path slots - we
-    // already resolved them ourselves above.
-    rac_rag_config_t config = rac_rag_config_default();
-    config.embedding_model_path = embedding_path;
-    config.llm_model_path = llm_path;
-    if (proto.embedding_dimension() > 0)
-        config.embedding_dimension = static_cast<size_t>(proto.embedding_dimension());
-    if (proto.top_k() > 0) config.top_k = static_cast<size_t>(proto.top_k());
-    if (proto.similarity_threshold() > 0.0f)
-        config.similarity_threshold = proto.similarity_threshold();
-    if (proto.chunk_size() > 0)
-        config.chunk_size = static_cast<size_t>(proto.chunk_size());
-    if (proto.chunk_overlap() >= 0)
-        config.chunk_overlap = static_cast<size_t>(proto.chunk_overlap());
-    if (proto.max_context_tokens() > 0)
-        config.max_context_tokens = static_cast<size_t>(proto.max_context_tokens());
-    if (proto.has_prompt_template())
-        config.prompt_template = rag_copy_string(proto.prompt_template());
-    if (proto.has_embedding_config_json())
-        config.embedding_config_json = rag_copy_string(proto.embedding_config_json());
-    if (proto.has_llm_config_json())
-        config.llm_config_json = rag_copy_string(proto.llm_config_json());
+    // Spin up the embeddings + (optional) LLM service handles. Ownership is
+    // transferred into the RAGBackend (owns_services=true) so the Session
+    // destructor will clean them up via RAGBackend::~RAGBackend().
+    rac_handle_t embed_handle = nullptr;
+    rac_handle_t llm_handle = nullptr;
 
-    rac_rag_pipeline_t* pipeline = nullptr;
-    rac_result_t rc = rac_rag_pipeline_create_standalone(&config, &pipeline);
-    free_rag_config(&config);
-    if (rc != RAC_SUCCESS) {
+    const char* embedding_config_json =
+        proto.has_embedding_config_json() && !proto.embedding_config_json().empty()
+            ? proto.embedding_config_json().c_str()
+            : nullptr;
+
+    LOGI("sessionCreate: embed_path=%s, llm_path=%s", embedding_path.c_str(),
+         llm_path.empty() ? "(none)" : llm_path.c_str());
+
+    rac_result_t rc = rac_embeddings_create_with_config(
+        embedding_path.c_str(), embedding_config_json, &embed_handle);
+    if (rc != RAC_SUCCESS || !embed_handle) {
+        rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_INITIALIZATION_FAILED;
         publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
         return rc;
     }
-    *out_session = reinterpret_cast<rac_handle_t>(pipeline);
-    return RAC_SUCCESS;
+
+    if (!llm_path.empty()) {
+        rc = rac_llm_create(llm_path.c_str(), &llm_handle);
+        if (rc != RAC_SUCCESS || !llm_handle) {
+            rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_INITIALIZATION_FAILED;
+            rac_embeddings_destroy(embed_handle);
+            publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
+            return rc;
+        }
+    }
+
+    try {
+        auto session = std::make_unique<Session>();
+        session->backend = std::make_unique<RAGBackend>(build_backend_config(proto),
+                                                        llm_handle, embed_handle,
+                                                        /*owns_services=*/true);
+        if (!session->backend->is_initialized()) {
+            publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate",
+                            "RAG pipeline failed to initialize");
+            // session destructor clears owned services.
+            return RAC_ERROR_INITIALIZATION_FAILED;
+        }
+        *out_session = reinterpret_cast<rac_handle_t>(session.release());
+        LOGI("RAG session created");
+        return RAC_SUCCESS;
+    } catch (const std::exception& e) {
+        LOGE("Exception creating RAG session: %s", e.what());
+        if (llm_handle) rac_llm_destroy(llm_handle);
+        if (embed_handle) rac_embeddings_destroy(embed_handle);
+        publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate", e.what());
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
 #endif
 }
 
 void rac_rag_session_destroy_proto(rac_handle_t session) {
-    rac_rag_pipeline_destroy(reinterpret_cast<rac_rag_pipeline_t*>(session));
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session;
+#else
+    delete as_session(session);
+#endif
 }
 
 rac_result_t rac_rag_ingest_proto(rac_handle_t session,
@@ -341,8 +387,8 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session,
     (void)document_proto_size;
     return feature_unavailable(out_stats);
 #else
-    auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(session);
-    if (!pipeline) {
+    auto* s = as_session(session);
+    if (!s || !s->backend) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.ingest",
                         "RAG session is not loaded");
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
@@ -367,34 +413,30 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session,
     if (!document.id().empty()) {
         metadata["document_id"] = document.id();
     }
-    if (document.has_metadata_json() && !document.metadata_json().empty()) {
-        try {
-            auto legacy = nlohmann::json::parse(document.metadata_json());
-            if (legacy.is_object()) {
-                metadata.update(legacy);
-            } else {
-                metadata["metadata_json"] = document.metadata_json();
-            }
-        } catch (...) {
-            metadata["metadata_json"] = document.metadata_json();
-        }
-    }
     for (const auto& item : document.metadata()) {
         metadata[item.first] = item.second;
     }
-    const std::string metadata_json = metadata.dump();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED,
                        "rag.ingest", 0.0f, 1, 0, nullptr);
-    rac_result_t rc = rac_rag_add_document(pipeline, document.text().c_str(),
-                                           metadata_json.c_str());
-    if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "rag.ingest", rac_error_message(rc));
-        return rac_proto_buffer_set_error(out_stats, rc, rac_error_message(rc));
+
+    bool added = false;
+    try {
+        added = s->backend->add_document(document.text(), metadata);
+    } catch (const std::exception& e) {
+        LOGE("rag.ingest exception: %s", e.what());
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.ingest", e.what());
+        return rac_proto_buffer_set_error(out_stats, RAC_ERROR_PROCESSING_FAILED, e.what());
+    }
+    if (!added) {
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.ingest",
+                        rac_error_message(RAC_ERROR_PROCESSING_FAILED));
+        return rac_proto_buffer_set_error(out_stats, RAC_ERROR_PROCESSING_FAILED,
+                                          rac_error_message(RAC_ERROR_PROCESSING_FAILED));
     }
 
-    auto stats = make_stats(pipeline);
-    rc = copy_proto(stats, out_stats);
+    auto stats = make_stats(*s->backend);
+    rac_result_t rc = copy_proto(stats, out_stats);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED,
                        "rag.ingest", 1.0f, 1, stats.indexed_chunks(), nullptr);
     return rc;
@@ -412,8 +454,8 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
     (void)query_proto_size;
     return feature_unavailable(out_result);
 #else
-    auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(session);
-    if (!pipeline) {
+    auto* s = as_session(session);
+    if (!s || !s->backend) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.query",
                         "RAG session is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
@@ -430,35 +472,79 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
                                           "failed to parse RAGQueryOptions");
     }
 
-    rac_rag_query_t query = {};
-    if (!rac::foundation::rac_rag_query_from_proto(query_proto, &query) || !query.question ||
-        query.question[0] == '\0') {
-        free_rag_query(&query);
+    const std::string question = query_proto.question();
+    if (question.empty()) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "RAGQueryOptions.question is required");
     }
 
+    const std::string system_prompt =
+        query_proto.has_system_prompt() ? query_proto.system_prompt() : std::string();
+
+    rac_llm_options_t opts = {};
+    opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
+    opts.temperature =
+        query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
+    opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
+    opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.query", 0.0f, 1, 0, nullptr);
-    rac_rag_result_t result = {};
-    rac_result_t rc = rac_rag_query(pipeline, &query, &result);
-    if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "rag.query", rac_error_message(rc));
-        free_rag_query(&query);
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+
+    const auto t_start = std::chrono::high_resolution_clock::now();
+    rac_llm_result_t llm_result = {};
+    nlohmann::json metadata;
+    rac_result_t status = RAC_SUCCESS;
+    try {
+        status = s->backend->query(question, &opts, &llm_result, metadata);
+    } catch (const std::exception& e) {
+        LOGE("rag.query exception: %s", e.what());
+        rac_llm_result_free(&llm_result);
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.query", e.what());
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_PROCESSING_FAILED, e.what());
+    }
+    const auto t_end = std::chrono::high_resolution_clock::now();
+    const double total_ms =
+        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+    if (status != RAC_SUCCESS) {
+        rac_llm_result_free(&llm_result);
+        publish_failure(status, "rag.query", rac_error_message(status));
+        return rac_proto_buffer_set_error(out_result, status, rac_error_message(status));
     }
 
     runanywhere::v1::RAGResult proto;
-    if (!rac::foundation::rac_rag_result_to_proto(&result, &proto)) {
-        rc = rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
-                                        "failed to encode RAGResult");
-    } else {
-        rc = copy_proto(proto, out_result);
+    if (llm_result.text) proto.set_answer(llm_result.text);
+
+    if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
+        proto.set_context_used(metadata["context_used"].get<std::string>());
     }
+
+    if (metadata.contains("sources") && metadata["sources"].is_array()) {
+        for (const auto& s_item : metadata["sources"]) {
+            auto* chunk = proto.add_retrieved_chunks();
+            if (s_item.contains("id") && s_item["id"].is_string()) {
+                chunk->set_chunk_id(s_item["id"].get<std::string>());
+            }
+            if (s_item.contains("text") && s_item["text"].is_string()) {
+                chunk->set_text(s_item["text"].get<std::string>());
+            }
+            if (s_item.contains("score") && s_item["score"].is_number()) {
+                chunk->set_similarity_score(s_item["score"].get<float>());
+            }
+        }
+    }
+
+    const double generation_ms = llm_result.total_time_ms;
+    const double retrieval_ms = std::max(0.0, total_ms - generation_ms);
+    proto.set_retrieval_time_ms(static_cast<int64_t>(retrieval_ms));
+    proto.set_generation_time_ms(static_cast<int64_t>(generation_ms));
+    proto.set_total_time_ms(static_cast<int64_t>(total_ms));
+
+    rac_result_t rc = copy_proto(proto, out_result);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
                        "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr);
-    rac_rag_result_free(&result);
-    free_rag_query(&query);
+    rac_llm_result_free(&llm_result);
     return rc;
 #endif
 }
@@ -469,12 +555,12 @@ rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_s
     (void)session;
     return feature_unavailable(out_stats);
 #else
-    auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(session);
-    if (!pipeline) {
+    auto* s = as_session(session);
+    if (!s || !s->backend) {
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
                                           "RAG session is not loaded");
     }
-    return copy_proto(make_stats(pipeline), out_stats);
+    return copy_proto(make_stats(*s->backend), out_stats);
 #endif
 }
 
@@ -484,17 +570,19 @@ rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_t* out_s
     (void)session;
     return feature_unavailable(out_stats);
 #else
-    auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(session);
-    if (!pipeline) {
+    auto* s = as_session(session);
+    if (!s || !s->backend) {
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
                                           "RAG session is not loaded");
     }
-    rac_result_t rc = rac_rag_clear_documents(pipeline);
-    if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "rag.clear", rac_error_message(rc));
-        return rac_proto_buffer_set_error(out_stats, rc, rac_error_message(rc));
+    try {
+        s->backend->clear();
+    } catch (const std::exception& e) {
+        LOGE("rag.clear exception: %s", e.what());
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.clear", e.what());
+        return rac_proto_buffer_set_error(out_stats, RAC_ERROR_PROCESSING_FAILED, e.what());
     }
-    return copy_proto(make_stats(pipeline), out_stats);
+    return copy_proto(make_stats(*s->backend), out_stats);
 #endif
 }
 

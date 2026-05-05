@@ -63,7 +63,6 @@ set(RAG_PIPELINE_SOURCES
     rag_chunker.cpp
     bm25_index.cpp
     rac_rag_register.cpp
-    rac_rag_pipeline.cpp
     rac_rag_proto_abi.cpp
 )
 

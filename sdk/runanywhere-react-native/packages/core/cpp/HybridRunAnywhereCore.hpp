@@ -378,7 +378,7 @@ public:
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
 
   // ============================================================================
-  // RAG Pipeline - Delegates to RAGBridge
+  // RAG Pipeline - Proto ABI via rac_rag_*_proto symbols (see +Tools.cpp)
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> ragCreatePipelineProto(

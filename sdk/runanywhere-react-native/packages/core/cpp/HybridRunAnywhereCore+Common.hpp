@@ -22,7 +22,6 @@
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
-#include "bridges/RAGBridge.hpp"
 #include "bridges/FileManagerBridge.hpp"
 
 // RACommons C API headers for capability methods

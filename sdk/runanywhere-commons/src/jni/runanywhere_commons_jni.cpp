@@ -72,7 +72,7 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/lora/rac_lora_service.h"
-#include "rac/features/rag/rac_rag_pipeline.h"
+#include "rac/features/rag/rac_rag.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"

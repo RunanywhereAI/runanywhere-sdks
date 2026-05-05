@@ -140,7 +140,6 @@
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
-#include "rac/features/rag/rac_rag_pipeline.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 
@@ -439,30 +438,6 @@ bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in,
                               char** out_adapter_path /*owned*/,
                               float* out_scale, bool* out_applied,
                               char** out_error_message /*owned, may be NULL*/);
-
-// ===========================================================================
-// RAG
-// ===========================================================================
-
-bool rac_rag_config_to_proto(const rac_rag_config_t* in,
-                             ::runanywhere::v1::RAGConfiguration* out);
-bool rac_rag_config_from_proto(const ::runanywhere::v1::RAGConfiguration& in,
-                               rac_rag_config_t* out);
-
-bool rac_rag_query_to_proto(const rac_rag_query_t* in,
-                            ::runanywhere::v1::RAGQueryOptions* out);
-bool rac_rag_query_from_proto(const ::runanywhere::v1::RAGQueryOptions& in,
-                              rac_rag_query_t* out);
-
-bool rac_search_result_to_proto(const rac_search_result_t* in,
-                                ::runanywhere::v1::RAGSearchResult* out);
-bool rac_search_result_from_proto(const ::runanywhere::v1::RAGSearchResult& in,
-                                  rac_search_result_t* out);
-
-bool rac_rag_result_to_proto(const rac_rag_result_t* in,
-                             ::runanywhere::v1::RAGResult* out);
-bool rac_rag_result_from_proto(const ::runanywhere::v1::RAGResult& in,
-                               rac_rag_result_t* out);
 
 // ===========================================================================
 // EMBEDDINGS

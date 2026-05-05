@@ -11,7 +11,6 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/rag/rac_rag.h"
-#include "rac/features/rag/rac_rag_pipeline.h"
 
 #ifdef RAG_HAS_ONNX_PROVIDER
 #include "rac/backends/rac_embeddings_onnx.h"
