@@ -85,11 +85,20 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_ONNX,
     RAC_MODEL_FORMAT_ID_ORT,
 };
+/* RT-ONNX-05: the onnxrt adapter is a generic ORT tensor runner —
+ * `onnxrt_run_session` dispatches `OrtSession::Run` without primitive-aware
+ * pre/post processing. The only wired consumer today is the onnx embedding
+ * provider (engines/onnx, manifest at rac_plugin_entry_onnx.cpp). STT / TTS /
+ * VAD primitives advertised here previously were aspirational: a router that
+ * picked onnxrt for TRANSCRIBE would still need engine-side feature extraction
+ * and token decoding, which this adapter does not provide.
+ *
+ * RT-ONNX-06 will introduce an `rac_onnxrt_runtime_register_provider` surface
+ * parallel to CPU's; once that lands, this list should be rebuilt dynamically
+ * from the registered providers (mirroring `cpu_capabilities`). Until then,
+ * advertise only the primitive actually serviced end-to-end. */
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_EMBED,
-    RAC_PRIMITIVE_DETECT_VOICE,
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_SYNTHESIZE,
 };
 
 }  // namespace

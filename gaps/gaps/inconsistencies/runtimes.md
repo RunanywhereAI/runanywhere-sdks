@@ -105,18 +105,6 @@ that way. Also, `SessionOptions` at `rac_runtime_onnxrt.h:35-39` has no knobs
 for selecting an EP — `Session::create` hard-codes CPU-only behavior by never
 calling `SessionOptionsAppendExecutionProvider_*`.
 
-#### RT-ONNX-05: Primitive list advertises STT/TTS/VAD without wired providers
-
-`k_supported_primitives` (`rac_runtime_onnxrt.cpp:87-92`) advertises EMBED,
-DETECT_VOICE, TRANSCRIBE, SYNTHESIZE. But `onnxrt_run_session` is generic
-tensor I/O against `OrtSession::Run` — there is no code that recognizes a
-primitive argument from `rac_runtime_session_desc_t` and fuses the model with
-an engine-side pre/post processor. A router that picks onnxrt for TRANSCRIBE
-expects feature extraction + token decoding; none of that lives in this
-adapter. This is a manifest/capability drift: onnxrt is really a "generic ORT
-tensor runner" and only works as a TRANSCRIBE / SYNTHESIZE / VAD runtime when
-the calling engine supplies the front-end.
-
 #### RT-ONNX-06: No provider-registration surface
 
 Unlike CPU, onnxrt has no `rac_onnxrt_runtime_register_provider` equivalent.
