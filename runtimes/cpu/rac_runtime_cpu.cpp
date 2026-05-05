@@ -458,17 +458,10 @@ rac_result_t cpu_copy_buffer(rac_runtime_buffer_t* dst,
     if (dst_buffer == nullptr || src_buffer == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
-    if (dst_offset > dst_buffer->bytes || src_offset > src_buffer->bytes) {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-    if (bytes > dst_buffer->bytes - dst_offset ||
-        bytes > src_buffer->bytes - src_offset) {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-    std::memmove(static_cast<unsigned char*>(dst_buffer->data) + dst_offset,
-                 static_cast<const unsigned char*>(src_buffer->data) + src_offset,
-                 bytes);
-    return RAC_SUCCESS;
+    return rac::runtime::rac_runtime_copy_buffer(dst_buffer->data, dst_buffer->bytes,
+                                                 dst_offset,
+                                                 src_buffer->data, src_buffer->bytes,
+                                                 src_offset, bytes);
 }
 
 void cpu_release_tensor(rac_runtime_tensor_t* tensor) {

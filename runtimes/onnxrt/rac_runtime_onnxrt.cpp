@@ -469,16 +469,9 @@ rac_result_t onnxrt_copy_buffer(rac_runtime_buffer_t* dst,
                                 size_t src_offset,
                                 size_t bytes) {
     if (!dst || !src) return RAC_ERROR_NULL_POINTER;
-    if (dst_offset > dst->bytes || src_offset > src->bytes) {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-    if (bytes > dst->bytes - dst_offset || bytes > src->bytes - src_offset) {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-    std::memmove(static_cast<unsigned char*>(dst->data) + dst_offset,
-                 static_cast<const unsigned char*>(src->data) + src_offset,
-                 bytes);
-    return RAC_SUCCESS;
+    return rac::runtime::rac_runtime_copy_buffer(dst->data, dst->bytes, dst_offset,
+                                                 src->data, src->bytes, src_offset,
+                                                 bytes);
 }
 
 void onnxrt_release_tensor(rac_runtime_tensor_t* tensor) {
