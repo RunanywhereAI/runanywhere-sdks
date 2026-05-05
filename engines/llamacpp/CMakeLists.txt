@@ -225,6 +225,7 @@ rac_add_engine_plugin(llamacpp
     LINK_LIBRARIES      llama common
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
                         ${llamacpp_SOURCE_DIR}/include
                         ${llamacpp_SOURCE_DIR}/src    # llama-adapter.h for LoRA introspection
                         ${llamacpp_SOURCE_DIR}/common

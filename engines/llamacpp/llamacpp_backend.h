@@ -17,21 +17,10 @@
 #include <string>
 #include <vector>
 
+#include "common/rac_engine_device_type.h"
 #include "rac/core/rac_benchmark.h"
 
 namespace runanywhere {
-
-// =============================================================================
-// DEVICE TYPES (internal use only)
-// =============================================================================
-
-enum class DeviceType {
-    CPU = 0,
-    GPU = 1,
-    METAL = 3,
-    CUDA = 4,
-    WEBGPU = 5,
-};
 
 // =============================================================================
 // TEXT GENERATION TYPES (internal use only)

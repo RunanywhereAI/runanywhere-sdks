@@ -20,6 +20,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/rac_engine_device_type.h"
+
 // Sherpa-ONNX C API for TTS/STT
 #if SHERPA_ONNX_AVAILABLE
 #include <sherpa-onnx/c-api/c-api.h>
@@ -59,11 +61,7 @@ namespace runanywhere {
 // INTERNAL TYPES
 // =============================================================================
 
-enum class DeviceType {
-    CPU = 0,
-    GPU = 1,
-    NEURAL_ENGINE = 2,
-};
+// DeviceType is shared across engines — see engines/common/rac_engine_device_type.h
 
 struct DeviceInfo {
     DeviceType device_type = DeviceType::CPU;
