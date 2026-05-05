@@ -29,21 +29,23 @@ if ! command -v protoc >/dev/null 2>&1; then
     exit 127
 fi
 
+# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# filesystem discovery when invoked standalone. C++ is the authoritative
+# consumer and emits every proto in idl/ — no exclusions.
+if [ -z "${RAC_PROTO_FILES:-}" ]; then
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+fi
+
+CPP_PROTO_BASENAMES=()
+while IFS= read -r proto_path; do
+    [ -z "${proto_path}" ] && continue
+    CPP_PROTO_BASENAMES+=("$(basename "${proto_path}")")
+done <<< "${RAC_PROTO_FILES}"
+
 protoc \
     --proto_path="${PROTO_DIR}" \
     --cpp_out="${OUT_DIR}" \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto \
-    voice_agent_service.proto llm_service.proto download_service.proto \
-    llm_options.proto chat.proto tool_calling.proto \
-    diffusion_options.proto embeddings_options.proto errors.proto \
-    lora_options.proto rag.proto sdk_events.proto storage_types.proto \
-    structured_output.proto stt_options.proto tts_options.proto \
-    vad_options.proto vlm_options.proto \
-    hardware_profile.proto \
-    lifecycle_service.proto \
-    thinking_tag_pattern.proto \
-    component_types.proto \
-    router.proto
+    "${CPP_PROTO_BASENAMES[@]}"
 
 echo "✓ C++ proto codegen → ${OUT_DIR}"
 ls -1 "${OUT_DIR}"

@@ -29,42 +29,36 @@ if ! command -v protoc-gen-swift >/dev/null 2>&1; then
     exit 127
 fi
 
-# Message types — always generated.
-MESSAGE_PROTOS=(
-    "${PROTO_DIR}/model_types.proto"
-    "${PROTO_DIR}/voice_events.proto"
-    "${PROTO_DIR}/pipeline.proto"
-    "${PROTO_DIR}/solutions.proto"
-    # GAP 09 service definitions ALSO emit message types (Request types).
-    "${PROTO_DIR}/voice_agent_service.proto"
-    "${PROTO_DIR}/llm_service.proto"
-    "${PROTO_DIR}/download_service.proto"
-    # Phase 3 IDL exhaustiveness — duplicated data shapes across SDKs.
-    "${PROTO_DIR}/llm_options.proto"
-    "${PROTO_DIR}/chat.proto"
-    "${PROTO_DIR}/tool_calling.proto"
-    # Phase B — additional duplicated data shapes (per-modality options + shared types).
-    "${PROTO_DIR}/diffusion_options.proto"
-    "${PROTO_DIR}/embeddings_options.proto"
-    "${PROTO_DIR}/errors.proto"
-    "${PROTO_DIR}/lora_options.proto"
-    "${PROTO_DIR}/rag.proto"
-    "${PROTO_DIR}/sdk_events.proto"
-    "${PROTO_DIR}/storage_types.proto"
-    "${PROTO_DIR}/structured_output.proto"
-    "${PROTO_DIR}/stt_options.proto"
-    "${PROTO_DIR}/tts_options.proto"
-    "${PROTO_DIR}/vad_options.proto"
-    "${PROTO_DIR}/vlm_options.proto"
-    # Wave 3 Step 3.1 (RC-8) — hardware profile types for hardware namespace.
-    "${PROTO_DIR}/hardware_profile.proto"
-    # CPP-02 — model lifecycle service stub mirroring rac_model_lifecycle.h.
-    "${PROTO_DIR}/lifecycle_service.proto"
-    # Wave H-2 / IDL-02 — canonical ThinkingTagPattern shared by llm_options and model_types.
-    "${PROTO_DIR}/thinking_tag_pattern.proto"
-    # Wave H-2 / IDL-04 — shared ComponentLifecycleState + EventCategory (import-cycle break).
-    "${PROTO_DIR}/component_types.proto"
+# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# filesystem discovery when invoked standalone. Swift excludes router.proto
+# (see RAC_PROTO_EXCLUDES_SWIFT below for rationale).
+if [ -z "${RAC_PROTO_FILES:-}" ]; then
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+fi
+
+# Language-specific exclusions (basenames of .proto files to skip).
+# router.proto — engine-router capability-query types are consumed only by
+#   the C++ core and Kotlin adapters; Swift calls commons directly via the
+#   C ABI and has no need for the generated Swift message types. Keeping
+#   the exclusion means swift codegen doesn't emit dead router.pb.swift.
+RAC_PROTO_EXCLUDES_SWIFT=(
+    "router.proto"
 )
+
+MESSAGE_PROTOS=()
+while IFS= read -r proto_path; do
+    [ -z "${proto_path}" ] && continue
+    proto_base="$(basename "${proto_path}")"
+    skip=0
+    for excluded in "${RAC_PROTO_EXCLUDES_SWIFT[@]}"; do
+        if [ "${proto_base}" = "${excluded}" ]; then
+            skip=1
+            break
+        fi
+    done
+    [ "${skip}" -eq 1 ] && continue
+    MESSAGE_PROTOS+=("${proto_path}")
+done <<< "${RAC_PROTO_FILES}"
 
 protoc \
     --proto_path="${PROTO_DIR}" \

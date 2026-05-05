@@ -10,6 +10,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+IDL_DIR="${REPO_ROOT}/idl"
 
 SKIP_DART=0
 for arg in "$@"; do
@@ -33,6 +35,19 @@ if ! command -v protoc >/dev/null 2>&1; then
 fi
 
 echo "▶ protoc version: $(protoc --version)"
+
+# IDL-19c: canonical proto-file list shared with every per-language codegen
+# script via the RAC_PROTO_FILES env var (absolute paths, newline-separated,
+# sorted). Discovery via `ls` prevents drift when a new .proto is added — the
+# full list is derived from the filesystem, and each per-language script
+# applies its own documented exclusion filter (RAC_PROTO_EXCLUDES_<lang>)
+# rather than duplicating the positive list. Per-language scripts fall back
+# to the same `ls "$IDL_DIR"/*.proto` discovery when invoked standalone, so
+# behavior is identical whether run via generate_all.sh or individually.
+RAC_PROTO_FILES="$(ls "${IDL_DIR}"/*.proto | sort)"
+export RAC_PROTO_FILES
+echo "▶ canonical proto file list:"
+echo "${RAC_PROTO_FILES}" | sed 's|^.*/|    - |'
 
 echo "▶ Swift proto codegen"
 "${SCRIPT_DIR}/generate_swift.sh"

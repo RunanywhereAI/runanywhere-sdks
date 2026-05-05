@@ -31,6 +31,38 @@ if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
     exit 127
 fi
 
+# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# filesystem discovery when invoked standalone. TS excludes:
+#   - component_types.proto — ts-proto auto-emits its message types
+#     transitively via dependent protos' imports, so passing it explicitly
+#     is redundant. Exclusion keeps the positive list minimal.
+#   - router.proto — engine-router capability-query types are consumed only
+#     by C++/Kotlin; RN/Web call commons through NitroModules/WASM bindings
+#     without needing generated router.ts.
+if [ -z "${RAC_PROTO_FILES:-}" ]; then
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+fi
+
+RAC_PROTO_EXCLUDES_TS=(
+    "component_types.proto"
+    "router.proto"
+)
+
+TS_PROTO_BASENAMES=()
+while IFS= read -r proto_path; do
+    [ -z "${proto_path}" ] && continue
+    proto_base="$(basename "${proto_path}")"
+    skip=0
+    for excluded in "${RAC_PROTO_EXCLUDES_TS[@]}"; do
+        if [ "${proto_base}" = "${excluded}" ]; then
+            skip=1
+            break
+        fi
+    done
+    [ "${skip}" -eq 1 ] && continue
+    TS_PROTO_BASENAMES+=("${proto_base}")
+done <<< "${RAC_PROTO_FILES}"
+
 # Shared target: env=browser keeps bytes as Uint8Array, which works in Web and
 # React Native without coupling generated code to global Buffer.
 protoc \
@@ -38,14 +70,6 @@ protoc \
     --proto_path="${PROTO_DIR}" \
     --ts_proto_out="${TS_OUT_DIR}" \
     --ts_proto_opt=esModuleInterop=true,outputServices=false,env=browser,useOptionals=messages \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto voice_agent_service.proto llm_service.proto download_service.proto \
-    llm_options.proto chat.proto tool_calling.proto \
-    diffusion_options.proto embeddings_options.proto errors.proto \
-    lora_options.proto rag.proto sdk_events.proto storage_types.proto \
-    structured_output.proto stt_options.proto tts_options.proto \
-    vad_options.proto vlm_options.proto \
-    hardware_profile.proto \
-    lifecycle_service.proto \
-    thinking_tag_pattern.proto
+    "${TS_PROTO_BASENAMES[@]}"
 
 echo "✓ TS proto codegen → ${TS_OUT_DIR}"

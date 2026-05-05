@@ -29,20 +29,41 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # client wrapper is hand-written in
     # sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/.../adapters/
     # using kotlinx.coroutines Flow + the Wire-generated message types.
+    #
+    # IDL-19c: canonical proto-file list from generate_all.sh, with fallback
+    # to filesystem discovery when invoked standalone.
+    # Kotlin excludes component_types.proto — Wire auto-emits its message
+    # types (ComponentLifecycleState, EventCategory) transitively via
+    # `import "component_types.proto"` in dependent protos, so passing it
+    # explicitly would be a no-op. The exclusion keeps the positive list
+    # minimal and matches historical behaviour.
+    if [ -z "${RAC_PROTO_FILES:-}" ]; then
+        RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+    fi
+
+    RAC_PROTO_EXCLUDES_KOTLIN=(
+        "component_types.proto"
+    )
+
+    KOTLIN_PROTO_BASENAMES=()
+    while IFS= read -r proto_path; do
+        [ -z "${proto_path}" ] && continue
+        proto_base="$(basename "${proto_path}")"
+        skip=0
+        for excluded in "${RAC_PROTO_EXCLUDES_KOTLIN[@]}"; do
+            if [ "${proto_base}" = "${excluded}" ]; then
+                skip=1
+                break
+            fi
+        done
+        [ "${skip}" -eq 1 ] && continue
+        KOTLIN_PROTO_BASENAMES+=("${proto_base}")
+    done <<< "${RAC_PROTO_FILES}"
+
     wire-compiler \
         --proto_path="${PROTO_DIR}" \
         --kotlin_out="${OUT_DIR}" \
-        model_types.proto voice_events.proto pipeline.proto solutions.proto \
-        voice_agent_service.proto llm_service.proto download_service.proto \
-        llm_options.proto chat.proto tool_calling.proto \
-        diffusion_options.proto embeddings_options.proto errors.proto \
-        lora_options.proto rag.proto sdk_events.proto storage_types.proto \
-        structured_output.proto stt_options.proto tts_options.proto \
-        vad_options.proto vlm_options.proto \
-        hardware_profile.proto \
-        lifecycle_service.proto \
-        thinking_tag_pattern.proto \
-        router.proto
+        "${KOTLIN_PROTO_BASENAMES[@]}"
 
     # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
     # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both

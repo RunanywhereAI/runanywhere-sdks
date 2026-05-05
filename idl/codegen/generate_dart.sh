@@ -69,61 +69,43 @@ if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
     fi
 fi
 
-# Message types — always emitted.
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto
+# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# filesystem discovery when invoked standalone. Dart excludes router.proto —
+# the engine-router capability-query types are consumed only by C++/Kotlin
+# today; Flutter would emit dead .pb.dart files for unused messages.
+#
+# Using `--dart_out=<dir>` (no `grpc:` prefix) skips the gRPC client stubs
+# for services (voice_agent_service, llm_service, download_service) and
+# emits only the .pb.dart message types. Streaming flows through the
+# hand-written VoiceAgentStreamAdapter / LLMStreamAdapter over
+# rac_*_set_proto_callback instead.
+if [ -z "${RAC_PROTO_FILES:-}" ]; then
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+fi
 
-# GAP 09 service definitions — emit message types only (NOT the gRPC client
-# stubs). The .pbgrpc.dart stubs depend on package:grpc runtime which we
-# don't carry in the Flutter SDK (streaming flows via the hand-written
-# VoiceAgentStreamAdapter / LLMStreamAdapter over rac_*_set_proto_callback
-# instead). Using `--dart_out=<dir>` (no `grpc:` prefix) skips the gRPC
-# stubs and emits only the .pb.dart message types.
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    voice_agent_service.proto llm_service.proto download_service.proto
+RAC_PROTO_EXCLUDES_DART=(
+    "router.proto"
+)
 
-# Phase 3 IDL exhaustiveness — duplicated data shapes across SDKs.
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    llm_options.proto chat.proto tool_calling.proto
+DART_PROTO_BASENAMES=()
+while IFS= read -r proto_path; do
+    [ -z "${proto_path}" ] && continue
+    proto_base="$(basename "${proto_path}")"
+    skip=0
+    for excluded in "${RAC_PROTO_EXCLUDES_DART[@]}"; do
+        if [ "${proto_base}" = "${excluded}" ]; then
+            skip=1
+            break
+        fi
+    done
+    [ "${skip}" -eq 1 ] && continue
+    DART_PROTO_BASENAMES+=("${proto_base}")
+done <<< "${RAC_PROTO_FILES}"
 
-# Phase B — additional duplicated data shapes (per-modality options + shared types).
 protoc \
     --proto_path="${PROTO_DIR}" \
     --dart_out="${OUT_DIR}" \
-    diffusion_options.proto embeddings_options.proto errors.proto \
-    lora_options.proto rag.proto sdk_events.proto storage_types.proto \
-    structured_output.proto stt_options.proto tts_options.proto \
-    vad_options.proto vlm_options.proto
-
-# Wave 3 Step 3.1 (RC-8) — hardware profile types for hardware namespace.
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    hardware_profile.proto
-
-# CPP-02 — model lifecycle service stub mirroring rac_model_lifecycle.h.
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    lifecycle_service.proto
-
-# Wave H-2 / IDL-02 — canonical ThinkingTagPattern shared by llm_options and model_types.
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    thinking_tag_pattern.proto
-
-# Wave H-2 / IDL-04 — shared ComponentLifecycleState + EventCategory (import-cycle break).
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --dart_out="${OUT_DIR}" \
-    component_types.proto
+    "${DART_PROTO_BASENAMES[@]}"
 
 # Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
 # (some older protoc_plugin versions emit them even without the grpc: prefix).
