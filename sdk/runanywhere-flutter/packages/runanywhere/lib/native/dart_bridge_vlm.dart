@@ -30,7 +30,12 @@ typedef _RacVlmGenerateProtoDart = int Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-typedef _RacVlmStreamEventProtoCallbackNative = ffi.Int32 Function(
+/// Thread-safe stream-event callback signature used with
+/// `NativeCallable.listener`. The underlying C type returns `rac_bool_t`, but
+/// the listener dispatches messages asynchronously and cannot return a value
+/// synchronously — matching the approach used by every other Flutter stream
+/// bridge (LLM, STT, voice-agent, tool-calling).
+typedef _RacVlmStreamEventProtoCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
   ffi.Pointer<ffi.Void>,
@@ -79,57 +84,77 @@ class DartBridgeVLM {
   Stream<VLMStreamEvent> processImageStreamProto(
     VLMGenerationRequest request,
   ) {
-    final controller = StreamController<VLMStreamEvent>(sync: true);
+    final controller = StreamController<VLMStreamEvent>(sync: false);
+    ffi.NativeCallable<_RacVlmStreamEventProtoCallbackNative>? callback;
 
-    controller.onListen = () {
-      unawaited(_runProcessImageStreamProto(request, controller));
-    };
-    controller.onCancel = cancel;
+    Future<void> run() async {
+      final bytes = request.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
-    return controller.stream;
-  }
+      try {
+        callback =
+            ffi.NativeCallable<_RacVlmStreamEventProtoCallbackNative>.listener(
+          (
+            ffi.Pointer<ffi.Uint8> bytesPtr,
+            int bytesLen,
+            ffi.Pointer<ffi.Void> _,
+          ) {
+            if (controller.isClosed ||
+                bytesPtr == ffi.nullptr ||
+                bytesLen <= 0) {
+              return;
+            }
+            try {
+              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+              final event = VLMStreamEvent.fromBuffer(copy);
+              controller.add(event);
+              if (event.isFinal) {
+                unawaited(controller.close());
+              }
+            } catch (e, st) {
+              controller.addError(e, st);
+              unawaited(controller.close());
+            }
+          },
+        );
 
-  Future<void> _runProcessImageStreamProto(
-    VLMGenerationRequest request,
-    StreamController<VLMStreamEvent> controller,
-  ) async {
-    await Future<void>.delayed(Duration.zero);
-
-    final bytes = request.writeToBuffer();
-    final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
-    final stateId = _registerVlmStreamCallbackState(controller: controller);
-    final userData = calloc<ffi.Int64>()..value = stateId;
-    final callback =
-        ffi.Pointer.fromFunction<_RacVlmStreamEventProtoCallbackNative>(
-      _vlmStreamProtoCallback,
-      RAC_FALSE,
-    );
-
-    try {
-      final fn = _lookupStreamProto();
-      final code = fn(
-        requestPtr,
-        bytes.length,
-        callback,
-        userData.cast<ffi.Void>(),
-      );
-      if (code != RacResultCode.success && !controller.isClosed) {
-        controller.addError(StateError(
-          'rac_vlm_stream_proto failed: ${RacResultCode.getMessage(code)}',
-        ));
-      }
-    } catch (e, st) {
-      if (!controller.isClosed) {
-        controller.addError(e, st);
-      }
-    } finally {
-      _vlmStreamCallbackStates.remove(stateId);
-      calloc.free(requestPtr);
-      calloc.free(userData);
-      if (!controller.isClosed) {
-        await controller.close();
+        final fn = _lookupStreamProto();
+        final code = fn(
+          requestPtr,
+          bytes.length,
+          callback!.nativeFunction,
+          ffi.nullptr,
+        );
+        if (code != RacResultCode.success && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_vlm_stream_proto failed: ${RacResultCode.getMessage(code)}',
+          ));
+          await controller.close();
+        } else if (!controller.isClosed) {
+          await controller.close();
+        }
+      } catch (e, st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          await controller.close();
+        }
+      } finally {
+        calloc.free(requestPtr);
+        callback?.close();
+        callback = null;
       }
     }
+
+    controller.onListen = () {
+      unawaited(run());
+    };
+    controller.onCancel = () {
+      cancel();
+      callback?.close();
+      callback = null;
+    };
+
+    return controller.stream;
   }
 
   /// Cancel lifecycle-owned VLM generation.
@@ -180,49 +205,5 @@ class DartBridgeVLM {
     } catch (_) {
       return null;
     }
-  }
-}
-
-class _VlmStreamCallbackState {
-  const _VlmStreamCallbackState({
-    required this.controller,
-  });
-
-  final StreamController<VLMStreamEvent> controller;
-}
-
-final _vlmStreamCallbackStates = <int, _VlmStreamCallbackState>{};
-int _nextVlmStreamCallbackStateId = 1;
-
-int _registerVlmStreamCallbackState({
-  required StreamController<VLMStreamEvent> controller,
-}) {
-  final id = _nextVlmStreamCallbackStateId++;
-  _vlmStreamCallbackStates[id] = _VlmStreamCallbackState(
-    controller: controller,
-  );
-  return id;
-}
-
-@pragma('vm:entry-point')
-int _vlmStreamProtoCallback(
-  ffi.Pointer<ffi.Uint8> bytesPtr,
-  int bytesLen,
-  ffi.Pointer<ffi.Void> userData,
-) {
-  if (userData == ffi.nullptr) return RAC_FALSE;
-  final state = _vlmStreamCallbackStates[userData.cast<ffi.Int64>().value];
-  if (state == null || state.controller.isClosed) return RAC_FALSE;
-  if (bytesPtr == ffi.nullptr || bytesLen <= 0) return RAC_TRUE;
-
-  try {
-    final bytes = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-    state.controller.add(VLMStreamEvent.fromBuffer(bytes));
-    return RAC_TRUE;
-  } catch (e, st) {
-    if (!state.controller.isClosed) {
-      state.controller.addError(e, st);
-    }
-    return RAC_FALSE;
   }
 }
