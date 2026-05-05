@@ -67,7 +67,7 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 
 ## Items to DELETE (hard delete, no deprecation)
 
-- `// MARK: - Legacy alias` + `public typealias HTTPService = HTTPClientAdapter` in `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift:477-482`. The only SDK-internal references are in `CppBridge+HTTP.swift:21-45` (`HTTPService.shared` and `await HTTPService.shared.configure(...)`). Rename the internal usages to `HTTPClientAdapter.shared` and drop the typealias. User rule: DELETE do not deprecate.
+(none open)
 
 ## Cross-SDK naming alignment gaps
 

@@ -3,8 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Swift-side actor wrapping the canonical `rac_http_client_*` C ABI
-//  (curl-backed, shared across all SDKs). Drop-in replacement for the
-//  legacy URLSession-based `HTTPService`. All platform SDKs now route
+//  (curl-backed, shared across all SDKs). All platform SDKs now route
 //  HTTP transport through this single C implementation.
 //
 
@@ -12,10 +11,6 @@ import CRACommons
 import Foundation
 
 /// HTTPClientAdapter — thin Swift bridge over `rac_http_client_*`.
-///
-/// Preserves the public surface of the old `HTTPService` actor so
-/// call sites migrate unchanged (see `typealias HTTPService =
-/// HTTPClientAdapter` below).
 public actor HTTPClientAdapter: NetworkService {
 
     // MARK: - Singleton
@@ -246,7 +241,7 @@ public actor HTTPClientAdapter: NetworkService {
         ]
     }
 
-    /// Default request timeout (matches legacy HTTPService: 30s).
+    /// Default request timeout: 30s.
     private static let defaultTimeoutMs: Int32 = 30_000
 
     /// Run the blocking curl call on a background queue and surface
@@ -473,10 +468,3 @@ public actor HTTPClientAdapter: NetworkService {
         }
     }
 }
-
-// MARK: - Legacy alias
-
-/// Source-compatibility alias for existing call sites that reference
-/// the pre-migration `HTTPService` type (e.g. `CppBridge+HTTP` and the
-/// `NetworkService` conformance).
-public typealias HTTPService = HTTPClientAdapter
