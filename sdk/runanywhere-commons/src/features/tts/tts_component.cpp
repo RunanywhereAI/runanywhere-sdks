@@ -239,23 +239,23 @@ static rac_result_t tts_create_service(const char* voice_id, void* user_data,
                                        rac_handle_t* out_service) {
     (void)user_data;
 
-    log_info("TTS.Component", "Creating TTS service");
+    RAC_LOG_INFO("TTS.Component", "Creating TTS service");
 
     rac_result_t result = rac_tts_create(voice_id, out_service);
     if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "Failed to create TTS service");
+        RAC_LOG_ERROR("TTS.Component", "Failed to create TTS service");
         return result;
     }
 
     result = rac_tts_initialize(*out_service);
     if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "Failed to initialize TTS service");
+        RAC_LOG_ERROR("TTS.Component", "Failed to initialize TTS service");
         rac_tts_destroy(*out_service);
         *out_service = nullptr;
         return result;
     }
 
-    log_info("TTS.Component", "TTS service created successfully");
+    RAC_LOG_INFO("TTS.Component", "TTS service created successfully");
     return RAC_SUCCESS;
 }
 
@@ -263,7 +263,7 @@ static void tts_destroy_service(rac_handle_t service, void* user_data) {
     (void)user_data;
 
     if (service) {
-        log_info("TTS.Component", "Destroying TTS service");
+        RAC_LOG_INFO("TTS.Component", "Destroying TTS service");
         rac_tts_cleanup(service);
         rac_tts_destroy(service);
     }
@@ -298,7 +298,7 @@ extern "C" rac_result_t rac_tts_component_create(rac_handle_t* out_handle) {
 
     *out_handle = reinterpret_cast<rac_handle_t>(component);
 
-    log_info("TTS.Component", "TTS component created");
+    RAC_LOG_INFO("TTS.Component", "TTS component created");
 
     return RAC_SUCCESS;
 }
@@ -341,7 +341,7 @@ extern "C" rac_result_t rac_tts_component_configure(rac_handle_t handle,
     }
     component->default_options.use_ssml = config->enable_ssml;
 
-    log_info("TTS.Component", "TTS component configured");
+    RAC_LOG_INFO("TTS.Component", "TTS component configured");
 
     return RAC_SUCCESS;
 }
@@ -372,7 +372,7 @@ extern "C" void rac_tts_component_destroy(rac_handle_t handle) {
         rac_lifecycle_destroy(component->lifecycle);
     }
 
-    log_info("TTS.Component", "TTS component destroyed");
+    RAC_LOG_INFO("TTS.Component", "TTS component destroyed");
 
     delete component;
 }
@@ -467,7 +467,7 @@ extern "C" rac_result_t rac_tts_component_stop(rac_handle_t handle) {
         rac_tts_stop(service);
     }
 
-    log_info("TTS.Component", "Synthesis stop requested");
+    RAC_LOG_INFO("TTS.Component", "Synthesis stop requested");
 
     return RAC_SUCCESS;
 }
@@ -508,7 +508,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
 
         rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
-            log_error("TTS.Component", "No voice loaded - cannot synthesize");
+            RAC_LOG_ERROR("TTS.Component", "No voice loaded - cannot synthesize");
             // Emit SYNTHESIS_FAILED event
             rac_analytics_event_data_t event_data;
             event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
@@ -536,7 +536,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
 
-    log_info("TTS.Component", "Synthesizing text");
+    RAC_LOG_INFO("TTS.Component", "Synthesizing text");
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -546,7 +546,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
     if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "Synthesis failed");
+        RAC_LOG_ERROR("TTS.Component", "Synthesis failed");
         rac_lifecycle_track_error(component->lifecycle, result, "synthesize");
         // Emit SYNTHESIS_FAILED event
         rac_analytics_event_data_t event_data;
@@ -590,7 +590,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_COMPLETED, &event_data);
     }
 
-    log_info("TTS.Component", "Synthesis completed");
+    RAC_LOG_INFO("TTS.Component", "Synthesis completed");
 
     return RAC_SUCCESS;
 }
@@ -627,7 +627,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
 
         rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
-            log_error("TTS.Component", "No voice loaded - cannot synthesize stream");
+            RAC_LOG_ERROR("TTS.Component", "No voice loaded - cannot synthesize stream");
             // Emit SYNTHESIS_FAILED event
             rac_analytics_event_data_t event_data;
             event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
@@ -655,7 +655,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
 
-    log_info("TTS.Component", "Starting streaming synthesis");
+    RAC_LOG_INFO("TTS.Component", "Starting streaming synthesis");
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -666,7 +666,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
     if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "Streaming synthesis failed");
+        RAC_LOG_ERROR("TTS.Component", "Streaming synthesis failed");
         rac_lifecycle_track_error(component->lifecycle, result, "synthesizeStream");
         // Emit SYNTHESIS_FAILED event
         rac_analytics_event_data_t event_data;
@@ -742,7 +742,7 @@ extern "C" rac_result_t rac_tts_component_get_supported_languages(rac_handle_t h
     rac_handle_t service = nullptr;
     rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
     if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "No voice loaded - cannot enumerate languages");
+        RAC_LOG_ERROR("TTS.Component", "No voice loaded - cannot enumerate languages");
         return result;
     }
 

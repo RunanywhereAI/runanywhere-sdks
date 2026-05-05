@@ -124,14 +124,14 @@ rac_result_t rac_llm_analytics_create(rac_llm_analytics_handle_t* out_handle) {
     if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    log_info("LLM.Analytics", "LLM analytics service created");
+    RAC_LOG_INFO("LLM.Analytics", "LLM analytics service created");
     return RAC_SUCCESS;
 }
 
 void rac_llm_analytics_destroy(rac_llm_analytics_handle_t handle) {
     if (handle) {
         delete handle;
-        log_info("LLM.Analytics", "LLM analytics service destroyed");
+        RAC_LOG_INFO("LLM.Analytics", "LLM analytics service destroyed");
     }
 }
 
@@ -172,7 +172,7 @@ rac_result_t rac_llm_analytics_start_generation(rac_llm_analytics_handle_t handl
     }
     memcpy(*out_generation_id, id.c_str(), id.size() + 1);
 
-    log_debug("LLM.Analytics", "Non-streaming generation started: %s", id.c_str());
+    RAC_LOG_DEBUG("LLM.Analytics", "Non-streaming generation started: %s", id.c_str());
     return RAC_SUCCESS;
 }
 
@@ -211,7 +211,7 @@ rac_result_t rac_llm_analytics_start_streaming_generation(
     }
     memcpy(*out_generation_id, id.c_str(), id.size() + 1);
 
-    log_debug("LLM.Analytics", "Streaming generation started: %s", id.c_str());
+    RAC_LOG_DEBUG("LLM.Analytics", "Streaming generation started: %s", id.c_str());
     return RAC_SUCCESS;
 }
 
@@ -246,7 +246,7 @@ rac_result_t rac_llm_analytics_track_first_token(rac_llm_analytics_handle_t hand
     double time_to_first_token_ms =
         static_cast<double>(tracker.first_token_time_ms - tracker.start_time_ms);
 
-    log_debug("LLM.Analytics", "First token received for %s: %.1fms", generation_id,
+    RAC_LOG_DEBUG("LLM.Analytics", "First token received for %s: %.1fms", generation_id,
               time_to_first_token_ms);
 
     return RAC_SUCCESS;
@@ -320,7 +320,7 @@ rac_result_t rac_llm_analytics_complete_generation(rac_llm_analytics_handle_t ha
     handle->has_last_event_time = true;
 
     const char* mode_str = tracker.is_streaming ? "streaming" : "non-streaming";
-    log_debug("LLM.Analytics", "Generation completed (%s): %s", mode_str, generation_id);
+    RAC_LOG_DEBUG("LLM.Analytics", "Generation completed (%s): %s", mode_str, generation_id);
 
     return RAC_SUCCESS;
 }
@@ -339,7 +339,7 @@ rac_result_t rac_llm_analytics_track_generation_failed(rac_llm_analytics_handle_
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_error("LLM.Analytics", "Generation failed %s: %d - %s", generation_id, error_code,
+    RAC_LOG_ERROR("LLM.Analytics", "Generation failed %s: %d - %s", generation_id, error_code,
               error_message ? error_message : "");
 
     return RAC_SUCCESS;
@@ -358,7 +358,7 @@ rac_result_t rac_llm_analytics_track_error(rac_llm_analytics_handle_t handle,
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_error("LLM.Analytics", "LLM error in %s: %d - %s (model: %s, gen: %s)",
+    RAC_LOG_ERROR("LLM.Analytics", "LLM error in %s: %d - %s (model: %s, gen: %s)",
               operation ? operation : "unknown", error_code, error_message ? error_message : "",
               model_id ? model_id : "none", generation_id ? generation_id : "none");
 

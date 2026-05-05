@@ -222,7 +222,7 @@ extern "C" rac_result_t rac_llm_component_configure(rac_handle_t handle,
         component->default_options.system_prompt = config->system_prompt;
     }
 
-    log_info("LLM.Component", "LLM component configured");
+    RAC_LOG_INFO("LLM.Component", "LLM component configured");
 
     return RAC_SUCCESS;
 }
@@ -270,7 +270,7 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
     rac_llm_unset_stream_proto_callback(handle);
     rac_lora_forget_component_state(handle);
 
-    log_info("LLM.Component", "LLM component destroyed");
+    RAC_LOG_INFO("LLM.Component", "LLM component destroyed");
 
     delete component;
 }
@@ -400,7 +400,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     rac_handle_t service = nullptr;
     rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "No model loaded - cannot generate");
+        RAC_LOG_ERROR("LLM.Component", "No model loaded - cannot generate");
 
         // Emit generation failed event
         rac_analytics_event_data_t event = {};
@@ -448,7 +448,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     result = rac_llm_generate(service, prompt, effective_options, out_result);
 
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "Generation failed");
+        RAC_LOG_ERROR("LLM.Component", "Generation failed");
         rac_lifecycle_track_error(component->lifecycle, result, "generate");
 
         // Emit generation failed event
@@ -471,16 +471,16 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
 
     // Update result metrics
     // Use actual token counts from backend if available, otherwise estimate
-    log_debug("LLM.Component", "Backend returned prompt_tokens=%d, completion_tokens=%d",
+    RAC_LOG_DEBUG("LLM.Component", "Backend returned prompt_tokens=%d, completion_tokens=%d",
               out_result->prompt_tokens, out_result->completion_tokens);
 
     if (out_result->prompt_tokens <= 0) {
         out_result->prompt_tokens = estimate_tokens(prompt);
-        log_debug("LLM.Component", "Using estimated prompt_tokens=%d", out_result->prompt_tokens);
+        RAC_LOG_DEBUG("LLM.Component", "Using estimated prompt_tokens=%d", out_result->prompt_tokens);
     }
     if (out_result->completion_tokens <= 0) {
         out_result->completion_tokens = estimate_tokens(out_result->text);
-        log_debug("LLM.Component", "Using estimated completion_tokens=%d",
+        RAC_LOG_DEBUG("LLM.Component", "Using estimated completion_tokens=%d",
                   out_result->completion_tokens);
     }
     out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
@@ -494,7 +494,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         out_result->tokens_per_second = static_cast<float>(tokens_per_second);
     }
 
-    log_info("LLM.Component", "Generation completed");
+    RAC_LOG_INFO("LLM.Component", "Generation completed");
 
     // Emit generation completed event
     // Use estimated input_tokens for telemetry consistency across platforms
@@ -678,7 +678,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     rac_handle_t service = nullptr;
     rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "No model loaded - cannot generate stream");
+        RAC_LOG_ERROR("LLM.Component", "No model loaded - cannot generate stream");
 
         // Emit generation failed event
         rac_analytics_event_data_t event = {};
@@ -706,7 +706,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     rac_llm_info_t info;
     result = rac_llm_get_info(service, &info);
     if (result != RAC_SUCCESS || (info.supports_streaming == 0)) {
-        log_error("LLM.Component", "Streaming not supported");
+        RAC_LOG_ERROR("LLM.Component", "Streaming not supported");
 
         // Emit generation failed event
         rac_analytics_event_data_t event = {};
@@ -730,7 +730,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    log_info("LLM.Component", "Starting streaming generation");
+    RAC_LOG_INFO("LLM.Component", "Starting streaming generation");
 
     // Get context_length from service info
     int32_t context_length = info.context_length;
@@ -781,7 +781,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
                                      &ctx);
 
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "Streaming generation failed");
+        RAC_LOG_ERROR("LLM.Component", "Streaming generation failed");
         rac_lifecycle_track_error(component->lifecycle, result, "generateStream");
 
         // Emit generation failed event
@@ -821,7 +821,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
     if (!final_result.text) {
-        log_error("LLM.Component", "Failed to allocate result text");
+        RAC_LOG_ERROR("LLM.Component", "Failed to allocate result text");
         if (error_callback) {
             error_callback(RAC_ERROR_OUT_OF_MEMORY, "Failed to allocate result text", user_data);
         }
@@ -890,7 +890,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     // Free the duplicated text
     free(final_result.text);
 
-    log_info("LLM.Component", "Streaming generation completed");
+    RAC_LOG_INFO("LLM.Component", "Streaming generation completed");
 
     return RAC_SUCCESS;
 }
@@ -925,7 +925,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     rac_handle_t service = nullptr;
     rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "No model loaded - cannot generate stream");
+        RAC_LOG_ERROR("LLM.Component", "No model loaded - cannot generate stream");
 
         // Emit generation failed event
         rac_analytics_event_data_t event = {};
@@ -954,7 +954,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     rac_llm_info_t info;
     result = rac_llm_get_info(service, &info);
     if (result != RAC_SUCCESS || (info.supports_streaming == 0)) {
-        log_error("LLM.Component", "Streaming not supported");
+        RAC_LOG_ERROR("LLM.Component", "Streaming not supported");
 
         // Emit generation failed event
         rac_analytics_event_data_t event = {};
@@ -979,7 +979,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    log_info("LLM.Component", "Starting streaming generation with timing");
+    RAC_LOG_INFO("LLM.Component", "Starting streaming generation with timing");
 
     // Get context_length from service info
     int32_t context_length = info.context_length;
@@ -1029,7 +1029,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
                                                  llm_stream_token_callback, &ctx, timing_out);
 
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "Streaming generation failed");
+        RAC_LOG_ERROR("LLM.Component", "Streaming generation failed");
         rac_lifecycle_track_error(component->lifecycle, result, "generateStream");
 
         // Emit generation failed event
@@ -1070,7 +1070,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
     if (final_result.text == nullptr) {
-        log_error("LLM.Component", "strdup failed for result text");
+        RAC_LOG_ERROR("LLM.Component", "strdup failed for result text");
         if (timing_out != nullptr) {
             timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
             timing_out->error_code = RAC_ERROR_OUT_OF_MEMORY;
@@ -1165,7 +1165,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     // Free the duplicated text
     free(final_result.text);
 
-    log_info("LLM.Component", "Streaming generation with timing completed");
+    RAC_LOG_INFO("LLM.Component", "Streaming generation with timing completed");
 
     return RAC_SUCCESS;
 }
@@ -1190,7 +1190,7 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
         rac_lifecycle_release_service(component->lifecycle);
     }
 
-    log_info("LLM.Component", "Generation cancellation requested");
+    RAC_LOG_INFO("LLM.Component", "Generation cancellation requested");
 
     return RAC_SUCCESS;
 }
@@ -1211,7 +1211,7 @@ extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle, const c
 
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
     if (!service) {
-        log_error("LLM.Component", "Cannot load LoRA adapter: no model loaded");
+        RAC_LOG_ERROR("LLM.Component", "Cannot load LoRA adapter: no model loaded");
         return RAC_ERROR_COMPONENT_NOT_READY;
     }
 
@@ -1234,7 +1234,7 @@ extern "C" rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
 
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
     if (!service) {
-        log_error("LLM.Component", "Cannot remove LoRA adapter: no model loaded");
+        RAC_LOG_ERROR("LLM.Component", "Cannot remove LoRA adapter: no model loaded");
         return RAC_ERROR_COMPONENT_NOT_READY;
     }
 

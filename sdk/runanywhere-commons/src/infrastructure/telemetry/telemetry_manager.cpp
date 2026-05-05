@@ -333,7 +333,7 @@ rac_telemetry_manager_t* rac_telemetry_manager_create(rac_environment_t env, con
     manager->http_user_data = nullptr;
     manager->last_flush_time_ms = 0;  // Initialize to 0 (will be set on first flush)
 
-    log_debug("Telemetry", "Telemetry manager created for environment %d", env);
+    RAC_LOG_DEBUG("Telemetry", "Telemetry manager created for environment %d", env);
 
     return manager;
 }
@@ -346,7 +346,7 @@ void rac_telemetry_manager_destroy(rac_telemetry_manager_t* manager) {
     rac_telemetry_manager_flush(manager);
 
     delete manager;
-    log_debug("Telemetry", "Telemetry manager destroyed");
+    RAC_LOG_DEBUG("Telemetry", "Telemetry manager destroyed");
 }
 
 void rac_telemetry_manager_set_device_info(rac_telemetry_manager_t* manager,
@@ -404,11 +404,11 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     }
 
     // Use WARN level for production visibility (INFO is filtered in production)
-    log_debug("Telemetry", "Telemetry event queued: %s", payload->event_type);
+    RAC_LOG_DEBUG("Telemetry", "Telemetry event queued: %s", payload->event_type);
 
     // Auto-flush logic
     if (!manager->http_callback) {
-        log_debug("Telemetry", "HTTP callback not set, skipping auto-flush");
+        RAC_LOG_DEBUG("Telemetry", "HTTP callback not set, skipping auto-flush");
         return RAC_SUCCESS;
     }
 
@@ -424,7 +424,7 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     if (manager->environment == RAC_ENV_DEVELOPMENT) {
         // Development: Immediate flush for real-time debugging
         should_flush = true;
-        log_debug("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
+        RAC_LOG_DEBUG("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
                   queue_size);
     } else {
         // Production: Flush based on batch size or timeout
@@ -432,26 +432,26 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
         // Flush if queue reaches batch size
         if (queue_size >= manager->BATCH_SIZE_PRODUCTION) {
             should_flush = true;
-            log_debug("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
+            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
                       queue_size, manager->BATCH_SIZE_PRODUCTION);
         }
         // Flush if timeout reached (5 seconds since last flush)
         else if (manager->last_flush_time_ms > 0 &&
                  (current_time - manager->last_flush_time_ms) >= manager->BATCH_TIMEOUT_MS) {
             should_flush = true;
-            log_debug("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
+            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
                       current_time - manager->last_flush_time_ms);
         }
         // First flush: start the timer by flushing immediately if we have events
         else if (manager->last_flush_time_ms == 0 && queue_size > 0) {
             should_flush = true;
-            log_debug("Telemetry", "Production: first flush to start timer (queue size: %zu)",
+            RAC_LOG_DEBUG("Telemetry", "Production: first flush to start timer (queue size: %zu)",
                       queue_size);
         }
     }
 
     if (should_flush) {
-        log_debug("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);
+        RAC_LOG_DEBUG("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);
         rac_telemetry_manager_flush(manager);
         // Note: last_flush_time_ms is updated inside flush()
     }
@@ -645,11 +645,11 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 }
                 // Debug: Log if voice/model_id is null
                 if (!payload.voice || !payload.model_id) {
-                    log_debug(
+                    RAC_LOG_DEBUG(
                         "Telemetry",
                         "TTS event has null voice/model_id (voice_id from lifecycle may be null)");
                 } else {
-                    log_debug("Telemetry", "TTS event voice: %s", payload.voice);
+                    RAC_LOG_DEBUG("Telemetry", "TTS event voice: %s", payload.voice);
                 }
                 break;
             }
@@ -677,7 +677,7 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
     // This ensures important terminal events are captured before app exits
     if (result == RAC_SUCCESS && manager->environment != RAC_ENV_DEVELOPMENT &&
         is_completion_event(event_type) && manager->http_callback) {
-        log_debug("Telemetry", "Completion event detected, triggering immediate flush");
+        RAC_LOG_DEBUG("Telemetry", "Completion event detected, triggering immediate flush");
         rac_telemetry_manager_flush(manager);
     }
 
@@ -694,7 +694,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     }
 
     if (!manager->http_callback) {
-        log_debug("Telemetry", "No HTTP callback registered, cannot flush telemetry");
+        RAC_LOG_DEBUG("Telemetry", "No HTTP callback registered, cannot flush telemetry");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -710,7 +710,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         return RAC_SUCCESS;
     }
 
-    log_debug("Telemetry", "Flushing %zu telemetry events", events.size());
+    RAC_LOG_DEBUG("Telemetry", "Flushing %zu telemetry events", events.size());
 
     // Update last flush time
     manager->last_flush_time_ms = get_current_timestamp_ms();
@@ -769,7 +769,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 
             if (result == RAC_SUCCESS && json) {
                 // WARN: Log production telemetry payload for debugging (first 500 chars)
-                log_debug("Telemetry",
+                RAC_LOG_DEBUG("Telemetry",
                           "Sending production telemetry (modality=%s, %zu bytes): %.500s",
                           modality.c_str(), json_len, json);
                 manager->http_callback(manager->http_user_data, endpoint, json, json_len,
@@ -810,9 +810,9 @@ void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manager, rac_b
         return;
 
     if (success) {
-        log_debug("Telemetry", "Telemetry HTTP request completed successfully");
+        RAC_LOG_DEBUG("Telemetry", "Telemetry HTTP request completed successfully");
     } else {
-        log_warning("Telemetry", "Telemetry HTTP request failed: %s",
+        RAC_LOG_WARNING("Telemetry", "Telemetry HTTP request failed: %s",
                     error_message ? error_message : "unknown");
     }
 

@@ -79,14 +79,14 @@ rac_result_t rac_vad_analytics_create(rac_vad_analytics_handle_t* out_handle) {
     if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    log_info("VAD.Analytics", "VAD analytics service created");
+    RAC_LOG_INFO("VAD.Analytics", "VAD analytics service created");
     return RAC_SUCCESS;
 }
 
 void rac_vad_analytics_destroy(rac_vad_analytics_handle_t handle) {
     if (handle) {
         delete handle;
-        log_info("VAD.Analytics", "VAD analytics service destroyed");
+        RAC_LOG_INFO("VAD.Analytics", "VAD analytics service destroyed");
     }
 }
 
@@ -102,7 +102,7 @@ rac_result_t rac_vad_analytics_track_initialized(rac_vad_analytics_handle_t hand
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "VAD initialized with framework: %d", framework);
+    RAC_LOG_DEBUG("VAD.Analytics", "VAD initialized with framework: %d", framework);
     return RAC_SUCCESS;
 }
 
@@ -120,7 +120,7 @@ rac_result_t rac_vad_analytics_track_initialization_failed(rac_vad_analytics_han
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_error("VAD.Analytics", "VAD initialization failed: %d - %s", error_code,
+    RAC_LOG_ERROR("VAD.Analytics", "VAD initialization failed: %d - %s", error_code,
               error_message ? error_message : "");
     return RAC_SUCCESS;
 }
@@ -135,7 +135,7 @@ rac_result_t rac_vad_analytics_track_cleaned_up(rac_vad_analytics_handle_t handl
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "VAD cleaned up");
+    RAC_LOG_DEBUG("VAD.Analytics", "VAD cleaned up");
     return RAC_SUCCESS;
 }
 
@@ -149,7 +149,7 @@ rac_result_t rac_vad_analytics_track_started(rac_vad_analytics_handle_t handle) 
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "VAD started");
+    RAC_LOG_DEBUG("VAD.Analytics", "VAD started");
     return RAC_SUCCESS;
 }
 
@@ -163,7 +163,7 @@ rac_result_t rac_vad_analytics_track_stopped(rac_vad_analytics_handle_t handle) 
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "VAD stopped");
+    RAC_LOG_DEBUG("VAD.Analytics", "VAD stopped");
     return RAC_SUCCESS;
 }
 
@@ -180,7 +180,7 @@ rac_result_t rac_vad_analytics_track_speech_start(rac_vad_analytics_handle_t han
     handle->last_event_time_ms = now;
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "Speech started");
+    RAC_LOG_DEBUG("VAD.Analytics", "Speech started");
     return RAC_SUCCESS;
 }
 
@@ -204,7 +204,7 @@ rac_result_t rac_vad_analytics_track_speech_end(rac_vad_analytics_handle_t handl
     handle->last_event_time_ms = end_time_ms;
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "Speech ended: %.1fms", duration_ms);
+    RAC_LOG_DEBUG("VAD.Analytics", "Speech ended: %.1fms", duration_ms);
     return RAC_SUCCESS;
 }
 
@@ -218,7 +218,7 @@ rac_result_t rac_vad_analytics_track_paused(rac_vad_analytics_handle_t handle) {
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "VAD paused");
+    RAC_LOG_DEBUG("VAD.Analytics", "VAD paused");
     return RAC_SUCCESS;
 }
 
@@ -232,7 +232,7 @@ rac_result_t rac_vad_analytics_track_resumed(rac_vad_analytics_handle_t handle) 
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "VAD resumed");
+    RAC_LOG_DEBUG("VAD.Analytics", "VAD resumed");
     return RAC_SUCCESS;
 }
 
@@ -250,7 +250,7 @@ rac_result_t rac_vad_analytics_track_model_load_started(rac_vad_analytics_handle
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "Model load started: %s, size: %lld", model_id, model_size_bytes);
+    RAC_LOG_DEBUG("VAD.Analytics", "Model load started: %s, size: %lld", model_id, model_size_bytes);
     return RAC_SUCCESS;
 }
 
@@ -266,7 +266,7 @@ rac_result_t rac_vad_analytics_track_model_load_completed(rac_vad_analytics_hand
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "Model load completed: %s, duration: %.1fms, size: %lld", model_id,
+    RAC_LOG_DEBUG("VAD.Analytics", "Model load completed: %s, duration: %.1fms, size: %lld", model_id,
               duration_ms, model_size_bytes);
     return RAC_SUCCESS;
 }
@@ -284,7 +284,7 @@ rac_result_t rac_vad_analytics_track_model_load_failed(rac_vad_analytics_handle_
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_error("VAD.Analytics", "Model load failed: %s, error: %d - %s", model_id, error_code,
+    RAC_LOG_ERROR("VAD.Analytics", "Model load failed: %s, error: %d - %s", model_id, error_code,
               error_message ? error_message : "");
     return RAC_SUCCESS;
 }
@@ -300,7 +300,7 @@ rac_result_t rac_vad_analytics_track_model_unloaded(rac_vad_analytics_handle_t h
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_debug("VAD.Analytics", "Model unloaded: %s", model_id);
+    RAC_LOG_DEBUG("VAD.Analytics", "Model unloaded: %s", model_id);
     return RAC_SUCCESS;
 }
 

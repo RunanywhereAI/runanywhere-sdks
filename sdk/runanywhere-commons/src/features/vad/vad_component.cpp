@@ -346,7 +346,7 @@ extern "C" rac_result_t rac_vad_component_create(rac_handle_t* out_handle) {
 
     *out_handle = reinterpret_cast<rac_handle_t>(component);
 
-    log_info("VAD.Component", "VAD component created");
+    RAC_LOG_INFO("VAD.Component", "VAD component created");
 
     return RAC_SUCCESS;
 }
@@ -367,7 +367,7 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
 
     // 1. Energy threshold range (Swift lines 64-69)
     if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
-        log_error("VAD.Component",
+        RAC_LOG_ERROR("VAD.Component",
                   "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -386,13 +386,13 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
 
     // 4. Sample rate validation (Swift lines 88-93)
     if (config->sample_rate < 1 || config->sample_rate > 48000) {
-        log_error("VAD.Component", "Sample rate must be between 1 and 48000 Hz");
+        RAC_LOG_ERROR("VAD.Component", "Sample rate must be between 1 and 48000 Hz");
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
     // 5. Frame length validation (Swift lines 96-101)
     if (config->frame_length <= 0.0f || config->frame_length > 1.0f) {
-        log_error("VAD.Component", "Frame length must be between 0 and 1 second");
+        RAC_LOG_ERROR("VAD.Component", "Frame length must be between 0 and 1 second");
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
@@ -404,7 +404,7 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
 
     component->config = *config;
 
-    log_info("VAD.Component", "VAD component configured");
+    RAC_LOG_INFO("VAD.Component", "VAD component configured");
 
     return RAC_SUCCESS;
 }
@@ -438,7 +438,7 @@ extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
     // Create energy VAD service
     rac_result_t result = rac_energy_vad_create(&vad_config, &component->vad_service);
     if (result != RAC_SUCCESS) {
-        log_error("VAD.Component", "Failed to create energy VAD service");
+        RAC_LOG_ERROR("VAD.Component", "Failed to create energy VAD service");
         return result;
     }
 
@@ -454,7 +454,7 @@ extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
     // Initialize the VAD (starts calibration)
     result = rac_energy_vad_initialize(component->vad_service);
     if (result != RAC_SUCCESS) {
-        log_error("VAD.Component", "Failed to initialize energy VAD service");
+        RAC_LOG_ERROR("VAD.Component", "Failed to initialize energy VAD service");
         rac_energy_vad_destroy(component->vad_service);
         component->vad_service = nullptr;
         return result;
@@ -462,7 +462,7 @@ extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
 
     component->is_initialized = true;
 
-    log_info("VAD.Component", "VAD component initialized");
+    RAC_LOG_INFO("VAD.Component", "VAD component initialized");
 
     return RAC_SUCCESS;
 }
@@ -496,7 +496,7 @@ extern "C" rac_result_t rac_vad_component_cleanup(rac_handle_t handle) {
 
     component->is_initialized = false;
 
-    log_info("VAD.Component", "VAD component cleaned up");
+    RAC_LOG_INFO("VAD.Component", "VAD component cleaned up");
 
     return RAC_SUCCESS;
 }
@@ -514,7 +514,7 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
     // Cleanup first
     rac_vad_component_cleanup(handle);
 
-    log_info("VAD.Component", "VAD component destroyed");
+    RAC_LOG_INFO("VAD.Component", "VAD component destroyed");
 
     delete component;
 }
@@ -657,14 +657,14 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
                                            /*format=*/0,
                                            /*hints=*/nullptr, &vt);
     if (result != RAC_SUCCESS || !vt || !vt->vad_ops || !vt->vad_ops->create) {
-        log_error("VAD.Component", "rac_plugin_route failed for VAD");
+        RAC_LOG_ERROR("VAD.Component", "rac_plugin_route failed for VAD");
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
     }
 
     void* impl = nullptr;
     result = vt->vad_ops->create(model_path, /*config_json=*/nullptr, &impl);
     if (result != RAC_SUCCESS || !impl) {
-        log_error("VAD.Component", "Plugin create failed for VAD");
+        RAC_LOG_ERROR("VAD.Component", "Plugin create failed for VAD");
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
     }
 
@@ -688,7 +688,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     if (component->model_service->ops && component->model_service->ops->start) {
         result = component->model_service->ops->start(component->model_service->impl);
         if (result != RAC_SUCCESS) {
-            log_error("VAD.Component", "Model VAD start failed: %d — rolling back load", result);
+            RAC_LOG_ERROR("VAD.Component", "Model VAD start failed: %d — rolling back load", result);
             if (component->model_service->ops->destroy) {
                 component->model_service->ops->destroy(component->model_service->impl);
             }
@@ -702,7 +702,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
         }
     }
 
-    log_info("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
+    RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
 
     return RAC_SUCCESS;
 }
@@ -739,7 +739,7 @@ extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
 
-    log_info("VAD.Component", "VAD model unloaded, reverted to energy VAD");
+    RAC_LOG_INFO("VAD.Component", "VAD model unloaded, reverted to energy VAD");
 
     return RAC_SUCCESS;
 }
@@ -833,7 +833,7 @@ extern "C" rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t hand
 
     // Validation - Ported from Swift VADConfiguration.validate()
     if (threshold < 0.0f || threshold > 1.0f) {
-        log_error("VAD.Component", "Threshold must be between 0.0 and 1.0");
+        RAC_LOG_ERROR("VAD.Component", "Threshold must be between 0.0 and 1.0");
         return RAC_ERROR_INVALID_PARAMETER;
     }
 

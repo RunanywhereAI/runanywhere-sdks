@@ -324,25 +324,25 @@ static rac_result_t stt_create_service(const char* model_id, void* user_data,
                                        rac_handle_t* out_service) {
     (void)user_data;
 
-    log_info("STT.Component", "Creating STT service");
+    RAC_LOG_INFO("STT.Component", "Creating STT service");
 
     // Create STT service
     rac_result_t result = rac_stt_create(model_id, out_service);
     if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "Failed to create STT service");
+        RAC_LOG_ERROR("STT.Component", "Failed to create STT service");
         return result;
     }
 
     // Initialize with model path
     result = rac_stt_initialize(*out_service, model_id);
     if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "Failed to initialize STT service");
+        RAC_LOG_ERROR("STT.Component", "Failed to initialize STT service");
         rac_stt_destroy(*out_service);
         *out_service = nullptr;
         return result;
     }
 
-    log_info("STT.Component", "STT service created successfully");
+    RAC_LOG_INFO("STT.Component", "STT service created successfully");
     return RAC_SUCCESS;
 }
 
@@ -350,7 +350,7 @@ static void stt_destroy_service(rac_handle_t service, void* user_data) {
     (void)user_data;
 
     if (service) {
-        log_info("STT.Component", "Destroying STT service");
+        RAC_LOG_INFO("STT.Component", "Destroying STT service");
         rac_stt_cleanup(service);
         rac_stt_destroy(service);
     }
@@ -385,7 +385,7 @@ extern "C" rac_result_t rac_stt_component_create(rac_handle_t* out_handle) {
 
     *out_handle = reinterpret_cast<rac_handle_t>(component);
 
-    log_info("STT.Component", "STT component created");
+    RAC_LOG_INFO("STT.Component", "STT component created");
 
     return RAC_SUCCESS;
 }
@@ -418,7 +418,7 @@ extern "C" rac_result_t rac_stt_component_configure(rac_handle_t handle,
     component->default_options.enable_punctuation = config->enable_punctuation;
     component->default_options.enable_timestamps = config->enable_timestamps;
 
-    log_info("STT.Component", "STT component configured");
+    RAC_LOG_INFO("STT.Component", "STT component configured");
 
     return RAC_SUCCESS;
 }
@@ -449,7 +449,7 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
         rac_lifecycle_destroy(component->lifecycle);
     }
 
-    log_info("STT.Component", "STT component destroyed");
+    RAC_LOG_INFO("STT.Component", "STT component destroyed");
 
     delete component;
 }
@@ -571,7 +571,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
 
         rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
-            log_error("STT.Component", "No model loaded - cannot transcribe");
+            RAC_LOG_ERROR("STT.Component", "No model loaded - cannot transcribe");
 
             // Emit transcription failed event
             rac_analytics_event_data_t event = {};
@@ -592,7 +592,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     // Estimate audio length (assuming 16kHz mono 16-bit audio)
     double audio_length_ms = (audio_size / 2.0 / 16000.0) * 1000.0;
 
-    log_info("STT.Component", "Transcribing audio");
+    RAC_LOG_INFO("STT.Component", "Transcribing audio");
 
     // Emit transcription started event
     {
@@ -617,7 +617,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         rac_stt_transcribe(service, audio_data, audio_size, &local_options, out_result);
 
     if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "Transcription failed");
+        RAC_LOG_ERROR("STT.Component", "Transcription failed");
         rac_lifecycle_track_error(component->lifecycle, result, "transcribe");
 
         // Emit transcription failed event
@@ -648,7 +648,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     double real_time_factor =
         (audio_length_ms > 0 && duration_ms > 0) ? (audio_length_ms / duration_ms) : 0.0;
 
-    log_info("STT.Component", "Transcription completed");
+    RAC_LOG_INFO("STT.Component", "Transcription completed");
 
     // Emit transcription completed event
     {
@@ -710,7 +710,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     rac_handle_t service = nullptr;
     rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
     if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "No model loaded - cannot transcribe stream");
+        RAC_LOG_ERROR("STT.Component", "No model loaded - cannot transcribe stream");
         return result;
     }
 
@@ -718,11 +718,11 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     rac_stt_info_t info;
     result = rac_stt_get_info(service, &info);
     if (result != RAC_SUCCESS || (info.supports_streaming == 0)) {
-        log_error("STT.Component", "Streaming not supported");
+        RAC_LOG_ERROR("STT.Component", "Streaming not supported");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    log_info("STT.Component", "Starting streaming transcription");
+    RAC_LOG_INFO("STT.Component", "Starting streaming transcription");
 
     const rac_stt_options_t* effective_options = options ? options : &component->default_options;
 
@@ -732,11 +732,11 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
 
     // Debug: Log if model_id is null
     if (!model_id) {
-        log_warning(
+        RAC_LOG_WARNING(
             "STT.Component",
             "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
     } else {
-        log_debug("STT.Component", "STT streaming transcription using model_id: %s", model_id);
+        RAC_LOG_DEBUG("STT.Component", "STT streaming transcription using model_id: %s", model_id);
     }
 
     // Calculate audio length in ms (assume 16kHz, 16-bit mono)
@@ -772,7 +772,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
     if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "Streaming transcription failed");
+        RAC_LOG_ERROR("STT.Component", "Streaming transcription failed");
         rac_lifecycle_track_error(component->lifecycle, result, "transcribeStream");
 
         // Emit STT_TRANSCRIPTION_FAILED event
@@ -857,7 +857,7 @@ extern "C" rac_result_t rac_stt_component_get_supported_languages(rac_handle_t h
     rac_handle_t service = nullptr;
     rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
     if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "No model loaded - cannot enumerate languages");
+        RAC_LOG_ERROR("STT.Component", "No model loaded - cannot enumerate languages");
         return result;
     }
 
@@ -883,7 +883,7 @@ extern "C" rac_result_t rac_stt_component_detect_language(rac_handle_t handle,
 
         rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
-            log_error("STT.Component", "No model loaded - cannot detect language");
+            RAC_LOG_ERROR("STT.Component", "No model loaded - cannot detect language");
             return result;
         }
 

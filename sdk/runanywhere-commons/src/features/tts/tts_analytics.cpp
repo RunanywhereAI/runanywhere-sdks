@@ -113,14 +113,14 @@ rac_result_t rac_tts_analytics_create(rac_tts_analytics_handle_t* out_handle) {
     if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    log_info("TTS.Analytics", "TTS analytics service created");
+    RAC_LOG_INFO("TTS.Analytics", "TTS analytics service created");
     return RAC_SUCCESS;
 }
 
 void rac_tts_analytics_destroy(rac_tts_analytics_handle_t handle) {
     if (handle) {
         delete handle;
-        log_info("TTS.Analytics", "TTS analytics service destroyed");
+        RAC_LOG_INFO("TTS.Analytics", "TTS analytics service destroyed");
     }
 }
 
@@ -152,7 +152,7 @@ rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_t handle
     }
     memcpy(*out_synthesis_id, id.c_str(), id.size() + 1);
 
-    log_debug("TTS.Analytics", "Synthesis started: %s, voice: %s, %d characters", id.c_str(), voice,
+    RAC_LOG_DEBUG("TTS.Analytics", "Synthesis started: %s, voice: %s, %d characters", id.c_str(), voice,
               character_count);
 
     return RAC_SUCCESS;
@@ -165,7 +165,7 @@ rac_result_t rac_tts_analytics_track_synthesis_chunk(rac_tts_analytics_handle_t 
     }
 
     // Event would be published here in full implementation
-    log_debug("TTS.Analytics", "Synthesis chunk: %s, size: %d", synthesis_id, chunk_size);
+    RAC_LOG_DEBUG("TTS.Analytics", "Synthesis chunk: %s, size: %d", synthesis_id, chunk_size);
     return RAC_SUCCESS;
 }
 
@@ -206,7 +206,7 @@ rac_result_t rac_tts_analytics_complete_synthesis(rac_tts_analytics_handle_t han
     handle->last_event_time_ms = end_time_ms;
     handle->has_last_event_time = true;
 
-    log_debug("TTS.Analytics", "Synthesis completed: %s, voice: %s, audio: %.1fms, %d bytes",
+    RAC_LOG_DEBUG("TTS.Analytics", "Synthesis completed: %s, voice: %s, audio: %.1fms, %d bytes",
               synthesis_id, tracker.model_id.c_str(), audio_duration_ms, audio_size_bytes);
 
     return RAC_SUCCESS;
@@ -226,7 +226,7 @@ rac_result_t rac_tts_analytics_track_synthesis_failed(rac_tts_analytics_handle_t
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_error("TTS.Analytics", "Synthesis failed %s: %d - %s", synthesis_id, error_code,
+    RAC_LOG_ERROR("TTS.Analytics", "Synthesis failed %s: %d - %s", synthesis_id, error_code,
               error_message ? error_message : "");
 
     return RAC_SUCCESS;
@@ -245,7 +245,7 @@ rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t handle,
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    log_error("TTS.Analytics", "TTS error in %s: %d - %s (model: %s, syn: %s)",
+    RAC_LOG_ERROR("TTS.Analytics", "TTS error in %s: %d - %s (model: %s, syn: %s)",
               operation ? operation : "unknown", error_code, error_message ? error_message : "",
               model_id ? model_id : "none", synthesis_id ? synthesis_id : "none");
 
