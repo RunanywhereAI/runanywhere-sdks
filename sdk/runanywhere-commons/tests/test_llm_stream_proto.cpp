@@ -130,7 +130,7 @@ int test_synthetic_token_schedule() {
                                            static_cast<int>(g_capture.events[i].size())));
         ASSERT_TRUE(decoded.seq() > prev_seq);
         prev_seq = decoded.seq();
-        ASSERT_EQ(decoded.kind(), runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+        ASSERT_EQ(decoded.kind(), runanywhere::v1::TOKEN_KIND_ANSWER);
         if (i == 0) ASSERT_EQ(decoded.token(), "Hello");
         if (i == 1) ASSERT_EQ(decoded.token(), " ");
         if (i == 2) ASSERT_EQ(decoded.token(), "world");
@@ -204,7 +204,7 @@ int test_optional_fields_round_trip() {
     ASSERT_TRUE(decoded.ParseFromArray(
         g_capture.events.back().data(),
         static_cast<int>(g_capture.events.back().size())));
-    ASSERT_EQ(decoded.kind(), runanywhere::v1::LLM_TOKEN_KIND_THOUGHT);
+    ASSERT_EQ(decoded.kind(), runanywhere::v1::TOKEN_KIND_THOUGHT);
     ASSERT_EQ(decoded.token_id(), 12345U);
     ASSERT_TRUE(decoded.logprob() < 0.0f);
 
