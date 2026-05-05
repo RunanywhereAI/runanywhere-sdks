@@ -18,7 +18,6 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
   - `synthesizer` MainActor-isolated property accessed from nonisolated context at `SystemTTSService.swift:93`.
   - `mutation of captured var 'didInstall' in concurrently-executing code` at `LLMStreamAdapter.swift:70`.
   - `unnecessary check for 'macOS'; enclosing scope ensures guard will always be true` at `SystemFoundationModelsService.swift:64`.
-  - `variable 'lastProgress' was written to, but never read` at `DiffusionPlatformService.swift:234`.
   - `result of call to 'copyBytes(to:from:)' is unused` at `URLSessionHttpTransport.swift:308`.
 - **Why it matters**: Swift 6 language mode turns most of these into compile errors. User rule explicitly says "Use the latest Swift 6 APIs always" (see `CLAUDE.md#swift-specific-rules`). Every `@Sendable` closure capturing an opaque C pointer is a future breakage.
 - **Fix steps**:
@@ -27,9 +26,8 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
   3. In `AudioCaptureManager.swift:9` add `@preconcurrency import AVFoundation` (compiler explicitly suggests this).
   4. In `SystemTTSService.swift:93` wrap the `synthesizer` access in a `MainActor.run { ... }` or mark it `nonisolated(unsafe)` since `AVSpeechSynthesizer` is inherently single-threaded.
   5. Drop the redundant `#available(macOS)` at `SystemFoundationModelsService.swift:64`.
-  6. Remove the unused `lastProgress` local at `DiffusionPlatformService.swift:234` (dead, leftover from the pre-proto DiffusionProgressInfo callback).
-  7. Discard `copyBytes(to:from:)` return at `URLSessionHttpTransport.swift:308` with `_ =`.
-  8. Fix `LLMStreamAdapter.swift:70` `didInstall` — mutate inside `state.withLock { }` and return the captured value, don't mutate across concurrent closure scope.
+  6. Discard `copyBytes(to:from:)` return at `URLSessionHttpTransport.swift:308` with `_ =`.
+  7. Fix `LLMStreamAdapter.swift:70` `didInstall` — mutate inside `state.withLock { }` and return the captured value, don't mutate across concurrent closure scope.
 - **Validation**: unique warning sites drops from 28 to under 5 (architecture-specific warnings from DeviceKit tolerable; `@Sendable` / concurrency warnings should be 0).
 - **Scope**: M (one dedicated sendability file + ~8 surgical edits).
 
@@ -77,7 +75,6 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 
 ## Items to DELETE (hard delete, no deprecation)
 
-- `sdk/runanywhere-swift/Sources/RunAnywhere/Features/Diffusion/DiffusionPlatformService.swift:234` — dead `var lastProgress` (written, never read). See SWF-SENDABLE-01 step 6.
 - `// MARK: - Legacy alias` + `public typealias HTTPService = HTTPClientAdapter` in `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift:477-482`. The only SDK-internal references are in `CppBridge+HTTP.swift:21-45` (`HTTPService.shared` and `await HTTPService.shared.configure(...)`). Rename the internal usages to `HTTPClientAdapter.shared` and drop the typealias. User rule: DELETE do not deprecate.
 - `CppBridge+Device.swift:74` comment "Legacy fields (backward compatibility)". If the backend no longer reads them, scrub from both the commons C struct (`rac_telemetry_types.h:199`) and the Swift callback. If the backend still reads them, keep the fields but delete the comment so it doesn't read as tech debt.
 

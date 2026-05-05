@@ -231,8 +231,6 @@ actor DiffusionPlatformService {
         config.schedulerType = scheduler
         config.disableSafety = false
 
-        var lastProgress: DiffusionProgressInfo?
-
         do {
             let images = try pipeline.generateImages(configuration: config) { progress in
                 // Check for cancellation
@@ -240,19 +238,17 @@ actor DiffusionPlatformService {
                     return false
                 }
 
-                // Create progress info
-                // Flatten double optional: currentImages is [CGImage?], .first returns CGImage??
-                let currentImage = progress.currentImages.first.flatMap { $0 }
-                let progressInfo = DiffusionProgressInfo(
-                    step: progress.step,
-                    totalSteps: progress.stepCount,
-                    progress: Float(progress.step) / Float(progress.stepCount),
-                    currentImage: currentImage
-                )
-                lastProgress = progressInfo
-
                 // Call handler if provided
                 if let handler = progressHandler {
+                    // Create progress info
+                    // Flatten double optional: currentImages is [CGImage?], .first returns CGImage??
+                    let currentImage = progress.currentImages.first.flatMap { $0 }
+                    let progressInfo = DiffusionProgressInfo(
+                        step: progress.step,
+                        totalSteps: progress.stepCount,
+                        progress: Float(progress.step) / Float(progress.stepCount),
+                        currentImage: currentImage
+                    )
                     return handler(progressInfo)
                 }
                 return true
