@@ -127,8 +127,10 @@ message RAGDocument {
     // Plain text content to chunk/embed.
     string text = 2;
 
-    // Legacy metadata JSON blob.
-    optional string metadata_json = 3;
+    // Tag 3 reserved — previously `optional string metadata_json` (legacy).
+    // Deleted in favour of the typed `metadata` map below.
+    reserved 3;
+    reserved "metadata_json";
 
     // Typed metadata map for generated-proto callers.
     map<string, string> metadata = 4;
@@ -204,9 +206,10 @@ message RAGSearchResult {
     // canonicalized here as a typed map so consumers don't re-parse.
     map<string, string> metadata = 5;
 
-    // Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
-    // pass metadata without parsing it.
-    optional string metadata_json = 6;
+    // Tag 6 reserved — previously `optional string metadata_json` (legacy).
+    // Deleted in favour of the typed `metadata` map above.
+    reserved 6;
+    reserved "metadata_json";
 
     int32 rank = 7;
     int32 start_offset = 8;

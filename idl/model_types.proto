@@ -10,6 +10,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "hardware_profile.proto";
+import "thinking_tag_pattern.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -277,13 +278,11 @@ enum RoutingPolicy {
     ROUTING_POLICY_MANUAL            = 5;
 }
 
-// Model-level thinking tag metadata. This intentionally uses a model-specific
-// message name because llm_options.proto already owns the generation-options
-// ThinkingTagPattern message in this proto package.
-message ModelThinkingTagPattern {
-    string open_tag  = 1;
-    string close_tag = 2;
-}
+// Model-level thinking tag metadata uses the canonical ThinkingTagPattern from
+// thinking_tag_pattern.proto (Wave H-2 / IDL-02). Previously this file declared
+// a separate ModelThinkingTagPattern because llm_options.proto owned a distinct
+// ThinkingTagPattern with different field names; that duplicate has been
+// collapsed into the single shared message.
 
 message ModelInfoMetadata {
     string          description = 1;
@@ -345,7 +344,7 @@ message ModelInfo {
 
     // Thinking/reasoning metadata. `supports_thinking` remains the boolean
     // capability flag; this optional pattern declares model-specific tags.
-    optional ModelThinkingTagPattern thinking_pattern = 18;
+    optional ThinkingTagPattern thinking_pattern = 18;
 
     // Structured public catalog metadata. `description` (field 12) is kept for
     // backward compatibility and should mirror metadata.description when both
@@ -429,9 +428,10 @@ message ModelFileDescriptor {
     // newer SDK sources maps onto it (default true, mirrored in Swift).
     optional int64  size_bytes = 4;
 
-    // Legacy checksum field kept for generated consumers that already use it.
-    // Prefer checksum_sha256 for new manifests when the algorithm is known.
-    optional string checksum   = 5;
+    // Tag 5 reserved — previously `optional string checksum` (legacy).
+    // Deleted in favour of the typed `checksum_sha256` field below.
+    reserved 5;
+    reserved "checksum";
 
     // Path fields used by SDK-local wrappers/catalogs. `filename` is the
     // storage name for simple cases; relative_path/destination_path preserve
@@ -733,7 +733,7 @@ message ModelCompatibilityRequest {
 
     // Optional caller preferences (acceleration, framework). Reserved for
     // future use; today's verdict is based on memory/storage alone.
-    optional AcceleratorPreference accelerator_preference = 5;
+    optional AccelerationPreference accelerator_preference = 5;
     optional InferenceFramework preferred_framework = 6;
 }
 
