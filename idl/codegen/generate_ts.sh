@@ -32,10 +32,12 @@ if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
 fi
 
 # IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
-# filesystem discovery when invoked standalone. TS excludes:
-#   - component_types.proto — ts-proto auto-emits its message types
-#     transitively via dependent protos' imports, so passing it explicitly
-#     is redundant. Exclusion keeps the positive list minimal.
+# filesystem discovery when invoked standalone.
+# IDL-19a (post-fix): component_types.proto is included explicitly. ts-proto
+# does transitively emit component_types.ts via dependent imports, but the
+# positive list is made explicit here so behaviour stays aligned with Kotlin
+# (which requires the explicit entry — Wire does not transitively emit
+# enum-only dependencies). TS excludes:
 #   - router.proto — engine-router capability-query types are consumed only
 #     by C++/Kotlin; RN/Web call commons through NitroModules/WASM bindings
 #     without needing generated router.ts.
@@ -44,7 +46,6 @@ if [ -z "${RAC_PROTO_FILES:-}" ]; then
 fi
 
 RAC_PROTO_EXCLUDES_TS=(
-    "component_types.proto"
     "router.proto"
 )
 

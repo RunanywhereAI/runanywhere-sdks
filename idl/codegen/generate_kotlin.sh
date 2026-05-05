@@ -32,25 +32,24 @@ if command -v wire-compiler >/dev/null 2>&1; then
     #
     # IDL-19c: canonical proto-file list from generate_all.sh, with fallback
     # to filesystem discovery when invoked standalone.
-    # Kotlin excludes component_types.proto — Wire auto-emits its message
-    # types (ComponentLifecycleState, EventCategory) transitively via
-    # `import "component_types.proto"` in dependent protos, so passing it
-    # explicitly would be a no-op. The exclusion keeps the positive list
-    # minimal and matches historical behaviour.
+    # IDL-19a (post-fix): component_types.proto is included in the Kotlin
+    # positive list. Wire does NOT transitively emit enum-only dependencies
+    # (ComponentLifecycleState, EventCategory) when the defining proto is
+    # excluded — a prior assumption that it did was incorrect and left
+    # consumer code (VoiceAgentTypes.kt, EventBus.kt, SDKEvent.kt) depending
+    # on files that regen would delete. No exclusions today.
     if [ -z "${RAC_PROTO_FILES:-}" ]; then
         RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
     fi
 
-    RAC_PROTO_EXCLUDES_KOTLIN=(
-        "component_types.proto"
-    )
+    RAC_PROTO_EXCLUDES_KOTLIN=()
 
     KOTLIN_PROTO_BASENAMES=()
     while IFS= read -r proto_path; do
         [ -z "${proto_path}" ] && continue
         proto_base="$(basename "${proto_path}")"
         skip=0
-        for excluded in "${RAC_PROTO_EXCLUDES_KOTLIN[@]}"; do
+        for excluded in "${RAC_PROTO_EXCLUDES_KOTLIN[@]:-}"; do
             if [ "${proto_base}" = "${excluded}" ]; then
                 skip=1
                 break
