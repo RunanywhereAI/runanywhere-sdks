@@ -387,12 +387,9 @@ public extension RAInferenceFramework {
 }
 
 extension RAThinkingTagPattern: Codable {
-    public static var defaultPattern: RAThinkingTagPattern {
-        var pattern = RAThinkingTagPattern()
-        pattern.openTag = "<think>"
-        pattern.closeTag = "</think>"
-        return pattern
-    }
+    // `defaultPattern` lives in `RALLMTypes+CppBridge.swift` (canonical
+    // C-bridge extension). Codable conformance stays here next to the other
+    // model-type Codable extensions so RAModelInfo persists cleanly to JSON.
 
     public init(from decoder: Swift.Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
