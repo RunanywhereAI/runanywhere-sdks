@@ -66,26 +66,6 @@ KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
   delete the `buildPlatformProfile()` fallback.
 - **Scope**: ~40 LOC Kotlin deletion.
 
-### KOT-DEAD-SDKCONSTANTS: dead subobjects on `SDKConstants` (priority: LOW)
-- **Symptom**: `commonMain/.../utils/SDKConstants.kt`.
-  Used externally: `SDKConstants.VERSION`, `SDK_VERSION`, `SDK_NAME`, `USER_AGENT`. Everything else is dead:
-  - `Environment` (duplicate of `SDKEnvironment` proto enum) — zero callers
-  - `API.*` (AUTHENTICATE, REFRESH_TOKEN, MODELS, etc.) — zero callers
-  - `Defaults.*` (REQUEST_TIMEOUT_MS, STT_SAMPLE_RATE, etc.) — zero callers
-  - `Storage.*` — zero callers
-  - `SecureStorage.*` — zero callers
-  - `ErrorCodes.*` — zero callers
-  - `SDKConstants.platform` (delegates to `PlatformUtils.getPlatformName()`) — zero callers
-  - `SDKConstants.version` (lowercase alias) — zero callers
-- **Additional**: `VERSION = "0.1.0"` is hardcoded and doesn't track the canonical
-  `sdk/runanywhere-commons/VERSION` file (currently 0.19.13). Swift's `SDKConstants.version`
-  reads the VERSION file.
-- **Concrete steps**: Delete `API` / `Defaults` / `Storage` / `SecureStorage` / `ErrorCodes` /
-  `Environment` subobjects and `platform` / `version` accessors. Keep only
-  `VERSION`/`SDK_VERSION`/`SDK_NAME`/`USER_AGENT`. Fix the hardcoded VERSION (have
-  `sync-versions.sh` rewrite it, or read via Gradle resource).
-- **Scope**: 1 file, ~135 LOC.
-
 ### KOT-JNI-ORPHAN: 20 `external fun` declarations in `RunAnywhereBridge.kt` have no matching C thunk (priority: HIGH)
 - **Symptom**: Surfaced by Wave 1 CPP-06 JNI audit. 20 `external fun` entries in
   `sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/native/bridge/RunAnywhereBridge.kt`
@@ -123,12 +103,7 @@ KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
 
 ## Cross-SDK naming alignment gaps
 
-| Concern | Kotlin | Swift (source of truth) | Flutter | RN | Web |
-|---|---|---|---|---|---|
-| `SDKConstants.VERSION` | hardcoded `"0.1.0"` | tracks `VERSION` file | pubspec-driven | package.json-driven | package.json-driven |
-
-The `SDKConstants.VERSION` hardcoded-to-`"0.1.0"` mismatch is addressed implicitly by KOT-DEAD-SDKCONSTANTS
-(either `sync-versions.sh` rewrites the const or it's read from gradle resources at build time).
+None currently tracked.
 
 ## Example app (Android) inconsistencies
 
