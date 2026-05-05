@@ -73,7 +73,7 @@ inline constexpr VoiceSessionError::Impl_::Impl_(
         failed_component_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        code_{static_cast< ::runanywhere::v1::VoiceSessionErrorCode >(0)},
+        code_{static_cast< ::runanywhere::v1::ErrorCode >(0)},
         c_abi_code_{0},
         recoverable_{false} {}
 
@@ -122,13 +122,13 @@ inline constexpr VoiceAgentComponentStates::Impl_::Impl_(
         error_message_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        stt_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
-        llm_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
-        tts_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
-        vad_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
+        stt_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
+        llm_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
+        tts_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
+        vad_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
         ready_{false},
         any_loading_{false},
-        wakeword_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)} {}
+        wakeword_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)} {}
 
 template <typename>
 constexpr VoiceAgentComponentStates::VoiceAgentComponentStates(::_pbi::ConstantInitialized)
@@ -155,7 +155,7 @@ inline constexpr VADEvent::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
         frame_offset_us_{::int64_t{0}},
-        type_{static_cast< ::runanywhere::v1::VADEventType >(0)},
+        type_{static_cast< ::runanywhere::v1::VADStreamEventKind >(0)},
         confidence_{0},
         speech_duration_ms_{0},
         silence_duration_ms_{0},
@@ -689,8 +689,8 @@ inline constexpr VoiceEvent::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
-        category_{static_cast< ::runanywhere::v1::VoiceEventCategory >(0)},
-        severity_{static_cast< ::runanywhere::v1::VoiceEventSeverity >(0)},
+        category_{static_cast< ::runanywhere::v1::EventCategory >(0)},
+        severity_{static_cast< ::runanywhere::v1::ErrorSeverity >(0)},
         component_{static_cast< ::runanywhere::v1::VoicePipelineComponent >(0)},
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
         metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
@@ -726,7 +726,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_voice_5fevents_2eproto[12];
+    file_level_enum_descriptors_voice_5fevents_2eproto[7];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_voice_5fevents_2eproto = nullptr;
 const ::uint32_t
@@ -1102,215 +1102,193 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 };
 const char descriptor_table_protodef_voice_5fevents_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\022voice_events.proto\022\016runanywhere.v1\"\223\014\n"
-    "\nVoiceEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us"
-    "\030\002 \001(\003\0224\n\010category\030\003 \001(\0162\".runanywhere.v"
-    "1.VoiceEventCategory\0224\n\010severity\030\004 \001(\0162\""
-    ".runanywhere.v1.VoiceEventSeverity\0229\n\tco"
-    "mponent\030\005 \001(\0162&.runanywhere.v1.VoicePipe"
-    "lineComponent\0222\n\tuser_said\030\n \001(\0132\035.runan"
-    "ywhere.v1.UserSaidEventH\000\022>\n\017assistant_t"
-    "oken\030\013 \001(\0132#.runanywhere.v1.AssistantTok"
-    "enEventH\000\0220\n\005audio\030\014 \001(\0132\037.runanywhere.v"
-    "1.AudioFrameEventH\000\022\'\n\003vad\030\r \001(\0132\030.runan"
-    "ywhere.v1.VADEventH\000\0227\n\013interrupted\030\016 \001("
-    "\0132 .runanywhere.v1.InterruptedEventH\000\0221\n"
-    "\005state\030\017 \001(\0132 .runanywhere.v1.StateChang"
-    "eEventH\000\022+\n\005error\030\020 \001(\0132\032.runanywhere.v1"
-    ".ErrorEventH\000\022/\n\007metrics\030\021 \001(\0132\034.runanyw"
-    "here.v1.MetricsEventH\000\022L\n\027component_stat"
-    "e_changed\030\022 \001(\0132).runanywhere.v1.VoiceAg"
-    "entComponentStatesH\000\022:\n\rsession_error\030\023 "
-    "\001(\0132!.runanywhere.v1.VoiceSessionErrorH\000"
-    "\022>\n\017session_started\030\024 \001(\0132#.runanywhere."
-    "v1.SessionStartedEventH\000\022>\n\017session_stop"
-    "ped\030\025 \001(\0132#.runanywhere.v1.SessionStoppe"
-    "dEventH\000\022K\n\026agent_response_started\030\026 \001(\013"
-    "2).runanywhere.v1.AgentResponseStartedEv"
-    "entH\000\022O\n\030agent_response_completed\030\027 \001(\0132"
-    "+.runanywhere.v1.AgentResponseCompletedE"
-    "ventH\000\022I\n\025speech_turn_detection\030\030 \001(\0132(."
-    "runanywhere.v1.SpeechTurnDetectionEventH"
-    "\000\022<\n\016turn_lifecycle\030\031 \001(\0132\".runanywhere."
-    "v1.TurnLifecycleEventH\000\022B\n\021wakeword_dete"
-    "cted\030\032 \001(\0132%.runanywhere.v1.WakeWordDete"
-    "ctedEventH\000\0226\n\013audio_level\030\033 \001(\0132\037.runan"
-    "ywhere.v1.AudioLevelEventH\000\022D\n\022component"
-    "_progress\030\034 \001(\0132&.runanywhere.v1.Compone"
-    "ntProgressEventH\000\022\022\n\nsession_id\030\036 \001(\t\022\017\n"
-    "\007turn_id\030\037 \001(\t\022\022\n\nrequest_id\030  \001(\t\022:\n\010me"
-    "tadata\030! \003(\0132(.runanywhere.v1.VoiceEvent"
-    ".MetadataEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001"
-    " \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\t\n\007payload\"\237\001\n\rU"
-    "serSaidEvent\022\014\n\004text\030\001 \001(\t\022\020\n\010is_final\030\002"
-    " \001(\010\022\022\n\nconfidence\030\003 \001(\002\022\026\n\016audio_start_"
-    "us\030\004 \001(\003\022\024\n\014audio_end_us\030\005 \001(\003\022\025\n\rlangua"
-    "ge_code\030\006 \001(\t\022\025\n\rsegment_index\030\007 \001(\005\"\230\001\n"
-    "\023AssistantTokenEvent\022\014\n\004text\030\001 \001(\t\022\020\n\010is"
-    "_final\030\002 \001(\010\022\'\n\004kind\030\003 \001(\0162\031.runanywhere"
-    ".v1.TokenKind\022\020\n\010token_id\030\004 \001(\r\022\017\n\007logpr"
-    "ob\030\005 \001(\002\022\025\n\rfinish_reason\030\006 \001(\t\"\265\001\n\017Audi"
-    "oFrameEvent\022\013\n\003pcm\030\001 \001(\014\022\026\n\016sample_rate_"
-    "hz\030\002 \001(\005\022\020\n\010channels\030\003 \001(\005\022/\n\010encoding\030\004"
-    " \001(\0162\035.runanywhere.v1.AudioEncoding\022\020\n\010i"
-    "s_final\030\005 \001(\010\022\023\n\013chunk_index\030\006 \001(\005\022\023\n\013du"
-    "ration_ms\030\007 \001(\003\"\307\001\n\010VADEvent\022*\n\004type\030\001 \001"
-    "(\0162\034.runanywhere.v1.VADEventType\022\027\n\017fram"
-    "e_offset_us\030\002 \001(\003\022\022\n\nconfidence\030\003 \001(\002\022\021\n"
-    "\tis_speech\030\004 \001(\010\022\032\n\022speech_duration_ms\030\005"
-    " \001(\001\022\033\n\023silence_duration_ms\030\006 \001(\001\022\026\n\016noi"
-    "se_floor_db\030\007 \001(\001\"S\n\020InterruptedEvent\022/\n"
-    "\006reason\030\001 \001(\0162\037.runanywhere.v1.Interrupt"
-    "Reason\022\016\n\006detail\030\002 \001(\t\"s\n\020StateChangeEve"
-    "nt\022/\n\010previous\030\001 \001(\0162\035.runanywhere.v1.Pi"
-    "pelineState\022.\n\007current\030\002 \001(\0162\035.runanywhe"
-    "re.v1.PipelineState\"\177\n\nErrorEvent\022\014\n\004cod"
-    "e\030\001 \001(\005\022\017\n\007message\030\002 \001(\t\022\021\n\tcomponent\030\003 "
-    "\001(\t\022\026\n\016is_recoverable\030\004 \001(\010\022\021\n\toperation"
-    "\030\005 \001(\t\022\024\n\014details_json\030\006 \001(\t\"\301\002\n\014Metrics"
-    "Event\022\024\n\014stt_final_ms\030\001 \001(\001\022\032\n\022llm_first"
-    "_token_ms\030\002 \001(\001\022\032\n\022tts_first_audio_ms\030\003 "
-    "\001(\001\022\025\n\rend_to_end_ms\030\004 \001(\001\022\030\n\020tokens_gen"
-    "erated\030\005 \001(\003\022\034\n\024audio_samples_played\030\006 \001"
-    "(\003\022\026\n\016is_over_budget\030\007 \001(\010\022\025\n\rcreated_at"
-    "_ns\030\010 \001(\003\022\033\n\023vad_first_speech_ms\030\t \001(\001\022\034"
-    "\n\024stt_first_partial_ms\030\n \001(\001\022\024\n\014llm_tota"
-    "l_ms\030\013 \001(\001\022\024\n\014tts_total_ms\030\014 \001(\001\"W\n\017Audi"
-    "oLevelEvent\022\013\n\003rms\030\001 \001(\002\022\014\n\004peak\030\002 \001(\002\022\026"
-    "\n\016noise_floor_db\030\003 \001(\002\022\021\n\tis_speech\030\004 \001("
-    "\010\"\211\001\n\026ComponentProgressEvent\0229\n\tcomponen"
-    "t\030\001 \001(\0162&.runanywhere.v1.VoicePipelineCo"
-    "mponent\022\021\n\toperation\030\002 \001(\t\022\020\n\010progress\030\003"
-    " \001(\002\022\017\n\007message\030\004 \001(\t\"\205\003\n\031VoiceAgentComp"
-    "onentStates\0225\n\tstt_state\030\001 \001(\0162\".runanyw"
-    "here.v1.ComponentLoadState\0225\n\tllm_state\030"
-    "\002 \001(\0162\".runanywhere.v1.ComponentLoadStat"
-    "e\0225\n\ttts_state\030\003 \001(\0162\".runanywhere.v1.Co"
-    "mponentLoadState\0225\n\tvad_state\030\004 \001(\0162\".ru"
-    "nanywhere.v1.ComponentLoadState\022\r\n\005ready"
-    "\030\005 \001(\010\022\023\n\013any_loading\030\006 \001(\010\022:\n\016wakeword_"
-    "state\030\007 \001(\0162\".runanywhere.v1.ComponentLo"
-    "adState\022\032\n\rerror_message\030\010 \001(\tH\000\210\001\001B\020\n\016_"
-    "error_message\"\266\001\n\021VoiceSessionError\0223\n\004c"
-    "ode\030\001 \001(\0162%.runanywhere.v1.VoiceSessionE"
-    "rrorCode\022\017\n\007message\030\002 \001(\t\022\035\n\020failed_comp"
-    "onent\030\003 \001(\tH\000\210\001\001\022\022\n\nc_abi_code\030\004 \001(\005\022\023\n\013"
-    "recoverable\030\005 \001(\010B\023\n\021_failed_component\")"
-    "\n\023SessionStartedEvent\022\022\n\nsession_id\030\001 \001("
-    "\t\"9\n\023SessionStoppedEvent\022\022\n\nsession_id\030\001"
-    " \001(\t\022\016\n\006reason\030\002 \001(\t\",\n\031AgentResponseSta"
-    "rtedEvent\022\017\n\007turn_id\030\001 \001(\t\"L\n\033AgentRespo"
-    "nseCompletedEvent\022\017\n\007turn_id\030\001 \001(\t\022\034\n\024re"
-    "sponse_duration_ms\030\002 \001(\003\"\343\001\n\030SpeechTurnD"
-    "etectionEvent\022:\n\004kind\030\001 \001(\0162,.runanywher"
-    "e.v1.SpeechTurnDetectionEventKind\022\022\n\nspe"
-    "aker_id\030\002 \001(\t\022\025\n\rturn_start_us\030\003 \001(\003\022\023\n\013"
-    "turn_end_us\030\004 \001(\003\022\022\n\nconfidence\030\005 \001(\002\022\032\n"
-    "\022speech_duration_ms\030\006 \001(\001\022\033\n\023silence_dur"
-    "ation_ms\030\007 \001(\001\"\324\001\n\022TurnLifecycleEvent\0224\n"
-    "\004kind\030\001 \001(\0162&.runanywhere.v1.TurnLifecyc"
-    "leEventKind\022\017\n\007turn_id\030\002 \001(\t\022\022\n\nsession_"
-    "id\030\003 \001(\t\022\022\n\ntranscript\030\004 \001(\t\022\020\n\010response"
-    "\030\005 \001(\t\022\r\n\005error\030\006 \001(\t\022\025\n\rstarted_at_ms\030\007"
-    " \001(\003\022\027\n\017completed_at_ms\030\010 \001(\003\"\220\001\n\025WakeWo"
-    "rdDetectedEvent\022\021\n\twake_word\030\001 \001(\t\022\022\n\nco"
-    "nfidence\030\002 \001(\002\022\024\n\014timestamp_ms\030\003 \001(\003\022\020\n\010"
-    "model_id\030\004 \001(\t\022\023\n\013model_index\030\005 \001(\005\022\023\n\013d"
-    "uration_ms\030\006 \001(\003*\231\003\n\022VoiceEventCategory\022"
-    "$\n VOICE_EVENT_CATEGORY_UNSPECIFIED\020\000\022$\n"
-    " VOICE_EVENT_CATEGORY_VOICE_AGENT\020\001\022\034\n\030V"
-    "OICE_EVENT_CATEGORY_STT\020\002\022\034\n\030VOICE_EVENT"
-    "_CATEGORY_ASR\020\003\022\034\n\030VOICE_EVENT_CATEGORY_"
-    "TTS\020\004\022\034\n\030VOICE_EVENT_CATEGORY_VAD\020\005\022\034\n\030V"
-    "OICE_EVENT_CATEGORY_STD\020\006\022\034\n\030VOICE_EVENT"
-    "_CATEGORY_LLM\020\007\022\036\n\032VOICE_EVENT_CATEGORY_"
-    "AUDIO\020\010\022 \n\034VOICE_EVENT_CATEGORY_METRICS\020"
-    "\t\022\036\n\032VOICE_EVENT_CATEGORY_ERROR\020\n\022!\n\035VOI"
-    "CE_EVENT_CATEGORY_WAKEWORD\020\013*\270\001\n\022VoiceEv"
-    "entSeverity\022\036\n\032VOICE_EVENT_SEVERITY_DEBU"
-    "G\020\000\022\035\n\031VOICE_EVENT_SEVERITY_INFO\020\001\022 \n\034VO"
-    "ICE_EVENT_SEVERITY_WARNING\020\002\022\036\n\032VOICE_EV"
-    "ENT_SEVERITY_ERROR\020\003\022!\n\035VOICE_EVENT_SEVE"
-    "RITY_CRITICAL\020\004*\375\002\n\026VoicePipelineCompone"
-    "nt\022(\n$VOICE_PIPELINE_COMPONENT_UNSPECIFI"
-    "ED\020\000\022\"\n\036VOICE_PIPELINE_COMPONENT_AGENT\020\001"
-    "\022 \n\034VOICE_PIPELINE_COMPONENT_STT\020\002\022 \n\034VO"
-    "ICE_PIPELINE_COMPONENT_ASR\020\003\022 \n\034VOICE_PI"
-    "PELINE_COMPONENT_TTS\020\004\022 \n\034VOICE_PIPELINE"
-    "_COMPONENT_VAD\020\005\022 \n\034VOICE_PIPELINE_COMPO"
-    "NENT_STD\020\006\022 \n\034VOICE_PIPELINE_COMPONENT_L"
-    "LM\020\007\022\"\n\036VOICE_PIPELINE_COMPONENT_AUDIO\020\010"
-    "\022%\n!VOICE_PIPELINE_COMPONENT_WAKEWORD\020\t*"
-    "p\n\tTokenKind\022\032\n\026TOKEN_KIND_UNSPECIFIED\020\000"
-    "\022\025\n\021TOKEN_KIND_ANSWER\020\001\022\026\n\022TOKEN_KIND_TH"
-    "OUGHT\020\002\022\030\n\024TOKEN_KIND_TOOL_CALL\020\003*m\n\rAud"
-    "ioEncoding\022\036\n\032AUDIO_ENCODING_UNSPECIFIED"
-    "\020\000\022\035\n\031AUDIO_ENCODING_PCM_F32_LE\020\001\022\035\n\031AUD"
-    "IO_ENCODING_PCM_S16_LE\020\002*\320\001\n\014VADEventTyp"
-    "e\022\031\n\025VAD_EVENT_UNSPECIFIED\020\000\022\031\n\025VAD_EVEN"
-    "T_VOICE_START\020\001\022$\n VAD_EVENT_VOICE_END_O"
-    "F_UTTERANCE\020\002\022\026\n\022VAD_EVENT_BARGE_IN\020\003\022\025\n"
-    "\021VAD_EVENT_SILENCE\020\004\022\030\n\024VAD_EVENT_STATIS"
-    "TICS\020\005\022\033\n\027VAD_EVENT_STATE_CHANGED\020\006*\275\001\n\017"
-    "InterruptReason\022 \n\034INTERRUPT_REASON_UNSP"
-    "ECIFIED\020\000\022\"\n\036INTERRUPT_REASON_USER_BARGE"
-    "_IN\020\001\022\035\n\031INTERRUPT_REASON_APP_STOP\020\002\022\'\n#"
-    "INTERRUPT_REASON_AUDIO_ROUTE_CHANGE\020\003\022\034\n"
-    "\030INTERRUPT_REASON_TIMEOUT\020\004*\206\003\n\rPipeline"
-    "State\022\036\n\032PIPELINE_STATE_UNSPECIFIED\020\000\022\027\n"
-    "\023PIPELINE_STATE_IDLE\020\001\022\034\n\030PIPELINE_STATE"
-    "_LISTENING\020\002\022\033\n\027PIPELINE_STATE_THINKING\020"
-    "\003\022\033\n\027PIPELINE_STATE_SPEAKING\020\004\022\032\n\026PIPELI"
-    "NE_STATE_STOPPED\020\005\022#\n\037PIPELINE_STATE_WAI"
-    "TING_WAKEWORD\020\006\022$\n PIPELINE_STATE_PROCES"
-    "SING_SPEECH\020\007\022&\n\"PIPELINE_STATE_GENERATI"
-    "NG_RESPONSE\020\010\022\036\n\032PIPELINE_STATE_PLAYING_"
-    "TTS\020\t\022\033\n\027PIPELINE_STATE_COOLDOWN\020\n\022\030\n\024PI"
-    "PELINE_STATE_ERROR\020\013*\302\001\n\022ComponentLoadSt"
-    "ate\022$\n COMPONENT_LOAD_STATE_UNSPECIFIED\020"
-    "\000\022#\n\037COMPONENT_LOAD_STATE_NOT_LOADED\020\001\022 "
-    "\n\034COMPONENT_LOAD_STATE_LOADING\020\002\022\037\n\033COMP"
-    "ONENT_LOAD_STATE_LOADED\020\003\022\036\n\032COMPONENT_L"
-    "OAD_STATE_ERROR\020\004*\202\002\n\025VoiceSessionErrorC"
-    "ode\022(\n$VOICE_SESSION_ERROR_CODE_UNSPECIF"
-    "IED\020\000\0229\n5VOICE_SESSION_ERROR_CODE_MICROP"
-    "HONE_PERMISSION_DENIED\020\001\022&\n\"VOICE_SESSIO"
-    "N_ERROR_CODE_NOT_READY\020\002\022,\n(VOICE_SESSIO"
-    "N_ERROR_CODE_ALREADY_RUNNING\020\003\022.\n*VOICE_"
-    "SESSION_ERROR_CODE_COMPONENT_FAILURE\020\004*\233"
-    "\002\n\034SpeechTurnDetectionEventKind\0220\n,SPEEC"
-    "H_TURN_DETECTION_EVENT_KIND_UNSPECIFIED\020"
-    "\000\0221\n-SPEECH_TURN_DETECTION_EVENT_KIND_TU"
-    "RN_STARTED\020\001\022/\n+SPEECH_TURN_DETECTION_EV"
-    "ENT_KIND_TURN_ENDED\020\002\0224\n0SPEECH_TURN_DET"
-    "ECTION_EVENT_KIND_SPEAKER_CHANGED\020\003\022/\n+S"
-    "PEECH_TURN_DETECTION_EVENT_KIND_STATISTI"
-    "CS\020\004*\347\003\n\026TurnLifecycleEventKind\022)\n%TURN_"
-    "LIFECYCLE_EVENT_KIND_UNSPECIFIED\020\000\022%\n!TU"
-    "RN_LIFECYCLE_EVENT_KIND_STARTED\020\001\0221\n-TUR"
-    "N_LIFECYCLE_EVENT_KIND_USER_SPEECH_START"
-    "ED\020\002\022/\n+TURN_LIFECYCLE_EVENT_KIND_USER_S"
-    "PEECH_ENDED\020\003\0221\n-TURN_LIFECYCLE_EVENT_KI"
-    "ND_TRANSCRIPTION_FINAL\020\004\0224\n0TURN_LIFECYC"
-    "LE_EVENT_KIND_AGENT_RESPONSE_STARTED\020\005\0226"
-    "\n2TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPON"
-    "SE_COMPLETED\020\006\022\'\n#TURN_LIFECYCLE_EVENT_K"
-    "IND_COMPLETED\020\007\022\'\n#TURN_LIFECYCLE_EVENT_"
-    "KIND_CANCELLED\020\010\022$\n TURN_LIFECYCLE_EVENT"
-    "_KIND_FAILED\020\tBM\n\027ai.runanywhere.proto.v"
-    "1B\020VoiceEventsProtoP\001\370\001\001\242\002\004RAV1\252\002\016Runany"
-    "where.V1\272\002\002RAb\006proto3"
+    "\n\022voice_events.proto\022\016runanywhere.v1\032\025co"
+    "mponent_types.proto\032\014errors.proto\032\021vad_o"
+    "ptions.proto\"\211\014\n\nVoiceEvent\022\013\n\003seq\030\001 \001(\004"
+    "\022\024\n\014timestamp_us\030\002 \001(\003\022/\n\010category\030\003 \001(\016"
+    "2\035.runanywhere.v1.EventCategory\022/\n\010sever"
+    "ity\030\004 \001(\0162\035.runanywhere.v1.ErrorSeverity"
+    "\0229\n\tcomponent\030\005 \001(\0162&.runanywhere.v1.Voi"
+    "cePipelineComponent\0222\n\tuser_said\030\n \001(\0132\035"
+    ".runanywhere.v1.UserSaidEventH\000\022>\n\017assis"
+    "tant_token\030\013 \001(\0132#.runanywhere.v1.Assist"
+    "antTokenEventH\000\0220\n\005audio\030\014 \001(\0132\037.runanyw"
+    "here.v1.AudioFrameEventH\000\022\'\n\003vad\030\r \001(\0132\030"
+    ".runanywhere.v1.VADEventH\000\0227\n\013interrupte"
+    "d\030\016 \001(\0132 .runanywhere.v1.InterruptedEven"
+    "tH\000\0221\n\005state\030\017 \001(\0132 .runanywhere.v1.Stat"
+    "eChangeEventH\000\022+\n\005error\030\020 \001(\0132\032.runanywh"
+    "ere.v1.ErrorEventH\000\022/\n\007metrics\030\021 \001(\0132\034.r"
+    "unanywhere.v1.MetricsEventH\000\022L\n\027componen"
+    "t_state_changed\030\022 \001(\0132).runanywhere.v1.V"
+    "oiceAgentComponentStatesH\000\022:\n\rsession_er"
+    "ror\030\023 \001(\0132!.runanywhere.v1.VoiceSessionE"
+    "rrorH\000\022>\n\017session_started\030\024 \001(\0132#.runany"
+    "where.v1.SessionStartedEventH\000\022>\n\017sessio"
+    "n_stopped\030\025 \001(\0132#.runanywhere.v1.Session"
+    "StoppedEventH\000\022K\n\026agent_response_started"
+    "\030\026 \001(\0132).runanywhere.v1.AgentResponseSta"
+    "rtedEventH\000\022O\n\030agent_response_completed\030"
+    "\027 \001(\0132+.runanywhere.v1.AgentResponseComp"
+    "letedEventH\000\022I\n\025speech_turn_detection\030\030 "
+    "\001(\0132(.runanywhere.v1.SpeechTurnDetection"
+    "EventH\000\022<\n\016turn_lifecycle\030\031 \001(\0132\".runany"
+    "where.v1.TurnLifecycleEventH\000\022B\n\021wakewor"
+    "d_detected\030\032 \001(\0132%.runanywhere.v1.WakeWo"
+    "rdDetectedEventH\000\0226\n\013audio_level\030\033 \001(\0132\037"
+    ".runanywhere.v1.AudioLevelEventH\000\022D\n\022com"
+    "ponent_progress\030\034 \001(\0132&.runanywhere.v1.C"
+    "omponentProgressEventH\000\022\022\n\nsession_id\030\036 "
+    "\001(\t\022\017\n\007turn_id\030\037 \001(\t\022\022\n\nrequest_id\030  \001(\t"
+    "\022:\n\010metadata\030! \003(\0132(.runanywhere.v1.Voic"
+    "eEvent.MetadataEntry\032/\n\rMetadataEntry\022\013\n"
+    "\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\t\n\007payload"
+    "\"\237\001\n\rUserSaidEvent\022\014\n\004text\030\001 \001(\t\022\020\n\010is_f"
+    "inal\030\002 \001(\010\022\022\n\nconfidence\030\003 \001(\002\022\026\n\016audio_"
+    "start_us\030\004 \001(\003\022\024\n\014audio_end_us\030\005 \001(\003\022\025\n\r"
+    "language_code\030\006 \001(\t\022\025\n\rsegment_index\030\007 \001"
+    "(\005\"\230\001\n\023AssistantTokenEvent\022\014\n\004text\030\001 \001(\t"
+    "\022\020\n\010is_final\030\002 \001(\010\022\'\n\004kind\030\003 \001(\0162\031.runan"
+    "ywhere.v1.TokenKind\022\020\n\010token_id\030\004 \001(\r\022\017\n"
+    "\007logprob\030\005 \001(\002\022\025\n\rfinish_reason\030\006 \001(\t\"\265\001"
+    "\n\017AudioFrameEvent\022\013\n\003pcm\030\001 \001(\014\022\026\n\016sample"
+    "_rate_hz\030\002 \001(\005\022\020\n\010channels\030\003 \001(\005\022/\n\010enco"
+    "ding\030\004 \001(\0162\035.runanywhere.v1.AudioEncodin"
+    "g\022\020\n\010is_final\030\005 \001(\010\022\023\n\013chunk_index\030\006 \001(\005"
+    "\022\023\n\013duration_ms\030\007 \001(\003\"\315\001\n\010VADEvent\0220\n\004ty"
+    "pe\030\001 \001(\0162\".runanywhere.v1.VADStreamEvent"
+    "Kind\022\027\n\017frame_offset_us\030\002 \001(\003\022\022\n\nconfide"
+    "nce\030\003 \001(\002\022\021\n\tis_speech\030\004 \001(\010\022\032\n\022speech_d"
+    "uration_ms\030\005 \001(\001\022\033\n\023silence_duration_ms\030"
+    "\006 \001(\001\022\026\n\016noise_floor_db\030\007 \001(\001\"S\n\020Interru"
+    "ptedEvent\022/\n\006reason\030\001 \001(\0162\037.runanywhere."
+    "v1.InterruptReason\022\016\n\006detail\030\002 \001(\t\"s\n\020St"
+    "ateChangeEvent\022/\n\010previous\030\001 \001(\0162\035.runan"
+    "ywhere.v1.PipelineState\022.\n\007current\030\002 \001(\016"
+    "2\035.runanywhere.v1.PipelineState\"\177\n\nError"
+    "Event\022\014\n\004code\030\001 \001(\005\022\017\n\007message\030\002 \001(\t\022\021\n\t"
+    "component\030\003 \001(\t\022\026\n\016is_recoverable\030\004 \001(\010\022"
+    "\021\n\toperation\030\005 \001(\t\022\024\n\014details_json\030\006 \001(\t"
+    "\"\301\002\n\014MetricsEvent\022\024\n\014stt_final_ms\030\001 \001(\001\022"
+    "\032\n\022llm_first_token_ms\030\002 \001(\001\022\032\n\022tts_first"
+    "_audio_ms\030\003 \001(\001\022\025\n\rend_to_end_ms\030\004 \001(\001\022\030"
+    "\n\020tokens_generated\030\005 \001(\003\022\034\n\024audio_sample"
+    "s_played\030\006 \001(\003\022\026\n\016is_over_budget\030\007 \001(\010\022\025"
+    "\n\rcreated_at_ns\030\010 \001(\003\022\033\n\023vad_first_speec"
+    "h_ms\030\t \001(\001\022\034\n\024stt_first_partial_ms\030\n \001(\001"
+    "\022\024\n\014llm_total_ms\030\013 \001(\001\022\024\n\014tts_total_ms\030\014"
+    " \001(\001\"W\n\017AudioLevelEvent\022\013\n\003rms\030\001 \001(\002\022\014\n\004"
+    "peak\030\002 \001(\002\022\026\n\016noise_floor_db\030\003 \001(\002\022\021\n\tis"
+    "_speech\030\004 \001(\010\"\211\001\n\026ComponentProgressEvent"
+    "\0229\n\tcomponent\030\001 \001(\0162&.runanywhere.v1.Voi"
+    "cePipelineComponent\022\021\n\toperation\030\002 \001(\t\022\020"
+    "\n\010progress\030\003 \001(\002\022\017\n\007message\030\004 \001(\t\"\236\003\n\031Vo"
+    "iceAgentComponentStates\022:\n\tstt_state\030\001 \001"
+    "(\0162\'.runanywhere.v1.ComponentLifecycleSt"
+    "ate\022:\n\tllm_state\030\002 \001(\0162\'.runanywhere.v1."
+    "ComponentLifecycleState\022:\n\ttts_state\030\003 \001"
+    "(\0162\'.runanywhere.v1.ComponentLifecycleSt"
+    "ate\022:\n\tvad_state\030\004 \001(\0162\'.runanywhere.v1."
+    "ComponentLifecycleState\022\r\n\005ready\030\005 \001(\010\022\023"
+    "\n\013any_loading\030\006 \001(\010\022\?\n\016wakeword_state\030\007 "
+    "\001(\0162\'.runanywhere.v1.ComponentLifecycleS"
+    "tate\022\032\n\rerror_message\030\010 \001(\tH\000\210\001\001B\020\n\016_err"
+    "or_message\"\252\001\n\021VoiceSessionError\022\'\n\004code"
+    "\030\001 \001(\0162\031.runanywhere.v1.ErrorCode\022\017\n\007mes"
+    "sage\030\002 \001(\t\022\035\n\020failed_component\030\003 \001(\tH\000\210\001"
+    "\001\022\022\n\nc_abi_code\030\004 \001(\005\022\023\n\013recoverable\030\005 \001"
+    "(\010B\023\n\021_failed_component\")\n\023SessionStarte"
+    "dEvent\022\022\n\nsession_id\030\001 \001(\t\"9\n\023SessionSto"
+    "ppedEvent\022\022\n\nsession_id\030\001 \001(\t\022\016\n\006reason\030"
+    "\002 \001(\t\",\n\031AgentResponseStartedEvent\022\017\n\007tu"
+    "rn_id\030\001 \001(\t\"L\n\033AgentResponseCompletedEve"
+    "nt\022\017\n\007turn_id\030\001 \001(\t\022\034\n\024response_duration"
+    "_ms\030\002 \001(\003\"\343\001\n\030SpeechTurnDetectionEvent\022:"
+    "\n\004kind\030\001 \001(\0162,.runanywhere.v1.SpeechTurn"
+    "DetectionEventKind\022\022\n\nspeaker_id\030\002 \001(\t\022\025"
+    "\n\rturn_start_us\030\003 \001(\003\022\023\n\013turn_end_us\030\004 \001"
+    "(\003\022\022\n\nconfidence\030\005 \001(\002\022\032\n\022speech_duratio"
+    "n_ms\030\006 \001(\001\022\033\n\023silence_duration_ms\030\007 \001(\001\""
+    "\324\001\n\022TurnLifecycleEvent\0224\n\004kind\030\001 \001(\0162&.r"
+    "unanywhere.v1.TurnLifecycleEventKind\022\017\n\007"
+    "turn_id\030\002 \001(\t\022\022\n\nsession_id\030\003 \001(\t\022\022\n\ntra"
+    "nscript\030\004 \001(\t\022\020\n\010response\030\005 \001(\t\022\r\n\005error"
+    "\030\006 \001(\t\022\025\n\rstarted_at_ms\030\007 \001(\003\022\027\n\017complet"
+    "ed_at_ms\030\010 \001(\003\"\220\001\n\025WakeWordDetectedEvent"
+    "\022\021\n\twake_word\030\001 \001(\t\022\022\n\nconfidence\030\002 \001(\002\022"
+    "\024\n\014timestamp_ms\030\003 \001(\003\022\020\n\010model_id\030\004 \001(\t\022"
+    "\023\n\013model_index\030\005 \001(\005\022\023\n\013duration_ms\030\006 \001("
+    "\003*\375\002\n\026VoicePipelineComponent\022(\n$VOICE_PI"
+    "PELINE_COMPONENT_UNSPECIFIED\020\000\022\"\n\036VOICE_"
+    "PIPELINE_COMPONENT_AGENT\020\001\022 \n\034VOICE_PIPE"
+    "LINE_COMPONENT_STT\020\002\022 \n\034VOICE_PIPELINE_C"
+    "OMPONENT_ASR\020\003\022 \n\034VOICE_PIPELINE_COMPONE"
+    "NT_TTS\020\004\022 \n\034VOICE_PIPELINE_COMPONENT_VAD"
+    "\020\005\022 \n\034VOICE_PIPELINE_COMPONENT_STD\020\006\022 \n\034"
+    "VOICE_PIPELINE_COMPONENT_LLM\020\007\022\"\n\036VOICE_"
+    "PIPELINE_COMPONENT_AUDIO\020\010\022%\n!VOICE_PIPE"
+    "LINE_COMPONENT_WAKEWORD\020\t*p\n\tTokenKind\022\032"
+    "\n\026TOKEN_KIND_UNSPECIFIED\020\000\022\025\n\021TOKEN_KIND"
+    "_ANSWER\020\001\022\026\n\022TOKEN_KIND_THOUGHT\020\002\022\030\n\024TOK"
+    "EN_KIND_TOOL_CALL\020\003*m\n\rAudioEncoding\022\036\n\032"
+    "AUDIO_ENCODING_UNSPECIFIED\020\000\022\035\n\031AUDIO_EN"
+    "CODING_PCM_F32_LE\020\001\022\035\n\031AUDIO_ENCODING_PC"
+    "M_S16_LE\020\002*\275\001\n\017InterruptReason\022 \n\034INTERR"
+    "UPT_REASON_UNSPECIFIED\020\000\022\"\n\036INTERRUPT_RE"
+    "ASON_USER_BARGE_IN\020\001\022\035\n\031INTERRUPT_REASON"
+    "_APP_STOP\020\002\022\'\n#INTERRUPT_REASON_AUDIO_RO"
+    "UTE_CHANGE\020\003\022\034\n\030INTERRUPT_REASON_TIMEOUT"
+    "\020\004*\206\003\n\rPipelineState\022\036\n\032PIPELINE_STATE_U"
+    "NSPECIFIED\020\000\022\027\n\023PIPELINE_STATE_IDLE\020\001\022\034\n"
+    "\030PIPELINE_STATE_LISTENING\020\002\022\033\n\027PIPELINE_"
+    "STATE_THINKING\020\003\022\033\n\027PIPELINE_STATE_SPEAK"
+    "ING\020\004\022\032\n\026PIPELINE_STATE_STOPPED\020\005\022#\n\037PIP"
+    "ELINE_STATE_WAITING_WAKEWORD\020\006\022$\n PIPELI"
+    "NE_STATE_PROCESSING_SPEECH\020\007\022&\n\"PIPELINE"
+    "_STATE_GENERATING_RESPONSE\020\010\022\036\n\032PIPELINE"
+    "_STATE_PLAYING_TTS\020\t\022\033\n\027PIPELINE_STATE_C"
+    "OOLDOWN\020\n\022\030\n\024PIPELINE_STATE_ERROR\020\013*\233\002\n\034"
+    "SpeechTurnDetectionEventKind\0220\n,SPEECH_T"
+    "URN_DETECTION_EVENT_KIND_UNSPECIFIED\020\000\0221"
+    "\n-SPEECH_TURN_DETECTION_EVENT_KIND_TURN_"
+    "STARTED\020\001\022/\n+SPEECH_TURN_DETECTION_EVENT"
+    "_KIND_TURN_ENDED\020\002\0224\n0SPEECH_TURN_DETECT"
+    "ION_EVENT_KIND_SPEAKER_CHANGED\020\003\022/\n+SPEE"
+    "CH_TURN_DETECTION_EVENT_KIND_STATISTICS\020"
+    "\004*\347\003\n\026TurnLifecycleEventKind\022)\n%TURN_LIF"
+    "ECYCLE_EVENT_KIND_UNSPECIFIED\020\000\022%\n!TURN_"
+    "LIFECYCLE_EVENT_KIND_STARTED\020\001\0221\n-TURN_L"
+    "IFECYCLE_EVENT_KIND_USER_SPEECH_STARTED\020"
+    "\002\022/\n+TURN_LIFECYCLE_EVENT_KIND_USER_SPEE"
+    "CH_ENDED\020\003\0221\n-TURN_LIFECYCLE_EVENT_KIND_"
+    "TRANSCRIPTION_FINAL\020\004\0224\n0TURN_LIFECYCLE_"
+    "EVENT_KIND_AGENT_RESPONSE_STARTED\020\005\0226\n2T"
+    "URN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_"
+    "COMPLETED\020\006\022\'\n#TURN_LIFECYCLE_EVENT_KIND"
+    "_COMPLETED\020\007\022\'\n#TURN_LIFECYCLE_EVENT_KIN"
+    "D_CANCELLED\020\010\022$\n TURN_LIFECYCLE_EVENT_KI"
+    "ND_FAILED\020\tB\213\001\n\027ai.runanywhere.proto.v1B"
+    "\020VoiceEventsProtoP\001Z<github.com/runanywh"
+    "ere/runanywhere-sdks/idl/v1;runanywherev"
+    "1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto"
+    "3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_voice_5fevents_2eproto_deps[3] = {
+        &::descriptor_table_component_5ftypes_2eproto,
+        &::descriptor_table_errors_2eproto,
+        &::descriptor_table_vad_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_voice_5fevents_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_voice_5fevents_2eproto = {
     false,
     false,
-    7901,
+    6761,
     descriptor_table_protodef_voice_5fevents_2eproto,
     "voice_events.proto",
     &descriptor_table_voice_5fevents_2eproto_once,
-    nullptr,
-    0,
+    descriptor_table_voice_5fevents_2eproto_deps,
+    3,
     21,
     schemas,
     file_default_instances,
@@ -1321,86 +1299,51 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_voice_5fevents
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VoiceEventCategory_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[0];
-}
-PROTOBUF_CONSTINIT const uint32_t VoiceEventCategory_internal_data_[] = {
-    786432u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VoiceEventSeverity_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[1];
-}
-PROTOBUF_CONSTINIT const uint32_t VoiceEventSeverity_internal_data_[] = {
-    327680u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 VoicePipelineComponent_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[2];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[0];
 }
 PROTOBUF_CONSTINIT const uint32_t VoicePipelineComponent_internal_data_[] = {
     655360u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 TokenKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[3];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[1];
 }
 PROTOBUF_CONSTINIT const uint32_t TokenKind_internal_data_[] = {
     262144u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 AudioEncoding_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[4];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t AudioEncoding_internal_data_[] = {
     196608u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VADEventType_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[5];
-}
-PROTOBUF_CONSTINIT const uint32_t VADEventType_internal_data_[] = {
-    458752u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 InterruptReason_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[6];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[3];
 }
 PROTOBUF_CONSTINIT const uint32_t InterruptReason_internal_data_[] = {
     327680u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 PipelineState_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[7];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[4];
 }
 PROTOBUF_CONSTINIT const uint32_t PipelineState_internal_data_[] = {
     786432u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-ComponentLoadState_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[8];
-}
-PROTOBUF_CONSTINIT const uint32_t ComponentLoadState_internal_data_[] = {
-    327680u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VoiceSessionErrorCode_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[9];
-}
-PROTOBUF_CONSTINIT const uint32_t VoiceSessionErrorCode_internal_data_[] = {
-    327680u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 SpeechTurnDetectionEventKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[10];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[5];
 }
 PROTOBUF_CONSTINIT const uint32_t SpeechTurnDetectionEventKind_internal_data_[] = {
     327680u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 TurnLifecycleEventKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_voice_5fevents_2eproto);
-  return file_level_enum_descriptors_voice_5fevents_2eproto[11];
+  return file_level_enum_descriptors_voice_5fevents_2eproto[6];
 }
 PROTOBUF_CONSTINIT const uint32_t TurnLifecycleEventKind_internal_data_[] = {
     655360u, 0u, };
@@ -2178,11 +2121,11 @@ VoiceEvent::_table_ = {
     {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VoiceEvent, _impl_.timestamp_us_), 4>(),
      {16, 4, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.timestamp_us_)}},
-    // .runanywhere.v1.VoiceEventCategory category = 3;
+    // .runanywhere.v1.EventCategory category = 3;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.category_), 5>(),
      {24, 5, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.category_)}},
-    // .runanywhere.v1.VoiceEventSeverity severity = 4;
+    // .runanywhere.v1.ErrorSeverity severity = 4;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.severity_), 6>(),
      {32, 6, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.severity_)}},
@@ -2207,9 +2150,9 @@ VoiceEvent::_table_ = {
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.seq_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
     // int64 timestamp_us = 2;
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-    // .runanywhere.v1.VoiceEventCategory category = 3;
+    // .runanywhere.v1.EventCategory category = 3;
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.category_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // .runanywhere.v1.VoiceEventSeverity severity = 4;
+    // .runanywhere.v1.ErrorSeverity severity = 4;
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.severity_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.VoicePipelineComponent component = 5;
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.component_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
@@ -2361,7 +2304,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
     }
   }
 
-  // .runanywhere.v1.VoiceEventCategory category = 3;
+  // .runanywhere.v1.EventCategory category = 3;
   if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_category() != 0) {
       target = stream->EnsureSpace(target);
@@ -2370,7 +2313,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
     }
   }
 
-  // .runanywhere.v1.VoiceEventSeverity severity = 4;
+  // .runanywhere.v1.ErrorSeverity severity = 4;
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_severity() != 0) {
       target = stream->EnsureSpace(target);
@@ -2632,14 +2575,14 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
             this_._internal_timestamp_us());
       }
     }
-    // .runanywhere.v1.VoiceEventCategory category = 3;
+    // .runanywhere.v1.EventCategory category = 3;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_category() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_category());
       }
     }
-    // .runanywhere.v1.VoiceEventSeverity severity = 4;
+    // .runanywhere.v1.ErrorSeverity severity = 4;
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_severity() != 0) {
         total_size += 1 +
@@ -4571,7 +4514,7 @@ VADEvent::_table_ = {
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
-    // .runanywhere.v1.VADEventType type = 1;
+    // .runanywhere.v1.VADStreamEventKind type = 1;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADEvent, _impl_.type_), 1>(),
      {8, 1, 0,
       PROTOBUF_FIELD_OFFSET(VADEvent, _impl_.type_)}},
@@ -4602,7 +4545,7 @@ VADEvent::_table_ = {
   }}, {{
     65535, 65535
   }}, {{
-    // .runanywhere.v1.VADEventType type = 1;
+    // .runanywhere.v1.VADStreamEventKind type = 1;
     {PROTOBUF_FIELD_OFFSET(VADEvent, _impl_.type_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // int64 frame_offset_us = 2;
     {PROTOBUF_FIELD_OFFSET(VADEvent, _impl_.frame_offset_us_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
@@ -4657,7 +4600,7 @@ PROTOBUF_NOINLINE void VADEvent::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.VADEventType type = 1;
+  // .runanywhere.v1.VADStreamEventKind type = 1;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_type() != 0) {
       target = stream->EnsureSpace(target);
@@ -4753,7 +4696,7 @@ PROTOBUF_NOINLINE void VADEvent::Clear() {
             this_._internal_frame_offset_us());
       }
     }
-    // .runanywhere.v1.VADEventType type = 1;
+    // .runanywhere.v1.VADStreamEventKind type = 1;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_type() != 0) {
         total_size += 1 +
@@ -7401,19 +7344,19 @@ VoiceAgentComponentStates::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {66, 0, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.error_message_)}},
-    // .runanywhere.v1.ComponentLoadState stt_state = 1;
+    // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.stt_state_), 1>(),
      {8, 1, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.stt_state_)}},
-    // .runanywhere.v1.ComponentLoadState llm_state = 2;
+    // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.llm_state_), 2>(),
      {16, 2, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.llm_state_)}},
-    // .runanywhere.v1.ComponentLoadState tts_state = 3;
+    // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.tts_state_), 3>(),
      {24, 3, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.tts_state_)}},
-    // .runanywhere.v1.ComponentLoadState vad_state = 4;
+    // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.vad_state_), 4>(),
      {32, 4, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.vad_state_)}},
@@ -7425,26 +7368,26 @@ VoiceAgentComponentStates::_table_ = {
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceAgentComponentStates, _impl_.any_loading_), 6>(),
      {48, 6, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.any_loading_)}},
-    // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+    // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.wakeword_state_), 7>(),
      {56, 7, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.wakeword_state_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // .runanywhere.v1.ComponentLoadState stt_state = 1;
+    // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.stt_state_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // .runanywhere.v1.ComponentLoadState llm_state = 2;
+    // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.llm_state_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // .runanywhere.v1.ComponentLoadState tts_state = 3;
+    // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.tts_state_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // .runanywhere.v1.ComponentLoadState vad_state = 4;
+    // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.vad_state_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // bool ready = 5;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.ready_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // bool any_loading = 6;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.any_loading_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+    // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.wakeword_state_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // optional string error_message = 8;
     {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
@@ -7495,7 +7438,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.ComponentLoadState stt_state = 1;
+  // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_stt_state() != 0) {
       target = stream->EnsureSpace(target);
@@ -7504,7 +7447,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
     }
   }
 
-  // .runanywhere.v1.ComponentLoadState llm_state = 2;
+  // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_llm_state() != 0) {
       target = stream->EnsureSpace(target);
@@ -7513,7 +7456,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
     }
   }
 
-  // .runanywhere.v1.ComponentLoadState tts_state = 3;
+  // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_tts_state() != 0) {
       target = stream->EnsureSpace(target);
@@ -7522,7 +7465,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
     }
   }
 
-  // .runanywhere.v1.ComponentLoadState vad_state = 4;
+  // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_vad_state() != 0) {
       target = stream->EnsureSpace(target);
@@ -7549,7 +7492,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
     }
   }
 
-  // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+  // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_wakeword_state() != 0) {
       target = stream->EnsureSpace(target);
@@ -7597,28 +7540,28 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_error_message());
     }
-    // .runanywhere.v1.ComponentLoadState stt_state = 1;
+    // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_stt_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_stt_state());
       }
     }
-    // .runanywhere.v1.ComponentLoadState llm_state = 2;
+    // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_llm_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_llm_state());
       }
     }
-    // .runanywhere.v1.ComponentLoadState tts_state = 3;
+    // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_tts_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_tts_state());
       }
     }
-    // .runanywhere.v1.ComponentLoadState vad_state = 4;
+    // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_vad_state() != 0) {
         total_size += 1 +
@@ -7637,7 +7580,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
         total_size += 2;
       }
     }
-    // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+    // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_wakeword_state() != 0) {
         total_size += 1 +
@@ -7879,7 +7822,7 @@ VoiceSessionError::_table_ = {
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
-    // .runanywhere.v1.VoiceSessionErrorCode code = 1;
+    // .runanywhere.v1.ErrorCode code = 1;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceSessionError, _impl_.code_), 2>(),
      {8, 2, 0,
       PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.code_)}},
@@ -7904,7 +7847,7 @@ VoiceSessionError::_table_ = {
   }}, {{
     65535, 65535
   }}, {{
-    // .runanywhere.v1.VoiceSessionErrorCode code = 1;
+    // .runanywhere.v1.ErrorCode code = 1;
     {PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.code_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // string message = 2;
     {PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
@@ -7967,7 +7910,7 @@ PROTOBUF_NOINLINE void VoiceSessionError::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.VoiceSessionErrorCode code = 1;
+  // .runanywhere.v1.ErrorCode code = 1;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_code() != 0) {
       target = stream->EnsureSpace(target);
@@ -8050,7 +7993,7 @@ PROTOBUF_NOINLINE void VoiceSessionError::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_failed_component());
     }
-    // .runanywhere.v1.VoiceSessionErrorCode code = 1;
+    // .runanywhere.v1.ErrorCode code = 1;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_code() != 0) {
         total_size += 1 +

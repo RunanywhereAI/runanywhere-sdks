@@ -61,8 +61,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_vlm_
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum VLMErrorCode : int;
-extern const uint32_t VLMErrorCode_internal_data_[];
 enum VLMImageFormat : int;
 extern const uint32_t VLMImageFormat_internal_data_[];
 enum VLMModelFamily : int;
@@ -113,9 +111,6 @@ extern const ::google::protobuf::internal::ClassDataFull VLMStreamEvent_class_da
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
-template <>
-internal::EnumTraitsT<::runanywhere::v1::VLMErrorCode_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::VLMErrorCode>;
 template <>
 internal::EnumTraitsT<::runanywhere::v1::VLMImageFormat_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::VLMImageFormat>;
@@ -213,53 +208,6 @@ template <typename T>
 [[nodiscard]] inline bool VLMModelFamily_Parse(
     ::absl::string_view name, VLMModelFamily* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<VLMModelFamily>(VLMModelFamily_descriptor(), name,
-                                           value);
-}
-enum VLMErrorCode : int {
-  VLM_ERROR_CODE_UNSPECIFIED = 0,
-  VLM_ERROR_CODE_INVALID_IMAGE = 1,
-  VLM_ERROR_CODE_MODEL_NOT_LOADED = 2,
-  VLM_ERROR_CODE_UNSUPPORTED_FORMAT = 3,
-  VLM_ERROR_CODE_IMAGE_TOO_LARGE = 4,
-  VLM_ERROR_CODE_NOT_INITIALIZED = 5,
-  VLM_ERROR_CODE_MODEL_LOAD_FAILED = 6,
-  VLM_ERROR_CODE_PROCESSING_FAILED = 7,
-  VLM_ERROR_CODE_CANCELLED = 8,
-  VLMErrorCode_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  VLMErrorCode_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t VLMErrorCode_internal_data_[];
-inline constexpr VLMErrorCode VLMErrorCode_MIN =
-    static_cast<VLMErrorCode>(0);
-inline constexpr VLMErrorCode VLMErrorCode_MAX =
-    static_cast<VLMErrorCode>(8);
-[[nodiscard]] inline bool VLMErrorCode_IsValid(int value) {
-  return 0 <= value && value <= 8;
-}
-inline constexpr int VLMErrorCode_ARRAYSIZE = 8 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VLMErrorCode_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VLMErrorCode) {
-  return VLMErrorCode_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& VLMErrorCode_Name(T value) {
-  static_assert(::std::is_same<T, VLMErrorCode>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to VLMErrorCode_Name().");
-  return VLMErrorCode_Name(static_cast<VLMErrorCode>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& VLMErrorCode_Name(VLMErrorCode value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VLMErrorCode_descriptor, 0, 8>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool VLMErrorCode_Parse(
-    ::absl::string_view name, VLMErrorCode* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<VLMErrorCode>(VLMErrorCode_descriptor(), name,
                                            value);
 }
 enum VLMStreamEventKind : int {
@@ -6540,12 +6488,6 @@ struct is_proto_enum<::runanywhere::v1::VLMModelFamily> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VLMModelFamily>() {
   return ::runanywhere::v1::VLMModelFamily_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::VLMErrorCode> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VLMErrorCode>() {
-  return ::runanywhere::v1::VLMErrorCode_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::VLMStreamEventKind> : std::true_type {};

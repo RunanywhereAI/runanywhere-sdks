@@ -35,6 +35,9 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "component_types.pb.h"
+#include "errors.pb.h"
+#include "vad_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -62,8 +65,6 @@ namespace runanywhere {
 namespace v1 {
 enum AudioEncoding : int;
 extern const uint32_t AudioEncoding_internal_data_[];
-enum ComponentLoadState : int;
-extern const uint32_t ComponentLoadState_internal_data_[];
 enum InterruptReason : int;
 extern const uint32_t InterruptReason_internal_data_[];
 enum PipelineState : int;
@@ -74,16 +75,8 @@ enum TokenKind : int;
 extern const uint32_t TokenKind_internal_data_[];
 enum TurnLifecycleEventKind : int;
 extern const uint32_t TurnLifecycleEventKind_internal_data_[];
-enum VADEventType : int;
-extern const uint32_t VADEventType_internal_data_[];
-enum VoiceEventCategory : int;
-extern const uint32_t VoiceEventCategory_internal_data_[];
-enum VoiceEventSeverity : int;
-extern const uint32_t VoiceEventSeverity_internal_data_[];
 enum VoicePipelineComponent : int;
 extern const uint32_t VoicePipelineComponent_internal_data_[];
-enum VoiceSessionErrorCode : int;
-extern const uint32_t VoiceSessionErrorCode_internal_data_[];
 class AgentResponseCompletedEvent;
 struct AgentResponseCompletedEventDefaultTypeInternal;
 extern AgentResponseCompletedEventDefaultTypeInternal _AgentResponseCompletedEvent_default_instance_;
@@ -176,9 +169,6 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::AudioEncoding_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::AudioEncoding>;
 template <>
-internal::EnumTraitsT<::runanywhere::v1::ComponentLoadState_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::ComponentLoadState>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::InterruptReason_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::InterruptReason>;
 template <>
@@ -194,118 +184,13 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::TurnLifecycleEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::TurnLifecycleEventKind>;
 template <>
-internal::EnumTraitsT<::runanywhere::v1::VADEventType_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::VADEventType>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::VoiceEventCategory_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::VoiceEventCategory>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::VoiceEventSeverity_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::VoiceEventSeverity>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::VoicePipelineComponent_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::VoicePipelineComponent>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::VoiceSessionErrorCode_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::VoiceSessionErrorCode>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
-enum VoiceEventCategory : int {
-  VOICE_EVENT_CATEGORY_UNSPECIFIED = 0,
-  VOICE_EVENT_CATEGORY_VOICE_AGENT = 1,
-  VOICE_EVENT_CATEGORY_STT = 2,
-  VOICE_EVENT_CATEGORY_ASR = 3,
-  VOICE_EVENT_CATEGORY_TTS = 4,
-  VOICE_EVENT_CATEGORY_VAD = 5,
-  VOICE_EVENT_CATEGORY_STD = 6,
-  VOICE_EVENT_CATEGORY_LLM = 7,
-  VOICE_EVENT_CATEGORY_AUDIO = 8,
-  VOICE_EVENT_CATEGORY_METRICS = 9,
-  VOICE_EVENT_CATEGORY_ERROR = 10,
-  VOICE_EVENT_CATEGORY_WAKEWORD = 11,
-  VoiceEventCategory_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  VoiceEventCategory_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t VoiceEventCategory_internal_data_[];
-inline constexpr VoiceEventCategory VoiceEventCategory_MIN =
-    static_cast<VoiceEventCategory>(0);
-inline constexpr VoiceEventCategory VoiceEventCategory_MAX =
-    static_cast<VoiceEventCategory>(11);
-[[nodiscard]] inline bool VoiceEventCategory_IsValid(int value) {
-  return 0 <= value && value <= 11;
-}
-inline constexpr int VoiceEventCategory_ARRAYSIZE = 11 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VoiceEventCategory_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VoiceEventCategory) {
-  return VoiceEventCategory_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& VoiceEventCategory_Name(T value) {
-  static_assert(::std::is_same<T, VoiceEventCategory>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to VoiceEventCategory_Name().");
-  return VoiceEventCategory_Name(static_cast<VoiceEventCategory>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& VoiceEventCategory_Name(VoiceEventCategory value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VoiceEventCategory_descriptor, 0, 11>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool VoiceEventCategory_Parse(
-    ::absl::string_view name, VoiceEventCategory* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<VoiceEventCategory>(VoiceEventCategory_descriptor(), name,
-                                           value);
-}
-enum VoiceEventSeverity : int {
-  VOICE_EVENT_SEVERITY_DEBUG = 0,
-  VOICE_EVENT_SEVERITY_INFO = 1,
-  VOICE_EVENT_SEVERITY_WARNING = 2,
-  VOICE_EVENT_SEVERITY_ERROR = 3,
-  VOICE_EVENT_SEVERITY_CRITICAL = 4,
-  VoiceEventSeverity_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  VoiceEventSeverity_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t VoiceEventSeverity_internal_data_[];
-inline constexpr VoiceEventSeverity VoiceEventSeverity_MIN =
-    static_cast<VoiceEventSeverity>(0);
-inline constexpr VoiceEventSeverity VoiceEventSeverity_MAX =
-    static_cast<VoiceEventSeverity>(4);
-[[nodiscard]] inline bool VoiceEventSeverity_IsValid(int value) {
-  return 0 <= value && value <= 4;
-}
-inline constexpr int VoiceEventSeverity_ARRAYSIZE = 4 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VoiceEventSeverity_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VoiceEventSeverity) {
-  return VoiceEventSeverity_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& VoiceEventSeverity_Name(T value) {
-  static_assert(::std::is_same<T, VoiceEventSeverity>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to VoiceEventSeverity_Name().");
-  return VoiceEventSeverity_Name(static_cast<VoiceEventSeverity>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& VoiceEventSeverity_Name(VoiceEventSeverity value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VoiceEventSeverity_descriptor, 0, 4>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool VoiceEventSeverity_Parse(
-    ::absl::string_view name, VoiceEventSeverity* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<VoiceEventSeverity>(VoiceEventSeverity_descriptor(), name,
-                                           value);
-}
 enum VoicePipelineComponent : int {
   VOICE_PIPELINE_COMPONENT_UNSPECIFIED = 0,
   VOICE_PIPELINE_COMPONENT_AGENT = 1,
@@ -437,51 +322,6 @@ template <>
   return ::google::protobuf::internal::ParseNamedEnum<AudioEncoding>(AudioEncoding_descriptor(), name,
                                            value);
 }
-enum VADEventType : int {
-  VAD_EVENT_UNSPECIFIED = 0,
-  VAD_EVENT_VOICE_START = 1,
-  VAD_EVENT_VOICE_END_OF_UTTERANCE = 2,
-  VAD_EVENT_BARGE_IN = 3,
-  VAD_EVENT_SILENCE = 4,
-  VAD_EVENT_STATISTICS = 5,
-  VAD_EVENT_STATE_CHANGED = 6,
-  VADEventType_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  VADEventType_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t VADEventType_internal_data_[];
-inline constexpr VADEventType VADEventType_MIN =
-    static_cast<VADEventType>(0);
-inline constexpr VADEventType VADEventType_MAX =
-    static_cast<VADEventType>(6);
-[[nodiscard]] inline bool VADEventType_IsValid(int value) {
-  return 0 <= value && value <= 6;
-}
-inline constexpr int VADEventType_ARRAYSIZE = 6 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VADEventType_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VADEventType) {
-  return VADEventType_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& VADEventType_Name(T value) {
-  static_assert(::std::is_same<T, VADEventType>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to VADEventType_Name().");
-  return VADEventType_Name(static_cast<VADEventType>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& VADEventType_Name(VADEventType value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VADEventType_descriptor, 0, 6>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool VADEventType_Parse(
-    ::absl::string_view name, VADEventType* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<VADEventType>(VADEventType_descriptor(), name,
-                                           value);
-}
 enum InterruptReason : int {
   INTERRUPT_REASON_UNSPECIFIED = 0,
   INTERRUPT_REASON_USER_BARGE_IN = 1,
@@ -573,92 +413,6 @@ template <>
 [[nodiscard]] inline bool PipelineState_Parse(
     ::absl::string_view name, PipelineState* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<PipelineState>(PipelineState_descriptor(), name,
-                                           value);
-}
-enum ComponentLoadState : int {
-  COMPONENT_LOAD_STATE_UNSPECIFIED = 0,
-  COMPONENT_LOAD_STATE_NOT_LOADED = 1,
-  COMPONENT_LOAD_STATE_LOADING = 2,
-  COMPONENT_LOAD_STATE_LOADED = 3,
-  COMPONENT_LOAD_STATE_ERROR = 4,
-  ComponentLoadState_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  ComponentLoadState_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t ComponentLoadState_internal_data_[];
-inline constexpr ComponentLoadState ComponentLoadState_MIN =
-    static_cast<ComponentLoadState>(0);
-inline constexpr ComponentLoadState ComponentLoadState_MAX =
-    static_cast<ComponentLoadState>(4);
-[[nodiscard]] inline bool ComponentLoadState_IsValid(int value) {
-  return 0 <= value && value <= 4;
-}
-inline constexpr int ComponentLoadState_ARRAYSIZE = 4 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-ComponentLoadState_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(ComponentLoadState) {
-  return ComponentLoadState_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& ComponentLoadState_Name(T value) {
-  static_assert(::std::is_same<T, ComponentLoadState>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to ComponentLoadState_Name().");
-  return ComponentLoadState_Name(static_cast<ComponentLoadState>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& ComponentLoadState_Name(ComponentLoadState value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<ComponentLoadState_descriptor, 0, 4>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool ComponentLoadState_Parse(
-    ::absl::string_view name, ComponentLoadState* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<ComponentLoadState>(ComponentLoadState_descriptor(), name,
-                                           value);
-}
-enum VoiceSessionErrorCode : int {
-  VOICE_SESSION_ERROR_CODE_UNSPECIFIED = 0,
-  VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED = 1,
-  VOICE_SESSION_ERROR_CODE_NOT_READY = 2,
-  VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING = 3,
-  VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE = 4,
-  VoiceSessionErrorCode_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  VoiceSessionErrorCode_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t VoiceSessionErrorCode_internal_data_[];
-inline constexpr VoiceSessionErrorCode VoiceSessionErrorCode_MIN =
-    static_cast<VoiceSessionErrorCode>(0);
-inline constexpr VoiceSessionErrorCode VoiceSessionErrorCode_MAX =
-    static_cast<VoiceSessionErrorCode>(4);
-[[nodiscard]] inline bool VoiceSessionErrorCode_IsValid(int value) {
-  return 0 <= value && value <= 4;
-}
-inline constexpr int VoiceSessionErrorCode_ARRAYSIZE = 4 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VoiceSessionErrorCode_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VoiceSessionErrorCode) {
-  return VoiceSessionErrorCode_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& VoiceSessionErrorCode_Name(T value) {
-  static_assert(::std::is_same<T, VoiceSessionErrorCode>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to VoiceSessionErrorCode_Name().");
-  return VoiceSessionErrorCode_Name(static_cast<VoiceSessionErrorCode>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& VoiceSessionErrorCode_Name(VoiceSessionErrorCode value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VoiceSessionErrorCode_descriptor, 0, 4>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool VoiceSessionErrorCode_Parse(
-    ::absl::string_view name, VoiceSessionErrorCode* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<VoiceSessionErrorCode>(VoiceSessionErrorCode_descriptor(), name,
                                            value);
 }
 enum SpeechTurnDetectionEventKind : int {
@@ -1208,14 +962,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceSessionError final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_failed_component();
 
   public:
-  // .runanywhere.v1.VoiceSessionErrorCode code = 1;
+  // .runanywhere.v1.ErrorCode code = 1;
   void clear_code() ;
-  [[nodiscard]] ::runanywhere::v1::VoiceSessionErrorCode code() const;
-  void set_code(::runanywhere::v1::VoiceSessionErrorCode value);
+  [[nodiscard]] ::runanywhere::v1::ErrorCode code() const;
+  void set_code(::runanywhere::v1::ErrorCode value);
 
   private:
-  ::runanywhere::v1::VoiceSessionErrorCode _internal_code() const;
-  void _internal_set_code(::runanywhere::v1::VoiceSessionErrorCode value);
+  ::runanywhere::v1::ErrorCode _internal_code() const;
+  void _internal_set_code(::runanywhere::v1::ErrorCode value);
 
   public:
   // int32 c_abi_code = 4;
@@ -1491,44 +1245,44 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComponentStates final : p
   ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
 
   public:
-  // .runanywhere.v1.ComponentLoadState stt_state = 1;
+  // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
   void clear_stt_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLoadState stt_state() const;
-  void set_stt_state(::runanywhere::v1::ComponentLoadState value);
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState stt_state() const;
+  void set_stt_state(::runanywhere::v1::ComponentLifecycleState value);
 
   private:
-  ::runanywhere::v1::ComponentLoadState _internal_stt_state() const;
-  void _internal_set_stt_state(::runanywhere::v1::ComponentLoadState value);
+  ::runanywhere::v1::ComponentLifecycleState _internal_stt_state() const;
+  void _internal_set_stt_state(::runanywhere::v1::ComponentLifecycleState value);
 
   public:
-  // .runanywhere.v1.ComponentLoadState llm_state = 2;
+  // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
   void clear_llm_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLoadState llm_state() const;
-  void set_llm_state(::runanywhere::v1::ComponentLoadState value);
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState llm_state() const;
+  void set_llm_state(::runanywhere::v1::ComponentLifecycleState value);
 
   private:
-  ::runanywhere::v1::ComponentLoadState _internal_llm_state() const;
-  void _internal_set_llm_state(::runanywhere::v1::ComponentLoadState value);
+  ::runanywhere::v1::ComponentLifecycleState _internal_llm_state() const;
+  void _internal_set_llm_state(::runanywhere::v1::ComponentLifecycleState value);
 
   public:
-  // .runanywhere.v1.ComponentLoadState tts_state = 3;
+  // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
   void clear_tts_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLoadState tts_state() const;
-  void set_tts_state(::runanywhere::v1::ComponentLoadState value);
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState tts_state() const;
+  void set_tts_state(::runanywhere::v1::ComponentLifecycleState value);
 
   private:
-  ::runanywhere::v1::ComponentLoadState _internal_tts_state() const;
-  void _internal_set_tts_state(::runanywhere::v1::ComponentLoadState value);
+  ::runanywhere::v1::ComponentLifecycleState _internal_tts_state() const;
+  void _internal_set_tts_state(::runanywhere::v1::ComponentLifecycleState value);
 
   public:
-  // .runanywhere.v1.ComponentLoadState vad_state = 4;
+  // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
   void clear_vad_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLoadState vad_state() const;
-  void set_vad_state(::runanywhere::v1::ComponentLoadState value);
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState vad_state() const;
+  void set_vad_state(::runanywhere::v1::ComponentLifecycleState value);
 
   private:
-  ::runanywhere::v1::ComponentLoadState _internal_vad_state() const;
-  void _internal_set_vad_state(::runanywhere::v1::ComponentLoadState value);
+  ::runanywhere::v1::ComponentLifecycleState _internal_vad_state() const;
+  void _internal_set_vad_state(::runanywhere::v1::ComponentLifecycleState value);
 
   public:
   // bool ready = 5;
@@ -1551,14 +1305,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComponentStates final : p
   void _internal_set_any_loading(bool value);
 
   public:
-  // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+  // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
   void clear_wakeword_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLoadState wakeword_state() const;
-  void set_wakeword_state(::runanywhere::v1::ComponentLoadState value);
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState wakeword_state() const;
+  void set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value);
 
   private:
-  ::runanywhere::v1::ComponentLoadState _internal_wakeword_state() const;
-  void _internal_set_wakeword_state(::runanywhere::v1::ComponentLoadState value);
+  ::runanywhere::v1::ComponentLifecycleState _internal_wakeword_state() const;
+  void _internal_set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentComponentStates)
@@ -1770,14 +1524,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADEvent final : public ::google::p
   void _internal_set_frame_offset_us(::int64_t value);
 
   public:
-  // .runanywhere.v1.VADEventType type = 1;
+  // .runanywhere.v1.VADStreamEventKind type = 1;
   void clear_type() ;
-  [[nodiscard]] ::runanywhere::v1::VADEventType type() const;
-  void set_type(::runanywhere::v1::VADEventType value);
+  [[nodiscard]] ::runanywhere::v1::VADStreamEventKind type() const;
+  void set_type(::runanywhere::v1::VADStreamEventKind value);
 
   private:
-  ::runanywhere::v1::VADEventType _internal_type() const;
-  void _internal_set_type(::runanywhere::v1::VADEventType value);
+  ::runanywhere::v1::VADStreamEventKind _internal_type() const;
+  void _internal_set_type(::runanywhere::v1::VADStreamEventKind value);
 
   public:
   // float confidence = 3;
@@ -5863,24 +5617,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceEvent final : public ::google:
   void _internal_set_timestamp_us(::int64_t value);
 
   public:
-  // .runanywhere.v1.VoiceEventCategory category = 3;
+  // .runanywhere.v1.EventCategory category = 3;
   void clear_category() ;
-  [[nodiscard]] ::runanywhere::v1::VoiceEventCategory category() const;
-  void set_category(::runanywhere::v1::VoiceEventCategory value);
+  [[nodiscard]] ::runanywhere::v1::EventCategory category() const;
+  void set_category(::runanywhere::v1::EventCategory value);
 
   private:
-  ::runanywhere::v1::VoiceEventCategory _internal_category() const;
-  void _internal_set_category(::runanywhere::v1::VoiceEventCategory value);
+  ::runanywhere::v1::EventCategory _internal_category() const;
+  void _internal_set_category(::runanywhere::v1::EventCategory value);
 
   public:
-  // .runanywhere.v1.VoiceEventSeverity severity = 4;
+  // .runanywhere.v1.ErrorSeverity severity = 4;
   void clear_severity() ;
-  [[nodiscard]] ::runanywhere::v1::VoiceEventSeverity severity() const;
-  void set_severity(::runanywhere::v1::VoiceEventSeverity value);
+  [[nodiscard]] ::runanywhere::v1::ErrorSeverity severity() const;
+  void set_severity(::runanywhere::v1::ErrorSeverity value);
 
   private:
-  ::runanywhere::v1::VoiceEventSeverity _internal_severity() const;
-  void _internal_set_severity(::runanywhere::v1::VoiceEventSeverity value);
+  ::runanywhere::v1::ErrorSeverity _internal_severity() const;
+  void _internal_set_severity(::runanywhere::v1::ErrorSeverity value);
 
   public:
   // .runanywhere.v1.VoicePipelineComponent component = 5;
@@ -6449,52 +6203,52 @@ inline void VoiceEvent::_internal_set_timestamp_us(::int64_t value) {
   _impl_.timestamp_us_ = value;
 }
 
-// .runanywhere.v1.VoiceEventCategory category = 3;
+// .runanywhere.v1.EventCategory category = 3;
 inline void VoiceEvent::clear_category() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000020U);
 }
-inline ::runanywhere::v1::VoiceEventCategory VoiceEvent::category() const {
+inline ::runanywhere::v1::EventCategory VoiceEvent::category() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceEvent.category)
   return _internal_category();
 }
-inline void VoiceEvent::set_category(::runanywhere::v1::VoiceEventCategory value) {
+inline void VoiceEvent::set_category(::runanywhere::v1::EventCategory value) {
   _internal_set_category(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceEvent.category)
 }
-inline ::runanywhere::v1::VoiceEventCategory VoiceEvent::_internal_category() const {
+inline ::runanywhere::v1::EventCategory VoiceEvent::_internal_category() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::VoiceEventCategory>(_impl_.category_);
+  return static_cast<::runanywhere::v1::EventCategory>(_impl_.category_);
 }
-inline void VoiceEvent::_internal_set_category(::runanywhere::v1::VoiceEventCategory value) {
+inline void VoiceEvent::_internal_set_category(::runanywhere::v1::EventCategory value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = value;
 }
 
-// .runanywhere.v1.VoiceEventSeverity severity = 4;
+// .runanywhere.v1.ErrorSeverity severity = 4;
 inline void VoiceEvent::clear_severity() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.severity_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000040U);
 }
-inline ::runanywhere::v1::VoiceEventSeverity VoiceEvent::severity() const {
+inline ::runanywhere::v1::ErrorSeverity VoiceEvent::severity() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceEvent.severity)
   return _internal_severity();
 }
-inline void VoiceEvent::set_severity(::runanywhere::v1::VoiceEventSeverity value) {
+inline void VoiceEvent::set_severity(::runanywhere::v1::ErrorSeverity value) {
   _internal_set_severity(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceEvent.severity)
 }
-inline ::runanywhere::v1::VoiceEventSeverity VoiceEvent::_internal_severity() const {
+inline ::runanywhere::v1::ErrorSeverity VoiceEvent::_internal_severity() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::VoiceEventSeverity>(_impl_.severity_);
+  return static_cast<::runanywhere::v1::ErrorSeverity>(_impl_.severity_);
 }
-inline void VoiceEvent::_internal_set_severity(::runanywhere::v1::VoiceEventSeverity value) {
+inline void VoiceEvent::_internal_set_severity(::runanywhere::v1::ErrorSeverity value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.severity_ = value;
 }
@@ -9034,27 +8788,27 @@ inline void AudioFrameEvent::_internal_set_duration_ms(::int64_t value) {
 
 // VADEvent
 
-// .runanywhere.v1.VADEventType type = 1;
+// .runanywhere.v1.VADStreamEventKind type = 1;
 inline void VADEvent::clear_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.type_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000002U);
 }
-inline ::runanywhere::v1::VADEventType VADEvent::type() const {
+inline ::runanywhere::v1::VADStreamEventKind VADEvent::type() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADEvent.type)
   return _internal_type();
 }
-inline void VADEvent::set_type(::runanywhere::v1::VADEventType value) {
+inline void VADEvent::set_type(::runanywhere::v1::VADStreamEventKind value) {
   _internal_set_type(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADEvent.type)
 }
-inline ::runanywhere::v1::VADEventType VADEvent::_internal_type() const {
+inline ::runanywhere::v1::VADStreamEventKind VADEvent::_internal_type() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::VADEventType>(_impl_.type_);
+  return static_cast<::runanywhere::v1::VADStreamEventKind>(_impl_.type_);
 }
-inline void VADEvent::_internal_set_type(::runanywhere::v1::VADEventType value) {
+inline void VADEvent::_internal_set_type(::runanywhere::v1::VADStreamEventKind value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.type_ = value;
 }
@@ -10267,102 +10021,102 @@ inline void ComponentProgressEvent::set_allocated_message(::std::string* PROTOBU
 
 // VoiceAgentComponentStates
 
-// .runanywhere.v1.ComponentLoadState stt_state = 1;
+// .runanywhere.v1.ComponentLifecycleState stt_state = 1;
 inline void VoiceAgentComponentStates::clear_stt_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stt_state_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000002U);
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::stt_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::stt_state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.stt_state)
   return _internal_stt_state();
 }
-inline void VoiceAgentComponentStates::set_stt_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::set_stt_state(::runanywhere::v1::ComponentLifecycleState value) {
   _internal_set_stt_state(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComponentStates.stt_state)
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::_internal_stt_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::_internal_stt_state() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::ComponentLoadState>(_impl_.stt_state_);
+  return static_cast<::runanywhere::v1::ComponentLifecycleState>(_impl_.stt_state_);
 }
-inline void VoiceAgentComponentStates::_internal_set_stt_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::_internal_set_stt_state(::runanywhere::v1::ComponentLifecycleState value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stt_state_ = value;
 }
 
-// .runanywhere.v1.ComponentLoadState llm_state = 2;
+// .runanywhere.v1.ComponentLifecycleState llm_state = 2;
 inline void VoiceAgentComponentStates::clear_llm_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.llm_state_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000004U);
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::llm_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::llm_state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.llm_state)
   return _internal_llm_state();
 }
-inline void VoiceAgentComponentStates::set_llm_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::set_llm_state(::runanywhere::v1::ComponentLifecycleState value) {
   _internal_set_llm_state(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComponentStates.llm_state)
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::_internal_llm_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::_internal_llm_state() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::ComponentLoadState>(_impl_.llm_state_);
+  return static_cast<::runanywhere::v1::ComponentLifecycleState>(_impl_.llm_state_);
 }
-inline void VoiceAgentComponentStates::_internal_set_llm_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::_internal_set_llm_state(::runanywhere::v1::ComponentLifecycleState value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.llm_state_ = value;
 }
 
-// .runanywhere.v1.ComponentLoadState tts_state = 3;
+// .runanywhere.v1.ComponentLifecycleState tts_state = 3;
 inline void VoiceAgentComponentStates::clear_tts_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tts_state_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000008U);
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::tts_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::tts_state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.tts_state)
   return _internal_tts_state();
 }
-inline void VoiceAgentComponentStates::set_tts_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::set_tts_state(::runanywhere::v1::ComponentLifecycleState value) {
   _internal_set_tts_state(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComponentStates.tts_state)
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::_internal_tts_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::_internal_tts_state() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::ComponentLoadState>(_impl_.tts_state_);
+  return static_cast<::runanywhere::v1::ComponentLifecycleState>(_impl_.tts_state_);
 }
-inline void VoiceAgentComponentStates::_internal_set_tts_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::_internal_set_tts_state(::runanywhere::v1::ComponentLifecycleState value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tts_state_ = value;
 }
 
-// .runanywhere.v1.ComponentLoadState vad_state = 4;
+// .runanywhere.v1.ComponentLifecycleState vad_state = 4;
 inline void VoiceAgentComponentStates::clear_vad_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.vad_state_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000010U);
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::vad_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::vad_state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.vad_state)
   return _internal_vad_state();
 }
-inline void VoiceAgentComponentStates::set_vad_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::set_vad_state(::runanywhere::v1::ComponentLifecycleState value) {
   _internal_set_vad_state(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComponentStates.vad_state)
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::_internal_vad_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::_internal_vad_state() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::ComponentLoadState>(_impl_.vad_state_);
+  return static_cast<::runanywhere::v1::ComponentLifecycleState>(_impl_.vad_state_);
 }
-inline void VoiceAgentComponentStates::_internal_set_vad_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::_internal_set_vad_state(::runanywhere::v1::ComponentLifecycleState value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.vad_state_ = value;
 }
@@ -10417,27 +10171,27 @@ inline void VoiceAgentComponentStates::_internal_set_any_loading(bool value) {
   _impl_.any_loading_ = value;
 }
 
-// .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+// .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
 inline void VoiceAgentComponentStates::clear_wakeword_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.wakeword_state_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000080U);
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::wakeword_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::wakeword_state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.wakeword_state)
   return _internal_wakeword_state();
 }
-inline void VoiceAgentComponentStates::set_wakeword_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value) {
   _internal_set_wakeword_state(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComponentStates.wakeword_state)
 }
-inline ::runanywhere::v1::ComponentLoadState VoiceAgentComponentStates::_internal_wakeword_state() const {
+inline ::runanywhere::v1::ComponentLifecycleState VoiceAgentComponentStates::_internal_wakeword_state() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::ComponentLoadState>(_impl_.wakeword_state_);
+  return static_cast<::runanywhere::v1::ComponentLifecycleState>(_impl_.wakeword_state_);
 }
-inline void VoiceAgentComponentStates::_internal_set_wakeword_state(::runanywhere::v1::ComponentLoadState value) {
+inline void VoiceAgentComponentStates::_internal_set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.wakeword_state_ = value;
 }
@@ -10515,27 +10269,27 @@ inline void VoiceAgentComponentStates::set_allocated_error_message(::std::string
 
 // VoiceSessionError
 
-// .runanywhere.v1.VoiceSessionErrorCode code = 1;
+// .runanywhere.v1.ErrorCode code = 1;
 inline void VoiceSessionError::clear_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000004U);
 }
-inline ::runanywhere::v1::VoiceSessionErrorCode VoiceSessionError::code() const {
+inline ::runanywhere::v1::ErrorCode VoiceSessionError::code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionError.code)
   return _internal_code();
 }
-inline void VoiceSessionError::set_code(::runanywhere::v1::VoiceSessionErrorCode value) {
+inline void VoiceSessionError::set_code(::runanywhere::v1::ErrorCode value) {
   _internal_set_code(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionError.code)
 }
-inline ::runanywhere::v1::VoiceSessionErrorCode VoiceSessionError::_internal_code() const {
+inline ::runanywhere::v1::ErrorCode VoiceSessionError::_internal_code() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::VoiceSessionErrorCode>(_impl_.code_);
+  return static_cast<::runanywhere::v1::ErrorCode>(_impl_.code_);
 }
-inline void VoiceSessionError::_internal_set_code(::runanywhere::v1::VoiceSessionErrorCode value) {
+inline void VoiceSessionError::_internal_set_code(::runanywhere::v1::ErrorCode value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.code_ = value;
 }
@@ -11960,18 +11714,6 @@ namespace google {
 namespace protobuf {
 
 template <>
-struct is_proto_enum<::runanywhere::v1::VoiceEventCategory> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VoiceEventCategory>() {
-  return ::runanywhere::v1::VoiceEventCategory_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::VoiceEventSeverity> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VoiceEventSeverity>() {
-  return ::runanywhere::v1::VoiceEventSeverity_descriptor();
-}
-template <>
 struct is_proto_enum<::runanywhere::v1::VoicePipelineComponent> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VoicePipelineComponent>() {
@@ -11990,12 +11732,6 @@ inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v
   return ::runanywhere::v1::AudioEncoding_descriptor();
 }
 template <>
-struct is_proto_enum<::runanywhere::v1::VADEventType> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VADEventType>() {
-  return ::runanywhere::v1::VADEventType_descriptor();
-}
-template <>
 struct is_proto_enum<::runanywhere::v1::InterruptReason> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::InterruptReason>() {
@@ -12006,18 +11742,6 @@ struct is_proto_enum<::runanywhere::v1::PipelineState> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::PipelineState>() {
   return ::runanywhere::v1::PipelineState_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::ComponentLoadState> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ComponentLoadState>() {
-  return ::runanywhere::v1::ComponentLoadState_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::VoiceSessionErrorCode> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VoiceSessionErrorCode>() {
-  return ::runanywhere::v1::VoiceSessionErrorCode_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::SpeechTurnDetectionEventKind> : std::true_type {};

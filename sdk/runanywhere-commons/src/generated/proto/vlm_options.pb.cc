@@ -418,7 +418,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_vlm_5foptions_2eproto[4];
+    file_level_enum_descriptors_vlm_5foptions_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_vlm_5foptions_2eproto = nullptr;
 const ::uint32_t
@@ -729,30 +729,21 @@ const char descriptor_table_protodef_vlm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECT
     "IFIED\020\000\022\031\n\025VLM_MODEL_FAMILY_AUTO\020\001\022\035\n\031VL"
     "M_MODEL_FAMILY_QWEN2_VL\020\002\022\034\n\030VLM_MODEL_F"
     "AMILY_SMOLVLM\020\003\022\032\n\026VLM_MODEL_FAMILY_LLAV"
-    "A\020\004\022\033\n\027VLM_MODEL_FAMILY_CUSTOM\020c*\316\002\n\014VLM"
-    "ErrorCode\022\036\n\032VLM_ERROR_CODE_UNSPECIFIED\020"
-    "\000\022 \n\034VLM_ERROR_CODE_INVALID_IMAGE\020\001\022#\n\037V"
-    "LM_ERROR_CODE_MODEL_NOT_LOADED\020\002\022%\n!VLM_"
-    "ERROR_CODE_UNSUPPORTED_FORMAT\020\003\022\"\n\036VLM_E"
-    "RROR_CODE_IMAGE_TOO_LARGE\020\004\022\"\n\036VLM_ERROR"
-    "_CODE_NOT_INITIALIZED\020\005\022$\n VLM_ERROR_COD"
-    "E_MODEL_LOAD_FAILED\020\006\022$\n VLM_ERROR_CODE_"
-    "PROCESSING_FAILED\020\007\022\034\n\030VLM_ERROR_CODE_CA"
-    "NCELLED\020\010*\356\001\n\022VLMStreamEventKind\022%\n!VLM_"
-    "STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035VLM_S"
-    "TREAM_EVENT_KIND_STARTED\020\001\022\'\n#VLM_STREAM"
-    "_EVENT_KIND_IMAGE_ENCODED\020\002\022\037\n\033VLM_STREA"
-    "M_EVENT_KIND_TOKEN\020\003\022#\n\037VLM_STREAM_EVENT"
-    "_KIND_COMPLETED\020\004\022\037\n\033VLM_STREAM_EVENT_KI"
-    "ND_ERROR\020\0052\244\001\n\003VLM\022K\n\010Generate\022$.runanyw"
-    "here.v1.VLMGenerationRequest\032\031.runanywhe"
-    "re.v1.VLMResult\022P\n\006Stream\022$.runanywhere."
-    "v1.VLMGenerationRequest\032\036.runanywhere.v1"
-    ".VLMStreamEvent0\001B\212\001\n\027ai.runanywhere.pro"
-    "to.v1B\017VlmOptionsProtoP\001Z<github.com/run"
-    "anywhere/runanywhere-sdks/idl/v1;runanyw"
-    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
-    "proto3"
+    "A\020\004\022\033\n\027VLM_MODEL_FAMILY_CUSTOM\020c*\356\001\n\022VLM"
+    "StreamEventKind\022%\n!VLM_STREAM_EVENT_KIND"
+    "_UNSPECIFIED\020\000\022!\n\035VLM_STREAM_EVENT_KIND_"
+    "STARTED\020\001\022\'\n#VLM_STREAM_EVENT_KIND_IMAGE"
+    "_ENCODED\020\002\022\037\n\033VLM_STREAM_EVENT_KIND_TOKE"
+    "N\020\003\022#\n\037VLM_STREAM_EVENT_KIND_COMPLETED\020\004"
+    "\022\037\n\033VLM_STREAM_EVENT_KIND_ERROR\020\0052\244\001\n\003VL"
+    "M\022K\n\010Generate\022$.runanywhere.v1.VLMGenera"
+    "tionRequest\032\031.runanywhere.v1.VLMResult\022P"
+    "\n\006Stream\022$.runanywhere.v1.VLMGenerationR"
+    "equest\032\036.runanywhere.v1.VLMStreamEvent0\001"
+    "B\212\001\n\027ai.runanywhere.proto.v1B\017VlmOptions"
+    "ProtoP\001Z<github.com/runanywhere/runanywh"
+    "ere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252"
+    "\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_vlm_5foptions_2eproto_deps[1] = {
@@ -762,7 +753,7 @@ static ::absl::once_flag descriptor_table_vlm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vlm_5foptions_2eproto = {
     false,
     false,
-    4126,
+    3789,
     descriptor_table_protodef_vlm_5foptions_2eproto,
     "vlm_options.proto",
     &descriptor_table_vlm_5foptions_2eproto_once,
@@ -792,16 +783,9 @@ VLMModelFamily_descriptor() {
 PROTOBUF_CONSTINIT const uint32_t VLMModelFamily_internal_data_[] = {
     327680u, 65536u, 99u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VLMErrorCode_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_vlm_5foptions_2eproto);
-  return file_level_enum_descriptors_vlm_5foptions_2eproto[2];
-}
-PROTOBUF_CONSTINIT const uint32_t VLMErrorCode_internal_data_[] = {
-    589824u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 VLMStreamEventKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_vlm_5foptions_2eproto);
-  return file_level_enum_descriptors_vlm_5foptions_2eproto[3];
+  return file_level_enum_descriptors_vlm_5foptions_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t VLMStreamEventKind_internal_data_[] = {
     393216u, 0u, };

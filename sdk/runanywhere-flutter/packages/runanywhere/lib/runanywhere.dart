@@ -58,9 +58,9 @@ export 'generated/llm_options.pb.dart'
     show
         LLMConfiguration,
         LLMGenerationOptions,
-        LLMGenerationResult,
-        ThinkingTagPattern;
+        LLMGenerationResult;
 export 'generated/llm_options.pbenum.dart' show ExecutionTarget;
+export 'generated/thinking_tag_pattern.pb.dart' show ThinkingTagPattern;
 export 'generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent, LLMStreamFinalResult;
 export 'generated/lora_options.pb.dart'
@@ -87,7 +87,6 @@ export 'generated/model_types.pb.dart'
         CurrentModelResult,
         DiscoveredModel,
         ExpectedModelFiles,
-        ModelThinkingTagPattern,
         ModelFileDescriptor,
         ModelDiscoveryResult,
         ModelInfo,
@@ -234,8 +233,9 @@ export 'generated/voice_events.pb.dart'
         VoiceEvent,
         VoiceEvent_Payload,
         VoiceSessionError;
+export 'generated/vad_options.pbenum.dart' show VADStreamEventKind;
 export 'generated/voice_events.pbenum.dart'
-    show ComponentLoadState, PipelineState, VADEventType;
+    show ComponentLoadState, PipelineState;
 export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'
