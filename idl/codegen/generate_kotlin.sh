@@ -49,10 +49,8 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # VoiceAgentStreamAdapter / DownloadStreamAdapter under jvmAndroidMain
     # consume the message types directly via rac_*_set_proto_callback, so the
     # generated client stubs are dead weight. Strip them so regen stays green.
-    for svc in Download LLM VoiceAgent STT TTS VAD VLM Diffusion Embeddings RAG LoRA Storage SDKEvents ToolCalling StructuredOutput ModelRegistry Lifecycle Hardware; do
-        rm -f "${OUT_DIR}/ai/runanywhere/proto/v1/${svc}Client.kt"
-        rm -f "${OUT_DIR}/ai/runanywhere/proto/v1/Grpc${svc}Client.kt"
-    done
+    find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "*Client.kt" -delete
+    find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "Grpc*Client.kt" -delete
 
     echo "✓ Kotlin proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"
 
