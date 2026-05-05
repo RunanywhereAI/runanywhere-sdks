@@ -38,12 +38,6 @@ extension CppBridge {
                 let deviceInfo = DeviceInfo.current
                 let deviceId = DeviceIdentity.persistentUUID
 
-                #if targetEnvironment(simulator)
-                let isSimulator = true
-                #else
-                let isSimulator = false
-                #endif
-
                 // Fill out the device info struct
                 // Note: C strings are managed by Swift and remain valid during callback
 
@@ -70,12 +64,6 @@ extension CppBridge {
                 outInfo.pointee.performance_cores = Int32(deviceInfo.performanceCores)
                 outInfo.pointee.efficiency_cores = Int32(deviceInfo.efficiencyCores)
                 outInfo.pointee.device_fingerprint = (deviceId as NSString).utf8String
-
-                // Legacy fields (backward compatibility)
-                outInfo.pointee.device_type = (deviceInfo.deviceType as NSString).utf8String
-                outInfo.pointee.os_name = ("iOS" as NSString).utf8String
-                outInfo.pointee.processor_count = Int32(deviceInfo.coreCount)
-                outInfo.pointee.is_simulator = isSimulator ? RAC_TRUE : RAC_FALSE
             }
 
             // Get device ID callback
