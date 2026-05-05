@@ -36,6 +36,9 @@ import {
   type VLMResult as ProtoVLMResult,
 } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import type { VLMLoadModelParams } from '../Types/VLMWorkerTypes';
+
+export type { VLMLoadModelParams } from '../Types/VLMWorkerTypes';
 
 // ---------------------------------------------------------------------------
 // RPC protocol — typed messages exchanged between main thread and worker
