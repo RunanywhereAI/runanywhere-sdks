@@ -251,22 +251,13 @@ enum ModelFileRole {
 }
 
 // ---------------------------------------------------------------------------
-// Hardware acceleration preference for inference. Sources pre-IDL:
-//   Web    enums.ts:165   (Auto / WebGPU / CPU)
-//   Swift  extensions     (CPU / GPU / NPU / Metal)
-//   Kotlin enum           (CPU / GPU / NPU / Vulkan)
-// Canonicalized union below.
+// AccelerationPreference enum moved to hardware_profile.proto (Wave H-2 /
+// IDL-01). Hardware preference is a pure hardware concern; consolidating it
+// there avoids cyclic proto imports and collapses the prior duplicate
+// AcceleratorPreference (ANE/GPU/CPU/AUTO) with the richer AccelerationPreference
+// (AUTO/CPU/GPU/NPU/WEBGPU/METAL/VULKAN) into a single enum. Messages in this
+// file reference it via the existing `import "hardware_profile.proto";`.
 // ---------------------------------------------------------------------------
-enum AccelerationPreference {
-    ACCELERATION_PREFERENCE_UNSPECIFIED = 0;
-    ACCELERATION_PREFERENCE_AUTO        = 1;
-    ACCELERATION_PREFERENCE_CPU         = 2;
-    ACCELERATION_PREFERENCE_GPU         = 3;
-    ACCELERATION_PREFERENCE_NPU         = 4;
-    ACCELERATION_PREFERENCE_WEBGPU      = 5;
-    ACCELERATION_PREFERENCE_METAL       = 6;
-    ACCELERATION_PREFERENCE_VULKAN      = 7;
-}
 
 // ---------------------------------------------------------------------------
 // Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
