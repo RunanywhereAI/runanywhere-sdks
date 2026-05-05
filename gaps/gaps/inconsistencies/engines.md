@@ -28,8 +28,7 @@ Backend health: llamacpp (healthy, 5 gaps already resolved — 01/02/05/06/07), 
 
 ### engines/onnx
 
-#### ENG-ONNX-05: `rac_backend_onnx_register` still registers storage + download strategies (v2 model_strategy code)
-`engines/onnx/rac_backend_onnx_register.cpp:165-166` keeps `rac_storage_strategy_register(RAC_FRAMEWORK_ONNX, ...)` + `rac_download_strategy_register(RAC_FRAMEWORK_ONNX, ...)`. `RAC_FRAMEWORK_ONNX` is a pre-v3 identifier; the equivalent code in other backends has migrated the framework gating into the plugin-entry manifest (`g_<name>_engine_vtable.metadata`). Audit whether these strategies are still consumed by commons; if not, delete them and the matching `rac_model_strategy_unregister(RAC_FRAMEWORK_ONNX)` at line 195.
+(no open gaps — ENG-ONNX-05 resolved in Wave 2a: audited commons — no consumer calls `rac_storage_strategy_register`/`rac_download_strategy_register` outside this TU, wrappers `rac_model_strategy_*` all fall through to the default `rac_model_paths_resolve_artifact` path; deleted the three registrations + 7 strategy callbacks + unused `rac_model_strategy.h`/`rac_model_types.h` includes. Framework gating for ONNX already lives in `g_onnx_engine_vtable.metadata` per the plugin-entry TU comment. Whole strategy registry infrastructure in commons is now dead machinery — tracked as CPP-STRATEGY-CLEANUP in cpp-layer.md.)
 
 ## Cross-backend duplication
 
