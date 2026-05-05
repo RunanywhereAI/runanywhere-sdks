@@ -25,6 +25,8 @@
 #define RAC_PLUGIN_ENTRY_H
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
 #include "rac/plugin/rac_engine_vtable.h"
 
 #ifdef __cplusplus
@@ -183,6 +185,66 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 #define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
     /* Static registration requires C++ linkage — put a one-line C++ shim TU \
      * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
+#endif
+
+/* ===========================================================================
+ * Boilerplate "create" adapter helper (DUP-03)
+ *
+ * Most backends' per-primitive `create` op is a 7-line forward onto the
+ * engine's native `rac_<primitive>_<name>_create(model_id, nullptr, &handle)`
+ * entry point. This macro generates that scaffold so each backend doesn't
+ * hand-copy it.
+ *
+ * Scope: sherpa STT / TTS / VAD today. Backends with richer create flows
+ * (llamacpp LLM — CPU-runtime session wrapping; onnx embeddings — try/catch
+ * + unique_ptr; llamacpp VLM — mmproj path plumbing) hand-write their
+ * adapter and are NOT expected to use this macro.
+ *
+ * Requirements at expansion site:
+ *   - a file-scope `const char* LOG_CAT` (or similar) visible to RAC_LOG_INFO;
+ *   - `rac_<primitive>_<name>_create(const char*, const <cfg>*, rac_handle_t*)`
+ *     declared (i.e. the backend header is already included).
+ *
+ * The generated function has the ABI-v3 `create` signature:
+ *   rac_result_t <name>_<primitive>_create_impl(const char* model_id,
+ *                                               const char* config_json,
+ *                                               void** out_impl);
+ * `config_json` is currently ignored (passed as nullptr to the engine create);
+ * bring-your-own-adapter if you need to thread config through.
+ * =========================================================================== */
+
+#ifdef __cplusplus
+#  define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                              \
+      static ::rac_result_t name##_##primitive##_create_impl(                     \
+          const char* model_id, const char* /*config_json*/, void** out_impl) {   \
+          if (!out_impl) return RAC_ERROR_NULL_POINTER;                           \
+          *out_impl = nullptr;                                                    \
+          RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",    \
+                       model_id ? model_id : "(default)");                        \
+          ::rac_handle_t backend_handle = nullptr;                                \
+          ::rac_result_t rc =                                                     \
+              rac_##primitive##_##name##_create(model_id, nullptr,                \
+                                                &backend_handle);                 \
+          if (rc != RAC_SUCCESS) return rc;                                       \
+          *out_impl = backend_handle;                                             \
+          return RAC_SUCCESS;                                                     \
+      }
+#else
+#  define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                              \
+      static rac_result_t name##_##primitive##_create_impl(                       \
+          const char* model_id, const char* /*config_json*/, void** out_impl) {   \
+          if (!out_impl) return RAC_ERROR_NULL_POINTER;                           \
+          *out_impl = NULL;                                                       \
+          RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",    \
+                       model_id ? model_id : "(default)");                        \
+          rac_handle_t backend_handle = NULL;                                     \
+          rac_result_t rc =                                                       \
+              rac_##primitive##_##name##_create(model_id, NULL,                   \
+                                                &backend_handle);                 \
+          if (rc != RAC_SUCCESS) return rc;                                       \
+          *out_impl = backend_handle;                                             \
+          return RAC_SUCCESS;                                                     \
+      }
 #endif
 
 /* ===========================================================================

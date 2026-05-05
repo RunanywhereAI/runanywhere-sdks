@@ -32,19 +32,7 @@ Backend health: llamacpp (healthy, 5 gaps already resolved — 01/02/05/06/07), 
 
 ## Cross-backend duplication
 
-### DUP-03: Backend-create scaffolding is structurally identical across active backends
-Each backend's `<primitive>_create_impl` function in `rac_backend_<name>_register.cpp` follows the exact same shape:
-```c++
-if (!out_impl) return RAC_ERROR_NULL_POINTER;
-*out_impl = nullptr;
-RAC_LOG_INFO(LOG_CAT, "..._create_impl: model=%s", model_id);
-rac_handle_t backend_handle = nullptr;
-rac_result_t rc = rac_<primitive>_<name>_create(model_id, nullptr, &backend_handle);
-if (rc != RAC_SUCCESS) return rc;
-*out_impl = backend_handle;
-return RAC_SUCCESS;
-```
-See `engines/sherpa/rac_backend_sherpa_register.cpp:141-153`, `engines/llamacpp/rac_backend_llamacpp_register.cpp:290-336`. Consolidate into a `RAC_DEFINE_CREATE_ADAPTER(primitive, name)` macro in `rac_plugin_entry.h`.
+(DUP-03 resolved in Wave 2a: `RAC_DEFINE_CREATE_ADAPTER(primitive, name)` landed in `sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h`. Sherpa STT / TTS / VAD `*_create_impl` scaffolds collapsed to a single macro invocation each — net -32 LOC in `engines/sherpa/rac_backend_sherpa_register.cpp`. Llamacpp LLM `create_impl` intentionally NOT migrated: its 45-line body wraps `LlamaCppRuntimeImpl` around the CPU-runtime session path and cannot be expressed as a 7-line forward. Onnx embeddings `create_impl` also NOT migrated: wraps the create in try/catch + std::make_unique + is_ready()-after-init check. Both remain hand-written by design. Follow-up opportunity — DUP-03B — if and when whispercpp / whisperkit_coreml come off Iteration-I hold, their minimal STT `create_impl` scaffolds are direct candidates for the same macro.)
 
 ### DUP-05: Stream-callback adapter struct is copy-pasted inside llamacpp
 - `engines/llamacpp/rac_backend_llamacpp_register.cpp:160-172` `StreamAdapter`
