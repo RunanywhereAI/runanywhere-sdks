@@ -563,15 +563,23 @@ const char descriptor_table_protodef_solutions_2eproto[] ABSL_ATTRIBUTE_SECTION_
     "\n\021AUDIO_SOURCE_FILE\020\002\022\031\n\025AUDIO_SOURCE_CA"
     "LLBACK\020\003*`\n\013VectorStore\022\034\n\030VECTOR_STORE_"
     "UNSPECIFIED\020\000\022\030\n\024VECTOR_STORE_USEARCH\020\001\022"
-    "\031\n\025VECTOR_STORE_PGVECTOR\020\002B:\n\027ai.runanyw"
-    "here.proto.v1B\016SolutionsProtoP\001\370\001\001\242\002\004RAV"
-    "1\272\002\002RAb\006proto3"
+    "\031\n\025VECTOR_STORE_PGVECTOR\020\0022\261\002\n\tSolutions"
+    "\022H\n\006Create\022\036.runanywhere.v1.SolutionConf"
+    "ig\032\036.runanywhere.v1.SolutionHandle\022G\n\005St"
+    "art\022\036.runanywhere.v1.SolutionHandle\032\036.ru"
+    "nanywhere.v1.SolutionHandle\022F\n\004Stop\022\036.ru"
+    "nanywhere.v1.SolutionHandle\032\036.runanywher"
+    "e.v1.SolutionHandle\022I\n\007Destroy\022\036.runanyw"
+    "here.v1.SolutionHandle\032\036.runanywhere.v1."
+    "SolutionHandleB:\n\027ai.runanywhere.proto.v"
+    "1B\016SolutionsProtoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006prot"
+    "o3"
 };
 static ::absl::once_flag descriptor_table_solutions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_solutions_2eproto = {
     false,
     false,
-    2414,
+    2722,
     descriptor_table_protodef_solutions_2eproto,
     "solutions.proto",
     &descriptor_table_solutions_2eproto_once,

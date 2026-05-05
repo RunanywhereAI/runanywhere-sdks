@@ -80,10 +80,6 @@ class ToolCallValidationResult;
 struct ToolCallValidationResultDefaultTypeInternal;
 extern ToolCallValidationResultDefaultTypeInternal _ToolCallValidationResult_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull ToolCallValidationResult_class_data_;
-class ToolCall_ArgumentsEntry_DoNotUse;
-struct ToolCall_ArgumentsEntry_DoNotUseDefaultTypeInternal;
-extern ToolCall_ArgumentsEntry_DoNotUseDefaultTypeInternal _ToolCall_ArgumentsEntry_DoNotUse_default_instance_;
-extern const ::google::protobuf::internal::ClassDataFull ToolCall_ArgumentsEntry_DoNotUse_class_data_;
 class ToolCallingOptions;
 struct ToolCallingOptionsDefaultTypeInternal;
 extern ToolCallingOptionsDefaultTypeInternal _ToolCallingOptions_default_instance_;
@@ -152,10 +148,6 @@ class ToolResult;
 struct ToolResultDefaultTypeInternal;
 extern ToolResultDefaultTypeInternal _ToolResult_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull ToolResult_class_data_;
-class ToolResult_ResultEntry_DoNotUse;
-struct ToolResult_ResultEntry_DoNotUseDefaultTypeInternal;
-extern ToolResult_ResultEntry_DoNotUseDefaultTypeInternal _ToolResult_ResultEntry_DoNotUse_default_instance_;
-extern const ::google::protobuf::internal::ClassDataFull ToolResult_ResultEntry_DoNotUse_class_data_;
 class ToolValue;
 struct ToolValueDefaultTypeInternal;
 extern ToolValueDefaultTypeInternal _ToolValue_default_instance_;
@@ -1135,6 +1127,315 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolValueObject_FieldsEntry_DoNotUse
 extern const ::google::protobuf::internal::ClassDataFull ToolValueObject_FieldsEntry_DoNotUse_class_data_;
 // -------------------------------------------------------------------
 
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolResult) */ {
+ public:
+  inline ToolResult() : ToolResult(nullptr) {}
+  ~ToolResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ToolResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ToolResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline ToolResult(const ToolResult& from) : ToolResult(nullptr, from) {}
+  inline ToolResult(ToolResult&& from) noexcept
+      : ToolResult(nullptr, ::std::move(from)) {}
+  inline ToolResult& operator=(const ToolResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ToolResult& operator=(ToolResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ToolResult& default_instance() {
+    return *reinterpret_cast<const ToolResult*>(
+        &_ToolResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 8;
+  friend void swap(ToolResult& a, ToolResult& b) { a.Swap(&b); }
+  inline void Swap(ToolResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ToolResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ToolResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ToolResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ToolResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ToolResult& from) { ToolResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ToolResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolResult"; }
+
+  explicit ToolResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolResult& from);
+  ToolResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolResult&& from) noexcept
+      : ToolResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kToolCallIdFieldNumber = 1,
+    kNameFieldNumber = 2,
+    kResultJsonFieldNumber = 3,
+    kErrorFieldNumber = 4,
+    kCallIdFieldNumber = 7,
+    kStartedAtMsFieldNumber = 8,
+    kCompletedAtMsFieldNumber = 9,
+    kSuccessFieldNumber = 5,
+  };
+  // string tool_call_id = 1;
+  void clear_tool_call_id() ;
+  [[nodiscard]] const ::std::string& tool_call_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_tool_call_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_tool_call_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_tool_call_id();
+  void set_allocated_tool_call_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_tool_call_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_tool_call_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_tool_call_id();
+
+  public:
+  // string name = 2;
+  void clear_name() ;
+  [[nodiscard]] const ::std::string& name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
+  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
+
+  public:
+  // string result_json = 3;
+  void clear_result_json() ;
+  [[nodiscard]] const ::std::string& result_json() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_result_json(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_result_json();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_result_json();
+  void set_allocated_result_json(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_result_json() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_result_json(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_result_json();
+
+  public:
+  // optional string error = 4;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::std::string& error() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error();
+  void set_allocated_error(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
+  // optional string call_id = 7;
+  [[nodiscard]] bool has_call_id()
+      const;
+  void clear_call_id() ;
+  [[nodiscard]] const ::std::string& call_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_call_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_call_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_call_id();
+  void set_allocated_call_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_call_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_call_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_call_id();
+
+  public:
+  // int64 started_at_ms = 8;
+  void clear_started_at_ms() ;
+  [[nodiscard]] ::int64_t started_at_ms() const;
+  void set_started_at_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_started_at_ms() const;
+  void _internal_set_started_at_ms(::int64_t value);
+
+  public:
+  // int64 completed_at_ms = 9;
+  void clear_completed_at_ms() ;
+  [[nodiscard]] ::int64_t completed_at_ms() const;
+  void set_completed_at_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_completed_at_ms() const;
+  void _internal_set_completed_at_ms(::int64_t value);
+
+  public:
+  // bool success = 5;
+  void clear_success() ;
+  [[nodiscard]] bool success() const;
+  void set_success(bool value);
+
+  private:
+  bool _internal_success() const;
+  void _internal_set_success(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<4, 8,
+                                   0, 81,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ToolResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr tool_call_id_;
+    ::google::protobuf::internal::ArenaStringPtr name_;
+    ::google::protobuf::internal::ArenaStringPtr result_json_;
+    ::google::protobuf::internal::ArenaStringPtr error_;
+    ::google::protobuf::internal::ArenaStringPtr call_id_;
+    ::int64_t started_at_ms_;
+    ::int64_t completed_at_ms_;
+    bool success_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_tool_5fcalling_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ToolResult_class_data_;
+// -------------------------------------------------------------------
+
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolPromptFormatResult final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolPromptFormatResult) */ {
  public:
@@ -1191,7 +1492,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolPromptFormatResult final : publ
     return *reinterpret_cast<const ToolPromptFormatResult*>(
         &_ToolPromptFormatResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 16;
+  static constexpr int kIndexInFileMessages = 14;
   friend void swap(ToolPromptFormatResult& a, ToolPromptFormatResult& b) { a.Swap(&b); }
   inline void Swap(ToolPromptFormatResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1491,7 +1792,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionStepWithResultReq
     return *reinterpret_cast<const ToolCallingSessionStepWithResultRequest*>(
         &_ToolCallingSessionStepWithResultRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 24;
+  static constexpr int kIndexInFileMessages = 22;
   friend void swap(ToolCallingSessionStepWithResultRequest& a, ToolCallingSessionStepWithResultRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionStepWithResultRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1740,7 +2041,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionDestroyRequest fi
     return *reinterpret_cast<const ToolCallingSessionDestroyRequest*>(
         &_ToolCallingSessionDestroyRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 25;
+  static constexpr int kIndexInFileMessages = 23;
   friend void swap(ToolCallingSessionDestroyRequest& a, ToolCallingSessionDestroyRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionDestroyRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1936,7 +2237,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateResult fina
     return *reinterpret_cast<const ToolCallingSessionCreateResult*>(
         &_ToolCallingSessionCreateResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 22;
+  static constexpr int kIndexInFileMessages = 20;
   friend void swap(ToolCallingSessionCreateResult& a, ToolCallingSessionCreateResult& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionCreateResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2076,43 +2377,572 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateResult fina
 extern const ::google::protobuf::internal::ClassDataFull ToolCallingSessionCreateResult_class_data_;
 // -------------------------------------------------------------------
 
-class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult_ResultEntry_DoNotUse final
-    : public ::google::protobuf::internal::MapEntry<::std::string, ::google::protobuf::Message,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_MESSAGE> {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCall) */ {
  public:
-  using SuperType =
-      ::google::protobuf::internal::MapEntry<::std::string, ::google::protobuf::Message,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_MESSAGE>;
-  ToolResult_ResultEntry_DoNotUse();
+  inline ToolCall() : ToolCall(nullptr) {}
+  ~ToolCall() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ToolCall* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCall));
+  }
+#endif
+
   template <typename = void>
-  explicit constexpr ToolResult_ResultEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized);
-  explicit ToolResult_ResultEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr const void* PROTOBUF_NONNULL internal_default_instance() {
-    return &_ToolResult_ResultEntry_DoNotUse_default_instance_;
+  explicit constexpr ToolCall(::google::protobuf::internal::ConstantInitialized);
+
+  inline ToolCall(const ToolCall& from) : ToolCall(nullptr, from) {}
+  inline ToolCall(ToolCall&& from) noexcept
+      : ToolCall(nullptr, ::std::move(from)) {}
+  inline ToolCall& operator=(const ToolCall& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ToolCall& operator=(ToolCall&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
   }
 
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
 
-  static constexpr auto InternalGenerateClassData_();
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ToolCall& default_instance() {
+    return *reinterpret_cast<const ToolCall*>(
+        &_ToolCall_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 7;
+  friend void swap(ToolCall& a, ToolCall& b) { a.Swap(&b); }
+  inline void Swap(ToolCall* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ToolCall* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
 
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ToolCall* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ToolCall>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ToolCall& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ToolCall& from) { ToolCall::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ToolCall* PROTOBUF_NONNULL other);
  private:
-  friend class ::google::protobuf::MessageLite;
-  friend struct ::TableStruct_tool_5fcalling_2eproto;
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCall"; }
 
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<1, 2,
-                                   1, 49,
-                                   2>
-      _table_;
-
+  explicit ToolCall(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolCall(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCall& from);
+  ToolCall(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCall&& from) noexcept
+      : ToolCall(arena) {
+    *this = ::std::move(from);
+  }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
   static void* PROTOBUF_NONNULL PlacementNew_(
       const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
       ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kIdFieldNumber = 1,
+    kNameFieldNumber = 2,
+    kArgumentsJsonFieldNumber = 3,
+    kTypeFieldNumber = 4,
+    kCallIdFieldNumber = 6,
+    kRawTextFieldNumber = 8,
+    kCreatedAtMsFieldNumber = 7,
+  };
+  // string id = 1;
+  void clear_id() ;
+  [[nodiscard]] const ::std::string& id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_id();
+  void set_allocated_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_id();
+
+  public:
+  // string name = 2;
+  void clear_name() ;
+  [[nodiscard]] const ::std::string& name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
+  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
+
+  public:
+  // string arguments_json = 3;
+  void clear_arguments_json() ;
+  [[nodiscard]] const ::std::string& arguments_json() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_arguments_json(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_arguments_json();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_arguments_json();
+  void set_allocated_arguments_json(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_arguments_json() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_arguments_json(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_arguments_json();
+
+  public:
+  // string type = 4;
+  void clear_type() ;
+  [[nodiscard]] const ::std::string& type() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_type(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_type();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_type();
+  void set_allocated_type(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_type() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_type(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_type();
+
+  public:
+  // optional string call_id = 6;
+  [[nodiscard]] bool has_call_id()
+      const;
+  void clear_call_id() ;
+  [[nodiscard]] const ::std::string& call_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_call_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_call_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_call_id();
+  void set_allocated_call_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_call_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_call_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_call_id();
+
+  public:
+  // optional string raw_text = 8;
+  [[nodiscard]] bool has_raw_text()
+      const;
+  void clear_raw_text() ;
+  [[nodiscard]] const ::std::string& raw_text() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_raw_text(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_raw_text();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_raw_text();
+  void set_allocated_raw_text(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_raw_text() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_raw_text(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_raw_text();
+
+  public:
+  // int64 created_at_ms = 7;
+  void clear_created_at_ms() ;
+  [[nodiscard]] ::int64_t created_at_ms() const;
+  void set_created_at_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_created_at_ms() const;
+  void _internal_set_created_at_ms(::int64_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCall)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 7,
+                                   0, 71,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ToolCall& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr id_;
+    ::google::protobuf::internal::ArenaStringPtr name_;
+    ::google::protobuf::internal::ArenaStringPtr arguments_json_;
+    ::google::protobuf::internal::ArenaStringPtr type_;
+    ::google::protobuf::internal::ArenaStringPtr call_id_;
+    ::google::protobuf::internal::ArenaStringPtr raw_text_;
+    ::int64_t created_at_ms_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_tool_5fcalling_2eproto;
 };
-extern const ::google::protobuf::internal::ClassDataFull ToolResult_ResultEntry_DoNotUse_class_data_;
+
+extern const ::google::protobuf::internal::ClassDataFull ToolCall_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParseResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolParseResult) */ {
+ public:
+  inline ToolParseResult() : ToolParseResult(nullptr) {}
+  ~ToolParseResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ToolParseResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolParseResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ToolParseResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline ToolParseResult(const ToolParseResult& from) : ToolParseResult(nullptr, from) {}
+  inline ToolParseResult(ToolParseResult&& from) noexcept
+      : ToolParseResult(nullptr, ::std::move(from)) {}
+  inline ToolParseResult& operator=(const ToolParseResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ToolParseResult& operator=(ToolParseResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ToolParseResult& default_instance() {
+    return *reinterpret_cast<const ToolParseResult*>(
+        &_ToolParseResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 12;
+  friend void swap(ToolParseResult& a, ToolParseResult& b) { a.Swap(&b); }
+  inline void Swap(ToolParseResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ToolParseResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ToolParseResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ToolParseResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ToolParseResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ToolParseResult& from) { ToolParseResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ToolParseResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolParseResult"; }
+
+  explicit ToolParseResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolParseResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolParseResult& from);
+  ToolParseResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolParseResult&& from) noexcept
+      : ToolParseResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kToolCallsFieldNumber = 2,
+    kRemainingTextFieldNumber = 3,
+    kErrorMessageFieldNumber = 4,
+    kHasToolCallFieldNumber = 1,
+    kErrorCodeFieldNumber = 5,
+  };
+  // repeated .runanywhere.v1.ToolCall tool_calls = 2;
+  [[nodiscard]] int tool_calls_size()
+      const;
+  private:
+  int _internal_tool_calls_size() const;
+
+  public:
+  void clear_tool_calls() ;
+  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_calls(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL
+  mutable_tool_calls();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& _internal_tool_calls() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL _internal_mutable_tool_calls();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_calls(int index) const;
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL add_tool_calls();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& tool_calls()
+      const;
+  // string remaining_text = 3;
+  void clear_remaining_text() ;
+  [[nodiscard]] const ::std::string& remaining_text() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_remaining_text(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_remaining_text();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_remaining_text();
+  void set_allocated_remaining_text(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_remaining_text() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_remaining_text(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_remaining_text();
+
+  public:
+  // optional string error_message = 4;
+  [[nodiscard]] bool has_error_message()
+      const;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // bool has_tool_call = 1;
+  void clear_has_tool_call() ;
+  [[nodiscard]] bool has_tool_call() const;
+  void set_has_tool_call(bool value);
+
+  private:
+  bool _internal_has_tool_call() const;
+  void _internal_set_has_tool_call(bool value);
+
+  public:
+  // int32 error_code = 5;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolParseResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   1, 66,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ToolParseResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolCall > tool_calls_;
+    ::google::protobuf::internal::ArenaStringPtr remaining_text_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    bool has_tool_call_;
+    ::int32_t error_code_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_tool_5fcalling_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ToolParseResult_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParameter final : public ::google::protobuf::Message
@@ -2421,69 +3251,30 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParameter final : public ::goog
 extern const ::google::protobuf::internal::ClassDataFull ToolParameter_class_data_;
 // -------------------------------------------------------------------
 
-class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall_ArgumentsEntry_DoNotUse final
-    : public ::google::protobuf::internal::MapEntry<::std::string, ::google::protobuf::Message,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_MESSAGE> {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingResult) */ {
  public:
-  using SuperType =
-      ::google::protobuf::internal::MapEntry<::std::string, ::google::protobuf::Message,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_MESSAGE>;
-  ToolCall_ArgumentsEntry_DoNotUse();
-  template <typename = void>
-  explicit constexpr ToolCall_ArgumentsEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized);
-  explicit ToolCall_ArgumentsEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr const void* PROTOBUF_NONNULL internal_default_instance() {
-    return &_ToolCall_ArgumentsEntry_DoNotUse_default_instance_;
-  }
-
-
-  static constexpr auto InternalGenerateClassData_();
-
- private:
-  friend class ::google::protobuf::MessageLite;
-  friend struct ::TableStruct_tool_5fcalling_2eproto;
-
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<1, 2,
-                                   1, 50,
-                                   2>
-      _table_;
-
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-};
-extern const ::google::protobuf::internal::ClassDataFull ToolCall_ArgumentsEntry_DoNotUse_class_data_;
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolResult) */ {
- public:
-  inline ToolResult() : ToolResult(nullptr) {}
-  ~ToolResult() PROTOBUF_FINAL;
+  inline ToolCallingResult() : ToolCallingResult(nullptr) {}
+  ~ToolCallingResult() PROTOBUF_FINAL;
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ToolResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+  void operator delete(ToolCallingResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
     SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolResult));
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCallingResult));
   }
 #endif
 
   template <typename = void>
-  explicit constexpr ToolResult(::google::protobuf::internal::ConstantInitialized);
+  explicit constexpr ToolCallingResult(::google::protobuf::internal::ConstantInitialized);
 
-  inline ToolResult(const ToolResult& from) : ToolResult(nullptr, from) {}
-  inline ToolResult(ToolResult&& from) noexcept
-      : ToolResult(nullptr, ::std::move(from)) {}
-  inline ToolResult& operator=(const ToolResult& from) {
+  inline ToolCallingResult(const ToolCallingResult& from) : ToolCallingResult(nullptr, from) {}
+  inline ToolCallingResult(ToolCallingResult&& from) noexcept
+      : ToolCallingResult(nullptr, ::std::move(from)) {}
+  inline ToolCallingResult& operator=(const ToolCallingResult& from) {
     CopyFrom(from);
     return *this;
   }
-  inline ToolResult& operator=(ToolResult&& from) noexcept {
+  inline ToolCallingResult& operator=(ToolCallingResult&& from) noexcept {
     if (this == &from) return *this;
     if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
       InternalSwap(&from);
@@ -2512,13 +3303,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
   [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  [[nodiscard]] static const ToolResult& default_instance() {
-    return *reinterpret_cast<const ToolResult*>(
-        &_ToolResult_default_instance_);
+  [[nodiscard]] static const ToolCallingResult& default_instance() {
+    return *reinterpret_cast<const ToolCallingResult*>(
+        &_ToolCallingResult_default_instance_);
   }
   static constexpr int kIndexInFileMessages = 10;
-  friend void swap(ToolResult& a, ToolResult& b) { a.Swap(&b); }
-  inline void Swap(ToolResult* PROTOBUF_NONNULL other) {
+  friend void swap(ToolCallingResult& a, ToolCallingResult& b) { a.Swap(&b); }
+  inline void Swap(ToolCallingResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
     if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
       InternalSwap(other);
@@ -2526,7 +3317,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
       ::google::protobuf::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(ToolResult* PROTOBUF_NONNULL other) {
+  void UnsafeArenaSwap(ToolCallingResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
     ABSL_DCHECK(GetArena() == other->GetArena());
     InternalSwap(other);
@@ -2534,14 +3325,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
 
   // implements Message ----------------------------------------------
 
-  [[nodiscard]] ToolResult* PROTOBUF_NONNULL
+  [[nodiscard]] ToolCallingResult* PROTOBUF_NONNULL
   New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ToolResult>(arena);
+    return ::google::protobuf::Message::DefaultConstruct<ToolCallingResult>(arena);
   }
   using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ToolResult& from);
+  void CopyFrom(const ToolCallingResult& from);
   using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ToolResult& from) { ToolResult::MergeImpl(*this, from); }
+  void MergeFrom(const ToolCallingResult& from) { ToolCallingResult::MergeImpl(*this, from); }
 
   private:
   static void MergeImpl(::google::protobuf::MessageLite& to_msg,
@@ -2579,17 +3370,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
   private:
   void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static void SharedDtor(MessageLite& self);
-  void InternalSwap(ToolResult* PROTOBUF_NONNULL other);
+  void InternalSwap(ToolCallingResult* PROTOBUF_NONNULL other);
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolResult"; }
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCallingResult"; }
 
-  explicit ToolResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ToolResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolResult& from);
-  ToolResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolResult&& from) noexcept
-      : ToolResult(arena) {
+  explicit ToolCallingResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolCallingResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCallingResult& from);
+  ToolCallingResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCallingResult&& from) noexcept
+      : ToolCallingResult(arena) {
     *this = ::std::move(from);
   }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
@@ -2606,147 +3397,156 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
 
   // accessors -------------------------------------------------------
   enum : int {
-    kToolCallIdFieldNumber = 1,
-    kNameFieldNumber = 2,
-    kResultJsonFieldNumber = 3,
-    kErrorFieldNumber = 4,
-    kCallIdFieldNumber = 7,
-    kStartedAtMsFieldNumber = 8,
-    kCompletedAtMsFieldNumber = 9,
-    kSuccessFieldNumber = 5,
-    kResultFieldNumber = 6,
+    kToolCallsFieldNumber = 2,
+    kToolResultsFieldNumber = 3,
+    kTextFieldNumber = 1,
+    kConversationIdFieldNumber = 5,
+    kErrorMessageFieldNumber = 7,
+    kRawTextFieldNumber = 9,
+    kIsCompleteFieldNumber = 4,
+    kIterationsUsedFieldNumber = 6,
+    kErrorCodeFieldNumber = 8,
   };
-  // string tool_call_id = 1;
-  void clear_tool_call_id() ;
-  [[nodiscard]] const ::std::string& tool_call_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_tool_call_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_tool_call_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_tool_call_id();
-  void set_allocated_tool_call_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_tool_call_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_tool_call_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_tool_call_id();
-
-  public:
-  // string name = 2;
-  void clear_name() ;
-  [[nodiscard]] const ::std::string& name() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_name(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_name();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
-  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_name() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
-
-  public:
-  // string result_json = 3;
-  void clear_result_json() ;
-  [[nodiscard]] const ::std::string& result_json() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_result_json(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_result_json();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_result_json();
-  void set_allocated_result_json(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_result_json() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_result_json(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_result_json();
-
-  public:
-  // optional string error = 4;
-  [[nodiscard]] bool has_error()
-      const;
-  void clear_error() ;
-  [[nodiscard]] const ::std::string& error() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error();
-  void set_allocated_error(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error();
-
-  public:
-  // optional string call_id = 7;
-  [[nodiscard]] bool has_call_id()
-      const;
-  void clear_call_id() ;
-  [[nodiscard]] const ::std::string& call_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_call_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_call_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_call_id();
-  void set_allocated_call_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_call_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_call_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_call_id();
-
-  public:
-  // int64 started_at_ms = 8;
-  void clear_started_at_ms() ;
-  [[nodiscard]] ::int64_t started_at_ms() const;
-  void set_started_at_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_started_at_ms() const;
-  void _internal_set_started_at_ms(::int64_t value);
-
-  public:
-  // int64 completed_at_ms = 9;
-  void clear_completed_at_ms() ;
-  [[nodiscard]] ::int64_t completed_at_ms() const;
-  void set_completed_at_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_completed_at_ms() const;
-  void _internal_set_completed_at_ms(::int64_t value);
-
-  public:
-  // bool success = 5;
-  void clear_success() ;
-  [[nodiscard]] bool success() const;
-  void set_success(bool value);
-
-  private:
-  bool _internal_success() const;
-  void _internal_set_success(bool value);
-
-  public:
-  // map<string, .runanywhere.v1.ToolValue> result = 6;
-  [[nodiscard]] int result_size()
+  // repeated .runanywhere.v1.ToolCall tool_calls = 2;
+  [[nodiscard]] int tool_calls_size()
       const;
   private:
-  int _internal_result_size() const;
+  int _internal_tool_calls_size() const;
 
   public:
-  void clear_result() ;
-  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& result() const;
-  [[nodiscard]] ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL mutable_result();
+  void clear_tool_calls() ;
+  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_calls(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL
+  mutable_tool_calls();
 
   private:
-  const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& _internal_result() const;
-  ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL _internal_mutable_result();
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& _internal_tool_calls() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL _internal_mutable_tool_calls();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_calls(int index) const;
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL add_tool_calls();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& tool_calls()
+      const;
+  // repeated .runanywhere.v1.ToolResult tool_results = 3;
+  [[nodiscard]] int tool_results_size()
+      const;
+  private:
+  int _internal_tool_results_size() const;
 
   public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolResult)
+  void clear_tool_results() ;
+  [[nodiscard]] ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL mutable_tool_results(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL
+  mutable_tool_results();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& _internal_tool_results() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL _internal_mutable_tool_results();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::ToolResult& tool_results(int index) const;
+  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL add_tool_results();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& tool_results()
+      const;
+  // string text = 1;
+  void clear_text() ;
+  [[nodiscard]] const ::std::string& text() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_text(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_text();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_text();
+  void set_allocated_text(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_text() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_text(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
+
+  public:
+  // optional string conversation_id = 5;
+  [[nodiscard]] bool has_conversation_id()
+      const;
+  void clear_conversation_id() ;
+  [[nodiscard]] const ::std::string& conversation_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_conversation_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_conversation_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_conversation_id();
+  void set_allocated_conversation_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_conversation_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_conversation_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_conversation_id();
+
+  public:
+  // optional string error_message = 7;
+  [[nodiscard]] bool has_error_message()
+      const;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // string raw_text = 9;
+  void clear_raw_text() ;
+  [[nodiscard]] const ::std::string& raw_text() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_raw_text(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_raw_text();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_raw_text();
+  void set_allocated_raw_text(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_raw_text() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_raw_text(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_raw_text();
+
+  public:
+  // bool is_complete = 4;
+  void clear_is_complete() ;
+  [[nodiscard]] bool is_complete() const;
+  void set_is_complete(bool value);
+
+  private:
+  bool _internal_is_complete() const;
+  void _internal_set_is_complete(bool value);
+
+  public:
+  // int32 iterations_used = 6;
+  void clear_iterations_used() ;
+  [[nodiscard]] ::int32_t iterations_used() const;
+  void set_iterations_used(::int32_t value);
+
+  private:
+  ::int32_t _internal_iterations_used() const;
+  void _internal_set_iterations_used(::int32_t value);
+
+  public:
+  // int32 error_code = 8;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingResult)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<4, 9,
-                                   2, 87,
+                                   2, 89,
                                    2>
       _table_;
 
@@ -2766,25 +3566,25 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
     inline explicit Impl_(
         ::google::protobuf::internal::InternalVisibility visibility,
         ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ToolResult& from_msg);
+        const ToolCallingResult& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr tool_call_id_;
-    ::google::protobuf::internal::ArenaStringPtr name_;
-    ::google::protobuf::internal::ArenaStringPtr result_json_;
-    ::google::protobuf::internal::ArenaStringPtr error_;
-    ::google::protobuf::internal::ArenaStringPtr call_id_;
-    ::int64_t started_at_ms_;
-    ::int64_t completed_at_ms_;
-    bool success_;
-    ::google::protobuf::internal::MapField<ToolResult_ResultEntry_DoNotUse, ::std::string, ::runanywhere::v1::ToolValue> result_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolCall > tool_calls_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolResult > tool_results_;
+    ::google::protobuf::internal::ArenaStringPtr text_;
+    ::google::protobuf::internal::ArenaStringPtr conversation_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::google::protobuf::internal::ArenaStringPtr raw_text_;
+    bool is_complete_;
+    ::int32_t iterations_used_;
+    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
   friend struct ::TableStruct_tool_5fcalling_2eproto;
 };
 
-extern const ::google::protobuf::internal::ClassDataFull ToolResult_class_data_;
+extern const ::google::protobuf::internal::ClassDataFull ToolCallingResult_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolDefinition final : public ::google::protobuf::Message
@@ -3083,30 +3883,30 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolDefinition final : public ::goo
 extern const ::google::protobuf::internal::ClassDataFull ToolDefinition_class_data_;
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCall) */ {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingStreamEvent final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingStreamEvent) */ {
  public:
-  inline ToolCall() : ToolCall(nullptr) {}
-  ~ToolCall() PROTOBUF_FINAL;
+  inline ToolCallingStreamEvent() : ToolCallingStreamEvent(nullptr) {}
+  ~ToolCallingStreamEvent() PROTOBUF_FINAL;
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ToolCall* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+  void operator delete(ToolCallingStreamEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
     SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCall));
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCallingStreamEvent));
   }
 #endif
 
   template <typename = void>
-  explicit constexpr ToolCall(::google::protobuf::internal::ConstantInitialized);
+  explicit constexpr ToolCallingStreamEvent(::google::protobuf::internal::ConstantInitialized);
 
-  inline ToolCall(const ToolCall& from) : ToolCall(nullptr, from) {}
-  inline ToolCall(ToolCall&& from) noexcept
-      : ToolCall(nullptr, ::std::move(from)) {}
-  inline ToolCall& operator=(const ToolCall& from) {
+  inline ToolCallingStreamEvent(const ToolCallingStreamEvent& from) : ToolCallingStreamEvent(nullptr, from) {}
+  inline ToolCallingStreamEvent(ToolCallingStreamEvent&& from) noexcept
+      : ToolCallingStreamEvent(nullptr, ::std::move(from)) {}
+  inline ToolCallingStreamEvent& operator=(const ToolCallingStreamEvent& from) {
     CopyFrom(from);
     return *this;
   }
-  inline ToolCall& operator=(ToolCall&& from) noexcept {
+  inline ToolCallingStreamEvent& operator=(ToolCallingStreamEvent&& from) noexcept {
     if (this == &from) return *this;
     if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
       InternalSwap(&from);
@@ -3135,13 +3935,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
   [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  [[nodiscard]] static const ToolCall& default_instance() {
-    return *reinterpret_cast<const ToolCall*>(
-        &_ToolCall_default_instance_);
+  [[nodiscard]] static const ToolCallingStreamEvent& default_instance() {
+    return *reinterpret_cast<const ToolCallingStreamEvent*>(
+        &_ToolCallingStreamEvent_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 8;
-  friend void swap(ToolCall& a, ToolCall& b) { a.Swap(&b); }
-  inline void Swap(ToolCall* PROTOBUF_NONNULL other) {
+  static constexpr int kIndexInFileMessages = 17;
+  friend void swap(ToolCallingStreamEvent& a, ToolCallingStreamEvent& b) { a.Swap(&b); }
+  inline void Swap(ToolCallingStreamEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
     if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
       InternalSwap(other);
@@ -3149,7 +3949,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
       ::google::protobuf::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(ToolCall* PROTOBUF_NONNULL other) {
+  void UnsafeArenaSwap(ToolCallingStreamEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
     ABSL_DCHECK(GetArena() == other->GetArena());
     InternalSwap(other);
@@ -3157,14 +3957,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
 
   // implements Message ----------------------------------------------
 
-  [[nodiscard]] ToolCall* PROTOBUF_NONNULL
+  [[nodiscard]] ToolCallingStreamEvent* PROTOBUF_NONNULL
   New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ToolCall>(arena);
+    return ::google::protobuf::Message::DefaultConstruct<ToolCallingStreamEvent>(arena);
   }
   using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ToolCall& from);
+  void CopyFrom(const ToolCallingStreamEvent& from);
   using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ToolCall& from) { ToolCall::MergeImpl(*this, from); }
+  void MergeFrom(const ToolCallingStreamEvent& from) { ToolCallingStreamEvent::MergeImpl(*this, from); }
 
   private:
   static void MergeImpl(::google::protobuf::MessageLite& to_msg,
@@ -3202,17 +4002,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
   private:
   void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static void SharedDtor(MessageLite& self);
-  void InternalSwap(ToolCall* PROTOBUF_NONNULL other);
+  void InternalSwap(ToolCallingStreamEvent* PROTOBUF_NONNULL other);
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCall"; }
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCallingStreamEvent"; }
 
-  explicit ToolCall(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ToolCall(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCall& from);
-  ToolCall(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCall&& from) noexcept
-      : ToolCall(arena) {
+  explicit ToolCallingStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolCallingStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCallingStreamEvent& from);
+  ToolCallingStreamEvent(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCallingStreamEvent&& from) noexcept
+      : ToolCallingStreamEvent(arena) {
     *this = ::std::move(from);
   }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
@@ -3229,141 +4029,158 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
 
   // accessors -------------------------------------------------------
   enum : int {
-    kIdFieldNumber = 1,
-    kNameFieldNumber = 2,
-    kArgumentsJsonFieldNumber = 3,
-    kTypeFieldNumber = 4,
-    kCallIdFieldNumber = 6,
-    kRawTextFieldNumber = 8,
-    kCreatedAtMsFieldNumber = 7,
-    kArgumentsFieldNumber = 5,
+    kConversationIdFieldNumber = 3,
+    kTokenFieldNumber = 5,
+    kErrorMessageFieldNumber = 9,
+    kToolCallFieldNumber = 6,
+    kToolResultFieldNumber = 7,
+    kResultFieldNumber = 8,
+    kSeqFieldNumber = 1,
+    kTimestampUsFieldNumber = 2,
+    kKindFieldNumber = 4,
+    kErrorCodeFieldNumber = 10,
   };
-  // string id = 1;
-  void clear_id() ;
-  [[nodiscard]] const ::std::string& id() const;
+  // string conversation_id = 3;
+  void clear_conversation_id() ;
+  [[nodiscard]] const ::std::string& conversation_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_id();
-  void set_allocated_id(::std::string* PROTOBUF_NULLABLE value);
+  void set_conversation_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_conversation_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_conversation_id();
+  void set_allocated_conversation_id(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_id();
+  const ::std::string& _internal_conversation_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_conversation_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_conversation_id();
 
   public:
-  // string name = 2;
-  void clear_name() ;
-  [[nodiscard]] const ::std::string& name() const;
+  // string token = 5;
+  void clear_token() ;
+  [[nodiscard]] const ::std::string& token() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_name(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_name();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
-  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
+  void set_token(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_token();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_token();
+  void set_allocated_token(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_name() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
+  const ::std::string& _internal_token() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_token(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_token();
 
   public:
-  // string arguments_json = 3;
-  void clear_arguments_json() ;
-  [[nodiscard]] const ::std::string& arguments_json() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_arguments_json(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_arguments_json();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_arguments_json();
-  void set_allocated_arguments_json(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_arguments_json() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_arguments_json(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_arguments_json();
-
-  public:
-  // string type = 4;
-  void clear_type() ;
-  [[nodiscard]] const ::std::string& type() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_type(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_type();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_type();
-  void set_allocated_type(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_type() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_type(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_type();
-
-  public:
-  // optional string call_id = 6;
-  [[nodiscard]] bool has_call_id()
+  // optional string error_message = 9;
+  [[nodiscard]] bool has_error_message()
       const;
-  void clear_call_id() ;
-  [[nodiscard]] const ::std::string& call_id() const;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_call_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_call_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_call_id();
-  void set_allocated_call_id(::std::string* PROTOBUF_NULLABLE value);
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_call_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_call_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_call_id();
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
 
   public:
-  // optional string raw_text = 8;
-  [[nodiscard]] bool has_raw_text()
+  // optional .runanywhere.v1.ToolCall tool_call = 6;
+  [[nodiscard]] bool has_tool_call()
       const;
-  void clear_raw_text() ;
-  [[nodiscard]] const ::std::string& raw_text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_raw_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_raw_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_raw_text();
-  void set_allocated_raw_text(::std::string* PROTOBUF_NULLABLE value);
+  void clear_tool_call() ;
+  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_call() const;
+  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE release_tool_call();
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_call();
+  void set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE unsafe_arena_release_tool_call();
 
   private:
-  const ::std::string& _internal_raw_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_raw_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_raw_text();
+  const ::runanywhere::v1::ToolCall& _internal_tool_call() const;
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL _internal_mutable_tool_call();
 
   public:
-  // int64 created_at_ms = 7;
-  void clear_created_at_ms() ;
-  [[nodiscard]] ::int64_t created_at_ms() const;
-  void set_created_at_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_created_at_ms() const;
-  void _internal_set_created_at_ms(::int64_t value);
-
-  public:
-  // map<string, .runanywhere.v1.ToolValue> arguments = 5;
-  [[nodiscard]] int arguments_size()
+  // optional .runanywhere.v1.ToolResult tool_result = 7;
+  [[nodiscard]] bool has_tool_result()
       const;
+  void clear_tool_result() ;
+  [[nodiscard]] const ::runanywhere::v1::ToolResult& tool_result() const;
+  [[nodiscard]] ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE release_tool_result();
+  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL mutable_tool_result();
+  void set_allocated_tool_result(::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_tool_result(::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE unsafe_arena_release_tool_result();
+
   private:
-  int _internal_arguments_size() const;
+  const ::runanywhere::v1::ToolResult& _internal_tool_result() const;
+  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL _internal_mutable_tool_result();
 
   public:
-  void clear_arguments() ;
-  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& arguments() const;
-  [[nodiscard]] ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL mutable_arguments();
+  // optional .runanywhere.v1.ToolCallingResult result = 8;
+  [[nodiscard]] bool has_result()
+      const;
+  void clear_result() ;
+  [[nodiscard]] const ::runanywhere::v1::ToolCallingResult& result() const;
+  [[nodiscard]] ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE release_result();
+  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL mutable_result();
+  void set_allocated_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
 
   private:
-  const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& _internal_arguments() const;
-  ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL _internal_mutable_arguments();
+  const ::runanywhere::v1::ToolCallingResult& _internal_result() const;
+  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL _internal_mutable_result();
 
   public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCall)
+  // uint64 seq = 1;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
+  // int64 timestamp_us = 2;
+  void clear_timestamp_us() ;
+  [[nodiscard]] ::int64_t timestamp_us() const;
+  void set_timestamp_us(::int64_t value);
+
+  private:
+  ::int64_t _internal_timestamp_us() const;
+  void _internal_set_timestamp_us(::int64_t value);
+
+  public:
+  // .runanywhere.v1.ToolCallingStreamEventKind kind = 4;
+  void clear_kind() ;
+  [[nodiscard]] ::runanywhere::v1::ToolCallingStreamEventKind kind() const;
+  void set_kind(::runanywhere::v1::ToolCallingStreamEventKind value);
+
+  private:
+  ::runanywhere::v1::ToolCallingStreamEventKind _internal_kind() const;
+  void _internal_set_kind(::runanywhere::v1::ToolCallingStreamEventKind value);
+
+  public:
+  // int32 error_code = 10;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingStreamEvent)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 8,
-                                   2, 88,
+  static const ::google::protobuf::internal::TcParseTable<4, 10,
+                                   3, 87,
                                    2>
       _table_;
 
@@ -3383,24 +4200,324 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
     inline explicit Impl_(
         ::google::protobuf::internal::InternalVisibility visibility,
         ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ToolCall& from_msg);
+        const ToolCallingStreamEvent& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr id_;
-    ::google::protobuf::internal::ArenaStringPtr name_;
-    ::google::protobuf::internal::ArenaStringPtr arguments_json_;
-    ::google::protobuf::internal::ArenaStringPtr type_;
-    ::google::protobuf::internal::ArenaStringPtr call_id_;
-    ::google::protobuf::internal::ArenaStringPtr raw_text_;
-    ::int64_t created_at_ms_;
-    ::google::protobuf::internal::MapField<ToolCall_ArgumentsEntry_DoNotUse, ::std::string, ::runanywhere::v1::ToolValue> arguments_;
+    ::google::protobuf::internal::ArenaStringPtr conversation_id_;
+    ::google::protobuf::internal::ArenaStringPtr token_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE tool_call_;
+    ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE tool_result_;
+    ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE result_;
+    ::uint64_t seq_;
+    ::int64_t timestamp_us_;
+    int kind_;
+    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
   friend struct ::TableStruct_tool_5fcalling_2eproto;
 };
 
-extern const ::google::protobuf::internal::ClassDataFull ToolCall_class_data_;
+extern const ::google::protobuf::internal::ClassDataFull ToolCallingStreamEvent_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionEvent final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingSessionEvent) */ {
+ public:
+  inline ToolCallingSessionEvent() : ToolCallingSessionEvent(nullptr) {}
+  ~ToolCallingSessionEvent() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ToolCallingSessionEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCallingSessionEvent));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ToolCallingSessionEvent(::google::protobuf::internal::ConstantInitialized);
+
+  inline ToolCallingSessionEvent(const ToolCallingSessionEvent& from) : ToolCallingSessionEvent(nullptr, from) {}
+  inline ToolCallingSessionEvent(ToolCallingSessionEvent&& from) noexcept
+      : ToolCallingSessionEvent(nullptr, ::std::move(from)) {}
+  inline ToolCallingSessionEvent& operator=(const ToolCallingSessionEvent& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ToolCallingSessionEvent& operator=(ToolCallingSessionEvent&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ToolCallingSessionEvent& default_instance() {
+    return *reinterpret_cast<const ToolCallingSessionEvent*>(
+        &_ToolCallingSessionEvent_default_instance_);
+  }
+  enum KindCase {
+    kLlmStreamEventBytes = 1,
+    kToolCall = 2,
+    kFinalResult = 3,
+    kErrorBytes = 4,
+    KIND_NOT_SET = 0,
+  };
+  static constexpr int kIndexInFileMessages = 21;
+  friend void swap(ToolCallingSessionEvent& a, ToolCallingSessionEvent& b) { a.Swap(&b); }
+  inline void Swap(ToolCallingSessionEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ToolCallingSessionEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ToolCallingSessionEvent* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ToolCallingSessionEvent>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ToolCallingSessionEvent& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ToolCallingSessionEvent& from) { ToolCallingSessionEvent::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ToolCallingSessionEvent* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCallingSessionEvent"; }
+
+  explicit ToolCallingSessionEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolCallingSessionEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCallingSessionEvent& from);
+  ToolCallingSessionEvent(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCallingSessionEvent&& from) noexcept
+      : ToolCallingSessionEvent(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSeqFieldNumber = 5,
+    kLlmStreamEventBytesFieldNumber = 1,
+    kToolCallFieldNumber = 2,
+    kFinalResultFieldNumber = 3,
+    kErrorBytesFieldNumber = 4,
+  };
+  // uint64 seq = 5;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
+  // bytes llm_stream_event_bytes = 1;
+  [[nodiscard]] bool has_llm_stream_event_bytes()
+      const;
+  void clear_llm_stream_event_bytes() ;
+  [[nodiscard]] const ::std::string& llm_stream_event_bytes() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_llm_stream_event_bytes(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_llm_stream_event_bytes();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_llm_stream_event_bytes();
+  void set_allocated_llm_stream_event_bytes(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_llm_stream_event_bytes() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_llm_stream_event_bytes(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_llm_stream_event_bytes();
+
+  public:
+  // .runanywhere.v1.ToolCall tool_call = 2;
+  [[nodiscard]] bool has_tool_call()
+      const;
+  private:
+  bool _internal_has_tool_call() const;
+
+  public:
+  void clear_tool_call() ;
+  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_call() const;
+  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE release_tool_call();
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_call();
+  void set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE unsafe_arena_release_tool_call();
+
+  private:
+  const ::runanywhere::v1::ToolCall& _internal_tool_call() const;
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL _internal_mutable_tool_call();
+
+  public:
+  // .runanywhere.v1.ToolCallingResult final_result = 3;
+  [[nodiscard]] bool has_final_result()
+      const;
+  private:
+  bool _internal_has_final_result() const;
+
+  public:
+  void clear_final_result() ;
+  [[nodiscard]] const ::runanywhere::v1::ToolCallingResult& final_result() const;
+  [[nodiscard]] ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE release_final_result();
+  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL mutable_final_result();
+  void set_allocated_final_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_final_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE unsafe_arena_release_final_result();
+
+  private:
+  const ::runanywhere::v1::ToolCallingResult& _internal_final_result() const;
+  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL _internal_mutable_final_result();
+
+  public:
+  // bytes error_bytes = 4;
+  [[nodiscard]] bool has_error_bytes()
+      const;
+  void clear_error_bytes() ;
+  [[nodiscard]] const ::std::string& error_bytes() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_bytes(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_bytes();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_bytes();
+  void set_allocated_error_bytes(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_bytes() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_bytes(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_bytes();
+
+  public:
+  void clear_kind();
+  KindCase kind_case() const;
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingSessionEvent)
+ private:
+  class _Internal;
+  void set_has_llm_stream_event_bytes();
+  void set_has_tool_call();
+  void set_has_final_result();
+  void set_has_error_bytes();
+  [[nodiscard]] inline bool has_kind() const;
+  inline void clear_has_kind();
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 5,
+                                   2, 0,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ToolCallingSessionEvent& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::uint64_t seq_;
+    union KindUnion {
+      constexpr KindUnion() : _constinit_{} {}
+      ::google::protobuf::internal::ConstantInitialized _constinit_;
+      ::google::protobuf::internal::ArenaStringPtr llm_stream_event_bytes_;
+      ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE tool_call_;
+      ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE final_result_;
+      ::google::protobuf::internal::ArenaStringPtr error_bytes_;
+    } kind_;
+    ::uint32_t _oneof_case_[1];
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_tool_5fcalling_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ToolCallingSessionEvent_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolRegistrySnapshot final : public ::google::protobuf::Message
@@ -3459,7 +4576,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolRegistrySnapshot final : public
     return *reinterpret_cast<const ToolRegistrySnapshot*>(
         &_ToolRegistrySnapshot_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 20;
+  static constexpr int kIndexInFileMessages = 18;
   friend void swap(ToolRegistrySnapshot& a, ToolRegistrySnapshot& b) { a.Swap(&b); }
   inline void Swap(ToolRegistrySnapshot* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3621,272 +4738,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolRegistrySnapshot final : public
 extern const ::google::protobuf::internal::ClassDataFull ToolRegistrySnapshot_class_data_;
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParseResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolParseResult) */ {
- public:
-  inline ToolParseResult() : ToolParseResult(nullptr) {}
-  ~ToolParseResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ToolParseResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolParseResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ToolParseResult(::google::protobuf::internal::ConstantInitialized);
-
-  inline ToolParseResult(const ToolParseResult& from) : ToolParseResult(nullptr, from) {}
-  inline ToolParseResult(ToolParseResult&& from) noexcept
-      : ToolParseResult(nullptr, ::std::move(from)) {}
-  inline ToolParseResult& operator=(const ToolParseResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ToolParseResult& operator=(ToolParseResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ToolParseResult& default_instance() {
-    return *reinterpret_cast<const ToolParseResult*>(
-        &_ToolParseResult_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 14;
-  friend void swap(ToolParseResult& a, ToolParseResult& b) { a.Swap(&b); }
-  inline void Swap(ToolParseResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ToolParseResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ToolParseResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ToolParseResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ToolParseResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ToolParseResult& from) { ToolParseResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ToolParseResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolParseResult"; }
-
-  explicit ToolParseResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ToolParseResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolParseResult& from);
-  ToolParseResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolParseResult&& from) noexcept
-      : ToolParseResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kToolCallsFieldNumber = 2,
-    kRemainingTextFieldNumber = 3,
-    kErrorMessageFieldNumber = 4,
-    kHasToolCallFieldNumber = 1,
-    kErrorCodeFieldNumber = 5,
-  };
-  // repeated .runanywhere.v1.ToolCall tool_calls = 2;
-  [[nodiscard]] int tool_calls_size()
-      const;
-  private:
-  int _internal_tool_calls_size() const;
-
-  public:
-  void clear_tool_calls() ;
-  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_calls(int index);
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL
-  mutable_tool_calls();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& _internal_tool_calls() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL _internal_mutable_tool_calls();
-  public:
-  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_calls(int index) const;
-  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL add_tool_calls();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& tool_calls()
-      const;
-  // string remaining_text = 3;
-  void clear_remaining_text() ;
-  [[nodiscard]] const ::std::string& remaining_text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_remaining_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_remaining_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_remaining_text();
-  void set_allocated_remaining_text(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_remaining_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_remaining_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_remaining_text();
-
-  public:
-  // optional string error_message = 4;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // bool has_tool_call = 1;
-  void clear_has_tool_call() ;
-  [[nodiscard]] bool has_tool_call() const;
-  void set_has_tool_call(bool value);
-
-  private:
-  bool _internal_has_tool_call() const;
-  void _internal_set_has_tool_call(bool value);
-
-  public:
-  // int32 error_code = 5;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolParseResult)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
-                                   1, 66,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ToolParseResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolCall > tool_calls_;
-    ::google::protobuf::internal::ArenaStringPtr remaining_text_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    bool has_tool_call_;
-    ::int32_t error_code_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_tool_5fcalling_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull ToolParseResult_class_data_;
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingSessionCreateRequest) */ {
  public:
@@ -3943,7 +4794,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
     return *reinterpret_cast<const ToolCallingSessionCreateRequest*>(
         &_ToolCallingSessionCreateRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 21;
+  static constexpr int kIndexInFileMessages = 19;
   friend void swap(ToolCallingSessionCreateRequest& a, ToolCallingSessionCreateRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionCreateRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4216,342 +5067,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
 extern const ::google::protobuf::internal::ClassDataFull ToolCallingSessionCreateRequest_class_data_;
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingResult) */ {
- public:
-  inline ToolCallingResult() : ToolCallingResult(nullptr) {}
-  ~ToolCallingResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ToolCallingResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCallingResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ToolCallingResult(::google::protobuf::internal::ConstantInitialized);
-
-  inline ToolCallingResult(const ToolCallingResult& from) : ToolCallingResult(nullptr, from) {}
-  inline ToolCallingResult(ToolCallingResult&& from) noexcept
-      : ToolCallingResult(nullptr, ::std::move(from)) {}
-  inline ToolCallingResult& operator=(const ToolCallingResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ToolCallingResult& operator=(ToolCallingResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ToolCallingResult& default_instance() {
-    return *reinterpret_cast<const ToolCallingResult*>(
-        &_ToolCallingResult_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 12;
-  friend void swap(ToolCallingResult& a, ToolCallingResult& b) { a.Swap(&b); }
-  inline void Swap(ToolCallingResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ToolCallingResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ToolCallingResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ToolCallingResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ToolCallingResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ToolCallingResult& from) { ToolCallingResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ToolCallingResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCallingResult"; }
-
-  explicit ToolCallingResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ToolCallingResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCallingResult& from);
-  ToolCallingResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCallingResult&& from) noexcept
-      : ToolCallingResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kToolCallsFieldNumber = 2,
-    kToolResultsFieldNumber = 3,
-    kTextFieldNumber = 1,
-    kConversationIdFieldNumber = 5,
-    kErrorMessageFieldNumber = 7,
-    kRawTextFieldNumber = 9,
-    kIsCompleteFieldNumber = 4,
-    kIterationsUsedFieldNumber = 6,
-    kErrorCodeFieldNumber = 8,
-  };
-  // repeated .runanywhere.v1.ToolCall tool_calls = 2;
-  [[nodiscard]] int tool_calls_size()
-      const;
-  private:
-  int _internal_tool_calls_size() const;
-
-  public:
-  void clear_tool_calls() ;
-  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_calls(int index);
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL
-  mutable_tool_calls();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& _internal_tool_calls() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL _internal_mutable_tool_calls();
-  public:
-  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_calls(int index) const;
-  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL add_tool_calls();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& tool_calls()
-      const;
-  // repeated .runanywhere.v1.ToolResult tool_results = 3;
-  [[nodiscard]] int tool_results_size()
-      const;
-  private:
-  int _internal_tool_results_size() const;
-
-  public:
-  void clear_tool_results() ;
-  [[nodiscard]] ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL mutable_tool_results(int index);
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL
-  mutable_tool_results();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& _internal_tool_results() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL _internal_mutable_tool_results();
-  public:
-  [[nodiscard]] const ::runanywhere::v1::ToolResult& tool_results(int index) const;
-  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL add_tool_results();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& tool_results()
-      const;
-  // string text = 1;
-  void clear_text() ;
-  [[nodiscard]] const ::std::string& text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_text();
-  void set_allocated_text(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
-
-  public:
-  // optional string conversation_id = 5;
-  [[nodiscard]] bool has_conversation_id()
-      const;
-  void clear_conversation_id() ;
-  [[nodiscard]] const ::std::string& conversation_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_conversation_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_conversation_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_conversation_id();
-  void set_allocated_conversation_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_conversation_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_conversation_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_conversation_id();
-
-  public:
-  // optional string error_message = 7;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // string raw_text = 9;
-  void clear_raw_text() ;
-  [[nodiscard]] const ::std::string& raw_text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_raw_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_raw_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_raw_text();
-  void set_allocated_raw_text(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_raw_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_raw_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_raw_text();
-
-  public:
-  // bool is_complete = 4;
-  void clear_is_complete() ;
-  [[nodiscard]] bool is_complete() const;
-  void set_is_complete(bool value);
-
-  private:
-  bool _internal_is_complete() const;
-  void _internal_set_is_complete(bool value);
-
-  public:
-  // int32 iterations_used = 6;
-  void clear_iterations_used() ;
-  [[nodiscard]] ::int32_t iterations_used() const;
-  void set_iterations_used(::int32_t value);
-
-  private:
-  ::int32_t _internal_iterations_used() const;
-  void _internal_set_iterations_used(::int32_t value);
-
-  public:
-  // int32 error_code = 8;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingResult)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 9,
-                                   2, 89,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ToolCallingResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolCall > tool_calls_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolResult > tool_results_;
-    ::google::protobuf::internal::ArenaStringPtr text_;
-    ::google::protobuf::internal::ArenaStringPtr conversation_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    ::google::protobuf::internal::ArenaStringPtr raw_text_;
-    bool is_complete_;
-    ::int32_t iterations_used_;
-    ::int32_t error_code_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_tool_5fcalling_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull ToolCallingResult_class_data_;
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingOptions) */ {
  public:
@@ -4608,7 +5123,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
     return *reinterpret_cast<const ToolCallingOptions*>(
         &_ToolCallingOptions_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(ToolCallingOptions& a, ToolCallingOptions& b) { a.Swap(&b); }
   inline void Swap(ToolCallingOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5028,7 +5543,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallValidationResult final : pu
     return *reinterpret_cast<const ToolCallValidationResult*>(
         &_ToolCallValidationResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 18;
+  static constexpr int kIndexInFileMessages = 16;
   friend void swap(ToolCallValidationResult& a, ToolCallValidationResult& b) { a.Swap(&b); }
   inline void Swap(ToolCallValidationResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5317,7 +5832,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolPromptFormatRequest final : pub
     return *reinterpret_cast<const ToolPromptFormatRequest*>(
         &_ToolPromptFormatRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 15;
+  static constexpr int kIndexInFileMessages = 13;
   friend void swap(ToolPromptFormatRequest& a, ToolPromptFormatRequest& b) { a.Swap(&b); }
   inline void Swap(ToolPromptFormatRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5577,7 +6092,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParseRequest final : public ::g
     return *reinterpret_cast<const ToolParseRequest*>(
         &_ToolParseRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 13;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(ToolParseRequest& a, ToolParseRequest& b) { a.Swap(&b); }
   inline void Swap(ToolParseRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5740,643 +6255,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParseRequest final : public ::g
 extern const ::google::protobuf::internal::ClassDataFull ToolParseRequest_class_data_;
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingStreamEvent final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingStreamEvent) */ {
- public:
-  inline ToolCallingStreamEvent() : ToolCallingStreamEvent(nullptr) {}
-  ~ToolCallingStreamEvent() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ToolCallingStreamEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCallingStreamEvent));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ToolCallingStreamEvent(::google::protobuf::internal::ConstantInitialized);
-
-  inline ToolCallingStreamEvent(const ToolCallingStreamEvent& from) : ToolCallingStreamEvent(nullptr, from) {}
-  inline ToolCallingStreamEvent(ToolCallingStreamEvent&& from) noexcept
-      : ToolCallingStreamEvent(nullptr, ::std::move(from)) {}
-  inline ToolCallingStreamEvent& operator=(const ToolCallingStreamEvent& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ToolCallingStreamEvent& operator=(ToolCallingStreamEvent&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ToolCallingStreamEvent& default_instance() {
-    return *reinterpret_cast<const ToolCallingStreamEvent*>(
-        &_ToolCallingStreamEvent_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 19;
-  friend void swap(ToolCallingStreamEvent& a, ToolCallingStreamEvent& b) { a.Swap(&b); }
-  inline void Swap(ToolCallingStreamEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ToolCallingStreamEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ToolCallingStreamEvent* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ToolCallingStreamEvent>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ToolCallingStreamEvent& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ToolCallingStreamEvent& from) { ToolCallingStreamEvent::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ToolCallingStreamEvent* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCallingStreamEvent"; }
-
-  explicit ToolCallingStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ToolCallingStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCallingStreamEvent& from);
-  ToolCallingStreamEvent(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCallingStreamEvent&& from) noexcept
-      : ToolCallingStreamEvent(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kConversationIdFieldNumber = 3,
-    kTokenFieldNumber = 5,
-    kErrorMessageFieldNumber = 9,
-    kToolCallFieldNumber = 6,
-    kToolResultFieldNumber = 7,
-    kResultFieldNumber = 8,
-    kSeqFieldNumber = 1,
-    kTimestampUsFieldNumber = 2,
-    kKindFieldNumber = 4,
-    kErrorCodeFieldNumber = 10,
-  };
-  // string conversation_id = 3;
-  void clear_conversation_id() ;
-  [[nodiscard]] const ::std::string& conversation_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_conversation_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_conversation_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_conversation_id();
-  void set_allocated_conversation_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_conversation_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_conversation_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_conversation_id();
-
-  public:
-  // string token = 5;
-  void clear_token() ;
-  [[nodiscard]] const ::std::string& token() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_token(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_token();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_token();
-  void set_allocated_token(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_token() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_token(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_token();
-
-  public:
-  // optional string error_message = 9;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // optional .runanywhere.v1.ToolCall tool_call = 6;
-  [[nodiscard]] bool has_tool_call()
-      const;
-  void clear_tool_call() ;
-  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_call() const;
-  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE release_tool_call();
-  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_call();
-  void set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE unsafe_arena_release_tool_call();
-
-  private:
-  const ::runanywhere::v1::ToolCall& _internal_tool_call() const;
-  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL _internal_mutable_tool_call();
-
-  public:
-  // optional .runanywhere.v1.ToolResult tool_result = 7;
-  [[nodiscard]] bool has_tool_result()
-      const;
-  void clear_tool_result() ;
-  [[nodiscard]] const ::runanywhere::v1::ToolResult& tool_result() const;
-  [[nodiscard]] ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE release_tool_result();
-  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL mutable_tool_result();
-  void set_allocated_tool_result(::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_tool_result(::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE unsafe_arena_release_tool_result();
-
-  private:
-  const ::runanywhere::v1::ToolResult& _internal_tool_result() const;
-  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL _internal_mutable_tool_result();
-
-  public:
-  // optional .runanywhere.v1.ToolCallingResult result = 8;
-  [[nodiscard]] bool has_result()
-      const;
-  void clear_result() ;
-  [[nodiscard]] const ::runanywhere::v1::ToolCallingResult& result() const;
-  [[nodiscard]] ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE release_result();
-  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL mutable_result();
-  void set_allocated_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
-
-  private:
-  const ::runanywhere::v1::ToolCallingResult& _internal_result() const;
-  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL _internal_mutable_result();
-
-  public:
-  // uint64 seq = 1;
-  void clear_seq() ;
-  [[nodiscard]] ::uint64_t seq() const;
-  void set_seq(::uint64_t value);
-
-  private:
-  ::uint64_t _internal_seq() const;
-  void _internal_set_seq(::uint64_t value);
-
-  public:
-  // int64 timestamp_us = 2;
-  void clear_timestamp_us() ;
-  [[nodiscard]] ::int64_t timestamp_us() const;
-  void set_timestamp_us(::int64_t value);
-
-  private:
-  ::int64_t _internal_timestamp_us() const;
-  void _internal_set_timestamp_us(::int64_t value);
-
-  public:
-  // .runanywhere.v1.ToolCallingStreamEventKind kind = 4;
-  void clear_kind() ;
-  [[nodiscard]] ::runanywhere::v1::ToolCallingStreamEventKind kind() const;
-  void set_kind(::runanywhere::v1::ToolCallingStreamEventKind value);
-
-  private:
-  ::runanywhere::v1::ToolCallingStreamEventKind _internal_kind() const;
-  void _internal_set_kind(::runanywhere::v1::ToolCallingStreamEventKind value);
-
-  public:
-  // int32 error_code = 10;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingStreamEvent)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 10,
-                                   3, 87,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ToolCallingStreamEvent& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr conversation_id_;
-    ::google::protobuf::internal::ArenaStringPtr token_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE tool_call_;
-    ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE tool_result_;
-    ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE result_;
-    ::uint64_t seq_;
-    ::int64_t timestamp_us_;
-    int kind_;
-    ::int32_t error_code_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_tool_5fcalling_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull ToolCallingStreamEvent_class_data_;
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionEvent final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallingSessionEvent) */ {
- public:
-  inline ToolCallingSessionEvent() : ToolCallingSessionEvent(nullptr) {}
-  ~ToolCallingSessionEvent() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ToolCallingSessionEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolCallingSessionEvent));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ToolCallingSessionEvent(::google::protobuf::internal::ConstantInitialized);
-
-  inline ToolCallingSessionEvent(const ToolCallingSessionEvent& from) : ToolCallingSessionEvent(nullptr, from) {}
-  inline ToolCallingSessionEvent(ToolCallingSessionEvent&& from) noexcept
-      : ToolCallingSessionEvent(nullptr, ::std::move(from)) {}
-  inline ToolCallingSessionEvent& operator=(const ToolCallingSessionEvent& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ToolCallingSessionEvent& operator=(ToolCallingSessionEvent&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ToolCallingSessionEvent& default_instance() {
-    return *reinterpret_cast<const ToolCallingSessionEvent*>(
-        &_ToolCallingSessionEvent_default_instance_);
-  }
-  enum KindCase {
-    kLlmStreamEventBytes = 1,
-    kToolCall = 2,
-    kFinalResult = 3,
-    kErrorBytes = 4,
-    KIND_NOT_SET = 0,
-  };
-  static constexpr int kIndexInFileMessages = 23;
-  friend void swap(ToolCallingSessionEvent& a, ToolCallingSessionEvent& b) { a.Swap(&b); }
-  inline void Swap(ToolCallingSessionEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ToolCallingSessionEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ToolCallingSessionEvent* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ToolCallingSessionEvent>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ToolCallingSessionEvent& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ToolCallingSessionEvent& from) { ToolCallingSessionEvent::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ToolCallingSessionEvent* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolCallingSessionEvent"; }
-
-  explicit ToolCallingSessionEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ToolCallingSessionEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolCallingSessionEvent& from);
-  ToolCallingSessionEvent(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolCallingSessionEvent&& from) noexcept
-      : ToolCallingSessionEvent(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kSeqFieldNumber = 5,
-    kLlmStreamEventBytesFieldNumber = 1,
-    kToolCallFieldNumber = 2,
-    kFinalResultFieldNumber = 3,
-    kErrorBytesFieldNumber = 4,
-  };
-  // uint64 seq = 5;
-  void clear_seq() ;
-  [[nodiscard]] ::uint64_t seq() const;
-  void set_seq(::uint64_t value);
-
-  private:
-  ::uint64_t _internal_seq() const;
-  void _internal_set_seq(::uint64_t value);
-
-  public:
-  // bytes llm_stream_event_bytes = 1;
-  [[nodiscard]] bool has_llm_stream_event_bytes()
-      const;
-  void clear_llm_stream_event_bytes() ;
-  [[nodiscard]] const ::std::string& llm_stream_event_bytes() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_llm_stream_event_bytes(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_llm_stream_event_bytes();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_llm_stream_event_bytes();
-  void set_allocated_llm_stream_event_bytes(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_llm_stream_event_bytes() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_llm_stream_event_bytes(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_llm_stream_event_bytes();
-
-  public:
-  // .runanywhere.v1.ToolCall tool_call = 2;
-  [[nodiscard]] bool has_tool_call()
-      const;
-  private:
-  bool _internal_has_tool_call() const;
-
-  public:
-  void clear_tool_call() ;
-  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_call() const;
-  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE release_tool_call();
-  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_call();
-  void set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE unsafe_arena_release_tool_call();
-
-  private:
-  const ::runanywhere::v1::ToolCall& _internal_tool_call() const;
-  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL _internal_mutable_tool_call();
-
-  public:
-  // .runanywhere.v1.ToolCallingResult final_result = 3;
-  [[nodiscard]] bool has_final_result()
-      const;
-  private:
-  bool _internal_has_final_result() const;
-
-  public:
-  void clear_final_result() ;
-  [[nodiscard]] const ::runanywhere::v1::ToolCallingResult& final_result() const;
-  [[nodiscard]] ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE release_final_result();
-  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL mutable_final_result();
-  void set_allocated_final_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_final_result(::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE unsafe_arena_release_final_result();
-
-  private:
-  const ::runanywhere::v1::ToolCallingResult& _internal_final_result() const;
-  ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL _internal_mutable_final_result();
-
-  public:
-  // bytes error_bytes = 4;
-  [[nodiscard]] bool has_error_bytes()
-      const;
-  void clear_error_bytes() ;
-  [[nodiscard]] const ::std::string& error_bytes() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_bytes(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_bytes();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_bytes();
-  void set_allocated_error_bytes(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_bytes() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_bytes(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_bytes();
-
-  public:
-  void clear_kind();
-  KindCase kind_case() const;
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingSessionEvent)
- private:
-  class _Internal;
-  void set_has_llm_stream_event_bytes();
-  void set_has_tool_call();
-  void set_has_final_result();
-  void set_has_error_bytes();
-  [[nodiscard]] inline bool has_kind() const;
-  inline void clear_has_kind();
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<0, 5,
-                                   2, 0,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ToolCallingSessionEvent& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::uint64_t seq_;
-    union KindUnion {
-      constexpr KindUnion() : _constinit_{} {}
-      ::google::protobuf::internal::ConstantInitialized _constinit_;
-      ::google::protobuf::internal::ArenaStringPtr llm_stream_event_bytes_;
-      ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE tool_call_;
-      ::runanywhere::v1::ToolCallingResult* PROTOBUF_NULLABLE final_result_;
-      ::google::protobuf::internal::ArenaStringPtr error_bytes_;
-    } kind_;
-    ::uint32_t _oneof_case_[1];
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_tool_5fcalling_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull ToolCallingSessionEvent_class_data_;
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallValidationRequest final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolCallValidationRequest) */ {
  public:
@@ -6433,7 +6311,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallValidationRequest final : p
     return *reinterpret_cast<const ToolCallValidationRequest*>(
         &_ToolCallValidationRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 17;
+  static constexpr int kIndexInFileMessages = 15;
   friend void swap(ToolCallValidationRequest& a, ToolCallValidationRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallValidationRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -7849,8 +7727,6 @@ inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL T
 
 // -------------------------------------------------------------------
 
-// -------------------------------------------------------------------
-
 // ToolCall
 
 // string id = 1;
@@ -8113,38 +7989,6 @@ inline void ToolCall::set_allocated_type(::std::string* PROTOBUF_NULLABLE value)
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCall.type)
 }
 
-// map<string, .runanywhere.v1.ToolValue> arguments = 5;
-inline int ToolCall::_internal_arguments_size() const {
-  return _internal_arguments().size();
-}
-inline int ToolCall::arguments_size() const {
-  return _internal_arguments_size();
-}
-inline void ToolCall::clear_arguments() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.arguments_.Clear();
-  ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00000080U);
-}
-inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& ToolCall::_internal_arguments() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.arguments_.GetMap();
-}
-inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& ToolCall::arguments() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_map:runanywhere.v1.ToolCall.arguments)
-  return _internal_arguments();
-}
-inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL ToolCall::_internal_mutable_arguments() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.arguments_.MutableMap();
-}
-inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL ToolCall::mutable_arguments()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.ToolCall.arguments)
-  return _internal_mutable_arguments();
-}
-
 // optional string call_id = 6;
 inline bool ToolCall::has_call_id() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
@@ -8307,8 +8151,6 @@ inline void ToolCall::set_allocated_raw_text(::std::string* PROTOBUF_NULLABLE va
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCall.raw_text)
 }
-
-// -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
 
@@ -8601,38 +8443,6 @@ inline bool ToolResult::_internal_success() const {
 inline void ToolResult::_internal_set_success(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.success_ = value;
-}
-
-// map<string, .runanywhere.v1.ToolValue> result = 6;
-inline int ToolResult::_internal_result_size() const {
-  return _internal_result().size();
-}
-inline int ToolResult::result_size() const {
-  return _internal_result_size();
-}
-inline void ToolResult::clear_result() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.result_.Clear();
-  ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00000100U);
-}
-inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& ToolResult::_internal_result() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.result_.GetMap();
-}
-inline const ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>& ToolResult::result() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_map:runanywhere.v1.ToolResult.result)
-  return _internal_result();
-}
-inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL ToolResult::_internal_mutable_result() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.result_.MutableMap();
-}
-inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PROTOBUF_NONNULL ToolResult::mutable_result()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.ToolResult.result)
-  return _internal_mutable_result();
 }
 
 // optional string call_id = 7;

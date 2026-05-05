@@ -32,6 +32,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "hardware_profile.pb.h"
+#include "thinking_tag_pattern.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -57,8 +58,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_mode
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum AccelerationPreference : int;
-extern const uint32_t AccelerationPreference_internal_data_[];
 enum ArchiveStructure : int;
 extern const uint32_t ArchiveStructure_internal_data_[];
 enum ArchiveType : int;
@@ -223,10 +222,6 @@ class ModelRuntimeCompatibility;
 struct ModelRuntimeCompatibilityDefaultTypeInternal;
 extern ModelRuntimeCompatibilityDefaultTypeInternal _ModelRuntimeCompatibility_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull ModelRuntimeCompatibility_class_data_;
-class ModelThinkingTagPattern;
-struct ModelThinkingTagPatternDefaultTypeInternal;
-extern ModelThinkingTagPatternDefaultTypeInternal _ModelThinkingTagPattern_default_instance_;
-extern const ::google::protobuf::internal::ClassDataFull ModelThinkingTagPattern_class_data_;
 class ModelUnloadRequest;
 struct ModelUnloadRequestDefaultTypeInternal;
 extern ModelUnloadRequestDefaultTypeInternal _ModelUnloadRequest_default_instance_;
@@ -247,9 +242,6 @@ extern const ::google::protobuf::internal::ClassDataFull SingleFileArtifact_clas
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
-template <>
-internal::EnumTraitsT<::runanywhere::v1::AccelerationPreference_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::AccelerationPreference>;
 template <>
 internal::EnumTraitsT<::runanywhere::v1::ArchiveStructure_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ArchiveStructure>;
@@ -906,52 +898,6 @@ template <>
   return ::google::protobuf::internal::ParseNamedEnum<ModelFileRole>(ModelFileRole_descriptor(), name,
                                            value);
 }
-enum AccelerationPreference : int {
-  ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
-  ACCELERATION_PREFERENCE_AUTO = 1,
-  ACCELERATION_PREFERENCE_CPU = 2,
-  ACCELERATION_PREFERENCE_GPU = 3,
-  ACCELERATION_PREFERENCE_NPU = 4,
-  ACCELERATION_PREFERENCE_WEBGPU = 5,
-  ACCELERATION_PREFERENCE_METAL = 6,
-  ACCELERATION_PREFERENCE_VULKAN = 7,
-  AccelerationPreference_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  AccelerationPreference_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t AccelerationPreference_internal_data_[];
-inline constexpr AccelerationPreference AccelerationPreference_MIN =
-    static_cast<AccelerationPreference>(0);
-inline constexpr AccelerationPreference AccelerationPreference_MAX =
-    static_cast<AccelerationPreference>(7);
-[[nodiscard]] inline bool AccelerationPreference_IsValid(int value) {
-  return 0 <= value && value <= 7;
-}
-inline constexpr int AccelerationPreference_ARRAYSIZE = 7 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-AccelerationPreference_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(AccelerationPreference) {
-  return AccelerationPreference_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& AccelerationPreference_Name(T value) {
-  static_assert(::std::is_same<T, AccelerationPreference>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to AccelerationPreference_Name().");
-  return AccelerationPreference_Name(static_cast<AccelerationPreference>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& AccelerationPreference_Name(AccelerationPreference value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<AccelerationPreference_descriptor, 0, 7>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool AccelerationPreference_Parse(
-    ::absl::string_view name, AccelerationPreference* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<AccelerationPreference>(AccelerationPreference_descriptor(), name,
-                                           value);
-}
 enum RoutingPolicy : int {
   ROUTING_POLICY_UNSPECIFIED = 0,
   ROUTING_POLICY_PREFER_LOCAL = 1,
@@ -1058,7 +1004,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelUnloadResult final : public ::
     return *reinterpret_cast<const ModelUnloadResult*>(
         &_ModelUnloadResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 26;
+  static constexpr int kIndexInFileMessages = 25;
   friend void swap(ModelUnloadResult& a, ModelUnloadResult& b) { a.Swap(&b); }
   inline void Swap(ModelUnloadResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1337,7 +1283,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelUnloadRequest final : public :
     return *reinterpret_cast<const ModelUnloadRequest*>(
         &_ModelUnloadRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 25;
+  static constexpr int kIndexInFileMessages = 24;
   friend void swap(ModelUnloadRequest& a, ModelUnloadRequest& b) { a.Swap(&b); }
   inline void Swap(ModelUnloadRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1522,224 +1468,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelUnloadRequest final : public :
 extern const ::google::protobuf::internal::ClassDataFull ModelUnloadRequest_class_data_;
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelThinkingTagPattern final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ModelThinkingTagPattern) */ {
- public:
-  inline ModelThinkingTagPattern() : ModelThinkingTagPattern(nullptr) {}
-  ~ModelThinkingTagPattern() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ModelThinkingTagPattern* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ModelThinkingTagPattern));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ModelThinkingTagPattern(::google::protobuf::internal::ConstantInitialized);
-
-  inline ModelThinkingTagPattern(const ModelThinkingTagPattern& from) : ModelThinkingTagPattern(nullptr, from) {}
-  inline ModelThinkingTagPattern(ModelThinkingTagPattern&& from) noexcept
-      : ModelThinkingTagPattern(nullptr, ::std::move(from)) {}
-  inline ModelThinkingTagPattern& operator=(const ModelThinkingTagPattern& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ModelThinkingTagPattern& operator=(ModelThinkingTagPattern&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ModelThinkingTagPattern& default_instance() {
-    return *reinterpret_cast<const ModelThinkingTagPattern*>(
-        &_ModelThinkingTagPattern_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 0;
-  friend void swap(ModelThinkingTagPattern& a, ModelThinkingTagPattern& b) { a.Swap(&b); }
-  inline void Swap(ModelThinkingTagPattern* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ModelThinkingTagPattern* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ModelThinkingTagPattern* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ModelThinkingTagPattern>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ModelThinkingTagPattern& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ModelThinkingTagPattern& from) { ModelThinkingTagPattern::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ModelThinkingTagPattern* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ModelThinkingTagPattern"; }
-
-  explicit ModelThinkingTagPattern(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ModelThinkingTagPattern(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ModelThinkingTagPattern& from);
-  ModelThinkingTagPattern(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ModelThinkingTagPattern&& from) noexcept
-      : ModelThinkingTagPattern(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kOpenTagFieldNumber = 1,
-    kCloseTagFieldNumber = 2,
-  };
-  // string open_tag = 1;
-  void clear_open_tag() ;
-  [[nodiscard]] const ::std::string& open_tag() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_open_tag(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_open_tag();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_open_tag();
-  void set_allocated_open_tag(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_open_tag() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_open_tag(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_open_tag();
-
-  public:
-  // string close_tag = 2;
-  void clear_close_tag() ;
-  [[nodiscard]] const ::std::string& close_tag() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_close_tag(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_close_tag();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_close_tag();
-  void set_allocated_close_tag(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_close_tag() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_close_tag(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_close_tag();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ModelThinkingTagPattern)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<1, 2,
-                                   0, 64,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ModelThinkingTagPattern& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr open_tag_;
-    ::google::protobuf::internal::ArenaStringPtr close_tag_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_model_5ftypes_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull ModelThinkingTagPattern_class_data_;
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRuntimeCompatibility final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ModelRuntimeCompatibility) */ {
  public:
@@ -1796,7 +1524,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRuntimeCompatibility final : p
     return *reinterpret_cast<const ModelRuntimeCompatibility*>(
         &_ModelRuntimeCompatibility_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 1;
   friend void swap(ModelRuntimeCompatibility& a, ModelRuntimeCompatibility& b) { a.Swap(&b); }
   inline void Swap(ModelRuntimeCompatibility* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2026,7 +1754,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryFetchAssignmentsReques
     return *reinterpret_cast<const ModelRegistryFetchAssignmentsRequest*>(
         &_ModelRegistryFetchAssignmentsRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 37;
+  static constexpr int kIndexInFileMessages = 36;
   friend void swap(ModelRegistryFetchAssignmentsRequest& a, ModelRegistryFetchAssignmentsRequest& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryFetchAssignmentsRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2253,7 +1981,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelQuery final : public ::google:
     return *reinterpret_cast<const ModelQuery*>(
         &_ModelQuery_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(ModelQuery& a, ModelQuery& b) { a.Swap(&b); }
   inline void Swap(ModelQuery* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2594,7 +2322,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadRequest final : public ::g
     return *reinterpret_cast<const ModelLoadRequest*>(
         &_ModelLoadRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 23;
+  static constexpr int kIndexInFileMessages = 22;
   friend void swap(ModelLoadRequest& a, ModelLoadRequest& b) { a.Swap(&b); }
   inline void Swap(ModelLoadRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2847,7 +2575,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelInfoMetadata final : public ::
     return *reinterpret_cast<const ModelInfoMetadata*>(
         &_ModelInfoMetadata_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 1;
+  static constexpr int kIndexInFileMessages = 0;
   friend void swap(ModelInfoMetadata& a, ModelInfoMetadata& b) { a.Swap(&b); }
   inline void Swap(ModelInfoMetadata* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3126,7 +2854,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelGetRequest final : public ::go
     return *reinterpret_cast<const ModelGetRequest*>(
         &_ModelGetRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 16;
+  static constexpr int kIndexInFileMessages = 15;
   friend void swap(ModelGetRequest& a, ModelGetRequest& b) { a.Swap(&b); }
   inline void Swap(ModelGetRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3327,7 +3055,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFormatFromUrlResult final : pu
     return *reinterpret_cast<const ModelFormatFromUrlResult*>(
         &_ModelFormatFromUrlResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 34;
+  static constexpr int kIndexInFileMessages = 33;
   friend void swap(ModelFormatFromUrlResult& a, ModelFormatFromUrlResult& b) { a.Swap(&b); }
   inline void Swap(ModelFormatFromUrlResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3535,7 +3263,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFormatFromUrlRequest final : p
     return *reinterpret_cast<const ModelFormatFromUrlRequest*>(
         &_ModelFormatFromUrlRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 33;
+  static constexpr int kIndexInFileMessages = 32;
   friend void swap(ModelFormatFromUrlRequest& a, ModelFormatFromUrlRequest& b) { a.Swap(&b); }
   inline void Swap(ModelFormatFromUrlRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3736,7 +3464,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFileDescriptor final : public 
     return *reinterpret_cast<const ModelFileDescriptor*>(
         &_ModelFileDescriptor_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 7;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(ModelFileDescriptor& a, ModelFileDescriptor& b) { a.Swap(&b); }
   inline void Swap(ModelFileDescriptor* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3828,7 +3556,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFileDescriptor final : public 
   enum : int {
     kUrlFieldNumber = 1,
     kFilenameFieldNumber = 2,
-    kChecksumFieldNumber = 5,
     kRelativePathFieldNumber = 6,
     kDestinationPathFieldNumber = 7,
     kLocalPathFieldNumber = 9,
@@ -3865,23 +3592,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFileDescriptor final : public 
   const ::std::string& _internal_filename() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_filename(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_filename();
-
-  public:
-  // optional string checksum = 5;
-  [[nodiscard]] bool has_checksum()
-      const;
-  void clear_checksum() ;
-  [[nodiscard]] const ::std::string& checksum() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_checksum(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_checksum();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_checksum();
-  void set_allocated_checksum(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_checksum() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_checksum(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_checksum();
 
   public:
   // optional string relative_path = 6;
@@ -3990,8 +3700,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFileDescriptor final : public 
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 10,
-                                   0, 124,
+  static const ::google::protobuf::internal::TcParseTable<4, 9,
+                                   0, 116,
                                    2>
       _table_;
 
@@ -4016,7 +3726,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFileDescriptor final : public 
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr url_;
     ::google::protobuf::internal::ArenaStringPtr filename_;
-    ::google::protobuf::internal::ArenaStringPtr checksum_;
     ::google::protobuf::internal::ArenaStringPtr relative_path_;
     ::google::protobuf::internal::ArenaStringPtr destination_path_;
     ::google::protobuf::internal::ArenaStringPtr local_path_;
@@ -4089,7 +3798,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDeleteResult final : public ::
     return *reinterpret_cast<const ModelDeleteResult*>(
         &_ModelDeleteResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 30;
+  static constexpr int kIndexInFileMessages = 29;
   friend void swap(ModelDeleteResult& a, ModelDeleteResult& b) { a.Swap(&b); }
   inline void Swap(ModelDeleteResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4394,7 +4103,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDeleteRequest final : public :
     return *reinterpret_cast<const ModelDeleteRequest*>(
         &_ModelDeleteRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 29;
+  static constexpr int kIndexInFileMessages = 28;
   friend void swap(ModelDeleteRequest& a, ModelDeleteRequest& b) { a.Swap(&b); }
   inline void Swap(ModelDeleteRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4631,7 +4340,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityResult final : pu
     return *reinterpret_cast<const ModelCompatibilityResult*>(
         &_ModelCompatibilityResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(ModelCompatibilityResult& a, ModelCompatibilityResult& b) { a.Swap(&b); }
   inline void Swap(ModelCompatibilityResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4926,7 +4635,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityCheckResult final
     return *reinterpret_cast<const ModelCompatibilityCheckResult*>(
         &_ModelCompatibilityCheckResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 32;
+  static constexpr int kIndexInFileMessages = 31;
   friend void swap(ModelCompatibilityCheckResult& a, ModelCompatibilityCheckResult& b) { a.Swap(&b); }
   inline void Swap(ModelCompatibilityCheckResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5294,7 +5003,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CurrentModelRequest final : public 
     return *reinterpret_cast<const CurrentModelRequest*>(
         &_CurrentModelRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 27;
+  static constexpr int kIndexInFileMessages = 26;
   friend void swap(CurrentModelRequest& a, CurrentModelRequest& b) { a.Swap(&b); }
   inline void Swap(CurrentModelRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5518,7 +5227,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArtifactInferFromUrlResult final : 
     return *reinterpret_cast<const ArtifactInferFromUrlResult*>(
         &_ArtifactInferFromUrlResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 36;
+  static constexpr int kIndexInFileMessages = 35;
   friend void swap(ArtifactInferFromUrlResult& a, ArtifactInferFromUrlResult& b) { a.Swap(&b); }
   inline void Swap(ArtifactInferFromUrlResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5767,7 +5476,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArtifactInferFromUrlRequest final :
     return *reinterpret_cast<const ArtifactInferFromUrlRequest*>(
         &_ArtifactInferFromUrlRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 35;
+  static constexpr int kIndexInFileMessages = 34;
   friend void swap(ArtifactInferFromUrlRequest& a, ArtifactInferFromUrlRequest& b) { a.Swap(&b); }
   inline void Swap(ArtifactInferFromUrlRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5985,7 +5694,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MultiFileArtifact final : public ::
     return *reinterpret_cast<const MultiFileArtifact*>(
         &_MultiFileArtifact_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(MultiFileArtifact& a, MultiFileArtifact& b) { a.Swap(&b); }
   inline void Swap(MultiFileArtifact* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6191,7 +5900,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryRefreshRequest final :
     return *reinterpret_cast<const ModelRegistryRefreshRequest*>(
         &_ModelRegistryRefreshRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 12;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(ModelRegistryRefreshRequest& a, ModelRegistryRefreshRequest& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryRefreshRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6470,7 +6179,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadResult final : public ::go
     return *reinterpret_cast<const ModelLoadResult*>(
         &_ModelLoadResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 24;
+  static constexpr int kIndexInFileMessages = 23;
   friend void swap(ModelLoadResult& a, ModelLoadResult& b) { a.Swap(&b); }
   inline void Swap(ModelLoadResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6814,7 +6523,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelListRequest final : public ::g
     return *reinterpret_cast<const ModelListRequest*>(
         &_ModelListRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 14;
+  static constexpr int kIndexInFileMessages = 13;
   friend void swap(ModelListRequest& a, ModelListRequest& b) { a.Swap(&b); }
   inline void Swap(ModelListRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -7028,7 +6737,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDiscoveryRequest final : publi
     return *reinterpret_cast<const ModelDiscoveryRequest*>(
         &_ModelDiscoveryRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 20;
+  static constexpr int kIndexInFileMessages = 19;
   friend void swap(ModelDiscoveryRequest& a, ModelDiscoveryRequest& b) { a.Swap(&b); }
   inline void Swap(ModelDiscoveryRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -7317,7 +7026,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityRequest final : p
     return *reinterpret_cast<const ModelCompatibilityRequest*>(
         &_ModelCompatibilityRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 31;
+  static constexpr int kIndexInFileMessages = 30;
   friend void swap(ModelCompatibilityRequest& a, ModelCompatibilityRequest& b) { a.Swap(&b); }
   inline void Swap(ModelCompatibilityRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -7465,16 +7174,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityRequest final : p
   void _internal_set_available_storage_bytes(::int64_t value);
 
   public:
-  // optional .runanywhere.v1.AcceleratorPreference accelerator_preference = 5;
+  // optional .runanywhere.v1.AccelerationPreference accelerator_preference = 5;
   [[nodiscard]] bool has_accelerator_preference()
       const;
   void clear_accelerator_preference() ;
-  [[nodiscard]] ::runanywhere::v1::AcceleratorPreference accelerator_preference() const;
-  void set_accelerator_preference(::runanywhere::v1::AcceleratorPreference value);
+  [[nodiscard]] ::runanywhere::v1::AccelerationPreference accelerator_preference() const;
+  void set_accelerator_preference(::runanywhere::v1::AccelerationPreference value);
 
   private:
-  ::runanywhere::v1::AcceleratorPreference _internal_accelerator_preference() const;
-  void _internal_set_accelerator_preference(::runanywhere::v1::AcceleratorPreference value);
+  ::runanywhere::v1::AccelerationPreference _internal_accelerator_preference() const;
+  void _internal_set_accelerator_preference(::runanywhere::v1::AccelerationPreference value);
 
   public:
   // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
@@ -7588,7 +7297,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ExpectedModelFiles final : public :
     return *reinterpret_cast<const ExpectedModelFiles*>(
         &_ExpectedModelFiles_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(ExpectedModelFiles& a, ExpectedModelFiles& b) { a.Swap(&b); }
   inline void Swap(ExpectedModelFiles* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -7886,7 +7595,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SingleFileArtifact final : public :
     return *reinterpret_cast<const SingleFileArtifact*>(
         &_SingleFileArtifact_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(SingleFileArtifact& a, SingleFileArtifact& b) { a.Swap(&b); }
   inline void Swap(SingleFileArtifact* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -8142,7 +7851,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArchiveArtifact final : public ::go
     return *reinterpret_cast<const ArchiveArtifact*>(
         &_ArchiveArtifact_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(ArchiveArtifact& a, ArchiveArtifact& b) { a.Swap(&b); }
   inline void Swap(ArchiveArtifact* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -8430,7 +8139,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelInfo final : public ::google::
     kBuiltIn = 24,
     ARTIFACT_NOT_SET = 0,
   };
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 2;
   friend void swap(ModelInfo& a, ModelInfo& b) { a.Swap(&b); }
   inline void Swap(ModelInfo* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -8667,20 +8376,20 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelInfo final : public ::google::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_status_message();
 
   public:
-  // optional .runanywhere.v1.ModelThinkingTagPattern thinking_pattern = 18;
+  // optional .runanywhere.v1.ThinkingTagPattern thinking_pattern = 18;
   [[nodiscard]] bool has_thinking_pattern()
       const;
   void clear_thinking_pattern() ;
-  [[nodiscard]] const ::runanywhere::v1::ModelThinkingTagPattern& thinking_pattern() const;
-  [[nodiscard]] ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE release_thinking_pattern();
-  ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NONNULL mutable_thinking_pattern();
-  void set_allocated_thinking_pattern(::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_thinking_pattern(::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE unsafe_arena_release_thinking_pattern();
+  [[nodiscard]] const ::runanywhere::v1::ThinkingTagPattern& thinking_pattern() const;
+  [[nodiscard]] ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE release_thinking_pattern();
+  ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL mutable_thinking_pattern();
+  void set_allocated_thinking_pattern(::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_thinking_pattern(::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE unsafe_arena_release_thinking_pattern();
 
   private:
-  const ::runanywhere::v1::ModelThinkingTagPattern& _internal_thinking_pattern() const;
-  ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NONNULL _internal_mutable_thinking_pattern();
+  const ::runanywhere::v1::ThinkingTagPattern& _internal_thinking_pattern() const;
+  ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL _internal_mutable_thinking_pattern();
 
   public:
   // optional .runanywhere.v1.ModelInfoMetadata metadata = 19;
@@ -9096,7 +8805,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelInfo final : public ::google::
     ::google::protobuf::internal::ArenaStringPtr description_;
     ::google::protobuf::internal::ArenaStringPtr checksum_sha256_;
     ::google::protobuf::internal::ArenaStringPtr status_message_;
-    ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE thinking_pattern_;
+    ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE thinking_pattern_;
     ::runanywhere::v1::ModelInfoMetadata* PROTOBUF_NULLABLE metadata_;
     ::runanywhere::v1::ExpectedModelFiles* PROTOBUF_NULLABLE expected_files_;
     ::runanywhere::v1::ModelRuntimeCompatibility* PROTOBUF_NULLABLE compatibility_;
@@ -9196,7 +8905,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelInfoList final : public ::goog
     return *reinterpret_cast<const ModelInfoList*>(
         &_ModelInfoList_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 3;
   friend void swap(ModelInfoList& a, ModelInfoList& b) { a.Swap(&b); }
   inline void Swap(ModelInfoList* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -9402,7 +9111,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelImportResult final : public ::
     return *reinterpret_cast<const ModelImportResult*>(
         &_ModelImportResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 19;
+  static constexpr int kIndexInFileMessages = 18;
   friend void swap(ModelImportResult& a, ModelImportResult& b) { a.Swap(&b); }
   inline void Swap(ModelImportResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -9713,7 +9422,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelImportRequest final : public :
     return *reinterpret_cast<const ModelImportRequest*>(
         &_ModelImportRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 18;
+  static constexpr int kIndexInFileMessages = 17;
   friend void swap(ModelImportRequest& a, ModelImportRequest& b) { a.Swap(&b); }
   inline void Swap(ModelImportRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -9990,7 +9699,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelGetResult final : public ::goo
     return *reinterpret_cast<const ModelGetResult*>(
         &_ModelGetResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 17;
+  static constexpr int kIndexInFileMessages = 16;
   friend void swap(ModelGetResult& a, ModelGetResult& b) { a.Swap(&b); }
   inline void Swap(ModelGetResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -10221,7 +9930,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiscoveredModel final : public ::go
     return *reinterpret_cast<const DiscoveredModel*>(
         &_DiscoveredModel_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 21;
+  static constexpr int kIndexInFileMessages = 20;
   friend void swap(DiscoveredModel& a, DiscoveredModel& b) { a.Swap(&b); }
   inline void Swap(DiscoveredModel* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -10508,7 +10217,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CurrentModelResult final : public :
     return *reinterpret_cast<const CurrentModelResult*>(
         &_CurrentModelResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 28;
+  static constexpr int kIndexInFileMessages = 27;
   friend void swap(CurrentModelResult& a, CurrentModelResult& b) { a.Swap(&b); }
   inline void Swap(CurrentModelResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -10831,7 +10540,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryRefreshResult final : 
     return *reinterpret_cast<const ModelRegistryRefreshResult*>(
         &_ModelRegistryRefreshResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 13;
+  static constexpr int kIndexInFileMessages = 12;
   friend void swap(ModelRegistryRefreshResult& a, ModelRegistryRefreshResult& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryRefreshResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -11185,7 +10894,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryFetchAssignmentsResult
     return *reinterpret_cast<const ModelRegistryFetchAssignmentsResult*>(
         &_ModelRegistryFetchAssignmentsResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 38;
+  static constexpr int kIndexInFileMessages = 37;
   friend void swap(ModelRegistryFetchAssignmentsResult& a, ModelRegistryFetchAssignmentsResult& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryFetchAssignmentsResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -11452,7 +11161,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelListResult final : public ::go
     return *reinterpret_cast<const ModelListResult*>(
         &_ModelListResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 15;
+  static constexpr int kIndexInFileMessages = 14;
   friend void swap(ModelListResult& a, ModelListResult& b) { a.Swap(&b); }
   inline void Swap(ModelListResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -11731,7 +11440,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDiscoveryResult final : public
     return *reinterpret_cast<const ModelDiscoveryResult*>(
         &_ModelDiscoveryResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 22;
+  static constexpr int kIndexInFileMessages = 21;
   friend void swap(ModelDiscoveryResult& a, ModelDiscoveryResult& b) { a.Swap(&b); }
   inline void Swap(ModelDiscoveryResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -11996,140 +11705,6 @@ extern const ::google::protobuf::internal::ClassDataFull ModelDiscoveryResult_cl
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif  // __GNUC__
-// -------------------------------------------------------------------
-
-// ModelThinkingTagPattern
-
-// string open_tag = 1;
-inline void ModelThinkingTagPattern::clear_open_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.open_tag_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000001U);
-}
-inline const ::std::string& ModelThinkingTagPattern::open_tag() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelThinkingTagPattern.open_tag)
-  return _internal_open_tag();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void ModelThinkingTagPattern::set_open_tag(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.open_tag_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelThinkingTagPattern.open_tag)
-}
-inline ::std::string* PROTOBUF_NONNULL ModelThinkingTagPattern::mutable_open_tag()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_open_tag();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelThinkingTagPattern.open_tag)
-  return _s;
-}
-inline const ::std::string& ModelThinkingTagPattern::_internal_open_tag() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.open_tag_.Get();
-}
-inline void ModelThinkingTagPattern::_internal_set_open_tag(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.open_tag_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL ModelThinkingTagPattern::_internal_mutable_open_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.open_tag_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE ModelThinkingTagPattern::release_open_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelThinkingTagPattern.open_tag)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.open_tag_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.open_tag_.Set("", GetArena());
-  }
-  return released;
-}
-inline void ModelThinkingTagPattern::set_allocated_open_tag(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.open_tag_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.open_tag_.IsDefault()) {
-    _impl_.open_tag_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelThinkingTagPattern.open_tag)
-}
-
-// string close_tag = 2;
-inline void ModelThinkingTagPattern::clear_close_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.close_tag_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
-}
-inline const ::std::string& ModelThinkingTagPattern::close_tag() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelThinkingTagPattern.close_tag)
-  return _internal_close_tag();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void ModelThinkingTagPattern::set_close_tag(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.close_tag_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelThinkingTagPattern.close_tag)
-}
-inline ::std::string* PROTOBUF_NONNULL ModelThinkingTagPattern::mutable_close_tag()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_close_tag();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelThinkingTagPattern.close_tag)
-  return _s;
-}
-inline const ::std::string& ModelThinkingTagPattern::_internal_close_tag() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.close_tag_.Get();
-}
-inline void ModelThinkingTagPattern::_internal_set_close_tag(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.close_tag_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL ModelThinkingTagPattern::_internal_mutable_close_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.close_tag_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE ModelThinkingTagPattern::release_close_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelThinkingTagPattern.close_tag)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.close_tag_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.close_tag_.Set("", GetArena());
-  }
-  return released;
-}
-inline void ModelThinkingTagPattern::set_allocated_close_tag(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.close_tag_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.close_tag_.IsDefault()) {
-    _impl_.close_tag_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelThinkingTagPattern.close_tag)
-}
-
 // -------------------------------------------------------------------
 
 // ModelInfoMetadata
@@ -13249,34 +12824,28 @@ inline void ModelInfo::set_allocated_checksum_sha256(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelInfo.checksum_sha256)
 }
 
-// optional .runanywhere.v1.ModelThinkingTagPattern thinking_pattern = 18;
+// optional .runanywhere.v1.ThinkingTagPattern thinking_pattern = 18;
 inline bool ModelInfo::has_thinking_pattern() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   PROTOBUF_ASSUME(!value || _impl_.thinking_pattern_ != nullptr);
   return value;
 }
-inline void ModelInfo::clear_thinking_pattern() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.thinking_pattern_ != nullptr) _impl_.thinking_pattern_->Clear();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
-}
-inline const ::runanywhere::v1::ModelThinkingTagPattern& ModelInfo::_internal_thinking_pattern() const {
+inline const ::runanywhere::v1::ThinkingTagPattern& ModelInfo::_internal_thinking_pattern() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::ModelThinkingTagPattern* p = _impl_.thinking_pattern_;
-  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::ModelThinkingTagPattern&>(::runanywhere::v1::_ModelThinkingTagPattern_default_instance_);
+  const ::runanywhere::v1::ThinkingTagPattern* p = _impl_.thinking_pattern_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::ThinkingTagPattern&>(::runanywhere::v1::_ThinkingTagPattern_default_instance_);
 }
-inline const ::runanywhere::v1::ModelThinkingTagPattern& ModelInfo::thinking_pattern() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline const ::runanywhere::v1::ThinkingTagPattern& ModelInfo::thinking_pattern() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelInfo.thinking_pattern)
   return _internal_thinking_pattern();
 }
 inline void ModelInfo::unsafe_arena_set_allocated_thinking_pattern(
-    ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE value) {
+    ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (GetArena() == nullptr) {
     delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.thinking_pattern_);
   }
-  _impl_.thinking_pattern_ = reinterpret_cast<::runanywhere::v1::ModelThinkingTagPattern*>(value);
+  _impl_.thinking_pattern_ = reinterpret_cast<::runanywhere::v1::ThinkingTagPattern*>(value);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   } else {
@@ -13284,11 +12853,11 @@ inline void ModelInfo::unsafe_arena_set_allocated_thinking_pattern(
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ModelInfo.thinking_pattern)
 }
-inline ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE ModelInfo::release_thinking_pattern() {
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE ModelInfo::release_thinking_pattern() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-  ::runanywhere::v1::ModelThinkingTagPattern* released = _impl_.thinking_pattern_;
+  ::runanywhere::v1::ThinkingTagPattern* released = _impl_.thinking_pattern_;
   _impl_.thinking_pattern_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
     auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
@@ -13303,31 +12872,31 @@ inline ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE ModelInfo::
   }
   return released;
 }
-inline ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE ModelInfo::unsafe_arena_release_thinking_pattern() {
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE ModelInfo::unsafe_arena_release_thinking_pattern() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelInfo.thinking_pattern)
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-  ::runanywhere::v1::ModelThinkingTagPattern* temp = _impl_.thinking_pattern_;
+  ::runanywhere::v1::ThinkingTagPattern* temp = _impl_.thinking_pattern_;
   _impl_.thinking_pattern_ = nullptr;
   return temp;
 }
-inline ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NONNULL ModelInfo::_internal_mutable_thinking_pattern() {
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL ModelInfo::_internal_mutable_thinking_pattern() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.thinking_pattern_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ModelThinkingTagPattern>(GetArena());
-    _impl_.thinking_pattern_ = reinterpret_cast<::runanywhere::v1::ModelThinkingTagPattern*>(p);
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ThinkingTagPattern>(GetArena());
+    _impl_.thinking_pattern_ = reinterpret_cast<::runanywhere::v1::ThinkingTagPattern*>(p);
   }
   return _impl_.thinking_pattern_;
 }
-inline ::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NONNULL ModelInfo::mutable_thinking_pattern()
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL ModelInfo::mutable_thinking_pattern()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  ::runanywhere::v1::ModelThinkingTagPattern* _msg = _internal_mutable_thinking_pattern();
+  ::runanywhere::v1::ThinkingTagPattern* _msg = _internal_mutable_thinking_pattern();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelInfo.thinking_pattern)
   return _msg;
 }
-inline void ModelInfo::set_allocated_thinking_pattern(::runanywhere::v1::ModelThinkingTagPattern* PROTOBUF_NULLABLE value) {
+inline void ModelInfo::set_allocated_thinking_pattern(::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value) {
   ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (message_arena == nullptr) {
@@ -13335,7 +12904,7 @@ inline void ModelInfo::set_allocated_thinking_pattern(::runanywhere::v1::ModelTh
   }
 
   if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
@@ -13344,7 +12913,7 @@ inline void ModelInfo::set_allocated_thinking_pattern(::runanywhere::v1::ModelTh
     ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   }
 
-  _impl_.thinking_pattern_ = reinterpret_cast<::runanywhere::v1::ModelThinkingTagPattern*>(value);
+  _impl_.thinking_pattern_ = reinterpret_cast<::runanywhere::v1::ThinkingTagPattern*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelInfo.thinking_pattern)
 }
 
@@ -15114,7 +14683,7 @@ inline void ModelFileDescriptor::clear_is_required() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_required_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000080U);
 }
 inline bool ModelFileDescriptor::is_required() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFileDescriptor.is_required)
@@ -15122,7 +14691,7 @@ inline bool ModelFileDescriptor::is_required() const {
 }
 inline void ModelFileDescriptor::set_is_required(bool value) {
   _internal_set_is_required(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.is_required)
 }
 inline bool ModelFileDescriptor::_internal_is_required() const {
@@ -15136,14 +14705,14 @@ inline void ModelFileDescriptor::_internal_set_is_required(bool value) {
 
 // optional int64 size_bytes = 4;
 inline bool ModelFileDescriptor::has_size_bytes() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   return value;
 }
 inline void ModelFileDescriptor::clear_size_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.size_bytes_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000040U);
 }
 inline ::int64_t ModelFileDescriptor::size_bytes() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFileDescriptor.size_bytes)
@@ -15151,7 +14720,7 @@ inline ::int64_t ModelFileDescriptor::size_bytes() const {
 }
 inline void ModelFileDescriptor::set_size_bytes(::int64_t value) {
   _internal_set_size_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.size_bytes)
 }
 inline ::int64_t ModelFileDescriptor::_internal_size_bytes() const {
@@ -15163,85 +14732,16 @@ inline void ModelFileDescriptor::_internal_set_size_bytes(::int64_t value) {
   _impl_.size_bytes_ = value;
 }
 
-// optional string checksum = 5;
-inline bool ModelFileDescriptor::has_checksum() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void ModelFileDescriptor::clear_checksum() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.checksum_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
-}
-inline const ::std::string& ModelFileDescriptor::checksum() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFileDescriptor.checksum)
-  return _internal_checksum();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void ModelFileDescriptor::set_checksum(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.checksum_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.checksum)
-}
-inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::mutable_checksum()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_checksum();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelFileDescriptor.checksum)
-  return _s;
-}
-inline const ::std::string& ModelFileDescriptor::_internal_checksum() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.checksum_.Get();
-}
-inline void ModelFileDescriptor::_internal_set_checksum(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.checksum_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::_internal_mutable_checksum() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.checksum_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_checksum() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelFileDescriptor.checksum)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.checksum_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.checksum_.Set("", GetArena());
-  }
-  return released;
-}
-inline void ModelFileDescriptor::set_allocated_checksum(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.checksum_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.checksum_.IsDefault()) {
-    _impl_.checksum_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelFileDescriptor.checksum)
-}
-
 // optional string relative_path = 6;
 inline bool ModelFileDescriptor::has_relative_path() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   return value;
 }
 inline void ModelFileDescriptor::clear_relative_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.relative_path_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000004U);
 }
 inline const ::std::string& ModelFileDescriptor::relative_path() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -15251,13 +14751,13 @@ inline const ::std::string& ModelFileDescriptor::relative_path() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ModelFileDescriptor::set_relative_path(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.relative_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.relative_path)
 }
 inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::mutable_relative_path()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_relative_path();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelFileDescriptor.relative_path)
   return _s;
@@ -15277,10 +14777,10 @@ inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::_internal_mutable_re
 inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_relative_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelFileDescriptor.relative_path)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.relative_path_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.relative_path_.Set("", GetArena());
@@ -15290,9 +14790,9 @@ inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_relative_pa
 inline void ModelFileDescriptor::set_allocated_relative_path(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.relative_path_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.relative_path_.IsDefault()) {
@@ -15303,14 +14803,14 @@ inline void ModelFileDescriptor::set_allocated_relative_path(::std::string* PROT
 
 // optional string destination_path = 7;
 inline bool ModelFileDescriptor::has_destination_path() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   return value;
 }
 inline void ModelFileDescriptor::clear_destination_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.destination_path_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000008U);
 }
 inline const ::std::string& ModelFileDescriptor::destination_path() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -15320,13 +14820,13 @@ inline const ::std::string& ModelFileDescriptor::destination_path() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ModelFileDescriptor::set_destination_path(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   _impl_.destination_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.destination_path)
 }
 inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::mutable_destination_path()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::std::string* _s = _internal_mutable_destination_path();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelFileDescriptor.destination_path)
   return _s;
@@ -15346,10 +14846,10 @@ inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::_internal_mutable_de
 inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_destination_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelFileDescriptor.destination_path)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   auto* released = _impl_.destination_path_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.destination_path_.Set("", GetArena());
@@ -15359,9 +14859,9 @@ inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_destination
 inline void ModelFileDescriptor::set_allocated_destination_path(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   _impl_.destination_path_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.destination_path_.IsDefault()) {
@@ -15372,14 +14872,14 @@ inline void ModelFileDescriptor::set_allocated_destination_path(::std::string* P
 
 // optional .runanywhere.v1.ModelFileRole role = 8;
 inline bool ModelFileDescriptor::has_role() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
   return value;
 }
 inline void ModelFileDescriptor::clear_role() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.role_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000200U);
+                  0x00000100U);
 }
 inline ::runanywhere::v1::ModelFileRole ModelFileDescriptor::role() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFileDescriptor.role)
@@ -15387,7 +14887,7 @@ inline ::runanywhere::v1::ModelFileRole ModelFileDescriptor::role() const {
 }
 inline void ModelFileDescriptor::set_role(::runanywhere::v1::ModelFileRole value) {
   _internal_set_role(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.role)
 }
 inline ::runanywhere::v1::ModelFileRole ModelFileDescriptor::_internal_role() const {
@@ -15401,14 +14901,14 @@ inline void ModelFileDescriptor::_internal_set_role(::runanywhere::v1::ModelFile
 
 // optional string local_path = 9;
 inline bool ModelFileDescriptor::has_local_path() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
 }
 inline void ModelFileDescriptor::clear_local_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.local_path_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000010U);
 }
 inline const ::std::string& ModelFileDescriptor::local_path() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -15418,13 +14918,13 @@ inline const ::std::string& ModelFileDescriptor::local_path() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ModelFileDescriptor::set_local_path(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   _impl_.local_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.local_path)
 }
 inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::mutable_local_path()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::std::string* _s = _internal_mutable_local_path();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelFileDescriptor.local_path)
   return _s;
@@ -15444,10 +14944,10 @@ inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::_internal_mutable_lo
 inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_local_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelFileDescriptor.local_path)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   auto* released = _impl_.local_path_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.local_path_.Set("", GetArena());
@@ -15457,9 +14957,9 @@ inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_local_path(
 inline void ModelFileDescriptor::set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   _impl_.local_path_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.local_path_.IsDefault()) {
@@ -15470,14 +14970,14 @@ inline void ModelFileDescriptor::set_allocated_local_path(::std::string* PROTOBU
 
 // optional string checksum_sha256 = 10;
 inline bool ModelFileDescriptor::has_checksum_sha256() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void ModelFileDescriptor::clear_checksum_sha256() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.checksum_sha256_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000020U);
 }
 inline const ::std::string& ModelFileDescriptor::checksum_sha256() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -15487,13 +14987,13 @@ inline const ::std::string& ModelFileDescriptor::checksum_sha256() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ModelFileDescriptor::set_checksum_sha256(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   _impl_.checksum_sha256_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFileDescriptor.checksum_sha256)
 }
 inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::mutable_checksum_sha256()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::std::string* _s = _internal_mutable_checksum_sha256();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelFileDescriptor.checksum_sha256)
   return _s;
@@ -15513,10 +15013,10 @@ inline ::std::string* PROTOBUF_NONNULL ModelFileDescriptor::_internal_mutable_ch
 inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_checksum_sha256() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelFileDescriptor.checksum_sha256)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   auto* released = _impl_.checksum_sha256_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.checksum_sha256_.Set("", GetArena());
@@ -15526,9 +15026,9 @@ inline ::std::string* PROTOBUF_NULLABLE ModelFileDescriptor::release_checksum_sh
 inline void ModelFileDescriptor::set_allocated_checksum_sha256(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
   _impl_.checksum_sha256_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.checksum_sha256_.IsDefault()) {
@@ -21943,7 +21443,7 @@ inline void ModelCompatibilityRequest::_internal_set_available_storage_bytes(::i
   _impl_.available_storage_bytes_ = value;
 }
 
-// optional .runanywhere.v1.AcceleratorPreference accelerator_preference = 5;
+// optional .runanywhere.v1.AccelerationPreference accelerator_preference = 5;
 inline bool ModelCompatibilityRequest::has_accelerator_preference() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
@@ -21954,20 +21454,20 @@ inline void ModelCompatibilityRequest::clear_accelerator_preference() {
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000010U);
 }
-inline ::runanywhere::v1::AcceleratorPreference ModelCompatibilityRequest::accelerator_preference() const {
+inline ::runanywhere::v1::AccelerationPreference ModelCompatibilityRequest::accelerator_preference() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelCompatibilityRequest.accelerator_preference)
   return _internal_accelerator_preference();
 }
-inline void ModelCompatibilityRequest::set_accelerator_preference(::runanywhere::v1::AcceleratorPreference value) {
+inline void ModelCompatibilityRequest::set_accelerator_preference(::runanywhere::v1::AccelerationPreference value) {
   _internal_set_accelerator_preference(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelCompatibilityRequest.accelerator_preference)
 }
-inline ::runanywhere::v1::AcceleratorPreference ModelCompatibilityRequest::_internal_accelerator_preference() const {
+inline ::runanywhere::v1::AccelerationPreference ModelCompatibilityRequest::_internal_accelerator_preference() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::AcceleratorPreference>(_impl_.accelerator_preference_);
+  return static_cast<::runanywhere::v1::AccelerationPreference>(_impl_.accelerator_preference_);
 }
-inline void ModelCompatibilityRequest::_internal_set_accelerator_preference(::runanywhere::v1::AcceleratorPreference value) {
+inline void ModelCompatibilityRequest::_internal_set_accelerator_preference(::runanywhere::v1::AccelerationPreference value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.accelerator_preference_ = value;
 }
@@ -23385,12 +22885,6 @@ struct is_proto_enum<::runanywhere::v1::ModelFileRole> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ModelFileRole>() {
   return ::runanywhere::v1::ModelFileRole_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::AccelerationPreference> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AccelerationPreference>() {
-  return ::runanywhere::v1::AccelerationPreference_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::RoutingPolicy> : std::true_type {};

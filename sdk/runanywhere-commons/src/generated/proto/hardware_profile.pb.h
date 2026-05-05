@@ -57,8 +57,8 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_hard
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum AcceleratorPreference : int;
-extern const uint32_t AcceleratorPreference_internal_data_[];
+enum AccelerationPreference : int;
+extern const uint32_t AccelerationPreference_internal_data_[];
 class AcceleratorInfo;
 struct AcceleratorInfoDefaultTypeInternal;
 extern AcceleratorInfoDefaultTypeInternal _AcceleratorInfo_default_instance_;
@@ -92,53 +92,57 @@ extern const ::google::protobuf::internal::ClassDataFull HardwareProfileResult_c
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::AcceleratorPreference_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::AcceleratorPreference>;
+internal::EnumTraitsT<::runanywhere::v1::AccelerationPreference_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::AccelerationPreference>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
-enum AcceleratorPreference : int {
-  ACCELERATOR_PREFERENCE_AUTO = 0,
-  ACCELERATOR_PREFERENCE_ANE = 1,
-  ACCELERATOR_PREFERENCE_GPU = 2,
-  ACCELERATOR_PREFERENCE_CPU = 3,
-  AcceleratorPreference_INT_MIN_SENTINEL_DO_NOT_USE_ =
+enum AccelerationPreference : int {
+  ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
+  ACCELERATION_PREFERENCE_AUTO = 1,
+  ACCELERATION_PREFERENCE_CPU = 2,
+  ACCELERATION_PREFERENCE_GPU = 3,
+  ACCELERATION_PREFERENCE_NPU = 4,
+  ACCELERATION_PREFERENCE_WEBGPU = 5,
+  ACCELERATION_PREFERENCE_METAL = 6,
+  ACCELERATION_PREFERENCE_VULKAN = 7,
+  AccelerationPreference_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
-  AcceleratorPreference_INT_MAX_SENTINEL_DO_NOT_USE_ =
+  AccelerationPreference_INT_MAX_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::max(),
 };
 
-extern const uint32_t AcceleratorPreference_internal_data_[];
-inline constexpr AcceleratorPreference AcceleratorPreference_MIN =
-    static_cast<AcceleratorPreference>(0);
-inline constexpr AcceleratorPreference AcceleratorPreference_MAX =
-    static_cast<AcceleratorPreference>(3);
-[[nodiscard]] inline bool AcceleratorPreference_IsValid(int value) {
-  return 0 <= value && value <= 3;
+extern const uint32_t AccelerationPreference_internal_data_[];
+inline constexpr AccelerationPreference AccelerationPreference_MIN =
+    static_cast<AccelerationPreference>(0);
+inline constexpr AccelerationPreference AccelerationPreference_MAX =
+    static_cast<AccelerationPreference>(7);
+[[nodiscard]] inline bool AccelerationPreference_IsValid(int value) {
+  return 0 <= value && value <= 7;
 }
-inline constexpr int AcceleratorPreference_ARRAYSIZE = 3 + 1;
+inline constexpr int AccelerationPreference_ARRAYSIZE = 7 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-AcceleratorPreference_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(AcceleratorPreference) {
-  return AcceleratorPreference_descriptor();
+AccelerationPreference_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(AccelerationPreference) {
+  return AccelerationPreference_descriptor();
 }
 template <typename T>
-[[nodiscard]] const ::std::string& AcceleratorPreference_Name(T value) {
-  static_assert(::std::is_same<T, AcceleratorPreference>::value ||
+[[nodiscard]] const ::std::string& AccelerationPreference_Name(T value) {
+  static_assert(::std::is_same<T, AccelerationPreference>::value ||
                     ::std::is_integral<T>::value,
-                "Incorrect type passed to AcceleratorPreference_Name().");
-  return AcceleratorPreference_Name(static_cast<AcceleratorPreference>(value));
+                "Incorrect type passed to AccelerationPreference_Name().");
+  return AccelerationPreference_Name(static_cast<AccelerationPreference>(value));
 }
 template <>
-[[nodiscard]] inline const ::std::string& AcceleratorPreference_Name(AcceleratorPreference value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<AcceleratorPreference_descriptor, 0, 3>(
+[[nodiscard]] inline const ::std::string& AccelerationPreference_Name(AccelerationPreference value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<AccelerationPreference_descriptor, 0, 7>(
       static_cast<int>(value));
 }
-[[nodiscard]] inline bool AcceleratorPreference_Parse(
-    ::absl::string_view name, AcceleratorPreference* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<AcceleratorPreference>(AcceleratorPreference_descriptor(), name,
+[[nodiscard]] inline bool AccelerationPreference_Parse(
+    ::absl::string_view name, AccelerationPreference* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<AccelerationPreference>(AccelerationPreference_descriptor(), name,
                                            value);
 }
 
@@ -1094,14 +1098,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareAcceleratorPreferenceReques
   enum : int {
     kPreferenceFieldNumber = 1,
   };
-  // .runanywhere.v1.AcceleratorPreference preference = 1;
+  // .runanywhere.v1.AccelerationPreference preference = 1;
   void clear_preference() ;
-  [[nodiscard]] ::runanywhere::v1::AcceleratorPreference preference() const;
-  void set_preference(::runanywhere::v1::AcceleratorPreference value);
+  [[nodiscard]] ::runanywhere::v1::AccelerationPreference preference() const;
+  void set_preference(::runanywhere::v1::AccelerationPreference value);
 
   private:
-  ::runanywhere::v1::AcceleratorPreference _internal_preference() const;
-  void _internal_set_preference(::runanywhere::v1::AcceleratorPreference value);
+  ::runanywhere::v1::AccelerationPreference _internal_preference() const;
+  void _internal_set_preference(::runanywhere::v1::AccelerationPreference value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
@@ -1307,14 +1311,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AcceleratorInfo final : public ::go
   ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
 
   public:
-  // .runanywhere.v1.AcceleratorPreference type = 2;
+  // .runanywhere.v1.AccelerationPreference type = 2;
   void clear_type() ;
-  [[nodiscard]] ::runanywhere::v1::AcceleratorPreference type() const;
-  void set_type(::runanywhere::v1::AcceleratorPreference value);
+  [[nodiscard]] ::runanywhere::v1::AccelerationPreference type() const;
+  void set_type(::runanywhere::v1::AccelerationPreference value);
 
   private:
-  ::runanywhere::v1::AcceleratorPreference _internal_type() const;
-  void _internal_set_type(::runanywhere::v1::AcceleratorPreference value);
+  ::runanywhere::v1::AccelerationPreference _internal_type() const;
+  void _internal_set_type(::runanywhere::v1::AccelerationPreference value);
 
   public:
   // bool available = 3;
@@ -2060,27 +2064,27 @@ inline void AcceleratorInfo::set_allocated_name(::std::string* PROTOBUF_NULLABLE
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.AcceleratorInfo.name)
 }
 
-// .runanywhere.v1.AcceleratorPreference type = 2;
+// .runanywhere.v1.AccelerationPreference type = 2;
 inline void AcceleratorInfo::clear_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.type_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000002U);
 }
-inline ::runanywhere::v1::AcceleratorPreference AcceleratorInfo::type() const {
+inline ::runanywhere::v1::AccelerationPreference AcceleratorInfo::type() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.AcceleratorInfo.type)
   return _internal_type();
 }
-inline void AcceleratorInfo::set_type(::runanywhere::v1::AcceleratorPreference value) {
+inline void AcceleratorInfo::set_type(::runanywhere::v1::AccelerationPreference value) {
   _internal_set_type(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.AcceleratorInfo.type)
 }
-inline ::runanywhere::v1::AcceleratorPreference AcceleratorInfo::_internal_type() const {
+inline ::runanywhere::v1::AccelerationPreference AcceleratorInfo::_internal_type() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::AcceleratorPreference>(_impl_.type_);
+  return static_cast<::runanywhere::v1::AccelerationPreference>(_impl_.type_);
 }
-inline void AcceleratorInfo::_internal_set_type(::runanywhere::v1::AcceleratorPreference value) {
+inline void AcceleratorInfo::_internal_set_type(::runanywhere::v1::AccelerationPreference value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.type_ = value;
 }
@@ -2281,27 +2285,27 @@ HardwareProfileResult::_internal_mutable_accelerators() {
 
 // HardwareAcceleratorPreferenceRequest
 
-// .runanywhere.v1.AcceleratorPreference preference = 1;
+// .runanywhere.v1.AccelerationPreference preference = 1;
 inline void HardwareAcceleratorPreferenceRequest::clear_preference() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.preference_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000001U);
 }
-inline ::runanywhere::v1::AcceleratorPreference HardwareAcceleratorPreferenceRequest::preference() const {
+inline ::runanywhere::v1::AccelerationPreference HardwareAcceleratorPreferenceRequest::preference() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareAcceleratorPreferenceRequest.preference)
   return _internal_preference();
 }
-inline void HardwareAcceleratorPreferenceRequest::set_preference(::runanywhere::v1::AcceleratorPreference value) {
+inline void HardwareAcceleratorPreferenceRequest::set_preference(::runanywhere::v1::AccelerationPreference value) {
   _internal_set_preference(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareAcceleratorPreferenceRequest.preference)
 }
-inline ::runanywhere::v1::AcceleratorPreference HardwareAcceleratorPreferenceRequest::_internal_preference() const {
+inline ::runanywhere::v1::AccelerationPreference HardwareAcceleratorPreferenceRequest::_internal_preference() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::AcceleratorPreference>(_impl_.preference_);
+  return static_cast<::runanywhere::v1::AccelerationPreference>(_impl_.preference_);
 }
-inline void HardwareAcceleratorPreferenceRequest::_internal_set_preference(::runanywhere::v1::AcceleratorPreference value) {
+inline void HardwareAcceleratorPreferenceRequest::_internal_set_preference(::runanywhere::v1::AccelerationPreference value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.preference_ = value;
 }
@@ -2413,10 +2417,10 @@ namespace google {
 namespace protobuf {
 
 template <>
-struct is_proto_enum<::runanywhere::v1::AcceleratorPreference> : std::true_type {};
+struct is_proto_enum<::runanywhere::v1::AccelerationPreference> : std::true_type {};
 template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AcceleratorPreference>() {
-  return ::runanywhere::v1::AcceleratorPreference_descriptor();
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AccelerationPreference>() {
+  return ::runanywhere::v1::AccelerationPreference_descriptor();
 }
 
 }  // namespace protobuf

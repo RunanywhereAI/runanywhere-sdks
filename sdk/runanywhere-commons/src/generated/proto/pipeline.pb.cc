@@ -28,6 +28,67 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 namespace runanywhere {
 namespace v1 {
 
+inline constexpr PipelineStopResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        handle_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        status_{static_cast< ::runanywhere::v1::PipelineStatus >(0)},
+        error_code_{0} {}
+
+template <typename>
+constexpr PipelineStopResult::PipelineStopResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(PipelineStopResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct PipelineStopResultDefaultTypeInternal {
+  constexpr PipelineStopResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~PipelineStopResultDefaultTypeInternal() {}
+  union {
+    PipelineStopResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PipelineStopResultDefaultTypeInternal _PipelineStopResult_default_instance_;
+
+inline constexpr PipelineStartRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        handle_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
+template <typename>
+constexpr PipelineStartRequest::PipelineStartRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(PipelineStartRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct PipelineStartRequestDefaultTypeInternal {
+  constexpr PipelineStartRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~PipelineStartRequestDefaultTypeInternal() {}
+  union {
+    PipelineStartRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PipelineStartRequestDefaultTypeInternal _PipelineStartRequest_default_instance_;
+
 inline constexpr PipelineOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -55,6 +116,71 @@ struct PipelineOptionsDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PipelineOptionsDefaultTypeInternal _PipelineOptions_default_instance_;
+
+inline constexpr PipelineHandle::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        handle_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        state_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        status_{static_cast< ::runanywhere::v1::PipelineStatus >(0)} {}
+
+template <typename>
+constexpr PipelineHandle::PipelineHandle(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(PipelineHandle_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct PipelineHandleDefaultTypeInternal {
+  constexpr PipelineHandleDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~PipelineHandleDefaultTypeInternal() {}
+  union {
+    PipelineHandle _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PipelineHandleDefaultTypeInternal _PipelineHandle_default_instance_;
+
+inline constexpr PipelineCompileResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        handle_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        status_{static_cast< ::runanywhere::v1::PipelineStatus >(0)},
+        error_code_{0} {}
+
+template <typename>
+constexpr PipelineCompileResult::PipelineCompileResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(PipelineCompileResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct PipelineCompileResultDefaultTypeInternal {
+  constexpr PipelineCompileResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~PipelineCompileResultDefaultTypeInternal() {}
+  union {
+    PipelineCompileResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PipelineCompileResultDefaultTypeInternal _PipelineCompileResult_default_instance_;
 template <typename>
 constexpr OperatorSpec_ParamsEntry_DoNotUse::OperatorSpec_ParamsEntry_DoNotUse(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -203,7 +329,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_pipeline_2eproto[2];
+    file_level_enum_descriptors_pipeline_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_pipeline_2eproto = nullptr;
 const ::uint32_t
@@ -262,6 +388,42 @@ const ::uint32_t
         0,
         1,
         2,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineCompileResult, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineCompileResult, _impl_.handle_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineCompileResult, _impl_.status_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineCompileResult, _impl_.error_message_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineCompileResult, _impl_.error_code_),
+        0,
+        2,
+        1,
+        3,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStartRequest, _impl_._has_bits_),
+        4, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStartRequest, _impl_.handle_id_),
+        0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineHandle, _impl_._has_bits_),
+        6, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineHandle, _impl_.handle_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineHandle, _impl_.status_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineHandle, _impl_.state_),
+        0,
+        2,
+        1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStopResult, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStopResult, _impl_.handle_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStopResult, _impl_.status_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStopResult, _impl_.error_message_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PipelineStopResult, _impl_.error_code_),
+        0,
+        2,
+        1,
+        3,
 };
 
 static const ::_pbi::MigrationSchema
@@ -271,6 +433,10 @@ static const ::_pbi::MigrationSchema
         {18, sizeof(::runanywhere::v1::OperatorSpec)},
         {33, sizeof(::runanywhere::v1::EdgeSpec)},
         {44, sizeof(::runanywhere::v1::PipelineOptions)},
+        {53, sizeof(::runanywhere::v1::PipelineCompileResult)},
+        {64, sizeof(::runanywhere::v1::PipelineStartRequest)},
+        {69, sizeof(::runanywhere::v1::PipelineHandle)},
+        {78, sizeof(::runanywhere::v1::PipelineStopResult)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_PipelineSpec_default_instance_._instance,
@@ -278,6 +444,10 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_OperatorSpec_default_instance_._instance,
     &::runanywhere::v1::_EdgeSpec_default_instance_._instance,
     &::runanywhere::v1::_PipelineOptions_default_instance_._instance,
+    &::runanywhere::v1::_PipelineCompileResult_default_instance_._instance,
+    &::runanywhere::v1::_PipelineStartRequest_default_instance_._instance,
+    &::runanywhere::v1::_PipelineHandle_default_instance_._instance,
+    &::runanywhere::v1::_PipelineStopResult_default_instance_._instance,
 };
 const char descriptor_table_protodef_pipeline_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -296,28 +466,49 @@ const char descriptor_table_protodef_pipeline_2eproto[] ABSL_ATTRIBUTE_SECTION_V
     "\022\020\n\010capacity\030\003 \001(\r\022*\n\006policy\030\004 \001(\0162\032.run"
     "anywhere.v1.EdgePolicy\"]\n\017PipelineOption"
     "s\022\031\n\021latency_budget_ms\030\001 \001(\005\022\024\n\014emit_met"
-    "rics\030\002 \001(\010\022\031\n\021strict_validation\030\003 \001(\010*\225\001"
-    "\n\016DeviceAffinity\022\037\n\033DEVICE_AFFINITY_UNSP"
-    "ECIFIED\020\000\022\027\n\023DEVICE_AFFINITY_ANY\020\001\022\027\n\023DE"
-    "VICE_AFFINITY_CPU\020\002\022\027\n\023DEVICE_AFFINITY_G"
-    "PU\020\003\022\027\n\023DEVICE_AFFINITY_ANE\020\004*z\n\nEdgePol"
-    "icy\022\033\n\027EDGE_POLICY_UNSPECIFIED\020\000\022\025\n\021EDGE"
-    "_POLICY_BLOCK\020\001\022\033\n\027EDGE_POLICY_DROP_OLDE"
-    "ST\020\002\022\033\n\027EDGE_POLICY_DROP_NEWEST\020\003B9\n\027ai."
-    "runanywhere.proto.v1B\rPipelineProtoP\001\370\001\001"
-    "\242\002\004RAV1\272\002\002RAb\006proto3"
+    "rics\030\002 \001(\010\022\031\n\021strict_validation\030\003 \001(\010\"\234\001"
+    "\n\025PipelineCompileResult\022\021\n\thandle_id\030\001 \001"
+    "(\t\022.\n\006status\030\002 \001(\0162\036.runanywhere.v1.Pipe"
+    "lineStatus\022\032\n\rerror_message\030\003 \001(\tH\000\210\001\001\022\022"
+    "\n\nerror_code\030\004 \001(\005B\020\n\016_error_message\")\n\024"
+    "PipelineStartRequest\022\021\n\thandle_id\030\001 \001(\t\""
+    "q\n\016PipelineHandle\022\021\n\thandle_id\030\001 \001(\t\022.\n\006"
+    "status\030\002 \001(\0162\036.runanywhere.v1.PipelineSt"
+    "atus\022\022\n\005state\030\003 \001(\tH\000\210\001\001B\010\n\006_state\"\231\001\n\022P"
+    "ipelineStopResult\022\021\n\thandle_id\030\001 \001(\t\022.\n\006"
+    "status\030\002 \001(\0162\036.runanywhere.v1.PipelineSt"
+    "atus\022\032\n\rerror_message\030\003 \001(\tH\000\210\001\001\022\022\n\nerro"
+    "r_code\030\004 \001(\005B\020\n\016_error_message*\225\001\n\016Devic"
+    "eAffinity\022\037\n\033DEVICE_AFFINITY_UNSPECIFIED"
+    "\020\000\022\027\n\023DEVICE_AFFINITY_ANY\020\001\022\027\n\023DEVICE_AF"
+    "FINITY_CPU\020\002\022\027\n\023DEVICE_AFFINITY_GPU\020\003\022\027\n"
+    "\023DEVICE_AFFINITY_ANE\020\004*z\n\nEdgePolicy\022\033\n\027"
+    "EDGE_POLICY_UNSPECIFIED\020\000\022\025\n\021EDGE_POLICY"
+    "_BLOCK\020\001\022\033\n\027EDGE_POLICY_DROP_OLDEST\020\002\022\033\n"
+    "\027EDGE_POLICY_DROP_NEWEST\020\003*e\n\016PipelineSt"
+    "atus\022\037\n\033PIPELINE_STATUS_UNSPECIFIED\020\000\022\026\n"
+    "\022PIPELINE_STATUS_OK\020\001\022\032\n\026PIPELINE_STATUS"
+    "_FAILED\020\0022\365\001\n\010Pipeline\022N\n\007Compile\022\034.runa"
+    "nywhere.v1.PipelineSpec\032%.runanywhere.v1"
+    ".PipelineCompileResult\022M\n\005Start\022$.runany"
+    "where.v1.PipelineStartRequest\032\036.runanywh"
+    "ere.v1.PipelineHandle\022J\n\004Stop\022\036.runanywh"
+    "ere.v1.PipelineHandle\032\".runanywhere.v1.P"
+    "ipelineStopResultB9\n\027ai.runanywhere.prot"
+    "o.v1B\rPipelineProtoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006pr"
+    "oto3"
 };
 static ::absl::once_flag descriptor_table_pipeline_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_pipeline_2eproto = {
     false,
     false,
-    980,
+    1804,
     descriptor_table_protodef_pipeline_2eproto,
     "pipeline.proto",
     &descriptor_table_pipeline_2eproto_once,
     nullptr,
     0,
-    5,
+    9,
     schemas,
     file_default_instances,
     TableStruct_pipeline_2eproto::offsets,
@@ -340,6 +531,13 @@ EdgePolicy_descriptor() {
 }
 PROTOBUF_CONSTINIT const uint32_t EdgePolicy_internal_data_[] = {
     262144u, 0u, };
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+PipelineStatus_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_pipeline_2eproto);
+  return file_level_enum_descriptors_pipeline_2eproto[2];
+}
+PROTOBUF_CONSTINIT const uint32_t PipelineStatus_internal_data_[] = {
+    196608u, 0u, };
 // ===================================================================
 
 class PipelineSpec::_Internal {
@@ -2130,6 +2328,1395 @@ void PipelineOptions::InternalSwap(PipelineOptions* PROTOBUF_RESTRICT PROTOBUF_N
 }
 
 ::google::protobuf::Metadata PipelineOptions::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class PipelineCompileResult::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<PipelineCompileResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_._has_bits_);
+};
+
+PipelineCompileResult::PipelineCompileResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineCompileResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.PipelineCompileResult)
+}
+PROTOBUF_NDEBUG_INLINE PipelineCompileResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::PipelineCompileResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        handle_id_(arena, from.handle_id_),
+        error_message_(arena, from.error_message_) {}
+
+PipelineCompileResult::PipelineCompileResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const PipelineCompileResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineCompileResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  PipelineCompileResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, status_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, status_),
+           offsetof(Impl_, error_code_) -
+               offsetof(Impl_, status_) +
+               sizeof(Impl_::error_code_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.PipelineCompileResult)
+}
+PROTOBUF_NDEBUG_INLINE PipelineCompileResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        handle_id_(arena),
+        error_message_(arena) {}
+
+inline void PipelineCompileResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, status_),
+           0,
+           offsetof(Impl_, error_code_) -
+               offsetof(Impl_, status_) +
+               sizeof(Impl_::error_code_));
+}
+PipelineCompileResult::~PipelineCompileResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.PipelineCompileResult)
+  SharedDtor(*this);
+}
+inline void PipelineCompileResult::SharedDtor(MessageLite& self) {
+  PipelineCompileResult& this_ = static_cast<PipelineCompileResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.handle_id_.Destroy();
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL PipelineCompileResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) PipelineCompileResult(arena);
+}
+constexpr auto PipelineCompileResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(PipelineCompileResult),
+                                            alignof(PipelineCompileResult));
+}
+constexpr auto PipelineCompileResult::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_PipelineCompileResult_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &PipelineCompileResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<PipelineCompileResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &PipelineCompileResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<PipelineCompileResult>(), &PipelineCompileResult::ByteSizeLong,
+              &PipelineCompileResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_._cached_size_),
+          false,
+      },
+      &PipelineCompileResult::kDescriptorMethods,
+      &descriptor_table_pipeline_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull PipelineCompileResult_class_data_ =
+        PipelineCompileResult::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+PipelineCompileResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&PipelineCompileResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(PipelineCompileResult_class_data_.tc_table);
+  return PipelineCompileResult_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 67, 2>
+PipelineCompileResult::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    PipelineCompileResult_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::PipelineCompileResult>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // int32 error_code = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PipelineCompileResult, _impl_.error_code_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.error_code_)}},
+    // string handle_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.handle_id_)}},
+    // .runanywhere.v1.PipelineStatus status = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PipelineCompileResult, _impl_.status_), 2>(),
+     {16, 2, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.status_)}},
+    // optional string error_message = 3;
+    {::_pbi::TcParser::FastUS1,
+     {26, 1, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.error_message_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string handle_id = 1;
+    {PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.handle_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // .runanywhere.v1.PipelineStatus status = 2;
+    {PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.status_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional string error_message = 3;
+    {PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 error_code = 4;
+    {PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.error_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+  }},
+  // no aux_entries
+  {{
+    "\44\11\0\15\0\0\0\0"
+    "runanywhere.v1.PipelineCompileResult"
+    "handle_id"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void PipelineCompileResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.PipelineCompileResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.handle_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
+    ::memset(&_impl_.status_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.error_code_) -
+        reinterpret_cast<char*>(&_impl_.status_)) + sizeof(_impl_.error_code_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL PipelineCompileResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const PipelineCompileResult& this_ = static_cast<const PipelineCompileResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL PipelineCompileResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const PipelineCompileResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.PipelineCompileResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string handle_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_handle_id().empty()) {
+      const ::std::string& _s = this_._internal_handle_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineCompileResult.handle_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // .runanywhere.v1.PipelineStatus status = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_status() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          2, this_._internal_status(), target);
+    }
+  }
+
+  // optional string error_message = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_error_message();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineCompileResult.error_message");
+    target = stream->WriteStringMaybeAliased(3, _s, target);
+  }
+
+  // int32 error_code = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_error_code() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+              stream, this_._internal_error_code(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.PipelineCompileResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t PipelineCompileResult::ByteSizeLong(const MessageLite& base) {
+  const PipelineCompileResult& this_ = static_cast<const PipelineCompileResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t PipelineCompileResult::ByteSizeLong() const {
+  const PipelineCompileResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.PipelineCompileResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // string handle_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_handle_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_handle_id());
+      }
+    }
+    // optional string error_message = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_error_message());
+    }
+    // .runanywhere.v1.PipelineStatus status = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_status() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_status());
+      }
+    }
+    // int32 error_code = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_error_code() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_error_code());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void PipelineCompileResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<PipelineCompileResult*>(&to_msg);
+  auto& from = static_cast<const PipelineCompileResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.PipelineCompileResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_handle_id().empty()) {
+        _this->_internal_set_handle_id(from._internal_handle_id());
+      } else {
+        if (_this->_impl_.handle_id_.IsDefault()) {
+          _this->_internal_set_handle_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_error_message(from._internal_error_message());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_status() != 0) {
+        _this->_impl_.status_ = from._impl_.status_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void PipelineCompileResult::CopyFrom(const PipelineCompileResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.PipelineCompileResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void PipelineCompileResult::InternalSwap(PipelineCompileResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.handle_id_, &other->_impl_.handle_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.error_code_)
+      + sizeof(PipelineCompileResult::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(PipelineCompileResult, _impl_.status_)>(
+          reinterpret_cast<char*>(&_impl_.status_),
+          reinterpret_cast<char*>(&other->_impl_.status_));
+}
+
+::google::protobuf::Metadata PipelineCompileResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class PipelineStartRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<PipelineStartRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(PipelineStartRequest, _impl_._has_bits_);
+};
+
+PipelineStartRequest::PipelineStartRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineStartRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.PipelineStartRequest)
+}
+PROTOBUF_NDEBUG_INLINE PipelineStartRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::PipelineStartRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        handle_id_(arena, from.handle_id_) {}
+
+PipelineStartRequest::PipelineStartRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const PipelineStartRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineStartRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  PipelineStartRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.PipelineStartRequest)
+}
+PROTOBUF_NDEBUG_INLINE PipelineStartRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        handle_id_(arena) {}
+
+inline void PipelineStartRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+PipelineStartRequest::~PipelineStartRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.PipelineStartRequest)
+  SharedDtor(*this);
+}
+inline void PipelineStartRequest::SharedDtor(MessageLite& self) {
+  PipelineStartRequest& this_ = static_cast<PipelineStartRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.handle_id_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL PipelineStartRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) PipelineStartRequest(arena);
+}
+constexpr auto PipelineStartRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(PipelineStartRequest),
+                                            alignof(PipelineStartRequest));
+}
+constexpr auto PipelineStartRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_PipelineStartRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &PipelineStartRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<PipelineStartRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &PipelineStartRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<PipelineStartRequest>(), &PipelineStartRequest::ByteSizeLong,
+              &PipelineStartRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(PipelineStartRequest, _impl_._cached_size_),
+          false,
+      },
+      &PipelineStartRequest::kDescriptorMethods,
+      &descriptor_table_pipeline_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull PipelineStartRequest_class_data_ =
+        PipelineStartRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+PipelineStartRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&PipelineStartRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(PipelineStartRequest_class_data_.tc_table);
+  return PipelineStartRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<0, 1, 0, 53, 2>
+PipelineStartRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(PipelineStartRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    1, 0,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967294,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    1,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    PipelineStartRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::PipelineStartRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string handle_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineStartRequest, _impl_.handle_id_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string handle_id = 1;
+    {PROTOBUF_FIELD_OFFSET(PipelineStartRequest, _impl_.handle_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\43\11\0\0\0\0\0\0"
+    "runanywhere.v1.PipelineStartRequest"
+    "handle_id"
+  }},
+};
+PROTOBUF_NOINLINE void PipelineStartRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.PipelineStartRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.handle_id_.ClearNonDefaultToEmpty();
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL PipelineStartRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const PipelineStartRequest& this_ = static_cast<const PipelineStartRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL PipelineStartRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const PipelineStartRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.PipelineStartRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string handle_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_handle_id().empty()) {
+      const ::std::string& _s = this_._internal_handle_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineStartRequest.handle_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.PipelineStartRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t PipelineStartRequest::ByteSizeLong(const MessageLite& base) {
+  const PipelineStartRequest& this_ = static_cast<const PipelineStartRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t PipelineStartRequest::ByteSizeLong() const {
+  const PipelineStartRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.PipelineStartRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+   {
+    // string handle_id = 1;
+    cached_has_bits = this_._impl_._has_bits_[0];
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_handle_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_handle_id());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void PipelineStartRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<PipelineStartRequest*>(&to_msg);
+  auto& from = static_cast<const PipelineStartRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.PipelineStartRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!from._internal_handle_id().empty()) {
+      _this->_internal_set_handle_id(from._internal_handle_id());
+    } else {
+      if (_this->_impl_.handle_id_.IsDefault()) {
+        _this->_internal_set_handle_id("");
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void PipelineStartRequest::CopyFrom(const PipelineStartRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.PipelineStartRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void PipelineStartRequest::InternalSwap(PipelineStartRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.handle_id_, &other->_impl_.handle_id_, arena);
+}
+
+::google::protobuf::Metadata PipelineStartRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class PipelineHandle::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<PipelineHandle>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_._has_bits_);
+};
+
+PipelineHandle::PipelineHandle(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineHandle_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.PipelineHandle)
+}
+PROTOBUF_NDEBUG_INLINE PipelineHandle::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::PipelineHandle& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        handle_id_(arena, from.handle_id_),
+        state_(arena, from.state_) {}
+
+PipelineHandle::PipelineHandle(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const PipelineHandle& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineHandle_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  PipelineHandle* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.status_ = from._impl_.status_;
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.PipelineHandle)
+}
+PROTOBUF_NDEBUG_INLINE PipelineHandle::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        handle_id_(arena),
+        state_(arena) {}
+
+inline void PipelineHandle::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.status_ = {};
+}
+PipelineHandle::~PipelineHandle() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.PipelineHandle)
+  SharedDtor(*this);
+}
+inline void PipelineHandle::SharedDtor(MessageLite& self) {
+  PipelineHandle& this_ = static_cast<PipelineHandle&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.handle_id_.Destroy();
+  this_._impl_.state_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL PipelineHandle::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) PipelineHandle(arena);
+}
+constexpr auto PipelineHandle::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(PipelineHandle),
+                                            alignof(PipelineHandle));
+}
+constexpr auto PipelineHandle::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_PipelineHandle_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &PipelineHandle::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<PipelineHandle>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &PipelineHandle::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<PipelineHandle>(), &PipelineHandle::ByteSizeLong,
+              &PipelineHandle::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_._cached_size_),
+          false,
+      },
+      &PipelineHandle::kDescriptorMethods,
+      &descriptor_table_pipeline_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull PipelineHandle_class_data_ =
+        PipelineHandle::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+PipelineHandle::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&PipelineHandle_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(PipelineHandle_class_data_.tc_table);
+  return PipelineHandle_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 3, 0, 52, 2>
+PipelineHandle::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_._has_bits_),
+    0, // no _extensions_
+    3, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967288,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    3,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    PipelineHandle_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::PipelineHandle>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // string handle_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_.handle_id_)}},
+    // .runanywhere.v1.PipelineStatus status = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PipelineHandle, _impl_.status_), 2>(),
+     {16, 2, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_.status_)}},
+    // optional string state = 3;
+    {::_pbi::TcParser::FastUS1,
+     {26, 1, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_.state_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string handle_id = 1;
+    {PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_.handle_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // .runanywhere.v1.PipelineStatus status = 2;
+    {PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_.status_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional string state = 3;
+    {PROTOBUF_FIELD_OFFSET(PipelineHandle, _impl_.state_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\35\11\0\5\0\0\0\0"
+    "runanywhere.v1.PipelineHandle"
+    "handle_id"
+    "state"
+  }},
+};
+PROTOBUF_NOINLINE void PipelineHandle::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.PipelineHandle)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.handle_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.state_.ClearNonDefaultToEmpty();
+    }
+  }
+  _impl_.status_ = 0;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL PipelineHandle::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const PipelineHandle& this_ = static_cast<const PipelineHandle&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL PipelineHandle::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const PipelineHandle& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.PipelineHandle)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string handle_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_handle_id().empty()) {
+      const ::std::string& _s = this_._internal_handle_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineHandle.handle_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // .runanywhere.v1.PipelineStatus status = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_status() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          2, this_._internal_status(), target);
+    }
+  }
+
+  // optional string state = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_state();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineHandle.state");
+    target = stream->WriteStringMaybeAliased(3, _s, target);
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.PipelineHandle)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t PipelineHandle::ByteSizeLong(const MessageLite& base) {
+  const PipelineHandle& this_ = static_cast<const PipelineHandle&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t PipelineHandle::ByteSizeLong() const {
+  const PipelineHandle& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.PipelineHandle)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // string handle_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_handle_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_handle_id());
+      }
+    }
+    // optional string state = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_state());
+    }
+    // .runanywhere.v1.PipelineStatus status = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_status() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_status());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void PipelineHandle::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<PipelineHandle*>(&to_msg);
+  auto& from = static_cast<const PipelineHandle&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.PipelineHandle)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_handle_id().empty()) {
+        _this->_internal_set_handle_id(from._internal_handle_id());
+      } else {
+        if (_this->_impl_.handle_id_.IsDefault()) {
+          _this->_internal_set_handle_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_state(from._internal_state());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_status() != 0) {
+        _this->_impl_.status_ = from._impl_.status_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void PipelineHandle::CopyFrom(const PipelineHandle& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.PipelineHandle)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void PipelineHandle::InternalSwap(PipelineHandle* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.handle_id_, &other->_impl_.handle_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.state_, &other->_impl_.state_, arena);
+  swap(_impl_.status_, other->_impl_.status_);
+}
+
+::google::protobuf::Metadata PipelineHandle::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class PipelineStopResult::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<PipelineStopResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_._has_bits_);
+};
+
+PipelineStopResult::PipelineStopResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineStopResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.PipelineStopResult)
+}
+PROTOBUF_NDEBUG_INLINE PipelineStopResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::PipelineStopResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        handle_id_(arena, from.handle_id_),
+        error_message_(arena, from.error_message_) {}
+
+PipelineStopResult::PipelineStopResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const PipelineStopResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, PipelineStopResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  PipelineStopResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, status_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, status_),
+           offsetof(Impl_, error_code_) -
+               offsetof(Impl_, status_) +
+               sizeof(Impl_::error_code_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.PipelineStopResult)
+}
+PROTOBUF_NDEBUG_INLINE PipelineStopResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        handle_id_(arena),
+        error_message_(arena) {}
+
+inline void PipelineStopResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, status_),
+           0,
+           offsetof(Impl_, error_code_) -
+               offsetof(Impl_, status_) +
+               sizeof(Impl_::error_code_));
+}
+PipelineStopResult::~PipelineStopResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.PipelineStopResult)
+  SharedDtor(*this);
+}
+inline void PipelineStopResult::SharedDtor(MessageLite& self) {
+  PipelineStopResult& this_ = static_cast<PipelineStopResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.handle_id_.Destroy();
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL PipelineStopResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) PipelineStopResult(arena);
+}
+constexpr auto PipelineStopResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(PipelineStopResult),
+                                            alignof(PipelineStopResult));
+}
+constexpr auto PipelineStopResult::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_PipelineStopResult_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &PipelineStopResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<PipelineStopResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &PipelineStopResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<PipelineStopResult>(), &PipelineStopResult::ByteSizeLong,
+              &PipelineStopResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_._cached_size_),
+          false,
+      },
+      &PipelineStopResult::kDescriptorMethods,
+      &descriptor_table_pipeline_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull PipelineStopResult_class_data_ =
+        PipelineStopResult::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+PipelineStopResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&PipelineStopResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(PipelineStopResult_class_data_.tc_table);
+  return PipelineStopResult_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 64, 2>
+PipelineStopResult::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    PipelineStopResult_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::PipelineStopResult>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // int32 error_code = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PipelineStopResult, _impl_.error_code_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.error_code_)}},
+    // string handle_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.handle_id_)}},
+    // .runanywhere.v1.PipelineStatus status = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PipelineStopResult, _impl_.status_), 2>(),
+     {16, 2, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.status_)}},
+    // optional string error_message = 3;
+    {::_pbi::TcParser::FastUS1,
+     {26, 1, 0,
+      PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.error_message_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string handle_id = 1;
+    {PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.handle_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // .runanywhere.v1.PipelineStatus status = 2;
+    {PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.status_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional string error_message = 3;
+    {PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 error_code = 4;
+    {PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.error_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+  }},
+  // no aux_entries
+  {{
+    "\41\11\0\15\0\0\0\0"
+    "runanywhere.v1.PipelineStopResult"
+    "handle_id"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void PipelineStopResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.PipelineStopResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.handle_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
+    ::memset(&_impl_.status_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.error_code_) -
+        reinterpret_cast<char*>(&_impl_.status_)) + sizeof(_impl_.error_code_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL PipelineStopResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const PipelineStopResult& this_ = static_cast<const PipelineStopResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL PipelineStopResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const PipelineStopResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.PipelineStopResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string handle_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_handle_id().empty()) {
+      const ::std::string& _s = this_._internal_handle_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineStopResult.handle_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // .runanywhere.v1.PipelineStatus status = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_status() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          2, this_._internal_status(), target);
+    }
+  }
+
+  // optional string error_message = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_error_message();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.PipelineStopResult.error_message");
+    target = stream->WriteStringMaybeAliased(3, _s, target);
+  }
+
+  // int32 error_code = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_error_code() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+              stream, this_._internal_error_code(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.PipelineStopResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t PipelineStopResult::ByteSizeLong(const MessageLite& base) {
+  const PipelineStopResult& this_ = static_cast<const PipelineStopResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t PipelineStopResult::ByteSizeLong() const {
+  const PipelineStopResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.PipelineStopResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // string handle_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_handle_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_handle_id());
+      }
+    }
+    // optional string error_message = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_error_message());
+    }
+    // .runanywhere.v1.PipelineStatus status = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_status() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_status());
+      }
+    }
+    // int32 error_code = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_error_code() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_error_code());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void PipelineStopResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<PipelineStopResult*>(&to_msg);
+  auto& from = static_cast<const PipelineStopResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.PipelineStopResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_handle_id().empty()) {
+        _this->_internal_set_handle_id(from._internal_handle_id());
+      } else {
+        if (_this->_impl_.handle_id_.IsDefault()) {
+          _this->_internal_set_handle_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_error_message(from._internal_error_message());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_status() != 0) {
+        _this->_impl_.status_ = from._impl_.status_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void PipelineStopResult::CopyFrom(const PipelineStopResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.PipelineStopResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void PipelineStopResult::InternalSwap(PipelineStopResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.handle_id_, &other->_impl_.handle_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.error_code_)
+      + sizeof(PipelineStopResult::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(PipelineStopResult, _impl_.status_)>(
+          reinterpret_cast<char*>(&_impl_.status_),
+          reinterpret_cast<char*>(&other->_impl_.status_));
+}
+
+::google::protobuf::Metadata PipelineStopResult::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

@@ -139,7 +139,7 @@ inline constexpr HardwareAcceleratorPreferenceRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        preference_{static_cast< ::runanywhere::v1::AcceleratorPreference >(0)} {}
+        preference_{static_cast< ::runanywhere::v1::AccelerationPreference >(0)} {}
 
 template <typename>
 constexpr HardwareAcceleratorPreferenceRequest::HardwareAcceleratorPreferenceRequest(::_pbi::ConstantInitialized)
@@ -168,7 +168,7 @@ inline constexpr AcceleratorInfo::Impl_::Impl_(
         name_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        type_{static_cast< ::runanywhere::v1::AcceleratorPreference >(0)},
+        type_{static_cast< ::runanywhere::v1::AccelerationPreference >(0)},
         available_{false} {}
 
 template <typename>
@@ -314,39 +314,45 @@ const char descriptor_table_protodef_hardware_5fprofile_2eproto[] ABSL_ATTRIBUTE
     "de\030\003 \001(\t\022\032\n\022total_memory_bytes\030\004 \001(\004\022\022\n\n"
     "core_count\030\005 \001(\r\022\031\n\021performance_cores\030\006 "
     "\001(\r\022\030\n\020efficiency_cores\030\007 \001(\r\022\024\n\014archite"
-    "cture\030\010 \001(\t\022\020\n\010platform\030\t \001(\t\"g\n\017Acceler"
-    "atorInfo\022\014\n\004name\030\001 \001(\t\0223\n\004type\030\002 \001(\0162%.r"
-    "unanywhere.v1.AcceleratorPreference\022\021\n\ta"
-    "vailable\030\003 \001(\010\"\200\001\n\025HardwareProfileResult"
-    "\0220\n\007profile\030\001 \001(\0132\037.runanywhere.v1.Hardw"
-    "areProfile\0225\n\014accelerators\030\002 \003(\0132\037.runan"
-    "ywhere.v1.AcceleratorInfo\"\030\n\026HardwarePro"
-    "fileRequest\"\035\n\033HardwareAcceleratorsReque"
-    "st\"a\n$HardwareAcceleratorPreferenceReque"
-    "st\0229\n\npreference\030\001 \001(\0162%.runanywhere.v1."
-    "AcceleratorPreference\"M\n#HardwareAcceler"
-    "atorPreferenceResult\022\017\n\007success\030\001 \001(\010\022\025\n"
-    "\rerror_message\030\002 \001(\t*\230\001\n\025AcceleratorPref"
-    "erence\022\037\n\033ACCELERATOR_PREFERENCE_AUTO\020\000\022"
-    "\036\n\032ACCELERATOR_PREFERENCE_ANE\020\001\022\036\n\032ACCEL"
-    "ERATOR_PREFERENCE_GPU\020\002\022\036\n\032ACCELERATOR_P"
-    "REFERENCE_CPU\020\0032\326\002\n\010Hardware\022[\n\nGetProfi"
-    "le\022&.runanywhere.v1.HardwareProfileReque"
-    "st\032%.runanywhere.v1.HardwareProfileResul"
-    "t\022e\n\017GetAccelerators\022+.runanywhere.v1.Ha"
-    "rdwareAcceleratorsRequest\032%.runanywhere."
-    "v1.HardwareProfileResult\022\205\001\n\030SetAccelera"
-    "torPreference\0224.runanywhere.v1.HardwareA"
-    "cceleratorPreferenceRequest\0323.runanywher"
-    "e.v1.HardwareAcceleratorPreferenceResult"
-    "B@\n\027ai.runanywhere.proto.v1B\024HardwarePro"
-    "fileProtoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006proto3"
+    "cture\030\010 \001(\t\022\020\n\010platform\030\t \001(\t\"h\n\017Acceler"
+    "atorInfo\022\014\n\004name\030\001 \001(\t\0224\n\004type\030\002 \001(\0162&.r"
+    "unanywhere.v1.AccelerationPreference\022\021\n\t"
+    "available\030\003 \001(\010\"\200\001\n\025HardwareProfileResul"
+    "t\0220\n\007profile\030\001 \001(\0132\037.runanywhere.v1.Hard"
+    "wareProfile\0225\n\014accelerators\030\002 \003(\0132\037.runa"
+    "nywhere.v1.AcceleratorInfo\"\030\n\026HardwarePr"
+    "ofileRequest\"\035\n\033HardwareAcceleratorsRequ"
+    "est\"b\n$HardwareAcceleratorPreferenceRequ"
+    "est\022:\n\npreference\030\001 \001(\0162&.runanywhere.v1"
+    ".AccelerationPreference\"M\n#HardwareAccel"
+    "eratorPreferenceResult\022\017\n\007success\030\001 \001(\010\022"
+    "\025\n\rerror_message\030\002 \001(\t*\261\002\n\026AccelerationP"
+    "reference\022\'\n#ACCELERATION_PREFERENCE_UNS"
+    "PECIFIED\020\000\022 \n\034ACCELERATION_PREFERENCE_AU"
+    "TO\020\001\022\037\n\033ACCELERATION_PREFERENCE_CPU\020\002\022\037\n"
+    "\033ACCELERATION_PREFERENCE_GPU\020\003\022\037\n\033ACCELE"
+    "RATION_PREFERENCE_NPU\020\004\022\"\n\036ACCELERATION_"
+    "PREFERENCE_WEBGPU\020\005\022!\n\035ACCELERATION_PREF"
+    "ERENCE_METAL\020\006\022\"\n\036ACCELERATION_PREFERENC"
+    "E_VULKAN\020\0072\326\002\n\010Hardware\022[\n\nGetProfile\022&."
+    "runanywhere.v1.HardwareProfileRequest\032%."
+    "runanywhere.v1.HardwareProfileResult\022e\n\017"
+    "GetAccelerators\022+.runanywhere.v1.Hardwar"
+    "eAcceleratorsRequest\032%.runanywhere.v1.Ha"
+    "rdwareProfileResult\022\205\001\n\030SetAcceleratorPr"
+    "eference\0224.runanywhere.v1.HardwareAccele"
+    "ratorPreferenceRequest\0323.runanywhere.v1."
+    "HardwareAcceleratorPreferenceResultB\217\001\n\027"
+    "ai.runanywhere.proto.v1B\024HardwareProfile"
+    "ProtoP\001Z<github.com/runanywhere/runanywh"
+    "ere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252"
+    "\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_hardware_5fprofile_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hardware_5fprofile_2eproto = {
     false,
     false,
-    1314,
+    1549,
     descriptor_table_protodef_hardware_5fprofile_2eproto,
     "hardware_profile.proto",
     &descriptor_table_hardware_5fprofile_2eproto_once,
@@ -362,12 +368,12 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hardware_5fpro
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-AcceleratorPreference_descriptor() {
+AccelerationPreference_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hardware_5fprofile_2eproto);
   return file_level_enum_descriptors_hardware_5fprofile_2eproto[0];
 }
-PROTOBUF_CONSTINIT const uint32_t AcceleratorPreference_internal_data_[] = {
-    262144u, 0u, };
+PROTOBUF_CONSTINIT const uint32_t AccelerationPreference_internal_data_[] = {
+    524288u, 0u, };
 // ===================================================================
 
 class HardwareProfile::_Internal {
@@ -1081,7 +1087,7 @@ AcceleratorInfo::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {10, 0, 0,
       PROTOBUF_FIELD_OFFSET(AcceleratorInfo, _impl_.name_)}},
-    // .runanywhere.v1.AcceleratorPreference type = 2;
+    // .runanywhere.v1.AccelerationPreference type = 2;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(AcceleratorInfo, _impl_.type_), 1>(),
      {16, 1, 0,
       PROTOBUF_FIELD_OFFSET(AcceleratorInfo, _impl_.type_)}},
@@ -1094,7 +1100,7 @@ AcceleratorInfo::_table_ = {
   }}, {{
     // string name = 1;
     {PROTOBUF_FIELD_OFFSET(AcceleratorInfo, _impl_.name_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // .runanywhere.v1.AcceleratorPreference type = 2;
+    // .runanywhere.v1.AccelerationPreference type = 2;
     {PROTOBUF_FIELD_OFFSET(AcceleratorInfo, _impl_.type_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // bool available = 3;
     {PROTOBUF_FIELD_OFFSET(AcceleratorInfo, _impl_.available_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
@@ -1155,7 +1161,7 @@ PROTOBUF_NOINLINE void AcceleratorInfo::Clear() {
     }
   }
 
-  // .runanywhere.v1.AcceleratorPreference type = 2;
+  // .runanywhere.v1.AccelerationPreference type = 2;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_type() != 0) {
       target = stream->EnsureSpace(target);
@@ -1206,7 +1212,7 @@ PROTOBUF_NOINLINE void AcceleratorInfo::Clear() {
                                         this_._internal_name());
       }
     }
-    // .runanywhere.v1.AcceleratorPreference type = 2;
+    // .runanywhere.v1.AccelerationPreference type = 2;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_type() != 0) {
         total_size += 1 +
@@ -1970,14 +1976,14 @@ HardwareAcceleratorPreferenceRequest::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::HardwareAcceleratorPreferenceRequest>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // .runanywhere.v1.AcceleratorPreference preference = 1;
+    // .runanywhere.v1.AccelerationPreference preference = 1;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HardwareAcceleratorPreferenceRequest, _impl_.preference_), 0>(),
      {8, 0, 0,
       PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_.preference_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // .runanywhere.v1.AcceleratorPreference preference = 1;
+    // .runanywhere.v1.AccelerationPreference preference = 1;
     {PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_.preference_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
   }},
   // no aux_entries
@@ -2015,7 +2021,7 @@ PROTOBUF_NOINLINE void HardwareAcceleratorPreferenceRequest::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.AcceleratorPreference preference = 1;
+  // .runanywhere.v1.AccelerationPreference preference = 1;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (this_._internal_preference() != 0) {
       target = stream->EnsureSpace(target);
@@ -2048,7 +2054,7 @@ PROTOBUF_NOINLINE void HardwareAcceleratorPreferenceRequest::Clear() {
   (void)cached_has_bits;
 
    {
-    // .runanywhere.v1.AcceleratorPreference preference = 1;
+    // .runanywhere.v1.AccelerationPreference preference = 1;
     cached_has_bits = this_._impl_._has_bits_[0];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_preference() != 0) {

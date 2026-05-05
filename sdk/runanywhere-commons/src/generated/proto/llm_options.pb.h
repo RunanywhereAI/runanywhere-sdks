@@ -37,6 +37,7 @@
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
 #include "structured_output.pb.h"
+#include "thinking_tag_pattern.pb.h"
 #include "tool_calling.pb.h"
 // @@protoc_insertion_point(includes)
 
@@ -103,10 +104,6 @@ class StreamToken;
 struct StreamTokenDefaultTypeInternal;
 extern StreamTokenDefaultTypeInternal _StreamToken_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull StreamToken_class_data_;
-class ThinkingTagPattern;
-struct ThinkingTagPatternDefaultTypeInternal;
-extern ThinkingTagPatternDefaultTypeInternal _ThinkingTagPattern_default_instance_;
-extern const ::google::protobuf::internal::ClassDataFull ThinkingTagPattern_class_data_;
 }  // namespace v1
 }  // namespace runanywhere
 namespace google {
@@ -216,224 +213,6 @@ template <>
 
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ThinkingTagPattern final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ThinkingTagPattern) */ {
- public:
-  inline ThinkingTagPattern() : ThinkingTagPattern(nullptr) {}
-  ~ThinkingTagPattern() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ThinkingTagPattern* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ThinkingTagPattern));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ThinkingTagPattern(::google::protobuf::internal::ConstantInitialized);
-
-  inline ThinkingTagPattern(const ThinkingTagPattern& from) : ThinkingTagPattern(nullptr, from) {}
-  inline ThinkingTagPattern(ThinkingTagPattern&& from) noexcept
-      : ThinkingTagPattern(nullptr, ::std::move(from)) {}
-  inline ThinkingTagPattern& operator=(const ThinkingTagPattern& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ThinkingTagPattern& operator=(ThinkingTagPattern&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ThinkingTagPattern& default_instance() {
-    return *reinterpret_cast<const ThinkingTagPattern*>(
-        &_ThinkingTagPattern_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 7;
-  friend void swap(ThinkingTagPattern& a, ThinkingTagPattern& b) { a.Swap(&b); }
-  inline void Swap(ThinkingTagPattern* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ThinkingTagPattern* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ThinkingTagPattern* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ThinkingTagPattern>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ThinkingTagPattern& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ThinkingTagPattern& from) { ThinkingTagPattern::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ThinkingTagPattern* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ThinkingTagPattern"; }
-
-  explicit ThinkingTagPattern(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ThinkingTagPattern(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ThinkingTagPattern& from);
-  ThinkingTagPattern(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ThinkingTagPattern&& from) noexcept
-      : ThinkingTagPattern(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kOpeningTagFieldNumber = 1,
-    kClosingTagFieldNumber = 2,
-  };
-  // string opening_tag = 1;
-  void clear_opening_tag() ;
-  [[nodiscard]] const ::std::string& opening_tag() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_opening_tag(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_opening_tag();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_opening_tag();
-  void set_allocated_opening_tag(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_opening_tag() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_opening_tag(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_opening_tag();
-
-  public:
-  // string closing_tag = 2;
-  void clear_closing_tag() ;
-  [[nodiscard]] const ::std::string& closing_tag() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_closing_tag(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_closing_tag();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_closing_tag();
-  void set_allocated_closing_tag(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_closing_tag() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_closing_tag(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_closing_tag();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ThinkingTagPattern)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<1, 2,
-                                   0, 64,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ThinkingTagPattern& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr opening_tag_;
-    ::google::protobuf::internal::ArenaStringPtr closing_tag_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_llm_5foptions_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull ThinkingTagPattern_class_data_;
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StreamToken final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.StreamToken) */ {
  public:
@@ -490,7 +269,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StreamToken final : public ::google
     return *reinterpret_cast<const StreamToken*>(
         &_StreamToken_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(StreamToken& a, StreamToken& b) { a.Swap(&b); }
   inline void Swap(StreamToken* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -715,7 +494,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PerformanceMetrics final : public :
     return *reinterpret_cast<const PerformanceMetrics*>(
         &_PerformanceMetrics_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(PerformanceMetrics& a, PerformanceMetrics& b) { a.Swap(&b); }
   inline void Swap(PerformanceMetrics* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3573,12 +3352,6 @@ inline bool LLMGenerationOptions::has_thinking_pattern() const {
   PROTOBUF_ASSUME(!value || _impl_.thinking_pattern_ != nullptr);
   return value;
 }
-inline void LLMGenerationOptions::clear_thinking_pattern() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.thinking_pattern_ != nullptr) _impl_.thinking_pattern_->Clear();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
-}
 inline const ::runanywhere::v1::ThinkingTagPattern& LLMGenerationOptions::_internal_thinking_pattern() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   const ::runanywhere::v1::ThinkingTagPattern* p = _impl_.thinking_pattern_;
@@ -3653,7 +3426,7 @@ inline void LLMGenerationOptions::set_allocated_thinking_pattern(::runanywhere::
   }
 
   if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
@@ -6541,140 +6314,6 @@ inline void GenerationHints::set_allocated_system_role(::std::string* PROTOBUF_N
     _impl_.system_role_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.GenerationHints.system_role)
-}
-
-// -------------------------------------------------------------------
-
-// ThinkingTagPattern
-
-// string opening_tag = 1;
-inline void ThinkingTagPattern::clear_opening_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.opening_tag_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000001U);
-}
-inline const ::std::string& ThinkingTagPattern::opening_tag() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ThinkingTagPattern.opening_tag)
-  return _internal_opening_tag();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void ThinkingTagPattern::set_opening_tag(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.opening_tag_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ThinkingTagPattern.opening_tag)
-}
-inline ::std::string* PROTOBUF_NONNULL ThinkingTagPattern::mutable_opening_tag()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_opening_tag();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ThinkingTagPattern.opening_tag)
-  return _s;
-}
-inline const ::std::string& ThinkingTagPattern::_internal_opening_tag() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.opening_tag_.Get();
-}
-inline void ThinkingTagPattern::_internal_set_opening_tag(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.opening_tag_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL ThinkingTagPattern::_internal_mutable_opening_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.opening_tag_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE ThinkingTagPattern::release_opening_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.ThinkingTagPattern.opening_tag)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.opening_tag_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.opening_tag_.Set("", GetArena());
-  }
-  return released;
-}
-inline void ThinkingTagPattern::set_allocated_opening_tag(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.opening_tag_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.opening_tag_.IsDefault()) {
-    _impl_.opening_tag_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ThinkingTagPattern.opening_tag)
-}
-
-// string closing_tag = 2;
-inline void ThinkingTagPattern::clear_closing_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.closing_tag_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
-}
-inline const ::std::string& ThinkingTagPattern::closing_tag() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ThinkingTagPattern.closing_tag)
-  return _internal_closing_tag();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void ThinkingTagPattern::set_closing_tag(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.closing_tag_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ThinkingTagPattern.closing_tag)
-}
-inline ::std::string* PROTOBUF_NONNULL ThinkingTagPattern::mutable_closing_tag()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_closing_tag();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ThinkingTagPattern.closing_tag)
-  return _s;
-}
-inline const ::std::string& ThinkingTagPattern::_internal_closing_tag() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.closing_tag_.Get();
-}
-inline void ThinkingTagPattern::_internal_set_closing_tag(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.closing_tag_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL ThinkingTagPattern::_internal_mutable_closing_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.closing_tag_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE ThinkingTagPattern::release_closing_tag() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.ThinkingTagPattern.closing_tag)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.closing_tag_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.closing_tag_.Set("", GetArena());
-  }
-  return released;
-}
-inline void ThinkingTagPattern::set_allocated_closing_tag(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.closing_tag_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.closing_tag_.IsDefault()) {
-    _impl_.closing_tag_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ThinkingTagPattern.closing_tag)
 }
 
 // -------------------------------------------------------------------

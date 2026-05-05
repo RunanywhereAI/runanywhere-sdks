@@ -48,6 +48,8 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_service.proto
     # Wave H-2 / IDL-02 — canonical ThinkingTagPattern shared by llm_options and model_types.
     ${CMAKE_CURRENT_SOURCE_DIR}/thinking_tag_pattern.proto
+    # Wave H-2 / IDL-04 — shared ComponentLifecycleState + EventCategory (import-cycle break).
+    ${CMAKE_CURRENT_SOURCE_DIR}/component_types.proto
     # Wave H-5 (KOT-12) — engine-router capability query types.
     ${CMAKE_CURRENT_SOURCE_DIR}/router.proto
 )

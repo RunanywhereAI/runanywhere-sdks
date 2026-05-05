@@ -216,6 +216,7 @@ enum VADStreamEventKind : int {
   VAD_STREAM_EVENT_KIND_STATISTICS = 4,
   VAD_STREAM_EVENT_KIND_STOPPED = 5,
   VAD_STREAM_EVENT_KIND_ERROR = 6,
+  VAD_STREAM_EVENT_KIND_BARGE_IN = 7,
   VADStreamEventKind_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   VADStreamEventKind_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -226,11 +227,11 @@ extern const uint32_t VADStreamEventKind_internal_data_[];
 inline constexpr VADStreamEventKind VADStreamEventKind_MIN =
     static_cast<VADStreamEventKind>(0);
 inline constexpr VADStreamEventKind VADStreamEventKind_MAX =
-    static_cast<VADStreamEventKind>(6);
+    static_cast<VADStreamEventKind>(7);
 [[nodiscard]] inline bool VADStreamEventKind_IsValid(int value) {
-  return 0 <= value && value <= 6;
+  return 0 <= value && value <= 7;
 }
-inline constexpr int VADStreamEventKind_ARRAYSIZE = 6 + 1;
+inline constexpr int VADStreamEventKind_ARRAYSIZE = 7 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 VADStreamEventKind_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VADStreamEventKind) {
@@ -245,7 +246,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& VADStreamEventKind_Name(VADStreamEventKind value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VADStreamEventKind_descriptor, 0, 6>(
+  return ::google::protobuf::internal::NameOfDenseEnum<VADStreamEventKind_descriptor, 0, 7>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool VADStreamEventKind_Parse(

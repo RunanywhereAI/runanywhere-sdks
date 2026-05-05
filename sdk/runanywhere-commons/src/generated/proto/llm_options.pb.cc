@@ -28,37 +28,6 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 namespace runanywhere {
 namespace v1 {
 
-inline constexpr ThinkingTagPattern::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        opening_tag_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        closing_tag_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()) {}
-
-template <typename>
-constexpr ThinkingTagPattern::ThinkingTagPattern(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(ThinkingTagPattern_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-struct ThinkingTagPatternDefaultTypeInternal {
-  constexpr ThinkingTagPatternDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~ThinkingTagPatternDefaultTypeInternal() {}
-  union {
-    ThinkingTagPattern _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ThinkingTagPatternDefaultTypeInternal _ThinkingTagPattern_default_instance_;
-
 inline constexpr StreamToken::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -625,13 +594,6 @@ const ::uint32_t
         2,
         0,
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_._has_bits_),
-        5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_.opening_tag_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_.closing_tag_),
-        0,
-        1,
-        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StreamToken, _impl_._has_bits_),
         6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StreamToken, _impl_.text_),
@@ -664,9 +626,8 @@ static const ::_pbi::MigrationSchema
         {126, sizeof(::runanywhere::v1::LLMGenerationStatus)},
         {147, sizeof(::runanywhere::v1::LLMConfiguration)},
         {164, sizeof(::runanywhere::v1::GenerationHints)},
-        {173, sizeof(::runanywhere::v1::ThinkingTagPattern)},
-        {180, sizeof(::runanywhere::v1::StreamToken)},
-        {189, sizeof(::runanywhere::v1::PerformanceMetrics)},
+        {173, sizeof(::runanywhere::v1::StreamToken)},
+        {182, sizeof(::runanywhere::v1::PerformanceMetrics)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_LLMGenerationOptions_default_instance_._instance,
@@ -676,7 +637,6 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_LLMGenerationStatus_default_instance_._instance,
     &::runanywhere::v1::_LLMConfiguration_default_instance_._instance,
     &::runanywhere::v1::_GenerationHints_default_instance_._instance,
-    &::runanywhere::v1::_ThinkingTagPattern_default_instance_._instance,
     &::runanywhere::v1::_StreamToken_default_instance_._instance,
     &::runanywhere::v1::_PerformanceMetrics_default_instance_._instance,
 };
@@ -684,120 +644,120 @@ const char descriptor_table_protodef_llm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECT
     protodesc_cold) = {
     "\n\021llm_options.proto\022\016runanywhere.v1\032\021mod"
     "el_types.proto\032\027structured_output.proto\032"
-    "\022tool_calling.proto\"\251\007\n\024LLMGenerationOpt"
-    "ions\022\022\n\nmax_tokens\030\001 \001(\005\022\023\n\013temperature\030"
-    "\002 \001(\002\022\r\n\005top_p\030\003 \001(\002\022\r\n\005top_k\030\004 \001(\005\022\032\n\022r"
-    "epetition_penalty\030\005 \001(\002\022\026\n\016stop_sequence"
-    "s\030\006 \003(\t\022\031\n\021streaming_enabled\030\007 \001(\010\022\?\n\023pr"
-    "eferred_framework\030\010 \001(\0162\".runanywhere.v1"
-    ".InferenceFramework\022\032\n\rsystem_prompt\030\t \001"
-    "(\tH\000\210\001\001\022\030\n\013json_schema\030\n \001(\tH\001\210\001\001\022A\n\020thi"
-    "nking_pattern\030\013 \001(\0132\".runanywhere.v1.Thi"
-    "nkingTagPatternH\002\210\001\001\022>\n\020execution_target"
-    "\030\014 \001(\0162\037.runanywhere.v1.ExecutionTargetH"
-    "\003\210\001\001\022G\n\021structured_output\030\r \001(\0132\'.runany"
-    "where.v1.StructuredOutputOptionsH\004\210\001\001\022!\n"
-    "\031enable_real_time_tracking\030\016 \001(\010\022\014\n\004seed"
-    "\030\017 \001(\003\022\031\n\021frequency_penalty\030\020 \001(\002\022\030\n\020pre"
-    "sence_penalty\030\021 \001(\002\022\025\n\rrepeat_last_n\030\022 \001"
-    "(\005\022\r\n\005min_p\030\023 \001(\002\022\024\n\007grammar\030\024 \001(\tH\005\210\001\001\022"
-    "\034\n\017response_format\030\025 \001(\tH\006\210\001\001\022\023\n\013echo_pr"
-    "ompt\030\026 \001(\010\022\021\n\tn_threads\030\027 \001(\005\022=\n\014tool_ca"
-    "lling\030\030 \001(\0132\".runanywhere.v1.ToolCalling"
-    "OptionsH\007\210\001\001B\020\n\016_system_promptB\016\n\014_json_"
-    "schemaB\023\n\021_thinking_patternB\023\n\021_executio"
-    "n_targetB\024\n\022_structured_outputB\n\n\010_gramm"
-    "arB\022\n\020_response_formatB\017\n\r_tool_calling\""
-    "\251\007\n\023LLMGenerationResult\022\014\n\004text\030\001 \001(\t\022\035\n"
-    "\020thinking_content\030\002 \001(\tH\000\210\001\001\022\024\n\014input_to"
-    "kens\030\003 \001(\005\022\030\n\020tokens_generated\030\004 \001(\005\022\022\n\n"
-    "model_used\030\005 \001(\t\022\032\n\022generation_time_ms\030\006"
-    " \001(\001\022\024\n\007ttft_ms\030\007 \001(\001H\001\210\001\001\022\031\n\021tokens_per"
-    "_second\030\010 \001(\001\022\026\n\tframework\030\t \001(\tH\002\210\001\001\022\025\n"
-    "\rfinish_reason\030\n \001(\t\022\027\n\017thinking_tokens\030"
-    "\013 \001(\005\022\027\n\017response_tokens\030\014 \001(\005\022\030\n\013json_o"
-    "utput\030\r \001(\tH\003\210\001\001\022<\n\013performance\030\016 \001(\0132\"."
-    "runanywhere.v1.PerformanceMetricsH\004\210\001\001\0229"
-    "\n\013executed_on\030\017 \001(\0162\037.runanywhere.v1.Exe"
-    "cutionTargetH\005\210\001\001\022U\n\034structured_output_v"
-    "alidation\030\020 \001(\0132*.runanywhere.v1.Structu"
-    "redOutputValidationH\006\210\001\001\022\024\n\014total_tokens"
-    "\030\021 \001(\005\022\032\n\rerror_message\030\022 \001(\tH\007\210\001\001\022\022\n\ner"
-    "ror_code\030\023 \001(\005\022\034\n\024cached_prompt_tokens\030\024"
-    " \001(\005\022\033\n\023prompt_eval_time_ms\030\025 \001(\003\022\026\n\016dec"
-    "ode_time_ms\030\026 \001(\003\022,\n\ntool_calls\030\027 \003(\0132\030."
-    "runanywhere.v1.ToolCall\0220\n\014tool_results\030"
-    "\030 \003(\0132\032.runanywhere.v1.ToolResultB\023\n\021_th"
-    "inking_contentB\n\n\010_ttft_msB\014\n\n_framework"
-    "B\016\n\014_json_outputB\016\n\014_performanceB\016\n\014_exe"
-    "cuted_onB\037\n\035_structured_output_validatio"
-    "nB\020\n\016_error_message\"\325\002\n\024LLMGenerationReq"
-    "uest\022\022\n\nrequest_id\030\001 \001(\t\022\020\n\010model_id\030\002 \001"
-    "(\t\022\016\n\006prompt\030\003 \001(\t\022:\n\007options\030\004 \001(\0132$.ru"
-    "nanywhere.v1.LLMGenerationOptionsH\000\210\001\001\022\026"
-    "\n\016context_chunks\030\005 \003(\t\022D\n\010metadata\030\006 \003(\013"
-    "22.runanywhere.v1.LLMGenerationRequest.M"
-    "etadataEntry\022\034\n\017conversation_id\030\007 \001(\tH\001\210"
-    "\001\001\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005valu"
-    "e\030\002 \001(\t:\0028\001B\n\n\010_optionsB\022\n\020_conversation"
-    "_id\"\254\002\n\023LLMGenerationStatus\022\022\n\nrequest_i"
-    "d\030\001 \001(\t\0221\n\005state\030\002 \001(\0162\".runanywhere.v1."
-    "LLMGenerationState\022\037\n\027prompt_tokens_proc"
-    "essed\030\003 \001(\005\022#\n\033completion_tokens_generat"
-    "ed\030\004 \001(\005\022\020\n\010progress\030\005 \001(\002\022\022\n\nelapsed_ms"
-    "\030\006 \001(\003\022\024\n\007message\030\007 \001(\tH\000\210\001\001\022\032\n\rerror_me"
-    "ssage\030\010 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\t \001(\005B\n\n\010"
-    "_messageB\020\n\016_error_message\"\226\002\n\020LLMConfig"
-    "uration\022\026\n\016context_length\030\001 \001(\005\022\023\n\013tempe"
-    "rature\030\002 \001(\002\022\022\n\nmax_tokens\030\003 \001(\005\022\032\n\rsyst"
-    "em_prompt\030\004 \001(\tH\000\210\001\001\022\021\n\tstreaming\030\005 \001(\010\022"
-    "\025\n\010model_id\030\006 \001(\tH\001\210\001\001\022D\n\023preferred_fram"
-    "ework\030\007 \001(\0162\".runanywhere.v1.InferenceFr"
-    "ameworkH\002\210\001\001B\020\n\016_system_promptB\013\n\t_model"
-    "_idB\026\n\024_preferred_framework\"d\n\017Generatio"
-    "nHints\022\023\n\013temperature\030\001 \001(\002\022\022\n\nmax_token"
-    "s\030\002 \001(\005\022\030\n\013system_role\030\003 \001(\tH\000\210\001\001B\016\n\014_sy"
-    "stem_role\">\n\022ThinkingTagPattern\022\023\n\013openi"
-    "ng_tag\030\001 \001(\t\022\023\n\013closing_tag\030\002 \001(\t\"@\n\013Str"
-    "eamToken\022\014\n\004text\030\001 \001(\t\022\024\n\014timestamp_ms\030\002"
-    " \001(\003\022\r\n\005index\030\003 \001(\005\"\223\001\n\022PerformanceMetri"
-    "cs\022\022\n\nlatency_ms\030\001 \001(\003\022\024\n\014memory_bytes\030\002"
-    " \001(\003\022!\n\031throughput_tokens_per_sec\030\003 \001(\002\022"
-    "\025\n\rprompt_tokens\030\004 \001(\005\022\031\n\021completion_tok"
-    "ens\030\005 \001(\005*\263\002\n\022LLMGenerationState\022$\n LLM_"
-    "GENERATION_STATE_UNSPECIFIED\020\000\022\037\n\033LLM_GE"
-    "NERATION_STATE_QUEUED\020\001\022#\n\037LLM_GENERATIO"
-    "N_STATE_PREFILLING\020\002\022!\n\035LLM_GENERATION_S"
-    "TATE_DECODING\020\003\022%\n!LLM_GENERATION_STATE_"
-    "TOOL_CALLING\020\004\022\"\n\036LLM_GENERATION_STATE_C"
-    "OMPLETED\020\005\022\"\n\036LLM_GENERATION_STATE_CANCE"
-    "LLED\020\006\022\037\n\033LLM_GENERATION_STATE_FAILED\020\007*"
-    "\212\001\n\017ExecutionTarget\022 \n\034EXECUTION_TARGET_"
-    "UNSPECIFIED\020\000\022\036\n\032EXECUTION_TARGET_ON_DEV"
-    "ICE\020\001\022\032\n\026EXECUTION_TARGET_CLOUD\020\002\022\031\n\025EXE"
-    "CUTION_TARGET_AUTO\020\003B\212\001\n\027ai.runanywhere."
-    "proto.v1B\017LLMOptionsProtoP\001Z<github.com/"
-    "runanywhere/runanywhere-sdks/idl/v1;runa"
-    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
-    "Ab\006proto3"
+    "\032thinking_tag_pattern.proto\032\022tool_callin"
+    "g.proto\"\251\007\n\024LLMGenerationOptions\022\022\n\nmax_"
+    "tokens\030\001 \001(\005\022\023\n\013temperature\030\002 \001(\002\022\r\n\005top"
+    "_p\030\003 \001(\002\022\r\n\005top_k\030\004 \001(\005\022\032\n\022repetition_pe"
+    "nalty\030\005 \001(\002\022\026\n\016stop_sequences\030\006 \003(\t\022\031\n\021s"
+    "treaming_enabled\030\007 \001(\010\022\?\n\023preferred_fram"
+    "ework\030\010 \001(\0162\".runanywhere.v1.InferenceFr"
+    "amework\022\032\n\rsystem_prompt\030\t \001(\tH\000\210\001\001\022\030\n\013j"
+    "son_schema\030\n \001(\tH\001\210\001\001\022A\n\020thinking_patter"
+    "n\030\013 \001(\0132\".runanywhere.v1.ThinkingTagPatt"
+    "ernH\002\210\001\001\022>\n\020execution_target\030\014 \001(\0162\037.run"
+    "anywhere.v1.ExecutionTargetH\003\210\001\001\022G\n\021stru"
+    "ctured_output\030\r \001(\0132\'.runanywhere.v1.Str"
+    "ucturedOutputOptionsH\004\210\001\001\022!\n\031enable_real"
+    "_time_tracking\030\016 \001(\010\022\014\n\004seed\030\017 \001(\003\022\031\n\021fr"
+    "equency_penalty\030\020 \001(\002\022\030\n\020presence_penalt"
+    "y\030\021 \001(\002\022\025\n\rrepeat_last_n\030\022 \001(\005\022\r\n\005min_p\030"
+    "\023 \001(\002\022\024\n\007grammar\030\024 \001(\tH\005\210\001\001\022\034\n\017response_"
+    "format\030\025 \001(\tH\006\210\001\001\022\023\n\013echo_prompt\030\026 \001(\010\022\021"
+    "\n\tn_threads\030\027 \001(\005\022=\n\014tool_calling\030\030 \001(\0132"
+    "\".runanywhere.v1.ToolCallingOptionsH\007\210\001\001"
+    "B\020\n\016_system_promptB\016\n\014_json_schemaB\023\n\021_t"
+    "hinking_patternB\023\n\021_execution_targetB\024\n\022"
+    "_structured_outputB\n\n\010_grammarB\022\n\020_respo"
+    "nse_formatB\017\n\r_tool_calling\"\251\007\n\023LLMGener"
+    "ationResult\022\014\n\004text\030\001 \001(\t\022\035\n\020thinking_co"
+    "ntent\030\002 \001(\tH\000\210\001\001\022\024\n\014input_tokens\030\003 \001(\005\022\030"
+    "\n\020tokens_generated\030\004 \001(\005\022\022\n\nmodel_used\030\005"
+    " \001(\t\022\032\n\022generation_time_ms\030\006 \001(\001\022\024\n\007ttft"
+    "_ms\030\007 \001(\001H\001\210\001\001\022\031\n\021tokens_per_second\030\010 \001("
+    "\001\022\026\n\tframework\030\t \001(\tH\002\210\001\001\022\025\n\rfinish_reas"
+    "on\030\n \001(\t\022\027\n\017thinking_tokens\030\013 \001(\005\022\027\n\017res"
+    "ponse_tokens\030\014 \001(\005\022\030\n\013json_output\030\r \001(\tH"
+    "\003\210\001\001\022<\n\013performance\030\016 \001(\0132\".runanywhere."
+    "v1.PerformanceMetricsH\004\210\001\001\0229\n\013executed_o"
+    "n\030\017 \001(\0162\037.runanywhere.v1.ExecutionTarget"
+    "H\005\210\001\001\022U\n\034structured_output_validation\030\020 "
+    "\001(\0132*.runanywhere.v1.StructuredOutputVal"
+    "idationH\006\210\001\001\022\024\n\014total_tokens\030\021 \001(\005\022\032\n\rer"
+    "ror_message\030\022 \001(\tH\007\210\001\001\022\022\n\nerror_code\030\023 \001"
+    "(\005\022\034\n\024cached_prompt_tokens\030\024 \001(\005\022\033\n\023prom"
+    "pt_eval_time_ms\030\025 \001(\003\022\026\n\016decode_time_ms\030"
+    "\026 \001(\003\022,\n\ntool_calls\030\027 \003(\0132\030.runanywhere."
+    "v1.ToolCall\0220\n\014tool_results\030\030 \003(\0132\032.runa"
+    "nywhere.v1.ToolResultB\023\n\021_thinking_conte"
+    "ntB\n\n\010_ttft_msB\014\n\n_frameworkB\016\n\014_json_ou"
+    "tputB\016\n\014_performanceB\016\n\014_executed_onB\037\n\035"
+    "_structured_output_validationB\020\n\016_error_"
+    "message\"\325\002\n\024LLMGenerationRequest\022\022\n\nrequ"
+    "est_id\030\001 \001(\t\022\020\n\010model_id\030\002 \001(\t\022\016\n\006prompt"
+    "\030\003 \001(\t\022:\n\007options\030\004 \001(\0132$.runanywhere.v1"
+    ".LLMGenerationOptionsH\000\210\001\001\022\026\n\016context_ch"
+    "unks\030\005 \003(\t\022D\n\010metadata\030\006 \003(\01322.runanywhe"
+    "re.v1.LLMGenerationRequest.MetadataEntry"
+    "\022\034\n\017conversation_id\030\007 \001(\tH\001\210\001\001\032/\n\rMetada"
+    "taEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B"
+    "\n\n\010_optionsB\022\n\020_conversation_id\"\254\002\n\023LLMG"
+    "enerationStatus\022\022\n\nrequest_id\030\001 \001(\t\0221\n\005s"
+    "tate\030\002 \001(\0162\".runanywhere.v1.LLMGeneratio"
+    "nState\022\037\n\027prompt_tokens_processed\030\003 \001(\005\022"
+    "#\n\033completion_tokens_generated\030\004 \001(\005\022\020\n\010"
+    "progress\030\005 \001(\002\022\022\n\nelapsed_ms\030\006 \001(\003\022\024\n\007me"
+    "ssage\030\007 \001(\tH\000\210\001\001\022\032\n\rerror_message\030\010 \001(\tH"
+    "\001\210\001\001\022\022\n\nerror_code\030\t \001(\005B\n\n\010_messageB\020\n\016"
+    "_error_message\"\226\002\n\020LLMConfiguration\022\026\n\016c"
+    "ontext_length\030\001 \001(\005\022\023\n\013temperature\030\002 \001(\002"
+    "\022\022\n\nmax_tokens\030\003 \001(\005\022\032\n\rsystem_prompt\030\004 "
+    "\001(\tH\000\210\001\001\022\021\n\tstreaming\030\005 \001(\010\022\025\n\010model_id\030"
+    "\006 \001(\tH\001\210\001\001\022D\n\023preferred_framework\030\007 \001(\0162"
+    "\".runanywhere.v1.InferenceFrameworkH\002\210\001\001"
+    "B\020\n\016_system_promptB\013\n\t_model_idB\026\n\024_pref"
+    "erred_framework\"d\n\017GenerationHints\022\023\n\013te"
+    "mperature\030\001 \001(\002\022\022\n\nmax_tokens\030\002 \001(\005\022\030\n\013s"
+    "ystem_role\030\003 \001(\tH\000\210\001\001B\016\n\014_system_role\"@\n"
+    "\013StreamToken\022\014\n\004text\030\001 \001(\t\022\024\n\014timestamp_"
+    "ms\030\002 \001(\003\022\r\n\005index\030\003 \001(\005\"\223\001\n\022PerformanceM"
+    "etrics\022\022\n\nlatency_ms\030\001 \001(\003\022\024\n\014memory_byt"
+    "es\030\002 \001(\003\022!\n\031throughput_tokens_per_sec\030\003 "
+    "\001(\002\022\025\n\rprompt_tokens\030\004 \001(\005\022\031\n\021completion"
+    "_tokens\030\005 \001(\005*\263\002\n\022LLMGenerationState\022$\n "
+    "LLM_GENERATION_STATE_UNSPECIFIED\020\000\022\037\n\033LL"
+    "M_GENERATION_STATE_QUEUED\020\001\022#\n\037LLM_GENER"
+    "ATION_STATE_PREFILLING\020\002\022!\n\035LLM_GENERATI"
+    "ON_STATE_DECODING\020\003\022%\n!LLM_GENERATION_ST"
+    "ATE_TOOL_CALLING\020\004\022\"\n\036LLM_GENERATION_STA"
+    "TE_COMPLETED\020\005\022\"\n\036LLM_GENERATION_STATE_C"
+    "ANCELLED\020\006\022\037\n\033LLM_GENERATION_STATE_FAILE"
+    "D\020\007*\212\001\n\017ExecutionTarget\022 \n\034EXECUTION_TAR"
+    "GET_UNSPECIFIED\020\000\022\036\n\032EXECUTION_TARGET_ON"
+    "_DEVICE\020\001\022\032\n\026EXECUTION_TARGET_CLOUD\020\002\022\031\n"
+    "\025EXECUTION_TARGET_AUTO\020\003B\212\001\n\027ai.runanywh"
+    "ere.proto.v1B\017LLMOptionsProtoP\001Z<github."
+    "com/runanywhere/runanywhere-sdks/idl/v1;"
+    "runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
+    "\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_llm_5foptions_2eproto_deps[3] = {
+    descriptor_table_llm_5foptions_2eproto_deps[4] = {
         &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_structured_5foutput_2eproto,
+        &::descriptor_table_thinking_5ftag_5fpattern_2eproto,
         &::descriptor_table_tool_5fcalling_2eproto,
 };
 static ::absl::once_flag descriptor_table_llm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5foptions_2eproto = {
     false,
     false,
-    3889,
+    3853,
     descriptor_table_protodef_llm_5foptions_2eproto,
     "llm_options.proto",
     &descriptor_table_llm_5foptions_2eproto_once,
     descriptor_table_llm_5foptions_2eproto_deps,
-    3,
-    10,
+    4,
+    9,
     schemas,
     file_default_instances,
     TableStruct_llm_5foptions_2eproto::offsets,
@@ -830,6 +790,12 @@ class LLMGenerationOptions::_Internal {
       8 * PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_._has_bits_);
 };
 
+void LLMGenerationOptions::clear_thinking_pattern() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.thinking_pattern_ != nullptr) _impl_.thinking_pattern_->Clear();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
 void LLMGenerationOptions::clear_structured_output() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.structured_output_ != nullptr) _impl_.structured_output_->Clear();
@@ -4921,325 +4887,6 @@ void GenerationHints::InternalSwap(GenerationHints* PROTOBUF_RESTRICT PROTOBUF_N
 }
 
 ::google::protobuf::Metadata GenerationHints::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-class ThinkingTagPattern::_Internal {
- public:
-  using HasBits =
-      decltype(::std::declval<ThinkingTagPattern>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_._has_bits_);
-};
-
-ThinkingTagPattern::ThinkingTagPattern(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, ThinkingTagPattern_class_data_.base()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ThinkingTagPattern)
-}
-PROTOBUF_NDEBUG_INLINE ThinkingTagPattern::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::ThinkingTagPattern& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        opening_tag_(arena, from.opening_tag_),
-        closing_tag_(arena, from.closing_tag_) {}
-
-ThinkingTagPattern::ThinkingTagPattern(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const ThinkingTagPattern& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, ThinkingTagPattern_class_data_.base()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  ThinkingTagPattern* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ThinkingTagPattern)
-}
-PROTOBUF_NDEBUG_INLINE ThinkingTagPattern::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        opening_tag_(arena),
-        closing_tag_(arena) {}
-
-inline void ThinkingTagPattern::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-}
-ThinkingTagPattern::~ThinkingTagPattern() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.ThinkingTagPattern)
-  SharedDtor(*this);
-}
-inline void ThinkingTagPattern::SharedDtor(MessageLite& self) {
-  ThinkingTagPattern& this_ = static_cast<ThinkingTagPattern&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.opening_tag_.Destroy();
-  this_._impl_.closing_tag_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-inline void* PROTOBUF_NONNULL ThinkingTagPattern::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ThinkingTagPattern(arena);
-}
-constexpr auto ThinkingTagPattern::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ThinkingTagPattern),
-                                            alignof(ThinkingTagPattern));
-}
-constexpr auto ThinkingTagPattern::InternalGenerateClassData_() {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &_ThinkingTagPattern_default_instance_._instance,
-          &_table_.header,
-          nullptr,  // IsInitialized
-          &ThinkingTagPattern::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ThinkingTagPattern>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ThinkingTagPattern::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ThinkingTagPattern>(), &ThinkingTagPattern::ByteSizeLong,
-              &ThinkingTagPattern::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_._cached_size_),
-          false,
-      },
-      &ThinkingTagPattern::kDescriptorMethods,
-      &descriptor_table_llm_5foptions_2eproto,
-      nullptr,  // tracker
-  };
-}
-
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull ThinkingTagPattern_class_data_ =
-        ThinkingTagPattern::InternalGenerateClassData_();
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-ThinkingTagPattern::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&ThinkingTagPattern_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(ThinkingTagPattern_class_data_.tc_table);
-  return ThinkingTagPattern_class_data_.base();
-}
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<1, 2, 0, 64, 2>
-ThinkingTagPattern::_table_ = {
-  {
-    PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_._has_bits_),
-    0, // no _extensions_
-    2, 8,  // max_field_number, fast_idx_mask
-    offsetof(decltype(_table_), field_lookup_table),
-    4294967292,  // skipmap
-    offsetof(decltype(_table_), field_entries),
-    2,  // num_field_entries
-    0,  // num_aux_entries
-    offsetof(decltype(_table_), field_names),  // no aux_entries
-    ThinkingTagPattern_class_data_.base(),
-    nullptr,  // post_loop_handler
-    ::_pbi::TcParser::GenericFallback,  // fallback
-    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::runanywhere::v1::ThinkingTagPattern>(),  // to_prefetch
-    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-  }, {{
-    // string closing_tag = 2;
-    {::_pbi::TcParser::FastUS1,
-     {18, 1, 0,
-      PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.closing_tag_)}},
-    // string opening_tag = 1;
-    {::_pbi::TcParser::FastUS1,
-     {10, 0, 0,
-      PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.opening_tag_)}},
-  }}, {{
-    65535, 65535
-  }}, {{
-    // string opening_tag = 1;
-    {PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.opening_tag_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // string closing_tag = 2;
-    {PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.closing_tag_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-  }},
-  // no aux_entries
-  {{
-    "\41\13\13\0\0\0\0\0"
-    "runanywhere.v1.ThinkingTagPattern"
-    "opening_tag"
-    "closing_tag"
-  }},
-};
-PROTOBUF_NOINLINE void ThinkingTagPattern::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ThinkingTagPattern)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.opening_tag_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.closing_tag_.ClearNonDefaultToEmpty();
-    }
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL ThinkingTagPattern::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const ThinkingTagPattern& this_ = static_cast<const ThinkingTagPattern&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL ThinkingTagPattern::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const ThinkingTagPattern& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ThinkingTagPattern)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // string opening_tag = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_opening_tag().empty()) {
-      const ::std::string& _s = this_._internal_opening_tag();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ThinkingTagPattern.opening_tag");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // string closing_tag = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_closing_tag().empty()) {
-      const ::std::string& _s = this_._internal_closing_tag();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ThinkingTagPattern.closing_tag");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ThinkingTagPattern)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t ThinkingTagPattern::ByteSizeLong(const MessageLite& base) {
-  const ThinkingTagPattern& this_ = static_cast<const ThinkingTagPattern&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t ThinkingTagPattern::ByteSizeLong() const {
-  const ThinkingTagPattern& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ThinkingTagPattern)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // string opening_tag = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_opening_tag().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_opening_tag());
-      }
-    }
-    // string closing_tag = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_closing_tag().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_closing_tag());
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void ThinkingTagPattern::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                            const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this =
-      static_cast<ThinkingTagPattern*>(&to_msg);
-  auto& from = static_cast<const ThinkingTagPattern&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ThinkingTagPattern)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_opening_tag().empty()) {
-        _this->_internal_set_opening_tag(from._internal_opening_tag());
-      } else {
-        if (_this->_impl_.opening_tag_.IsDefault()) {
-          _this->_internal_set_opening_tag("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_closing_tag().empty()) {
-        _this->_internal_set_closing_tag(from._internal_closing_tag());
-      } else {
-        if (_this->_impl_.closing_tag_.IsDefault()) {
-          _this->_internal_set_closing_tag("");
-        }
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void ThinkingTagPattern::CopyFrom(const ThinkingTagPattern& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ThinkingTagPattern)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void ThinkingTagPattern::InternalSwap(ThinkingTagPattern* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.opening_tag_, &other->_impl_.opening_tag_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.closing_tag_, &other->_impl_.closing_tag_, arena);
-}
-
-::google::protobuf::Metadata ThinkingTagPattern::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================

@@ -909,7 +909,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ChatMessage final : public ::google
 
   // accessors -------------------------------------------------------
   enum : int {
-    kToolCallsJsonFieldNumber = 6,
     kToolCallsFieldNumber = 8,
     kAttachmentsFieldNumber = 14,
     kIdFieldNumber = 1,
@@ -924,31 +923,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ChatMessage final : public ::google
     kStatusFieldNumber = 11,
     kMetadataFieldNumber = 13,
   };
-  // repeated string tool_calls_json = 6;
-  [[nodiscard]] int tool_calls_json_size()
-      const;
-  private:
-  int _internal_tool_calls_json_size() const;
-
-  public:
-  void clear_tool_calls_json() ;
-  [[nodiscard]] const ::std::string& tool_calls_json(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_tool_calls_json(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_tool_calls_json(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_tool_calls_json();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_tool_calls_json(Arg_&& value, Args_... args);
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::std::string>&
-  tool_calls_json() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-  mutable_tool_calls_json();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_tool_calls_json() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_tool_calls_json();
-
-  public:
   // repeated .runanywhere.v1.ToolCall tool_calls = 8;
   [[nodiscard]] int tool_calls_size()
       const;
@@ -1153,8 +1127,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ChatMessage final : public ::google
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 14,
-                                   4, 113,
+  static const ::google::protobuf::internal::TcParseTable<4, 13,
+                                   4, 98,
                                    2>
       _table_;
 
@@ -1177,7 +1151,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ChatMessage final : public ::google
         const ChatMessage& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> tool_calls_json_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolCall > tool_calls_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ChatAttachment > attachments_;
     ::google::protobuf::internal::ArenaStringPtr id_;
@@ -2977,7 +2950,7 @@ inline void ChatMessage::clear_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.id_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000004U);
 }
 inline const ::std::string& ChatMessage::id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -2987,13 +2960,13 @@ inline const ::std::string& ChatMessage::id() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ChatMessage::set_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.id)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_id();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.id)
   return _s;
@@ -3013,10 +2986,10 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_id() {
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.id_.Set("", GetArena());
@@ -3026,9 +2999,9 @@ inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_id() {
 inline void ChatMessage::set_allocated_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.id_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.id_.IsDefault()) {
@@ -3042,7 +3015,7 @@ inline void ChatMessage::clear_role() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.role_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000800U);
+                  0x00000400U);
 }
 inline ::runanywhere::v1::MessageRole ChatMessage::role() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ChatMessage.role)
@@ -3050,7 +3023,7 @@ inline ::runanywhere::v1::MessageRole ChatMessage::role() const {
 }
 inline void ChatMessage::set_role(::runanywhere::v1::MessageRole value) {
   _internal_set_role(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.role)
 }
 inline ::runanywhere::v1::MessageRole ChatMessage::_internal_role() const {
@@ -3067,7 +3040,7 @@ inline void ChatMessage::clear_content() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.content_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000008U);
 }
 inline const ::std::string& ChatMessage::content() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3077,13 +3050,13 @@ inline const ::std::string& ChatMessage::content() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ChatMessage::set_content(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   _impl_.content_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.content)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_content()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::std::string* _s = _internal_mutable_content();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.content)
   return _s;
@@ -3103,10 +3076,10 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_content() 
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_content() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.content)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   auto* released = _impl_.content_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.content_.Set("", GetArena());
@@ -3116,9 +3089,9 @@ inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_content() {
 inline void ChatMessage::set_allocated_content(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   _impl_.content_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.content_.IsDefault()) {
@@ -3132,7 +3105,7 @@ inline void ChatMessage::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000400U);
+                  0x00000200U);
 }
 inline ::int64_t ChatMessage::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ChatMessage.timestamp_us)
@@ -3140,7 +3113,7 @@ inline ::int64_t ChatMessage::timestamp_us() const {
 }
 inline void ChatMessage::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.timestamp_us)
 }
 inline ::int64_t ChatMessage::_internal_timestamp_us() const {
@@ -3154,14 +3127,14 @@ inline void ChatMessage::_internal_set_timestamp_us(::int64_t value) {
 
 // optional string name = 5;
 inline bool ChatMessage::has_name() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
 }
 inline void ChatMessage::clear_name() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.name_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000010U);
 }
 inline const ::std::string& ChatMessage::name() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3171,13 +3144,13 @@ inline const ::std::string& ChatMessage::name() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ChatMessage::set_name(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   _impl_.name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.name)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_name()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::std::string* _s = _internal_mutable_name();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.name)
   return _s;
@@ -3197,10 +3170,10 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_name() {
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_name() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.name)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   auto* released = _impl_.name_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.name_.Set("", GetArena());
@@ -3210,9 +3183,9 @@ inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_name() {
 inline void ChatMessage::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   _impl_.name_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
@@ -3221,88 +3194,16 @@ inline void ChatMessage::set_allocated_name(::std::string* PROTOBUF_NULLABLE val
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ChatMessage.name)
 }
 
-// repeated string tool_calls_json = 6;
-inline int ChatMessage::_internal_tool_calls_json_size() const {
-  return _internal_tool_calls_json().size();
-}
-inline int ChatMessage::tool_calls_json_size() const {
-  return _internal_tool_calls_json_size();
-}
-inline void ChatMessage::clear_tool_calls_json() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.tool_calls_json_.Clear();
-  ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00000001U);
-}
-inline ::std::string* PROTOBUF_NONNULL ChatMessage::add_tool_calls_json()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::std::string* _s =
-      _internal_mutable_tool_calls_json()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.ChatMessage.tool_calls_json)
-  return _s;
-}
-inline const ::std::string& ChatMessage::tool_calls_json(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ChatMessage.tool_calls_json)
-  return _internal_tool_calls_json().Get(index);
-}
-inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_tool_calls_json(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.tool_calls_json)
-  return _internal_mutable_tool_calls_json()->Mutable(index);
-}
-template <typename Arg_, typename... Args_>
-inline void ChatMessage::set_tool_calls_json(int index, Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::AssignToString(*_internal_mutable_tool_calls_json()->Mutable(index), ::std::forward<Arg_>(value),
-                        args... );
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.tool_calls_json)
-}
-template <typename Arg_, typename... Args_>
-inline void ChatMessage::add_tool_calls_json(Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::google::protobuf::internal::AddToRepeatedPtrField(
-      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
-      *_internal_mutable_tool_calls_json(), ::std::forward<Arg_>(value),
-      args... );
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.ChatMessage.tool_calls_json)
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>& ChatMessage::tool_calls_json()
-    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.ChatMessage.tool_calls_json)
-  return _internal_tool_calls_json();
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-ChatMessage::mutable_tool_calls_json() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.ChatMessage.tool_calls_json)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_tool_calls_json();
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>&
-ChatMessage::_internal_tool_calls_json() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.tool_calls_json_;
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-ChatMessage::_internal_mutable_tool_calls_json() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.tool_calls_json_;
-}
-
 // optional string tool_call_id = 7;
 inline bool ChatMessage::has_tool_call_id() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void ChatMessage::clear_tool_call_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tool_call_id_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000020U);
 }
 inline const ::std::string& ChatMessage::tool_call_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3312,13 +3213,13 @@ inline const ::std::string& ChatMessage::tool_call_id() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ChatMessage::set_tool_call_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   _impl_.tool_call_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.tool_call_id)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_tool_call_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::std::string* _s = _internal_mutable_tool_call_id();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.tool_call_id)
   return _s;
@@ -3338,10 +3239,10 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_tool_call_
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_tool_call_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.tool_call_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   auto* released = _impl_.tool_call_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.tool_call_id_.Set("", GetArena());
@@ -3351,9 +3252,9 @@ inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_tool_call_id() {
 inline void ChatMessage::set_allocated_tool_call_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
   _impl_.tool_call_id_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.tool_call_id_.IsDefault()) {
@@ -3376,7 +3277,7 @@ inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL ChatMessage::mutable_tool_c
 }
 inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL ChatMessage::mutable_tool_calls()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.ChatMessage.tool_calls)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   return _internal_mutable_tool_calls();
@@ -3392,7 +3293,7 @@ inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL ChatMessage::add_tool_calls
   ::runanywhere::v1::ToolCall* _add =
       _internal_mutable_tool_calls()->InternalAddWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:runanywhere.v1.ChatMessage.tool_calls)
   return _add;
 }
@@ -3414,7 +3315,7 @@ ChatMessage::_internal_mutable_tool_calls() {
 
 // optional .runanywhere.v1.ToolResult tool_result = 9;
 inline bool ChatMessage::has_tool_result() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
   PROTOBUF_ASSUME(!value || _impl_.tool_result_ != nullptr);
   return value;
 }
@@ -3435,16 +3336,16 @@ inline void ChatMessage::unsafe_arena_set_allocated_tool_result(
   }
   _impl_.tool_result_ = reinterpret_cast<::runanywhere::v1::ToolResult*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ChatMessage.tool_result)
 }
 inline ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE ChatMessage::release_tool_result() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
   ::runanywhere::v1::ToolResult* released = _impl_.tool_result_;
   _impl_.tool_result_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3464,7 +3365,7 @@ inline ::runanywhere::v1::ToolResult* PROTOBUF_NULLABLE ChatMessage::unsafe_aren
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.tool_result)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
   ::runanywhere::v1::ToolResult* temp = _impl_.tool_result_;
   _impl_.tool_result_ = nullptr;
   return temp;
@@ -3479,7 +3380,7 @@ inline ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL ChatMessage::_internal_mu
 }
 inline ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL ChatMessage::mutable_tool_result()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   ::runanywhere::v1::ToolResult* _msg = _internal_mutable_tool_result();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.tool_result)
   return _msg;
@@ -3496,9 +3397,9 @@ inline void ChatMessage::set_allocated_tool_result(::runanywhere::v1::ToolResult
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
   }
 
   _impl_.tool_result_ = reinterpret_cast<::runanywhere::v1::ToolResult*>(value);
@@ -3507,14 +3408,14 @@ inline void ChatMessage::set_allocated_tool_result(::runanywhere::v1::ToolResult
 
 // optional string parent_id = 10;
 inline bool ChatMessage::has_parent_id() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   return value;
 }
 inline void ChatMessage::clear_parent_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.parent_id_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000040U);
 }
 inline const ::std::string& ChatMessage::parent_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3524,13 +3425,13 @@ inline const ::std::string& ChatMessage::parent_id() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ChatMessage::set_parent_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   _impl_.parent_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.parent_id)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_parent_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   ::std::string* _s = _internal_mutable_parent_id();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.parent_id)
   return _s;
@@ -3550,10 +3451,10 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_parent_id(
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_parent_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.parent_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000080U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   auto* released = _impl_.parent_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.parent_id_.Set("", GetArena());
@@ -3563,9 +3464,9 @@ inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_parent_id() {
 inline void ChatMessage::set_allocated_parent_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   }
   _impl_.parent_id_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.parent_id_.IsDefault()) {
@@ -3579,7 +3480,7 @@ inline void ChatMessage::clear_status() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.status_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00001000U);
+                  0x00000800U);
 }
 inline ::runanywhere::v1::ChatMessageStatus ChatMessage::status() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ChatMessage.status)
@@ -3587,7 +3488,7 @@ inline ::runanywhere::v1::ChatMessageStatus ChatMessage::status() const {
 }
 inline void ChatMessage::set_status(::runanywhere::v1::ChatMessageStatus value) {
   _internal_set_status(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.status)
 }
 inline ::runanywhere::v1::ChatMessageStatus ChatMessage::_internal_status() const {
@@ -3601,14 +3502,14 @@ inline void ChatMessage::_internal_set_status(::runanywhere::v1::ChatMessageStat
 
 // optional string error_message = 12;
 inline bool ChatMessage::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   return value;
 }
 inline void ChatMessage::clear_error_message() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_message_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000080U);
 }
 inline const ::std::string& ChatMessage::error_message() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3618,13 +3519,13 @@ inline const ::std::string& ChatMessage::error_message() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ChatMessage::set_error_message(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ChatMessage.error_message)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_error_message()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   ::std::string* _s = _internal_mutable_error_message();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ChatMessage.error_message)
   return _s;
@@ -3644,10 +3545,10 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_error_mess
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_error_message() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ChatMessage.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000100U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000080U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   auto* released = _impl_.error_message_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.error_message_.Set("", GetArena());
@@ -3657,9 +3558,9 @@ inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_error_message() {
 inline void ChatMessage::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   }
   _impl_.error_message_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
@@ -3679,7 +3580,7 @@ inline void ChatMessage::clear_metadata() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.metadata_.Clear();
   ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00002000U);
+                  0x00001000U);
 }
 inline const ::google::protobuf::Map<::std::string, ::std::string>& ChatMessage::_internal_metadata() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3695,7 +3596,7 @@ inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL C
 }
 inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL ChatMessage::mutable_metadata()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00002000U);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.ChatMessage.metadata)
   return _internal_mutable_metadata();
 }
@@ -3711,7 +3612,7 @@ inline void ChatMessage::clear_attachments() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.attachments_.Clear();
   ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000002U);
 }
 inline ::runanywhere::v1::ChatAttachment* PROTOBUF_NONNULL ChatMessage::mutable_attachments(int index)
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3720,7 +3621,7 @@ inline ::runanywhere::v1::ChatAttachment* PROTOBUF_NONNULL ChatMessage::mutable_
 }
 inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ChatAttachment>* PROTOBUF_NONNULL ChatMessage::mutable_attachments()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.ChatMessage.attachments)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   return _internal_mutable_attachments();
@@ -3736,7 +3637,7 @@ inline ::runanywhere::v1::ChatAttachment* PROTOBUF_NONNULL ChatMessage::add_atta
   ::runanywhere::v1::ChatAttachment* _add =
       _internal_mutable_attachments()->InternalAddWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:runanywhere.v1.ChatMessage.attachments)
   return _add;
 }

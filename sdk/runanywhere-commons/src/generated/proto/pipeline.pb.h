@@ -64,6 +64,8 @@ enum DeviceAffinity : int;
 extern const uint32_t DeviceAffinity_internal_data_[];
 enum EdgePolicy : int;
 extern const uint32_t EdgePolicy_internal_data_[];
+enum PipelineStatus : int;
+extern const uint32_t PipelineStatus_internal_data_[];
 class EdgeSpec;
 struct EdgeSpecDefaultTypeInternal;
 extern EdgeSpecDefaultTypeInternal _EdgeSpec_default_instance_;
@@ -76,6 +78,14 @@ class OperatorSpec_ParamsEntry_DoNotUse;
 struct OperatorSpec_ParamsEntry_DoNotUseDefaultTypeInternal;
 extern OperatorSpec_ParamsEntry_DoNotUseDefaultTypeInternal _OperatorSpec_ParamsEntry_DoNotUse_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull OperatorSpec_ParamsEntry_DoNotUse_class_data_;
+class PipelineCompileResult;
+struct PipelineCompileResultDefaultTypeInternal;
+extern PipelineCompileResultDefaultTypeInternal _PipelineCompileResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull PipelineCompileResult_class_data_;
+class PipelineHandle;
+struct PipelineHandleDefaultTypeInternal;
+extern PipelineHandleDefaultTypeInternal _PipelineHandle_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull PipelineHandle_class_data_;
 class PipelineOptions;
 struct PipelineOptionsDefaultTypeInternal;
 extern PipelineOptionsDefaultTypeInternal _PipelineOptions_default_instance_;
@@ -84,6 +94,14 @@ class PipelineSpec;
 struct PipelineSpecDefaultTypeInternal;
 extern PipelineSpecDefaultTypeInternal _PipelineSpec_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull PipelineSpec_class_data_;
+class PipelineStartRequest;
+struct PipelineStartRequestDefaultTypeInternal;
+extern PipelineStartRequestDefaultTypeInternal _PipelineStartRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull PipelineStartRequest_class_data_;
+class PipelineStopResult;
+struct PipelineStopResultDefaultTypeInternal;
+extern PipelineStopResultDefaultTypeInternal _PipelineStopResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull PipelineStopResult_class_data_;
 }  // namespace v1
 }  // namespace runanywhere
 namespace google {
@@ -94,6 +112,9 @@ internal::EnumTraitsT<::runanywhere::v1::DeviceAffinity_internal_data_>
 template <>
 internal::EnumTraitsT<::runanywhere::v1::EdgePolicy_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::EdgePolicy>;
+template <>
+internal::EnumTraitsT<::runanywhere::v1::PipelineStatus_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::PipelineStatus>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -184,10 +205,496 @@ template <>
   return ::google::protobuf::internal::ParseNamedEnum<EdgePolicy>(EdgePolicy_descriptor(), name,
                                            value);
 }
+enum PipelineStatus : int {
+  PIPELINE_STATUS_UNSPECIFIED = 0,
+  PIPELINE_STATUS_OK = 1,
+  PIPELINE_STATUS_FAILED = 2,
+  PipelineStatus_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  PipelineStatus_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t PipelineStatus_internal_data_[];
+inline constexpr PipelineStatus PipelineStatus_MIN =
+    static_cast<PipelineStatus>(0);
+inline constexpr PipelineStatus PipelineStatus_MAX =
+    static_cast<PipelineStatus>(2);
+[[nodiscard]] inline bool PipelineStatus_IsValid(int value) {
+  return 0 <= value && value <= 2;
+}
+inline constexpr int PipelineStatus_ARRAYSIZE = 2 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+PipelineStatus_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(PipelineStatus) {
+  return PipelineStatus_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& PipelineStatus_Name(T value) {
+  static_assert(::std::is_same<T, PipelineStatus>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to PipelineStatus_Name().");
+  return PipelineStatus_Name(static_cast<PipelineStatus>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& PipelineStatus_Name(PipelineStatus value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<PipelineStatus_descriptor, 0, 2>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool PipelineStatus_Parse(
+    ::absl::string_view name, PipelineStatus* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<PipelineStatus>(PipelineStatus_descriptor(), name,
+                                           value);
+}
 
 // ===================================================================
 
 
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PipelineStopResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.PipelineStopResult) */ {
+ public:
+  inline PipelineStopResult() : PipelineStopResult(nullptr) {}
+  ~PipelineStopResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(PipelineStopResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(PipelineStopResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr PipelineStopResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline PipelineStopResult(const PipelineStopResult& from) : PipelineStopResult(nullptr, from) {}
+  inline PipelineStopResult(PipelineStopResult&& from) noexcept
+      : PipelineStopResult(nullptr, ::std::move(from)) {}
+  inline PipelineStopResult& operator=(const PipelineStopResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PipelineStopResult& operator=(PipelineStopResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const PipelineStopResult& default_instance() {
+    return *reinterpret_cast<const PipelineStopResult*>(
+        &_PipelineStopResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 8;
+  friend void swap(PipelineStopResult& a, PipelineStopResult& b) { a.Swap(&b); }
+  inline void Swap(PipelineStopResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PipelineStopResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] PipelineStopResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<PipelineStopResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const PipelineStopResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const PipelineStopResult& from) { PipelineStopResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(PipelineStopResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.PipelineStopResult"; }
+
+  explicit PipelineStopResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  PipelineStopResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const PipelineStopResult& from);
+  PipelineStopResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, PipelineStopResult&& from) noexcept
+      : PipelineStopResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kHandleIdFieldNumber = 1,
+    kErrorMessageFieldNumber = 3,
+    kStatusFieldNumber = 2,
+    kErrorCodeFieldNumber = 4,
+  };
+  // string handle_id = 1;
+  void clear_handle_id() ;
+  [[nodiscard]] const ::std::string& handle_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_handle_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_handle_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_handle_id();
+  void set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_handle_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_handle_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_handle_id();
+
+  public:
+  // optional string error_message = 3;
+  [[nodiscard]] bool has_error_message()
+      const;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // .runanywhere.v1.PipelineStatus status = 2;
+  void clear_status() ;
+  [[nodiscard]] ::runanywhere::v1::PipelineStatus status() const;
+  void set_status(::runanywhere::v1::PipelineStatus value);
+
+  private:
+  ::runanywhere::v1::PipelineStatus _internal_status() const;
+  void _internal_set_status(::runanywhere::v1::PipelineStatus value);
+
+  public:
+  // int32 error_code = 4;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.PipelineStopResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 4,
+                                   0, 64,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const PipelineStopResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr handle_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    int status_;
+    ::int32_t error_code_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_pipeline_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull PipelineStopResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PipelineStartRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.PipelineStartRequest) */ {
+ public:
+  inline PipelineStartRequest() : PipelineStartRequest(nullptr) {}
+  ~PipelineStartRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(PipelineStartRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(PipelineStartRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr PipelineStartRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline PipelineStartRequest(const PipelineStartRequest& from) : PipelineStartRequest(nullptr, from) {}
+  inline PipelineStartRequest(PipelineStartRequest&& from) noexcept
+      : PipelineStartRequest(nullptr, ::std::move(from)) {}
+  inline PipelineStartRequest& operator=(const PipelineStartRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PipelineStartRequest& operator=(PipelineStartRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const PipelineStartRequest& default_instance() {
+    return *reinterpret_cast<const PipelineStartRequest*>(
+        &_PipelineStartRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 6;
+  friend void swap(PipelineStartRequest& a, PipelineStartRequest& b) { a.Swap(&b); }
+  inline void Swap(PipelineStartRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PipelineStartRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] PipelineStartRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<PipelineStartRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const PipelineStartRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const PipelineStartRequest& from) { PipelineStartRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(PipelineStartRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.PipelineStartRequest"; }
+
+  explicit PipelineStartRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  PipelineStartRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const PipelineStartRequest& from);
+  PipelineStartRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, PipelineStartRequest&& from) noexcept
+      : PipelineStartRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kHandleIdFieldNumber = 1,
+  };
+  // string handle_id = 1;
+  void clear_handle_id() ;
+  [[nodiscard]] const ::std::string& handle_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_handle_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_handle_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_handle_id();
+  void set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_handle_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_handle_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_handle_id();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.PipelineStartRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 1,
+                                   0, 53,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const PipelineStartRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr handle_id_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_pipeline_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull PipelineStartRequest_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PipelineOptions final : public ::google::protobuf::Message
@@ -408,6 +915,482 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PipelineOptions final : public ::go
 };
 
 extern const ::google::protobuf::internal::ClassDataFull PipelineOptions_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PipelineHandle final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.PipelineHandle) */ {
+ public:
+  inline PipelineHandle() : PipelineHandle(nullptr) {}
+  ~PipelineHandle() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(PipelineHandle* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(PipelineHandle));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr PipelineHandle(::google::protobuf::internal::ConstantInitialized);
+
+  inline PipelineHandle(const PipelineHandle& from) : PipelineHandle(nullptr, from) {}
+  inline PipelineHandle(PipelineHandle&& from) noexcept
+      : PipelineHandle(nullptr, ::std::move(from)) {}
+  inline PipelineHandle& operator=(const PipelineHandle& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PipelineHandle& operator=(PipelineHandle&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const PipelineHandle& default_instance() {
+    return *reinterpret_cast<const PipelineHandle*>(
+        &_PipelineHandle_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 7;
+  friend void swap(PipelineHandle& a, PipelineHandle& b) { a.Swap(&b); }
+  inline void Swap(PipelineHandle* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PipelineHandle* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] PipelineHandle* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<PipelineHandle>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const PipelineHandle& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const PipelineHandle& from) { PipelineHandle::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(PipelineHandle* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.PipelineHandle"; }
+
+  explicit PipelineHandle(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  PipelineHandle(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const PipelineHandle& from);
+  PipelineHandle(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, PipelineHandle&& from) noexcept
+      : PipelineHandle(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kHandleIdFieldNumber = 1,
+    kStateFieldNumber = 3,
+    kStatusFieldNumber = 2,
+  };
+  // string handle_id = 1;
+  void clear_handle_id() ;
+  [[nodiscard]] const ::std::string& handle_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_handle_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_handle_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_handle_id();
+  void set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_handle_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_handle_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_handle_id();
+
+  public:
+  // optional string state = 3;
+  [[nodiscard]] bool has_state()
+      const;
+  void clear_state() ;
+  [[nodiscard]] const ::std::string& state() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_state(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_state();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_state();
+  void set_allocated_state(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_state() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_state(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_state();
+
+  public:
+  // .runanywhere.v1.PipelineStatus status = 2;
+  void clear_status() ;
+  [[nodiscard]] ::runanywhere::v1::PipelineStatus status() const;
+  void set_status(::runanywhere::v1::PipelineStatus value);
+
+  private:
+  ::runanywhere::v1::PipelineStatus _internal_status() const;
+  void _internal_set_status(::runanywhere::v1::PipelineStatus value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.PipelineHandle)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 3,
+                                   0, 52,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const PipelineHandle& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr handle_id_;
+    ::google::protobuf::internal::ArenaStringPtr state_;
+    int status_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_pipeline_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull PipelineHandle_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED PipelineCompileResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.PipelineCompileResult) */ {
+ public:
+  inline PipelineCompileResult() : PipelineCompileResult(nullptr) {}
+  ~PipelineCompileResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(PipelineCompileResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(PipelineCompileResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr PipelineCompileResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline PipelineCompileResult(const PipelineCompileResult& from) : PipelineCompileResult(nullptr, from) {}
+  inline PipelineCompileResult(PipelineCompileResult&& from) noexcept
+      : PipelineCompileResult(nullptr, ::std::move(from)) {}
+  inline PipelineCompileResult& operator=(const PipelineCompileResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PipelineCompileResult& operator=(PipelineCompileResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const PipelineCompileResult& default_instance() {
+    return *reinterpret_cast<const PipelineCompileResult*>(
+        &_PipelineCompileResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 5;
+  friend void swap(PipelineCompileResult& a, PipelineCompileResult& b) { a.Swap(&b); }
+  inline void Swap(PipelineCompileResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PipelineCompileResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] PipelineCompileResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<PipelineCompileResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const PipelineCompileResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const PipelineCompileResult& from) { PipelineCompileResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(PipelineCompileResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.PipelineCompileResult"; }
+
+  explicit PipelineCompileResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  PipelineCompileResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const PipelineCompileResult& from);
+  PipelineCompileResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, PipelineCompileResult&& from) noexcept
+      : PipelineCompileResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kHandleIdFieldNumber = 1,
+    kErrorMessageFieldNumber = 3,
+    kStatusFieldNumber = 2,
+    kErrorCodeFieldNumber = 4,
+  };
+  // string handle_id = 1;
+  void clear_handle_id() ;
+  [[nodiscard]] const ::std::string& handle_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_handle_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_handle_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_handle_id();
+  void set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_handle_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_handle_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_handle_id();
+
+  public:
+  // optional string error_message = 3;
+  [[nodiscard]] bool has_error_message()
+      const;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // .runanywhere.v1.PipelineStatus status = 2;
+  void clear_status() ;
+  [[nodiscard]] ::runanywhere::v1::PipelineStatus status() const;
+  void set_status(::runanywhere::v1::PipelineStatus value);
+
+  private:
+  ::runanywhere::v1::PipelineStatus _internal_status() const;
+  void _internal_set_status(::runanywhere::v1::PipelineStatus value);
+
+  public:
+  // int32 error_code = 4;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.PipelineCompileResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<2, 4,
+                                   0, 67,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const PipelineCompileResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr handle_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    int status_;
+    ::int32_t error_code_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_pipeline_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull PipelineCompileResult_class_data_;
 // -------------------------------------------------------------------
 
 class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED OperatorSpec_ParamsEntry_DoNotUse final
@@ -2113,6 +3096,614 @@ inline void PipelineOptions::_internal_set_strict_validation(bool value) {
   _impl_.strict_validation_ = value;
 }
 
+// -------------------------------------------------------------------
+
+// PipelineCompileResult
+
+// string handle_id = 1;
+inline void PipelineCompileResult::clear_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& PipelineCompileResult::handle_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineCompileResult.handle_id)
+  return _internal_handle_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineCompileResult::set_handle_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.handle_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineCompileResult.handle_id)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineCompileResult::mutable_handle_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_handle_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineCompileResult.handle_id)
+  return _s;
+}
+inline const ::std::string& PipelineCompileResult::_internal_handle_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.handle_id_.Get();
+}
+inline void PipelineCompileResult::_internal_set_handle_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineCompileResult::_internal_mutable_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.handle_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineCompileResult::release_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineCompileResult.handle_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.handle_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineCompileResult::set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.handle_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.handle_id_.IsDefault()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineCompileResult.handle_id)
+}
+
+// .runanywhere.v1.PipelineStatus status = 2;
+inline void PipelineCompileResult::clear_status() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.status_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::runanywhere::v1::PipelineStatus PipelineCompileResult::status() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineCompileResult.status)
+  return _internal_status();
+}
+inline void PipelineCompileResult::set_status(::runanywhere::v1::PipelineStatus value) {
+  _internal_set_status(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineCompileResult.status)
+}
+inline ::runanywhere::v1::PipelineStatus PipelineCompileResult::_internal_status() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::PipelineStatus>(_impl_.status_);
+}
+inline void PipelineCompileResult::_internal_set_status(::runanywhere::v1::PipelineStatus value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.status_ = value;
+}
+
+// optional string error_message = 3;
+inline bool PipelineCompileResult::has_error_message() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void PipelineCompileResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& PipelineCompileResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineCompileResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineCompileResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineCompileResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineCompileResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineCompileResult.error_message)
+  return _s;
+}
+inline const ::std::string& PipelineCompileResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void PipelineCompileResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineCompileResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineCompileResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineCompileResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineCompileResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineCompileResult.error_message)
+}
+
+// int32 error_code = 4;
+inline void PipelineCompileResult::clear_error_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_code_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::int32_t PipelineCompileResult::error_code() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineCompileResult.error_code)
+  return _internal_error_code();
+}
+inline void PipelineCompileResult::set_error_code(::int32_t value) {
+  _internal_set_error_code(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineCompileResult.error_code)
+}
+inline ::int32_t PipelineCompileResult::_internal_error_code() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_code_;
+}
+inline void PipelineCompileResult::_internal_set_error_code(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_code_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// PipelineStartRequest
+
+// string handle_id = 1;
+inline void PipelineStartRequest::clear_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& PipelineStartRequest::handle_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineStartRequest.handle_id)
+  return _internal_handle_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineStartRequest::set_handle_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.handle_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineStartRequest.handle_id)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineStartRequest::mutable_handle_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_handle_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineStartRequest.handle_id)
+  return _s;
+}
+inline const ::std::string& PipelineStartRequest::_internal_handle_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.handle_id_.Get();
+}
+inline void PipelineStartRequest::_internal_set_handle_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineStartRequest::_internal_mutable_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.handle_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineStartRequest::release_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineStartRequest.handle_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.handle_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineStartRequest::set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.handle_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.handle_id_.IsDefault()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineStartRequest.handle_id)
+}
+
+// -------------------------------------------------------------------
+
+// PipelineHandle
+
+// string handle_id = 1;
+inline void PipelineHandle::clear_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& PipelineHandle::handle_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineHandle.handle_id)
+  return _internal_handle_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineHandle::set_handle_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.handle_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineHandle.handle_id)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineHandle::mutable_handle_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_handle_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineHandle.handle_id)
+  return _s;
+}
+inline const ::std::string& PipelineHandle::_internal_handle_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.handle_id_.Get();
+}
+inline void PipelineHandle::_internal_set_handle_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineHandle::_internal_mutable_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.handle_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineHandle::release_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineHandle.handle_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.handle_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineHandle::set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.handle_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.handle_id_.IsDefault()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineHandle.handle_id)
+}
+
+// .runanywhere.v1.PipelineStatus status = 2;
+inline void PipelineHandle::clear_status() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.status_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::runanywhere::v1::PipelineStatus PipelineHandle::status() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineHandle.status)
+  return _internal_status();
+}
+inline void PipelineHandle::set_status(::runanywhere::v1::PipelineStatus value) {
+  _internal_set_status(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineHandle.status)
+}
+inline ::runanywhere::v1::PipelineStatus PipelineHandle::_internal_status() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::PipelineStatus>(_impl_.status_);
+}
+inline void PipelineHandle::_internal_set_status(::runanywhere::v1::PipelineStatus value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.status_ = value;
+}
+
+// optional string state = 3;
+inline bool PipelineHandle::has_state() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void PipelineHandle::clear_state() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.state_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& PipelineHandle::state() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineHandle.state)
+  return _internal_state();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineHandle::set_state(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.state_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineHandle.state)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineHandle::mutable_state()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_state();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineHandle.state)
+  return _s;
+}
+inline const ::std::string& PipelineHandle::_internal_state() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.state_.Get();
+}
+inline void PipelineHandle::_internal_set_state(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.state_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineHandle::_internal_mutable_state() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.state_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineHandle::release_state() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineHandle.state)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.state_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.state_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineHandle::set_allocated_state(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.state_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.state_.IsDefault()) {
+    _impl_.state_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineHandle.state)
+}
+
+// -------------------------------------------------------------------
+
+// PipelineStopResult
+
+// string handle_id = 1;
+inline void PipelineStopResult::clear_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& PipelineStopResult::handle_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineStopResult.handle_id)
+  return _internal_handle_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineStopResult::set_handle_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.handle_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineStopResult.handle_id)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineStopResult::mutable_handle_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_handle_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineStopResult.handle_id)
+  return _s;
+}
+inline const ::std::string& PipelineStopResult::_internal_handle_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.handle_id_.Get();
+}
+inline void PipelineStopResult::_internal_set_handle_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.handle_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineStopResult::_internal_mutable_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.handle_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineStopResult::release_handle_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineStopResult.handle_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.handle_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineStopResult::set_allocated_handle_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.handle_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.handle_id_.IsDefault()) {
+    _impl_.handle_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineStopResult.handle_id)
+}
+
+// .runanywhere.v1.PipelineStatus status = 2;
+inline void PipelineStopResult::clear_status() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.status_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::runanywhere::v1::PipelineStatus PipelineStopResult::status() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineStopResult.status)
+  return _internal_status();
+}
+inline void PipelineStopResult::set_status(::runanywhere::v1::PipelineStatus value) {
+  _internal_set_status(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineStopResult.status)
+}
+inline ::runanywhere::v1::PipelineStatus PipelineStopResult::_internal_status() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::PipelineStatus>(_impl_.status_);
+}
+inline void PipelineStopResult::_internal_set_status(::runanywhere::v1::PipelineStatus value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.status_ = value;
+}
+
+// optional string error_message = 3;
+inline bool PipelineStopResult::has_error_message() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void PipelineStopResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& PipelineStopResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineStopResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void PipelineStopResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineStopResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineStopResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.PipelineStopResult.error_message)
+  return _s;
+}
+inline const ::std::string& PipelineStopResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void PipelineStopResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL PipelineStopResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE PipelineStopResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.PipelineStopResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void PipelineStopResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.PipelineStopResult.error_message)
+}
+
+// int32 error_code = 4;
+inline void PipelineStopResult::clear_error_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_code_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::int32_t PipelineStopResult::error_code() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.PipelineStopResult.error_code)
+  return _internal_error_code();
+}
+inline void PipelineStopResult::set_error_code(::int32_t value) {
+  _internal_set_error_code(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.PipelineStopResult.error_code)
+}
+inline ::int32_t PipelineStopResult::_internal_error_code() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_code_;
+}
+inline void PipelineStopResult::_internal_set_error_code(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_code_ = value;
+}
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -2136,6 +3727,12 @@ struct is_proto_enum<::runanywhere::v1::EdgePolicy> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EdgePolicy>() {
   return ::runanywhere::v1::EdgePolicy_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::PipelineStatus> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::PipelineStatus>() {
+  return ::runanywhere::v1::PipelineStatus_descriptor();
 }
 
 }  // namespace protobuf

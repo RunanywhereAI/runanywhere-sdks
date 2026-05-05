@@ -106,6 +106,7 @@
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/plugin/rac_plugin_loader.h"
 #include "rac/router/rac_hardware_abi.h"
+#include "rac/router/rac_router_capabilities.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -7009,6 +7010,53 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareSetAccelerat
     JNIEnv* env, jclass clazz, jint preferenceEnum) {
     return static_cast<jint>(
         rac_hardware_set_accelerator_preference(static_cast<int>(preferenceEnum)));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Engine Router Capabilities (Wave H-5 / KOT-12)
+//
+// `rac_router_frameworks_for_capability_proto` consumes a serialized
+// FrameworksForCapabilityRequest and returns a serialized
+// FrameworksForCapabilityResponse. Kotlin replaces the local when-mapping
+// in RunAnywhere+Frameworks.jvmAndroid.kt with one call here.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterFrameworksForCapabilityProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    const jsize length = requestProto != nullptr ? env->GetArrayLength(requestProto) : 0;
+    jbyte* requestBytes = length > 0 ? env->GetByteArrayElements(requestProto, nullptr) : nullptr;
+    if (length > 0 && requestBytes == nullptr) {
+        LOGe("racRouterFrameworksForCapabilityProto: failed to access JNI byte array");
+        return nullptr;
+    }
+
+    uint8_t* responseBytes = nullptr;
+    size_t responseSize = 0;
+    rac_result_t rc = rac_router_frameworks_for_capability_proto(
+        reinterpret_cast<const uint8_t*>(requestBytes), static_cast<size_t>(length),
+        &responseBytes, &responseSize);
+    if (requestBytes != nullptr) {
+        env->ReleaseByteArrayElements(requestProto, requestBytes, JNI_ABORT);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_router_frameworks_for_capability_proto_free(responseBytes);
+        LOGe("racRouterFrameworksForCapabilityProto: failed with code %d", rc);
+        return nullptr;
+    }
+
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(responseSize));
+    if (jArr == nullptr) {
+        rac_router_frameworks_for_capability_proto_free(responseBytes);
+        LOGe("racRouterFrameworksForCapabilityProto: failed to allocate jbyteArray");
+        return nullptr;
+    }
+    if (responseSize > 0) {
+        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(responseSize),
+                                reinterpret_cast<const jbyte*>(responseBytes));
+    }
+    rac_router_frameworks_for_capability_proto_free(responseBytes);
+    return env->ExceptionCheck() ? nullptr : jArr;
 }
 
 // =============================================================================

@@ -151,15 +151,6 @@ inline constexpr ChatMessage::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
-        tool_calls_json_{visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ChatMessage,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_calls_json_)>()
-        }
-        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
-        tool_calls_json_ {}
-        #endif
-        ,
-        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
         tool_calls_{visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::ChatMessage,
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_calls_)>()
@@ -470,13 +461,12 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_._has_bits_),
-        17, // hasbit index offset
+        16, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.role_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.content_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.name_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_calls_json_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_call_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_calls_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_result_),
@@ -485,20 +475,19 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.metadata_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.attachments_),
-        3,
-        11,
-        4,
+        2,
         10,
+        3,
+        9,
+        4,
         5,
         0,
+        8,
         6,
-        1,
-        9,
+        11,
         7,
         12,
-        8,
-        13,
-        2,
+        1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatGenerationRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
         5, // hasbit index offset
@@ -593,12 +582,12 @@ static const ::_pbi::MigrationSchema
         {7, sizeof(::runanywhere::v1::ChatAttachment)},
         {28, sizeof(::runanywhere::v1::ChatMessage_MetadataEntry_DoNotUse)},
         {35, sizeof(::runanywhere::v1::ChatMessage)},
-        {66, sizeof(::runanywhere::v1::ChatGenerationRequest_MetadataEntry_DoNotUse)},
-        {73, sizeof(::runanywhere::v1::ChatGenerationRequest)},
-        {88, sizeof(::runanywhere::v1::ChatGenerationResult)},
-        {105, sizeof(::runanywhere::v1::ChatStreamEvent)},
-        {132, sizeof(::runanywhere::v1::ChatConversationState_MetadataEntry_DoNotUse)},
-        {139, sizeof(::runanywhere::v1::ChatConversationState)},
+        {64, sizeof(::runanywhere::v1::ChatGenerationRequest_MetadataEntry_DoNotUse)},
+        {71, sizeof(::runanywhere::v1::ChatGenerationRequest)},
+        {86, sizeof(::runanywhere::v1::ChatGenerationResult)},
+        {103, sizeof(::runanywhere::v1::ChatStreamEvent)},
+        {130, sizeof(::runanywhere::v1::ChatConversationState_MetadataEntry_DoNotUse)},
+        {137, sizeof(::runanywhere::v1::ChatConversationState)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_ChatAttachment_MetadataEntry_DoNotUse_default_instance_._instance,
@@ -622,82 +611,86 @@ const char descriptor_table_protodef_chat_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIA
     "ze_bytes\030\007 \001(\003\022>\n\010metadata\030\010 \003(\0132,.runan"
     "ywhere.v1.ChatAttachment.MetadataEntry\032/"
     "\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 "
-    "\001(\t:\0028\001B\010\n\006sourceB\007\n\005_name\"\352\004\n\013ChatMessa"
+    "\001(\t:\0028\001B\010\n\006sourceB\007\n\005_name\"\350\004\n\013ChatMessa"
     "ge\022\n\n\002id\030\001 \001(\t\022)\n\004role\030\002 \001(\0162\033.runanywhe"
     "re.v1.MessageRole\022\017\n\007content\030\003 \001(\t\022\024\n\014ti"
-    "mestamp_us\030\004 \001(\003\022\021\n\004name\030\005 \001(\tH\000\210\001\001\022\027\n\017t"
-    "ool_calls_json\030\006 \003(\t\022\031\n\014tool_call_id\030\007 \001"
-    "(\tH\001\210\001\001\022,\n\ntool_calls\030\010 \003(\0132\030.runanywher"
-    "e.v1.ToolCall\0224\n\013tool_result\030\t \001(\0132\032.run"
-    "anywhere.v1.ToolResultH\002\210\001\001\022\026\n\tparent_id"
-    "\030\n \001(\tH\003\210\001\001\0221\n\006status\030\013 \001(\0162!.runanywher"
-    "e.v1.ChatMessageStatus\022\032\n\rerror_message\030"
-    "\014 \001(\tH\004\210\001\001\022;\n\010metadata\030\r \003(\0132).runanywhe"
-    "re.v1.ChatMessage.MetadataEntry\0223\n\013attac"
-    "hments\030\016 \003(\0132\036.runanywhere.v1.ChatAttach"
-    "ment\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005va"
-    "lue\030\002 \001(\t:\0028\001B\007\n\005_nameB\017\n\r_tool_call_idB"
-    "\016\n\014_tool_resultB\014\n\n_parent_idB\020\n\016_error_"
-    "message\"\203\003\n\025ChatGenerationRequest\022\022\n\nreq"
-    "uest_id\030\001 \001(\t\022\027\n\017conversation_id\030\002 \001(\t\022-"
-    "\n\010messages\030\003 \003(\0132\033.runanywhere.v1.ChatMe"
-    "ssage\022:\n\007options\030\004 \001(\0132$.runanywhere.v1."
-    "LLMGenerationOptionsH\000\210\001\001\022=\n\014tool_callin"
-    "g\030\005 \001(\0132\".runanywhere.v1.ToolCallingOpti"
-    "onsH\001\210\001\001\022E\n\010metadata\030\006 \003(\01323.runanywhere"
-    ".v1.ChatGenerationRequest.MetadataEntry\032"
-    "/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002"
-    " \001(\t:\0028\001B\n\n\010_optionsB\017\n\r_tool_calling\"\314\002"
-    "\n\024ChatGenerationResult\022\027\n\017conversation_i"
-    "d\030\001 \001(\t\022,\n\007message\030\002 \001(\0132\033.runanywhere.v"
-    "1.ChatMessage\022<\n\ngeneration\030\003 \001(\0132#.runa"
-    "nywhere.v1.LLMGenerationResultH\000\210\001\001\022,\n\nt"
-    "ool_calls\030\004 \003(\0132\030.runanywhere.v1.ToolCal"
-    "l\0220\n\014tool_results\030\005 \003(\0132\032.runanywhere.v1"
-    ".ToolResult\022\032\n\rerror_message\030\006 \001(\tH\001\210\001\001\022"
-    "\022\n\nerror_code\030\007 \001(\005B\r\n\013_generationB\020\n\016_e"
-    "rror_message\"\212\004\n\017ChatStreamEvent\022\013\n\003seq\030"
-    "\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_i"
-    "d\030\003 \001(\t\022\027\n\017conversation_id\030\004 \001(\t\0221\n\004kind"
-    "\030\005 \001(\0162#.runanywhere.v1.ChatStreamEventK"
-    "ind\022\022\n\005token\030\006 \001(\tH\000\210\001\001\0221\n\007message\030\007 \001(\013"
-    "2\033.runanywhere.v1.ChatMessageH\001\210\001\001\0220\n\tto"
-    "ol_call\030\010 \001(\0132\030.runanywhere.v1.ToolCallH"
-    "\002\210\001\001\0224\n\013tool_result\030\t \001(\0132\032.runanywhere."
-    "v1.ToolResultH\003\210\001\001\022>\n\014final_result\030\n \001(\013"
-    "2#.runanywhere.v1.LLMGenerationResultH\004\210"
-    "\001\001\022\032\n\rerror_message\030\013 \001(\tH\005\210\001\001\022\022\n\nerror_"
-    "code\030\014 \001(\005B\010\n\006_tokenB\n\n\010_messageB\014\n\n_too"
-    "l_callB\016\n\014_tool_resultB\017\n\r_final_resultB"
-    "\020\n\016_error_message\"\205\002\n\025ChatConversationSt"
-    "ate\022\027\n\017conversation_id\030\001 \001(\t\022-\n\010messages"
-    "\030\002 \003(\0132\033.runanywhere.v1.ChatMessage\022\025\n\rc"
-    "reated_at_ms\030\003 \001(\003\022\025\n\rupdated_at_ms\030\004 \001("
-    "\003\022E\n\010metadata\030\005 \003(\01323.runanywhere.v1.Cha"
-    "tConversationState.MetadataEntry\032/\n\rMeta"
-    "dataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028"
-    "\001*\252\001\n\013MessageRole\022\034\n\030MESSAGE_ROLE_UNSPEC"
-    "IFIED\020\000\022\025\n\021MESSAGE_ROLE_USER\020\001\022\032\n\026MESSAG"
-    "E_ROLE_ASSISTANT\020\002\022\027\n\023MESSAGE_ROLE_SYSTE"
-    "M\020\003\022\025\n\021MESSAGE_ROLE_TOOL\020\004\022\032\n\026MESSAGE_RO"
-    "LE_DEVELOPER\020\005*\341\001\n\021ChatMessageStatus\022#\n\037"
-    "CHAT_MESSAGE_STATUS_UNSPECIFIED\020\000\022\037\n\033CHA"
-    "T_MESSAGE_STATUS_PENDING\020\001\022!\n\035CHAT_MESSA"
-    "GE_STATUS_STREAMING\020\002\022 \n\034CHAT_MESSAGE_ST"
-    "ATUS_COMPLETE\020\003\022\036\n\032CHAT_MESSAGE_STATUS_F"
-    "AILED\020\004\022!\n\035CHAT_MESSAGE_STATUS_CANCELLED"
-    "\020\005*\251\002\n\023ChatStreamEventKind\022&\n\"CHAT_STREA"
-    "M_EVENT_KIND_UNSPECIFIED\020\000\022*\n&CHAT_STREA"
-    "M_EVENT_KIND_MESSAGE_STARTED\020\001\022 \n\034CHAT_S"
-    "TREAM_EVENT_KIND_TOKEN\020\002\022$\n CHAT_STREAM_"
-    "EVENT_KIND_TOOL_CALL\020\003\022&\n\"CHAT_STREAM_EV"
-    "ENT_KIND_TOOL_RESULT\020\004\022,\n(CHAT_STREAM_EV"
-    "ENT_KIND_MESSAGE_COMPLETED\020\005\022 \n\034CHAT_STR"
-    "EAM_EVENT_KIND_ERROR\020\006B\204\001\n\027ai.runanywher"
-    "e.proto.v1B\tChatProtoP\001Z<github.com/runa"
-    "nywhere/runanywhere-sdks/idl/v1;runanywh"
-    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
-    "roto3"
+    "mestamp_us\030\004 \001(\003\022\021\n\004name\030\005 \001(\tH\000\210\001\001\022\031\n\014t"
+    "ool_call_id\030\007 \001(\tH\001\210\001\001\022,\n\ntool_calls\030\010 \003"
+    "(\0132\030.runanywhere.v1.ToolCall\0224\n\013tool_res"
+    "ult\030\t \001(\0132\032.runanywhere.v1.ToolResultH\002\210"
+    "\001\001\022\026\n\tparent_id\030\n \001(\tH\003\210\001\001\0221\n\006status\030\013 \001"
+    "(\0162!.runanywhere.v1.ChatMessageStatus\022\032\n"
+    "\rerror_message\030\014 \001(\tH\004\210\001\001\022;\n\010metadata\030\r "
+    "\003(\0132).runanywhere.v1.ChatMessage.Metadat"
+    "aEntry\0223\n\013attachments\030\016 \003(\0132\036.runanywher"
+    "e.v1.ChatAttachment\032/\n\rMetadataEntry\022\013\n\003"
+    "key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\007\n\005_nameB\017\n"
+    "\r_tool_call_idB\016\n\014_tool_resultB\014\n\n_paren"
+    "t_idB\020\n\016_error_messageJ\004\010\006\020\007R\017tool_calls"
+    "_json\"\203\003\n\025ChatGenerationRequest\022\022\n\nreque"
+    "st_id\030\001 \001(\t\022\027\n\017conversation_id\030\002 \001(\t\022-\n\010"
+    "messages\030\003 \003(\0132\033.runanywhere.v1.ChatMess"
+    "age\022:\n\007options\030\004 \001(\0132$.runanywhere.v1.LL"
+    "MGenerationOptionsH\000\210\001\001\022=\n\014tool_calling\030"
+    "\005 \001(\0132\".runanywhere.v1.ToolCallingOption"
+    "sH\001\210\001\001\022E\n\010metadata\030\006 \003(\01323.runanywhere.v"
+    "1.ChatGenerationRequest.MetadataEntry\032/\n"
+    "\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001"
+    "(\t:\0028\001B\n\n\010_optionsB\017\n\r_tool_calling\"\314\002\n\024"
+    "ChatGenerationResult\022\027\n\017conversation_id\030"
+    "\001 \001(\t\022,\n\007message\030\002 \001(\0132\033.runanywhere.v1."
+    "ChatMessage\022<\n\ngeneration\030\003 \001(\0132#.runany"
+    "where.v1.LLMGenerationResultH\000\210\001\001\022,\n\ntoo"
+    "l_calls\030\004 \003(\0132\030.runanywhere.v1.ToolCall\022"
+    "0\n\014tool_results\030\005 \003(\0132\032.runanywhere.v1.T"
+    "oolResult\022\032\n\rerror_message\030\006 \001(\tH\001\210\001\001\022\022\n"
+    "\nerror_code\030\007 \001(\005B\r\n\013_generationB\020\n\016_err"
+    "or_message\"\212\004\n\017ChatStreamEvent\022\013\n\003seq\030\001 "
+    "\001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id\030"
+    "\003 \001(\t\022\027\n\017conversation_id\030\004 \001(\t\0221\n\004kind\030\005"
+    " \001(\0162#.runanywhere.v1.ChatStreamEventKin"
+    "d\022\022\n\005token\030\006 \001(\tH\000\210\001\001\0221\n\007message\030\007 \001(\0132\033"
+    ".runanywhere.v1.ChatMessageH\001\210\001\001\0220\n\ttool"
+    "_call\030\010 \001(\0132\030.runanywhere.v1.ToolCallH\002\210"
+    "\001\001\0224\n\013tool_result\030\t \001(\0132\032.runanywhere.v1"
+    ".ToolResultH\003\210\001\001\022>\n\014final_result\030\n \001(\0132#"
+    ".runanywhere.v1.LLMGenerationResultH\004\210\001\001"
+    "\022\032\n\rerror_message\030\013 \001(\tH\005\210\001\001\022\022\n\nerror_co"
+    "de\030\014 \001(\005B\010\n\006_tokenB\n\n\010_messageB\014\n\n_tool_"
+    "callB\016\n\014_tool_resultB\017\n\r_final_resultB\020\n"
+    "\016_error_message\"\205\002\n\025ChatConversationStat"
+    "e\022\027\n\017conversation_id\030\001 \001(\t\022-\n\010messages\030\002"
+    " \003(\0132\033.runanywhere.v1.ChatMessage\022\025\n\rcre"
+    "ated_at_ms\030\003 \001(\003\022\025\n\rupdated_at_ms\030\004 \001(\003\022"
+    "E\n\010metadata\030\005 \003(\01323.runanywhere.v1.ChatC"
+    "onversationState.MetadataEntry\032/\n\rMetada"
+    "taEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001*"
+    "\252\001\n\013MessageRole\022\034\n\030MESSAGE_ROLE_UNSPECIF"
+    "IED\020\000\022\025\n\021MESSAGE_ROLE_USER\020\001\022\032\n\026MESSAGE_"
+    "ROLE_ASSISTANT\020\002\022\027\n\023MESSAGE_ROLE_SYSTEM\020"
+    "\003\022\025\n\021MESSAGE_ROLE_TOOL\020\004\022\032\n\026MESSAGE_ROLE"
+    "_DEVELOPER\020\005*\341\001\n\021ChatMessageStatus\022#\n\037CH"
+    "AT_MESSAGE_STATUS_UNSPECIFIED\020\000\022\037\n\033CHAT_"
+    "MESSAGE_STATUS_PENDING\020\001\022!\n\035CHAT_MESSAGE"
+    "_STATUS_STREAMING\020\002\022 \n\034CHAT_MESSAGE_STAT"
+    "US_COMPLETE\020\003\022\036\n\032CHAT_MESSAGE_STATUS_FAI"
+    "LED\020\004\022!\n\035CHAT_MESSAGE_STATUS_CANCELLED\020\005"
+    "*\251\002\n\023ChatStreamEventKind\022&\n\"CHAT_STREAM_"
+    "EVENT_KIND_UNSPECIFIED\020\000\022*\n&CHAT_STREAM_"
+    "EVENT_KIND_MESSAGE_STARTED\020\001\022 \n\034CHAT_STR"
+    "EAM_EVENT_KIND_TOKEN\020\002\022$\n CHAT_STREAM_EV"
+    "ENT_KIND_TOOL_CALL\020\003\022&\n\"CHAT_STREAM_EVEN"
+    "T_KIND_TOOL_RESULT\020\004\022,\n(CHAT_STREAM_EVEN"
+    "T_KIND_MESSAGE_COMPLETED\020\005\022 \n\034CHAT_STREA"
+    "M_EVENT_KIND_ERROR\020\0062\263\001\n\004Chat\022W\n\010Generat"
+    "e\022%.runanywhere.v1.ChatGenerationRequest"
+    "\032$.runanywhere.v1.ChatGenerationResult\022R"
+    "\n\006Stream\022%.runanywhere.v1.ChatGeneration"
+    "Request\032\037.runanywhere.v1.ChatStreamEvent"
+    "0\001B\204\001\n\027ai.runanywhere.proto.v1B\tChatProt"
+    "oP\001Z<github.com/runanywhere/runanywhere-"
+    "sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Ru"
+    "nanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_chat_2eproto_deps[2] = {
@@ -708,7 +701,7 @@ static ::absl::once_flag descriptor_table_chat_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_chat_2eproto = {
     false,
     false,
-    3325,
+    3505,
     descriptor_table_protodef_chat_2eproto,
     "chat.proto",
     &descriptor_table_chat_2eproto_once,
@@ -1574,13 +1567,13 @@ void ChatMessage::clear_tool_calls() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tool_calls_.Clear();
   ClearHasBitForRepeated(_impl_._has_bits_[0],
-                  0x00000002U);
+                  0x00000001U);
 }
 void ChatMessage::clear_tool_result() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.tool_result_ != nullptr) _impl_.tool_result_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000200U);
+                  0x00000100U);
 }
 ChatMessage::ChatMessage(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -1597,15 +1590,6 @@ PROTOBUF_NDEBUG_INLINE ChatMessage::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::ChatMessage& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
-        tool_calls_json_{visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ChatMessage,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_calls_json_)>()
-        , from.tool_calls_json_}
-        #else
-        tool_calls_json_ { visibility, arena, from.tool_calls_json_ }
-        #endif
-        ,
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
         tool_calls_{visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::ChatMessage,
@@ -1654,7 +1638,7 @@ ChatMessage::ChatMessage(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.tool_result_ = (CheckHasBit(cached_has_bits, 0x00000200U))
+  _impl_.tool_result_ = (CheckHasBit(cached_has_bits, 0x00000100U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.tool_result_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
@@ -1671,15 +1655,6 @@ PROTOBUF_NDEBUG_INLINE ChatMessage::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
-        tool_calls_json_{visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ChatMessage,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ChatMessage, _impl_.tool_calls_json_)>()
-        }
-        #else
-        tool_calls_json_ { visibility, arena }
-        #endif
-        ,
         #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
         tool_calls_{visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::ChatMessage,
@@ -1757,10 +1732,6 @@ constexpr auto ChatMessage::InternalNewImpl_() {
 #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
 constexpr auto ChatMessage::InternalNewImpl_() {
   constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
-      PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_json_) +
-          decltype(ChatMessage::_impl_.tool_calls_json_)::
-              InternalGetArenaOffset(
-                  ::google::protobuf::Message::internal_visibility()),
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_) +
           decltype(ChatMessage::_impl_.tool_calls_)::
               InternalGetArenaOffset(
@@ -1817,16 +1788,16 @@ ChatMessage::GetClassData() const {
   return ChatMessage_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<4, 14, 4, 113, 2>
+const ::_pbi::TcParseTable<4, 13, 4, 98, 2>
 ChatMessage::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_._has_bits_),
     0, // no _extensions_
     14, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294950912,  // skipmap
+    4294950944,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    14,  // num_field_entries
+    13,  // num_field_entries
     4,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     ChatMessage_class_data_.base(),
@@ -1839,89 +1810,84 @@ ChatMessage::_table_ = {
     {::_pbi::TcParser::MiniParse, {}},
     // string id = 1;
     {::_pbi::TcParser::FastUS1,
-     {10, 3, 0,
+     {10, 2, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.id_)}},
     // .runanywhere.v1.MessageRole role = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ChatMessage, _impl_.role_), 11>(),
-     {16, 11, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ChatMessage, _impl_.role_), 10>(),
+     {16, 10, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.role_)}},
     // string content = 3;
     {::_pbi::TcParser::FastUS1,
-     {26, 4, 0,
+     {26, 3, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.content_)}},
     // int64 timestamp_us = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ChatMessage, _impl_.timestamp_us_), 10>(),
-     {32, 10, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ChatMessage, _impl_.timestamp_us_), 9>(),
+     {32, 9, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.timestamp_us_)}},
     // optional string name = 5;
     {::_pbi::TcParser::FastUS1,
-     {42, 5, 0,
+     {42, 4, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.name_)}},
-    // repeated string tool_calls_json = 6;
-    {::_pbi::TcParser::FastUR1,
-     {50, 0, 0,
-      PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_json_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // optional string tool_call_id = 7;
     {::_pbi::TcParser::FastUS1,
-     {58, 6, 0,
+     {58, 5, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_call_id_)}},
     // repeated .runanywhere.v1.ToolCall tool_calls = 8;
     {::_pbi::TcParser::FastMtR1,
-     {66, 1, 0,
+     {66, 0, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_)}},
     // optional .runanywhere.v1.ToolResult tool_result = 9;
     {::_pbi::TcParser::FastMtS1,
-     {74, 9, 1,
+     {74, 8, 1,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_result_)}},
     // optional string parent_id = 10;
     {::_pbi::TcParser::FastUS1,
-     {82, 7, 0,
+     {82, 6, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.parent_id_)}},
     // .runanywhere.v1.ChatMessageStatus status = 11;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ChatMessage, _impl_.status_), 12>(),
-     {88, 12, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ChatMessage, _impl_.status_), 11>(),
+     {88, 11, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.status_)}},
     // optional string error_message = 12;
     {::_pbi::TcParser::FastUS1,
-     {98, 8, 0,
+     {98, 7, 0,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.error_message_)}},
     {::_pbi::TcParser::MiniParse, {}},
     // repeated .runanywhere.v1.ChatAttachment attachments = 14;
     {::_pbi::TcParser::FastMtR1,
-     {114, 2, 2,
+     {114, 1, 2,
       PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.attachments_)}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // string id = 1;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // .runanywhere.v1.MessageRole role = 2;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.role_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.role_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // string content = 3;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.content_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.content_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // int64 timestamp_us = 4;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // optional string name = 5;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.name_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // repeated string tool_calls_json = 6;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_json_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.name_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // optional string tool_call_id = 7;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_call_id_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_call_id_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // repeated .runanywhere.v1.ToolCall tool_calls = 8;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_calls_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
     // optional .runanywhere.v1.ToolResult tool_result = 9;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_result_), _Internal::kHasBitsOffset + 9, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.tool_result_), _Internal::kHasBitsOffset + 8, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     // optional string parent_id = 10;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.parent_id_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.parent_id_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // .runanywhere.v1.ChatMessageStatus status = 11;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.status_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.status_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // optional string error_message = 12;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.error_message_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.error_message_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // map<string, string> metadata = 13;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.metadata_), _Internal::kHasBitsOffset + 13, 3, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.metadata_), _Internal::kHasBitsOffset + 12, 3, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
     // repeated .runanywhere.v1.ChatAttachment attachments = 14;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.attachments_), _Internal::kHasBitsOffset + 2, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.attachments_), _Internal::kHasBitsOffset + 1, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCall>()},
@@ -1931,12 +1897,11 @@ ChatMessage::_table_ = {
           1, 0, 9, 9, 0)},
   }},
   {{
-    "\32\2\0\7\0\4\17\14\0\0\11\0\15\10\0\0"
+    "\32\2\0\7\0\4\14\0\0\11\0\15\10\0\0\0"
     "runanywhere.v1.ChatMessage"
     "id"
     "content"
     "name"
-    "tool_calls_json"
     "tool_call_id"
     "parent_id"
     "error_message"
@@ -1953,44 +1918,39 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   cached_has_bits = _impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
-      _impl_.tool_calls_json_.Clear();
-    }
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
       _impl_.tool_calls_.Clear();
     }
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
       _impl_.attachments_.Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.id_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.content_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       _impl_.name_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.tool_call_id_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       _impl_.parent_id_.ClearNonDefaultToEmpty();
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       _impl_.error_message_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      ABSL_DCHECK(_impl_.tool_result_ != nullptr);
-      _impl_.tool_result_->Clear();
-    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00003c00U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    ABSL_DCHECK(_impl_.tool_result_ != nullptr);
+    _impl_.tool_result_->Clear();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00001e00U)) {
     ::memset(&_impl_.timestamp_us_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.status_) -
         reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.status_));
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00001000U)) {
       _impl_.metadata_.Clear();
     }
   }
@@ -2018,7 +1978,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // string id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (!this_._internal_id().empty()) {
       const ::std::string& _s = this_._internal_id();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -2028,7 +1988,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // .runanywhere.v1.MessageRole role = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (this_._internal_role() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2037,7 +1997,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // string content = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (!this_._internal_content().empty()) {
       const ::std::string& _s = this_._internal_content();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -2047,7 +2007,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // int64 timestamp_us = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
@@ -2056,25 +2016,15 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // optional string name = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     const ::std::string& _s = this_._internal_name();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ChatMessage.name");
     target = stream->WriteStringMaybeAliased(5, _s, target);
   }
 
-  // repeated string tool_calls_json = 6;
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
-    for (int i = 0, n = this_._internal_tool_calls_json_size(); i < n; ++i) {
-      const auto& s = this_._internal_tool_calls_json().Get(i);
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ChatMessage.tool_calls_json");
-      target = stream->WriteString(6, s, target);
-    }
-  }
-
   // optional string tool_call_id = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     const ::std::string& _s = this_._internal_tool_call_id();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ChatMessage.tool_call_id");
@@ -2082,7 +2032,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // repeated .runanywhere.v1.ToolCall tool_calls = 8;
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
     for (unsigned i = 0, n = static_cast<unsigned>(
                              this_._internal_tool_calls_size());
          i < n; i++) {
@@ -2095,14 +2045,14 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // optional .runanywhere.v1.ToolResult tool_result = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         9, *this_._impl_.tool_result_, this_._impl_.tool_result_->GetCachedSize(), target,
         stream);
   }
 
   // optional string parent_id = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     const ::std::string& _s = this_._internal_parent_id();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ChatMessage.parent_id");
@@ -2110,7 +2060,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // .runanywhere.v1.ChatMessageStatus status = 11;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_status() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2119,7 +2069,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // optional string error_message = 12;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     const ::std::string& _s = this_._internal_error_message();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ChatMessage.error_message");
@@ -2127,7 +2077,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // map<string, string> metadata = 13;
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00001000U)) {
     if (!this_._internal_metadata().empty()) {
       using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
       using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
@@ -2162,7 +2112,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   }
 
   // repeated .runanywhere.v1.ChatAttachment attachments = 14;
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
     for (unsigned i = 0, n = static_cast<unsigned>(
                              this_._internal_attachments_size());
          i < n; i++) {
@@ -2200,93 +2150,84 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // repeated string tool_calls_json = 6;
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
-      total_size +=
-          1 * ::google::protobuf::internal::FromIntSize(this_._internal_tool_calls_json().size());
-      for (int i = 0, n = this_._internal_tool_calls_json().size(); i < n; ++i) {
-        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
-            this_._internal_tool_calls_json().Get(i));
-      }
-    }
     // repeated .runanywhere.v1.ToolCall tool_calls = 8;
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_tool_calls_size();
       for (const auto& msg : this_._internal_tool_calls()) {
         total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
       }
     }
     // repeated .runanywhere.v1.ChatAttachment attachments = 14;
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
       total_size += 1UL * this_._internal_attachments_size();
       for (const auto& msg : this_._internal_attachments()) {
         total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
       }
     }
     // string id = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!this_._internal_id().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_id());
       }
     }
     // string content = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!this_._internal_content().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_content());
       }
     }
     // optional string name = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_name());
     }
     // optional string tool_call_id = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_tool_call_id());
     }
     // optional string parent_id = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_parent_id());
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
     // optional string error_message = 12;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_error_message());
     }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
     // optional .runanywhere.v1.ToolResult tool_result = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.tool_result_);
     }
     // int64 timestamp_us = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
     // .runanywhere.v1.MessageRole role = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (this_._internal_role() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_role());
       }
     }
     // .runanywhere.v1.ChatMessageStatus status = 11;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_status() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_status());
       }
     }
     // map<string, string> metadata = 13;
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00001000U)) {
       total_size +=
           1 * ::google::protobuf::internal::FromIntSize(this_._internal_metadata_size());
       for (const auto& entry : this_._internal_metadata()) {
@@ -2317,21 +2258,16 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg,
   cached_has_bits = from._impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
-      _this->_internal_mutable_tool_calls_json()->InternalMergeFromWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), arena,
-          from._internal_tool_calls_json());
-    }
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
       _this->_internal_mutable_tool_calls()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_tool_calls());
     }
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000002U)) {
       _this->_internal_mutable_attachments()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_attachments());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!from._internal_id().empty()) {
         _this->_internal_set_id(from._internal_id());
       } else {
@@ -2340,7 +2276,7 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!from._internal_content().empty()) {
         _this->_internal_set_content(from._internal_content());
       } else {
@@ -2349,21 +2285,21 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       _this->_internal_set_name(from._internal_name());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _this->_internal_set_tool_call_id(from._internal_tool_call_id());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       _this->_internal_set_parent_id(from._internal_parent_id());
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       _this->_internal_set_error_message(from._internal_error_message());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       ABSL_DCHECK(from._impl_.tool_result_ != nullptr);
       if (_this->_impl_.tool_result_ == nullptr) {
         _this->_impl_.tool_result_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.tool_result_);
@@ -2371,22 +2307,22 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.tool_result_->MergeFrom(*from._impl_.tool_result_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (from._internal_role() != 0) {
         _this->_impl_.role_ = from._impl_.role_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_status() != 0) {
         _this->_impl_.status_ = from._impl_.status_;
       }
     }
-    if (CheckHasBitForRepeated(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00001000U)) {
       _this->_impl_.metadata_.MergeFrom(from._impl_.metadata_);
     }
   }
@@ -2409,7 +2345,6 @@ void ChatMessage::InternalSwap(ChatMessage* PROTOBUF_RESTRICT PROTOBUF_NONNULL o
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  _impl_.tool_calls_json_.InternalSwap(&other->_impl_.tool_calls_json_);
   _impl_.tool_calls_.InternalSwap(&other->_impl_.tool_calls_);
   _impl_.attachments_.InternalSwap(&other->_impl_.attachments_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.id_, &other->_impl_.id_, arena);

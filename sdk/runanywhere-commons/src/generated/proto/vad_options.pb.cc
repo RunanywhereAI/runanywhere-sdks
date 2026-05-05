@@ -640,22 +640,22 @@ const char descriptor_table_protodef_vad_5foptions_2eproto[] ABSL_ATTRIBUTE_SECT
     "ING\020\003*|\n\020VADAudioEncoding\022\"\n\036VAD_AUDIO_E"
     "NCODING_UNSPECIFIED\020\000\022!\n\035VAD_AUDIO_ENCOD"
     "ING_PCM_F32_LE\020\001\022!\n\035VAD_AUDIO_ENCODING_P"
-    "CM_S16_LE\020\002*\224\002\n\022VADStreamEventKind\022%\n!VA"
+    "CM_S16_LE\020\002*\270\002\n\022VADStreamEventKind\022%\n!VA"
     "D_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035VAD"
     "_STREAM_EVENT_KIND_STARTED\020\001\022\037\n\033VAD_STRE"
     "AM_EVENT_KIND_FRAME\020\002\022)\n%VAD_STREAM_EVEN"
     "T_KIND_SPEECH_ACTIVITY\020\003\022$\n VAD_STREAM_E"
     "VENT_KIND_STATISTICS\020\004\022!\n\035VAD_STREAM_EVE"
     "NT_KIND_STOPPED\020\005\022\037\n\033VAD_STREAM_EVENT_KI"
-    "ND_ERROR\020\0062\242\001\n\003VAD\022L\n\014ProcessFrame\022!.run"
-    "anywhere.v1.VADProcessRequest\032\031.runanywh"
-    "ere.v1.VADResult\022M\n\006Stream\022!.runanywhere"
-    ".v1.VADProcessRequest\032\036.runanywhere.v1.V"
-    "ADStreamEvent0\001B\212\001\n\027ai.runanywhere.proto"
-    ".v1B\017VadOptionsProtoP\001Z<github.com/runan"
-    "ywhere/runanywhere-sdks/idl/v1;runanywhe"
-    "rev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pr"
-    "oto3"
+    "ND_ERROR\020\006\022\"\n\036VAD_STREAM_EVENT_KIND_BARG"
+    "E_IN\020\0072\242\001\n\003VAD\022L\n\014ProcessFrame\022!.runanyw"
+    "here.v1.VADProcessRequest\032\031.runanywhere."
+    "v1.VADResult\022M\n\006Stream\022!.runanywhere.v1."
+    "VADProcessRequest\032\036.runanywhere.v1.VADSt"
+    "reamEvent0\001B\212\001\n\027ai.runanywhere.proto.v1B"
+    "\017VadOptionsProtoP\001Z<github.com/runanywhe"
+    "re/runanywhere-sdks/idl/v1;runanywherev1"
+    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_vad_5foptions_2eproto_deps[1] = {
@@ -665,7 +665,7 @@ static ::absl::once_flag descriptor_table_vad_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vad_5foptions_2eproto = {
     false,
     false,
-    3364,
+    3400,
     descriptor_table_protodef_vad_5foptions_2eproto,
     "vad_options.proto",
     &descriptor_table_vad_5foptions_2eproto_once,
@@ -700,7 +700,7 @@ VADStreamEventKind_descriptor() {
   return file_level_enum_descriptors_vad_5foptions_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t VADStreamEventKind_internal_data_[] = {
-    458752u, 0u, };
+    524288u, 0u, };
 // ===================================================================
 
 class VADConfiguration::_Internal {

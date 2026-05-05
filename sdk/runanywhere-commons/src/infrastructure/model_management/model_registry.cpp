@@ -1194,7 +1194,7 @@ static bool model_matches_search_text(const ModelInfo& model,
                 contains_text_case_insensitive(file.relative_path(), needle_lower) ||
                 contains_text_case_insensitive(file.destination_path(), needle_lower) ||
                 contains_text_case_insensitive(file.local_path(), needle_lower) ||
-                contains_text_case_insensitive(file.checksum(), needle_lower)) {
+                contains_text_case_insensitive(file.checksum_sha256(), needle_lower)) {
                 return true;
             }
         }

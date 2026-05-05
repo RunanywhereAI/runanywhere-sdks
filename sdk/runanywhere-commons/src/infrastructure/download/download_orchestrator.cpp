@@ -323,9 +323,6 @@ std::string checksum_from_descriptor(const rav1::ModelFileDescriptor& file) {
     if (file.has_checksum_sha256() && !file.checksum_sha256().empty()) {
         return file.checksum_sha256();
     }
-    if (file.has_checksum() && !file.checksum().empty()) {
-        return file.checksum();
-    }
     return "";
 }
 
